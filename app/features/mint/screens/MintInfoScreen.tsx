@@ -546,7 +546,7 @@ export function MintInfoScreen() {
               appeared only once a score was known moved the chart under it.
               The reviews star used to be a header action, invisible to the
               accepter flow and to anyone who did not know to look up there. */}
-            <HStack justify="center" gap={28} style={{ marginTop: 16 }}>
+            <HStack className="mt-4 justify-center gap-7">
               <CircleActionButton
                 icon="ic:round-star"
                 systemIcon="star"

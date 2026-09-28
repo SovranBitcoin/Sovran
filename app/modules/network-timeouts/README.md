@@ -15,3 +15,8 @@ the effective limits and sit under this value.
 
 Remove when Expo lets the idle timeout be configured from JavaScript, or when
 Routstr nodes stream `X-Cashu` responses instead of buffering them.
+
+Knip ignores this dependency because Expo autolinking loads the native module
+without a JavaScript import. `expo-modules-autolinking resolve --platform apple`
+resolves `NetworkTimeoutsModule` and the `NetworkTimeouts` pod from this package.
+Keep the dependency and this exception until the native module is removed.

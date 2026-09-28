@@ -35,6 +35,7 @@
       "ignoreDependencies": [
         "buffer",
         "expo-screen-corner-radius",
+        "network-timeouts",
         "react-native-fast-squircle"
       ],
       "ignoreBinaries": ["claude", "eas", "gh", "tsx", "python3"]

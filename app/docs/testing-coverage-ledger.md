@@ -517,3 +517,15 @@ of disk space. See [the capture workflow and audit](testing-store-screenshots.md
 Both validate and pass fake-driver orchestration smoke. Native AX reachability,
 keyboard dismissal, scrolling and back navigation remain unverified on both
 platforms; these results are not product proof.
+
+## AI funding entry and mint history navigation
+
+- `ai.add-funds`: opens a provider's Add funds action, enters a fixed receive
+  amount through the semantic keypad control, then returns to the wallet without
+  requesting a quote or paying the provider.
+- `mint.info.history`: enters a selected mint's details, opens its update history,
+  and returns to the wallet. An empty history is a valid result.
+
+Both scenarios target iOS and Android. Their authoring and fake-driver checks
+cover harness orchestration only; native execution remains unverified on both
+platforms and is required to establish product behavior.

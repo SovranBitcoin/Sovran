@@ -159,6 +159,17 @@ describe('wallet surface e2e selectors', () => {
     expect(policy).toContain('testID={`notification-policy-${option.toLowerCase()}`}');
   });
 
+  it.each([
+    ['Segmented', 'segmented', 'segmentsAuto'],
+    ['Timeline', 'timeline', 'timelineAuto'],
+  ])('exposes the %s autoplay control as native checked state', (screen, id, state) => {
+    const source = read(`features/settings/screens/SettingsDesignSystem${screen}Screen.tsx`);
+    const control = source.slice(source.indexOf(`testID="design-system-${id}-auto"`));
+    const props = control.slice(0, control.indexOf('onPress='));
+    expect(props).toContain('accessibilityRole="switch"');
+    expect(props).toContain(`accessibilityState={{ checked: ${state} }}`);
+  });
+
   it('drives the Design System through actionable outer-row selectors', () => {
     const settings = read('features/settings/screens/SettingsScreen.tsx');
     expect(settings).toContain('testID="settings-design-system-row"');
