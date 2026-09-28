@@ -264,6 +264,8 @@ export interface RoutstrMessage {
    * messages from before the cost-tracking change shipped.
    */
   costSats?: number;
+  /** Model names at send time, retained with an answer that used a fallback. */
+  modelSwitch?: { from: string; to: string };
   /**
    * Optimistic dispatch flag for user messages — `true` between submit and
    * the moment the streaming round-trip resolves (success or error).
@@ -590,6 +592,7 @@ interface RoutstrActions {
       thinkingDurationSec?: number;
       reasoningContent?: string;
       costSats?: number;
+      modelSwitch?: RoutstrMessage['modelSwitch'];
     }
   ) => void;
   removeMessages: (ids: Set<string>) => void;
@@ -715,6 +718,7 @@ const PersistedRoutstrMessage = z.looseObject({
   thinkingDurationSec: z.number().nonnegative().optional(),
   reasoningContent: z.string().max(65_536).optional(),
   costSats: z.number().int().nonnegative().optional(),
+  modelSwitch: z.object({ from: z.string(), to: z.string() }).optional().catch(undefined),
   pending: z.boolean().optional(),
 });
 
@@ -1122,6 +1126,7 @@ export const useRoutstrStore = create<RoutstrStore>()(
                   thinkingDurationSec: fields.thinkingDurationSec ?? msg.thinkingDurationSec,
                   reasoningContent: fields.reasoningContent ?? msg.reasoningContent,
                   costSats: fields.costSats ?? msg.costSats,
+                  modelSwitch: fields.modelSwitch ?? msg.modelSwitch,
                 }
               : msg
           )

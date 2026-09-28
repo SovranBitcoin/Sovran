@@ -33,7 +33,9 @@ import {
   getProviderById,
   getTierById,
   resolveCandidateEntries,
+  resolveSelectedEntry,
   selectFromChain,
+  slotForModel,
   sendMaxTokens,
 } from '../lib/format';
 import { confirmSpend } from '../lib/spendConfirm';
@@ -217,6 +219,7 @@ export function useAiSend() {
       // deliberately no hardcoded id to guess at anymore, so surface it
       // instead of burning a round-trip on a dead model.
       const lineup = storeState.lineup ?? storeState.lastKnownLineup?.lineup ?? null;
+      const displayedModel = resolveSelectedEntry(provider.id, tier.id, balanceSats, lineup);
       // ONE chain, built once and never widened. Its `sealed` tag carries the
       // user's encryption choice through every later narrowing below — the
       // vision filter and the post-repoint recovery both derive from it, and
@@ -484,6 +487,24 @@ export function useAiSend() {
             costPromise = result.cost;
             modelToUse = candidate;
             sentMaxTokens = maxTokens;
+            const current = useRoutstrStore.getState();
+            // Adopt an accepted fallback without overwriting a newer choice.
+            if (
+              displayedModel?.modelId !== candidate &&
+              !controller.signal.aborted &&
+              useProfileStore.getState().activeAccountIndex === profile &&
+              current.currentSessionId === storeState.currentSessionId &&
+              current.nodeBaseUrl === requestNode &&
+              current.selectedProvider === provider.id &&
+              current.selectedTier === tier.id
+            ) {
+              const slot = slotForModel(
+                current.lineup ?? current.lastKnownLineup?.lineup ?? null,
+                candidate,
+                tier.id
+              );
+              if (slot) current.setSelectedSlot(slot);
+            }
             if (i > 0) {
               aiLog.warn('ai.send.fallback_used', {
                 flowId,
@@ -794,6 +815,16 @@ export function useAiSend() {
           finalizeAssistantMessage(assistantMessageId, {
             ...finalizePayload,
             thinkingDurationSec: thinkingSec,
+            ...(displayedModel && displayedModel.modelId !== modelToUse
+              ? {
+                  modelSwitch: {
+                    from: displayedModel.displayName,
+                    to:
+                      candidateEntries.find((entry) => entry.modelId === modelToUse)?.displayName ??
+                      getModelDisplayName(modelToUse, cachedModels),
+                  },
+                }
+              : {}),
             ...(costSats != null && costSats > 0 ? { costSats } : {}),
           });
         }

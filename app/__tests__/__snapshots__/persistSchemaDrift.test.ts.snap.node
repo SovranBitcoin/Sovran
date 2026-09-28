@@ -5122,6 +5122,21 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
                       "maxLength": 128,
                       "type": "string",
                     },
+                    "modelSwitch": {
+                      "properties": {
+                        "from": {
+                          "type": "string",
+                        },
+                        "to": {
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "from",
+                        "to",
+                      ],
+                      "type": "object",
+                    },
                     "parentId": {
                       "anyOf": [
                         {
