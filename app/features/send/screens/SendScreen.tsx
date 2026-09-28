@@ -25,7 +25,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Platform, StyleSheet, TextInput } from 'react-native';
+import { StyleSheet, TextInput } from 'react-native';
 import { ScreenScrollView } from '@/shared/ui/composed/ScreenScrollView';
 import { usePaymentFlowMachine } from 'wallet/react';
 import { describeDestination, defaultDetectors, parsePaymentInput } from 'wallet';
@@ -62,8 +62,7 @@ import type { NostrPubkeyHex } from '@/shared/lib/protocolIds';
 import { normalizeRecentPersonPubkey } from '@/shared/stores/profile/recentPeopleStore';
 import type { NostrSearchResult } from '@/shared/lib/apiClient';
 import { useNfcSupported } from '@/shared/lib/nfc';
-import { useNfcTapStore } from '@/shared/stores/runtime/nfcTapStore';
-import { showActionSheet } from '@/shared/lib/popup';
+import { runTapToPayScan } from '@/features/send/lib/runTapToPayScan';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { paymentLog } from '@/shared/lib/logger';
@@ -276,16 +275,11 @@ export function SendScreen({ unit }: { unit: string }) {
   }, [machine]);
 
   const nfcSupported = useNfcSupported();
-  const nfcArmed = useNfcTapStore((s) => s.armed);
   const handleNfc = useCallback(() => {
-    paymentLog.info('send.method.nfc', { armed: nfcArmed });
-    if (Platform.OS === 'android' && nfcArmed) {
-      showActionSheet('nfc-tap', {});
-      return;
-    }
+    paymentLog.info('send.method.nfc');
     clearPaymentContext('send.nfc');
-    void machine.scan?.(undefined, { source: 'nfc' });
-  }, [machine, nfcArmed]);
+    void runTapToPayScan(() => machine.scan?.(undefined, { source: 'nfc' }));
+  }, [machine]);
 
   const handleNutDrop = useCallback(() => {
     paymentLog.info('send.method.nut_drop');
