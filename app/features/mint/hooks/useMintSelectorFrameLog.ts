@@ -70,6 +70,7 @@ export function useMintSelectorFrameLog({
   const previousKeyRef = useRef('');
 
   useEffect(() => {
+    if (!paymentLog.isLevelEnabled('info')) return;
     // Plain assignment, not `??=`: the React Compiler cannot lower a logical
     // assignment operator and bails out of the whole hook when it sees one,
     // which leaves the mint selector rendering unmemoized.

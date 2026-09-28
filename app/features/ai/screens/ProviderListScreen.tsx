@@ -4,7 +4,7 @@ import { View } from 'react-native';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { getAiProviders } from '@/shared/lib/apiClient';
-import { aiLog } from '@/shared/lib/logger';
+import { aiLog, SHOW_LOGS } from '@/shared/lib/logger';
 import { buildProviderInfoHref } from '@/shared/lib/nav/providerInfoRoutes';
 import { paramPopup } from '@/shared/lib/popup';
 import { discoverProviders } from '@/shared/lib/routstr/discovery';
@@ -134,19 +134,21 @@ function ProviderListRow({
   // Recorded during render, deliberately: this is a statement about what THIS
   // render put on screen, and an effect would report the value the row settled
   // on rather than each value it showed on the way there.
-  recordRowPaint({
-    baseUrl: row.baseUrl,
-    title: row.name,
-    titleIsHost: row.nameIsHost,
-    status: row.status,
-    statusSource: row.statusSource,
-    followers: profile?.followers ?? row.followers ?? null,
-    followersFromProfile: typeof profile?.followers === 'number',
-    modelCount: row.modelCount,
-    encryptedModelCount: row.encryptedModelCount,
-    spendableSats: row.spendableSats,
-    blocked: row.blockedReason,
-  });
+  if (aiLog.isLevelEnabled('info')) {
+    recordRowPaint({
+      baseUrl: row.baseUrl,
+      title: row.name,
+      titleIsHost: row.nameIsHost,
+      status: row.status,
+      statusSource: row.statusSource,
+      followers: profile?.followers ?? row.followers ?? null,
+      followersFromProfile: typeof profile?.followers === 'number',
+      modelCount: row.modelCount,
+      encryptedModelCount: row.encryptedModelCount,
+      spendableSats: row.spendableSats,
+      blocked: row.blockedReason,
+    });
+  }
 
   return (
     <ContactRow
@@ -236,20 +238,22 @@ export function ProviderListScreen() {
   // of these that changed IDENTITY since the previous render — the question
   // being whether a store handed back a new object for a fact that did not
   // change, which costs every row a render and shows the user nothing.
-  const knownProviders = useRoutstrStore((s) => s.knownProviders);
-  recordListRender({
-    order: rows.map((row) => row.baseUrl),
-    inputs: {
-      directory,
-      knownProviders,
-      probed,
-      rows,
-      checking,
-      headerHeight,
-      chosen,
-      nodeBaseUrl,
-    },
-  });
+  const knownProviders = useRoutstrStore((s) => (SHOW_LOGS ? s.knownProviders : null));
+  if (aiLog.isLevelEnabled('info')) {
+    recordListRender({
+      order: rows.map((row) => row.baseUrl),
+      inputs: {
+        directory,
+        knownProviders,
+        probed,
+        rows,
+        checking,
+        headerHeight,
+        chosen,
+        nodeBaseUrl,
+      },
+    });
+  }
 
   // Which providers this viewing has actually checked. Read synchronously by
   // the tap handler, which cannot wait for a render to learn what the

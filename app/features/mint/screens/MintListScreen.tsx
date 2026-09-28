@@ -171,20 +171,21 @@ export function MintListScreen({
   // (with the units that ruled them out). Logged on change only. A testnut tab
   // (TSAT, TUSD) can only appear when a test mint reaches `items` at all; see
   // `operations.buildMintListItems.scope` for the mints a flow picker leaves out.
-  const hiddenByTab = Object.fromEntries(
-    items
-      .filter((item) => !filteredItems.includes(item))
-      .map((item) => [item.mintUrl, `units=${item.supportedUnits?.join(',') || 'none'}`])
-  );
-  const tabsLogKey = JSON.stringify([
-    availableCurrencies,
-    selectedCurrency,
-    testnutAccount,
-    hiddenByTab,
-    items.length,
-  ]);
   const prevTabsLogKey = useRef('');
   useEffect(() => {
+    if (!cashuLog.isLevelEnabled('info')) return;
+    const hiddenByTab = Object.fromEntries(
+      items
+        .filter((item) => !filteredItems.includes(item))
+        .map((item) => [item.mintUrl, `units=${item.supportedUnits?.join(',') || 'none'}`])
+    );
+    const tabsLogKey = JSON.stringify([
+      availableCurrencies,
+      selectedCurrency,
+      testnutAccount,
+      hiddenByTab,
+      items.length,
+    ]);
     if (tabsLogKey === prevTabsLogKey.current) return;
     prevTabsLogKey.current = tabsLogKey;
     cashuLog.info('mint.list.tabs', {
