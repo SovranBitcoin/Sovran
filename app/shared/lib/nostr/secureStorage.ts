@@ -514,6 +514,16 @@ export async function clearAllSecureData(
   accountIndexes: number[],
   importedPubkeys: string[] = []
 ): Promise<boolean> {
+  const clear = await prepareSecureDataReset(accountIndexes, importedPubkeys);
+  return clear();
+}
+
+/** Read every deletion manifest before the caller destroys any wallet database. */
+export async function prepareSecureDataReset(
+  accountIndexes: number[],
+  importedPubkeys: string[] = []
+): Promise<() => Promise<boolean>> {
+  await keyIndexQueue;
   const callerKeys: string[] = [
     STORAGE_KEYS.USER_MNEMONIC,
     STORAGE_KEYS.MIGRATIONS_COMPLETE_LEGACY,
@@ -539,42 +549,32 @@ export async function clearAllSecureData(
   const indexed = await readKeyIndex(true);
   const allKeys = Array.from(new Set([...callerKeys, ...indexed]));
 
-  const results = await Promise.all(
-    allKeys.map(async (key) => {
-      if (key.startsWith('routstr_v1_') && key.endsWith('_manifest')) {
-        try {
-          const raw = await readSensitiveValue(key);
-          if (raw !== null) {
-            const manifest = SecureVaultManifest.parse(JSON.parse(raw));
-            for (let slot = 0; slot < manifest.slots.length; slot++) {
-              for (let index = 0; index < manifest.slots[slot]; index++) {
-                if (
-                  !(await secureDelete(
-                    secureVaultChunkKey(key, slot, index),
-                    'clear_recovery_chunk'
-                  ))
-                )
-                  return false;
-              }
-            }
-          }
-        } catch {
-          return false;
-        }
+  const chunkKeys: string[] = [];
+  for (const key of allKeys) {
+    if (!key.startsWith('routstr_v1_') || !key.endsWith('_manifest')) continue;
+    const raw = await readSensitiveValue(key);
+    if (raw === null) continue;
+    const manifest = SecureVaultManifest.parse(JSON.parse(raw));
+    for (let slot = 0; slot < manifest.slots.length; slot++) {
+      for (let index = 0; index < manifest.slots[slot]; index++) {
+        chunkKeys.push(secureVaultChunkKey(key, slot, index));
       }
-      return secureDelete(key, 'clear_key');
-    })
-  );
-  // Drop the index itself last so a partial wipe followed by a retry still
-  // sees the un-wiped keys on the second pass.
-  const keysCleared = results.every(Boolean);
-  const allOk = keysCleared && (await secureDelete(STORAGE_KEYS.KEY_INDEX, 'clear_index'));
-  if (allOk) {
-    nostrLog.info('nostr.secure.all_data_cleared', { count: allKeys.length });
-  } else {
-    nostrLog.warn('nostr.secure.all_data_cleared_with_errors', { count: allKeys.length });
+    }
   }
-  return allOk;
+
+  return async () => {
+    // Keep manifests until all their chunks are gone, so a failed wipe is retryable.
+    const chunks = await Promise.all(
+      chunkKeys.map((key) => secureDelete(key, 'clear_recovery_chunk'))
+    );
+    if (!chunks.every(Boolean)) return false;
+    const results = await Promise.all(allKeys.map((key) => secureDelete(key, 'clear_key')));
+    const allOk =
+      results.every(Boolean) && (await secureDelete(STORAGE_KEYS.KEY_INDEX, 'clear_index'));
+    if (allOk) nostrLog.info('nostr.secure.all_data_cleared', { count: allKeys.length });
+    else nostrLog.warn('nostr.secure.all_data_cleared_with_errors', { count: allKeys.length });
+    return allOk;
+  };
 }
 
 /** A source repair must discard both mnemonic and PBKDF2 caches from the old chain. */

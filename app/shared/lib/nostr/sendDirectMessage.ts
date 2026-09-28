@@ -40,10 +40,14 @@ import { buildRecipientGiftWrap } from './nip17';
 
 const DEFAULT_PAYMENT_RELAY = 'wss://relay.vertexlab.io';
 
+// Order matters: the first three become our nprofile hints, so they must be
+// relays Sovran reads gift wraps from (nagg ingests damus and nos.lol, and both
+// are in the relay tier). Macadamia ignores hints and publishes only to its own
+// relays, whose defaults also include damus and nos.lol.
 const FALLBACK_PAYMENT_RELAYS = [
   'wss://relay.damus.io',
-  'wss://relay.8333.space/',
   'wss://nos.lol',
+  'wss://relay.8333.space/',
   'wss://relay.nostr.band',
 ];
 
@@ -86,6 +90,24 @@ interface SendDirectMessageParams {
 }
 
 /**
+ * A payment request's nostr target is normally an nprofile, but payers also
+ * meet a bare npub or hex key (NUT-26 can carry the key without relays, and
+ * Macadamia accepts both). Those carry no hints, so `kind:10050` decides.
+ */
+function recipientOf(target: string): { pubkey: string; relays?: string[] } {
+  const trimmed = target.trim();
+  if (/^[0-9a-f]{64}$/i.test(trimmed)) return { pubkey: trimmed.toLowerCase() };
+  const decoded = nip19.decode(trimmed);
+  if (decoded.type === 'nprofile') return decoded.data;
+  if (decoded.type === 'npub') return { pubkey: decoded.data };
+  nostrLog.warn('nostr.sendDirectMessage.invalidNprofile', {
+    decodedType: decoded.type,
+    inputPreview: trimmed.slice(0, 30),
+  });
+  throw new Error('Invalid nprofile format');
+}
+
+/**
  * Build a DM publisher over an injected relay-pool factory. Each publish opens
  * a pool, publishes, and closes the relays it used.
  */
@@ -95,16 +117,7 @@ export function createDirectMessageSender(deps: {
   resolveDmRelays: (pubkey: string) => Promise<string[]>;
 }): (params: SendDirectMessageParams) => Promise<void> {
   return async function sendDirectMessage(params) {
-    const decoded = nip19.decode(params.nprofile);
-    if (decoded.type !== 'nprofile') {
-      nostrLog.warn('nostr.sendDirectMessage.invalidNprofile', {
-        decodedType: decoded.type,
-        inputPreview: params.nprofile.slice(0, 30),
-      });
-      throw new Error('Invalid nprofile format');
-    }
-
-    const { pubkey, relays } = decoded.data;
+    const { pubkey, relays } = recipientOf(params.nprofile);
     const hinted = [...new Set(relays ?? [])];
     // No hints: ask the recipient where they read DMs. Never guess — a wrap on
     // the wrong relay is spent ecash the payee will never see.

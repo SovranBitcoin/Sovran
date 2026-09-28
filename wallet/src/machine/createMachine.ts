@@ -777,6 +777,46 @@ export function createPaymentMachine(
     ) {
       const originalStep = step;
       const data = stepData as StepDataMap["navigateToMeltPreview"];
+      if (
+        data.meltQuote?.expiresAt != null &&
+        data.meltQuote.expiresAt <= Date.now() / 1000 &&
+        operations.quoteMelt
+      ) {
+        // The previous approval expired. Show the new quote and require a
+        // second tap, even when the fee happens to be unchanged.
+        handlerExecuting = true;
+        notify();
+        try {
+          const refreshed = await runMeltQuotePreviewEffect({
+            data,
+            operation: operations.quoteMelt,
+            isStale: (op) => isStaleGeneration(sendGeneration, op),
+          });
+          if (refreshed.isOk()) {
+            if (refreshed.value.kind === "stale") return;
+            flowCtx = { ...flowCtx, meltQuotePreview: refreshed.value.quote };
+            setStep("navigateToMeltPreview", {
+              ...data,
+              meltQuote: refreshed.value.quote,
+            });
+          } else {
+            routeOperationFailure(
+              refreshed.error.cause,
+              "melt",
+              data.meltTarget,
+              data,
+            );
+          }
+          await dispatchHandler(step, stepData);
+        } finally {
+          if (!isStaleGeneration(sendGeneration, "confirmMelt.refreshQuote")) {
+            handlerExecuting = false;
+            sendLocked = false;
+            notify();
+          }
+        }
+        return;
+      }
       logger.info("machine.confirmMelt.start", {
         ...mintUrlFields(data.mintUrl),
         amount: data.amount,

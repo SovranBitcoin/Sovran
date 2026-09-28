@@ -950,7 +950,7 @@ export function loadWorkspaceFreshMatrixSource(
           })
         )
       );
-      if (selection.scenarios.length !== 158 || expectedPairs.length !== 274) {
+      if (selection.scenarios.length !== 162 || expectedPairs.length !== 282) {
         throw new Error(
           `full matrix drifted: ${selection.scenarios.length} scenarios, ${expectedPairs.length} pairs`
         );
@@ -966,8 +966,8 @@ export function loadWorkspaceFreshMatrixSource(
         entry.platforms.map((platform) => pairKey({ scenarioId: entry.id, platform }))
       );
       if (
-        catalog.length !== 158 ||
-        viewerKeys.length !== 274 ||
+        catalog.length !== 162 ||
+        viewerKeys.length !== 282 ||
         JSON.stringify([...viewerKeys].sort()) !== JSON.stringify([...expectedKeys].sort())
       ) {
         throw new Error(

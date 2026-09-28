@@ -182,6 +182,7 @@ and the JSON plan or blocker. A cited pure test proves only its own layer.
 | `send.cashu.sat`                       | JF    | product-run                                  | Fund 100; pending toast/tx; redeem/finalize 40; named token QA shot; sweep 60; exact accounting |
 | `send.lightning.sat`                   | JF    | product-run                                  | Fund 100; preview/pay 40; PAID; exact -40/no fee; sweep 60; final zero/reconciliation           |
 | `recovery.reinstall`                   | JS    | product-run                                  | Reinstall RestoreGate and drawer profile-name continuity                                        |
+| `recovery.derived-keys-error`          | JP    | authored; manual prerequisite                | Derived-account key-error gate opens phrase recovery and cancels back to the gate               |
 | `receive.lightning.change-mint.amount` | JF    | product-run                                  | PROVEN LIVE (run `2026-07-18T05-51-23-237Z-7be54b02`): 125-sat amount survives the mint-selector round trip, the fresh quote names Minibits, cocod pays it, +125 settles at Minibits; swept (the earlier Minibits TLS blocker was external and is gone) |
 | `receive.lightning.pending-relaunch`   | JF    | product-run                                  | Interruption axis PROVEN LIVE first try (run `2026-07-18T10-22-20-242Z-7524d8f3`): 25-sat quote proven UNPAID, sheet dismissed, cold relaunch (`reset:none`), THEN cocod pays — the resumed pending-quote watcher (`watchExistingPendingOnStart`) settles the SAME pre-relaunch transaction: confirmed toast renders on the wallet home (root `E2EToastProbe` reachable there), View routes to the finalized original tx, +25 exactly once, swept/reconciled. New `check:interruption` facet documents the axis |
 | `receive.cashu.dismiss`                | JF    | product-run                                  | Prepared 50-sat preview; Cancel; zero mutation; recover unspent token; final zero               |
@@ -517,3 +518,15 @@ of disk space. See [the capture workflow and audit](testing-store-screenshots.md
 Both validate and pass fake-driver orchestration smoke. Native AX reachability,
 keyboard dismissal, scrolling and back navigation remain unverified on both
 platforms; these results are not product proof.
+
+## AI funding entry and mint history navigation
+
+- `ai.add-funds`: opens a provider's Add funds action, enters a fixed receive
+  amount through the semantic keypad control, then returns to the wallet without
+  requesting a quote or paying the provider.
+- `mint.info.history`: enters a selected mint's details, opens its update history,
+  and returns to the wallet. An empty history is a valid result.
+
+Both scenarios target iOS and Android. Their authoring and fake-driver checks
+cover harness orchestration only; native execution remains unverified on both
+platforms and is required to establish product behavior.

@@ -484,6 +484,16 @@ export function entryForSlot(
   return lineup?.[provider]?.[tier] ?? null;
 }
 
+/** Find the picker slot for the model that actually accepted a request. */
+export function slotForModel(lineup: AiLineup | null, modelId: string, preferredTier: AiTierId) {
+  for (const tier of [preferredTier, ...AI_TIER_IDS.filter((t) => t !== preferredTier)]) {
+    for (const provider of lineupProviderIds(lineup)) {
+      if (lineup?.[provider]?.[tier]?.modelId === modelId) return { provider, tier };
+    }
+  }
+  return null;
+}
+
 /**
  * A lineup entry whose model id carries the end-to-end-encryption prefix.
  *

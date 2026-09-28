@@ -322,8 +322,8 @@ describe('ecash send — P2PK locked', () => {
     expect(sendCall?.args[3]).toMatchObject({ p2pkLockPubkey: LOCK_PUBKEY });
   });
 
-  it('unlocked sends are unaffected: localFirst still used with exact proofs', async () => {
-    const tm = createTestMachine();
+  it('unlocked sends are unaffected: offline, exact proofs still make a local token', async () => {
+    const tm = createTestMachine({ offline: true });
     await tm.machine.startSendEcash();
     await tm.machine.enterAmount({ value: 100, unit: 'sat' }, MINT1);
 

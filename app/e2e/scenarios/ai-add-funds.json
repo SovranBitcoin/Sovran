@@ -20,7 +20,7 @@
     {"action":"waitFor","selector":{"label":"Add funds"}},
     {"action":"tap","selector":{"id":"ai-funds-button"}},
     {"action":"waitFor","selector":{"id":"amount-next"}},
-    {"action":"tap","selector":{"label":"1"}},
+    {"action":"tap","selector":{"id":"keypad-key-1"}},
     {"action":"waitFor","selector":{"id":"amount-state:1"}},
     {"action":"screenshot","name":"receive-amount"},
     {"action":"goHome"}

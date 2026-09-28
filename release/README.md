@@ -1,8 +1,10 @@
 # Production releases
 
-**Implemented but not executed or enabled.** This pipeline requires the operator's
-account checks and validation below before activation. Static review cannot prove
-store credentials, historical signing continuity, hosting limits or live APIs work.
+**Executed for 0.1.3; publication is enabled as of 2026-09-28.** The release
+checkpoint records all five channels complete. That first run included manual
+Play submission and controller fixes; it does not prove the next release will
+finish unattended. See [0.1.4 preparation](preparations/0.1.4.md) for the current
+evidence and pre-merge blockers. Recheck mutable account settings before merging.
 
 ## Day-to-day operation
 

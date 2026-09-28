@@ -348,10 +348,6 @@
   "features/receive/screens/ReceiveScreen.tsx": {
     "stylesheet-create": 1
   },
-  "features/send/components/P2PKLockIndicator.tsx": {
-    "stylesheet-create": 1,
-    "stack-layout-props": 1
-  },
   "features/send/screens/AmountSelector.tsx": {
     "stylesheet-create": 1
   },

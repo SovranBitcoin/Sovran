@@ -70,6 +70,35 @@ describe('routstrStore persist resilience', () => {
     for (const k of Object.keys(mockMemory)) delete mockMemory[k];
   });
 
+  it.each([
+    { stored: { from: 'GPT', to: 'GLM' }, expected: { from: 'GPT', to: 'GLM' } },
+    { stored: { from: 12 }, expected: undefined },
+  ])(
+    'contains malformed model-switch metadata without losing the answer: %j',
+    async ({ stored, expected }) => {
+      preload({
+        sessions: [
+          {
+            ...baseSession,
+            messages: [
+              {
+                id: 'answer',
+                role: 'assistant',
+                content: 'Hello',
+                timestamp: 1,
+                modelSwitch: stored,
+              },
+            ],
+          },
+        ],
+        currentSessionId: baseSession.id,
+      });
+      const store = await loadStore();
+      expect(store.getState().sessions[0].messages[0].content).toBe('Hello');
+      expect(store.getState().sessions[0].messages[0].modelSwitch).toEqual(expected);
+    }
+  );
+
   it('retains every unsettled payment instead of evicting the oldest recovery token', async () => {
     const store = await loadStore();
     for (let index = 0; index < 33; index++) {

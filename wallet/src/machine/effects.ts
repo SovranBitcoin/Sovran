@@ -1025,6 +1025,7 @@ function handleConfirmSendFailure(args: {
   }
 
   if (
+    !args.shouldCreateLocalTokenFirst &&
     isMintOfflineError(args.cause) &&
     config.operations.executeOfflineSend &&
     config.proofAmounts.length > 0
@@ -1928,11 +1929,15 @@ export function runConfirmSendEffect({
   const p2pkLocked = isLockedSend(context);
   const localProofs = buildProofSuggestions(proofAmounts, data.amount);
   const hasExactLocalProofs = proofAmounts.length > 0 && localProofs.exactMatch;
-  const shouldCreateLocalTokenFirst =
-    hasExactLocalProofs && !p2pkLocked && !!operations.executeOfflineSend;
   const appOffline = getOffline() || context.offline === true;
   const forceLocalSend =
-    !p2pkLocked && (appOffline || context.localProofSend === true);
+    !p2pkLocked &&
+    (appOffline ||
+      context.localProofSend === true ||
+      context.mintUnreachableConfirmed === true);
+  // Exact bearer proofs need no mint request. Locked sends must still swap.
+  const shouldCreateLocalTokenFirst =
+    !p2pkLocked && hasExactLocalProofs && !!operations.executeOfflineSend;
   const config: RunConfirmSendEffectConfig = {
     data,
     operations,

@@ -78,12 +78,9 @@ const SOFT_ROOT: Record<NoticeStatus, string> = {
 /** Icon and type scale per size. `compact` matches the chat status strips.
  *  `bodyLineHeight` is explicit so a reserved line count is an exact height. */
 const SIZE = {
-  default: { icon: 20, title: 15, body: 14, bodyLineHeight: 19, gap: 'gap-3' },
-  compact: { icon: 16, title: 13, body: 12, bodyLineHeight: 16, gap: 'gap-2' },
+  default: { icon: 20, title: 15, body: 14, bodyLineHeight: 19, iconClass: 'size-5', gap: 'gap-3' },
+  compact: { icon: 16, title: 13, body: 12, bodyLineHeight: 16, iconClass: 'size-4', gap: 'gap-2' },
 } as const;
-
-/** The low-contrast fill every whole-block skeleton in the app uses. */
-const SKELETON_FILL_ALPHA = 0.07;
 
 interface NoticeProps {
   status: NoticeStatus;
@@ -211,6 +208,7 @@ export function Notice({
     reserveLines !== undefined ? { minHeight: scale.bodyLineHeight * reserveLines } : undefined;
 
   if (loading) {
+    const bodySlotStyle = { minHeight: scale.bodyLineHeight * Math.max(1, reserveLines ?? 2) };
     // The whole card is the skeleton — one low-contrast block at the height
     // the finished card will have (padding + title line + reserved body
     // lines), not an icon beside a stack of text bars. The finished card's
@@ -219,16 +217,20 @@ export function Notice({
       <View
         accessible={false}
         testID={testID ? `${testID}-loading` : undefined}
-        className={cn('flex-row rounded-2xl px-4 py-3', scale.gap, 'items-start', className)}
-        style={{ backgroundColor: withAlpha(foreground, SKELETON_FILL_ALPHA) }}>
-        <View style={{ width: scale.icon, height: scale.icon }} />
-        <View className="min-w-0 flex-1 gap-0.5" style={{ opacity: 0 }}>
+        className={cn(
+          'bg-foreground/[0.07] flex-row rounded-2xl px-4 py-3',
+          scale.gap,
+          'items-start',
+          className
+        )}>
+        <View className={scale.iconClass} />
+        <View className="min-w-0 flex-1 gap-0.5 opacity-0">
           {title ? (
             <Text size={scale.title} bold>
               {title}
             </Text>
           ) : null}
-          <View style={{ minHeight: scale.bodyLineHeight * Math.max(1, reserveLines ?? 2) }} />
+          <View style={bodySlotStyle} />
         </View>
       </View>
     );
@@ -263,7 +265,8 @@ export function Notice({
               // The measuring twin: same type, same width, never seen.
               <Text
                 size={scale.body}
-                style={[bodyStyle, { position: 'absolute', left: 0, right: 0, top: 0, opacity: 0 }]}
+                className="absolute inset-x-0 top-0 opacity-0"
+                style={bodyStyle}
                 pointerEvents="none"
                 accessible={false}
                 accessibilityElementsHidden

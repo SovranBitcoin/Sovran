@@ -125,7 +125,8 @@ export function createNutzapProfileResolver(deps: {
     } finally {
       pool.destroy();
     }
-    writeCache(pubkeyHex, profile, clock());
+    // A timeout/absence is not evidence that the identity key is the wallet key.
+    if (profile.source === 'nutzapInfo') writeCache(pubkeyHex, profile, clock());
     return profile;
   }
 

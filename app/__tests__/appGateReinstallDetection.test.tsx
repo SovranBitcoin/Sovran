@@ -134,7 +134,11 @@ jest.mock('@/shared/lib/profile/profileSessionOrchestrator', () => ({
   deleteAllProfiles: jest.fn(),
 }));
 jest.mock('@/shared/stores/global/profileStore', () => ({
-  useProfileStore: { getState: jest.fn() },
+  useProfileStore: Object.assign(
+    (selector: (state: { activeAccountIndex: number; profiles: never[] }) => unknown) =>
+      selector({ activeAccountIndex: 0, profiles: [] }),
+    { getState: jest.fn() }
+  ),
 }));
 
 describe('AppGate locked recovery', () => {

@@ -4,11 +4,16 @@ import {
   recoverMnemonicSession,
   deleteAllProfiles,
 } from '@/shared/lib/profile/profileSessionOrchestrator';
-import { storeMnemonic, clearAllSecureData } from '@/shared/lib/nostr/secureStorage';
+import {
+  storeMnemonic,
+  clearAllSecureData,
+  prepareSecureDataReset,
+} from '@/shared/lib/nostr/secureStorage';
 import { useSecureStoreState } from '@/shared/stores/runtime/secureStoreState';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { restartApp } from '@/shared/lib/profile/appRestart';
+import { deriveNostrKeys } from '@/shared/lib/nostr/keyDerivation';
 import { CocoManager } from '@/shared/lib/cashu/manager';
 
 jest.mock('@react-native-async-storage/async-storage', () => ({
@@ -26,6 +31,9 @@ jest.mock('@/shared/lib/logger', () => ({
 jest.mock('@/shared/lib/nostr/secureStorage', () => ({
   storeMnemonic: jest.fn(async () => true),
   clearAllSecureData: jest.fn(async () => true),
+  prepareSecureDataReset: jest.fn(
+    async () => jest.requireMock('@/shared/lib/nostr/secureStorage').clearAllSecureData
+  ),
 }));
 jest.mock('@/shared/lib/profile/appRestart', () => ({ restartApp: jest.fn(() => true) }));
 jest.mock('@/shared/lib/cashu/manager', () => ({
@@ -114,6 +122,32 @@ it('does not erase preferences or restart when secure deletion fails', async () 
   expect(clearAllSecureData).toHaveBeenCalled();
   expect(AsyncStorage.clear).not.toHaveBeenCalled();
   expect(restartApp).not.toHaveBeenCalled();
+});
+
+it('leaves databases and keys intact when reset enumeration fails', async () => {
+  jest.mocked(prepareSecureDataReset).mockRejectedValueOnce(new Error('index unreadable'));
+  await expect(deleteAllProfiles()).resolves.toBe(false);
+  expect(CocoManager.completeReset).not.toHaveBeenCalled();
+  expect(clearAllSecureData).not.toHaveBeenCalled();
+  expect(AsyncStorage.clear).not.toHaveBeenCalled();
+});
+
+it('lets a derived account recover its matching phrase after a setup failure', async () => {
+  useSecureStoreState.setState({ secureStoreState: 'available', errorName: null });
+  jest
+    .mocked(useSettingsStore.getState)
+    .mockReturnValueOnce({ ...useSettingsStore.getState(), hasSeenOnboarding: true });
+  useProfileStore.setState({
+    profiles: [
+      { accountIndex: 0, pubkey: deriveNostrKeys(phrase, 0).pubkey, source: 'derived', addedAt: 1 },
+    ],
+  });
+  jest.mocked(AsyncStorage.setItem).mockClear();
+  await expect(recoverMnemonicSession(phrase)).resolves.toBe(true);
+  expect(storeMnemonic).toHaveBeenCalledWith(phrase);
+  expect(
+    jest.mocked(AsyncStorage.setItem).mock.calls.some(([key]) => key === 'profile-store')
+  ).toBe(false);
 });
 
 it('clears secure data and preferences before restarting fresh', async () => {

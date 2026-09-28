@@ -29,7 +29,7 @@ describe('loadE2E over the real tree', () => {
   });
 
   it('requires every canonical scenario to author a non-empty verify section', () => {
-    expect(loaded.scenarios.size).toBe(158);
+    expect(loaded.scenarios.size).toBe(162);
     for (const scenario of loaded.scenarios.values()) {
       expect(scenario.verify.length).toBeGreaterThan(0);
     }
@@ -1403,6 +1403,8 @@ describe('loadE2E over the real tree', () => {
     // Each checked selector below is pinned to a
     // checkbox, radio, or switch contract in the focused product-source tests.
     const auditedCheckedSelectors = [
+      'design-system-segmented-auto',
+      'design-system-timeline-auto',
       'filter-direction-all',
       'filter-direction-incoming',
       'filter-direction-outgoing',
