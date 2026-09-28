@@ -24,6 +24,7 @@ jest.mock('expo-router', () => ({
   useNavigation: () => ({ setOptions: jest.fn() }),
 }));
 jest.mock('expo-router/react-navigation', () => ({
+  NavigationContext: jest.requireActual<typeof import('react')>('react').createContext(null),
   useHeaderHeight: () => 80,
   HeaderHeightContext: require('react').createContext(80),
 }));
@@ -42,6 +43,12 @@ jest.mock('react-native-reanimated', () => {
   return {
     __esModule: true,
     default: { View: require('react-native').View },
+    makeMutable: (value: number) => ({
+      get: () => value,
+      set: (next: number) => {
+        value = next;
+      },
+    }),
     FadeIn: { duration: () => ({}) },
     useSharedValue: (initial: number) =>
       React.useState(() => ({

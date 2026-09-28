@@ -168,6 +168,12 @@ jest.mock('react-native-reanimated', () => {
       quad: easing,
     },
     cancelAnimation: jest.fn(),
+    makeMutable: (value: number) => ({
+      get: () => value,
+      set: (next: number) => {
+        value = next;
+      },
+    }),
     Extrapolation: { CLAMP: 'clamp' },
     FadeIn: transition,
     FadeOut: transition,

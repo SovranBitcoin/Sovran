@@ -17,6 +17,7 @@ jest.mock('@shopify/flash-list', () => ({
 jest.mock('uniwind', () => ({ withUniwind: (component: unknown) => component }));
 jest.mock('expo-router', () => ({ useNavigation: () => ({ setOptions: mockSetOptions }) }));
 jest.mock('expo-router/react-navigation', () => ({
+  NavigationContext: jest.requireActual<typeof import('react')>('react').createContext(null),
   HeaderHeightContext: require('react').createContext(0),
 }));
 jest.mock('@/shared/ui/composed/AndroidSheetRoot', () => ({

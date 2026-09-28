@@ -39,6 +39,12 @@ jest.mock('react-native-reanimated', () => {
   return {
     __esModule: true,
     default: { View },
+    makeMutable: (value: number) => ({
+      get: () => value,
+      set: (next: number) => {
+        value = next;
+      },
+    }),
     useReducedMotion: () => mockReducedMotion,
     useAnimatedStyle: <T extends object>(factory: () => T) => factory(),
     useAnimatedReaction: jest.fn(),
@@ -76,6 +82,7 @@ jest.mock('@/features/transactions/lib/transactionIdentity', () => ({
 }));
 jest.mock('expo-router', () => ({ useNavigation: () => ({ setOptions: jest.fn() }) }));
 jest.mock('expo-router/react-navigation', () => ({
+  NavigationContext: jest.requireActual<typeof import('react')>('react').createContext(null),
   HeaderHeightContext: jest.requireActual<typeof import('react')>('react').createContext(80),
 }));
 jest.mock('react-native-safe-area-context', () => ({
