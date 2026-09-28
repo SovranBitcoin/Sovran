@@ -17,7 +17,7 @@
  */
 import * as bip39 from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english.js';
-import { storeMnemonic, clearAllSecureData } from '@/shared/lib/nostr/secureStorage';
+import { storeMnemonic, prepareSecureDataReset } from '@/shared/lib/nostr/secureStorage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ResultAsync } from 'neverthrow';
 
@@ -339,9 +339,15 @@ export async function recoverMnemonicSession(mnemonic: string): Promise<boolean>
   transitionInFlight = true;
   try {
     const locked = useSecureStoreState.getState().secureStoreState === 'locked';
-    if (!locked && useSettingsStore.getState().hasSeenOnboarding) return false;
+    const onboarding = !locked && !useSettingsStore.getState().hasSeenOnboarding;
     if (
-      locked &&
+      !onboarding &&
+      !locked &&
+      !useProfileStore.getState().profiles.some((p) => p.source !== 'imported')
+    )
+      return false;
+    if (
+      !onboarding &&
       useProfileStore
         .getState()
         .profiles.some(
@@ -366,7 +372,7 @@ export async function recoverMnemonicSession(mnemonic: string): Promise<boolean>
         lastRestoreError: null,
       },
     });
-    if (useSecureStoreState.getState().secureStoreState !== 'locked') {
+    if (onboarding) {
       // The carousel's auto-generated account is disposable. Its row must not
       // point at the new mnemonic on restart; no wallet operation is available here.
       const profiles = useProfileStore.persist.getOptions();
@@ -418,11 +424,13 @@ export async function deleteAllProfiles(opts?: {
     const accountIndexes = Array.from(new Set([0, ...profiles.map((p) => p.accountIndex)]));
     const importedPubkeys = profiles.filter((p) => p.source === 'imported').map((p) => p.pubkey);
 
+    const clearSecureData = await prepareSecureDataReset(accountIndexes, importedPubkeys);
+
     // 1. Close SQLite and destroy all Coco databases
     await CocoManager.completeReset(accountIndexes);
 
     // 2. Clear ALL secure storage (mnemonic, derived keys, cashu mnemonics, imported nsecs)
-    if (!(await clearAllSecureData(accountIndexes, importedPubkeys))) {
+    if (!(await clearSecureData())) {
       throw new Error('Secure data reset incomplete');
     }
 
