@@ -1,4 +1,5 @@
 import { getTokenMetadata } from '@cashu/cashu-ts';
+import type { WalletAdapter } from '@routstr/sdk/browser';
 
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { apiLog } from '@/shared/lib/logger';
@@ -38,6 +39,14 @@ function manager() {
   if (!instance) throw new Error('wallet is not ready');
   return instance;
 }
+
+type ReceiveReceipt = Awaited<ReturnType<WalletAdapter['receiveToken']>>;
+// The active response and a recovery sweep can return the same change token.
+// Share that receive across adapter instances, while keeping wallets isolated.
+const pendingReceives = new WeakMap<
+  ReturnType<typeof manager>,
+  Map<string, Promise<ReceiveReceipt>>
+>();
 
 /** The wallet's selected mint, unless it is a testnut: its balance is excluded
  *  from `getBalances`, and naming it here would still invite the SDK to pay
@@ -122,7 +131,7 @@ export function createCocoWalletAdapter(assertOwner: () => void = () => {}) {
        * and should not wait on a second round trip.
        */
       options: { probeSpent?: boolean } = {}
-    ): Promise<{ success: boolean; amount: number; unit: 'sat' | 'msat'; message?: string }> {
+    ): Promise<ReceiveReceipt> {
       assertOwner();
       // Change from a node is V4; a journalled request token the sweep hands
       // back may be the V3 this adapter itself sent. The wallet reads only V4.
@@ -152,18 +161,37 @@ export function createCocoWalletAdapter(assertOwner: () => void = () => {}) {
       }
       try {
         const instance = ownedManager();
-        if (options.probeSpent && (await isTokenSpent(instance, token))) {
-          assertManager(instance);
-          return { success: false, amount: 0, unit: 'sat', message: TOKEN_ALREADY_SPENT_MESSAGE };
+        let pending = pendingReceives.get(instance);
+        if (!pending) {
+          pending = new Map();
+          pendingReceives.set(instance, pending);
         }
-        assertManager(instance);
-        const prepared = await instance.ops.receive.prepare({ token });
-        assertManager(instance);
-        const finalized = await instance.ops.receive.execute(prepared);
-        assertManager(instance);
-        annotatePaymentLeg('receive', finalized.id);
-        apiLog.info('routstr.sdk.received', { amount });
-        return { success: true, amount, unit };
+        const active = pending.get(token);
+        if (active) {
+          const result = await active;
+          assertManager(instance);
+          return result;
+        }
+        const receiving = Promise.resolve().then(async (): Promise<ReceiveReceipt> => {
+          if (options.probeSpent && (await isTokenSpent(instance, token))) {
+            assertManager(instance);
+            return { success: false, amount: 0, unit: 'sat', message: TOKEN_ALREADY_SPENT_MESSAGE };
+          }
+          assertManager(instance);
+          const prepared = await instance.ops.receive.prepare({ token });
+          assertManager(instance);
+          const finalized = await instance.ops.receive.execute(prepared);
+          assertManager(instance);
+          annotatePaymentLeg('receive', finalized.id);
+          apiLog.info('routstr.sdk.received', { amount });
+          return { success: true, amount, unit };
+        });
+        pending.set(token, receiving);
+        try {
+          return await receiving;
+        } finally {
+          pending.delete(token);
+        }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         apiLog.error('routstr.sdk.receive_failed', { message, amount });

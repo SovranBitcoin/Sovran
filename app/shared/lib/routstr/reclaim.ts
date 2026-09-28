@@ -8,6 +8,10 @@ import { isTokenSpent } from './spentProbe';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 import type { RequestControls } from 'wallet/safeFetch';
 
+type WalletManager = NonNullable<ReturnType<typeof CocoManager.peekInstance>>;
+const pendingPaymentSweeps = new WeakMap<WalletManager, Promise<number>>();
+const legacyBalanceSweeps = new WeakMap<WalletManager, Promise<ReclaimOutcome>>();
+
 /**
  * Sweep every Routstr credential this profile has held back into the wallet.
  *
@@ -92,7 +96,22 @@ async function askNode(
  */
 export async function recoverPendingPayments(controls: RequestControls = {}): Promise<number> {
   const manager = CocoManager.peekInstance();
-  if (!manager) return 0;
+  if (!manager || controls.signal?.aborted) return 0;
+  const active = pendingPaymentSweeps.get(manager);
+  if (active) return active;
+  const sweep = recoverPendingPaymentsOnce(manager, controls);
+  pendingPaymentSweeps.set(manager, sweep);
+  try {
+    return await sweep;
+  } finally {
+    pendingPaymentSweeps.delete(manager);
+  }
+}
+
+async function recoverPendingPaymentsOnce(
+  manager: WalletManager,
+  controls: RequestControls
+): Promise<number> {
   const owner = useProfileStore.getState().activeAccountIndex;
   const ownsScope = () =>
     !controls.signal?.aborted &&
@@ -192,7 +211,24 @@ export async function reclaimRoutstrBalances(
   controls: RequestControls = {}
 ): Promise<ReclaimOutcome> {
   const manager = CocoManager.peekInstance();
-  if (!manager) return { attempted: 0, reclaimed: 0, deferred: 0 };
+  if (!manager || controls.signal?.aborted) return { attempted: 0, reclaimed: 0, deferred: 0 };
+  // Startup and the manual Reclaim action share one pass over this wallet's
+  // credentials. A second snapshot could redeem the same replayed refund.
+  const active = legacyBalanceSweeps.get(manager);
+  if (active) return active;
+  const sweep = reclaimRoutstrBalancesOnce(manager, controls);
+  legacyBalanceSweeps.set(manager, sweep);
+  try {
+    return await sweep;
+  } finally {
+    legacyBalanceSweeps.delete(manager);
+  }
+}
+
+async function reclaimRoutstrBalancesOnce(
+  manager: WalletManager,
+  controls: RequestControls
+): Promise<ReclaimOutcome> {
   const owner = useProfileStore.getState().activeAccountIndex;
   const ownsScope = () =>
     !controls.signal?.aborted &&

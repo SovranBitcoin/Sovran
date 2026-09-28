@@ -94,6 +94,43 @@ describe('isTokenSpent', () => {
 });
 
 describe('the wallet adapter receiving a recovery token', () => {
+  it('shares a receive between active change collection and a concurrent recovery adapter', async () => {
+    mockCheckStates.mockResolvedValue(states('UNSPENT', 'UNSPENT'));
+
+    const receipts = await Promise.all([
+      createCocoWalletAdapter().receiveToken(TOKEN),
+      createCocoWalletAdapter().receiveToken(TOKEN, { probeSpent: true }),
+    ]);
+
+    expect(receipts).toEqual([
+      { success: true, amount: 3, unit: 'sat' },
+      { success: true, amount: 3, unit: 'sat' },
+    ]);
+    expect(mockPrepare).toHaveBeenCalledTimes(1);
+    expect(mockExecute).toHaveBeenCalledTimes(1);
+  });
+
+  it('allows a later retry after a shared receive fails', async () => {
+    mockPrepare.mockRejectedValueOnce(new Error('offline'));
+    const receipts = await Promise.all([
+      createCocoWalletAdapter().receiveToken(TOKEN),
+      createCocoWalletAdapter().receiveToken(TOKEN),
+    ]);
+    expect(receipts).toEqual([
+      { success: false, amount: 0, unit: 'sat', message: 'offline' },
+      { success: false, amount: 0, unit: 'sat', message: 'offline' },
+    ]);
+    expect(mockPrepare).toHaveBeenCalledTimes(1);
+
+    expect(await createCocoWalletAdapter().receiveToken(TOKEN)).toEqual({
+      success: true,
+      amount: 3,
+      unit: 'sat',
+    });
+    expect(mockPrepare).toHaveBeenCalledTimes(2);
+    expect(mockExecute).toHaveBeenCalledTimes(1);
+  });
+
   it('does not ask the wallet to receive a spent token', async () => {
     mockCheckStates.mockResolvedValue(states('SPENT', 'SPENT'));
 

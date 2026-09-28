@@ -340,6 +340,7 @@ const REFUND_RETRY_BUDGET_MS = 12_000;
  * minutes. Each is asked once per session, and again on the next launch.
  */
 const pendingThisSession = new Set<string>();
+const recoverySweeps = new WeakMap<Built, Promise<void>>();
 
 /**
  * How old a token must be before a 425 stops it being asked about again this
@@ -399,6 +400,29 @@ export async function sweepUnsettledPayments(
 ): Promise<void> {
   try {
     const built = await ensure();
+    // Foreground, startup and request failure can all arrive together. Join
+    // this owner's sweep before either caller snapshots the recovery journal.
+    const active = recoverySweeps.get(built);
+    if (active) return await active;
+    const sweep = runRecoverySweep(built, reason);
+    recoverySweeps.set(built, sweep);
+    try {
+      await sweep;
+    } finally {
+      recoverySweeps.delete(built);
+    }
+  } catch (error) {
+    apiLog.warn('routstr.sdk.sweep_failed', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
+async function runRecoverySweep(
+  built: Built,
+  reason: 'launch' | 'failure' | 'scheduled'
+): Promise<void> {
+  try {
     const assertOwner = () => {
       const profile = useProfileStore.getState();
       if (

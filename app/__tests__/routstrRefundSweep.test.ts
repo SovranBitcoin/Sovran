@@ -120,6 +120,21 @@ describe('Routstr refund sweep', () => {
       headers: { 'retry-after': '2' },
     });
 
+  it('joins overlapping sweeps instead of receiving the same refund twice', async () => {
+    await journalOneToken();
+    mockFetch.mockImplementation(
+      async () => new Response(JSON.stringify({ token: 'cashuB-refund' }))
+    );
+
+    await Promise.all([sweepUnsettledPayments('launch'), sweepUnsettledPayments('failure')]);
+
+    expect(refundCalls()).toHaveLength(1);
+    expect(mockReceive).toHaveBeenCalledTimes(1);
+    expect(mockReceive).toHaveBeenCalledWith('cashuB-refund', { probeSpent: true });
+    await sweepUnsettledPayments('scheduled');
+    expect(refundCalls()).toHaveLength(1);
+  });
+
   it('retries a pending refund and banks the change the node finally mints', async () => {
     await journalOneToken();
     mockFetch

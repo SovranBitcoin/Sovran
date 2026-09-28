@@ -131,6 +131,44 @@ describe('reclaimRoutstrBalances', () => {
     );
   });
 
+  it('shares a legacy refund between startup and a concurrent manual reclaim', async () => {
+    archive({ 'https://api.routstr.com': 'sk-old' });
+    const transport = stub(() => json(200, { token: 'cashuB-refund', sats: '250' }));
+
+    const outcomes = await Promise.all([reclaimRoutstrBalances(), reclaimRoutstrBalances()]);
+
+    expect(outcomes).toEqual([
+      { attempted: 1, reclaimed: 1, deferred: 0 },
+      { attempted: 1, reclaimed: 1, deferred: 0 },
+    ]);
+    expect(transport).toHaveBeenCalledTimes(1);
+    expect(mockPrepare).toHaveBeenCalledTimes(1);
+    expect(mockExecute).toHaveBeenCalledTimes(1);
+    expect(await reclaimRoutstrBalances()).toEqual({ attempted: 0, reclaimed: 0, deferred: 0 });
+  });
+
+  it('retains an aborted legacy refund for a later pass', async () => {
+    archive({ 'https://api.routstr.com': 'sk-old' });
+    const controller = new AbortController();
+    stub(() => {
+      controller.abort();
+      return json(200, { token: 'cashuB-refund' });
+    });
+
+    const outcomes = await Promise.all([
+      reclaimRoutstrBalances({ signal: controller.signal }),
+      reclaimRoutstrBalances(),
+    ]);
+
+    expect(outcomes.map((outcome) => outcome.reclaimed)).toEqual([0, 0]);
+    expect(mockPrepare).not.toHaveBeenCalled();
+    expect(
+      useRoutstrStore.getState().legacyAccounts['https://api.routstr.com']?.reclaimedAt
+    ).toBeNull();
+    stub(() => json(200, { token: 'cashuB-refund' }));
+    expect(await reclaimRoutstrBalances()).toEqual({ attempted: 1, reclaimed: 1, deferred: 0 });
+  });
+
   it('ignores a late refund after the active profile changes', async () => {
     archive({ 'https://old.example': 'sk-old' });
     stub(() => {
@@ -309,6 +347,16 @@ describe('recoverPendingPayments', () => {
 
     expect(mockPrepare).toHaveBeenCalledWith({ token: 'cashuB-change' });
     expect(useRoutstrStore.getState().pendingPayments).toEqual({});
+  });
+
+  it('shares concurrent recovery of the same legacy pending payment', async () => {
+    stub(200, { token: 'cashuB-change', sats: '7' });
+
+    expect(await Promise.all([recoverPendingPayments(), recoverPendingPayments()])).toEqual([1, 1]);
+    expect(mockPrepare).toHaveBeenCalledTimes(1);
+    expect(mockExecute).toHaveBeenCalledTimes(1);
+    expect(useRoutstrStore.getState().pendingPayments).toEqual({});
+    expect(await recoverPendingPayments()).toBe(0);
   });
 
   it('undoes the send when the node never saw the token', async () => {
