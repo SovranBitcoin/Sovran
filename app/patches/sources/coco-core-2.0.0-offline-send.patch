@@ -1,16 +1,55 @@
 diff --git a/.changeset/offline-exact-send.md b/.changeset/offline-exact-send.md
 new file mode 100644
-index 00000000..defa8d94
+index 00000000..04aaaa70
 --- /dev/null
 +++ b/.changeset/offline-exact-send.md
-@@ -0,0 +1,7 @@
+@@ -0,0 +1,10 @@
 +---
 +'@cashu/coco-core': minor
 +---
 +
-+Add `offline` to `ops.send.prepare`. An offline send is prepared from the mint's stored keysets
-+without contacting it, and succeeds only when held proofs exactly match the amount; otherwise it
-+fails before reserving anything. Executing an exact-match send no longer refreshes mint data.
++Add `offline` to `ops.send.prepare` and `Manager.setOffline`. An offline send is prepared from the
++mint's stored keysets without contacting it, and succeeds only when held proofs exactly match the
++amount (found by an exact subset search, not the randomized selector); otherwise it fails before
++reserving anything. A failed refresh of
++stale mint data now falls back to the stored data instead of throwing, and no refresh is attempted
++while offline; a swap send checks the mint is reachable before reserving anything. Executing an exact-match send no longer refreshes mint data.
+diff --git a/packages/core/Manager.ts b/packages/core/Manager.ts
+index 7279a501..bfccfeba 100644
+--- a/packages/core/Manager.ts
++++ b/packages/core/Manager.ts
+@@ -294,6 +294,7 @@ export class Manager {
+   private disposed = false;
+   private disposePromise?: Promise<void>;
+   private readonly outputDataCreator?: OutputDataCreator;
++  private offline = false;
+   constructor(
+     repositories: Repositories,
+     seedGetter: () => Promise<Uint8Array>,
+@@ -687,6 +688,15 @@ export class Manager {
+     return { reconciled, skipped };
+   }
+ 
++  /**
++   * Tell coco whether the device has network. While offline, stale mint data is used from storage
++   * without a request, and work that must reach the mint (a swap) fails with `MintFetchError`
++   * before anything is reserved. Online, a failed refresh still falls back to stored data.
++   */
++  setOffline(offline: boolean): void {
++    this.offline = offline;
++  }
++
+   async pauseSubscriptions(): Promise<void> {
+     if (this.subscriptionsPaused) {
+       this.logger.debug('Subscriptions already paused');
+@@ -884,6 +894,7 @@ export class Manager {
+       this.mintAdapter,
+       mintLogger,
+       this.eventBus,
++      { isOffline: () => this.offline },
+     );
+     const seedService = new SeedService(seedGetter);
+     const keyRingService = new KeyRingService(
 diff --git a/packages/core/api/SendOpsApi.ts b/packages/core/api/SendOpsApi.ts
 index 521f4859..51079cb3 100644
 --- a/packages/core/api/SendOpsApi.ts
@@ -38,10 +77,18 @@ index 521f4859..51079cb3 100644
  
    /**
 diff --git a/packages/core/infra/handlers/send/DefaultSendHandler.ts b/packages/core/infra/handlers/send/DefaultSendHandler.ts
-index 1bfec9c2..8339e302 100644
+index 1bfec9c2..f4b4c6c9 100644
 --- a/packages/core/infra/handlers/send/DefaultSendHandler.ts
 +++ b/packages/core/infra/handlers/send/DefaultSendHandler.ts
-@@ -33,11 +33,39 @@ export class DefaultSendHandler implements SendMethodHandler<'default'> {
+@@ -23,6 +23,7 @@ import {
+ } from '../../../utils';
+ import type { CoreProof } from '../../../types';
+ import { ProofValidationError } from '../../../models/Error';
++import { selectExactSubset } from './exactSubset';
+ 
+ /**
+  * Default send handler for standard (unlocked) token sends.
+@@ -33,11 +34,19 @@ export class DefaultSendHandler implements SendMethodHandler<'default'> {
     * Prepare the send operation by selecting proofs and creating outputs.
     */
    async prepare(ctx: BasePrepareContext): Promise<PreparedSendOperation> {
@@ -49,41 +96,22 @@ index 1bfec9c2..8339e302 100644
 +    const { operation, wallet, proofService, logger, offline } = ctx;
      const { mintUrl, amount, unit } = operation;
  
-     // Try exact match first (no swap needed)
+-    // Try exact match first (no swap needed)
 -    const exactProofs = await proofService.selectProofsToSend(mintUrl, { amount, unit }, false);
-+    let exactProofs: Proof[] = [];
-+    if (offline) {
-+      // Binary denominations have an exact greedy solution. The randomized
-+      // selector can miss one, so do not make an offline send depend on luck.
-+      const available = await ctx.proofRepository.getAvailableProofs(mintUrl, { unit });
-+      const sorted = [...available].sort((a, b) => {
-+        const left = Amount.from(a.amount);
-+        const right = Amount.from(b.amount);
-+        return left.equals(right) ? 0 : left.greaterThan(right) ? -1 : 1;
-+      });
-+      let remaining = amount;
-+      for (const proof of sorted) {
-+        const value = Amount.from(proof.amount);
-+        if (value.greaterThan(remaining)) continue;
-+        exactProofs.push(proof);
-+        remaining = remaining.subtract(value);
-+        if (remaining.isZero()) break;
-+      }
-+    }
-+    // Preserve the upstream selector for online sends and non-binary sets
-+    // for which the greedy pass did not find an exact combination.
-+    if (!offline || !sumProofs(exactProofs).equals(amount)) {
-+      exactProofs = await proofService.selectProofsToSend(
-+        mintUrl,
-+        { amount, unit },
-+        false,
-+        wallet,
-+      );
++    // Try exact match first (no swap needed). The randomized selector can miss an exact match that
++    // exists, so an exact send never depends on it: a subset search backs it up, and is all an
++    // offline send uses.
++    const available = await ctx.proofRepository.getAvailableProofs(mintUrl, { unit });
++    let exactProofs: Proof[] = offline
++      ? []
++      : await proofService.selectProofsToSend(mintUrl, { amount, unit }, false, wallet);
++    if (!sumProofs(exactProofs).equals(amount)) {
++      exactProofs = selectExactSubset(available, amount) ?? [];
 +    }
      const exactAmount = sumProofs(exactProofs);
      const needsSwap = !exactAmount.equals(amount);
  
-@@ -53,10 +81,19 @@ export class DefaultSendHandler implements SendMethodHandler<'default'> {
+@@ -53,10 +62,21 @@ export class DefaultSendHandler implements SendMethodHandler<'default'> {
          amount,
          proofCount: selectedProofs.length,
        });
@@ -92,7 +120,10 @@ index 1bfec9c2..8339e302 100644
 +        `Offline send needs proofs that add up to exactly ${amount.toString()} ${unit}`,
 +      );
      } else {
-       // Need to swap - select proofs including fees
+-      // Need to swap - select proofs including fees
++      // Need to swap - select proofs including fees. A swap needs the mint, so confirm it answers
++      // before anything is reserved.
++      await ctx.mintService.ensureMintReachable(mintUrl);
  
 -      const selected = await proofService.selectProofsToSend(mintUrl, { amount, unit }, true);
 +      const selected = await proofService.selectProofsToSend(
@@ -104,6 +135,75 @@ index 1bfec9c2..8339e302 100644
        selectedProofs = selected;
        const selectedAmount = sumProofs(selectedProofs);
        fee = wallet.getFeesForProofs(selectedProofs);
+diff --git a/packages/core/infra/handlers/send/P2pkSendHandler.ts b/packages/core/infra/handlers/send/P2pkSendHandler.ts
+index 29e8a6fc..c77d8651 100644
+--- a/packages/core/infra/handlers/send/P2pkSendHandler.ts
++++ b/packages/core/infra/handlers/send/P2pkSendHandler.ts
+@@ -54,6 +54,7 @@ export class P2pkSendHandler implements SendMethodHandler<'p2pk'> {
+     const { mintUrl, amount, unit } = operation;
+ 
+     const p2pkOptions = this.getP2pkOptions(operation.methodData as SendMethodData<'p2pk'>);
++    await mintService.ensureMintReachable(mintUrl);
+     await mintService.assertNutSupported(mintUrl, 11, 'P2PK send');
+ 
+     // P2PK always requires a swap to lock proofs to the pubkey
+diff --git a/packages/core/infra/handlers/send/exactSubset.ts b/packages/core/infra/handlers/send/exactSubset.ts
+new file mode 100644
+index 00000000..ba57cf15
+--- /dev/null
++++ b/packages/core/infra/handlers/send/exactSubset.ts
+@@ -0,0 +1,51 @@
++import { Amount, type Proof } from '@cashu/cashu-ts';
++
++/** Largest exact-match target searched by dynamic programming; larger sums rely on greedy. */
++const EXACT_SEARCH_LIMIT = 2_000_000;
++
++/**
++ * An exact subset of `available` summing to `amount`, or null when none exists. The randomized
++ * selector can miss an exact match; a wallet that promised the user an exact amount must not
++ * depend on chance. Largest-first is exact for power-of-two denominations; other denominations
++ * get a subset-sum search up to {@link EXACT_SEARCH_LIMIT}.
++ */
++export function selectExactSubset(available: readonly Proof[], amount: Amount): Proof[] | null {
++  const sorted = [...available].sort((a, b) => {
++    const left = Amount.from(a.amount);
++    const right = Amount.from(b.amount);
++    return left.equals(right) ? 0 : left.greaterThan(right) ? -1 : 1;
++  });
++  const greedy: Proof[] = [];
++  let remaining = amount;
++  for (const proof of sorted) {
++    if (remaining.isZero()) break;
++    const value = Amount.from(proof.amount);
++    if (value.greaterThan(remaining)) continue;
++    greedy.push(proof);
++    remaining = remaining.subtract(value);
++  }
++  if (remaining.isZero()) return greedy;
++
++  const target = Number(amount.toString());
++  if (!Number.isSafeInteger(target) || target > EXACT_SEARCH_LIMIT) return null;
++  // from[s] is the index of the proof that first reached sum s; a reached sum's predecessor was
++  // always reached by an earlier proof, so walking back never reuses one.
++  const from = new Int32Array(target + 1).fill(-1);
++  const values = sorted.map((proof) => Number(Amount.from(proof.amount).toString()));
++  from[0] = values.length;
++  for (let index = 0; index < values.length && from[target] === -1; index++) {
++    const value = values[index]!;
++    if (value <= 0 || value > target) continue;
++    for (let sum = target; sum >= value; sum--) {
++      if (from[sum] === -1 && from[sum - value] !== -1) from[sum] = index;
++    }
++  }
++  if (from[target] === -1) return null;
++  const selected: Proof[] = [];
++  for (let sum = target; sum > 0; ) {
++    const index = from[sum]!;
++    selected.push(sorted[index]!);
++    sum -= values[index]!;
++  }
++  return selected;
++}
 diff --git a/packages/core/operations/send/SendMethodHandler.ts b/packages/core/operations/send/SendMethodHandler.ts
 index e860263c..95d57b26 100644
 --- a/packages/core/operations/send/SendMethodHandler.ts
@@ -208,13 +308,44 @@ index 7816df52..e5f23ebe 100644
            operation.mintUrl,
            operation.id,
 diff --git a/packages/core/services/MintService.ts b/packages/core/services/MintService.ts
-index dde4f33a..15067776 100644
+index dde4f33a..6346049d 100644
 --- a/packages/core/services/MintService.ts
 +++ b/packages/core/services/MintService.ts
-@@ -241,6 +241,18 @@ export class MintService {
-     return { mint, keysets };
-   }
+@@ -129,6 +129,7 @@ export class MintService {
+     mintAdapter: MintAdapter,
+     logger?: Logger,
+     eventBus?: EventBus<CoreEvents>,
++    private readonly connectivity: { isOffline(): boolean } = { isOffline: () => false },
+   ) {
+     this.mintRepo = mintRepo;
+     this.keysetRepo = keysetRepo;
+@@ -230,17 +231,56 @@ export class MintService {
+     }
  
+     const now = Math.floor(Date.now() / 1000);
++    const keysets = excludeBlsKeysets(await this.keysetRepo.getKeysetsByMintUrl(mint.mintUrl));
+     if (mint.updatedAt < now - MINT_REFRESH_TTL_S) {
++      // Stale data stays usable: keyset ids commit to their keys, and the mint rejects an outdated
++      // keyset or fee when a request does reach it. Only a never-synced mint needs the network.
++      const usable = keysets.length > 0;
++      if (usable && this.connectivity.isOffline()) return { mint, keysets };
+       this.logger?.debug('Refreshing stale mint', { mintUrl });
+-      const updated = await this.updateMint(mint);
++      let updated: { mint: Mint; keysets: Keyset[] };
++      try {
++        updated = await this.updateMint(mint);
++      } catch (error) {
++        if (!usable) throw error;
++        this.logger?.warn('Mint refresh failed; using stored data', { mintUrl, error });
++        return { mint, keysets };
++      }
+       await this.eventBus?.emit('mint:updated', updated);
+       return updated;
+     }
+ 
++    return { mint, keysets };
++  }
++
 +  /**
 +   * The Known Mint's stored info and keysets, however old. Never contacts the mint.
 +   * Returns null when the mint is not known.
@@ -223,8 +354,24 @@ index dde4f33a..15067776 100644
 +    mintUrl = normalizeMintUrl(mintUrl);
 +    const mint = await this.mintRepo.getMintByUrl(mintUrl).catch(() => null);
 +    if (!mint) return null;
-+    const keysets = excludeBlsKeysets(await this.keysetRepo.getKeysetsByMintUrl(mint.mintUrl));
-+    return { mint, keysets };
+     const keysets = excludeBlsKeysets(await this.keysetRepo.getKeysetsByMintUrl(mint.mintUrl));
+     return { mint, keysets };
+   }
+ 
++  /**
++   * Refresh stale mint data and throw when the mint cannot be reached, with no fallback to stored
++   * data. Work that must reach the mint anyway, such as a swap, calls this before reserving
++   * anything, so an unreachable mint fails cleanly instead of partway through the swap.
++   */
++  async ensureMintReachable(mintUrl: string): Promise<void> {
++    mintUrl = normalizeMintUrl(mintUrl);
++    const mint = await this.mintRepo.getMintByUrl(mintUrl).catch(() => null);
++    const now = Math.floor(Date.now() / 1000);
++    if (mint && mint.updatedAt >= now - MINT_REFRESH_TTL_S) return;
++    if (this.connectivity.isOffline()) {
++      throw new MintFetchError(mintUrl, `Mint ${mintUrl} cannot be reached while offline`);
++    }
++    await this.updateMintData(mintUrl);
 +  }
 +
    async deleteMint(mintUrl: string): Promise<void> {
@@ -388,14 +535,128 @@ index 2b4808c5..028edaa8 100644
        keysetCount: validKeysets.length,
      });
      return wallet;
+diff --git a/packages/core/test/unit/DefaultSendHandler.test.ts b/packages/core/test/unit/DefaultSendHandler.test.ts
+index 1c7eac5e..fdf92543 100644
+--- a/packages/core/test/unit/DefaultSendHandler.test.ts
++++ b/packages/core/test/unit/DefaultSendHandler.test.ts
+@@ -204,6 +204,7 @@ describe('DefaultSendHandler', () => {
+ 
+     mintService = {
+       isTrustedMint: mock(() => Promise.resolve(true)),
++      ensureMintReachable: mock(() => Promise.resolve()),
+     } as unknown as MintService;
+ 
+     walletService = {
+@@ -323,7 +324,26 @@ describe('DefaultSendHandler', () => {
+       );
+     });
+ 
++    it('fails a swap send before reserving anything when the mint cannot be reached', async () => {
++      (proofRepository.getAvailableProofs as Mock<any>).mockImplementation(() =>
++        Promise.resolve([makeCoreProof('input-1', 60), makeCoreProof('input-2', 50)]),
++      );
++      (mintService.ensureMintReachable as Mock<any>).mockImplementation(() =>
++        Promise.reject(new Error('mint unreachable')),
++      );
++
++      await expect(handler.prepare(buildPrepareContext(makeInitOp('op-down')))).rejects.toThrow(
++        'mint unreachable',
++      );
++      expect(proofService.reserveProofs).not.toHaveBeenCalled();
++      expect(proofService.createOutputsAndIncrementCounters).not.toHaveBeenCalled();
++    });
++
+     it('throws ProofValidationError when selected proofs do not cover fees', async () => {
++      // No held subset matches the amount, so the exact-subset fallback finds nothing either.
++      (proofRepository.getAvailableProofs as Mock<any>).mockImplementation(() =>
++        Promise.resolve([makeCoreProof('input-1', 60), makeCoreProof('input-2', 50)]),
++      );
+       (proofService.selectProofsToSend as Mock<any>).mockImplementation(
+         (
+           _mintUrl: string,
 diff --git a/packages/core/test/unit/MintService.test.ts b/packages/core/test/unit/MintService.test.ts
-index 106d6973..bff27597 100644
+index 106d6973..3278524e 100644
 --- a/packages/core/test/unit/MintService.test.ts
 +++ b/packages/core/test/unit/MintService.test.ts
-@@ -193,6 +193,29 @@ describe('MintService', () => {
+@@ -50,6 +50,8 @@ describe('MintService', () => {
+     '8': 'key-8',
+   };
+ 
++  let offline = false;
++
+   beforeEach(() => {
+     mintRepo = new MemoryMintRepository();
+     keysetRepo = new MemoryKeysetRepository();
+@@ -65,7 +67,10 @@ describe('MintService', () => {
+       checkProofStates: mock(() => Promise.resolve([])),
+     } as unknown as MintAdapter;
+ 
+-    service = new MintService(mintRepo, keysetRepo, mockAdapter, undefined, eventBus);
++    offline = false;
++    service = new MintService(mintRepo, keysetRepo, mockAdapter, undefined, eventBus, {
++      isOffline: () => offline,
++    });
+   });
+ 
+   describe('trust management', () => {
+@@ -193,6 +198,83 @@ describe('MintService', () => {
      });
    });
  
++  describe('stale mint data without the mint', () => {
++    const makeStale = async () => {
++      const mint = await mintRepo.getMintByUrl(testMintUrl);
++      mint.updatedAt = 0;
++      await mintRepo.updateMint(mint);
++    };
++
++    it('uses stored data when the refresh fails', async () => {
++      await service.addMintByUrl(testMintUrl);
++      await makeStale();
++      (mockAdapter.fetchMintInfo as ReturnType<typeof mock>).mockImplementation(() =>
++        Promise.reject(new Error('network down')),
++      );
++
++      const result = await service.ensureUpdatedMint(testMintUrl);
++
++      expect(result.mint.updatedAt).toBe(0);
++      expect(result.keysets.map((keyset) => keyset.id)).toEqual(['keyset-1']);
++    });
++
++    it('uses stored data without a request while offline', async () => {
++      await service.addMintByUrl(testMintUrl);
++      await makeStale();
++      (mockAdapter.fetchMintInfo as ReturnType<typeof mock>).mockClear();
++      offline = true;
++
++      const result = await service.ensureUpdatedMint(testMintUrl);
++
++      expect(mockAdapter.fetchMintInfo).not.toHaveBeenCalled();
++      expect(result.keysets.map((keyset) => keyset.id)).toEqual(['keyset-1']);
++    });
++
++    it('still requires the mint for work that must reach it', async () => {
++      await service.addMintByUrl(testMintUrl);
++      await makeStale();
++      (mockAdapter.fetchMintInfo as ReturnType<typeof mock>).mockImplementation(() =>
++        Promise.reject(new Error('network down')),
++      );
++
++      await expect(service.ensureMintReachable(testMintUrl)).rejects.toThrow();
++      offline = true;
++      await expect(service.ensureMintReachable(testMintUrl)).rejects.toThrow('while offline');
++    });
++
++    it('still needs the mint for a mint it has never synced', async () => {
++      offline = true;
++      (mockAdapter.fetchMintInfo as ReturnType<typeof mock>).mockImplementation(() =>
++        Promise.reject(new Error('network down')),
++      );
++
++      await expect(service.ensureUpdatedMint(testMintUrl)).rejects.toThrow();
++    });
++  });
++
 +  describe('getStoredMint', () => {
 +    it('returns stale stored mint data without contacting the mint', async () => {
 +      await service.addMintByUrl(testMintUrl);
@@ -422,8 +683,20 @@ index 106d6973..bff27597 100644
    describe('ensureUpdatedMint', () => {
      it('should create mint if it does not exist', async () => {
        const result = await service.ensureUpdatedMint(testMintUrl);
+diff --git a/packages/core/test/unit/P2pkSendHandler.test.ts b/packages/core/test/unit/P2pkSendHandler.test.ts
+index 4d35212b..16145363 100644
+--- a/packages/core/test/unit/P2pkSendHandler.test.ts
++++ b/packages/core/test/unit/P2pkSendHandler.test.ts
+@@ -222,6 +222,7 @@ describe('P2pkSendHandler', () => {
+     // Mock MintService
+     mintService = {
+       isTrustedMint: mock(() => Promise.resolve(true)),
++      ensureMintReachable: mock(() => Promise.resolve()),
+       assertNutSupported: mock(() => Promise.resolve()),
+     } as unknown as MintService;
+ 
 diff --git a/packages/core/test/unit/SendOperationService.test.ts b/packages/core/test/unit/SendOperationService.test.ts
-index f412747e..c95c58c9 100644
+index f412747e..b93cbb71 100644
 --- a/packages/core/test/unit/SendOperationService.test.ts
 +++ b/packages/core/test/unit/SendOperationService.test.ts
 @@ -96,6 +96,7 @@ describe('SendOperationService', () => {
@@ -446,7 +719,7 @@ index f412747e..c95c58c9 100644
          },
        ),
        reserveProofs: mock((selectedMintUrl: string, secrets: string[], operationId: string) =>
-@@ -231,6 +233,63 @@ describe('SendOperationService', () => {
+@@ -231,6 +233,78 @@ describe('SendOperationService', () => {
      expect(lockedDuringEvent).toBe(true);
    });
  
@@ -461,6 +734,21 @@ index f412747e..c95c58c9 100644
 +    expect(walletService.getOfflineWallet).toHaveBeenCalledWith(mintUrl, 'sat');
 +    expect(walletService.getWalletWithActiveKeysetId).not.toHaveBeenCalled();
 +    expect(proofService.createOutputsAndIncrementCounters).not.toHaveBeenCalled();
++  });
++
++  it('sends an exact match of non-binary denominations offline', async () => {
++    await proofRepo.saveProofs(mintUrl, [
++      makeProof('proof-5', 5),
++      makeProof('proof-3a', 3),
++      makeProof('proof-3b', 3),
++    ]);
++
++    const preparedOp = await service.prepare(await service.init(mintUrl, unitAmount(6)), {
++      offline: true,
++    });
++
++    expect(preparedOp.needsSwap).toBe(false);
++    expect([...preparedOp.inputProofSecrets].sort()).toEqual(['proof-3a', 'proof-3b']);
 +  });
 +
 +  it('refuses an offline send that needs a swap and reserves nothing', async () => {
@@ -510,7 +798,7 @@ index f412747e..c95c58c9 100644
    it('prepares and executes a custom-unit send without selecting sat proofs', async () => {
      await proofRepo.saveProofs(mintUrl, [
        makeProof('sat-proof', 100, 'sat'),
-@@ -244,6 +303,7 @@ describe('SendOperationService', () => {
+@@ -244,6 +318,7 @@ describe('SendOperationService', () => {
      expect(preparedOp.unit).toBe('usd');
      expect(preparedOp.inputProofSecrets).toEqual(['usd-proof']);
      expect(walletService.getWalletWithActiveKeysetId).toHaveBeenCalledWith(mintUrl, 'usd');

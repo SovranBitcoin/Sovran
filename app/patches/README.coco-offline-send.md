@@ -1,13 +1,23 @@
 # Coco offline exact-match send patch
 
-`@cashu+coco-core+2.0.0.patch` adds `offline` to `ops.send.prepare`. With it,
-coco prepares a send from the mint's stored keysets without contacting the
-mint, and succeeds only when held proofs add up to the amount exactly.
-Otherwise it fails before reserving anything. Executing an exact-match send
-also stops refreshing mint data, since it hands over proofs the wallet already
-holds. Without `offline`, coco behaves as published: stale mint data (older
-than five minutes) is refreshed, and a mint that cannot be reached fails the
-prepare with `MintFetchError` before anything is reserved.
+`@cashu+coco-core+2.0.0.patch` makes coco offline-first, the way cdk's
+`KeysetLoadPolicy` does:
+
+- `ops.send.prepare({ offline: true })` prepares from the mint's stored
+  keysets without contacting it, and succeeds only when held proofs add up to
+  the amount exactly; otherwise it fails before reserving anything (cdk's
+  `SendKind::OfflineExact`).
+- Stale mint data (older than five minutes) is still refreshed, but a failed
+  refresh falls back to the stored info and keysets instead of throwing
+  `MintFetchError` (cdk's `CacheThenNetwork`). Only a mint that was never
+  synced needs the network.
+- `Manager.setOffline(true)` skips the refresh entirely, so nothing waits on
+  a request that cannot succeed. The app drives it from `OfflineProvider`.
+- A send that needs a swap checks the mint is reachable before reserving
+  anything, and fails with `MintFetchError` otherwise, so an unreachable mint
+  never strands proofs mid-swap.
+- Exact matches are found by a subset search, not only by the randomized
+  selector, so an amount the amount screen calls exact is always sent as is.
 
 Why, and how the app uses it: [ADR 0019](../docs/adr/0019-an-exact-send-needs-no-mint.md).
 
@@ -31,6 +41,10 @@ miss at 1097 sats. The online selector remains unchanged:
 | `SendOperationService.execute` | An exact-match operation uses the offline wallet. |
 | `DefaultSendHandler.prepare` | Offline binary exact selection is deterministic; non-exact sends fail before reservation. |
 | `SendOpsApi.prepare` | `PrepareSendInput.offline`, passed through. |
+| `MintService.ensureUpdatedMint` | Falls back to stored data when a refresh fails; no refresh while offline. |
+| `MintService.ensureMintReachable` | Strict refresh for work that must reach the mint. |
+| `Manager.setOffline` | Host-reported connectivity. |
+| `DefaultSendHandler`, `P2pkSendHandler` | Exact subset search (`exactSubset.ts`); swaps call `ensureMintReachable` before reserving. |
 
 The design follows cdk, whose `SendKind::OfflineExact` loads keysets with a
 cache-only policy and returns an error when no exact selection exists

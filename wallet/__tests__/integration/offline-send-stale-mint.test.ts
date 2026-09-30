@@ -166,11 +166,41 @@ describe("offline exact-match send with a dead network", () => {
     }
   });
 
-  it("keeps the online path online: stale mint data is refreshed, and failure is a mint-offline error", async () => {
+  it("online, an exact send to an unreachable mint falls back to stored data", async () => {
     const manager = await createSeededManager(STALE_SEC());
     try {
       const operations = createDefaultOperations({ getManager: () => manager });
-      const failure = await operations.executeSend!(MINT_URL, 36).then(
+      // 36 = 32 + 4: the refresh fails, and the held proofs are sent as they are.
+      await expect(operations.executeSend!(MINT_URL, 36)).resolves.toBeDefined();
+      expect(fetchSpy).toHaveBeenCalled();
+    } finally {
+      await manager.dispose();
+    }
+  });
+
+  it("set offline, sends never contact the mint: exact succeeds, a swap is a mint-offline error", async () => {
+    const manager = await createSeededManager(STALE_SEC());
+    try {
+      manager.setOffline(true);
+      const operations = createDefaultOperations({ getManager: () => manager });
+      await expect(operations.executeSend!(MINT_URL, 36)).resolves.toBeDefined();
+      const failure = await operations.executeSend!(MINT_URL, 35).then(
+        () => null,
+        (error: unknown) => error,
+      );
+      expect(isMintOfflineError(failure)).toBe(true);
+      expect(await reservedCount(manager)).toBe(0);
+      expect(fetchSpy).not.toHaveBeenCalled();
+    } finally {
+      await manager.dispose();
+    }
+  });
+
+  it("online, a swap send to an unreachable mint is a mint-offline error with nothing reserved", async () => {
+    const manager = await createSeededManager(STALE_SEC());
+    try {
+      const operations = createDefaultOperations({ getManager: () => manager });
+      const failure = await operations.executeSend!(MINT_URL, 35).then(
         () => null,
         (error: unknown) => error,
       );

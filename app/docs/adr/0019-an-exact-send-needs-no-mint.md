@@ -106,3 +106,16 @@ without a network request. The app's routing stays.
 Nothing here was run on a device. The airplane-mode send on a phone, offline
 receive, and the five-second offline confirmation in `OfflineProvider` are
 unverified.
+
+## Amendment (2026-09-29): offline-first mint data
+
+The patch now follows cdk further. A failed refresh of stale mint data falls
+back to the stored info and keysets instead of throwing, so an online
+exact-match send to an unreachable mint is made locally without an error.
+`Manager.setOffline`, driven by `OfflineProvider` in the Colada provider, skips
+the refresh altogether. A send that needs a swap still requires the mint: it
+checks reachability before reserving anything and fails with `MintFetchError`,
+which the app already routes to the round-down / round-up sheet. Exact
+matches are found by a subset search, so coco sends every amount the amount
+screen calls exact. The same change is on coco branch
+`feat/offline-first-mint-metadata` for upstream.
