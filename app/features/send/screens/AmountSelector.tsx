@@ -78,26 +78,27 @@ function buildNextVariants(
   nextAction: AmountEntryActions['next'],
   nextExecuteParams: NextExecuteParams,
   suppress: boolean,
-  lockOption?: { reason?: string; choose: () => Promise<P2pkLockSpec | null> },
-  confirmLock?: () => Promise<P2pkLockSpec | null>
+  confirmLock?: () => Promise<P2pkLockSpec | null>,
+  askLock?: () => Promise<P2pkLockSpec | null | undefined>
 ): ActionMenuVariant[] | undefined {
   if (suppress) return undefined;
   const raw = nextAction.variants as ActionVariant[] | undefined;
   if (!raw || raw.length === 0) return undefined;
   return (
     raw
-      // "Lock Ecash" needs terms, and the sender is always the one who
-      // answers for them: `lockOption` when locking is theirs to turn on,
-      // `confirmLock` when the flow arrived locked and only its length is.
-      .filter((v) => v.id !== 'locked-ecash' || lockOption || confirmLock)
+      // Locking is a question "as Ecash" asks, not an option of its own. The
+      // row survives only for a lock the flow arrived with, where it is the
+      // one thing that can happen and only its length is the sender's.
+      .filter((v) => v.id !== 'locked-ecash' || !!confirmLock)
       .map((v) => ({
         id: v.id,
         label: v.label,
         description: v.description,
         icon: v.icon,
-        isDisabled: !v.available || (v.id === 'locked-ecash' && !!lockOption?.reason),
-        reason: v.id === 'locked-ecash' ? (lockOption?.reason ?? v.reason) : v.reason,
+        isDisabled: !v.available,
+        reason: v.reason,
         isDestructive: v.isDestructive,
+        isCaution: v.isCaution,
         onPress: async () => {
           walletLog.info('amount.next.variant', {
             variantId: v.id,
@@ -106,16 +107,22 @@ function buildNextVariants(
             recipientDisplayName: nextExecuteParams.recipientProfile?.displayName ?? null,
           });
           if (v.id === 'locked-ecash') {
-            const lock = await (lockOption?.choose ?? confirmLock)?.();
+            const lock = await confirmLock?.();
             if (!lock) return;
             await nextAction.execute({ ...nextExecuteParams, variantId: v.id, p2pkLock: lock });
-          } else {
+            return;
+          }
+          if (v.id === 'ecash' && askLock) {
+            const lock = await askLock();
+            if (lock === undefined) return;
             await nextAction.execute({
               ...nextExecuteParams,
-              variantId: v.id,
-              ...(lockOption ? { p2pkLock: null } : {}),
+              variantId: lock ? 'locked-ecash' : 'ecash',
+              p2pkLock: lock,
             });
+            return;
           }
+          await nextAction.execute({ ...nextExecuteParams, variantId: v.id });
         },
       }))
   );
@@ -194,7 +201,8 @@ interface AmountSelectorProps {
   lockChoice?: null;
   /** Short line under the amount when the lock is worth a caveat. */
   lockWarning?: string | null;
-  lockOption?: { reason?: string; choose: () => Promise<P2pkLockSpec | null> };
+  /** See `useSendLock().askLock`: "as Ecash" asks "Lock to <name>" first. */
+  askLock?: () => Promise<P2pkLockSpec | null | undefined>;
   /**
    * Set whenever the send will be locked. Called as the send leaves, it
    * returns the terms to send on, asking the sender first if they have not
@@ -218,8 +226,8 @@ export function AmountSelector({
   recipientProfile,
   lockChoice,
   lockWarning = null,
-  lockOption,
   confirmLock,
+  askLock,
   suppressNextVariants = false,
 }: AmountSelectorProps) {
   useLifecycleLogger('AmountSelector', walletLog);
@@ -283,6 +291,15 @@ export function AmountSelector({
       recipientDisplayName: nextExecuteParams.recipientProfile?.displayName ?? null,
       locked: !!nextExecuteParams.p2pkLock || !!confirmLock,
     });
+    if (askLock) {
+      const asked = await askLock();
+      if (asked === undefined) {
+        walletLog.info('amount.next.lock_declined');
+        return;
+      }
+      await actions.next.execute({ ...nextExecuteParams, p2pkLock: asked });
+      return;
+    }
     if (!confirmLock) {
       await actions.next.execute(nextExecuteParams);
       return;
@@ -309,8 +326,8 @@ export function AmountSelector({
     actions.next,
     nextExecuteParams,
     suppressNextVariants || isCreateEcashEntry,
-    lockOption,
-    confirmLock
+    confirmLock,
+    askLock
   );
 
   // The AI-credit top-up flow lands on this screen via a hand-rolled

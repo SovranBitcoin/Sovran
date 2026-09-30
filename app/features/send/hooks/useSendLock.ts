@@ -3,10 +3,10 @@
  * what the send is told.
  *
  * One owner for every flow, so a lock is always announced the same way. The
- * header icon says whether the ecash about to be created is locked. The sheet
- * names who it is locked to and asks for how long. And a locked send never
- * leaves without that sheet having been answered — by tapping the icon
- * beforehand, or when Next is pressed.
+ * header icon is status only: whether the ecash about to be created is
+ * locked. The question comes as the ecash leaves: "as Ecash" asks "Lock to
+ * <name>" (or "Don't lock") when online, and a required lock asks only for
+ * how long. Offline there is nothing to ask — a lock needs a swap at the mint.
  */
 
 import { useCallback, useEffect, useMemo } from 'react';
@@ -14,7 +14,6 @@ import type { P2pkLockSpec } from 'wallet';
 
 import type { MintNuts } from '@/shared/lib/cashu/mintNuts';
 import { paymentLog } from '@/shared/lib/logger';
-import { acknowledgeSheet } from '@/shared/lib/popup/popups/acknowledgeSheet';
 import { actionMenuSheet } from '@/shared/lib/popup/popups/actionMenuSheet';
 import { useSendLockStore } from '@/shared/stores/runtime/sendLockStore';
 
@@ -40,8 +39,6 @@ interface SendLock {
   locked: boolean;
   /** What the header icon says to a screen reader. */
   label: string;
-  /** The header icon's tap: the sheet, or the reason there is none. */
-  open: () => void;
   /**
    * What an unlocked send tells the machine: `null` when locking was the
    * sender's to choose and they left it off, so no lock may stand by default;
@@ -49,8 +46,13 @@ interface SendLock {
    * never travel this way — they come from `confirmLock`, as the send leaves.
    */
   lockChoice: null | undefined;
-  /** Drives the "Lock Ecash" row of the payment-method menu. */
-  lockOption: { reason?: string; choose: LockChooser } | undefined;
+  /**
+   * Set when locking is the sender's to choose and it can happen now (online):
+   * "as Ecash" asks "Lock to <name>" first. Resolves the lock, `null` for
+   * "Don't lock", or `undefined` when the sender backed out and nothing may
+   * be sent.
+   */
+  askLock: (() => Promise<P2pkLockSpec | null | undefined>) | undefined;
   /**
    * Set whenever the send will be locked. Called as the send leaves: it
    * returns the terms as of that moment, asking first if the sheet has not
@@ -67,12 +69,13 @@ interface UseSendLockParams {
   recipientName: string;
   selectedMintUrl?: string;
   selectedMintNuts?: MintNuts;
+  /** No network: a lock cannot be made, so an optional one is never asked for. */
+  offline?: boolean;
 }
 
-const LOCK_ICON = 'mdi:lock-outline';
-
 export function useSendLock(params: UseSendLockParams): SendLock {
-  const { entry, recipientPubkey, recipientName, selectedMintUrl, selectedMintNuts } = params;
+  const { entry, recipientPubkey, recipientName, selectedMintUrl, selectedMintNuts, offline } =
+    params;
   const draft = useSendLockStore((state) => state.draft);
   const setDraft = useSendLockStore((state) => state.set);
   const clearDraft = useSendLockStore((state) => state.clear);
@@ -108,9 +111,10 @@ export function useSendLock(params: UseSendLockParams): SendLock {
     if (draft && !choiceMatchesMode(draft, mode)) clearDraft();
   }, [draft, mode, clearDraft]);
 
-  const choose = useCallback(
-    (allowOff: boolean): Promise<P2pkLockSpec | null> => {
-      if (mode.mode !== 'optional' && mode.mode !== 'required') return Promise.resolve(null);
+  // Resolves the lock, `null` for "Don't lock", `undefined` when dismissed.
+  const ask = useCallback(
+    (allowOff: boolean): Promise<P2pkLockSpec | null | undefined> => {
+      if (mode.mode !== 'optional' && mode.mode !== 'required') return Promise.resolve(undefined);
       const lockKey = mode.lockKey;
       const confirmed = mode.mode === 'required' || mode.confirmed;
       const current: SendLockDurationId | null = choice
@@ -121,7 +125,7 @@ export function useSendLock(params: UseSendLockParams): SendLock {
       return new Promise((resolve) =>
         actionMenuSheet({
           title: `Lock to ${recipientName}`,
-          onDismiss: () => resolve(null),
+          onDismiss: () => resolve(undefined),
           buttons: buildSendLockMenuItems({
             recipientName,
             current,
@@ -155,17 +159,9 @@ export function useSendLock(params: UseSendLockParams): SendLock {
     },
     [mode, choice, recipientName, recipientPubkey, refundKey, setDraft, clearDraft]
   );
-
-  const explain = useCallback(
-    (reason: string) => {
-      void acknowledgeSheet({
-        title: mode.mode === 'request' && mode.locked ? 'Locked by the request' : 'Not locked',
-        testID: 'amount-lock-notice-ok',
-        description: reason,
-        icon: mode.mode === 'request' && mode.locked ? LOCK_ICON : 'mdi:lock-open-variant-outline',
-      });
-    },
-    [mode]
+  const choose = useCallback(
+    async (allowOff: boolean): Promise<P2pkLockSpec | null> => (await ask(allowOff)) ?? null,
+    [ask]
   );
 
   return useMemo<SendLock>(() => {
@@ -187,59 +183,50 @@ export function useSendLock(params: UseSendLockParams): SendLock {
           mode: 'hidden',
           locked: false,
           label: '',
-          open: () => {},
           lockChoice: undefined,
-          lockOption: undefined,
           confirmLock: undefined,
+          askLock: undefined,
         };
       case 'request':
         return {
           mode: 'request',
           locked: mode.locked,
           label: mode.locked ? 'Locked by the payment request' : 'Not locked',
-          open: () => explain(mode.reason),
           lockChoice: undefined,
-          lockOption: undefined,
           confirmLock: undefined,
+          askLock: undefined,
         };
       case 'unavailable':
         return {
           mode: 'unavailable',
           locked: false,
           label: `Not locked. ${mode.reason}`,
-          open: () => explain(mode.reason),
           // A send to a person still says "no lock" out loud, so a lock the
           // flow started with cannot stand by default.
           lockChoice: mode.hasRecipient ? null : undefined,
-          lockOption: mode.hasRecipient
-            ? { reason: mode.reason, choose: () => Promise.resolve(null) }
-            : undefined,
           confirmLock: undefined,
+          askLock: undefined,
         };
       case 'required':
         return {
           mode: 'required',
           locked: true,
-          label: `Locked to ${recipientName}. Change how long`,
-          open: () => void choose(false),
+          label: `Locked to ${recipientName}`,
           lockChoice: undefined,
-          lockOption: undefined,
           confirmLock: confirm,
+          askLock: undefined,
         };
       case 'optional':
         return {
           mode: 'optional',
-          locked: hasChoice,
-          label: hasChoice
-            ? `Locked to ${recipientName}. Change lock`
-            : `Not locked. Lock to ${recipientName}`,
-          open: () => void choose(true),
-          lockChoice: hasChoice ? undefined : null,
-          // Already answered from the header: the row sends on those terms
-          // rather than asking the same question twice.
-          lockOption: { choose: confirm },
-          confirmLock: hasChoice ? confirm : undefined,
+          locked: hasChoice && !offline,
+          label: hasChoice && !offline ? `Locked to ${recipientName}` : 'Not locked',
+          lockChoice: hasChoice && !offline ? undefined : null,
+          // Offline a lock cannot be made, so the ecash leaves unlocked rather
+          // than failing on a choice made while online.
+          confirmLock: hasChoice && !offline ? confirm : undefined,
+          askLock: offline ? undefined : () => ask(true),
         };
     }
-  }, [mode, choice, choose, explain, recipientName]);
+  }, [mode, choice, choose, ask, recipientName, offline]);
 }

@@ -34,6 +34,8 @@ import { withGlassHeaderItems } from '@/navigation/headerItems';
 import { ScreenErrorState } from '@/shared/ui/composed/ScreenStates';
 import { paymentLog, useLifecycleLogger, Log } from '@/shared/lib/logger';
 import { useNearPaySessionStore } from '@/shared/stores/runtime/nearPayStore';
+import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
+import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useAmountDraftStore } from '@/shared/stores/runtime/amountDraftStore';
 import { zIndex } from '@/shared/styles/tokens';
 import { E2EActionMenuProbe } from '@/shared/lib/popup/E2EActionMenuProbe';
@@ -208,12 +210,16 @@ export function AmountFlowContent({
     const mint = trustedMints.find((m) => m.mintUrl === mintUrl);
     return (mint?.mintInfo as { nuts?: MintNuts } | undefined)?.nuts;
   }, [trustedMints, mintUrl]);
+  const { isOffline: networkOffline } = useOfflineStatus();
+  const mockOffline = useSettingsStore((state) => state.mockOffline);
+  const sendOffline = mockOffline || networkOffline;
   const sendLock = useSendLock({
     entry: entry as Record<string, unknown> | undefined,
     ...(recipientPubkey ? { recipientPubkey } : {}),
     recipientName: headerDisplayName ?? 'this key',
     ...(mintUrl ? { selectedMintUrl: mintUrl } : {}),
     ...(selectedMintNuts ? { selectedMintNuts } : {}),
+    offline: sendOffline,
   });
 
   useEffect(() => {
@@ -318,18 +324,16 @@ export function AmountFlowContent({
   );
   const isSendOperation = entry?.destination !== 'mintQuote';
   const showHeaderStatus = (isSendOperation && !!mintUrl) || sendLock.mode !== 'hidden';
-  const { locked: lockLocked, label: lockLabel, open: openLock } = sendLock;
+  const { locked: lockLocked, label: lockLabel } = sendLock;
   const lockShown = sendLock.mode !== 'hidden';
   const renderHeaderRight = useCallback(
     () => (
       <AmountHeaderStatus
         canSendOffline={canSendOffline}
-        {...(lockShown
-          ? { lock: { locked: lockLocked, label: lockLabel, onPress: openLock } }
-          : {})}
+        {...(lockShown ? { lock: { locked: lockLocked, label: lockLabel } } : {})}
       />
     ),
-    [canSendOffline, lockShown, lockLocked, lockLabel, openLock]
+    [canSendOffline, lockShown, lockLocked, lockLabel]
   );
   // The inline host draws the bar; hand it the status to draw there.
   useEffect(() => {
@@ -387,8 +391,8 @@ export function AmountFlowContent({
           recipientPubkey={recipientPubkey}
           recipientProfile={forwardedRecipientProfile}
           lockChoice={sendLock.lockChoice}
-          lockOption={sendLock.lockOption}
           confirmLock={sendLock.confirmLock}
+          askLock={sendLock.askLock}
           suppressNextVariants={!!nearPayRecipient}
         />
       </View>

@@ -76,6 +76,13 @@ jest.mock('@/features/send/hooks/useSendLockTarget', () => ({
   }),
 }));
 jest.mock('@cashu/coco-react', () => ({ useMints: () => ({ trustedMints: [] }) }));
+jest.mock('@/shared/providers/OfflineProvider', () => ({
+  useOfflineStatus: () => ({ isOffline: false }),
+}));
+jest.mock('@/shared/stores/global/settingsStore', () => ({
+  useSettingsStore: (select: (state: { mockOffline: boolean }) => unknown) =>
+    select({ mockOffline: false }),
+}));
 jest.mock('@/shared/stores/runtime/sendLockStore', () => ({
   useSendLockStore: (selector: (s: unknown) => unknown) =>
     selector({ draft: null, set: jest.fn(), clear: jest.fn() }),

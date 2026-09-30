@@ -80,3 +80,15 @@ every payment flow, because the plain Next now sends on it.
 - **Not proven on a device.** The sheet, the header on both platforms and the
   radar hand-off are covered by unit tests. `send.cashu.header-lock` is
   authored and has not been run.
+
+## Amendment (2026-09-29): the question is asked by "as Ecash"
+
+The header lock is status only; tapping it does nothing. Locking is no longer
+a separate "as Locked Ecash" row in the Select option menu. Instead "as Ecash"
+asks "Lock to <name>" (with "Don't lock") as the ecash leaves, when the device
+is online. Offline the question is skipped, the ecash leaves unlocked, and the
+round-up / round-down sheet follows if the held proofs do not match. A lock the
+flow arrived with (a scanned receive key, a Nut Drop) keeps its single
+"as Locked Ecash" row, which asks only for how long. If an optional lock fails
+at the mint, the send-fallback sheet offers plain ecash; a required lock never
+falls back.

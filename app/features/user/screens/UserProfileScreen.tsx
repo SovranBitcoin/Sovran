@@ -1192,7 +1192,7 @@ export function UserProfileScreen() {
   // No (valid) lud16 in the profile → fall back to the recipient's npub.cash
   // address: every Nostr pubkey is payable at <npub>@npub.cash, so money can
   // always be sent. The send flow's Select-option menu labels the Lightning
-  // variant "to npub.cash" for npc targets, so the destination stays explicit.
+  // variant "as Lightning (npub.cash)" for npc targets, so the destination stays explicit.
   const npcFallback = npub ? getNpcAddress(undefined, npub) : undefined;
   const meltTarget = lud16 ?? npcFallback;
   const handleSendMoney = () => {
@@ -1210,7 +1210,7 @@ export function UserProfileScreen() {
       return;
     }
     clearPaymentContext('user.profile.send_money');
-    // Start the lock-target lookup now, so the amount screen's "Lock Ecash"
+    // Start the lock-target lookup now, so the amount screen's "as Locked Ecash"
     // option is decided before the user gets there.
     prefetchNutzapProfile(pubkey);
     paymentLog.info('user.profile.send_money.start', {

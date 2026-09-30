@@ -33,21 +33,20 @@ function render(props: React.ComponentProps<typeof AmountHeaderStatus>) {
 }
 
 describe('AmountHeaderStatus', () => {
-  it('shows a closed lock that opens the lock sheet', () => {
-    const onPress = jest.fn();
+  it('shows a closed lock as status only', () => {
     const { lock } = render({
-      lock: { locked: true, label: 'Locked to David. Change how long', onPress },
+      lock: { locked: true, label: 'Locked to David' },
       canSendOffline: null,
     });
     expect(lock.icon).toBe('mdi:lock-outline');
-    expect(lock.accessibilityLabel).toBe('Locked to David. Change how long');
-    lock.onPress();
-    expect(onPress).toHaveBeenCalledTimes(1);
+    expect(lock.accessibilityLabel).toBe('Locked to David');
+    // The lock question is asked as the ecash leaves, never from the header.
+    expect(lock.onPress).toBeUndefined();
   });
 
   it('shows an open lock when the ecash will not be locked', () => {
     const { lock } = render({
-      lock: { locked: false, label: 'Not locked. Lock to Alice', onPress: jest.fn() },
+      lock: { locked: false, label: 'Not locked. Lock to Alice' },
       canSendOffline: true,
     });
     expect(lock.icon).toBe('mdi:lock-open-variant-outline');
@@ -61,7 +60,7 @@ describe('AmountHeaderStatus', () => {
 
   it('says an unlocked exact amount can leave with no network', () => {
     const { sendability } = render({
-      lock: { locked: false, label: 'Not locked', onPress: jest.fn() },
+      lock: { locked: false, label: 'Not locked' },
       canSendOffline: true,
     });
     expect(sendability.icon).toBe('mdi:airplane');
@@ -72,7 +71,7 @@ describe('AmountHeaderStatus', () => {
   // help: the send still cannot leave without the network.
   it('says a locked send needs the network even when the proofs match exactly', () => {
     const { sendability } = render({
-      lock: { locked: true, label: 'Locked to David', onPress: jest.fn() },
+      lock: { locked: true, label: 'Locked to David' },
       canSendOffline: true,
     });
     expect(sendability.icon).toBe('mdi:wifi');

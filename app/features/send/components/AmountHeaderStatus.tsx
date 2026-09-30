@@ -3,7 +3,8 @@ import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 
 interface AmountHeaderStatusProps {
   /** Omit when the payment is not ecash and there is nothing to lock. */
-  lock?: { locked: boolean; label: string; onPress: () => void };
+  /** Status only: the lock question is asked as the ecash leaves, not from here. */
+  lock?: { locked: boolean; label: string };
   /**
    * Whether this amount can be sent with no network: `true` when the wallet
    * already holds proofs that make it exactly, `false` when the mint has to
@@ -32,7 +33,6 @@ export function AmountHeaderStatus({ lock, canSendOffline }: AmountHeaderStatusP
           icon={lock.locked ? 'mdi:lock-outline' : 'mdi:lock-open-variant-outline'}
           size={STATUS_ICON_SIZE}
           accessibilityLabel={lock.label}
-          onPress={lock.onPress}
         />
       ) : null}
       <View className={offline === null ? 'opacity-30' : undefined}>
