@@ -31,6 +31,7 @@ import { useNotificationPolicyStore } from '@/features/feed/stores/notificationP
 import { notificationPolicyLabel } from '@/features/feed/lib/notificationCopy';
 import { useMediaServerStore } from '@/shared/lib/nostr/media/mediaServerStore';
 import { useNip46RequestsStore } from '@/features/nostrSigner';
+import { hasFeature } from '@/shared/config/features';
 
 const name = Application.applicationName;
 const version = Application.nativeApplicationVersion;
@@ -285,13 +286,17 @@ export const SettingsScreen = () => {
                 description={notificationPolicyLabel(notificationPolicy)}
                 descriptionNumberOfLines={1}
               />
-              <Separator className="mx-4" />
-              <SettingsListLinkItem
-                href="/(settings-flow)/network"
-                title="Network"
-                testID="settings-network-row"
-                description="Aggregators, caching, and relays"
-              />
+              {hasFeature('nostr') && (
+                <>
+                  <Separator className="mx-4" />
+                  <SettingsListLinkItem
+                    href="/(settings-flow)/network"
+                    title="Network"
+                    testID="settings-network-row"
+                    description="Aggregators, caching, and relays"
+                  />
+                </>
+              )}
             </ListGroup>
           </Section>
         </LayoutShiftProbe>
@@ -319,14 +324,18 @@ export const SettingsScreen = () => {
         <LayoutShiftProbe tag="settings.security">
           <Section title="Security">
             <ListGroup variant="secondary">
-              <SettingsListLinkItem
-                href="/(signer-flow)"
-                title="Remote Login"
-                testID="settings-remote-login-row"
-                description={signerRowDescription(signerPendingCount)}
-                descriptionNumberOfLines={1}
-              />
-              <Separator className="mx-4" />
+              {hasFeature('nostr') && (
+                <>
+                  <SettingsListLinkItem
+                    href="/(signer-flow)"
+                    title="Remote Login"
+                    testID="settings-remote-login-row"
+                    description={signerRowDescription(signerPendingCount)}
+                    descriptionNumberOfLines={1}
+                  />
+                  <Separator className="mx-4" />
+                </>
+              )}
               <SettingsListLinkItem
                 href="/(settings-flow)/keyring"
                 title="P2PK Keys"
@@ -353,20 +362,28 @@ export const SettingsScreen = () => {
                 isSelected={sendLocationEnabled ?? false}
                 onSelectedChange={setSendLocationEnabled}
               />
-              <Separator className="mx-4" />
-              <SettingsListLinkItem
-                href="/(settings-flow)/moderation"
-                testID="settings-moderation-row"
-                title="Moderation"
-                description="Blocked people and private-message word filter"
-              />
-              <Separator className="mx-4" />
-              <SettingsListLinkItem
-                href="/(settings-flow)/media"
-                title="My media"
-                testID="settings-media-row"
-                description={`Images you've posted · uploads via ${mediaHost}`}
-              />
+              {hasFeature('nostr') && (
+                <>
+                  <Separator className="mx-4" />
+                  <SettingsListLinkItem
+                    href="/(settings-flow)/moderation"
+                    testID="settings-moderation-row"
+                    title="Moderation"
+                    description="Blocked people and private-message word filter"
+                  />
+                </>
+              )}
+              {hasFeature('feed') && (
+                <>
+                  <Separator className="mx-4" />
+                  <SettingsListLinkItem
+                    href="/(settings-flow)/media"
+                    title="My media"
+                    testID="settings-media-row"
+                    description={`Images you've posted · uploads via ${mediaHost}`}
+                  />
+                </>
+              )}
             </ListGroup>
           </Section>
         </LayoutShiftProbe>

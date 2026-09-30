@@ -6,6 +6,7 @@ import Icon from 'assets/icons';
 import { SovranTabBar } from '@/shared/blocks/SovranTabBar';
 import { Expo55NativeTabs, isExpo55NativeTabsSupported } from '@/navigation/nativeTabs';
 import { TabBarInsetsProvider } from '@/shared/hooks/useScreenInsets';
+import { hasFeature, type Feature } from '@/shared/config/features';
 
 export const unstable_settings = {
   anchor: 'index',
@@ -21,11 +22,14 @@ type TabDef = {
   sf: { default: SFSymbol; selected: SFSymbol };
   /** Monicon (Iconify) pair for the cross-platform JS tab bar. */
   monicon: { default: string; selected: string };
+  /** Module this tab belongs to; omitted tabs always ship. */
+  feature?: Feature;
 };
 
-const TAB_DEFS: readonly TabDef[] = [
+const ALL_TAB_DEFS: readonly TabDef[] = [
   {
     name: 'feed',
+    feature: 'feed',
     testID: 'tab-feed',
     title: 'Feed',
     sf: { default: 'house', selected: 'house.fill' },
@@ -33,6 +37,7 @@ const TAB_DEFS: readonly TabDef[] = [
   },
   {
     name: 'contacts',
+    feature: 'contacts',
     testID: 'tab-contacts',
     title: 'Contacts',
     sf: { default: 'person.2', selected: 'person.2.fill' },
@@ -47,6 +52,7 @@ const TAB_DEFS: readonly TabDef[] = [
   },
   {
     name: 'notifications',
+    feature: 'feed',
     testID: 'tab-notifications',
     title: 'Notifications',
     sf: { default: 'bell', selected: 'bell.fill' },
@@ -54,12 +60,15 @@ const TAB_DEFS: readonly TabDef[] = [
   },
   {
     name: 'ai',
+    feature: 'ai',
     title: 'AI',
     testID: 'tab-ai',
     sf: { default: 'brain', selected: 'brain' },
     monicon: { default: 'mdi:robot-outline', selected: 'mdi:robot' },
   },
 ];
+
+const TAB_DEFS = ALL_TAB_DEFS.filter((tab) => !tab.feature || hasFeature(tab.feature));
 
 const NATIVE_TAB_PROPS = Object.fromEntries(
   TAB_DEFS.map((tab) => [

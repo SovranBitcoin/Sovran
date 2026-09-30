@@ -82,6 +82,7 @@ import { usePricelistStore } from '@/shared/stores/global/pricelistStore';
 import { useSettingsStore, type DisplayCurrency } from '@/shared/stores/global/settingsStore';
 import { clearPaymentContext } from '@/shared/stores/runtime/clearPaymentContext';
 import { useDmEchoStore } from '@/shared/stores/runtime/dmEchoStore';
+import { buildDetectors } from '@/shared/config/featureDetectors';
 import { isPaymentRequestFailureMockEnabled } from '@/features/send/lib/paymentRequestFailureMock';
 
 // Per-mint NUT-06 deadline used by `fetchMintInfo` below. Only matters on a
@@ -697,6 +698,7 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
   return (
     <ColadaProviderBase
       handlers={handlers}
+      detectors={buildDetectors}
       instance={instance}
       getManager={getManager}
       annotationStore={transactionAnnotationAdapter}

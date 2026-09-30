@@ -33,6 +33,8 @@ import { MODAL_SCREENS, ModalConfig } from '../config/modalScreens';
 import { getBaseModalHeaderOptions } from '../config/flowLayoutOptions';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { loadSettledHeaderHeights } from '@/shared/ui/composed/settledHeaderHeight';
+import { applyFeatureSetToWallet, hasFeature } from '@/shared/config/features';
+import { useFeatureRouteGuard } from '@/shared/lib/nav/featureRoutes';
 import { preloadNfcSupported } from '@/shared/lib/nfc/useNfcSupported';
 import { withGlassHeaderItems } from '@/navigation/headerItems';
 import { CocoProvider } from '@/shared/providers/CocoProvider';
@@ -74,6 +76,7 @@ LogBox.ignoreAllLogs();
 // Before any stack pushes a page, so it starts at the right header height.
 void loadSettledHeaderHeights();
 // Before Send opens, so its method list is sized by the answer, not the guess.
+applyFeatureSetToWallet();
 preloadNfcSupported();
 
 // Outer providers — stable across profile switches, never remount.
@@ -127,7 +130,8 @@ function AccountScopedProviders({
         // Mounts BitChat DM listeners once per account scope without
         // starting BLE on app launch. BLE discovery announces to nearby
         // bitchat clients, so explicit peer-list/chat surfaces own startup.
-        BitchatBLEProvider,
+        // Proximity DMs ship only with Nut Drop (ADR 0021).
+        ...(hasFeature('nutDrop') ? [BitchatBLEProvider] : []),
         AppGate,
       ]),
     [accountIndex]
@@ -215,6 +219,7 @@ const CloseButton = React.memo(function CloseButton() {
 
 // Inner component that can access theme context
 function RootLayoutContent() {
+  useFeatureRouteGuard();
   const { currentTheme } = useTheme();
   const [foreground, background] = useThemeColor(['foreground', 'surface'] as const);
 

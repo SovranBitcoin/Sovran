@@ -56,6 +56,7 @@ import {
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { useSpendingConditions } from '../hooks/useSpendingConditions';
 import { spendingConditionDetailItems } from '../components/SpendingConditionsCard';
+import { hasFeature } from '@/shared/config/features';
 
 interface SendTokenScreenProps {
   sendHistoryEntry?: SendHistoryEntry | string;
@@ -247,7 +248,7 @@ export function SendTokenScreen({
                 await new Promise((r) => setTimeout(r, 400));
                 await actions.nfc.execute();
               },
-              condition: actions.nfc.available,
+              condition: hasFeature('nfc') && actions.nfc.available,
               disabled: actions.cancel.loading,
             },
             {

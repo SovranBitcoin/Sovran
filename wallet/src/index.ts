@@ -410,6 +410,7 @@ export {
   getMintMethodCapability,
   hasCompatibleMintForMethod,
   hasMintSupportingMethod,
+  configureEnabledPaymentMethods,
   isMethodImplemented,
   isMintMethodCompatible,
   methodContextHasCompatibleMint,
