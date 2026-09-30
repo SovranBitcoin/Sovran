@@ -43,7 +43,7 @@ import { Button } from '@/shared/ui/primitives/Button';
 import { CircleActionButton } from '@/shared/ui/composed/CircleActionButton';
 import { View } from '@/shared/ui/primitives/View/View';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
-import { SheetMenuRowContent } from '@/shared/lib/popup/popups/sheetMenuRow';
+import { MenuRowTint, SheetMenuRowContent } from '@/shared/lib/popup/popups/sheetMenuRow';
 import Icon from 'assets/icons';
 import { MenuScrim } from '@/shared/blocks/popup/MenuScrim';
 import {
@@ -75,6 +75,8 @@ export interface ActionMenuVariant {
   reason?: string;
   /** Red destructive styling. */
   isDestructive?: boolean;
+  /** Yellow caution tint: the option works but carries a caveat. */
+  isCaution?: boolean;
   /** Override the default testID `${rootTestID}-menu-${id}`. */
   testID?: string;
   onPress: () => void | Promise<void>;
@@ -130,6 +132,7 @@ function toActionMenuItem(v: ActionMenuVariant, rootTestID: string | undefined):
     disabled: v.isDisabled,
     reason: v.reason,
     variant: v.isDestructive ? 'dangerous' : undefined,
+    isCaution: v.isCaution,
     testID: itemTestID,
     onPress: async () => {
       try {
@@ -357,32 +360,36 @@ function renderPopoverPortal(
           </Menu.Label>
         ) : null}
         {variants.map((v) => (
-          <Menu.Item
+          <MenuRowTint
             key={v.id}
-            testID={v.testID ?? (rootTestID ? `${rootTestID}-menu-${v.id}` : undefined)}
-            isDisabled={v.isDisabled}
-            variant={v.isDestructive ? 'danger' : 'default'}
-            onPress={() => {
-              if (v.isDisabled) return;
-              void (async () => {
-                try {
-                  await v.onPress();
-                } catch (error) {
-                  log.error('ui.action_menu.menu_action_failed', {
-                    testID: v.testID ?? (rootTestID ? `${rootTestID}-menu-${v.id}` : undefined),
-                    variantId: v.id,
-                    error: error instanceof Error ? error.message : String(error),
-                  });
-                }
-              })();
-            }}>
-            <SheetMenuRowContent
-              singleLineTitle={false}
-              icon={v.iconNode ?? (v.icon ? <Icon name={v.icon} size={18} /> : null)}
-              title={v.label}
-              description={(v.isDisabled && v.reason ? v.reason : v.description) || undefined}
-            />
-          </Menu.Item>
+            tone={v.isCaution ? 'caution' : undefined}
+            disabled={v.isDisabled === true}>
+            <Menu.Item
+              testID={v.testID ?? (rootTestID ? `${rootTestID}-menu-${v.id}` : undefined)}
+              isDisabled={v.isDisabled}
+              variant={v.isDestructive ? 'danger' : 'default'}
+              onPress={() => {
+                if (v.isDisabled) return;
+                void (async () => {
+                  try {
+                    await v.onPress();
+                  } catch (error) {
+                    log.error('ui.action_menu.menu_action_failed', {
+                      testID: v.testID ?? (rootTestID ? `${rootTestID}-menu-${v.id}` : undefined),
+                      variantId: v.id,
+                      error: error instanceof Error ? error.message : String(error),
+                    });
+                  }
+                })();
+              }}>
+              <SheetMenuRowContent
+                singleLineTitle={false}
+                icon={v.iconNode ?? (v.icon ? <Icon name={v.icon} size={18} /> : null)}
+                title={v.label}
+                description={(v.isDisabled && v.reason ? v.reason : v.description) || undefined}
+              />
+            </Menu.Item>
+          </MenuRowTint>
         ))}
       </Menu.Content>
     </Menu.Portal>

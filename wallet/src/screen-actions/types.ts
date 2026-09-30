@@ -101,6 +101,12 @@ export interface ActionVariant {
   reason?: string;
   /** Marks destructive variants (red styling). */
   isDestructive?: boolean;
+  /**
+   * Marks a variant that works but carries a caveat the user must weigh
+   * (yellow styling), e.g. paying an npub.cash address the recipient never
+   * advertised.
+   */
+  isCaution?: boolean;
 }
 
 export interface ActionAvailability {
