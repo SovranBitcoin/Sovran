@@ -1,0 +1,1563 @@
+.qr { width: 176px; height: 176px; padding: 8px; border: 1px solid var(--line); border-radius: var(--r); background: #FFFFFF; flex: none; }
+.qr img, .qr canvas { width: 100% !important; height: auto !important; display: block; }
+.qrrow { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+.rails { display: grid; gap: 6px; min-width: 0; flex: 1; }
+.rail { display: flex; gap: 8px; align-items: baseline; font-size: 0.9rem; min-width: 0; }
+.rail .mk { width: 14px; flex: none; }
+.rail.off { color: var(--muted); text-decoration: line-through; }
+.link { background: none; border: 0; padding: 0; color: var(--fg); text-decoration: underline; text-underline-offset: 3px; font: inherit; font-size: 0.88rem; cursor: pointer; justify-self: start; }
+.chip[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.chip.exact::after { content: " ✓"; color: var(--ok); }
+.chip[aria-pressed="true"].exact::after { color: var(--bg); }
+.hint { font-size: 0.82rem; color: var(--muted); }
+.ic { flex: none; vertical-align: -3px; }
+.layout { max-width: 560px; margin: 0 auto; padding-inline: 16px; padding-block: 12px 110px; display: grid; gap: 24px; }
+.layout > * { min-width: 0; }
+.flow { display: grid; gap: 16px; align-content: start; }
+.research { display: grid; gap: 26px; align-content: start; }
+.research h2 { font: 500 1rem var(--f-display); margin: 0 0 8px; }
+.research p { margin: 0; }
+.card { border: 1px solid var(--line); border-radius: var(--r); padding: 14px; display: grid; gap: 10px; }
+/* Big Receive / Send switch */
+.bigtabs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.bigtabs button { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 16px; border-radius: 14px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); font: 500 1.1rem var(--f-display); cursor: pointer; }
+.bigtabs button[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.status { display: flex; gap: 8px; align-items: center; font-size: 0.82rem; color: var(--muted); }
+.balances { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+.bal { border: 1px solid var(--line); border-radius: var(--r); padding: 10px 12px; display: grid; gap: 2px; }
+.bal .amt { font: 500 1.1rem var(--f-mono); font-variant-numeric: tabular-nums; }
+.bal .sub { font-size: 0.76rem; color: var(--muted); }
+/* action tiles */
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(92px, 1fr)); gap: 8px; }
+.tile { display: grid; justify-items: center; gap: 6px; padding: 12px 6px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--fg); font: 500 0.82rem var(--f-body); cursor: pointer; text-align: center; }
+.tile[aria-pressed="true"] { border-color: var(--fg); box-shadow: inset 0 0 0 1px var(--fg); }
+.tile .ic { width: 22px; height: 22px; }
+/* people dropdown */
+.dd { position: relative; }
+.dd-btn { width: 100%; display: flex; align-items: center; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--fg); font: 500 0.95rem var(--f-body); cursor: pointer; text-align: left; }
+.dd-btn .chev { margin-left: auto; color: var(--muted); }
+.dd-list { margin-top: 6px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); padding: 6px; display: grid; gap: 2px; box-shadow: 0 8px 24px rgba(0,0,0,.08); }
+.dd-list input { margin: 2px 2px 6px; width: calc(100% - 4px); }
+.dd-opt { display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: 8px; border: 0; background: none; color: var(--fg); font: inherit; text-align: left; cursor: pointer; width: 100%; }
+.dd-opt:hover, .dd-opt:focus-visible { background: var(--accent-soft); }
+.avatar { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font: 600 0.8rem var(--f-body); color: var(--bg); background: var(--fg); flex: none; }
+.dd-opt .who { display: grid; min-width: 0; }
+.dd-opt .who span:last-child { font-size: 0.78rem; color: var(--muted); }
+/* decision trace */
+.trace { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 0.86rem; }
+.trace li { display: flex; gap: 8px; align-items: baseline; }
+.trace .t-ok { color: var(--ok); } .trace .t-no { color: var(--bad); } .trace .t-skip { color: var(--muted); }
+.trace b { font-weight: 600; }
+.chips.stack { display: grid; gap: 6px; }
+.chip.wide { text-align: left; border-radius: 10px; display: flex; gap: 8px; align-items: center; }
+.mini { display: flex; align-items: center; gap: 10px; margin-top: 6px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); animation: compact .32s ease both; transform-origin: left center; min-width: 0; }
+.mini .avatar { width: 26px; height: 26px; font-size: .75rem; }
+.mini .big { font: 500 1.05rem var(--f-mono); font-variant-numeric: tabular-nums; }
+.mini .sub { font-size: .8rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@keyframes compact { from { transform: scale(1.06); opacity: .4; } to { transform: scale(1); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .mini { animation: none; } }
+.fails { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 8px 10px; border: 1px dashed var(--line); border-radius: 10px; }
+.fails .chip[aria-pressed="true"] { background: var(--bad); border-color: var(--bad); color: var(--bg); }
+.trace .t-fail { color: var(--bad); font-weight: 600; }
+.bottom-inner { position: relative; }
+.simmenu { position: absolute; right: 0; bottom: calc(100% + 8px); width: min(300px, 100%); background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 6px; display: grid; gap: 2px; box-shadow: 0 8px 24px rgba(0,0,0,.12); }
+.simmenu .hint { padding: 6px 8px; }
+.simmenu button { display: flex; justify-content: space-between; gap: 8px; padding: 10px 8px; border: 0; background: none; border-radius: 8px; color: var(--fg); font: 500 0.9rem var(--f-body); cursor: pointer; text-align: left; }
+.simmenu button:hover { background: var(--accent-soft); }
+.simmenu button[aria-checked="true"] { color: var(--bad); }
+.bottom { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; background: var(--bg); border-top: 1px solid var(--line); padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px)); }
+.bottom-inner { max-width: 520px; display: flex; gap: 10px; }
+.bottom-inner { margin: 0 auto; }
+.bottom .back { display: flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); font: 500 0.95rem var(--f-body); padding: 13px 16px; border-radius: 999px; cursor: pointer; }
+.bottom .back:disabled { opacity: .4; cursor: default; }
+.bottom .cta { flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px; }
+.flow .step.active .body > [data-next], .flow .step.active .body > .cta { display: none; }
+.results { font-size: 0.85rem; overflow-x: auto; }
+.results table { border-collapse: collapse; width: 100%; }
+.results th, .results td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.results th { font-weight: 500; color: var(--muted); }
+.matrix { table-layout: fixed; }
+.matrix td, .matrix th { text-align: center; padding: 6px 4px; }
+.matrix th { font-size: 0.72rem; line-height: 1.2; vertical-align: bottom; }
+.matrix col.w { width: 12%; }
+.matrix td:first-child, .matrix th:first-child { text-align: left; padding-left: 8px; }
+.matrix .yes { color: var(--ok); font-weight: 600; } .matrix .part { color: var(--warn); } .matrix .no { color: var(--muted); }
+.matrix tr.group td { font-weight: 600; background: var(--accent-soft); text-align: left; }
+.matrix .us { background: var(--ok-soft); }
+#overpay, #maxfee { accent-color: var(--fg); width: 100%; }
+.research details > summary { cursor: pointer; font: 500 1rem var(--f-display); margin-bottom: 8px; }
+.switch { display: flex; align-items: center; justify-content: space-between; gap: 12px; cursor: pointer; font-size: 0.9rem; }
+.switch input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.switch input:checked + .track { background: var(--plane); }
+.switch input:checked + .track::after { transform: translateX(20px); }
+.switch input:focus-visible + .track { outline: 2px solid var(--accent); outline-offset: 2px; }
+.switch .lbl { display: flex; gap: 8px; align-items: center; }
+details.why-box { border-top: 1px dashed var(--line); padding-top: 8px; font-size: 0.84rem; color: var(--muted); }
+details.why-box summary { cursor: pointer; color: var(--fg); }
+/* ---- Soft by default: selection is a tint and a faint ring, never a hard outline.
+   The one solid element is the main action (bottom button). Tokens adapt to every theme. */
+:root { --tint: color-mix(in srgb, var(--fg) 7%, var(--surface)); --ring: color-mix(in srgb, var(--fg) 16%, transparent); }
+.chip { border-color: transparent; background: var(--accent-soft); }
+.chip:hover { background: var(--tint); border-color: transparent; }
+.chip[aria-pressed="true"], .tile[aria-pressed="true"], button.bal[aria-pressed="true"], .themes button[aria-checked="true"],
+.choice:has(input:checked), .dd-opt[aria-selected="true"], .bigtabs button[aria-pressed="true"] {
+  background: var(--tint); border-color: var(--ring); box-shadow: none; color: var(--fg); }
+.bigtabs button, .tile, .choice, .card, .bal, .dd-btn, .iconbtn, .themes button, .lockbox, .tapbox, .mini { border-color: var(--line); }
+.scanbtn { background: var(--accent-soft); color: var(--fg); border-color: transparent; }
+.step.done .num { background: var(--tint); color: var(--fg); border-color: transparent; }
+.step.active .num { border-color: var(--ring); color: var(--fg); }
+.amount input:focus { border-color: var(--ring); }
+.tapbox.armed .tap-ic { border-color: var(--ring); }
+.lockseg button[aria-checked="true"] { box-shadow: none; background: var(--surface); }
+.dd-list, .simmenu { box-shadow: 0 8px 28px rgba(0, 0, 0, .08); border-color: var(--line); }
+.sheet-panel { box-shadow: 0 0 36px rgba(0, 0, 0, .12); }
+.timeline li.done::before { background: var(--muted); border-color: var(--muted); }
+.receipt .qr, .qr { border-color: var(--line); }
+/* Receipt controls live in the footer; the inline ones stay for scripts/tests only. */
+.tl-demo, .receipt ~ .next[data-reset], #send-steps .body > .next[data-reset], #recv-steps .body > .next[data-reset] { display: none; }
+/* The Ecash option and its lock are one card: the lock appears inside it once Ecash is chosen. */
+.choice-group { border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); overflow: hidden; }
+.choice-group > .choice { border: 0; border-radius: 0; background: transparent; }
+.choice-group.on { background: var(--tint); border-color: var(--ring); }
+.choice-group > .lockbox, .choice-group > .hint { margin: 0 12px 12px 42px; background: var(--surface); }
+.choice-group > .hint { background: transparent; }
+.mintfix { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.mintfix .chip { display: inline-flex; gap: 6px; align-items: center; font-family: var(--f-mono); font-size: 0.78rem; }
+.rail.off + .mintfix { margin: -2px 0 4px 22px; }
+.unsupported { display: flex; gap: 12px; align-items: center; padding: 14px; border-radius: var(--r); background: var(--accent-soft); }
+.unsupported .u-text { display: grid; gap: 2px; flex: 1; min-width: 0; }
+.unsupported > .ic { color: var(--warn); }
+.chip.unsup { color: var(--muted); }
+.modlist { display: grid; gap: 8px; }
+.note { display: grid; gap: 4px; }
+.note input { font: inherit; padding: 10px 12px; border-radius: var(--r); border: 1px solid var(--line); background: var(--surface); color: var(--fg); }
+</style>
+
+<div class="layout">
+<main class="flow">
+  <header class="topbar">
+    <button type="button" class="iconbtn" id="open-settings" aria-haspopup="dialog" aria-label="Settings"><svg class="ic" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1 7 17M17 7l2.1-2.1"/></svg></button>
+    <h1>Help me pay</h1>
+    <button type="button" class="iconbtn" id="open-research" aria-haspopup="dialog">Research</button>
+  </header>
+
+  <div class="bigtabs" role="group" aria-label="Receive or send">
+    <button id="tab-recv" aria-pressed="false" type="button">%RECV% Receive</button>
+    <button id="open-scan" class="scanbtn" type="button" aria-haspopup="dialog" aria-label="Scan a QR code"><svg class="ic" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3"/><path d="M7 12h10"/></svg></button>
+    <button id="tab-send" aria-pressed="true" type="button">%SEND% Send</button>
+  </div>
+  <div class="status" id="status"></div>
+  <section class="balances" id="balances" aria-label="Mint balances (demo)"></section>
+
+  <form id="send-form" autocomplete="off"><ol class="steps" id="send-steps"></ol></form>
+  <form id="recv-form" autocomplete="off" hidden><ol class="steps" id="recv-steps"></ol></form>
+</main>
+</div>
+
+<div class="sheet" id="sheet-settings" hidden><div class="sheet-panel left research" role="dialog" aria-modal="true" aria-labelledby="set-title">
+  <div class="sheet-head"><h2 id="set-title">Settings</h2><button type="button" class="chip" data-close>Done</button></div>
+  <section class="card" aria-labelledby="theme-h">
+    <h2 id="theme-h">Theme</h2>
+    <div class="themes" role="radiogroup" aria-label="Theme"><button type="button" role="radio" data-themeopt="paper" class="theme-paper"><span class="sw" aria-hidden="true"><i></i><i></i><i></i></span>Paper</button><button type="button" role="radio" data-themeopt="ink" class="theme-ink"><span class="sw" aria-hidden="true"><i></i><i></i><i></i></span>Ink</button><button type="button" role="radio" data-themeopt="sand" class="theme-sand"><span class="sw" aria-hidden="true"><i></i><i></i><i></i></span>Sand</button><button type="button" role="radio" data-themeopt="sage" class="theme-sage"><span class="sw" aria-hidden="true"><i></i><i></i><i></i></span>Sage</button><button type="button" role="radio" data-themeopt="slate" class="theme-slate"><span class="sw" aria-hidden="true"><i></i><i></i><i></i></span>Slate</button><button type="button" role="radio" data-themeopt="dusk" class="theme-dusk"><span class="sw" aria-hidden="true"><i></i><i></i><i></i></span>Dusk</button></div>
+  </section>
+  <section class="card" aria-labelledby="set-h">
+    <h2 id="set-h">Your settings</h2>
+    <label class="ctext" for="maxfee"><span class="lbl" style="display:flex;justify-content:space-between"><span>Refuse Lightning fees above</span><b id="maxfee-out">2%</b></span>
+      <input type="range" id="maxfee" min="0" max="5" step="0.5" value="2" aria-label="Largest Lightning fee reserve you accept"></label>
+    <p class="hint">Checked against the mint's quoted fee reserve (NUT-05); unused reserve comes back (NUT-08). Reserves under 3 sats always pass.</p>
+    <label class="ctext" for="overpay"><span class="lbl" style="display:flex;justify-content:space-between"><span>Overpay offline at most</span><b id="overpay-out">2%</b></span>
+      <input type="range" id="overpay" min="0" max="10" step="1" value="2" aria-label="Largest overpayment you accept"></label>
+    <p class="hint">When no mint can make change, send slightly more from pieces you hold (like Minibits' offline approximate send).</p>
+    <label class="switch" for="f-coverfee"><span class="lbl">%ECASH% Add the receiver's claim fee to tokens I send</span><input type="checkbox" id="f-coverfee" checked><span class="track" aria-hidden="true"></span></label>
+    <p class="hint">So they get the full amount (cashu.me's "include fees"). Payment requests always include it: NUT-18 requires it.</p>
+    <label class="switch" for="f-topup"><span class="lbl">%BOLT% Top up a mint I already use to pay a request</span><input type="checkbox" id="f-topup" checked><span class="track" aria-hidden="true"></span></label>
+    <p class="hint">Last resort when a request only takes a mint where you hold too little. Never adds a new mint; the Lightning fee is shown first.</p>
+  </section>
+
+  <section class="card" aria-labelledby="mod-h">
+    <h2 id="mod-h">Wallet build</h2>
+    <label class="switch" for="preset"><span class="lbl">Preset</span><select id="preset"></select></label>
+    <div id="modules" class="modlist"></div>
+    <p class="hint">Each module is a build switch (flow.py MODULES). Off hides it everywhere; on adds what it needs.</p>
+  </section>
+
+  <section class="card" aria-labelledby="sc-h">
+    <h2 id="sc-h">Scenario (demo conditions)</h2>
+    <label class="switch" for="airplane"><span class="lbl">%PLANE% Airplane mode</span><input type="checkbox" id="airplane"><span class="track" aria-hidden="true"></span></label>
+    <label class="switch" for="mintdown"><span class="lbl">%SERVER% Mint not responding</span><select id="mintdown"><option value="">None</option><option value="sovran">mint.tidewater.cash</option><option value="minibits">mint.kestrel.money</option><option value="third">mint.northfield.io</option></select></label>
+    <label class="switch" for="f-amountless"><span class="lbl">%BOLT% Mint pays invoices with no amount (NUT-23)</span><input type="checkbox" id="f-amountless" checked><span class="track" aria-hidden="true"></span></label>
+    <label class="switch" for="f-bolt12"><span class="lbl">%BOLT% Mint supports BOLT12 (NUT-25)</span><input type="checkbox" id="f-bolt12" checked><span class="track" aria-hidden="true"></span></label>
+    <label class="switch" for="platform"><span class="lbl">%SERVER% Your phone</span><select id="platform"><option value="android">Android</option><option value="ios_eea">iPhone in the EEA</option><option value="ios">iPhone elsewhere</option></select></label>
+    <label class="switch" for="cached"><span class="lbl">%PEOPLE% Recipient's wallet info cached</span><input type="checkbox" id="cached" checked><span class="track" aria-hidden="true"></span></label>
+  </section>
+</div></div>
+
+<div class="sheet" id="sheet-research" hidden><div class="sheet-panel right research" role="dialog" aria-modal="true" aria-labelledby="res-title">
+  <div class="sheet-head"><h2 id="res-title">Research</h2><button type="button" class="chip" data-close>Done</button></div>
+  <section class="results" aria-labelledby="res-h">
+    <h2 id="res-h">How the flows compare</h2>
+    <div id="matrix"></div>
+    <p class="hint">From <span class="mono">bruteforce.py</span> (2,304 send, 80 receive designs, 1,536 situations). Wins 98.8% of 600 random weightings.</p>
+  </section>
+
+  <section class="results" aria-labelledby="bip-h">
+    <details><summary id="bip-h">Unified QR and tap-to-pay: what gets paid, and the fallback</summary>
+    <div id="bipmap"></div>
+    <p class="hint">No spec preference between rails; every wallet checked prefers ecash. A tap is hands-free only for ecash (numo waits ~3 s per message).</p></details>
+  </section>
+
+  <section class="results" aria-labelledby="paste-h">
+    <details><summary id="paste-h">What a paste can tell the wallet</summary>
+    <div id="pastemap"></div>
+  </details></section>
+
+  <section class="results" aria-labelledby="fail-h">
+    <details><summary id="fail-h">Failure paths: what can go wrong, and the next step</summary>
+    <div id="failmap"></div>
+    <p class="hint">From flow.py FAILURES: reference-wallet code (cashu.me, Minibits, Macadamia, Cashu Wallet, Zeus, cdk, coco, numo, Sovran).</p></details>
+  </section>
+  <details><summary>About this demo</summary><footer>
+    <div><b>Example wallet.</b> Three mints with made-up balances and features at $100,000 per bitcoin (1,000 sats is $1.00). QR codes are real but carry demo data. Nothing here moves money.</div>
+    <div><b>Protocol.</b> Ecash you hold sends with no mint. Making change (NUT-03), locking (NUT-11), Lightning (NUT-04/05) and onchain (NUT-30) need the mint. A lock can be checked offline (NUT-12) only against keys already saved for that mint. A payment request (NUT-18/26) can be made offline.</div>
+  </footer></details>
+</div></div>
+
+<div class="sheet" id="sheet-scan" hidden><div class="sheet-panel scan" role="dialog" aria-modal="true" aria-labelledby="scan-title">
+  <div class="sheet-head"><h2 id="scan-title">Scan</h2><button type="button" class="chip" data-close>Cancel</button></div>
+  <div class="srcseg" role="tablist" aria-label="Where it comes from">
+    <button type="button" role="tab" data-src="camera" aria-selected="true">%SCAN% Camera</button>
+    <button type="button" role="tab" data-src="paste" aria-selected="false">%PASTE% Paste</button>
+    <button type="button" role="tab" data-src="photos" aria-selected="false">%IMAGE% Photos</button>
+  </div>
+  <div class="viewfinder" id="scan-vf" aria-label="Camera (demo)"><span class="vf-corners" aria-hidden="true"></span><span class="hint">This demo has no camera. Pick what it would see below.</span></div>
+  <input type="file" id="scan-file" accept="image/*" hidden>
+  <div id="scan-msg" class="hint" role="status"></div>
+  <section class="scan-examples" aria-live="polite"><div id="scan-list" class="chips stack"></div></section>
+</div></div>
+
+<nav class="bottom" aria-label="Step navigation"><div class="bottom-inner">
+  <button type="button" class="back" id="nav-back">%BACK% Back</button>
+  <button type="button" class="cta" id="nav-next">Continue</button>
+  <button type="button" class="back" id="nav-more" aria-haspopup="true" aria-expanded="false" aria-label="Simulate a failure on this step" hidden>%WARN% <span class="sim-label">Simulate</span></button>
+  <div class="simmenu" id="simmenu" role="menu" hidden></div>
+</div></nav>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+<script>
+(() => {
+%ICONS%
+  const SATS_PER_USD = 1000;
+  const MINTS = [
+    { id: 'sovran', name: 'mint.tidewater.cash', proofs: [1024, 512, 128, 64, 32, 16, 8, 4, 1], fee: 0, bolt12: true, onchain: true, amountless: true, p2pk: true, desc: true,
+      limits: { mint: { bolt11: [1, 1e6], bolt12: [1, 1e6], onchain: [25000, 1e7] }, melt: { bolt11: [1, 1e6], bolt12: [1, 1e6], onchain: [25000, 1e7] } } },
+    { id: 'minibits', name: 'mint.kestrel.money', proofs: [256, 128, 32, 2], fee: 1, bolt12: false, onchain: false, amountless: false, p2pk: true, desc: false,
+      limits: { mint: { bolt11: [1, 100000] }, melt: { bolt11: [1, 100000] } } },
+    // Demo third mint: enough for a 1,000 sat Lightning payment, so falling back to another mint is visible.
+    { id: 'third', name: 'mint.northfield.io', proofs: [512, 256, 128, 64, 32, 16, 8, 4, 2], fee: 0, bolt12: false, onchain: false, amountless: true, p2pk: false, desc: true,
+      limits: { mint: { bolt11: [200, 500000] }, melt: { bolt11: [200, 500000] } } },
+  ];
+  // Mint info gates every step (NUT-06): per method-unit min/max for minting (NUT-04) and melting (NUT-05),
+  // a method may be absent or disabled, and locking needs NUT-11. '' = allowed, else a short reason.
+  const METHOD_NAMES = { bolt11: 'Lightning', bolt12: 'BOLT12', onchain: 'onchain' };
+  function lim(m, op, method, amt) {
+    const r = (method === 'bolt12' && !m.bolt12) || (method === 'onchain' && !m.onchain) ? null : m.limits[op][method];
+    if (!r) return `no ${METHOD_NAMES[method]} ${op === 'mint' ? 'receive' : 'send'}`;
+    if (amt && amt < r[0]) return `${METHOD_NAMES[method]} from ${fmt(r[0])} sats`;
+    if (amt && amt > r[1]) return `${METHOD_NAMES[method]} up to ${fmt(r[1])} sats`;
+    return '';
+  }
+  const FOREIGN_MINT = 'mint.orchardbay.cash'; // a mint you don't use (demo)
+  const LOCKS = ['Off', '1 hour', '1 day', '1 week', '30 days', 'Forever'];
+  const fmt = (n) => n.toLocaleString('en-US');
+  const usd = (s) => '$' + (s / SATS_PER_USD).toFixed(2);
+  const bal = (m) => m.proofs.reduce((a, b) => a + b, 0);
+  const mint = (id) => MINTS.find((m) => m.id === id);
+  const tags = (...t) => `<span class="tags">${t.map((x) => x.startsWith('+') ? `<span class="tag good">${x.slice(1)}</span>` : `<span class="tag">${x}</span>`).join('')}</span>`;
+
+  const S = { offline: false, mintDown: '', cached: true, overpay: 2, maxfee: 2, coverFee: true, topup: true, primary: 'sovran', platform: 'android', send: null, recv: null };
+  // Network for lookups and messages; the mint for swaps, locks, melts, quotes.
+  const net = () => !S.offline;
+  const mintUp = (m = MINTS[0]) => net() && S.mintDown !== m.id;
+  // Reachable mints first, keeping the user's order otherwise. Ecash from a
+  // mint that isn't answering can't be claimed (the receiver swaps it, NUT-03).
+  // Order per flow.py MINT_SELECTION: reachable first, then larger balance, then the user's order.
+  // Order per flow.py MINT_SELECTION: the primary mint first (a soft default, like Sovran's
+  // persisted selectedMint, app/shared/stores/profile/mintStore.ts:23), then reachable, then larger balance.
+  // The primary only leads; each step's own filter (accepted, balance, limits, NUT-11) still applies,
+  // so when it can't do the payment the next mint is used and the step says why.
+  const byReach = (list) => [...list].sort((a, b) => (b.id === S.primary && mintUp(b)) - (a.id === S.primary && mintUp(a)) || mintUp(b) - mintUp(a) || bal(b) - bal(a));
+  // The flow spec (flow.py → flow.json), embedded at build time.
+  const FLOW = %FLOW%;
+  // Modules (flow.py MODULES): a build switch per rail and feature. Off = hidden, never greyed:
+  // it isn't a condition the user can fix. `needs` are kept consistent by setModule().
+  S.mods = [...FLOW.presets.full]; S.preset = 'full';
+  const ON = (m) => !m || S.mods.includes(m);
+  const RAIL_MOD = { creq: 'ecash', ecash: 'ecash', npc: 'npubcash', lno: 'bolt12', ln: 'lightning', btc: 'onchain' };
+  function setModule(m, on) {
+    const set = new Set(S.mods), mods = FLOW.modules;
+    const add = (x) => { if (set.has(x)) return; set.add(x); mods[x].needs.forEach(add); };
+    const drop = (x) => { if (!set.has(x)) return; set.delete(x); Object.keys(mods).filter((y) => mods[y].needs.includes(x)).forEach(drop); };
+    on ? add(m) : drop(m);
+    if (!['ecash', 'lightning', 'onchain'].some((r) => set.has(r))) return false; // a wallet needs one way to pay
+    S.mods = Object.keys(mods).filter((x) => set.has(x)); S.preset = Object.keys(FLOW.presets).find((k) => FLOW.presets[k].join() === S.mods.join()) || 'custom';
+    return true;
+  }
+  const canSwitch = (kind, step) => (FLOW[kind === 'send' ? 'send' : 'receive'].find((x) => x.id === step) || {}).mint_switch === 'yes';
+  // The user's pick (From/Into mint control) goes first; otherwise reachable first.
+  const rank = (list, sel) => { const r = byReach(list); const i = r.findIndex((m) => m.id === sel); return i > 0 ? [r[i], ...r.slice(0, i), ...r.slice(i + 1)] : r; };
+  const mintState = (m) => !net() ? 'unknown, you\'re offline' : mintUp(m) ? 'responding' : 'not responding';
+  // From/Into mint control: shows the mint in use, opens every option. `ok` says which mints can do this payment.
+  // "Not supported by this mint" + Change mint: opens the mint selector filtered to what's needed.
+  const unsupported = (what, reason, need) => `<div class="unsupported">${ic('warn', 18)}<div class="u-text"><b>${what} isn't supported by this mint</b><span class="hint">${reason}</span></div><button type="button" class="chip" data-mintneed="${need}">Change mint</button></div>`;
+  function mintPill(f, kind, step, cur, ok0 = () => '', label = 'From') {
+    if (!cur || !canSwitch(kind, step)) return '';
+    const need = f.mintNeed || '', [nm, na] = need.split(':');
+    const needWhy = (m) => (!need ? '' : need === 'p2pk' ? (m.p2pk ? '' : 'can\'t lock (no NUT-11)') : lim(m, kind === 'recv' ? 'mint' : 'melt', nm, +na || 0));
+    const ok = (m) => ok0(m) || needWhy(m);
+    const head = need === 'p2pk' ? 'Mints that can lock' : need ? `Mints that ${kind === 'recv' ? 'issue' : 'pay'} ${METHOD_NAMES[nm]}` : kind === 'recv' ? 'Into' : 'Pay from';
+    const prim = mint(S.primary), off = !f.mintSel && cur.id !== prim.id;
+    const why = off ? (!mintUp(prim) ? mintState(prim) : ok(prim) || 'another mint fits this payment better') : '';
+    return `<div class="mintpill"><span class="hint">${label}</span><button type="button" class="chip" data-mintmenu aria-expanded="${!!f.mintMenu}">${ic('server', 14)} ${cur.name}${f.mintSel ? '' : cur.id === prim.id ? ' · primary' : ' · auto'} ▾</button></div>
+      ${off ? `<div class="hint">Not your primary, ${prim.name}: ${why}.</div>` : ''}
+      ${f.mintMenu ? `<div class="dd-list" role="listbox"><div class="dd-head"><span class="hint">${head}</span><button type="button" class="x" data-mintmenu aria-label="Close">✕</button></div><button type="button" class="dd-opt" data-mintsel="" aria-selected="${!f.mintSel}"><span class="who"><span>Auto</span><span>Your primary when it can, then reachable mints by balance</span></span></button>
+        ${MINTS.map((m) => { const why = ok(m); return `<button type="button" class="dd-opt" data-mintsel="${m.id}" aria-selected="${f.mintSel === m.id}" ${why ? 'disabled' : ''}><span class="who"><span>${m.name} · ${fmt(bal(m))} sats</span><span>${why || mintState(m)}${m.id === S.primary ? ' · primary' : ''}</span></span></button>`; }).join('')}</div>` : ''}`;
+  }
+
+  function can(proofs) {
+    const total = proofs.reduce((a, b) => a + b, 0);
+    const c = new Uint8Array(total + 1); c[0] = 1;
+    for (const p of proofs) for (let s = total; s >= p; s--) if (c[s - p]) c[s] = 1;
+    return c;
+  }
+  function near(proofs, target, lo = target, hi = target) {
+    const c = can(proofs);
+    for (let s = lo; s <= hi && s < c.length; s++) if (c[s]) return { exact: s };
+    let down = null, upv = null;
+    for (let s = Math.min(lo - 1, c.length - 1); s > 0; s--) if (c[s]) { down = s; break; }
+    for (let s = hi + 1; s < c.length; s++) if (c[s]) { upv = s; break; }
+    return { exact: null, down, up: upv };
+  }
+  const exactAt = (m, a) => !!can(m.proofs)[a];
+  const atLeast = (m, a) => { const c = can(m.proofs); for (let x = a; x < c.length; x++) if (c[x]) return x; return null; };
+
+  // ---------------- People and pastes ----------------
+  // lud16 from kind-0, mints and lockKey from NIP-61 kind 10019. Both are
+  // fetched from relays; offline they exist only if cached.
+  const USERS = [
+    { id: 'alice', name: 'Alice', nip05: 'alice@sovran.money', npub: 'npub1alice7q…3xk', lud16: 'alice@getalby.com', mints: ['sovran'], lockKey: '02a1b2…c3d4' },
+    { id: 'bob', name: 'Bob', nip05: 'bob@primal.net', npub: 'npub1bob9w…u2m', lud16: 'bob@walletofsatoshi.com', mints: null, lockKey: null },
+    { id: 'carol', name: 'Carol', nip05: null, npub: 'npub1carol4…8fz', lud16: null, mints: ['minibits'], lockKey: '03c0ffee…77aa' },
+    { id: 'dave', name: 'Dave', nip05: 'dave@nostr.com', npub: 'npub1dave2…q9t', lud16: null, mints: null, lockKey: null },
+  ];
+  const userBy = (id) => USERS.find((u) => u.id === id);
+
+  // Payloads a paste, scan or terminal can carry. creq: NUT-18 request
+  // (amount a, mints m, mp, nut10 lock). ln: bolt11. lno: bolt12. btc: address.
+  const PAYLOADS = {
+    both: { label: 'Cashu request + Lightning invoice', raw: 'bitcoin:?creq=CREQB1…&lightning=lnbc10240n1…', creq: { a: 1024, m: ['sovran', 'minibits'] }, ln: { a: 1024 } },
+    creq: { label: 'Cashu request only (needs change)', raw: 'creqB1QQ8QYQ9C8…', creq: { a: 1003, m: ['sovran', 'minibits'] } },
+    ln: { label: 'Lightning invoice only', raw: 'lnbc10u1pjdemo…', ln: { a: 1000 } },
+    foreign: { label: 'Cashu request for mints you don\'t use + Lightning', raw: 'bitcoin:?creq=CREQB1…(m=mint.orchardbay.cash)&lightning=lnbc…', creq: { a: 1000, m: ['coinos'] }, ln: { a: 1000 } },
+    locked: { label: 'Cashu request locked to a key + Lightning', raw: 'bitcoin:?creq=CREQB1…(nut10 P2PK)&lightning=lnbc…', creq: { a: 1000, m: ['sovran'], lock: true }, ln: { a: 1000 } },
+    feemint: { label: 'Cashu request only at a fee-charging mint + Lightning', raw: 'bitcoin:?creq=CREQB1…(m=mint.kestrel.money)&lightning=lnbc…', creq: { a: 287, m: ['minibits'] }, ln: { a: 287 } },
+    topup: { label: 'Cashu request only for a mint you hold too little at', raw: 'creqB1…(m=mint.kestrel.money, a=600)', creq: { a: 600, m: ['minibits'] } },
+    noamt: { label: 'Cashu request with no amount', raw: 'creqB1…(no a)', creq: { a: null, m: null } },
+    three: { label: 'Address + Lightning + Cashu request', raw: 'bitcoin:bc1q…?amount=0.00001&lightning=lnbc…&creq=CREQB1…', creq: { a: 1000, m: ['coinos'] }, ln: { a: 1000 }, btc: { a: 1000 } },
+    ln0: { label: 'Lightning invoice with no amount', raw: 'lnbc1pjdemo0…', ln: { a: null } },
+    lno0: { label: 'Lightning offer with no amount', raw: 'lno1qcp4256ypq…', lno: { a: null } },
+    offer: { label: 'Lightning offer + Cashu request', raw: 'bitcoin:?lno=lno1…&creq=CREQB1…', creq: { a: 1000, m: ['coinos'] }, lno: { a: 1000 } },
+  };
+
+  // A paste for a module this wallet doesn't have says so instead of "not recognised".
+  function classify(text) {
+    const h = classify0(text); if (!h) return h;
+    const P = h.kind === 'payload' ? PAYLOADS[h.payload] : null;
+    const off = h.kind === 'person' ? !ON('nostr') && 'Nostr people aren\'t part of this wallet.'
+      : h.kind === 'p2pk' ? !ON('lock') && 'Locking to a key (P2PK) isn\'t part of this wallet.'
+      : h.kind === 'lnaddr' ? !ON('lightning') && 'Lightning isn\'t part of this wallet.'
+      : P && !((P.creq && ON('ecash')) || (P.ln && ON('lightning')) || (P.lno && ON('bolt12')) || (P.btc && ON('onchain'))) && 'This wallet can\'t pay any way this code offers.';
+    return off ? { kind: 'off', why: off } : h;
+  }
+  function classify0(text) {
+    const v = text.trim().replace(/^nostr:/i, '');
+    if (!v) return null;
+    const lower = v.toLowerCase();
+    const u = USERS.find((x) => lower === x.npub.toLowerCase() || (x.nip05 && lower === x.nip05));
+    if (u) return { kind: 'person', user: u.id, via: lower.includes('@') ? 'nip05' : 'npub' };
+    if (/^(npub1|nprofile1)/.test(lower)) return { kind: 'person', user: 'unknown', via: 'npub' };
+    const k = USERS.find((x) => x.lockKey && lower === x.lockKey.toLowerCase());
+    if (/^0[23][0-9a-f…]+/.test(lower)) return { kind: 'p2pk', user: k ? k.id : null };
+    const p = Object.entries(PAYLOADS).find(([, x]) => x.raw.toLowerCase() === lower);
+    if (p) return { kind: 'payload', payload: p[0] };
+    if (/^(bitcoin:|creq|lnbc|lno1|bc1)/.test(lower)) return { kind: 'payload', payload: lower.startsWith('lnbc1') ? 'ln0' : lower.startsWith('lnbc') ? 'ln' : lower.startsWith('lno1') ? 'lno0' : lower.startsWith('creq') ? 'creq' : 'both' };
+    if (/^[^\s@]+@[^\s@]+\.[a-z]{2,}$/.test(lower)) return { kind: 'lnaddr', value: v };
+    return null;
+  }
+
+  // What we know about a person right now: live lookup online, cache offline.
+  function knowledge(u) {
+    if (!u) return null;
+    if (u.id === 'unknown') return net() ? { lud16: null, mints: null, lockKey: null, lockSource: 'nostr', source: 'looked up: no wallet info published' } : { unknown: true };
+    if (net()) return { ...u, lockSource: u.lockKey ? 'wallet' : 'nostr', source: 'looked up just now' };
+    if (S.cached) return { ...u, lockSource: u.lockKey ? 'wallet' : 'nostr', source: 'from the last 10 minutes' };
+    return { unknown: true };
+  }
+
+  // The one decision engine for unified QRs, pastes and taps. It records every
+  // check so the page can show why a rail was picked or skipped.
+  function resolve(key, { nfc, fails = [], sel = '' }) {
+    const P = PAYLOADS[key];
+    const trace = [];
+    let cur = null; // rail the next trace lines belong to
+    const push = (ok, text, fail = false) => trace.push({ ok, text, fail, rail: cur });
+    const tried = [];
+    let pick = null, stale = null;
+    if (P.creq && ON('ecash')) {
+      const c = P.creq;
+      cur = 'ecash'; push(null, `<b>Cashu request</b>${c.a ? ` for ${fmt(c.a)} sats` : ''}`);
+      let blocked = false;
+      if (!c.a) { if (nfc) { push(false, 'No amount: a tap can\'t ask you for one'); blocked = true; } else push(true, 'No amount: you choose it'); }
+      const listed = c.m ? MINTS.filter((m) => c.m.includes(m.id)) : MINTS;
+      if (!blocked) {
+        if (!listed.length) { push(false, `Only accepts ${c.m.map((x) => x === 'coinos' ? 'mint.orchardbay.cash' : x).join(', ')}, which you don't use`); blocked = true; }
+        else push(true, `Accepts ${listed.map((m) => m.name).join(', ')}`);
+      }
+      if (!blocked && c.lock) {
+        if (nfc) { push(false, 'Asks for a locked token: a lock needs a swap, too slow for a tap'); blocked = true; }
+        else if (!mintUp()) { push(false, 'Asks for a locked token: locking needs your mint'); blocked = true; }
+        else push(true, 'Asks for a locked token: your mint locks it');
+      }
+      let from = null, paid = 0;
+      if (!blocked) {
+        const amt = c.a || 1;
+        let rejected = false;
+        for (const m of rank(listed, sel)) {
+          // NUT-18: the request is net of the receiver's input fee, so the pieces must cover a + fee.
+          const need = amt + (m.fee || 0); // NUT-18: a is net of the receiver's input fee; the payer MUST cover it
+          if (bal(m) < need) { push(false, `${m.name}: not enough (${fmt(bal(m))} sats)`); continue; }
+          if (c.lock && !m.p2pk) { push(false, `${m.name}: can't lock tokens (no NUT-11)`); continue; }
+          if (net() && !mintUp(m)) {
+            if (exactAt(m, need) && !stale) stale = { m, paid: need };
+            push(false, `${m.name} isn't responding, so they couldn't claim it until it's back`); continue;
+          }
+          if (fails.includes('ecash') && !rejected) { rejected = true; tried.push('ecash'); push(false, `Failed (simulated): ${m.name} rejected it. Nothing was spent. Trying your next mint`, true); continue; }
+          if (exactAt(m, need)) { push(true, `${m.name}: your pieces make exactly ${fmt(need)} sats${m.fee ? ` (${fmt(amt)} + ${m.fee} sat fee)` : ''}, no mint needed`); from = m; paid = need; break; }
+          if (mintUp(m)) { push(true, `${m.name}: mint makes change first${nfc ? ' (about 2.6 s, tight for a tap)' : ''}`); from = m; paid = need; break; }
+          const over = atLeast(m, need);
+          const limit = Math.floor(amt * S.overpay / 100);
+          if (over != null && over - need <= limit) { push(true, `${m.name}: no mint for change, so overpay ${fmt(over - need)} sats (${fmt(over)} from pieces you hold; your limit is ${S.overpay}%)`); from = m; paid = over; break; }
+          push(false, `${m.name}: no change without the mint; ${over == null ? 'you hold too little' : `nearest is ${fmt(over)} (+${fmt(over - need)}, limit +${fmt(limit)})`}`);
+        }
+        // Delivery: a tap is in-band; a scanned request goes over Nostr or HTTP.
+        if (from && !nfc && !net()) { push(false, 'Sending it to them needs the network (their request uses Nostr or HTTP)'); from = null; }
+        if (from) tried.push('ecash');
+        if (from) pick = { rail: 'ecash', mint: from, confirm: !nfc && !c.a, text: `Pay ${c.a ? fmt(paid) + ' sats ' : ''}in ecash from ${from.name}` };
+      }
+    }
+    const lnLike = P.ln && ON('lightning') ? ['ln', 'Lightning invoice', P.ln] : P.lno && ON('bolt12') ? ['lno', 'Lightning offer', P.lno] : null;
+    if (!pick && lnLike) {
+      const [kind, name, x] = lnLike;
+      const amt = x.a || 1000; // no amount: you choose it (demo uses 1,000)
+      cur = kind; push(null, `<b>${P.creq ? 'Fallback: ' : ''}${name}</b>${x.a ? ` for ${fmt(x.a)} sats` : ', no amount: you choose it'}`);
+      const reserve = Math.max(2, Math.ceil(amt * 0.01));
+      let routeFailed = false;
+      if (nfc && !x.a) push(false, 'No amount: a tap can\'t ask you for one');
+      else if (!net()) push(false, 'Paying Lightning needs the network and your mint');
+      else if (reserve > amt * S.maxfee / 100 && reserve > 2) push(false, `Fee reserve ${fmt(reserve)} sats is above your ${S.maxfee}% limit`);
+      else for (const m of rank(MINTS, sel)) {
+        const L = lim(m, 'melt', kind === 'lno' ? 'bolt12' : 'bolt11', amt);
+        if (L) { push(false, `${m.name}: ${L}`); continue; }
+        if (kind === 'ln' && !x.a && !m.amountless) { push(false, `${m.name} can't pay invoices with no amount (NUT-23 amountless)`); continue; }
+        if (!mintUp(m)) { push(false, `${m.name} isn't responding`); continue; }
+        if (bal(m) < amt + reserve) { push(false, `${m.name}: too little for amount + fee`); continue; }
+        tried.push(kind); push(true, `${m.name} pays it; fee up to ${fmt(reserve)} sats`);
+        if (fails.includes(kind) && !routeFailed) { routeFailed = true; push(false, `Failed (simulated): ${m.name} found no route. Nothing was spent. Trying your next mint`, true); continue; }
+        pick = { rail: kind, mint: m, confirm: true, text: `Pay ${x.a ? fmt(x.a) + ' sats ' : ''}over Lightning from ${m.name}${nfc ? ' (confirm on screen)' : ''}` }; break;
+      }
+    }
+    if (!pick && P.btc && ON('onchain')) {
+      cur = 'btc'; push(null, `<b>Fallback: bitcoin address</b> for ${fmt(P.btc.a)} sats`);
+      if (nfc) push(false, 'Onchain is never picked from a tap');
+      else if (!MINTS.some((m) => mintUp(m) && !lim(m, 'melt', 'onchain', P.btc.a))) push(false, `No responding mint sends ${fmt(P.btc.a)} sats onchain (e.g. ${MINTS.map((m) => lim(m, 'melt', 'onchain', P.btc.a)).find(Boolean)})`);
+      else if (fails.includes('btc')) { tried.push('btc'); push(false, 'Failed: the mint couldn\'t broadcast (simulated)', true); }
+      else { const bm = MINTS.find((m) => mintUp(m) && !lim(m, 'melt', 'onchain', P.btc.a)); tried.push('btc'); push(true, `${bm.name} pays onchain; 10–60 min, network fee`); pick = { rail: 'btc', mint: bm, confirm: true, text: `Pay ${fmt(P.btc.a)} sats onchain` }; }
+    }
+    // Last resort: ecash from a mint that isn't answering. It arrives, but can't be claimed until the mint is back.
+    // Top up a mint we already use (never a new one) from another of ours over Lightning, then pay.
+    // Prior art: cashubtc/wallet AcquireThenPay (WalletCashuRequestPayment.kt:36-48 picks the largest funded mint).
+    if (!pick && P.creq?.a && !nfc && ON('ecash') && ON('lightning')) {
+      const ours = MINTS.filter((m) => (P.creq.m || []).includes(m.id));
+      const t = ours.find((m) => mintUp(m) && bal(m) < P.creq.a + (m.fee || 0));
+      if (t) {
+        const need = P.creq.a + (t.fee || 0), short = need - bal(t), fee = Math.max(2, Math.ceil(short * 0.01));
+        const src = byReach(MINTS).find((m) => m !== t && mintUp(m) && bal(m) >= short + fee && !lim(m, 'melt', 'bolt11', short));
+        const tl = lim(t, 'mint', 'bolt11', short);
+        cur = 'topup'; push(null, `<b>Last resort: top up ${t.name}</b>`);
+        if (!S.topup) push(false, 'Topping up a mint you use is off in your settings');
+        else if (tl) push(false, `${t.name}: ${tl}, so it can't take a ${fmt(short)} sat top-up`);
+        else if (!src) push(false, `No other mint of yours holds ${fmt(short + fee)} sats to move`);
+        else if (fails.includes('ln')) { tried.push('ln'); push(false, `Failed (simulated): moving from ${src.name} found no route. Nothing was spent`, true); }
+        else { tried.push('ln'); push(true, `Move ${fmt(short)} sats from ${src.name} over Lightning (fee up to ${fmt(fee)}), then pay in ecash`);
+          pick = { rail: 'ecash', mint: t, confirm: true, topup: { from: src, amt: short, fee }, text: `Top up ${t.name}, then pay ${fmt(need)} sats` }; }
+      }
+    }
+    if (!pick && stale) { cur = 'ecash'; push(true, `Only ${stale.m.name} can pay, and it isn't responding: they can claim it once it's back`); pick = { rail: 'ecash', mint: stale.m, confirm: true, text: `Send ${fmt(stale.paid)} sats from ${stale.m.name} anyway` }; }
+    cur = null;
+    if (!pick) push(false, '<b>Nothing here can be paid right now</b>');
+    // Which rails could be attempted here, for the simulator.
+    const railsInPlay = [...(P.creq && ON('ecash') ? ['ecash'] : []), ...(P.ln && ON('lightning') ? ['ln'] : []), ...(P.lno && ON('bolt12') ? ['lno'] : []), ...(P.btc && !nfc && ON('onchain') ? ['btc'] : [])];
+    return { P, trace, pick, railsInPlay, tried };
+  }
+
+  // ---------------- state ----------------
+  const blankSend = () => ({ mintSel: '', mintMenu: false, draft: null, step: 0, fails: [], pdd: false, entry: '', dd: false, ddq: '', user: '', paste: '', hit: null, payload: 'both', amount: '', unit: 'sats', how: '', lock: 0, final: null, queue: false, consent: false, sent: false });
+  const blankRecv = () => ({ nfcArmed: false, rdraft: null, tl: null, rmethod: '', mintSel: '', mintMenu: false, step: 0, fails: [], mode: '', amount: '', unit: 'sats', any: false, only: '', token: '', done: false });
+  S.send = blankSend(); S.recv = blankRecv();
+
+  function sats(f) {
+    const v = parseFloat(f.amount);
+    if (!isFinite(v) || v <= 0) return 0;
+    return f.unit === 'usd' ? Math.round(v * SATS_PER_USD) : Math.round(v);
+  }
+  const show = (f, s) => f.unit === 'usd' ? usd(s) : fmt(s) + ' sats';
+
+  function radio(name, value, current, title, desc, reason = '', cls = '') {
+    if (reason && !cls.includes('keep')) return '';
+    const id = `${name}-${value}`;
+    return `<label class="choice ${cls}" for="${id}"><input type="radio" id="${id}" name="${name}" value="${value}" ${current === value ? 'checked' : ''} ${reason ? 'disabled' : ''}>
+      <span class="ctext"><span class="ctitle">${title}</span><span class="cdesc">${desc}</span>${reason ? `<span class="why">${reason}</span>` : ''}</span></label>`;
+  }
+  // Failure simulator: marks a rail as failing so the funnel moves to the next.
+  const FAIL_LABELS = { ecash: 'Ecash fails', ln: 'Lightning fails', lno: 'Offer fails', btc: 'Onchain fails', swap: 'Mint swap fails', npc: 'npub.cash fails' };
+  const failed = (f, rail) => f.fails.includes(rail);
+  // The bottom bar's ⋯ menu lists what the current step can simulate; the step
+  // itself only shows what is being simulated right now.
+  let simRails = [];
+  let registering = false;
+  const failBar = (f, rails, shown = null) => {
+    if (registering) simRails = [...new Set([...simRails, ...rails])];
+    const on = f.fails.filter((r) => FAIL_LABELS[r] && (!shown || shown.includes(r)));
+    return on.length ? `<div class="fails"><span class="hint">Simulating:</span>${on.map((r) => `<span class="chip" aria-pressed="true">✗ ${FAIL_LABELS[r]}</span>`).join('')}<span class="hint">Change with ⋯ below.</span></div>` : '';
+  };
+  const traceHtml = (t) => `<ul class="trace">${t.map((x) => `<li><span class="${x.ok === null ? 't-skip' : x.ok ? 't-ok' : x.fail ? 't-fail' : 't-no'}">${x.ok === null ? '•' : x.ok ? '✓' : '✗'}</span><span>${x.text}</span></li>`).join('')}</ul>`;
+
+  // Outcome first, then one line per way to pay; every check stays one tap away.
+  const RAIL_NAMES = { topup: 'Top up, then ecash', ecash: 'Ecash', ln: 'Lightning invoice', lno: 'Lightning offer', btc: 'Bitcoin address' };
+  function railSummary(r) {
+    const rails = [...new Set(r.trace.map((x) => x.rail).filter(Boolean))];
+    const rows = rails.map((id) => {
+      const lines = r.trace.filter((x) => x.rail === id && x.ok !== null);
+      const paying = !!r.pick && (r.pick.topup ? id === 'topup' : r.pick.rail === id), failure = lines.find((x) => x.fail);
+      const state = paying ? ['t-ok', '✓', 'Paying'] : failure ? ['t-fail', '✗', 'Failed'] : ['t-no', '–', 'Skipped'];
+      // Paying: the line that settled it. Otherwise every reason, so a rejected mint isn't hidden behind the next one.
+      const shown = paying ? [lines.at(-1)] : lines.filter((x) => !x.ok);
+      const cap = (t) => (/^[a-z0-9-]+\.[a-z]/.test(t) ? t : t.charAt(0).toUpperCase() + t.slice(1));
+      const why = shown.map((x) => cap((x?.text || '').replace(/^Failed(?: \(simulated\))?: /, ''))).reduce((acc, t) => {
+        // "mint.a: reason" + "mint.b: reason" → "mint.a, mint.b: reason"
+        const m = t.match(/^(\S+): (.*)$/), same = m && acc.find((x) => x.reason === m[2]);
+        if (same) same.names.push(m[1]); else acc.push(m ? { names: [m[1]], reason: m[2] } : { names: [], reason: t });
+        return acc;
+      }, []).map((x) => `<div class="hint">${x.names.length ? `${x.names.join(', ')}: ` : ''}${x.reason}</div>`).join('');
+      return `<li><span class="${state[0]}">${state[1]}</span><span><b>${RAIL_NAMES[id]}</b> · ${state[2]}${why}</span></li>`;
+    }).join('');
+    const head = r.pick ? `<div class="verdict ok"><div>${ic('check')} ${r.pick.text}</div></div>`
+      : '<div class="verdict no"><div>Nothing in this code can be paid right now.</div></div>';
+    return `${head}<ul class="trace">${rows}</ul>
+      <details class="why-box"><summary>Every check</summary><div class="hint mono" style="word-break:break-all">${r.P.raw}</div>${traceHtml(r.trace)}</details>`;
+  }
+
+  function amountStep(f, px, { chips, anyOption, exactFrom, hint, all }) {
+    const a = sats(f);
+    const exactSet = exactFrom ? can(exactFrom) : null;
+    return `
+      <div class="chips" role="group" aria-label="Amounts">
+        ${anyOption ? `<button type="button" class="chip" data-any aria-pressed="${f.any}">Any amount</button>` : ''}
+        ${all ? `<button type="button" class="chip ${all.exact ? 'exact' : ''}" data-all="${all.amount}" aria-pressed="${!f.any && a === all.amount}">${all.label}</button>` : ''}
+        ${chips.map((s) => `<button type="button" class="chip ${exactSet && exactSet[s] ? 'exact' : ''}" data-pick="${s}" aria-pressed="${!f.any && a === s}">${show(f, s)}</button>`).join('')}
+      </div>
+      <div class="amount">
+        <input id="${px}-amount" class="mono" inputmode="decimal" placeholder="${f.any ? 'Any' : '0'}" value="${f.any ? '' : f.amount}" aria-label="Or type an amount">
+        <div class="unitseg" role="group" aria-label="Unit">
+          <button type="button" data-unit="sats" aria-pressed="${f.unit === 'sats'}">sats</button>
+          <button type="button" data-unit="usd" aria-pressed="${f.unit === 'usd'}">USD</button>
+        </div>
+      </div>
+      ${hint ? `<div class="hint">${hint}</div>` : ''}`;
+  }
+
+  // Ecash amount verdict: exact, rounding offline, or change from the mint.
+  // Tokens cost the receiver an input fee to claim (NUT-02). With the setting
+  // on, the send adds it so they get the full amount.
+  function feeNote(m, a) {
+    if (!m.fee) return '';
+    return S.coverFee ? `<div class="hint">Adds ${m.fee} sat so they receive the full ${fmt(a)} after ${m.name}'s claim fee.</div>`
+      : `<div class="hint">They receive ${fmt(a - m.fee)} after ${m.name}'s ${m.fee} sat claim fee.</div>`;
+  }
+  function ecashAmount(f, m, alts = []) {
+    const upM = mintUp(m) && !failed(f, 'swap');
+    const a = sats(f);
+    if (!a) return { final: null, html: '' };
+    const r = f.unit === 'usd'
+      ? near(m.proofs, a, Math.ceil((parseFloat(f.amount) - 0.005) * SATS_PER_USD), Math.floor((parseFloat(f.amount) + 0.005) * SATS_PER_USD - 1e-6))
+      : near(m.proofs, a);
+    if (r.exact != null) return { final: r.exact, html: `<div class="verdict ok"><div>${ic('check')} Your ecash at ${m.name} makes exactly ${fmt(r.exact)} sats. Works offline.</div></div>${feeNote(m, r.exact)}` };
+    if (!upM) {
+      const final = [r.down, r.up].includes(f.final) ? f.final : null;
+      const alt = net() && byReach(alts).find((x) => x !== m && mintUp(x) && bal(x) >= a);
+      return { final, html: `<div class="verdict round"><div>${mintUp(m) ? 'The mint couldn\'t make change (simulated), so' : net() ? `${m.name} isn't responding:` : 'Offline:'} only pieces held there can go${net() && !mintUp(m) ? ', claimable once it\'s back' : ''}.</div><div class="chips">
+        ${alt ? `<button type="button" class="chip" data-mintsel="${alt.id}">Exact ${show(f, a)} from ${alt.name}</button>` : ''}
+        ${r.down ? `<button type="button" class="chip" data-final="${r.down}" aria-pressed="${f.final === r.down}">↓ ${show(f, r.down)}</button>` : ''}
+        ${r.up ? `<button type="button" class="chip" data-final="${r.up}" aria-pressed="${f.final === r.up}">↑ ${show(f, r.up)}</button>` : ''}</div></div>` };
+    }
+    return { final: a, html: `<div class="verdict ok"><div>${m.name} makes change first${m.fee ? ` (fee ${m.fee} sat)` : ', no fee'}.</div></div>${feeNote(m, a)}` };
+  }
+
+  // Lock control (NUT-11): a switch, then "if unclaimed, take it back after …".
+  // The period is the locktime with you as the refund key; Never = no refund path.
+  // `required` (a pasted key) hides the switch: the lock is the point of that send.
+  const RECLAIM = [[1, '1h'], [2, '1d'], [3, '1w'], [4, '30d'], [5, 'Never']];
+  const reclaimText = (lock) => (lock === 5 ? 'It can\'t be taken back.' : `You can take it back after ${LOCKS[lock]} if unclaimed.`);
+  function lockSlider(f, name, note, required = false, from = null, canLock = MINTS) {
+    if (!required && !ON('lock')) return '';
+    const on = f.lock > 0;
+    // No mint the receiver accepts can lock: a global limit, so the switch is off and disabled, not a mint change.
+    if (!required && from && !from.p2pk && !canLock.length) {
+      return `<div class="lockbox">
+        <label class="switch" for="s-lockon"><span class="lbl">${ic('lock', 16)} Lock to ${name}</span><input type="checkbox" id="s-lockon" disabled><span class="track" aria-hidden="true"></span></label>
+        <div class="cdesc">None of your mints ${name} accepts can lock this (NUT-11). It goes unlocked.</div>
+      </div>`;
+    }
+    // Locking needs NUT-11 at the paying mint. When it can't, the lock asks for a mint that can
+    // (accepted by the receiver, holds enough, responding) instead of silently sending it unlocked.
+    if (on && from && !from.p2pk) {
+      return `<div class="lockbox">
+        <label class="switch" for="s-lockon"><span class="lbl">${ic('lock', 16)} Lock to ${name}</span><input type="checkbox" id="s-lockon" checked><span class="track" aria-hidden="true"></span></label>
+        ${f.mintMenu ? `<div class="cdesc">${from.name} can't lock (no NUT-11). Pick a mint that can, above, or switch the lock off.</div>` : unsupported('Locking', `${from.name} can't lock tokens (no NUT-11). Pick a mint that can, or switch the lock off.`, 'p2pk')}
+      </div>`;
+    }
+    return `<div class="lockbox">
+      ${required ? `<div class="lock-head">${ic('lock', 16)}<b>Locked to ${name}</b></div>`
+        : `<label class="switch" for="s-lockon"><span class="lbl">${ic('lock', 16)} Lock to ${name}</span><input type="checkbox" id="s-lockon" ${on ? 'checked' : ''}><span class="track" aria-hidden="true"></span></label>`}
+      <div class="cdesc">${on ? note : 'Anyone with the token can claim it.'}</div>
+      ${on ? `<div class="lockseg-wrap"><span class="hint">If unclaimed, take it back after</span>
+        <div class="lockseg" role="radiogroup" aria-label="Take it back if unclaimed after">${RECLAIM.map(([v, l]) => `<button type="button" role="radio" data-lock="${v}" aria-checked="${f.lock === v}">${l}</button>`).join('')}</div></div>` : ''}
+    </div>`;
+  }
+
+  // Message ("why"): one field, and under it who can read it, per rail. Sources:
+  // ecash payment memo NUT-18:154,161; token memo `d` NUT-00:281; request `d` shown to the payer NUT-18:44;
+  // invoice/offer description only if the mint says so, NUT-23:125, NUT-25:133; BIP-321 `message` (the payer
+  // sees it in the QR, nothing onchain); LNURL comment only up to `commentAllowed` chars, LUD-12.
+  const NOTE_VIS = {
+    dm: 'Visible to them: it goes with the ecash (NUT-18 memo).',
+    token: 'Visible to whoever claims the token (token memo, NUT-00).',
+    lnurl: 'Visible to them only if their address takes comments (LUD-12); otherwise only you see it.',
+    creq: 'Visible to the payer when they scan (NUT-18 description).',
+    recv: 'Visible to the payer: it goes into the request, the bitcoin QR and, where the mint allows, the invoice.',
+    ln: 'Visible to the payer in the invoice (NUT-04 description; the mint must allow it, NUT-23).',
+    lno: 'Visible to the payer in the offer, if your mint supports descriptions (NUT-25).',
+    btc: 'Visible to the payer in the QR (BIP-321 message). Nothing is recorded onchain.',
+    npc: 'Only you see it: the address is fixed. Payers can add their own comment.',
+  };
+  const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  // Asked before anything is created: a mint quote carries the description (NUT-04; cdk checks the mint's
+  // option first, wallet/issue/mod.rs:239-250), and a request or token carries `d` when it is encoded.
+  // Receive, before the rail is picked: name only the enabled rails that carry a message.
+  const visText = (vis) => vis !== 'recv' ? NOTE_VIS[vis] : `Visible to the payer: it goes into ${[ON('ecash') && ON('msg_ecash') && 'the Cashu request', ON('onchain') && ON('msg_onchain') && 'the bitcoin QR', ON('lightning') && ON('msg_lightning') && 'the invoice, where the mint allows'].filter(Boolean).join(', ')}.`;
+  const MSG_MOD = { dm: 'msg_ecash', token: 'msg_ecash', creq: 'msg_ecash', lnurl: 'msg_lightning', ln: 'msg_lightning', lno: 'msg_lightning', npc: 'msg_lightning', btc: 'msg_onchain' };
+  const recvMsgOn = () => ['creq', 'ln', 'btc'].some((r) => ON(RAIL_MOD[r]) && ON(MSG_MOD[r]));
+  const noteField = (f, px, vis, remakes = false) => ((vis === 'recv' ? !recvMsgOn() : !ON(MSG_MOD[vis])) ? '' : noteField0(f, px, vis, remakes));
+  const noteField0 = (f, px, vis, remakes = false) => `<label class="note"><span class="hint">Message (optional)</span>
+    <input type="text" id="${px}-why" maxlength="140" placeholder="What's it for?" value="${esc(f.why || '')}">
+    <span class="hint">${ic(/^Only you/.test(visText(vis)) ? 'lock' : 'person', 12)} ${visText(vis)}${remakes ? ' Changing it makes a new code.' : ''}</span></label>`;
+
+  // ---------------- SEND ----------------
+  // Who first; the how is inferred from what the wallet knows and asked only
+  // when two ways are really open.
+  const ENTRIES = [
+    ['scan', 'scan', 'Scan'], ['paste', 'paste', 'Paste'], ['tap', 'nfc', 'Tap to pay'], ['token', 'qr', 'Share token'],
+  ];
+  const PASTE_EXAMPLES = [
+    ['npub1alice7q…3xk', 'person', 'Alice\'s npub'], ['npub1zz9…new', 'person', 'An npub you don\'t know'], ['bob@primal.net', 'person', 'Bob\'s Nostr address'],
+    ['02a1b2…c3d4', 'key', 'Alice\'s wallet key (P2PK)'], ['03ffee…0019', 'key', 'An unknown P2PK key'],
+    [PAYLOADS.both.raw, 'qr', 'Cashu request + Lightning'], [PAYLOADS.three.raw, 'qr', 'Address + Lightning + Cashu'], [PAYLOADS.offer.raw, 'qr', 'Offer + Cashu request'],
+    [PAYLOADS.ln.raw, 'bolt', 'Lightning invoice'], [PAYLOADS.ln0.raw, 'bolt', 'Invoice with no amount'], [PAYLOADS.lno0.raw, 'bolt', 'BOLT12 offer, no amount'], ['bob@walletofsatoshi.com', 'bolt', 'Lightning address'], [PAYLOADS.noamt.raw, 'request', 'Cashu request, no amount'], [PAYLOADS.topup.raw, 'request', 'Request for a mint you hold too little at'],
+  ];
+
+  function sendSteps() {
+    const f = S.send, a = sats(f), steps = [];
+    const hit = f.entry === 'person' ? { kind: 'person', user: f.user } : f.hit;
+    const person = hit && hit.kind === 'person' ? (hit.user === 'unknown' ? { id: 'unknown', name: 'npub1zz9…new' } : userBy(hit.user)) : null;
+    const know = person ? knowledge(person) : null;
+    const whoLabel = person ? person.name : f.entry === 'tap' ? 'Tap to pay' : f.entry === 'token' ? 'Share token' : hit ? (hit.kind === 'p2pk' ? 'A P2PK key' : hit.kind === 'lnaddr' ? hit.value : PAYLOADS[hit.payload]?.label) : '';
+
+    // ---- Who
+    steps.push({
+      title: 'Who', summary: whoLabel, ok: !!whoLabel,
+      mini: person ? `<span class="avatar">${person.name[0]}</span><span><b>${person.name}</b><div class="sub">${person.nip05 || person.npub || ''}</div></span>`
+        : `${ic({ tap: 'nfc', token: 'qr', paste: 'paste', scan: 'scan' }[f.entry] || (hit && hit.kind === 'p2pk' ? 'key' : 'bolt'), 20)}<span><b>${whoLabel}</b>${f.paste ? `<div class="sub mono">${f.paste}</div>` : ''}</span>`,
+      render: () => `
+        ${ON('nostr') ? `<div class="dd">
+          <button type="button" class="dd-btn" data-dd aria-expanded="${f.dd}">${person && f.entry === 'person' ? `<span class="avatar">${person.name[0]}</span>${person.name}` : `${ic('people', 20)} Choose a person`}<span class="chev">▾</span></button>
+          ${f.dd ? `<div class="dd-list" role="listbox"><div class="dd-head"><span class="hint">People</span><button type="button" class="x" data-dd aria-label="Close">✕</button></div>
+            <input type="text" id="s-ddq" placeholder="Search people" value="${f.ddq}">
+            ${USERS.filter((u) => (u.name + ' ' + (u.nip05 || '')).toLowerCase().includes(f.ddq.toLowerCase())).map((u) => `<button type="button" class="dd-opt" role="option" data-person="${u.id}"><span class="avatar">${u.name[0]}</span><span class="who"><span>${u.name}</span><span>${u.nip05 || u.npub}</span></span></button>`).join('')}
+          </div>` : ''}
+        </div>` : ''}
+        <div class="tiles">${ENTRIES.filter(([id]) => (id === 'tap' ? ON('nfc') && (ON('ecash') || ON('lightning')) : id === 'token' ? ON('ecash') : true)).map(([id, icon, label]) => `<button type="button" class="tile" data-entry="${id}" aria-pressed="${f.entry === id}">${ic(icon, 22)}${label}</button>`).join('')}</div>
+        ${f.entry === 'paste' || f.entry === 'scan' ? pastePanel(f) : ''}
+        ${f.entry === 'tap' ? tapPanel(f) : ''}`,
+    });
+    if (!whoLabel || f.entry === 'tap') return steps;
+
+    // ---- Person: infer the how
+    if (person) {
+      f.draft = { to: person.name, toSub: person.nip05 || person.npub, avatar: person.name[0], rail: 'ecash', mint: rank(MINTS, f.mintSel)[0], amount: a, lock: null, transport: 'Private Nostr message, once you\'re back online' };
+      if (!net()) {
+        const cachedMsg = know.unknown
+          ? `Their mints and lock key come from their Nostr profile, and nothing recent is cached.`
+          : `Their wallet info is cached, but a message needs the network.`;
+        steps.push({
+          title: 'How', summary: '', ok: false,
+          render: () => `<div class="verdict round"><div>${ic('plane')} <b>Offline: nothing can reach ${person.name} now.</b> ${cachedMsg}</div></div>
+            <div class="choices">
+              ${radio('s-off', 'queue', f.queue ? 'queue' : '', `${ic('send')} Send when you're back online`, 'The payment waits and goes out as a private message once you reconnect.')}
+              ${radio('s-off', 'token', '', `${ic('qr')} They're here: show a QR they scan`, 'Unlocked ecash from what you hold. Whoever scans it can claim it.')}
+            </div>`,
+        });
+        return steps;
+      }
+      if (know.unknown) {
+        steps.push({
+          title: 'How', summary: '', ok: false,
+          render: () => `<div class="verdict round"><div>${ic('warn')} <b>You're offline, so ${person.name}'s wallet info can't be looked up.</b> Their mints and lock key come from their Nostr profile, and nothing recent is cached.</div></div>
+            <div class="choices">
+              ${radio('s-off', 'queue', f.queue ? 'queue' : '', `${ic('send')} Send when you're back online`, 'The payment waits and goes out as a private message once you reconnect.')}
+              ${radio('s-off', 'token', '', `${ic('qr')} They're here: show a QR they scan`, 'Unlocked ecash from what you hold. Whoever scans it can claim it.')}
+            </div>`,
+        });
+        return steps;
+      }
+      const ways = [];
+      const theirs = know.mints ? MINTS.filter((m) => know.mints.includes(m.id)) : MINTS;
+      const ranked = rank(theirs, f.mintSel).filter((m) => bal(m) >= (a || 1));
+      const fromM = failed(f, 'ecash') && ranked.filter(mintUp).length > 1 ? ranked.filter(mintUp)[1] : ranked[0];
+      const rejectedM = fromM !== ranked[0] ? ranked[0] : null;
+      if (!ON('ecash')) { /* module off: no ecash way */ }
+      else if (!net()) ways.push({ id: 'ecash', ok: false, why: 'A private message needs the network.' });
+      else if (fromM && !mintUp(fromM) && f.mintSel !== fromM.id) ways.push({ id: 'ecash', ok: false, why: `${fromM.name} isn't responding, so ${person.name} couldn't claim it until it's back.` });
+      else if (fromM && rejectedM) ways.push({ id: 'ecash', ok: true, mint: fromM, title: `${ic('ecash')} Ecash from ${fromM.name}`, why: `${rejectedM.name} rejected it (simulated), so this uses your next mint they accept.`, tags: ['+No fee', 'Private message'] });
+      else if (fromM) ways.push({ id: 'ecash', ok: true, mint: fromM, title: `${ic('ecash')} Ecash`, why: know.mints ? `They accept ${theirs.map((m) => m.name).join(', ')} (${know.source}); you have ${fmt(bal(fromM))} sats there.` : `No accepted mints published (${know.source}); any may work.`, tags: ['+No fee', 'Private message'] });
+      else ways.push({ id: 'ecash', ok: false, why: `They only accept ${theirs.map((m) => m.name).join(', ')}, where you don't have enough.` });
+      if (!ON('lightning')) { /* module off */ }
+      else if (!know.lud16 && !ON('npubcash')) ways.push({ id: 'ln', ok: false, why: `${person.name} hasn't published a Lightning address.` });
+      else if (!MINTS.some((m) => mintUp(m) && !lim(m, 'melt', 'bolt11', a))) ways.push({ id: 'ln', ok: false, why: `No responding mint sends ${fmt(a || 1)} sats over Lightning.` });
+      else ways.push({ id: 'ln', ok: true, title: know.lud16 ? `${ic('bolt')} Lightning to ${know.lud16}` : `${ic('bolt')} Lightning via npub.cash`, caution: !know.lud16, why: know.lud16 ? 'From their Nostr profile.' : 'They haven\'t published a Lightning address; npub.cash holds it until they claim it, so check they use it.', tags: ['Seconds', 'Small fee'] });
+      // Simulated failures: a failed way is shown and closed; a failed
+      // Lightning address falls back to npub.cash (the person's key still works).
+      const ecashWay = ways.find((w) => w.id === 'ecash');
+      if (ecashWay && ecashWay.ok && failed(f, 'ecash') && !rejectedM) Object.assign(ecashWay, { ok: false, failedSim: true, why: `Failed (simulated): ${ecashWay.mint.name} rejected the swap. Nothing was sent.` });
+      const lnWay = ways.find((w) => w.id === 'ln');
+      if (lnWay && lnWay.ok && failed(f, 'ln')) {
+        if (know.lud16 && !failed(f, 'npc') && ON('npubcash')) Object.assign(lnWay, { title: `${ic('bolt')} Lightning via npub.cash`, caution: true, why: `${know.lud16} failed (simulated). npub.cash holds it for their Nostr key until they claim it.` });
+        else Object.assign(lnWay, { ok: false, failedSim: true, why: 'Failed (simulated): the Lightning payment didn\'t go through.' });
+      }
+      const open = ways.filter((w) => w.ok);
+      if (open.length === 1) f.how = open[0].id;
+      if (f.how && !open.find((w) => w.id === f.how)) f.how = '';
+      const payM = f.how === 'ecash' ? open.find((w) => w.id === 'ecash').mint : MINTS[0];
+      const am = f.how === 'ecash' || !f.how ? ecashAmount(f, payM, theirs) : { final: a, html: '' };
+      const accepts = (m) => (theirs.includes(m) ? (bal(m) >= (a || 1) ? '' : 'not enough here') : `${person.name} doesn't accept it`);
+      // Mints that can lock this send. If some can but this one can't, switching the lock on opens the picker
+      // straight away (once; closing it leaves the Change mint panel). If none can, the switch is disabled.
+      const lockMints = MINTS.filter((m) => mintUp(m) && m.p2pk && !accepts(m));
+      if (f.how === 'ecash' && f.lock > 0 && mintUp(payM) && !payM.p2pk && lockMints.length && f.autoNeed !== 'p2pk') Object.assign(f, { mintNeed: 'p2pk', mintMenu: true, autoNeed: 'p2pk' });
+      const ecashLock = f.how === 'ecash' && mintUp(payM) && payM.p2pk;
+      f.draft = { to: person.name, toSub: person.nip05 || person.npub, avatar: person.name[0], rail: f.how, mint: payM, amount: f.final,
+        lockN: f.lock, lock: ecashLock && f.lock ? `To ${person.name}'s ${know.lockSource === 'wallet' ? 'wallet key' : 'Nostr key'} · ${f.lock === 5 ? 'no take-back' : `take back after ${LOCKS[f.lock]}`}` : null,
+        transport: f.how === 'ecash' ? 'Private Nostr message (NIP-17)' : know.lud16 && !failed(f, 'ln') ? `Lightning address ${know.lud16}` : 'npub.cash' };
+      f.final = am.final;
+      const lockNote = know.lockSource === 'wallet' ? `Only ${person.name} can claim it, with the wallet key they published.` : `Only ${person.name} can claim it. They haven't published a wallet key, so it's locked to their Nostr key (unconfirmed).`;
+      const sendBtn = `<button type="submit" class="cta" ${f.final && f.how ? '' : 'disabled'}>${f.final && f.how ? `Send ${fmt(f.final)} sats to ${person.name}` : 'Choose an amount'}</button>`;
+      const lastAmount = open.length <= 1;
+      steps.push({
+        title: 'Amount', summary: a ? `${fmt(f.final || a)} sats` : '', ok: !!f.final && open.length > 0,
+        mini: a ? `<span class="big">${fmt(f.final || a)} sats</span><span class="sub">${usd(f.final || a)}${f.final && f.final !== a ? ` · rounded from ${show(f, a)}` : ''}</span>` : '',
+        render: () => !open.length ? `<div class="verdict no"><div>No way to pay ${person.name} right now. ${ways.map((w) => w.why).join(' ')}</div></div>
+            <div class="choices">${radio('s-off', 'token', '', `${ic('qr')} They're here: show a QR they scan`, 'Ecash from what you hold.')}</div>
+            ${failBar(f, f.fails)}` : `
+          ${mintPill(f, 'send', 'amount', payM, accepts)}
+          ${amountStep(f, 's', { chips: [100, 500, 768, 1000, 1024], exactFrom: payM.proofs, all: { amount: bal(payM), label: `All ${fmt(bal(payM))}`, exact: true }, hint: lastAmount ? `Only ${open[0].id === 'ecash' ? 'ecash' : 'Lightning'} works for ${person.name} right now. ${open[0].why}` : '✓ amounts your ecash makes exactly' })}
+          ${am.html}
+          ${ways.filter((w) => w.failedSim).map((w) => `<div class="verdict no"><div>${w.why}</div></div>`).join('')}
+          ${lastAmount ? failBar(f, [...(net() ? ['ecash'] : []), ...(mintUp() ? ['ln'] : []), ...(failed(f, 'ln') && know.lud16 ? ['npc'] : [])]) : ''}
+          ${lastAmount ? `${f.how === 'ecash' ? (mintUp(payM) ? lockSlider(f, person.name, lockNote, false, payM, lockMints) : `<div class="hint">${ic('lock', 14)} Can't lock: locking swaps ecash at ${payM.name}, which isn't reachable. It goes unlocked.</div>`) : ''}${f.how ? noteField(f, 's', f.how === 'ecash' ? 'dm' : 'lnurl') : ''}${sendBtn}` : `<button type="button" class="next" data-next ${f.final ? '' : 'disabled'}>Continue</button>`}`,
+      });
+      if (open.length > 1 && f.final) steps.push({
+        title: 'How', summary: '', ok: false,
+        render: () => `${mintPill(f, 'send', 'how', payM, accepts)}<div class="choices">${ways.filter((w) => w.ok).map((w) => { const opt = radio('s-how', w.id, f.how, w.title, `${w.why}${tags(...w.tags)}`, '', w.caution ? 'caution' : ''); return w.id === 'ecash' ? `<div class="choice-group ${f.how === 'ecash' ? 'on' : ''}">${opt}${f.how === 'ecash' ? (mintUp(payM) ? lockSlider(f, person.name, lockNote, false, payM, lockMints) : `<div class="hint">${ic('lock', 14)} Can't lock: locking swaps ecash at ${payM.name}, which isn't reachable. It goes unlocked.</div>`) : ''}</div>` : opt; }).join('')}</div>
+          ${ways.filter((w) => w.failedSim).map((w) => `<div class="verdict no"><div>${w.why}</div></div>`).join('')}
+          ${failBar(f, [...(net() ? ['ecash'] : []), ...(mintUp() ? ['ln'] : []), ...(failed(f, 'ln') && know.lud16 ? ['npc'] : [])])}
+          ${f.how ? noteField(f, 's', f.how === 'ecash' ? 'dm' : 'lnurl') : ''}
+          ${sendBtn}`,
+      });
+      return steps;
+    }
+
+    // ---- A pasted P2PK key: a locked send, which needs the mint
+    if (hit && hit.kind === 'p2pk') {
+      const owner = hit.user ? userBy(hit.user) : null;
+      const km = rank(MINTS, f.mintSel).find((m) => bal(m) >= (a || 1) && m.p2pk) || MINTS[0];
+      const am = ecashAmount(f, km, MINTS);
+      f.draft = { to: owner ? owner.name : 'A P2PK key', toSub: hit.user ? owner.lockKey : 'unknown key', avatar: owner ? owner.name[0] : null, rail: 'ecash', mint: km, amount: a,
+        lockN: f.lock || 5, lock: `To this key · ${(f.lock || 5) === 5 ? 'no take-back' : `take back after ${LOCKS[f.lock]}`}`, transport: 'Token: QR, link or NFC card' };
+      f.final = am.final;
+      steps.push({
+        title: 'Amount', summary: '', ok: false,
+        render: () => mintUp(km) ? `${mintPill(f, 'send', 'amount', km, (m) => (m.p2pk ? '' : 'can\'t lock (no NUT-11)'))}
+          <div class="verdict ok"><div>${ic('key')} ${owner ? `This is ${owner.name}'s wallet key.` : 'A key you don\'t know.'} The token will be locked so only this key can claim it. Your mint makes the lock.</div></div>
+          ${amountStep(f, 's', { chips: [100, 500, 1000, 1024], exactFrom: km.proofs })}
+          ${lockSlider({ ...f, lock: f.lock || 5 }, owner ? owner.name : 'this key', 'Only this key can claim it.', true)}
+          ${noteField(f, 's', 'token')}
+          <button type="submit" class="cta" ${a ? '' : 'disabled'}>${a ? `Create ${fmt(a)} sat locked token` : 'Choose an amount'}</button>` : `
+          <div class="verdict round"><div>${ic('warn')} <b>Locking needs your mint${S.offline ? ", and you're offline" : ''}.</b> Ecash can only be locked to a key by swapping it at the mint.</div></div>
+          <div class="choices">
+            ${radio('s-off', 'queue', '', `${ic('send')} Lock and send when back online`, 'Nothing leaves until your mint can make the lock.')}
+            ${radio('s-off', 'token', '', `${ic('qr')} They're here: give unlocked ecash`, 'Anyone holding it can spend it. Only if you hand it over yourself.')}
+          </div>`,
+      });
+      return steps;
+    }
+
+    // ---- In person or a token link: unlocked ecash from what you hold
+    if (f.entry === 'token') {
+      const tm = rank(MINTS, f.mintSel).find((m) => bal(m) >= (a || 1)) || MINTS[0];
+      const am = ecashAmount(f, tm, MINTS);
+      f.draft = { to: 'Whoever scans it', toSub: 'Unlocked: the first to claim it gets it', rail: 'ecash', mint: tm, amount: f.final, lock: null, transport: 'Token: QR, link or NFC card' };
+      f.final = am.final;
+      steps.push({
+        title: 'Amount', summary: a ? `${fmt(f.final || a)} sats` : '', ok: !!f.final,
+        mini: a ? `<span class="big">${fmt(f.final || a)} sats</span><span class="sub">${usd(f.final || a)}</span>` : '',
+        render: () => `${mintPill(f, 'send', 'amount', tm)}${a && !exactAt(tm, a) && mintUp(tm) ? failBar(f, ['swap']) : ''}${amountStep(f, 's', { chips: [100, 500, 768, 1000, 1024], exactFrom: tm.proofs, all: { amount: bal(tm), label: `All ${fmt(bal(tm))}`, exact: true }, hint: 'Unlocked ecash from pieces you hold, shown as a QR they scan, or copied, shared or written to an NFC card. Whoever claims it first gets it.' })}
+          ${am.html}
+          ${noteField(f, 's', 'token')}
+          <button type="submit" class="cta" ${f.final ? '' : 'disabled'}>${f.final ? `Share ${fmt(f.final)} sats as a token` : 'Choose an amount'}</button>`,
+      });
+      return steps;
+    }
+
+    // ---- A Lightning address that isn't a known person
+    if (hit && hit.kind === 'lnaddr') {
+      const lm = rank(MINTS, f.mintSel).find((m) => mintUp(m) && bal(m) > (a || 1) && !lim(m, 'melt', 'bolt11', a)) || MINTS[0];
+      f.draft = { to: hit.value, toSub: 'Lightning address', rail: 'ln', mint: lm, amount: a, lock: null, transport: 'Lightning (LNURL-pay, LUD-16)' };
+      steps.push({
+        title: 'Amount', summary: '', ok: false,
+        render: () => mintUp(lm) ? `${mintPill(f, 'send', 'amount', lm, (m) => (!mintUp(m) ? mintState(m) : lim(m, 'melt', 'bolt11', a)))}${amountStep(f, 's', { chips: [1000, 5000, 21000], all: { amount: bal(lm) - 19, label: `Max ${fmt(bal(lm) - 19)} after fees` }, hint: 'Their address accepts 1 to 1,000,000 sats. Checked as a Nostr address too; no profile found.' })}
+          ${noteField(f, 's', 'lnurl')}
+          <button type="submit" class="cta" ${a ? '' : 'disabled'}>${a ? `Pay ${fmt(a)} sats` : 'Choose an amount'}</button>`
+          : `<div class="verdict no"><div>Paying a Lightning address needs your mint${S.offline ? ' and the internet' : ''}.</div></div>`,
+      });
+      return steps;
+    }
+
+    // ---- A pasted or scanned payment payload
+    if (hit && hit.kind === 'payload') {
+      const r = resolve(hit.payload, { nfc: false, fails: f.fails, sel: f.mintSel });
+      if (r.pick) f.draft = { to: r.P.creq && r.pick.rail === 'ecash' ? 'Cashu payment request' : r.pick.rail === 'btc' ? 'Bitcoin address' : 'Lightning invoice', toSub: r.P.raw, rail: r.pick.rail, mint: r.pick.mint, amount: (r.P.creq || r.P.ln || r.P.lno || r.P.btc || {}).a || a, lock: r.pick.rail === 'ecash' && r.P.creq?.lock ? 'To the key in their request' : null, topup: r.pick.topup,
+        transport: r.pick.rail === 'ecash' ? 'Their request\'s transport (Nostr or HTTP, NUT-18)' : r.pick.rail === 'btc' ? 'Bitcoin transaction' : 'Lightning' };
+      steps.push({
+        title: r.pick ? (r.pick.rail === 'ecash' ? 'Pay in ecash' : r.pick.rail === 'btc' ? 'Pay onchain' : 'Pay over Lightning') : 'Can\'t pay', summary: '', ok: false,
+        render: () => `${railSummary(r)}${r.pick ? mintPill(f, 'send', 'pay', r.pick.mint) : ''}
+          ${r.pick && ((r.pick.rail === 'ecash' && !r.P.creq?.a) || (r.pick.rail !== 'ecash' && !(r.P.ln || r.P.lno || {}).a && !r.P.btc)) ? amountStep(f, 's', { chips: [100, 500, 1000], exactFrom: r.pick.rail === 'ecash' ? r.pick.mint.proofs : null }) : ''}
+          ${failBar(f, r.railsInPlay, r.tried)}
+          ${r.pick ? `${r.pick.rail === 'ecash' && r.P.creq ? noteField(f, 's', 'dm') : ''}<button type="submit" class="cta">${r.pick.text}</button>` : ''}`,
+      });
+    }
+    return steps;
+  }
+
+  function pastePanel(f) {
+    return `<label class="ctext" for="s-paste"><span class="cdesc">${f.entry === 'scan' ? 'Scanned (demo): pick what the camera sees' : 'Paste anything: npub, name@domain, a P2PK key, an invoice, a unified QR'}</span>
+      <input type="text" id="s-paste" placeholder="Paste here" value="${f.paste}"></label>
+      <div class="chips stack">${PASTE_EXAMPLES.filter(([v]) => classify(v)?.kind !== 'off').map(([v, icon, label]) => `<button type="button" class="chip wide" data-paste="${v}" aria-pressed="${f.paste === v}">${ic(icon === 'person' ? 'person' : icon, 16)}<span>${label}</span></button>`).join('')}</div>
+      ${f.hit === null && f.paste ? '<div class="hint">Not recognised.</div>' : f.hit?.kind === 'off' ? `<div class="hint">${f.hit.why}</div>` : ''}`;
+  }
+
+  // Tap to pay: the terminal decides what it asks for; the wallet decides the
+  // rest during the tap, and only a Lightning fallback asks you anything.
+  function tapPanel(f) {
+    const r = resolve(f.payload, { nfc: true, fails: f.fails, sel: f.mintSel });
+    if (r.pick) f.draft = { to: 'Payment terminal', toSub: r.P.label, rail: r.pick.rail, mint: r.pick.mint, amount: (r.P.creq || r.P.ln || {}).a, lock: null, transport: 'NFC, inside the tap' };
+    return `<div class="dd"><div class="hint">Demo: what the terminal sends</div>
+      <button type="button" class="dd-btn" data-pdd aria-expanded="${f.pdd}">${ic('nfc', 20)} ${r.P.label}<span class="chev">▾</span></button>
+      ${f.pdd ? `<div class="dd-list" role="listbox">${['both', 'creq', 'ln', 'foreign', 'locked', 'feemint', 'noamt'].map((k) => `<button type="button" class="dd-opt" role="option" aria-selected="${f.payload === k}" data-payload="${k}">${ic(PAYLOADS[k].creq && (PAYLOADS[k].ln) ? 'qr' : PAYLOADS[k].creq ? 'ecash' : 'bolt', 18)}<span class="who"><span>${PAYLOADS[k].label}</span><span>${PAYLOADS[k].raw}</span></span></button>`).join('')}</div>` : ''}</div>
+      <div class="hint mono" style="word-break:break-all">${r.P.raw}</div>
+      <div class="card"><div class="hint">During the tap, with no input from you:</div>${traceHtml(r.trace)}</div>
+      ${failBar(f, r.railsInPlay)}
+      ${r.pick ? `<div class="verdict ${r.pick.confirm ? 'round' : 'ok'}"><div>${r.pick.confirm ? `${ic('bolt')} ${r.pick.text}. One screen to confirm.` : `${ic('check')} Paid inside the tap: ${r.pick.text}. No screens.`}</div></div>
+        <button type="submit" class="cta">${r.pick.confirm ? 'Confirm Lightning payment' : 'Simulate the tap'}</button>` : `<div class="verdict no"><div>Nothing is paid; the terminal gets no token.</div></div>`}`;
+  }
+
+  // ---------------- RECEIVE ----------------
+  const RECV_MODES = { any: 'Any amount', set: 'Set an amount', claim: 'Paste a token' };
+  let tokenKind = 'locked';
+  function claimVerdict(kind, m) {
+    const amt = '250 sats';
+    if (kind === 'other') return `<div class="verdict no"><div><b>You can't unlock this.</b> It's locked to someone else's key.</div></div>`;
+    if (kind === 'unknown') return !mintUp()
+      ? `<div class="verdict round"><div><b>${amt} from mint.orchardbay.cash</b>, a mint you don't use. It can't be checked offline, so it's kept aside and not counted.</div></div><button type="submit" class="cta">Keep aside</button>`
+      : `<div class="verdict round"><div><b>${amt} from mint.orchardbay.cash</b>, a mint you don't use yet.</div></div>
+        <div class="choices">${radio('r-unk', 'add', '', `${ic('server')} Add this mint and claim`, 'Keeps the ecash at mint.orchardbay.cash')}${radio('r-unk', 'move', '', `${ic('bolt')} Move it to ${m.name}`, 'Swapped over Lightning. Small fee.')}</div>`;
+    if (!mintUp() && kind === 'locked') return `<div class="verdict ok"><div><b>Received ${amt}, pending.</b> Signed by ${m.name} and only your key can spend it, so it counts now and is redeemed when your mint is back.</div></div>`;
+    if (!mintUp()) return `<div class="verdict round"><div><b>${amt}, unconfirmed.</b> It isn't locked to you, so the sender could still spend it. Kept aside until your mint is back.</div></div><button type="submit" class="cta">Keep aside</button>`;
+    return `<div class="done-msg">Claimed ${amt} from ${m.name}${kind === 'locked' ? ', unlocked with your key' : ''}. Nothing to confirm.</div>`;
+  }
+
+  function recvSteps() {
+    const f = S.recv, a = sats(f), steps = [], m = rank(MINTS, f.mintSel)[0];
+    steps.push({
+      title: 'Get paid', summary: RECV_MODES[f.mode] || '', ok: !!f.mode,
+      mini: f.mode ? `${ic({ any: 'infinity', set: 'hash', claim: 'paste' }[f.mode], 20)}<b>${RECV_MODES[f.mode]}</b>` : '',
+      render: () => `<div class="tiles">
+        <button type="button" class="tile" data-mode="any" aria-pressed="${f.mode === 'any'}">${ic('infinity', 22)}Any amount</button>
+        <button type="button" class="tile" data-mode="set" aria-pressed="${f.mode === 'set'}">${ic('hash', 22)}Set an amount</button>
+        ${ON('ecash') ? `<button type="button" class="tile" data-mode="claim" aria-pressed="${f.mode === 'claim'}">${ic('paste', 22)}Paste a token</button>` : ''}
+      </div>`,
+    });
+    if (!f.mode) return steps;
+    if (f.mode === 'claim') {
+      if (f.token.length > 8 && tokenKind !== 'other' && !f.done) { // frozen once the receipt shows
+        const up = mintUp(m);
+        f.rdraft = { dir: 'recv', amount: 250, mint: tokenKind === 'unknown' ? { name: FOREIGN_MINT } : m, from: 'Pasted token', method: 'Ecash token',
+          lock: tokenKind === 'locked' ? 'Locked to your key' : 'Unlocked', tlKind: !up ? (tokenKind === 'locked' ? 'claim_offline' : 'claim_later') : tokenKind === 'unknown' ? null : 'claim' };
+        if (tokenKind !== 'unknown' && (up || tokenKind === 'locked')) f.done = true; // no question to ask: go straight to the receipt
+      }
+      steps.push({
+        title: 'Claim', summary: '', ok: false,
+        render: () => `<textarea id="r-token" placeholder="cashuB…" aria-label="Ecash token">${f.token}</textarea>
+          <div class="chips stack">
+            <button type="button" class="chip wide" data-sampletoken="locked">${ic('lock', 16)}Locked to you, a mint you use</button>
+            <button type="button" class="chip wide" data-sampletoken="plain">${ic('ecash', 16)}Unlocked, a mint you use</button>
+            <button type="button" class="chip wide" data-sampletoken="unknown">${ic('server', 16)}From a new mint</button>
+            <button type="button" class="chip wide" data-sampletoken="other">${ic('key', 16)}Locked to someone else</button>
+          </div>
+          <div class="hint">${ic('nfc', 14)} Or hold an NFC card with a token to your phone.</div>
+          ${f.token.length > 8 ? claimVerdict(tokenKind, m) : ''}`,
+      });
+      return steps;
+    }
+    f.any = f.mode === 'any';
+    if (f.mode === 'set') steps.push({
+      title: 'Amount', summary: a ? `${fmt(a)} sats · ${usd(a)}` : '', ok: a > 0,
+      mini: a ? `<span class="big">${fmt(a)} sats</span><span class="sub">${usd(a)}</span>` : '',
+      render: () => `${mintPill(f, 'recv', 'amount', m, () => '', 'Into')}${amountStep(f, 'r', { chips: [1000, 5000, 21000, 100000] })}
+        ${noteField(f, 'r', 'recv')}
+        <button type="button" class="next" data-next ${a ? '' : 'disabled'}>Continue</button>`,
+    });
+    // Receive rails. A mint can't issue a bolt11 invoice without an amount
+    // (NUT-04/23), so "any amount" uses npub.cash (a static Lightning address),
+    // a BOLT12 offer (NUT-25, needs NUT-20) or an onchain address (NUT-30).
+    // Each rail needs a mint whose NUT-04 settings take this method at this amount.
+    const pool = f.mintSel ? [mint(f.mintSel)] : rank(MINTS, '');
+    const at = (method, amt) => pool.find((x) => mintUp(x) && !lim(x, 'mint', method, amt));
+    // Why a rail is off: the pinned mint's reason, else the reason from a mint that offers the method at all.
+    const why = (method, amt) => {
+      if (!net()) return 'needs the network';
+      if (f.mintSel) { const x = mint(f.mintSel); return `${x.name}: ${mintUp(x) ? lim(x, 'mint', method, amt) : mintState(x)}`; }
+      const has = pool.find((x) => x.limits.mint[method] && !lim(x, 'mint', method, 0));
+      return has ? `${lim(has, 'mint', method, amt) || mintState(has)} at your mints` : `none of your mints offers ${METHOD_NAMES[method]}`;
+    };
+    const railFor = (id, method, label, amt, okText) => { const x = at(method, amt); return { id, label, method, amt, ok: !!x, mint: x, detail: x ? okText(x) : why(method, amt) }; };
+    // Every way stays visible: one this mint can't issue says why and offers the mints that can.
+    const fixHtml = (r) => { const c = MINTS.filter((x) => mintUp(x) && !lim(x, 'mint', r.method, r.amt)); return c.length ? `<div class="mintfix"><span class="hint">Works at:</span>${c.map((x) => `<button type="button" class="chip" data-mintsel="${x.id}">${ic('server', 14)} ${x.name}</button>`).join('')}</div>` : ''; };
+    const rails = [
+      { id: 'creq', label: 'Ecash (Cashu request)', ok: true, detail: mintUp(m) ? 'no quote needed; arrives as a private message' : 'locked to your key: scan their token' },
+      ...(f.any ? [
+        { id: 'npc', label: 'Lightning address kelbie@npub.cash', ok: true, separate: true, detail: net() ? `own code (tap Address); claimed into ${m.name}` : 'own code (tap Address); claimed when you reconnect' },
+        railFor('lno', 'bolt12', 'Lightning offer (BOLT12)', 0, (x) => `reusable, at ${x.name}`),
+        railFor('btc', 'onchain', 'Bitcoin address', 0, (x) => `at ${x.name}; payments from ${fmt(x.limits.mint.onchain[0])} sats`),
+      ] : [
+        railFor('ln', 'bolt11', 'Lightning invoice', a, (x) => `one-time invoice at ${x.name}`),
+        railFor('btc', 'onchain', 'Bitcoin address', a, (x) => `at ${x.name}; 10–60 min`),
+      ]),
+    ].filter((r) => ON(RAIL_MOD[r.id]));
+    for (const r of rails) if (r.ok && failed(f, r.id === 'lno' ? 'ln' : r.id)) Object.assign(r, { ok: false, detail: r.id === 'npc' ? 'npub.cash didn\'t answer (simulated)' : 'the mint couldn\'t create it (simulated)' });
+    const live = rails.filter((r) => r.ok);
+    // Mint-specific vs global: a way this mint can't issue opens the picker when another responding mint can
+    // (r.need); when none can, it's disabled everywhere with the reason (r.nowhere).
+    for (const r of rails) if (!r.ok && r.method) { const any = MINTS.some((x) => mintUp(x) && !lim(x, 'mint', r.method, r.amt)); r.need = any && net() ? `${r.method}:${r.amt}` : ''; r.nowhere = !r.need; }
+    // A set amount asks which way to get paid: each Lightning or onchain choice makes the mint create a quote
+    // (NUT-04), so "All" is opt-in. Any amount keeps one reusable code.
+    const METHODS = [['ln', 'Lightning', 'bolt'], ['creq', 'Ecash', 'ecash'], ['btc', 'Onchain', 'btc'], ['all', 'All of them', 'qr']]
+      .filter(([id]) => (id === 'all' ? rails.length > 1 : rails.some((r) => r.id === id)));
+    // A single-rail build has nothing to choose: no "Get paid by" step.
+    if (!f.any && METHODS.length === 1) f.rmethod = METHODS[0][0];
+    // A set amount gets its own "Get paid by" step, like "Get paid": one tile per way, and the QR shows only that way.
+    // A way no mint can issue at this amount is disabled with the reason; with only one way open the step is skipped.
+    if (!f.any) {
+      if (f.rmethod === 'all' && live.length < 2) f.rmethod = '';
+    }
+    const QUOTED = (r) => r.id !== 'creq';
+    const methodLabel = (id) => (METHODS.find((x) => x[0] === id) || [])[1];
+    if (!f.any && f.mode === 'set' && METHODS.length > 1) steps.push({
+      title: 'Get paid by', summary: methodLabel(f.rmethod) || '', ok: !!f.rmethod,
+      mini: f.rmethod ? `${ic((METHODS.find((x) => x[0] === f.rmethod) || [])[2], 20)}<b>${methodLabel(f.rmethod)}</b>` : '',
+      render: () => `${mintPill(f, 'recv', 'method', m, () => '', 'Into')}
+        <div class="tiles method-tiles">${METHODS.map(([id, label, icon]) => {
+          const r = rails.find((x) => x.id === id), all = id === 'all', n = live.filter(QUOTED).length;
+          const off = (all && live.length < 2) || (!all && r.nowhere);
+          const sub = all ? `${live.length} ways in one code · ${n} mint quote${n === 1 ? '' : 's'}` : r.nowhere ? r.detail : !r.ok ? 'Not at this mint: pick one' : QUOTED(r) ? `${r.mint.name} · 1 mint quote${f.why && r.id === 'ln' && !r.mint.desc ? ' · no message' : ''}` : 'No mint quote needed';
+          return `<button type="button" class="tile" data-rmethod="${id}" ${r?.need ? `data-need="${r.need}"` : ''} aria-pressed="${f.rmethod === id}" ${off ? 'disabled' : ''}>${ic(icon, 22)}${label}<span class="sub">${/^[a-z0-9-]+\.[a-z]/.test(sub) ? sub : sub.replace(/^[a-z]/, (c) => c.toUpperCase())}</span></button>`;
+        }).join('')}</div>
+        `,
+    });
+    const chosen = f.any ? null : f.rmethod === 'all' ? null : rails.find((r) => r.id === f.rmethod);
+    const only = f.any ? rails.find((r) => r.id === f.only) : chosen;
+    const blocked = !!only && !only.ok; // the chosen way isn't supported by this mint
+    const paidBy = blocked ? null : only || live.find((r) => r.id === 'ln') || live.find((r) => r.id !== 'npc') || live[0];
+    if (paidBy && !f.done) f.rdraft = { dir: 'recv', startAt: 1, amount: f.any ? 1000 : a, mint: paidBy.mint || m,
+      from: f.any ? 'Your reusable code' : 'Your payment request',
+      method: { creq: 'Ecash', ln: 'Lightning invoice', lno: 'Lightning offer', npc: 'Lightning address', btc: 'Onchain' }[paidBy.id],
+      tlKind: { creq: 'recv_ecash', btc: 'recv_btc' }[paidBy.id] || 'recv_ln',
+      via: { creq: 'ecash', ln: 'Lightning', lno: 'Lightning offer', npc: 'npub.cash', btc: 'an onchain transaction' }[paidBy.id],
+      lock: paidBy.id === 'creq' ? 'Locked to your key by their wallet (NUT-18)' : null };
+    steps.push({
+      title: 'QR code', summary: '', ok: false,
+      render: () => `${mintPill(f, 'recv', 'qr', m, () => '', 'Into')}
+        ${blocked ? (f.mintMenu ? `<div class="cdesc">${only.label}: ${only.detail}. Pick a mint that can, above.</div>` : unsupported(only.label, only.detail, `${only.method}:${only.amt}`)) : `<div class="qrrow">
+          <div class="qr" role="img" aria-label="QR code" data-qr="${qrText(only, f.any ? 0 : a, live)}"></div>
+          <div class="rails"><div class="cdesc">${only ? `${only.label}, ${f.any ? 'any amount' : `${fmt(a)} sats`}.` : `One code any of these can pay${f.any ? ', any amount' : `, ${fmt(a)} sats`}:`}</div>
+            ${(only ? [only] : rails.filter((r) => !r.separate && (f.any || r.ok))).map((r) => `<div class="rail ${r.ok ? '' : 'off'}"><span class="mk">${r.ok ? '✓' : '–'}</span><span>${r.label}${r.detail ? ` <span class="hint">· ${r.detail}</span>` : ''}</span></div>`).join('')}${f.any && !only ? rails.filter((r) => r.separate).map((r) => `<div class="hint">Also: ${r.label}, ${r.detail}</div>`).join('') : ''}</div>
+        </div>${f.any ? noteField(f, 'r', only ? only.id : 'recv', true) : f.why ? `<div class="hint">Message: “${esc(f.why)}”${only && only.id === 'ln' && !only.mint?.desc ? ` (not in the invoice: ${only.mint?.name} doesn't allow descriptions)` : ''}</div>` : ''}`}
+        ${f.any ? `<div class="chips" role="group" aria-label="Show one method">
+          <button type="button" class="chip" data-only="" aria-pressed="${!only}">All</button>
+          ${rails.map((r) => `<button type="button" class="chip ${r.ok ? '' : 'unsup'}" data-only="${r.id}" ${r.need ? `data-need="${r.need}"` : ''} ${r.nowhere ? 'disabled' : ''} aria-pressed="${only?.id === r.id}">${ic(r.id === 'creq' ? 'ecash' : r.id === 'btc' ? 'btc' : 'bolt', 14)} ${{ creq: 'Cashu', lno: 'Offer', npc: 'Address', btc: 'Bitcoin' }[r.id]}</button>`).join('')}
+        </div>` : ''}
+        ${failBar(f, [...(mintUp(m) ? ['ln', 'btc'] : []), ...(f.any && net() ? ['npc'] : [])])}
+        ${tapReceive(f, a)}
+        ${ON('ecash') ? `<details class="why-box"${mintUp(m) ? '' : ' open'}><summary>Why a Cashu request works offline</summary>
+          The request carries your public key in its <span class="mono">nut10</span> field (NUT-18), so the payer's wallet, which is online, locks the token to you (NUT-11). With no transport listed the token comes in-band: they show it and you scan it, or tap. Offline you can check that it's locked to you and signed by a mint whose keys you saved (NUT-12), so it counts as received, pending. Without the lock you couldn't tell whether the sender will spend it again, so it would be held aside.
+        </details>` : ''}
+        ${blocked ? '' : '<button type="submit" class="cta">Simulate the payer paying</button>'}`,
+    });
+    return steps;
+  }
+
+  // ---------------- research tables ----------------
+  const WALLETS = ['This concept', 'Sovran today', 'cashu.me', 'Cashu Wallet', 'Macadamia', 'Minibits', 'Zeus'];
+  const SCREENS = { send: ['1.95', '2.6', '3.0', '2.5', '2.5', '3.0', '2.6'], recv: ['1.8', '3.1', '2.1', '2.1', '1.8', '2.1', '2.1'] };
+  const FEATURES = [
+    ['Send', null],
+    ['Starts with who, not how', 'Saves a method screen on every paste or scan', 'yypnpnn'],
+    ['Paste or scan works out what it is', 'Saves choosing the kind first', 'yyyyyyy'],
+    ['Search Nostr people', 'Pay a person without copying anything', 'yypnnyp'],
+    ['Pasting an npub or name@domain picks the person', 'Saves a search', 'yypnnpp'],
+    ['Method only asked when two ways are open', 'Saves a screen for most recipients', 'yppn?ny'],
+    ['Last tap sends ecash (no separate review)', 'Saves a screen per ecash send', 'yyynyny'],
+    ['Lightning fee shown before paying', 'One screen, needed for safety', 'yyyyyyp'],
+    ['Unified QR falls back to the next rail', 'Saves a failed payment', 'ypnynnn'],
+    ['Top up a mint you use to pay a request', 'Pays a single-mint request instead of failing', 'yn?y???'],
+    ['Unreachable person: send later or show a QR', 'Instead of a dead end', 'ypnnnnn'],
+    ['Amount', null],
+    ['Quick amounts', 'Saves typing', 'yynnnnn'],
+    ['Amounts your ecash makes exactly are marked', 'Avoids a rounding screen offline', 'yynnnnn'],
+    ['Fiat entry', 'No conversion step', 'yyy?yyy'],
+    ['Send all / Max after fees', 'Saves a failed quote when emptying a mint', 'yynynnp'],
+    ['Offline', null],
+    ['Offline ecash from exact pieces', 'Sends with no network', 'yyy??py'],
+    ['Offline round up or down', 'Otherwise the send fails', 'yynnnnp'],
+    ['Tap to pay offline by overpaying within a limit', 'The terminal redeems online; no failed tap', 'ynnnnnn'],
+    ['Options that need the mint hidden offline', 'Avoids dead ends', 'ypn?nnp'],
+    ['In-person QR when a person can\'t be reached', 'A way to pay with no network', 'ypyyyyp'],
+    ['Lock', null],
+    ['Lock ecash to the recipient', 'Adds a choice only when wanted', 'yyyyyyy'],
+    ['Lock duration', 'One control, no extra screen', 'ynnnnyy'],
+    ['Uses their published wallet key and mints (NIP-61)', 'Narrows the how without asking', 'yynnnnn'],
+    ['NFC', null],
+    ['Tap to pay a terminal, settled during the tap', 'Pay with no screens', 'yy?yyyp'],
+    ['Get paid by tap (phone acts as the tag)', 'No QR needed', 'ynnyyny'],
+    ['Write a token to an NFC card', 'One tap after creating', 'yy?y?yn'],
+    ['Receive', null],
+    ['One QR any wallet can pay (BIP-321)', 'Saves choosing a method', 'yp????p'],
+    ['Any amount: Lightning address (npub.cash)', 'No amount screen, any Lightning wallet', 'yyyynyp'],
+    ['Any amount: BOLT12 offer', 'Reusable; needs a mint with BOLT12', 'yy??ynp'],
+    ['Pay invoices with no amount, checked against the mint', 'Refused up front, not after a failed quote', 'yn????p'],
+    ['Own Lightning address', 'Share once, reuse', 'yyyynyn'],
+    ['Cashu payment request', 'Works offline', 'yyyyyyn'],
+    ['Tokens from known mints claimed at once', 'Saves a claim screen', 'yy?ypnn'],
+    ['New mint: add it or move the money', 'One choice instead of a failure', 'ypypypy'],
+    ['Offline token locked to you counts; others held aside', 'Safe offline receive', 'yp?pypp'],
+    ['Other', null],
+    ['One Lightning payment from several mints (NUT-15)', 'Saves a transfer between mints', 'nnynpny'],
+    ['Animated QR for large tokens', 'Big tokens still scan', 'yyyyypy'],
+    ['Onchain send and receive (NUT-30)', 'Payers with only bitcoin', 'yyyypyp'],
+    ['Watches whether a sent token was claimed', 'No manual checking', 'yyyyyyy'],
+  ];
+  function renderMatrix() {
+    const mark = { y: '<span class="yes" aria-label="yes">✓</span>', p: '<span class="part" aria-label="partial">◐</span>', n: '<span class="no" aria-label="no">–</span>', '?': '<span class="no" aria-label="not confirmed">?</span>' };
+    const head = `<tr><th>Feature</th>${WALLETS.map((w, i) => `<th class="${i === 0 ? 'us' : ''}">${w}</th>`).join('')}</tr>`;
+    // Coverage: ✓ counts 1, ◐ counts ½, – and ? count 0, over every feature row.
+    const cells = FEATURES.filter((x) => x[2]).map((x) => x[2]);
+    const cover = WALLETS.map((_, i) => Math.round(100 * cells.reduce((s, c) => s + ({ y: 1, p: 0.5 }[c[i]] || 0), 0) / cells.length));
+    const coverage = `<tr><td><b>Feature coverage</b><div class="hint">✓ = 1, ◐ = ½, over ${cells.length} features</div></td>${cover.map((v, i) => `<td class="${i === 0 ? 'us' : ''}"><b>${v}%</b></td>`).join('')}</tr>`;
+    const screens = ['send', 'recv'].map((k) => `<tr><td><b>Average screens, ${k === 'send' ? 'send' : 'receive'}</b></td>${SCREENS[k].map((v, i) => `<td class="${i === 0 ? 'us' : ''}"><b>${v}</b></td>`).join('')}</tr>`).join('');
+    const rows = FEATURES.map(([name, effect, cells]) => cells === undefined
+      ? `<tr class="group"><td colspan="${WALLETS.length + 1}">${name}</td></tr>`
+      : `<tr><td>${name}<div class="hint">${effect}</div></td>${[...cells].map((c, i) => `<td class="${i === 0 ? 'us' : ''}">${mark[c]}</td>`).join('')}</tr>`).join('');
+    document.getElementById('matrix').innerHTML = `<table class="matrix"><colgroup><col>${WALLETS.map(() => '<col class="w">').join('')}</colgroup><thead>${head}</thead><tbody>${coverage}${screens}${rows}</tbody></table>
+      <p class="hint">✓ yes · ◐ partial · – no · ? not confirmed. From jevgrep searches of each project; – may only mean nothing was found.</p>`;
+  }
+  // The same resolver as the form, run for every payload in the current scenario.
+  function renderBipMap() {
+    const keys = ['both', 'creq', 'ln', 'ln0', 'lno0', 'foreign', 'locked', 'feemint', 'topup', 'noamt', 'three', 'offer'];
+    const cell = (r, nfc) => r.pick ? `${r.pick.rail === 'ecash' ? 'Ecash' : r.pick.rail === 'btc' ? 'Onchain' : 'Lightning'}${nfc ? (r.pick.confirm ? ' · confirm on screen' : ' · no screens') : (r.pick.confirm && r.pick.rail !== 'ecash' ? ' · review, then pay' : ' · one tap to pay')}` : '<span class="t-no">Can\'t pay</span>';
+    document.getElementById('bipmap').innerHTML = `<table><thead><tr><th>Payload</th><th>Scanned or pasted</th><th>Tapped (NFC)</th></tr></thead><tbody>
+      ${keys.map((k) => { const q = resolve(k, { nfc: false }); const n = resolve(k, { nfc: true }); return `<tr><td>${PAYLOADS[k].label}</td><td>${cell(q, false)}</td><td>${['three', 'offer'].includes(k) ? '<span class="hint">n/a</span>' : cell(n, true)}</td></tr>`; }).join('')}
+      </tbody></table><p class="hint">Tried in order: Cashu request → Lightning → bitcoin address. Follows the scenario.</p>`;
+  }
+  function renderFailures() {
+    const rows = FLOW.failures.map((x) => `<tr><td>${x.rail}</td><td>${x.stage}</td><td>${x.failure}<div class="hint mono">${x.signal}</div></td><td>${x.funds}</td><td>${x.next}${x.best ? `<div class="hint">${x.best}</div>` : ''}${x.verified ? '' : '<div class="hint">(unverified)</div>'}</td></tr>`).join('');
+    document.getElementById('failmap').innerHTML = `<table><thead><tr><th>Rail</th><th>Stage</th><th>Failure · signal</th><th>Funds</th><th>Next step · prior art</th></tr></thead><tbody>${rows}</tbody></table>`;
+  }
+  function renderPasteMap() {
+    const rows = [
+      ['npub / nprofile', 'Looks up their Lightning address (kind 0) and wallet info (NIP-61: mints, lock key). Ecash by private message, or Lightning.', S.cached ? 'Uses the cached lookup if under 10 min old; the message waits until online.' : 'Nothing known: send later, or pay in person with a QR.'],
+      ['name@domain', 'Checked both as a Nostr address (NIP-05) and a Lightning address; whichever resolves.', 'Only a known contact; otherwise needs the internet.'],
+      ['P2PK key (02…/03…)', 'Locked ecash: the mint swaps it into a lock only that key opens.', 'Can\'t lock offline: lock and send later, or give unlocked ecash in person with consent.'],
+      ['Unified QR / creq / invoice', 'The resolver above picks the rail and falls back.', 'Only a Cashu request paid from exact pieces.'],
+    ];
+    document.getElementById('pastemap').innerHTML = `<table><thead><tr><th>Pasted</th><th>Online</th><th>Offline</th></tr></thead><tbody>${rows.map((r) => `<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td></tr>`).join('')}</tbody></table>`;
+  }
+
+  // ---------------- rendering ----------------
+  function qrText(only, amount, live) {
+    const creq = 'creqB1QQ8QYQ9C8SE0VPP5W3JKXVMRXDMJ7AMN0V9KXCMRXCX7MNFE5U';
+    const ln = 'lnbc' + (amount ? amount * 10 + 'n' : '') + '1pjdemo0pp5qqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqypq';
+    const btc = 'bc1qdemo0x2k5ugl8fyc3adzx8qh9hvtz0wlhtzy6';
+    const lno = 'lno1qcp4256ypqpq86q2pucnq42ngssx2an9wfujqerp0y2pqun4wd68jtn00fkxzcnn9ehhyec6qgqsz83qfw';
+    if (only) return only.id === 'creq' ? creq : only.id === 'ln' ? ln : only.id === 'lno' ? lno : only.id === 'npc' ? 'lightning:kelbie@npub.cash' : `bitcoin:${btc}${amount ? `?amount=${amount / 1e8}` : ''}`;
+    const has = (id) => live.some((r) => r.id === id);
+    const q = [amount ? `amount=${amount / 1e8}` : '', has('ln') ? `lightning=${ln}` : '', has('lno') ? `lno=${lno}` : '', has('creq') ? `creq=${creq}` : ''].filter(Boolean).join('&');
+    return `bitcoin:${has('btc') ? btc : ''}?${q}`.toUpperCase();
+  }
+  function renderQrs() {
+    if (!window.QRCode) return;
+    document.querySelectorAll('[data-qr]').forEach((el) => {
+      if (el.dataset.drawn === el.dataset.qr) return;
+      el.innerHTML = '';
+      try { new QRCode(el, { text: el.dataset.qr, width: 320, height: 320, colorDark: '#111111', colorLight: '#FFFFFF', correctLevel: QRCode.CorrectLevel.L }); } catch (e) {}
+      el.dataset.drawn = el.dataset.qr;
+    });
+  }
+  function renderStatus() {
+    document.getElementById('status').innerHTML = S.offline ? `${ic('plane', 16)} Offline: ecash you hold still sends` : S.mintDown ? `${ic('warn', 16)} ${mint(S.mintDown).name} isn't responding` : '<span class="dot"></span> Online';
+    const order = [mint(S.primary), ...MINTS.filter((m) => m.id !== S.primary).sort((a, b) => bal(b) - bal(a))];
+    document.getElementById('balances').innerHTML = order.map((m, i) => `<button type="button" class="bal" data-primary="${m.id}" aria-pressed="${m.id === S.primary}" title="${m.id === S.primary ? 'Your primary mint' : 'Make this your primary mint'}"><span class="bal-tag">${i === 0 ? 'Primary' : i === 1 ? '2nd' : '3rd'}</span><span class="sub">${m.name}</span><span class="amt">${fmt(bal(m))} sats</span><span class="sub">${usd(bal(m))} · ${mintState(m)}${m.fee ? ` · ${m.fee} sat fee` : ''}</span></button>`).join('');
+  }
+  function renderNav() {
+    const kind = document.getElementById('send-form').hidden ? 'recv' : 'send';
+    const f = S[kind];
+    const body = document.querySelector(`#${kind}-steps .step.active .body`);
+    const target = body && (body.querySelector(':scope > .cta') || body.querySelector(':scope > [data-next]'));
+    const next = document.getElementById('nav-next');
+    const back = document.getElementById('nav-back');
+    back.disabled = !(f.step > 0) || f.sent || f.done;
+    back.onclick = () => { if (f.step > 0) { f.step--; draw(kind); } };
+    const more = document.getElementById('nav-more');
+    const menu = document.getElementById('simmenu');
+    // On a receipt the footer drives the timeline: main = next event (or send/receive more once
+    // settled), left = replay, right = fail this step. The inline controls stay hidden in the page.
+    if (f.sent || f.done) {
+      const root = document.getElementById(`${kind}-steps`);
+      const pick = (sel) => root.querySelector(sel);
+      const nextB = pick('[data-tlnext]') || pick('[data-reset]'), replay = pick('[data-tlreset]'), fail = pick('[data-tlfail]');
+      next.hidden = !nextB; if (nextB) { next.disabled = false; next.textContent = nextB.textContent.trim(); next.onclick = () => nextB.click(); }
+      back.disabled = !replay; back.innerHTML = `${ic('back')} ${replay ? 'Replay' : 'Back'}`; back.onclick = () => replay && replay.click();
+      more.hidden = !fail; menu.hidden = true;
+      if (fail) { more.innerHTML = `${ic('warn', 16)} <span class="sim-label">Fail this step</span>`; more.setAttribute('aria-label', 'Fail this step'); more.onclick = (e) => { e.stopPropagation(); fail.click(); }; }
+      return;
+    }
+    back.innerHTML = `${ic('back')} Back`;
+    more.innerHTML = `${ic('warn', 16)} <span class="sim-label">Simulate</span>`; more.setAttribute('aria-label', 'Simulate a failure on this step');
+    const rails = simRails;
+    more.hidden = !rails.length || f.sent || f.done;
+    if (more.hidden) { menu.hidden = true; more.setAttribute('aria-expanded', 'false'); }
+    menu.innerHTML = `<div class="sim-head"><b>Simulate a failure on this step</b><button type="button" class="x" data-simclose aria-label="Close">✕</button></div>
+      ${rails.map((r) => `<button type="button" role="menuitemcheckbox" aria-checked="${failed(f, r)}" data-simfail="${r}"><span>${FAIL_LABELS[r]}</span><span class="mini-switch" aria-hidden="true"></span></button>`).join('')}
+      <div class="sim-foot">${f.fails.length ? '<button type="button" class="chip" data-simclear>Clear all</button>' : '<span></span>'}<button type="button" class="chip" data-simclose>Done</button></div>`;
+    more.onclick = (e) => { e.stopPropagation(); menu.hidden = !menu.hidden; more.setAttribute('aria-expanded', String(!menu.hidden)); if (!menu.hidden) menu.querySelector('[data-simfail]')?.focus(); };
+    menu.onclick = (e) => {
+      e.stopPropagation();
+      const b = e.target.closest('button'); if (!b) return;
+      if (b.dataset.simclose !== undefined) { menu.hidden = true; more.setAttribute('aria-expanded', 'false'); more.focus(); return; }
+      if (b.dataset.simclear !== undefined) f.fails = [];
+      else { const r = b.dataset.simfail; f.fails = failed(f, r) ? f.fails.filter((x) => x !== r) : [...f.fails, r]; if (f.how && failed(f, f.how)) f.how = ''; }
+      draw(kind); document.getElementById('simmenu').hidden = false;
+    };
+    if (target) { next.hidden = false; next.innerHTML = `${kind === 'send' && target.classList.contains('cta') ? ic('send') : ''}${target.textContent}`; next.disabled = target.disabled; next.onclick = () => target.click(); }
+    else next.hidden = true;
+  }
+  // Receipt timeline, rendered from FLOW.timeline_steps / FLOW.timelines (flow.py documents the principles).
+  // f.tl: i = index of the active step (== length when finished), fail = the active step failed, queued = waiting for a connection.
+  function timeline(f, R, { ecash, tap, reserve, amt }) {
+    const T = FLOW.timeline_steps;
+    const kind = R.tlKind || (!ecash ? (R.rail === 'btc' ? 'onchain' : 'lightning') : tap ? 'ecash_tap' : R.avatar ? 'ecash_person' : /^Token/.test(R.transport || '') ? 'ecash_token' : 'ecash_request');
+    const ids = [...(R.topup ? ['topup'] : []), ...FLOW.timelines[kind]];
+    f.tl = f.tl || { i: R.startAt || 0, fail: false, queued: !!f.queue };
+    const { i, fail, queued } = f.tl, n = ids.length, finished = i >= n;
+    const ctx = { to: R.avatar ? R.to : kind === 'ecash_token' ? 'someone' : 'the receiver', mint: R.mint?.name, src: R.topup?.from.name, amt: fmt(R.topup ? R.topup.amt : amt), fee: fmt(R.topup ? R.topup.fee : reserve), via: R.via || R.transport, dest: R.dest, reclaim: reclaimText(R.lockN || 5) };
+    const fill = (t) => t.replace(/\{(\w+)\}/g, (_, k) => ctx[k] ?? '');
+    const time = (k) => `12:${String(4 + k).padStart(2, '0')}`; // demo clock
+    const items = (fail ? ids.slice(0, i + 1) : ids).map((id, k) => {
+      const st = T[id];
+      if (k < i || finished) {
+        const result = finished && k === n - 1 && st.result ? `<span class="hint">${fill(st.result)}</span>` : '';
+        return `<li class="done"><div class="tl-row"><b>${fill(st.label[2])}</b><span class="hint mono">${time(k)}</span></div>${result}</li>`;
+      }
+      if (k === i && fail) return `<li class="fail"><div class="tl-row"><b>${fill(st.fail[0])}</b><span class="hint mono">${time(k)}</span></div><span class="hint">${fill(st.fail[1])}</span><button type="button" class="chip tl-act">${fill(st.fail[2])}</button></li>`;
+      if (k === i) {
+        const q = queued ? T.send.queued : null;
+        return `<li class="active"><div class="tl-row"><b>${q ? q[0] : fill(st.label[1])}</b><span class="hint mono">now</span></div><span class="hint">${q ? q[1] : fill((R.lock && st.active_locked) || (R.exact && st.active_exact) || st.active)}</span></li>`;
+      }
+      return `<li class="todo"><b>${fill(st.label[0]).replace(/^./, (c) => c.toUpperCase())}</b></li>`;
+    }).join('');
+    const canFail = !finished && !fail && T[ids[i]]?.fail && !queued;
+    // Header verb follows the timeline: nothing claims "sent" before the step that sends is done.
+    const sentAt = ids.findIndex((x) => ['send', 'hand', 'pay', 'broadcast'].includes(x));
+    const prepAt = ids.indexOf('prepare'), claimAt = ids.findIndex((x) => ['claim', 'redeem'].includes(x));
+    f.tlPhase = {
+      tokenReady: ecash && (finished || i > prepAt) && !(fail && i <= prepAt), // no token before it exists, none if making it failed
+      spent: ecash && claimAt >= 0 && (finished || i > claimAt),
+      sent: finished || (sentAt >= 0 && i > sentAt),
+      failed: fail,
+      settled: finished || fail || queued, // nothing is still in flight
+    };
+    if (R.dir === 'recv') { f.tlHead = fail ? 'Not received' : finished ? 'Received' : 'Receiving'; return `<ol class="timeline">${items}</ol>
+      <div class="tl-demo"><span class="hint">Demo</span>
+        ${finished || fail ? '<button type="button" class="chip" data-tlreset>Replay</button>' : '<button type="button" class="chip" data-tlnext>Next event</button>'}
+        ${canFail ? '<button type="button" class="chip" data-tlfail>Fail this step</button>' : ''}</div>`; }
+    f.tlHead = fail ? 'Couldn\'t send to' : queued ? 'Queued for' : finished && !ecash ? 'Paid' : i > (sentAt < 0 ? 0 : sentAt) || finished ? 'Sent to' : 'Sending to';
+    return `<ol class="timeline">${items}</ol>
+      <div class="tl-demo"><span class="hint">Demo</span>
+        ${finished || fail ? '<button type="button" class="chip" data-tlreset>Replay</button>' : `<button type="button" class="chip" data-tlnext>${queued ? 'Back online' : 'Next event'}</button>`}
+        ${canFail ? '<button type="button" class="chip" data-tlfail>Fail this step</button>' : ''}</div>`;
+  }
+
+  // The token on the receipt follows the timeline: a same-size placeholder until
+  // it exists, the QR once it does (also after a failed delivery: it's still yours),
+  // and a short "spent" line once claimed. The transport line changes tense with it.
+  function tokenBlock(R, ph, q) {
+    const via = (R.transport || '').replace(/^./, (c) => c.toLowerCase());
+    if (ph.spent) return `<div class="token-spent">${ic('check', 16)}<span>Claimed${R.avatar ? ` by ${R.to}` : ''}. This token is spent, so there's nothing left to show.</span></div>`;
+    if (!ph.tokenReady) return ph.failed ? '' : `<div class="qrrow"><div class="qr qr-wait" aria-label="Token not ready yet"></div>
+      <div class="rails"><div class="hint">The token appears here once it's ready.</div></div></div>`;
+    return `<div class="qrrow"><div class="qr" data-qr="cashuBo2FteBtodHRwczovL21pbnQuc292cmFuLm1vbmV5YXVjc2F0YXSBomFpSABsRGVtb1Rva2Vu"></div>
+      <div class="rails"><div class="hint">${R.lock ? 'Locked, so showing it is safe: only they can claim it.' : 'Unlocked: whoever scans it can claim it.'}</div>
+      ${/^Token/.test(R.transport || '') ? '' : `<div class="hint">${ph.failed ? `It didn't go by ${via}; share it another way.` : ph.sent ? `The same token went by ${via}.` : q ? `It goes by ${via} once you're online.` : `It's going by ${via}.`}</div>`}</div></div>
+      <div class="tiles"><button type="button" class="tile">${ic('paste', 22)}Copy</button><button type="button" class="tile">${ic('send', 22)}Share</button><button type="button" class="tile">${ic('nfc', 22)}Write to card</button></div>`;
+  }
+
+  // Being paid by tap: the phone acts as the tag (card emulation) while the request is on screen.
+  // Android listens by itself (numo arms HCE ~1 s after the screen opens); an iPhone can only emulate
+  // in the EEA, started by hand for up to 60 s (CardSession); elsewhere the payer scans the QR.
+  // A tap needs an amount: the payer's phone can't ask for one. docs/research/nfc-payment-requests.md
+  function tapReceive(f, a) {
+    if (!ON('nfc')) return '';
+    if (f.any) return `<div class="hint">${ic('nfc', 14)} Set an amount to be paid by tap: their phone can't ask for one.</div>`;
+    if (S.platform === 'ios') return `<div class="hint">${ic('nfc', 14)} iPhones outside the EEA can't be tapped to receive; they scan the QR.</div>`;
+    const armed = S.platform === 'android' || f.nfcArmed;
+    return `<div class="tapbox ${armed ? 'armed' : ''}">
+        <span class="tap-ic">${ic('nfc', 20)}</span>
+        <div class="tap-text"><b>${armed ? 'Ready for a tap' : 'Tap to receive'}</b><span class="hint">${armed ? `${S.platform === 'android' ? 'Listening while this code is on screen.' : 'Listening for 60 seconds.'} ${f.rmethod === 'ln' ? 'Their phone reads the invoice and pays over Lightning.' : 'Their wallet writes ecash to your phone.'}` : 'On iPhone, start it when they are ready: it listens for 60 seconds.'}</span></div>
+        ${armed ? '<button type="button" class="chip" data-tapin>Simulate their tap</button>' : '<button type="button" class="chip" data-arm>Start</button>'}
+      </div>`;
+  }
+
+  // The final receive state: what arrived, how, into which mint, and the same timeline rules as a send.
+  function recvReceipt(f) {
+    const R = f.rdraft;
+    const tlHtml = timeline(f, R, { ecash: true, tap: false, reserve: R.fee || 0, amt: R.amount });
+    const rows = [['From', R.from], ['Method', R.method], ['Into', R.dest || R.mint?.name], ...(R.lock ? [['Lock', R.lock]] : []), ...(f.why ? [['Message', esc(f.why)]] : [])];
+    const phase = f.tlHead;
+    return `<div class="receipt">
+        <div class="r-head"><span class="r-ic">${ic('receive', 20)}</span><div class="r-who"><span class="hint">${phase}</span><b>${R.method}</b><span class="hint r-sub">${R.from}</span></div></div>
+        <div class="r-amt"><span class="mono">${fmt(R.amount)}</span> sats<span class="hint">${usd(R.amount)}</span></div>
+        ${tlHtml}
+        <dl class="r-rows">${rows.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('')}</dl>
+      </div>
+      ${phase !== 'Receiving' ? '<button type="button" class="next" data-reset>Receive more</button>' : ''}`;
+  }
+
+  // The final send state: who, how much, how, from which mint, locked or not,
+  // and a timeline. Ecash always has its token as a QR, whatever carried it.
+  function doneHtml(kind) {
+    const f = S[kind];
+    if (kind === 'send') {
+      const R = f.draft || {}, amt = f.final || R.amount || sats(f);
+      R.exact = !!R.mint && exactAt(R.mint, amt + (S.coverFee && R.rail === 'ecash' ? R.mint.fee || 0 : 0));
+      const ecash = !R.rail || R.rail === 'ecash';
+      const railName = { ecash: 'Ecash', ln: 'Lightning', lno: 'Lightning offer', btc: 'Onchain' }[R.rail || 'ecash'];
+      const tap = R.transport === 'NFC, inside the tap', q = f.queue;
+      const reserve = Math.max(2, Math.ceil(amt * 0.01));
+      const who = R.to === 'Whoever scans it' ? 'whoever scans it' : R.avatar ? R.to : 'the receiver';
+      const rows = [['Method', railName], ['From', R.mint?.name],
+        ...(ecash ? [['Lock', R.lock || 'Unlocked'], ['Claim fee', R.mint?.fee ? (S.coverFee ? `${R.mint.fee} sat added for them` : `${R.mint.fee} sat, they pay`) : 'None']]
+          : [['Fee', `Up to ${fmt(reserve)} sats`]]),
+        ...(R.topup ? [['Top-up', `${fmt(R.topup.amt)} sats from ${R.topup.from.name}, fee up to ${fmt(R.topup.fee)}`]] : []),
+        ['Via', R.transport], ['Message', ['ecash', 'ln'].includes(R.rail || 'ecash') && f.why ? esc(f.why) : '']].filter((x) => x[1]);
+      const tlHtml = timeline(f, R, { ecash, tap, reserve, amt });
+      return `<div class="receipt">
+        <div class="r-head">${R.avatar ? `<span class="avatar">${R.avatar}</span>` : `<span class="r-ic">${ic(tap ? 'nfc' : ecash ? 'ecash' : 'bolt', 20)}</span>`}<div class="r-who"><span class="hint">${f.tlHead}</span><b>${R.to || 'Recipient'}</b>${R.toSub ? `<span class="hint mono r-sub">${R.toSub}</span>` : ''}</div></div>
+        <div class="r-amt"><span class="mono">${fmt(amt)}</span> sats<span class="hint">${usd(amt)}</span></div>
+        ${tlHtml}
+        <dl class="r-rows">${rows.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('')}</dl>
+        ${ecash ? tokenBlock(R, f.tlPhase, q) : ''}
+        </div>
+        ${f.tlPhase.settled ? '<button type="button" class="next" data-reset>Send another</button>' : ''}`;
+    }
+    if (f.rdraft) return recvReceipt(f);
+    return `<div class="done-msg">${!mintUp() ? 'Saved. It will be claimed when your mint is back.' : '250 sats added.'}</div><button type="button" class="next" data-reset>Start again</button>`;
+  }
+  function draw(kind) {
+    const f = S[kind];
+    const steps = kind === 'send' ? sendSteps() : recvSteps();
+    if (f.step >= steps.length) f.step = steps.length - 1;
+    registering = !document.getElementById(kind + '-form').hidden;
+    if (registering) simRails = [];
+    const ol = document.getElementById(kind + '-steps');
+    const fid = document.activeElement?.id, caret = document.activeElement?.selectionStart;
+    ol.innerHTML = (kind === 'send' ? f.sent : f.done) ? `<li class="step active"><div class="body" style="display:grid;padding-left:0">${doneHtml(kind)}</div></li>` : steps.map((s, i) => {
+      const st = i === f.step ? 'active' : i < f.step ? 'done' : 'todo';
+      const reach = i <= f.step || steps.slice(0, i).every((x) => x.ok);
+      return `<li class="step ${st}"><button type="button" class="head" data-go="${i}" ${reach && i !== f.step ? '' : 'disabled'} aria-expanded="${i === f.step}">
+        <span class="num">${i < f.step ? '✓' : i + 1}</span><span class="htext"><span class="htitle">${s.title}</span>${i < f.step && s.mini ? `<span class="mini">${s.mini}<span class="mini-edit">${ic('pencil', 14)}Edit</span></span>` : `<span class="hsum">${i === f.step ? '' : s.summary}</span>`}</span></button>
+        <div class="body">${i === f.step ? s.render() : ''}</div></li>`;
+    }).join('');
+    if (fid) { const el = document.getElementById(fid); if (el) { el.focus(); try { if (caret != null) el.setSelectionRange(caret, caret); } catch (e) {} } }
+    renderQrs(); renderStatus(); renderNav();
+  }
+  const redraw = () => { const vis = document.getElementById('send-form').hidden ? 'recv' : 'send'; draw(vis === 'send' ? 'recv' : 'send'); draw(vis); renderBipMap(); renderPasteMap(); };
+
+  function wire(kind) {
+    const form = document.getElementById(kind + '-form');
+    const px = kind === 'send' ? 's' : 'r';
+    form.addEventListener('click', (e) => {
+      const f = S[kind];
+      const t = e.target.closest('button'); if (!t) return;
+      const d = t.dataset;
+      if (d.arm !== undefined) f.nfcArmed = true;
+      else if (d.tapin !== undefined) { // a tap carries what the QR carries (numo serves the bolt11 on its Lightning tab)
+        f.rdraft = f.rmethod === 'ln' ? { ...f.rdraft, startAt: 0, method: 'Lightning invoice, read by tap', from: 'Tap to pay' }
+          : { ...f.rdraft, tlKind: 'recv_tap', startAt: 0, method: 'Ecash by tap', from: 'Tap to pay', via: 'NFC', lock: 'Locked to your key (their wallet locks it)', mint: rank(MINTS, f.mintSel)[0] };
+        f.done = true; }
+      else if (d.lock !== undefined) f.lock = +d.lock;
+      else if (d.tlnext !== undefined) { if (f.tl.queued) f.tl.queued = false; else f.tl.i++; }
+      else if (d.tlfail !== undefined) f.tl.fail = true;
+      else if (d.tlreset !== undefined) f.tl = null;
+      else if (d.mintneed !== undefined) { f.mintNeed = d.mintneed; f.mintMenu = true; }
+      else if (d.mintmenu !== undefined) { f.mintMenu = !f.mintMenu; if (!f.mintMenu) f.mintNeed = ''; }
+      else if (d.mintsel !== undefined) { f.mintSel = d.mintsel; f.mintMenu = false; f.mintNeed = ''; f.final = null; }
+      else if (d.go) f.step = +d.go;
+      else if (d.next !== undefined) f.step++;
+      else if (d.dd !== undefined) f.dd = !f.dd;
+      else if (d.pdd !== undefined) f.pdd = !f.pdd;
+      else if (d.fail) { f.fails = failed(f, d.fail) ? f.fails.filter((x) => x !== d.fail) : [...f.fails, d.fail]; if (f.how && failed(f, f.how)) f.how = ''; }
+      else if (d.payload) { f.payload = d.payload; f.pdd = false; f.fails = []; }
+      else if (d.person) { Object.assign(f, { fails: [], entry: 'person', user: d.person, dd: false, hit: null, how: '', final: null, step: 1 }); }
+      else if (d.entry) { Object.assign(f, { fails: [], entry: d.entry, dd: false, user: '', hit: null, paste: '', how: '', final: null, amount: '', step: d.entry === 'token' ? 1 : 0 }); }
+      else if (d.paste) { f.paste = d.paste; f.fails = []; applyPaste(f); }
+      else if (d.unit) { const a = sats(f); f.unit = d.unit; if (a) f.amount = f.unit === 'usd' ? (a / SATS_PER_USD).toFixed(2) : String(a); }
+      else if (d.pick) { f.any = false; f.amount = f.unit === 'usd' ? (+d.pick / SATS_PER_USD).toFixed(2) : d.pick; f.final = null; }
+      else if (d.all) { f.any = false; f.unit = 'sats'; f.amount = d.all; f.final = null; }
+      else if (d.any !== undefined) { f.any = !f.any; if (f.any) f.amount = ''; }
+      else if (d.final) f.final = +d.final;
+      else if (d.only !== undefined) { f.only = d.only; if (d.need) Object.assign(f, { mintNeed: d.need, mintMenu: true }); }
+      else if (d.rmethod !== undefined) { f.rmethod = d.rmethod; f.step++; if (d.need) Object.assign(f, { mintNeed: d.need, mintMenu: true }); }
+      else if (d.mode) { f.mode = d.mode; f.amount = ''; f.only = ''; f.token = ''; f.step = 1; }
+      else if (d.sampletoken !== undefined) { tokenKind = d.sampletoken || 'locked'; f.token = 'cashuBo2FteBtodHRwczovL21pbnQuc292cmFuLm1vbmV5YXVjc2F0…'; }
+      else if (d.reset !== undefined) S[kind] = kind === 'send' ? blankSend() : blankRecv();
+      else return;
+      draw(kind);
+    });
+    form.addEventListener('change', (e) => {
+      const f = S[kind], t = e.target;
+      if (t.id === 's-lockon') { f.lock = t.checked ? 3 : 0; if (!t.checked) Object.assign(f, { autoNeed: '', mintNeed: '', mintMenu: false }); } // on: default take-back after a week
+      else if (t.name === 's-how') f.how = t.value;
+      else if (t.name === 's-off') { if (t.value === 'queue') { f.queue = true; f.sent = true; f.tl = null; } else Object.assign(f, { entry: 'token', user: '', hit: null, how: '', final: null, amount: '', step: 1 }); }
+      else if (t.name === 'r-unk') { const dest = rank(MINTS, f.mintSel)[0].name; Object.assign(f.rdraft, t.value === 'add' ? { tlKind: 'claim_add' } : { tlKind: 'claim_move', dest, fee: 3 }); f.done = true; }
+      else if (t.id === 's-payload') f.payload = t.value;
+      else return;
+      draw(kind);
+    });
+    form.addEventListener('input', (e) => {
+      const f = S[kind], t = e.target;
+      if (t.id === 's-paste') { f.paste = t.value; applyPaste(f); }
+      else if (t.id === 's-ddq') f.ddq = t.value;
+      else if (t.id === px + '-amount') { f.amount = t.value.replace(/[^0-9.]/g, ''); f.any = false; f.final = null; }
+      else if (t.id === 'r-token') f.token = t.value;
+      else if (t.id === px + '-why') { f.why = t.value; return; } // no redraw: typing keeps focus
+      else return;
+      draw(kind);
+    });
+    form.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' || e.target.tagName !== 'INPUT' || e.target.type === 'checkbox') return;
+      e.preventDefault();
+      const n = document.getElementById('nav-next'); if (!n.hidden && !n.disabled) n.click();
+    });
+    form.addEventListener('submit', (e) => { e.preventDefault(); if (kind === 'send') { S.send.sent = true; S.send.tl = null; } else S.recv.done = true; draw(kind); });
+  }
+  // A pasted person is picked at once; payment data opens its own step.
+  function applyPaste(f) {
+    const hit = classify(f.paste);
+    f.hit = hit; f.how = ''; f.final = null; f.amount = '';
+    if (hit && hit.kind === 'person') Object.assign(f, { entry: 'person', user: hit.user, hit: null, step: 1 });
+    else if (hit && hit.kind !== 'off') f.step = 1;
+  }
+  wire('send'); wire('recv');
+
+  const tabs = { send: document.getElementById('tab-send'), recv: document.getElementById('tab-recv') };
+  const showTab = (w) => { for (const k of ['send', 'recv']) { tabs[k].setAttribute('aria-pressed', String(k === w)); document.getElementById(k + '-form').hidden = k !== w; } draw(w); };
+  tabs.send.onclick = () => showTab('send');
+  tabs.recv.onclick = () => showTab('recv');
+  const bind = (id, key) => document.getElementById(id).addEventListener('change', (e) => { S[key] = e.target.checked; document.body.classList.toggle('offline', S.offline); S.send.final = null; redraw(); });
+  bind('airplane', 'offline'); bind('cached', 'cached');
+  document.getElementById('mintdown').addEventListener('change', (e) => { S.mintDown = e.target.value; S.send.final = null; redraw(); });
+  document.getElementById('f-amountless').addEventListener('change', (e) => { MINTS[0].amountless = e.target.checked; redraw(); });
+  document.getElementById('f-bolt12').addEventListener('change', (e) => { MINTS[0].bolt12 = e.target.checked; redraw(); });
+  // Settings (top left) and Research (top right) open as sheets; Escape or Done closes them.
+  const sheet = (id, open) => { const el = document.getElementById(id); el.hidden = !open; if (open) el.querySelector('[data-close]').focus(); };
+  document.getElementById('open-settings').onclick = () => sheet('sheet-settings', true);
+  document.getElementById('open-research').onclick = () => { sheet('sheet-research', true); renderMatrix(); renderFailures(); };
+  document.querySelectorAll('.sheet').forEach((el) => el.addEventListener('click', (e) => { if (e.target === el || e.target.closest('[data-close]')) el.hidden = true; }));
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') document.querySelectorAll('.sheet').forEach((el) => { el.hidden = true; }); });
+  // Themes: equally minimal palettes on the same tokens; remembered per viewer when storage allows.
+  const setTheme = (t) => {
+    document.documentElement.setAttribute('data-theme', t);
+    document.querySelectorAll('[data-themeopt]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.themeopt === t)));
+    try { localStorage.setItem('hmp-theme', t); } catch (e) {}
+  };
+  document.querySelectorAll('[data-themeopt]').forEach((b) => { b.onclick = () => setTheme(b.dataset.themeopt); });
+  let saved = 'paper'; try { saved = localStorage.getItem('hmp-theme') || 'paper'; } catch (e) {}
+  setTheme(saved);
+
+  // ---- Scanner: the camera, plus two real options that do the same job (paste, photo),
+  // plus demo examples of everything someone could show you. Whatever is read is routed:
+  // a token opens Receive › Claim; anything payable opens Send with it pasted.
+  // Three ways something reaches the wallet, each with what it could realistically hold,
+  // including the ways it goes wrong. [value, icon, label, tokenKind?] or [null, icon, label, failMessage].
+  const SCAN_TOKENS = [['locked', 'cashuBo2F…locked', 'Ecash token locked to you'], ['plain', 'cashuBo2F…plain', 'Ecash token, unlocked'],
+    ['unknown', 'cashuBo2F…newmint', 'Ecash token from a mint you don\'t use'], ['other', 'cashuBo2F…otherkey', 'Ecash token locked to someone else']];
+  const TOK = SCAN_TOKENS.map(([k, v, l]) => [v, 'ecash', l, k]);
+  const PAY = [...PASTE_EXAMPLES, ...Object.values(PAYLOADS).filter((x) => !PASTE_EXAMPLES.some((e) => e[0] === x.raw)).map((x) => [x.raw, x.creq ? 'request' : 'bolt', x.label])];
+  const SOURCES = {
+    camera: { title: 'What the camera could see', items: [
+      ...PAY.map(([v, i, l]) => [v, i, `QR: ${l}`]),
+      ...TOK.map(([v, i, l, k]) => [v, i, `QR: ${l}`, k]),
+      ['cashuBo2F…animated', 'ecash', 'Animated QR of a large token (NUT-16, several frames)', 'plain'],
+      ['LIGHTNING:LNBC10U1PJDEMO…', 'bolt', 'Upper-case Lightning QR (smaller code, same invoice)'],
+      [null, 'warn', 'A QR that isn\'t a payment (a website link)', 'That QR is a website link, not something to pay or claim.'],
+      [null, 'warn', 'Only part of an animated QR, then it moved away', 'Hold it steady: 3 of 7 frames read. Keep the camera on it.'],
+    ] },
+    paste: { title: 'What could be on the clipboard', real: ['scan-paste', 'Use my real clipboard'], items: [
+      ...PAY.map(([v, i, l]) => [v, i, `Copied: ${l}`]),
+      ...TOK.map(([v, i, l, k]) => [v, i, `Copied: ${l}`, k]),
+      ['nostr:npub1alice7q…3xk', 'person', 'A nostr: link to Alice'],
+      ['lightning:lnbc10u1pjdemo…', 'bolt', 'A lightning: link'],
+      ['cashu:cashuBo2F…plain', 'ecash', 'A cashu: link to a token', 'plain'],
+      [null, 'warn', 'A mint\'s address (https://mint.orchardbay.cash)', 'That\'s a mint\'s address. Mints are added from the mint list; there is nothing to pay.'],
+      [null, 'warn', 'Some ordinary text', 'Nothing payable in what you copied.'],
+      [null, 'warn', 'Nothing copied', 'The clipboard is empty. Copy an invoice, address or token first.'],
+    ] },
+    photos: { title: 'What a photo could contain', real: ['scan-photo', 'Choose a real photo…'], items: [
+      [PAYLOADS.ln.raw, 'bolt', 'Screenshot of a Lightning invoice'],
+      [PAYLOADS.both.raw, 'qr', 'Screenshot of a shop\'s unified QR (Cashu request + Lightning)'],
+      ['bob@walletofsatoshi.com', 'bolt', 'Photo of a Lightning address on a poster'],
+      ['cashuBo2F…plain', 'ecash', 'Photo of a printed ecash token (paper gift)', 'plain'],
+      ['npub1alice7q…3xk', 'person', 'Screenshot of Alice\'s profile QR'],
+      [PAYLOADS.three.raw, 'qr', 'Photo of a bitcoin: QR with Lightning and Cashu'],
+      [null, 'warn', 'A photo with no QR code', 'No QR code found in that image.'],
+      [null, 'warn', 'A blurry or cropped QR', 'The QR is too blurry to read. Try a sharper photo, or scan it live.'],
+      [null, 'warn', 'A still of an animated QR', 'Only one frame of an animated QR: scan it live with the camera.'],
+    ] },
+  };
+  let scanSrc = 'camera';
+  const scanMsg = (t) => { document.getElementById('scan-msg').textContent = t; };
+  function renderScanList() {
+    const src = SOURCES[scanSrc];
+    document.querySelectorAll('[data-src]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.src === scanSrc)));
+    document.getElementById('scan-vf').hidden = scanSrc !== 'camera';
+    document.getElementById('scan-list').innerHTML = `<span class="hint">${src.title}</span>
+      ${src.real ? `<button type="button" class="chip wide real" id="${src.real[0]}">${ic(scanSrc === 'paste' ? 'paste' : 'image', 16)}<span>${src.real[1]}</span></button>` : ''}
+      ${src.items.map(([v, i, l, k]) => (v ? `<button type="button" class="chip wide" data-scan="${v}" ${k ? `data-scantoken="${k}"` : ''}>${ic(i === 'person' ? 'person' : i, 16)}<span>${l}</span></button>`
+        : `<button type="button" class="chip wide fails-ex" data-scanfail="${k}">${ic('warn', 16)}<span>${l}</span></button>`)).join('')}`;
+  }
+  function routeScan(text, tokenK) {
+    const v = (text || '').trim().replace(/^(lightning:|cashu:)/i, '');
+    if (!v) { scanMsg('Nothing to read.'); return; }
+    if (/^cashu[ab]/i.test(v)) {
+      if (!ON('ecash')) { scanMsg('That\'s an ecash token, and ecash isn\'t part of this wallet.'); return; }
+      document.getElementById('sheet-scan').hidden = true; showTab('recv');
+      tokenKind = tokenK || 'plain'; S.recv = { ...blankRecv(), mode: 'claim', step: 1, token: v.length > 8 ? v : v + '………' }; draw('recv'); return;
+    }
+    if (classify(v)?.kind === 'off') { scanMsg(classify(v).why); return; }
+    if (!classify(v)) { scanMsg(`Not recognised: ${v.slice(0, 40)}${v.length > 40 ? '…' : ''}`); return; }
+    document.getElementById('sheet-scan').hidden = true; showTab('send');
+    S.send = { ...blankSend(), entry: 'scan', paste: v }; applyPaste(S.send); draw('send');
+  }
+  document.getElementById('open-scan').onclick = () => { scanSrc = 'camera'; scanMsg(''); renderScanList(); sheet('sheet-scan', true); };
+  document.querySelectorAll('[data-src]').forEach((b) => { b.onclick = () => { scanSrc = b.dataset.src; scanMsg(''); renderScanList(); }; });
+  document.getElementById('scan-list').addEventListener('click', async (e) => {
+    const f = e.target.closest('[data-scanfail]'); if (f) { scanMsg(f.dataset.scanfail); return; }
+    const b = e.target.closest('[data-scan]'); if (b) { routeScan(b.dataset.scan, b.dataset.scantoken); return; }
+    if (e.target.closest('#scan-paste')) { try { routeScan(await navigator.clipboard.readText()); } catch (err) { scanMsg('The clipboard is blocked here. Pick one of the examples instead.'); } }
+    if (e.target.closest('#scan-photo')) document.getElementById('scan-file').click();
+  });
+  document.getElementById('scan-file').onchange = async (e) => {
+    const file = e.target.files[0]; e.target.value = ''; if (!file) return;
+    try {
+      const bmp = await createImageBitmap(file);
+      if ('BarcodeDetector' in window) { const r = await new window.BarcodeDetector({ formats: ['qr_code'] }).detect(bmp); if (r[0]) return routeScan(r[0].rawValue); }
+      const c = document.createElement('canvas'); c.width = bmp.width; c.height = bmp.height; const x = c.getContext('2d'); x.drawImage(bmp, 0, 0);
+      const code = window.jsQR && window.jsQR(x.getImageData(0, 0, c.width, c.height).data, c.width, c.height);
+      if (code) routeScan(code.data); else scanMsg('No QR code found in that image.');
+    } catch (err) { scanMsg('Couldn\'t read that image.'); }
+  };
+
+  // ---- Keyboard matches the buttons: Enter in a field presses the bottom button (never submits
+  // behind its back); Escape closes whatever is open (menus, pickers, sheets).
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    const menu = document.getElementById('simmenu'); menu.hidden = true;
+    for (const k of ['send', 'recv']) { const f = S[k]; if (f.mintMenu || f.dd || f.pdd) { f.mintMenu = f.dd = f.pdd = false; f.mintNeed = ''; draw(k); } }
+  });
+  document.addEventListener('click', (e) => {
+    const menu = document.getElementById('simmenu');
+    if (!menu.hidden && !menu.contains(e.target) && !e.target.closest('#nav-more')) { menu.hidden = true; document.getElementById('nav-more').setAttribute('aria-expanded', 'false'); }
+  });
+  // Tap a mint card to make it primary; the rest rank by balance.
+  document.getElementById('balances').addEventListener('click', (e) => { const b = e.target.closest('[data-primary]'); if (!b) return; S.primary = b.dataset.primary; S.send.final = null; redraw(); });
+  document.getElementById('platform').addEventListener('change', (e) => { S.platform = e.target.value; S.recv.nfcArmed = false; redraw(); });
+  document.getElementById('f-topup').addEventListener('change', (e) => { S.topup = e.target.checked; redraw(); });
+  document.getElementById('f-coverfee').addEventListener('change', (e) => { S.coverFee = e.target.checked; redraw(); });
+  document.getElementById('maxfee').addEventListener('input', (e) => { S.maxfee = +e.target.value; document.getElementById('maxfee-out').textContent = S.maxfee + '%'; redraw(); });
+  document.getElementById('overpay').addEventListener('input', (e) => { S.overpay = +e.target.value; document.getElementById('overpay-out').textContent = S.overpay + '%'; redraw(); });
+
+  // Wallet build: presets and one switch per module (flow.py MODULES / PRESETS).
+  const PRESET_NAMES = { full: 'Everything', lightning_only: 'Lightning only', onchain_only: 'Onchain only', ecash_lightning: 'Ecash + Lightning', ecash_no_messages: 'No ecash messages', no_nostr: 'No Nostr', custom: 'Custom' };
+  const MOD_NAMES = { ecash: 'Ecash', lightning: 'Lightning', bolt12: 'BOLT12 offers', onchain: 'Onchain', nostr: 'Nostr people', npubcash: 'npub.cash address', lock: 'Lock to a key', nfc: 'Tap (NFC)', msg_ecash: 'Messages on ecash', msg_lightning: 'Messages on Lightning', msg_onchain: 'Messages on onchain' };
+  function renderModules() {
+    document.getElementById('preset').innerHTML = [...Object.keys(FLOW.presets), ...(S.preset === 'custom' ? ['custom'] : [])].map((k) => `<option value="${k}" ${S.preset === k ? 'selected' : ''}>${PRESET_NAMES[k] || k}</option>`).join('');
+    document.getElementById('modules').innerHTML = Object.entries(FLOW.modules).map(([m, d]) => `<label class="switch" for="mod-${m}"><span class="lbl"><span>${MOD_NAMES[m] || m}${d.needs.length ? ` <span class="hint">needs ${d.needs.map((x) => MOD_NAMES[x]).join(', ')}</span>` : ''}</span></span><input type="checkbox" id="mod-${m}" data-mod="${m}" ${ON(m) ? 'checked' : ''}><span class="track" aria-hidden="true"></span></label>`).join('');
+  }
+  const rebuild = () => { S.send = blankSend(); S.recv = blankRecv(); renderModules(); redraw(); };
+  document.getElementById('preset').addEventListener('change', (e) => { S.mods = [...FLOW.presets[e.target.value]]; S.preset = e.target.value; rebuild(); });
+  document.getElementById('modules').addEventListener('change', (e) => { const m = e.target.dataset.mod; if (m) setModule(m, e.target.checked); rebuild(); });
+  renderModules();
+
+  // Open on a worked example: $1.00 to Alice.
+  Object.assign(S.send, { entry: 'person', user: 'alice', amount: '1.00', unit: 'usd', step: 2, how: 'ecash' });
+  renderMatrix();
+  redraw();
+})();
+</script>
