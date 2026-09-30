@@ -52,6 +52,7 @@ import { EmojiPickerContent } from '@/shared/lib/popup/popups/emojiPicker';
 import { ModelPickerContent } from '@/shared/lib/popup/popups/modelPicker';
 import { useRoutstrFunds } from '@/features/ai/hooks/useRoutstrFunds';
 import { PaymentOptionsContent } from '@/shared/lib/popup/popups/paymentOptionsSheet';
+import { SendFallbackContent } from '@/shared/lib/popup/popups/sendFallbackSheet';
 import { NfcTapContent } from '@/shared/lib/popup/popups/nfcTapSheet';
 import { ProofSelectorContent } from '@/shared/lib/popup/popups/proofSelectorSheet';
 import { SendMemoContent } from '@/shared/lib/popup/popups/sendMemoSheet';
@@ -276,6 +277,7 @@ const CUSTOM_SHEET_CONTENT: Record<keyof ActionSheetPayloads, CustomSheetRendere
   'payment-fallback': ((
     props: CustomSheetContentProps<ActionSheetPayloads['payment-fallback']>
   ) => <PaymentOptionsContent {...props} isFallback={true} />) as CustomSheetRenderer,
+  'send-fallback': SendFallbackContent as CustomSheetRenderer,
   'proof-selector': ProofSelectorContent as CustomSheetRenderer,
   'send-memo': SendMemoContent as CustomSheetRenderer,
   'signer-approval': SignerApprovalSheetContent as CustomSheetRenderer,

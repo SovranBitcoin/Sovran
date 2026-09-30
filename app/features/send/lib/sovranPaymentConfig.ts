@@ -79,6 +79,7 @@ import {
   paymentOptionsPopup,
   paymentStatusPopup,
   proofSelectorPopup,
+  sendFallbackPopup,
   sendMemoPopup,
   staticPopup,
   paramPopup,
@@ -1984,6 +1985,10 @@ export function createSovranHandlers({
 
     chooseFallbackOption: (stepData) => {
       paymentFallbackPopup({ ...stepData, machine, onDismiss: onOptionDismiss });
+    },
+
+    chooseSendFallback: (stepData) => {
+      sendFallbackPopup({ ...stepData, machine });
     },
 
     chooseProofs: (stepData) => {

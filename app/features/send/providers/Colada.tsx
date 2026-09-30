@@ -7,6 +7,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { npcAddressForPubkey } from '@/shared/lib/cashu/npc';
 import { Share } from 'react-native';
 
 import * as Clipboard from 'expo-clipboard';
@@ -538,6 +539,7 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
     () =>
       ({
         ...instance.operations,
+        npcAddressForPubkey,
         // The machine asks for a REAL unit; stay on the active account's side
         // of the testnut split.
         switchUnit: (unit: string) => {

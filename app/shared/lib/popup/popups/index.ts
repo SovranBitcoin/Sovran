@@ -10,6 +10,7 @@ export { copyPopup } from './copy';
 export { profileSwitcherPopup } from './actionSheets';
 export { paymentOptionsPopup, paymentFallbackPopup } from './paymentOptionsSheet';
 export { proofSelectorPopup } from './proofSelectorSheet';
+export { sendFallbackPopup } from './sendFallbackSheet';
 export { sendMemoPopup } from './sendMemoSheet';
 export { emojiPickerPopup } from './emojiPicker';
 export { modelPickerPopup } from './modelPicker';

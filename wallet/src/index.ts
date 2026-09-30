@@ -493,6 +493,8 @@ export type {
   NfcIOAdapter,
   RecipientProfile,
   SendEntrySource,
+  SendFallbackAlternative,
+  SendFallbackId,
 } from "./machine/types";
 
 export type { MintAvailability } from "./machine/selectMintContext";

@@ -449,6 +449,9 @@ function handleAmountEntered(
         amountEntryDisplay:
           event.amountEntryDisplay ?? currentCtx.amountEntryDisplay,
         ...lockPatch,
+        lockIsOptional: currentCtx.p2pkLockPubkey
+          ? currentCtx.lockIsOptional
+          : !!lockPatch.p2pkLockPubkey,
         memo: undefined,
         sendMemoHandled: false,
       };

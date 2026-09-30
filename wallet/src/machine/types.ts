@@ -20,6 +20,7 @@ export type FlowStep =
   | "selectDestination"
   | "chooseOption"
   | "chooseFallbackOption"
+  | "chooseSendFallback"
   | "enterAmount"
   | "selectMint"
   | "chooseProofs"
@@ -172,6 +173,18 @@ export interface StepDataMap {
     failedOptionValues: string[];
     lastFailedMessage?: string;
   };
+  /**
+   * A send the user picked from the amount screen failed, and a different way
+   * to pay the same person can still work: plain ecash when an optional lock
+   * failed, or their npub.cash address when their Lightning address failed.
+   * `chooseSendFallback(id)` retries with that alternative; `null` backs out.
+   */
+  chooseSendFallback: {
+    amount: number;
+    unit: string;
+    failed: { label: string; message: string };
+    alternatives: SendFallbackAlternative[];
+  };
   enterAmount: {
     unit: string;
     preselectedMintUrl?: string;
@@ -323,6 +336,16 @@ export interface StepDataMap {
   error: { code: ErrorCode; message: string; data?: Record<string, unknown> };
 }
 
+export type SendFallbackId = "ecash" | "lightning-npc";
+
+export interface SendFallbackAlternative {
+  id: SendFallbackId;
+  label: string;
+  description: string;
+  /** The alternative works but carries a caveat worth reading (yellow). */
+  isCaution?: boolean;
+}
+
 // ---------------------------------------------------------------------------
 // Error codes
 // ---------------------------------------------------------------------------
@@ -396,6 +419,13 @@ export interface FlowContext {
    * `normalizeP2pkLock`.
    */
   p2pkLock?: P2pkLockSpec;
+  /**
+   * True when the lock was first added on the amount screen, as the user's
+   * own choice. A lock the flow arrived with (a scanned receive key, a Nut
+   * Drop) is a requirement, and a failed send never falls back to plain
+   * ecash for it.
+   */
+  lockIsOptional?: boolean;
   /**
    * The NUT-10 P2PK key a scanned payment request locks its payment to, when
    * it carries one. Presence-only evidence for the UI: the send screen must
@@ -1152,6 +1182,14 @@ export interface MachineOperations {
   sendNostrDM?: (nprofile: string, message: string) => Promise<void>;
 
   /**
+   * The npub.cash address for a Nostr hex pubkey. When paying someone's own
+   * Lightning address fails, the machine offers this as a fallback, marked as
+   * a caution because the recipient never advertised it. Absent: no npub.cash
+   * fallback is offered.
+   */
+  npcAddressForPubkey?: (pubkeyHex: string) => string | undefined;
+
+  /**
    * Resolve a melt target (Lightning Address / lud16) to a Nostr hex pubkey
    * via NIP-05. Best-effort: returns `null` on any failure. Fired
    * automatically as a side effect when `ctx.meltTarget` is set and
@@ -1336,6 +1374,8 @@ export interface PaymentMachine {
   chooseOption: (option: PaymentOption) => Promise<void>;
   /** User selected round-down or round-up amount from offline proof suggestions. */
   chooseProofs: (amount: number) => Promise<void>;
+  /** Retry a failed send another way (see the `chooseSendFallback` step), or back out with null. */
+  chooseSendFallback: (id: SendFallbackId | null) => Promise<void>;
   /** Submit or skip the optional ecash token memo prompt. */
   submitSendMemo: (memo?: string) => Promise<void>;
   /** Select a mint. Without `destination`, continues the current flow with the new mint. */
