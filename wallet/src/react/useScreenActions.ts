@@ -464,6 +464,7 @@ function buildDerivedAmountConfig(refs: {
   walletContextRef: ColadaRefs['walletContextRef'];
   getBtcPriceRef: ColadaRefs['getBtcPriceRef'];
   getDisplayCurrencyRef: ColadaRefs['getDisplayCurrencyRef'];
+  getOfflineRef: ColadaRefs['getOfflineRef'];
 }): CreateAmountActionManagerConfig {
   const {
     machineRef,
@@ -480,6 +481,11 @@ function buildDerivedAmountConfig(refs: {
   } | null = null;
 
   return {
+    getNetwork: () => ({
+      offline: refs.getOfflineRef.current?.() ?? false,
+      mintUnreachable:
+        machineRef.current.getContext().mintUnreachableConfirmed === true,
+    }),
     getMintUrl: () => machineRef.current.getContext().mintUrl,
     getProofAmounts: () => {
       const mint = machineRef.current.getContext().mintUrl;
@@ -693,6 +699,7 @@ export function useScreenActions(
             walletContextRef,
             getBtcPriceRef,
             getDisplayCurrencyRef,
+            getOfflineRef,
           }),
     [
       isAmountEntry,
@@ -701,6 +708,7 @@ export function useScreenActions(
       walletContextRef,
       getBtcPriceRef,
       getDisplayCurrencyRef,
+      getOfflineRef,
     ],
   );
 

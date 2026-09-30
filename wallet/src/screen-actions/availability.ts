@@ -459,6 +459,15 @@ function amountEntryAvailability(
     isPaymentRequest &&
     typeof entry.paymentRequestLockPubkey === "string" &&
     entry.paymentRequestLockPubkey.length > 0;
+  // Lightning, onchain and locked ecash all need the mint (a melt, a mint
+  // quote, or a swap to lock). Plain ecash does not: it has an offline path
+  // from held proofs, with round-up / round-down when they don't match.
+  const deviceOffline = entry.offline === true;
+  const needsMintReason = deviceOffline
+    ? "Needs the mint, and you're offline"
+    : entry.mintUnreachable === true
+      ? "Needs the mint, which isn't responding"
+      : undefined;
   const hasFiatToggle =
     typeof entry.fiatCurrency === "string" &&
     entry.fiatCurrency.length > 0 &&
@@ -603,7 +612,9 @@ function amountEntryAvailability(
       ? "Onchain destination"
       : "Lightning destination";
   } else if (isPaymentRequest) {
-    ecashAvailable = nextCanFire;
+    // A payment request is delivered over the network to its requester.
+    ecashAvailable = nextCanFire && !deviceOffline;
+    if (deviceOffline) ecashReason = "Needs a connection to reach the requester";
     ecashDescription = paymentRequestIsLocked
       ? "Send a Cashu payment request, locked to its key"
       : "Send a Cashu payment request";
@@ -646,13 +657,13 @@ function amountEntryAvailability(
   // menu must say where the money actually goes instead of a generic
   // "as Lightning" (npub.cash is the marketing name; npubx.cash the host).
   const meltTargetIsNpc = /@npubx?\.cash$/i.test(meltTarget.trim());
-  const lightningLabel = meltTargetIsNpc ? "to npub.cash" : "as Lightning";
+  const lightningLabel = meltTargetIsNpc ? "as Lightning (npub.cash)" : "as Lightning";
   // npub.cash is a custodial service we picked on their behalf because they
   // advertised no Lightning address. It is reachable for every pubkey, which
   // is exactly why it can look like a confirmed destination when it is not —
   // so the caveat travels with the option, not in a help page.
   const NPC_CAUTION =
-    "They advertise no Lightning address. npub.cash can receive for any Nostr key, but only they can claim it — check they use it first.";
+    "They haven't published a Lightning address. npub.cash accepts payments for any Nostr key, but only they can claim it, so check they use it.";
 
   let lightningAvailable = false;
   let lightningDescription: string | undefined;
@@ -746,6 +757,11 @@ function amountEntryAvailability(
           : undefined
       : undefined;
 
+  const lightningNeedsMint = !!needsMintReason && lightningAvailable;
+  const onchainNeedsMint = !!needsMintReason && onchainAvailable;
+  const lockedAvailable = ecashAvailable && !needsMintReason;
+  const lockedReason = needsMintReason ?? ecashReason;
+
   // Base order — available entries bubble to the top via a stable sort below
   // so the user sees executable options first and disabled/"coming soon" rows
   // sink to the bottom.
@@ -756,11 +772,11 @@ function amountEntryAvailability(
     ? [
         {
           id: "locked-ecash",
-          label: "Lock Ecash",
+          label: "as Locked Ecash",
           icon: "mdi:lock-outline",
-          available: ecashAvailable,
+          available: lockedAvailable,
           description: "Lock a Cashu token to its recipient",
-          ...(ecashReason ? { reason: ecashReason } : {}),
+          ...(lockedReason ? { reason: lockedReason } : {}),
         },
       ]
     : [
@@ -776,21 +792,30 @@ function amountEntryAvailability(
           id: "lightning",
           label: lightningLabel,
           icon: "mingcute:lightning-fill",
-          available: lightningAvailable,
+          available: lightningAvailable && !lightningNeedsMint,
           ...(lightningDescription
             ? { description: lightningDescription }
             : {}),
-          ...(lightningReason ? { reason: lightningReason } : {}),
+          ...(lightningNeedsMint
+            ? { reason: needsMintReason }
+            : lightningReason
+              ? { reason: lightningReason }
+              : {}),
+          // Dimming already says a disabled row can't be used; the caution
+          // tint is only for an option the user can actually pick.
+          ...(meltTargetIsNpc && lightningAvailable && !lightningNeedsMint
+            ? { isCaution: true }
+            : {}),
         },
         ...(isSendEcash
           ? [
               {
                 id: "locked-ecash",
-                label: "Lock Ecash",
+                label: "as Locked Ecash",
                 icon: "mdi:lock-outline",
-                available: ecashAvailable,
+                available: lockedAvailable,
                 description: "Lock a Cashu token to its recipient",
-                ...(ecashReason ? { reason: ecashReason } : {}),
+                ...(lockedReason ? { reason: lockedReason } : {}),
               },
             ]
           : []),
@@ -800,11 +825,15 @@ function amountEntryAvailability(
                 id: "onchain",
                 label: "as Onchain",
                 icon: "hugeicons:blockchain-01",
-                available: onchainAvailable,
+                available: onchainAvailable && !onchainNeedsMint,
                 ...(onchainDescription
                   ? { description: onchainDescription }
                   : {}),
-                ...(onchainReason ? { reason: onchainReason } : {}),
+                ...(onchainNeedsMint
+                  ? { reason: needsMintReason }
+                  : onchainReason
+                    ? { reason: onchainReason }
+                    : {}),
               },
             ]
           : []),

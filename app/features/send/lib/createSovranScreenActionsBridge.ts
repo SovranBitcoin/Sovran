@@ -302,6 +302,8 @@ interface CreateSovranScreenActionsBridgeConfig {
    * passing the ref itself is also what kept the provider off React Compiler.
    */
   subscribeP2pkKeyRefreshed: (listener: (newKey: string | null) => void) => () => void;
+  /** Fires when the device goes on or offline, so menus that depend on it re-evaluate. */
+  subscribeOfflineChanged: (listener: () => void) => () => void;
 }
 
 // The mounted mint-info screen's "fetch NUT-06 again" hook. Set while a
@@ -320,6 +322,7 @@ export function createSovranScreenActionsBridge({
   manager,
   requestCameraPermission,
   subscribeP2pkKeyRefreshed,
+  subscribeOfflineChanged,
 }: CreateSovranScreenActionsBridgeConfig): ScreenActionsBridge {
   let mintInfoCallback: ((entry: EntryRecord) => void) | null = null;
   let mintInfoFetchingUrl: string | null = null;
@@ -474,6 +477,11 @@ export function createSovranScreenActionsBridge({
         useSettingsStore.subscribe(
           (state) => state.language,
           () => bus.publish({ type: 'screenActions.changed', reason: 'settings' })
+        )
+      );
+      unsubscribes.push(
+        subscribeOfflineChanged(() =>
+          bus.publish({ type: 'screenActions.changed', reason: 'offline' })
         )
       );
 

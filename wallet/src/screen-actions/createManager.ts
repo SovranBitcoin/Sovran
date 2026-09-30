@@ -126,7 +126,13 @@ export function createScreenActionManager<S extends ScreenType>(
 
   function getEffectiveEntry(): Record<string, unknown> | null {
     if (amountMgr && entry) {
-      return mergeAmountResolution(entry, amountMgr.inspect());
+      const network = amountConfig?.getNetwork?.();
+      return {
+        ...mergeAmountResolution(entry, amountMgr.inspect()),
+        ...(network
+          ? { offline: network.offline, mintUnreachable: network.mintUnreachable }
+          : {}),
+      };
     }
     return entry;
   }

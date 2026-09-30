@@ -242,6 +242,23 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
   const isOffline = mockOffline || contextOffline;
   const getOffline = useLatestGetter(isOffline);
 
+  // Coco serves stored mint data without a request while offline, and sends
+  // default to exact-only, so nothing waits on a mint that cannot answer.
+  const [offlineListeners] = useState(() => new Set<() => void>());
+  const subscribeOfflineChanged = useCallback(
+    (listener: () => void) => {
+      offlineListeners.add(listener);
+      return () => {
+        offlineListeners.delete(listener);
+      };
+    },
+    [offlineListeners]
+  );
+  useEffect(() => {
+    manager?.setOffline(isOffline);
+    for (const listener of offlineListeners) listener();
+  }, [manager, isOffline, offlineListeners]);
+
   // Camera permission lives here rather than behind a (receive-flow)-scoped
   // context provider so it's reachable from this provider's navigation /
   // screen-action bridges. A descendant context would resolve to undefined
@@ -607,8 +624,9 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
         manager,
         requestCameraPermission,
         subscribeP2pkKeyRefreshed: identity.subscribeP2pkKeyRefreshed,
+        subscribeOfflineChanged,
       }),
-    [manager, requestCameraPermission, identity]
+    [manager, requestCameraPermission, identity, subscribeOfflineChanged]
   );
 
   // Deliver a bearer ecash token to a remote Nostr contact over an encrypted
