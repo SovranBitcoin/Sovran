@@ -1,11 +1,18 @@
+import { PaymentRequest } from '@cashu/cashu-ts';
 import type { BLEPeer } from 'bitchat-module';
 
 import { peerAvatarState, peerDisplayName, toLayoutPeer } from '@/features/nearPay/lib/peerProfile';
 import { cashuP2pkPubkeyFromNostrHex } from '@/shared/lib/protocolIds';
-import { buildStandingCreq } from '@/shared/lib/nutCreq';
+
+const fixtureRequest = ({ mints, pubkey33 }: { mints: string[]; pubkey33: string }) =>
+  new PaymentRequest(undefined, 'fixture-request', undefined, 'sat', mints, undefined, false, {
+    kind: 'P2PK',
+    data: pubkey33,
+    tags: [],
+  }).toEncodedRequest();
 
 const NOSTR_HEX = 'ab'.repeat(32);
-const CREQ = buildStandingCreq({
+const CREQ = fixtureRequest({
   mints: ['https://mint.example'],
   pubkey33: cashuP2pkPubkeyFromNostrHex(NOSTR_HEX),
 })!;

@@ -9,6 +9,9 @@
  * Guards the fix that unified the Paste button, keyboard-submit, and the
  * detected-action row so pasting behaves exactly like a scan.
  */
+jest.mock('@/features/nearPay/hooks/useStartNearbySend', () => ({
+  useStartNearbySend: () => jest.fn(),
+}));
 
 import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';

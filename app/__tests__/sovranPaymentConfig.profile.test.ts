@@ -10,7 +10,6 @@ import {
 } from '@/features/send/lib/sovranPaymentConfig';
 import { paramPopup, sendMemoPopup } from '@/shared/lib/popup';
 import { getEncodedToken } from '@cashu/cashu-ts';
-import { sendBLEPrivateMessageWhole } from '@/features/bitchat/lib/blePrivateDelivery';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { paymentLog } from '@/shared/lib/logger';
 import { useContactSendStore } from '@/shared/stores/runtime/contactSendStore';
@@ -61,9 +60,6 @@ jest.mock('@/shared/lib/interactions', () => ({
   runAfterInteractions: (callback: () => void) => callback(),
 }));
 jest.mock('@cashu/cashu-ts', () => ({ getDecodedToken: jest.fn(), getEncodedToken: jest.fn() }));
-jest.mock('@/features/bitchat/lib/blePrivateDelivery', () => ({
-  sendBLEPrivateMessageWhole: jest.fn(),
-}));
 jest.mock('@/features/bitchat/hooks/useBitchatNickname', () => ({
   getBitchatNickname: jest.fn(() => 'Self Sender'),
 }));
@@ -158,7 +154,6 @@ describe('createSovranHandlers profile routing', () => {
     mockNearPaySetMintPickerOpen.mockReset();
     mockNearPayActive = null;
     (getEncodedToken as jest.Mock).mockReset();
-    (sendBLEPrivateMessageWhole as jest.Mock).mockReset();
     (sendMemoPopup as jest.Mock).mockReset();
     (paymentLog.debug as jest.Mock).mockClear();
     (paymentLog.info as jest.Mock).mockClear();
@@ -189,6 +184,7 @@ describe('createSovranHandlers profile routing', () => {
       id: 'near-pay-1',
       startedAt: 1,
       phase: 'picking',
+      presentation: 'radar',
       amountEntry: null,
       recipient: {
         peerID: 'peer-123',
@@ -234,6 +230,7 @@ describe('createSovranHandlers profile routing', () => {
       id: 'near-pay-1',
       startedAt: 1,
       phase: 'picking',
+      presentation: 'radar',
       amountEntry: null,
       mintPickerOpen: true,
       recipient: { peerID: 'peer-123', nickname: 'Nearby Alice', hasDirectLink: true, lastSeen: 2 },
@@ -258,6 +255,7 @@ describe('createSovranHandlers profile routing', () => {
       id: 'near-pay-1',
       startedAt: 1,
       phase: 'picking',
+      presentation: 'radar',
       amountEntry: null,
       mintPickerOpen: false,
       recipient: { peerID: 'peer-123', nickname: 'Nearby Alice', hasDirectLink: true, lastSeen: 2 },
@@ -559,136 +557,51 @@ describe('createSovranHandlers profile routing', () => {
     expect(submitSendMemo).not.toHaveBeenCalled();
   });
 
-  it('does not DM a token when the recipient has no creq capability proof', async () => {
+  it('routes a nearby Send selection to a visible amount screen', async () => {
     mockNearPayActive = {
-      id: 'near-pay-no-creq',
-      startedAt: 1,
-      recipient: {
-        peerID: 'peer-no-creq',
-        nickname: 'Unconfirmed Carol',
-        hasDirectLink: true,
-        lastSeen: 2,
-        delivery: { locked: false },
-      },
+      id: 'nearby-route',
+      presentation: 'route',
+      recipient: { peerID: 'peer' },
     };
-    (getEncodedToken as jest.Mock).mockReturnValue('cashuA-token-that-must-not-send');
+    // @ts-expect-error enterAmount only reads no machine methods.
+    const machine: PaymentMachine = { getContext: jest.fn(() => ({})) };
+    const handlers = createSovranHandlers({ machine, getManager: () => null });
+    await handlers.enterAmount?.({
+      unit: 'sat',
+      constraints: { destination: 'sendEcash', p2pkLockPubkey: `02${'ab'.repeat(32)}` },
+    });
+    expect(mockNearPaySetAmountEntry).not.toHaveBeenCalled();
+    expect(mockNavigate).toHaveBeenCalledWith({
+      pathname: '/(send-flow)/amount',
+      params: { amountEntry: expect.any(String) },
+    });
+    expect(JSON.parse(mockNavigate.mock.calls[0][0].params.amountEntry).p2pkLockPubkey).toBe(
+      `02${'ab'.repeat(32)}`
+    );
+  });
+
+  it('keeps the created token recoverable without completing an unrelated nearby session', async () => {
+    mockNearPayActive = {
+      id: 'different-selection',
+      presentation: 'route',
+      recipient: { peerID: 'other-peer' },
+    };
+    (getEncodedToken as jest.Mock).mockReturnValue('cashuA-created-token');
     // @ts-expect-error sendComplete only reads no machine methods.
     const machine: PaymentMachine = { getContext: jest.fn(() => ({})) };
-    const handlers = createSovranHandlers({
-      machine,
-      getManager: () => null,
-    });
-    const historyEntry = JSON.stringify({
-      id: 'send-no-creq',
-      type: 'send',
-      mintUrl: 'https://mint.example',
-      token: { mint: 'https://mint.example', proofs: [] },
-    });
-
+    const handlers = createSovranHandlers({ machine, getManager: () => null });
     await handlers.sendComplete?.({
-      historyEntry,
+      historyEntry: JSON.stringify({
+        id: 'send-1',
+        type: 'send',
+        mintUrl: 'https://mint.example',
+        token: { mint: 'https://mint.example', proofs: [] },
+      }),
       createdOffline: false,
       mintWasOffline: false,
     });
-
-    expect(sendBLEPrivateMessageWhole).not.toHaveBeenCalled();
-    expect(mockNearPayComplete).toHaveBeenCalledTimes(1);
-  });
-
-  it('DMs an offline bearer token to a creq-confirmed peer', async () => {
-    mockNearPayActive = {
-      id: 'near-pay-3',
-      startedAt: 1,
-      recipient: {
-        peerID: 'peer-789',
-        nickname: 'Sovran Carol',
-        hasDirectLink: true,
-        lastSeen: 2,
-        creq: 'creqA-confirmed',
-        delivery: { locked: false },
-      },
-    };
-    (getEncodedToken as jest.Mock).mockReturnValue('cashuA-bearer-token');
-    (sendBLEPrivateMessageWhole as jest.Mock).mockResolvedValue({
-      messageId: 'm',
-      startupMs: 1,
-      handshakeMs: 2,
-      sendMs: 3,
-    });
-    // @ts-expect-error sendComplete only reads no machine methods.
-    const machine: PaymentMachine = { getContext: jest.fn(() => ({})) };
-    const handlers = createSovranHandlers({
-      machine,
-      getManager: () => null,
-    });
-    const historyEntry = JSON.stringify({
-      id: 'send-3',
-      type: 'send',
-      mintUrl: 'https://mint.example',
-      token: { mint: 'https://mint.example', proofs: [] },
-    });
-
-    // Bearer drops take the local-proof shortcut when offline, but only after a
-    // valid creq confirmed the recipient can decode extended private DMs.
-    await handlers.sendComplete?.({
-      historyEntry,
-      createdOffline: true,
-      mintWasOffline: true,
-    });
-
-    expect(sendBLEPrivateMessageWhole).toHaveBeenCalledWith(
-      expect.objectContaining({ content: 'cashuA-bearer-token', peerID: 'peer-789' })
-    );
-    expect(mockNearPayComplete).toHaveBeenCalledTimes(1);
-  });
-
-  it('DMs a locked token privately to the recipient peer', async () => {
-    mockNearPayActive = {
-      id: 'near-pay-4',
-      startedAt: 1,
-      recipient: {
-        peerID: 'peer-999',
-        nickname: 'Sovran Dave',
-        hasDirectLink: true,
-        lastSeen: 2,
-        creq: 'creqA-confirmed',
-        delivery: { locked: true },
-      },
-    };
-    (getEncodedToken as jest.Mock).mockReturnValue('cashuA-locked-token');
-    (sendBLEPrivateMessageWhole as jest.Mock).mockResolvedValue({
-      messageId: 'm',
-      startupMs: 1,
-      handshakeMs: 2,
-      sendMs: 3,
-    });
-    // @ts-expect-error sendComplete only reads no machine methods.
-    const machine: PaymentMachine = { getContext: jest.fn(() => ({})) };
-    const handlers = createSovranHandlers({
-      machine,
-      getManager: () => null,
-    });
-    const historyEntry = JSON.stringify({
-      id: 'send-4',
-      type: 'send',
-      mintUrl: 'https://mint.example',
-      token: { mint: 'https://mint.example', proofs: [] },
-    });
-
-    // A locked token is delivered as a private Noise DM addressed to the
-    // recipient peer — encrypted to them, so the payment stays private and
-    // only they can redeem the P2PK-locked proofs.
-    await handlers.sendComplete?.({
-      historyEntry,
-      createdOffline: false,
-      mintWasOffline: false,
-      p2pkLockPubkey: `02${'ef'.repeat(32)}`,
-    });
-
-    expect(sendBLEPrivateMessageWhole).toHaveBeenCalledWith(
-      expect.objectContaining({ content: 'cashuA-locked-token', peerID: 'peer-999' })
-    );
-    expect(mockNearPayComplete).toHaveBeenCalledTimes(1);
+    expect(mockNearPayComplete).not.toHaveBeenCalled();
+    expect(mockNavigate).toHaveBeenCalled();
   });
 
   it('skips P2PK key regeneration when the current-profile P2PK plugin is active', async () => {

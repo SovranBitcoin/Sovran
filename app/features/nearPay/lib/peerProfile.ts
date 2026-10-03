@@ -7,12 +7,8 @@ import { lockableMintsFromCreq } from '@/shared/lib/nutCreq';
 
 import type { NearPayLayoutPeer } from './peerLayout';
 
-/**
- * The peer's x-only Nostr pubkey, learned via bitchat's native favorite
- * exchange (`[FAVORITED]:<npub>:<creq>`) — THIS is the peer's real Nostr identity,
- * usable for kind-0 profile lookups (real face/name pre-tap). Returns null
- * until the peer has favorited us back (stock peers never do).
- */
+/** Nostr identity from the sanitized wallet directory. Raw native favorites
+ * must not be passed to payment/profile presentation as authenticated identity. */
 export function peerNostrPubkey(peer: Pick<BLEPeer, 'nostrPubkeyHex'>): string | null {
   return peer.nostrPubkeyHex ?? null;
 }
@@ -75,6 +71,7 @@ export function toLayoutPeer(peer: BLEPeer, profile?: RecentPeopleProfileRow): N
     lockable: creqMints !== null,
     nostrPubkeyHex: peer.nostrPubkeyHex,
     creq: peer.creq,
+    walletCapabilityExpiresAt: peer.walletCapabilityExpiresAt,
     identitySeed,
     profileLoading: profile?.isLoading ?? false,
   };

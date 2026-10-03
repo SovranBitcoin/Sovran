@@ -1,33 +1,18 @@
+import { useStartNearbySend } from '@/features/nearPay/hooks/useStartNearbySend';
 import { StyleSheet } from 'react-native';
 import { useHeaderHeight } from 'expo-router/react-navigation';
 import { Stack } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import type { BLEPeer } from 'bitchat-module';
-import { accountMintUrls, toRealUnit } from 'wallet';
-import { usePaymentFlowMachine } from 'wallet/react';
 import { withAlpha } from '@/shared/lib/color';
 
 import Icon from 'assets/icons';
 import { useFreshNearbyPeers } from '@/features/nearPay/hooks/useFreshNearbyPeers';
 import { NearbyPeerRow } from '@/features/nearPay/components/NearbyPeerRow';
-import { peerDisplayName, peerNostrPubkey } from '@/features/nearPay/lib/peerProfile';
-import { nearPayPeerTapLog, planNearPaySend } from '@/features/nearPay/lib/nearPaySendDecision';
-import { readProfileRecord } from '@/shared/lib/nostr/useEntityCache';
-import { lockableMintsFromCreq } from '@/shared/lib/nutCreq';
-import { cachedProfileToMetadata } from '@/shared/stores/global/nostrMetadataCache';
-import {
-  confirmBearerDowngrade,
-  notifyNoSharedMint,
-  notifyNutDropNeedsBitcoinAccount,
-  notifyNutDropPeerNotReady,
-} from '@/features/nearPay/lib/startNearPaySend';
-import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
-import { useWalletContext } from '@/shared/providers/WalletContextProvider';
-import { useMintStore } from '@/shared/stores/profile/mintStore';
+
 import { BLUETOOTH_ACCENT } from '@/shared/lib/brandColors';
 import { paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { useNearPaySessionStore, type NearPayDelivery } from '@/shared/stores/runtime/nearPayStore';
 import { List } from '@/shared/ui/composed/List';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -45,15 +30,8 @@ interface NearPayPeerRowProps {
   onSelect: (peer: BLEPeer) => void;
 }
 
-function peerHasValidCreq(peer: Pick<BLEPeer, 'creq' | 'nostrPubkeyHex'>): boolean {
-  return lockableMintsFromCreq(peer.creq, peer.nostrPubkeyHex) !== null;
-}
-
 function sortPeersByReadiness(peers: BLEPeer[]): BLEPeer[] {
   return [...peers].sort((a, b) => {
-    const aLockable = peerHasValidCreq(a);
-    const bLockable = peerHasValidCreq(b);
-    if (aLockable !== bLockable) return aLockable ? -1 : 1;
     if (a.hasDirectLink !== b.hasDirectLink) return a.hasDirectLink ? -1 : 1;
     if (a.isConnected !== b.isConnected) return a.isConnected ? -1 : 1;
     return b.lastSeen - a.lastSeen;
@@ -71,30 +49,10 @@ function peerListSubtitle(total: number, connectedCount: number, directLinkCount
 
 const peerKeyExtractor = (peer: BLEPeer) => peer.peerID;
 
-/** Trailing pill for peers that have not advertised the creq capability yet. */
-function WaitingTag() {
-  const [foreground] = useThemeColor(['foreground'] as const);
-  const tagStyle = [styles.bearerTag, { backgroundColor: withAlpha(foreground, 0.08) }];
-  const tagTextStyle = { color: withAlpha(foreground, 0.55) };
-
-  return (
-    <HStack align="center" gap={4} style={tagStyle}>
-      <Icon name="mdi:lock-open-variant-outline" size={12} color={withAlpha(foreground, 0.55)} />
-      <Text size={11} style={tagTextStyle}>
-        Waiting
-      </Text>
-    </HStack>
-  );
-}
-
 function NearPayPeerRow({ peer, onSelect }: NearPayPeerRowProps) {
-  const trailing =
-    lockableMintsFromCreq(peer.creq, peer.nostrPubkeyHex) !== null ? undefined : <WaitingTag />;
-
   return (
     <NearbyPeerRow
       peer={peer}
-      trailing={trailing}
       onPress={() => onSelect(peer)}
       testID={`near-pay-peer-row:${peer.peerID}`}
     />
@@ -104,16 +62,11 @@ function NearPayPeerRow({ peer, onSelect }: NearPayPeerRowProps) {
 export function NearPayPeerListScreen() {
   useLifecycleLogger('NearPayPeerListScreen', paymentLog);
   const headerHeight = useHeaderHeight();
-  const walletContext = useWalletContext();
-  // NearPay is sat-pinned at the protocol level — it does NOT follow the
-  // wallet's active mint unit.
-  const machine = usePaymentFlowMachine({ walletContext, unit: 'sat' });
-  const { isOffline } = useOfflineStatus();
   const [foreground, background] = useThemeColor(['foreground', 'surface'] as const);
 
   const peers = useFreshNearbyPeers();
 
-  // Token DMs are only enabled after a peer advertises a valid creq capability.
+  // The shared directory exposes authenticated payment recipients only.
   const connectedCount = peers.filter((peer) => peer.isConnected).length;
   const directLinkCount = peers.filter((peer) => peer.hasDirectLink).length;
   const sortedPeers = sortPeersByReadiness(peers);
@@ -127,89 +80,8 @@ export function NearPayPeerListScreen() {
   const emptyTitleStyle = { color: withAlpha(foreground, 0.5), textAlign: 'center' as const };
   const emptyTextStyle = { color: withAlpha(foreground, 0.35), textAlign: 'center' as const };
 
-  const handleSelectPeer = async (peer: BLEPeer) => {
-    // The row already resolved this peer's profile into the entity cache, so
-    // the amount step can open with the same face and name the list showed.
-    const pubkey = peerNostrPubkey(peer);
-    const profile = pubkey ? cachedProfileToMetadata(readProfileRecord(pubkey)) : undefined;
-    const displayName = peerDisplayName(
-      peer,
-      pubkey && profile ? { pubkey, metadata: profile, isLoading: false } : undefined
-    );
-    // Decide lock vs offline bearer from the peer's creq (accepted mints +
-    // lock key), our trusted mints, and online status. Delivery is always a
-    // private DM, but only after a valid creq proved the peer is patched.
-    if (toRealUnit(useMintStore.getState().activeUnit) !== 'sat') {
-      paymentLog.info('near_pay.peer.needs_bitcoin_account', { source: 'peer-list' });
-      await notifyNutDropNeedsBitcoinAccount();
-      return;
-    }
-    // Only the active account's mints count as ours: a mint across the testnut
-    // split holds none of this account's funds, so a "shared" mint there would
-    // pass the plan and then fail as a balance error.
-    const ourMints = accountMintUrls(walletContext);
-    const plan = planNearPaySend({ peer, ourMints, isOffline });
-    paymentLog.info('near_pay.peer.tap', {
-      source: 'peer-list',
-      ...nearPayPeerTapLog({ peer, plan, ourMints, isOffline }),
-    });
-    // No valid creq ⇒ not confirmed patched; no mint in common ⇒ the
-    // recipient couldn't redeem. Block before any session/navigation state.
-    if (plan.mode === 'block') {
-      if (plan.reason === 'no-shared-mint') {
-        await notifyNoSharedMint(displayName);
-      } else {
-        await notifyNutDropPeerNotReady(displayName);
-      }
-      return;
-    }
-    // Offline bearer downgrade is never silent: confirm before sending an
-    // unlocked (bearer) token. (audit ND-2)
-    if (plan.mode === 'bearer' && plan.requiresConsent) {
-      const proceed = await confirmBearerDowngrade(displayName);
-      if (!proceed) {
-        paymentLog.info('near_pay.peer.bearer_downgrade_declined', { isOffline });
-        return;
-      }
-    }
-    const delivery: NearPayDelivery = { locked: plan.mode === 'lock' };
-    useNearPaySessionStore.getState().start({
-      peerID: peer.peerID,
-      nickname: displayName,
-      hasDirectLink: peer.hasDirectLink,
-      lastSeen: peer.lastSeen,
-      creq: peer.creq,
-      delivery,
-    });
-    // Failure paths must only unwind THIS selection — a newer session
-    // started meanwhile must survive a stale failure.
-    const sessionId = useNearPaySessionStore.getState().active?.id ?? null;
-    const clearOwnSession = () => {
-      if (useNearPaySessionStore.getState().active?.id === sessionId) {
-        useNearPaySessionStore.getState().clear();
-      }
-    };
-    router.back();
-    // The sendComplete handler delivers the finished token as a private Noise
-    // DM to the recipient peer (no public mesh). A locked token is P2PK-locked
-    // to the peer's key + minted from a mint they accept; offline fallback is
-    // bearer from a shared mint. `allowedMints` constrains the source mint.
-    void machine
-      .startSendEcash({
-        reset: true,
-        ...(plan.mode === 'lock'
-          ? { p2pkLockPubkey: plan.lockPubkey, recipientPubkey: plan.recipientPubkey }
-          : {}),
-        ...(plan.allowedMints ? { allowedMints: plan.allowedMints } : {}),
-        recipientProfile: { displayName, avatarUrl: profile?.picture ?? null, nip05: null },
-      })
-      .catch((err) => {
-        clearOwnSession();
-        paymentLog.error('near_pay.peer.list_start_send_failed', {
-          error: err instanceof Error ? err.message : String(err),
-        });
-      });
-  };
+  const startNearbySend = useStartNearbySend();
+  const handleSelectPeer = (peer: BLEPeer) => startNearbySend(peer, () => router.back());
 
   const renderItem = ({ item }: { item: BLEPeer }) => (
     <NearPayPeerRow peer={item} onSelect={handleSelectPeer} />
@@ -221,7 +93,7 @@ export function NearPayPeerListScreen() {
         No one nearby
       </Text>
       <Text size={13} style={emptyTextStyle}>
-        Keep the app open and nearby BitChat users will appear here.
+        Nearby wallets that accept locked payments will appear here.
       </Text>
     </VStack>
   );
@@ -275,10 +147,5 @@ const styles = StyleSheet.create({
   emptyState: {
     alignItems: 'center',
     paddingHorizontal: 40,
-  },
-  bearerTag: {
-    borderRadius: 10,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
   },
 });

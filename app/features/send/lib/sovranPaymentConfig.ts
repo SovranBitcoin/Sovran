@@ -87,10 +87,6 @@ import {
 import { RECEIVE_PENDING_TOAST_COPY } from '@/shared/lib/popup/paymentStatusCopy';
 import { captureAndStoreLocation } from '@/shared/hooks/useTransactionLocation';
 import { executeRoutstrTopUp, formatRoutstrBalance } from '@/shared/lib/routstr/topUp';
-import { sendBLEPrivateMessageWhole } from '@/features/bitchat/lib/blePrivateDelivery';
-import { getBitchatNickname } from '@/features/bitchat/hooks/useBitchatNickname';
-import { getBitchatProfileScope } from '@/features/bitchat/lib/profileScope';
-import type { BitchatBLEIdentityMaterial } from 'bitchat-module';
 import { useRoutstrTopUpStore } from '@/shared/stores/runtime/routstrTopUpStore';
 import { useNearPaySessionStore } from '@/shared/stores/runtime/nearPayStore';
 import { useContactSendStore } from '@/shared/stores/runtime/contactSendStore';
@@ -1324,7 +1320,6 @@ interface CreateSovranHandlersConfig {
   onOptionDismiss?: () => void;
   getManager: () => Manager | null;
   getNpub?: () => string | undefined;
-  getBitchatIdentityMaterial?: () => BitchatBLEIdentityMaterial | null;
   /**
    * Deliver a bearer ecash token to a remote Nostr contact over an encrypted
    * NIP-17 gift-wrapped DM. Provided by the Colada provider (which holds the
@@ -1368,70 +1363,6 @@ function getEncodedEcashTokenFromSendHistoryEntry(historyEntry: string): string 
     });
   }
   return null;
-}
-
-async function deliverNearPayIfActive(
-  historyEntry: string,
-  getBitchatIdentityMaterial?: () => BitchatBLEIdentityMaterial | null
-): Promise<void> {
-  const active = useNearPaySessionStore.getState().active;
-  if (!active) return;
-
-  // Every Nut Drop send is delivered as a SINGLE private Noise DM to a
-  // creq-confirmed Sovran peer — encrypted to them, so a locked OR offline
-  // bearer token stays private (no public-mesh broadcast of payment metadata).
-  // The whole multi-KB token fits one message thanks to the extended
-  // PrivateMessagePacket length. Stock clients can't decode extended DMs, so
-  // active sessions must carry a creq capability proof before we transmit.
-
-  try {
-    const encodedToken = getEncodedEcashTokenFromSendHistoryEntry(historyEntry);
-    if (!encodedToken) throw new Error('Created send entry did not contain an ecash token');
-    if (!active.recipient.creq) {
-      throw new Error('Nut Drop recipient has not advertised a creq capability');
-    }
-
-    const profileScope = getBitchatProfileScope();
-    const identityMaterial = getBitchatIdentityMaterial?.() ?? null;
-    const nickname = getBitchatNickname() || 'sovran';
-    const result = await sendBLEPrivateMessageWhole({
-      peerID: active.recipient.peerID,
-      content: encodedToken,
-      nickname,
-      profileScope,
-      identityMaterial,
-    });
-
-    paymentLog.info('near_pay.delivery.sent', {
-      peerID: active.recipient.peerID,
-      tokenBytes: encodedToken.length,
-      hasDirectLink: active.recipient.hasDirectLink,
-      startupMs: Math.round(result.startupMs * 100) / 100,
-      handshakeMs: Math.round(result.handshakeMs * 100) / 100,
-      sendMs: Math.round(result.sendMs * 100) / 100,
-      ...(result.handshakeError ? { handshakeError: result.handshakeError } : {}),
-    });
-
-    // Delivered over the BLE/bitchat mesh — stamp a bluetooth source badge on
-    // the resulting send transaction.
-    const entry = parseHistoryEntryOnce(historyEntry);
-    if (entry?.id) {
-      try {
-        setTransactionAnnotation(`id:${entry.id}`, { scan: { method: 'ble' } });
-      } catch (e) {
-        paymentLog.warn('near_pay.delivery.ble_source_annotation_failed', {
-          error: e instanceof Error ? e.message : String(e),
-        });
-      }
-    }
-  } catch (err) {
-    paymentLog.error('near_pay.delivery.failed', {
-      peerID: active.recipient.peerID,
-      error: err instanceof Error ? err.message : String(err),
-    });
-  } finally {
-    useNearPaySessionStore.getState().complete();
-  }
 }
 
 /**
@@ -1483,7 +1414,6 @@ export function createSovranHandlers({
   onOptionDismiss,
   getManager,
   getNpub,
-  getBitchatIdentityMaterial,
   deliverContactEcashDm,
 }: CreateSovranHandlersConfig): StepHandlerMap {
   paymentLog.debug('payment.handlers.created');
@@ -1624,18 +1554,14 @@ export function createSovranHandlers({
         }
       }
 
-      await deliverNearPayIfActive(enrichedHistoryEntry, getBitchatIdentityMaterial);
-
       // Remote-contact ecash: deliver the token over an encrypted Nostr DM and
       // drop the user into that chat thread (the self-copy wrap surfaces the
       // sent token bubble), instead of the bearer hand-off screen. The token
       // may be P2PK-locked to them; the DM is the envelope, the lock is what
       // is inside it.
       //
-      // This used to read "no P2PK lock" as "not a Nut Drop", which made a
-      // locked contact send impossible. Nut Drop is identified by its own
-      // session store, handled by `deliverNearPayIfActive` immediately above,
-      // and never populates this one.
+      // Nearby delivery is bound to its operation before execution and never
+      // populates the contact-send session.
       const contactTarget = useContactSendStore.getState().active;
       if (contactTarget) {
         const recipientPubkey = contactTarget.pubkey;
@@ -1909,11 +1835,9 @@ export function createSovranHandlers({
       };
       const params = { amountEntry: JSON.stringify(entry) };
       const nearPaySessionStore = useNearPaySessionStore.getState();
-      // Radar-launched sends stay inline on the radar: the vanilla ladder
-      // arrives as destination 'sendEcash', mesh sends as 'paymentRequest'
-      // (the solicited creq rides the payment-request machinery).
+      // Only radar-origin sessions render their amount step inline.
       if (
-        nearPaySessionStore.active &&
+        nearPaySessionStore.active?.presentation === 'radar' &&
         (constraints.destination === 'sendEcash' || constraints.destination === 'paymentRequest')
       ) {
         // The amount step is inline, so no route is pushed over the mint

@@ -9,6 +9,9 @@
  *    live results once the user types;
  *  - the trailing button is Paste at rest and Cancel once focused (clear + unfocus).
  */
+jest.mock('@/features/nearPay/hooks/useStartNearbySend', () => ({
+  useStartNearbySend: () => jest.fn(),
+}));
 
 import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
@@ -89,9 +92,8 @@ jest.mock('@/features/camera', () => ({
   useHandleCameraPermission: () => ({ handlePermission: jest.fn().mockResolvedValue(true) }),
 }));
 jest.mock('@/features/bitchat/hooks/useBLEPeers', () => ({ useBLEPeers: () => ({ peers: [] }) }));
-jest.mock('@/features/bitchat/lib/blePeerSnapshots', () => ({
-  BLE_PEER_FRESHNESS_TICK_MS: 1_000_000,
-  filterFreshBLEPeers: () => mockFreshPeers,
+jest.mock('@/features/nearPay/hooks/useFreshNearbyPeers', () => ({
+  useFreshNearbyPeers: () => mockFreshPeers,
 }));
 jest.mock('@/features/nearPay/lib/peerProfile', () => ({
   peerDisplayName: () => 'Peer',

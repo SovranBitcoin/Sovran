@@ -43,11 +43,9 @@ import { withAlpha } from '@/shared/lib/color';
 
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { useHandleCameraPermission } from '@/features/camera';
-import { useBLEPeers } from '@/features/bitchat/hooks/useBLEPeers';
-import {
-  BLE_PEER_FRESHNESS_TICK_MS,
-  filterFreshBLEPeers,
-} from '@/features/bitchat/lib/blePeerSnapshots';
+import { useFreshNearbyPeers } from '@/features/nearPay/hooks/useFreshNearbyPeers';
+import { useStartNearbySend } from '@/features/nearPay/hooks/useStartNearbySend';
+
 import { NearbyPeerRow } from '@/features/nearPay/components/NearbyPeerRow';
 import { peerNostrPubkey } from '@/features/nearPay/lib/peerProfile';
 import { useRememberPeers } from '@/features/nearPay/hooks/useRememberPeers';
@@ -135,22 +133,9 @@ export function SendScreen({ unit }: { unit: string }) {
   const [focused, setFocused] = useState(false);
 
   // ── Nearby Nut Drop peers (passive BLE discovery) ────────────────────────
-  const { peers } = useBLEPeers();
-  // Persist identified peers (with their nickname) so they survive into the
-  // quick-pay tier after they leave range.
-  useRememberPeers(peers);
-  // Re-tick so stale peers drop out of the fresh window without a peer event.
-  // The tick IS the dependency — `filterFreshBLEPeers` reads the wall clock, so
-  // nothing else marks the result stale.
-  const [freshnessTick, setFreshnessTick] = useState(0);
-  useEffect(() => {
-    const id = setInterval(() => setFreshnessTick((tick) => tick + 1), BLE_PEER_FRESHNESS_TICK_MS);
-    return () => clearInterval(id);
-  }, []);
-  const freshPeers = useMemo(
-    () => filterFreshBLEPeers(peers, Date.now()).filter((p) => peerNostrPubkey(p) != null),
-    [peers, freshnessTick]
-  );
+  const freshPeers = useFreshNearbyPeers();
+  useRememberPeers(freshPeers);
+  const startNearbySend = useStartNearbySend();
 
   // Live peers already show in the "Nearby" tier, so exclude them from the
   // People results (search hits + recents) below.
@@ -379,14 +364,7 @@ export function SendScreen({ unit }: { unit: string }) {
     [startContactSend]
   );
 
-  const handleSelectPeer = useCallback((_peer: BLEPeer) => {
-    // v1: hand off to the proven Nut Drop radar rather than reimplement the
-    // peer P2PK consent/decision flow here. The peer is surfaced in the unified
-    // list; selecting it routes through the radar (which owns the lock logic).
-    paymentLog.info('send.peer.select_handoff');
-    clearPaymentContext('send.near_pay');
-    router.push('/(send-flow)/nearPay');
-  }, []);
+  const handleSelectPeer = (peer: BLEPeer) => startNearbySend(peer);
 
   const methods: SendMethod[] = useMemo(
     () =>

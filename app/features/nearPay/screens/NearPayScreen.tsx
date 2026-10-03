@@ -45,8 +45,8 @@ import type { StrikeState } from '@/features/nearPay/lib/nutDropStrikeState';
 import { peerAvatarState, peerNostrPubkey, toLayoutPeer } from '@/features/nearPay/lib/peerProfile';
 import { nearPayPeerTapLog, planNearPaySend } from '@/features/nearPay/lib/nearPaySendDecision';
 import {
-  confirmBearerDowngrade,
   notifyNoSharedMint,
+  notifyNearbyNeedsConnection,
   notifyNutDropNeedsBitcoinAccount,
   notifyNutDropPeerNotReady,
 } from '@/features/nearPay/lib/startNearPaySend';
@@ -1780,9 +1780,8 @@ export function NearPayScreen() {
 
   const handleSelectPeer = useCallback(
     async (peer: NearPayLayoutPeer, avatarRect: AvatarRect) => {
-      // Decide lock vs offline bearer from the peer's creq (accepted mints +
-      // lock key), our trusted mints, and online status. Delivery is always a
-      // private DM, but only after a valid creq proved the peer is patched.
+      // Require a fresh authenticated recipient, a shared mint and the
+      // connection needed to create the P2PK lock.
       if (toRealUnit(useMintStore.getState().activeUnit) !== 'sat') {
         paymentLog.info('near_pay.peer.needs_bitcoin_account', { peerID: peer.peerID });
         await notifyNutDropNeedsBitcoinAccount();
@@ -1800,23 +1799,16 @@ export function NearPayScreen() {
             : 'near_pay.peer.not_ready',
           { peerID: peer.peerID, reason: plan.reason }
         );
-        if (plan.reason === 'no-shared-mint') {
+        if (plan.reason === 'offline') {
+          await notifyNearbyNeedsConnection();
+        } else if (plan.reason === 'no-shared-mint') {
           await notifyNoSharedMint(peer.name);
         } else {
           await notifyNutDropPeerNotReady(peer.name);
         }
         return;
       }
-      // Offline bearer downgrade is never silent: confirm before sending an
-      // unlocked (bearer) token, exactly as the peer list does. (audit ND-2)
-      if (plan.mode === 'bearer' && plan.requiresConsent) {
-        const proceed = await confirmBearerDowngrade(peer.name);
-        if (!proceed) {
-          paymentLog.info('near_pay.peer.bearer_downgrade_declined', { isOffline });
-          return;
-        }
-      }
-      const delivery: NearPayDelivery = { locked: plan.mode === 'lock' };
+      const delivery: NearPayDelivery = { locked: true };
       paymentLog.info('near_pay.peer.select', {
         peerID: peer.peerID,
         hasDirectLink: peer.hasDirectLink,
@@ -1842,6 +1834,8 @@ export function NearPayScreen() {
         hasDirectLink: peer.hasDirectLink,
         lastSeen: peer.lastSeen,
         creq: peer.creq,
+        nostrPubkeyHex: peer.nostrPubkeyHex,
+        walletCapabilityExpiresAt: peer.walletCapabilityExpiresAt,
         delivery,
       });
       // Failure paths must only unwind THIS selection — the radar stays
@@ -1869,22 +1863,17 @@ export function NearPayScreen() {
       // the span and six setters through a module-scope function, on the Nut
       // Drop send path; not a trade worth making for a memoization win.
       try {
-        // One path for every peer: enter the amount flow, then the
-        // sendComplete handler delivers the finished token as a private Noise
-        // DM to the recipient peer (no public mesh). A locked token is
-        // P2PK-locked to the peer's key + minted from a mint they accept;
-        // offline fallback is bearer from a shared mint. `allowedMints`
-        // constrains the source mint. recipientPubkey seeds their real profile.
+        // The operation binds delivery before execution; the mint allowlist
+        // and recipient lock remain fixed for this selection.
         paymentLog.info('near_pay.start_send', {
           peerID: peer.peerID,
           locked: delivery.locked,
         });
         await machine.startSendEcash({
           reset: true,
-          ...(plan.mode === 'lock'
-            ? { p2pkLockPubkey: plan.lockPubkey, recipientPubkey: plan.recipientPubkey }
-            : {}),
-          ...(plan.allowedMints ? { allowedMints: plan.allowedMints } : {}),
+          p2pkLockPubkey: plan.lockPubkey,
+          recipientPubkey: plan.recipientPubkey,
+          allowedMints: plan.allowedMints,
           recipientProfile: {
             displayName: peer.name,
             avatarUrl: peer.avatarUrl ?? null,

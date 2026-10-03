@@ -1,3 +1,4 @@
+import { captureNearbyDelivery } from '@/features/nearPay/lib/nearbyPayments';
 /**
  * @fileoverview Sovran ColadaProvider — wires colada to the app
  *
@@ -62,7 +63,6 @@ import {
   createSovranScanSources,
   createSovranScreenActionHandlers,
 } from '@/features/send/lib/sovranPaymentConfig';
-import { deriveBitchatBLEIdentityMaterial } from '@/features/bitchat/lib/bleIdentity';
 import {
   createSovranScreenActionsBridge,
   getSovranMintEnrichment,
@@ -178,7 +178,6 @@ type ColadaIdentity = {
   getNpub: () => string | undefined;
   getPubkey: () => string | undefined;
   getPrivateKey: () => Uint8Array | undefined;
-  getBitchatIdentityMaterial: () => ReturnType<typeof deriveBitchatBLEIdentityMaterial> | null;
   /** Register a receive surface for p2pk-keypair regeneration. Returns an unsubscribe. */
   subscribeP2pkKeyRefreshed: (listener: (newKey: string | null) => void) => () => void;
   notifyP2pkKeyRefreshed: (newKey: string | null) => void;
@@ -215,12 +214,6 @@ function useColadaIdentity(
       getNpub: () => npubRef.current,
       getPubkey: () => pubkeyRef.current,
       getPrivateKey: () => privateKeyRef.current,
-      getBitchatIdentityMaterial: () => {
-        const privateKey = privateKeyRef.current;
-        const pubkey = pubkeyRef.current;
-        if (!privateKey || !pubkey) return null;
-        return deriveBitchatBLEIdentityMaterial({ privateKey, pubkey });
-      },
       subscribeP2pkKeyRefreshed: (listener: (newKey: string | null) => void) => {
         subscribersRef.current.add(listener);
         return () => {
@@ -303,7 +296,7 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
   // `() => manager` inline, so every render handed the engine, the operations
   // override and the notifications factory a fresh function identity.
   const getManager = useCallback(() => manager, [manager]);
-  const { getNpub, getBitchatIdentityMaterial } = identity;
+  const { getNpub } = identity;
 
   const getBtcPrice = useCallback(() => {
     const currency = useSettingsStore.getState().displayCurrency;
@@ -329,6 +322,7 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
     () =>
       createColada({
         manager,
+        captureSendDelivery: captureNearbyDelivery,
         sendNostrDM: async (nprofile, message) => {
           paymentLog.info('colada.adapter.send_nostr_dm.start', {
             hasPrivateKey: !!identity.getPrivateKey(),
@@ -676,10 +670,9 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
         onOptionDismiss: () => refs.getOptionDismiss()?.(),
         getManager,
         getNpub,
-        getBitchatIdentityMaterial,
         deliverContactEcashDm,
       }),
-    [getManager, getNpub, getBitchatIdentityMaterial, deliverContactEcashDm]
+    [getManager, getNpub, deliverContactEcashDm]
   );
 
   // Built once per manager, not per render: it lands in Colada's context, so a

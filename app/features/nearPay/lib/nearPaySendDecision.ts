@@ -4,44 +4,27 @@ import { cashuP2pkPubkeyFromNostrHex } from '@/shared/lib/protocolIds';
 import { paymentLog } from '@/shared/lib/logger';
 import { creqParseDiagnostics, lockableMintsFromCreq } from '@/shared/lib/nutCreq';
 
-/**
- * Decides how a Nut Drop sends to a peer, from the peer's standing `creq`
- * (accepted mints + P2PK lock key), our trusted mints, and online status.
- *
- * - **lock** — the peer is cashu-capable (valid creq), we're online (a P2PK lock
- *   needs a mint swap), and we share a mint it accepts → lock the token to its
- *   key, minting from a shared mint.
- * - **bearer** — offline only, after a valid creq proved the peer is a patched
- *   Sovran client and we share a mint it accepts.
- * - **block** — no usable creq (unconfirmed patched client), or no shared mint.
- *
- * Delivery is always a private Noise DM (handled by the caller); these modes
- * only decide the token's lock + source mint.
- */
 type NearPaySendPlan =
   | {
       mode: 'lock';
       lockPubkey: string;
       recipientPubkey: string;
       allowedMints: string[];
-      /**
-       * The lock target is the peer's SELF-ASSERTED npub (from its creq /
-       * bitchat favorite) — nothing proves the nearby device controls that key.
-       * A spoofer could advertise someone else's npub; funds would then lock to
-       * a key the receiver can't redeem (no theft, but unrecoverable without a
-       * refund path). Callers should surface this as "unverified". (audit ND-1)
-       */
-      identityVerified: false;
+      identityVerified: true;
     }
-  | { mode: 'bearer'; allowedMints: string[] | null; requiresConsent: boolean }
-  | { mode: 'block'; reason: 'no-creq' | 'invalid-creq' | 'no-shared-mint' };
+  | {
+      mode: 'block';
+      reason: 'no-creq' | 'invalid-creq' | 'no-shared-mint' | 'unverified' | 'offline';
+    };
 
 export function planNearPaySend(args: {
-  peer: Pick<BLEPeer, 'creq' | 'nostrPubkeyHex'>;
+  peer: Pick<BLEPeer, 'creq' | 'nostrPubkeyHex' | 'walletCapabilityExpiresAt'>;
   ourMints: readonly string[];
   isOffline: boolean;
 }): NearPaySendPlan {
   const { peer, ourMints, isOffline } = args;
+  if ((peer.walletCapabilityExpiresAt ?? 0) <= Date.now())
+    return { mode: 'block', reason: 'unverified' };
   const acceptedMints = lockableMintsFromCreq(peer.creq, peer.nostrPubkeyHex);
   const logBase = {
     peerHasCreq: !!peer.creq,
@@ -53,8 +36,7 @@ export function planNearPaySend(args: {
     acceptedMintCount: acceptedMints?.length ?? 0,
   };
 
-  // A valid creq favorite is the capability signal for the extended private-DM
-  // wire format. Without it, a stock or stale client could drop the token.
+  // Require a request as well as the signed capability before creating funds.
   if (!peer.creq || !peer.nostrPubkeyHex) {
     paymentLog.info('near_pay.send.plan', {
       ...logBase,
@@ -82,18 +64,7 @@ export function planNearPaySend(args: {
     });
     return { mode: 'block', reason: 'no-shared-mint' };
   }
-  if (isOffline) {
-    // Offline: P2PK locking needs a mint swap, so we can only send bearer from a
-    // shared mint. A bearer token is redeemable by anyone who gets the bytes, so
-    // this downgrade requires explicit user consent — never silent. (audit ND-2)
-    paymentLog.info('near_pay.send.plan', {
-      ...logBase,
-      mode: 'bearer',
-      requiresConsent: true,
-      sharedMintCount: shared.length,
-    });
-    return { mode: 'bearer', allowedMints: shared, requiresConsent: true };
-  }
+  if (isOffline) return { mode: 'block', reason: 'offline' };
   paymentLog.info('near_pay.send.plan', {
     ...logBase,
     mode: 'lock',
@@ -104,7 +75,7 @@ export function planNearPaySend(args: {
     lockPubkey: cashuP2pkPubkeyFromNostrHex(peer.nostrPubkeyHex),
     recipientPubkey: peer.nostrPubkeyHex,
     allowedMints: shared,
-    identityVerified: false,
+    identityVerified: true,
   };
 }
 
