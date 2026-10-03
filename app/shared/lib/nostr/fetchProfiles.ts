@@ -1,8 +1,16 @@
 import type { facade } from 'nostr';
 
+import { cachedProfileToMetadata } from '@/shared/stores/global/nostrMetadataCache';
 import { buildNostrDataLayer } from '@/shared/lib/nostr/buildNostrDataLayer';
 
 type ProfileMetadata = facade.ProfileMetadata;
+type ProfileBatch = Record<string, ProfileMetadata>;
+// Only automatic, uncancelled revalidation shares work. Explicit cancellable
+// reads retain their caller's lifetime; account/tier changes get a new layer.
+const profileFlights = new WeakMap<
+  facade.NostrDataLayer,
+  Map<string, Promise<ProfileMetadata | undefined>>
+>();
 
 /**
  * Fetch kind-0 metadata for a set of pubkeys through the tier-selecting facade
@@ -16,19 +24,65 @@ export async function fetchProfilesViaFacade(
   if (pubkeys.length === 0) return {};
   const layer = buildNostrDataLayer();
   if (!layer) return {};
-  // getProfiles write-throughs resolved profiles into the shared entity cache
-  // (the single owner) and marks them pending while in flight. `refresh: true`
-  // forces a network fetch past a cache hit — needed to revalidate a stale or
-  // boot-seeded (seenAt 0) record rather than serve it back unchanged.
-  const result = await layer.getProfiles({
-    pubkeys,
-    ...(options.refresh ? { refresh: true } : {}),
-    ...(options.readId ? { readId: options.readId } : {}),
-    ...(options.signal ? { signal: options.signal } : {}),
-  });
-  return result.match(
-    (resolved) => resolved.profiles,
-    () => ({})
+  const fetch = async (keys: string[]): Promise<ProfileBatch> => {
+    const result = await layer.getProfiles({
+      pubkeys: keys,
+      ...options,
+    });
+    return result.match(
+      (resolved) => resolved.profiles,
+      () => ({})
+    );
+  };
+  if (!options.refresh || options.signal) return fetch(pubkeys);
+
+  const flights =
+    profileFlights.get(layer) ?? new Map<string, Promise<ProfileMetadata | undefined>>();
+  profileFlights.set(layer, flights);
+  const keys = [...new Set(pubkeys)];
+  const missing = keys.filter((key) => !flights.has(key));
+  if (missing.length) {
+    const previous = new Map(missing.map((key) => [key, layer.cache.getProfile(key)]));
+    const batch = fetch(missing);
+    for (const key of missing) {
+      const flight = batch.then(async (profiles) => {
+        if (Object.hasOwn(profiles, key)) return profiles[key];
+        // A partial aggregate is not a miss. Wait for this key's remaining
+        // sources so joining screens do not spend retry attempts on one read.
+        if (layer.cache.pendingProfiles.has(key)) {
+          await new Promise<void>((resolve) => {
+            const unsubscribe = layer.cache.pendingProfiles.subscribeKey(key, () => {
+              if (layer.cache.pendingProfiles.has(key)) return;
+              unsubscribe();
+              resolve();
+            });
+          });
+        }
+        const record = layer.cache.getProfile(key);
+        if (record === previous.get(key) || !record?.seenAt) return undefined;
+        const cached = cachedProfileToMetadata(record);
+        if (!cached) return undefined;
+        const { fetchedAt: _fetchedAt, ...metadata } = cached;
+        return metadata;
+      });
+      flights.set(key, flight);
+      const release = () => {
+        if (layer.cache.pendingProfiles.has(key)) {
+          const unsubscribe = layer.cache.pendingProfiles.subscribeKey(key, () => {
+            if (layer.cache.pendingProfiles.has(key)) return;
+            if (flights.get(key) === flight) flights.delete(key);
+            unsubscribe();
+          });
+        } else if (flights.get(key) === flight) flights.delete(key);
+      };
+      void flight.then(release, release);
+    }
+  }
+  const entries = await Promise.all(
+    keys.map(async (key) => [key, await flights.get(key)] as const)
+  );
+  return Object.fromEntries(
+    entries.filter((entry): entry is readonly [string, ProfileMetadata] => entry[1] !== undefined)
   );
 }
 
