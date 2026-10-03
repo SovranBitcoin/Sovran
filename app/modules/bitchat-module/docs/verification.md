@@ -75,3 +75,29 @@ Quiet discovery is not radio invisibility. Stock-mesh participation is explicitl
 visible, and a hidden wallet cannot depend solely on stock peers to relay to it.
 An idle warm directory also does not guarantee zero-latency cold discovery or
 instant profile metadata when connectivity is unavailable.
+
+## Domain identity review (2026-10-03)
+
+[ADR 0024](../../../docs/adr/0024-verify-domain-identities-against-recipient-keys.md)
+separates the domain's key mapping from the nearby capability's proof of key
+control. Opus 5.5 supplied the design consultation; independent diff review
+identified mixed-case lookup compatibility and an incoming-payment accessibility
+label, both corrected. The former unconditional blue NIP-05 badge is removed.
+
+The complete wallet suite passed (104 suites, 1,609 tests). Final focused app
+coverage passed (20 suites, 204 tests and 80 snapshots), covering lookup/cache
+races, publisher rejection, npub.cash ownership checks, identity presentation and
+existing payment surfaces. Disabling the publication guard made its regression
+test fail; restoring it passed. Workspace types, app lint (zero errors; existing
+warnings), styling, React Compiler and native-scenario validation passed. Both
+Metro platform exports passed. These checks do not establish native layout or
+real-domain interoperability.
+
+The broad app run completed 579 suites with three failures: the two intentionally
+changed design-system snapshots and the transaction-detail test's missing hook
+mock. Those failures were corrected and rerun in the focused pass. The broad
+runner also reproduced the existing Routstr import-after-teardown/open-handle
+problem (F55) and was terminated after assertions completed; a clean full-suite
+exit is not claimed. The authored unfunded settings scenario and live owned-domain
+and npub.cash checks remain unrun on devices; see F59 in the
+[follow-up ledger](../../../../docs/architecture/follow-ups.md).
