@@ -33,6 +33,11 @@ export function useStartNearbySend() {
       return notifyNutDropPeerNotReady(name);
     }
     const profile = readProfileRecord(plan.recipientPubkey);
+    const recipientProfile = {
+      displayName: name,
+      avatarUrl: profile?.picture ?? null,
+      nip05: profile?.nip05 ?? null,
+    };
     clearPaymentContext('send.near_pay');
     useNearPaySessionStore.getState().start(
       {
@@ -55,7 +60,7 @@ export function useStartNearbySend() {
         p2pkLockPubkey: plan.lockPubkey,
         recipientPubkey: plan.recipientPubkey,
         allowedMints: plan.allowedMints,
-        recipientProfile: { displayName: name, avatarUrl: profile?.picture ?? null, nip05: null },
+        recipientProfile,
       });
     } catch (error) {
       if (useNearPaySessionStore.getState().active?.id === sessionID)

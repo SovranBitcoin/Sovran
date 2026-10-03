@@ -18,6 +18,9 @@ const mockInnerContent = {};
 let mockReducedMotion = false;
 const mockAfterInteractions: (() => void)[] = [];
 const mockNavigateToProfile = jest.fn();
+jest.mock('@/shared/hooks/useNip05Verification', () => ({
+  useNip05Verification: () => ({ state: { status: 'none' }, retry: jest.fn() }),
+}));
 jest.mock('@/shared/hooks/useGuardedRouter', () => ({
   guardedRouter: { push: (...args: unknown[]) => mockNavigateToProfile(...args) },
 }));

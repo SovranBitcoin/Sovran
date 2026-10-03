@@ -1057,7 +1057,7 @@ export function ContactRow({
 
   const nip05 =
     showNip05 && !hideMetadata && !resolvedLoading && nostr?.profile?.nip05
-      ? { handle: nostr.profile.nip05 }
+      ? { handle: nostr.profile.nip05, pubkey: nostr.pubkey }
       : undefined;
   const hasNip05 = !!nip05;
 

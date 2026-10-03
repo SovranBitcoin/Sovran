@@ -1,3 +1,4 @@
+import { PaymentIdentity } from '@/shared/ui/composed/Nip05Identity';
 /**
  * Machine-driven adapter over the shared AmountEntryView primitive.
  * Unpacks colada's amountEntry screen state into the primitive's
@@ -417,6 +418,9 @@ export function AmountSelector({
           mint-fault scenarios — same rule as ReceiveScreen. */}
       <E2EToastProbe />
       <AmountEntryView
+        recipientIdentity={
+          <PaymentIdentity pubkey={recipientPubkey} address={recipientProfile?.nip05} />
+        }
         rawInput={rawInput}
         numericValue={numericValue}
         unit={unit}

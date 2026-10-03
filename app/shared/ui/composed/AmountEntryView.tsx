@@ -97,6 +97,8 @@ function FiatAmountDisplay({
 }
 
 interface AmountEntryViewProps {
+  /** Selected recipient details placed beside the amount, clear of native header chrome. */
+  recipientIdentity?: React.ReactNode;
   /** Raw keyboard input string; source of truth for CustomKeyboard's internal state. */
   rawInput: string;
   /** Parsed amount as a number (sats when the sat account types in unit mode). */
@@ -192,6 +194,7 @@ interface AmountEntryViewProps {
 }
 
 export function AmountEntryView({
+  recipientIdentity,
   rawInput,
   numericValue,
   unit,
@@ -436,6 +439,7 @@ export function AmountEntryView({
       <View style={{ flex: 1, paddingTop: topPadding, paddingHorizontal: 16 }}>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <VStack align="center" gap={centerSpacing}>
+            {recipientIdentity}
             <View
               testID="amount-value"
               accessible

@@ -1,3 +1,4 @@
+import { readProfileRecord } from '@/shared/lib/nostr/useEntityCache';
 import React, {
   useCallback,
   useEffect,
@@ -1877,7 +1878,7 @@ export function NearPayScreen() {
           recipientProfile: {
             displayName: peer.name,
             avatarUrl: peer.avatarUrl ?? null,
-            nip05: null,
+            nip05: readProfileRecord(plan.recipientPubkey)?.nip05 ?? null,
           },
         });
         startSendSpan.end({

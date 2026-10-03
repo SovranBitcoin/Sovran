@@ -1,3 +1,4 @@
+import { PaymentIdentity } from '@/shared/ui/composed/Nip05Identity';
 import React, { useCallback, useEffect, useRef } from 'react';
 import { StyleSheet, type ScrollView, type View as NativeView } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
@@ -175,7 +176,8 @@ export function TransactionDetailShell({
   }, []);
   // Other transactions with the same nostr counterparty (Nut Drop / lightning-
   // address-to-nostr). Rendered before technical details as a mini relationship view.
-  const counterpartyPubkey = transactionIdentitySnapshot(entry)?.pubkey;
+  const counterpartySnapshot = transactionIdentitySnapshot(entry);
+  const counterpartyPubkey = counterpartySnapshot?.pubkey;
   const { metadata: counterpartyProfile } = useNostrProfileMetadata(counterpartyPubkey);
   // The scroll mode picks its container, so it must not flip once mounted: it
   // follows the pubkey the entry carries (known synchronously), not the name
@@ -227,6 +229,10 @@ export function TransactionDetailShell({
               />
             </>
           ) : null}
+          <PaymentIdentity
+            pubkey={counterpartyPubkey}
+            address={counterpartyProfile?.nip05 ?? counterpartySnapshot?.nip05}
+          />
           {beforeStatus}
           {entry
             ? (statusRow ?? <HistoryEntryRefresh historyEntry={entry} mintInfo={mintInfo} />)

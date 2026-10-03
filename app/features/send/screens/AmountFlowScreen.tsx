@@ -161,7 +161,9 @@ export function AmountFlowContent({
   // Path 3: local NIP-05 fallback. Kicks in only when neither the entry
   // nor the live ctx already supplied a pubkey. Cancellable so a melt
   // target swap (or unmount) doesn't apply a stale resolution.
-  const [localPubkey, setLocalPubkey] = useState<string | null>(null);
+  const [localIdentity, setLocalIdentity] = useState<{ target: string; pubkey: string } | null>(
+    null
+  );
   useEffect(() => {
     if (entryRecipientPubkey || liveCtx.recipientPubkey || !entryMeltTarget) return;
     const controller = new AbortController();
@@ -170,7 +172,7 @@ export function AmountFlowContent({
       try {
         const pk = await fetchNip05Pubkey(entryMeltTarget, { signal: controller.signal });
         if (cancelled) return;
-        if (pk) setLocalPubkey(pk);
+        if (pk) setLocalIdentity({ target: entryMeltTarget, pubkey: pk });
       } catch (e) {
         if (cancelled) return;
         paymentLog.debug('amount_flow.local_nip05.failed', {
@@ -186,7 +188,9 @@ export function AmountFlowContent({
   }, [entryRecipientPubkey, liveCtx.recipientPubkey, entryMeltTarget]);
 
   const recipientPubkey =
-    entryRecipientPubkey ?? liveCtx.recipientPubkey ?? localPubkey ?? undefined;
+    entryRecipientPubkey ??
+    liveCtx.recipientPubkey ??
+    (localIdentity?.target === entryMeltTarget ? localIdentity?.pubkey : undefined);
   const recipientProfile = entryRecipientProfile ?? liveCtx.recipientProfile;
   const { metadata: liveNostrMetadata } = useNostrProfileMetadata(recipientPubkey);
   const fallbackDisplayName = liveNostrMetadata
@@ -249,10 +253,10 @@ export function AmountFlowContent({
         ? {
             displayName: headerDisplayName,
             avatarUrl: headerAvatarUrl,
-            nip05: nearPayRecipient ? null : (liveNostrMetadata?.nip05 ?? null),
+            nip05: liveNostrMetadata?.nip05 ?? recipientProfile?.nip05 ?? null,
           }
         : undefined,
-    [headerDisplayName, headerAvatarUrl, liveNostrMetadata?.nip05, nearPayRecipient]
+    [headerDisplayName, headerAvatarUrl, liveNostrMetadata?.nip05, recipientProfile?.nip05]
   );
 
   useEffect(() => {
