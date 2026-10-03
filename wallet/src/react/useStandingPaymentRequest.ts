@@ -131,6 +131,7 @@ export function useStandingPaymentRequest(
   );
 
   const unit = input?.unit ?? null;
+  const purpose = input?.purpose;
   // Mint list identity: order-stable join so a re-render with the same mints
   // doesn't re-resolve, while trust changes do.
   const mintsKey = input ? input.mints.join("|") : null;
@@ -167,6 +168,7 @@ export function useStandingPaymentRequest(
     } else if (
       !peekStandingPaymentRequest(manager, {
         unit,
+        purpose,
         mints: mintsRef.current,
         lockP2pkPubkey,
         mintsPreferred,
@@ -182,6 +184,7 @@ export function useStandingPaymentRequest(
         manager,
         {
           unit,
+          purpose,
           mints: mintsRef.current,
           lockP2pkPubkey,
           mintsPreferred,
@@ -207,6 +210,7 @@ export function useStandingPaymentRequest(
   }, [
     manager,
     unit,
+    purpose,
     mintsKey,
     lockP2pkPubkey,
     mintsPreferred,
@@ -220,13 +224,13 @@ export function useStandingPaymentRequest(
     if (!unit) return;
     const store = identityStoreRef.current;
     if (!store.subscribe) return;
-    const key = standingPaymentRequestKey(unit);
+    const key = standingPaymentRequestKey(unit, purpose);
     return store.subscribe(key, () => {
       const recorded = identityStoreRef.current.get(key);
       if (recorded && recorded === operationIdRef.current) return;
       setGeneration((g) => g + 1);
     });
-  }, [unit]);
+  }, [unit, purpose]);
 
   // The dep list names the refs too. It used to read
   // `[manager, unit, lockP2pkPubkey]` while the body also reached
@@ -240,6 +244,7 @@ export function useStandingPaymentRequest(
       manager,
       {
         unit,
+        purpose,
         mints: mintsRef.current,
         lockP2pkPubkey,
         mintsPreferred,
@@ -253,6 +258,7 @@ export function useStandingPaymentRequest(
   }, [
     manager,
     unit,
+    purpose,
     lockP2pkPubkey,
     mintsPreferred,
     mintsRef,

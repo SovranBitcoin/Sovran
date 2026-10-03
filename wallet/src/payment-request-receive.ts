@@ -27,6 +27,8 @@ import type { ReusableQuoteIdentityStore } from "./quotes/reusable";
 
 export interface StandingPaymentRequestInput {
   unit: string;
+  /** Independent durable address namespace (for example nearby). */
+  purpose?: string;
   /** Mint allow-list embedded in the request. Should be the wallet's trusted
    *  mints — coco rejects payloads from untrusted mints, so advertising
    *  anything else strands the payer's ecash in a DM. */
@@ -68,8 +70,11 @@ export interface StandingPaymentRequest {
   unit: string;
 }
 
-export function standingPaymentRequestKey(unit: string): string {
-  return `creq|${unit.trim().toLowerCase()}`;
+export function standingPaymentRequestKey(
+  unit: string,
+  purpose?: string,
+): string {
+  return `${purpose ? `${purpose}|` : ""}creq|${unit.trim().toLowerCase()}`;
 }
 
 function generateRequestId(): string {
@@ -78,14 +83,20 @@ function generateRequestId(): string {
 
 /**
  * Narrow a request's advertised mint list to a display subset (intersection).
- * An empty intersection would advertise "any mint" (m is optional in NUT-18) —
- * worse than the un-narrowed list — so it falls back to the original list.
+ * Standing requests are used for automatic wallet discovery and must fail
+ * closed when their advertised trust subset disappears. Single-use display
+ * retains its established fallback to the operation's accepted mint list.
  */
 function narrowDisplayMints(
   mints: string[] | undefined,
   displayMints: string[] | undefined,
+  failClosed = false,
 ): string[] | undefined {
-  if (!displayMints || displayMints.length === 0) return mints;
+  if (!displayMints) return mints;
+  if (displayMints.length === 0) {
+    if (failClosed) throw new Error("No accepted mints");
+    return mints;
+  }
   if (!mints || mints.length === 0) return mints;
   const allowed = new Set(displayMints);
   const narrowed = mints.filter((m) => allowed.has(m));
@@ -94,6 +105,7 @@ function narrowDisplayMints(
     opMintCount: mints.length,
     displayMintCount: displayMints.length,
   });
+  if (failClosed) throw new Error("No accepted mints in standing request");
   return mints;
 }
 
@@ -134,7 +146,7 @@ function toAmountlessEncodings(
     decoded.id,
     undefined, // amount — the whole point
     decoded.unit,
-    narrowDisplayMints(decoded.mints, displayMints),
+    narrowDisplayMints(decoded.mints, displayMints, true),
     decoded.description,
     false, // singleUse
     lockP2pkPubkey
@@ -244,7 +256,18 @@ async function createStanding(
   return toStanding(operation, input);
 }
 
-const inFlight = new Map<string, Promise<StandingPaymentRequest>>();
+const flights = new WeakMap<
+  Manager,
+  Map<string, Promise<StandingPaymentRequest>>
+>();
+function flightsFor(manager: Manager) {
+  let map = flights.get(manager);
+  if (!map) {
+    map = new Map();
+    flights.set(manager, map);
+  }
+  return map;
+}
 
 // Last resolved standing request per key+lock, PER MANAGER (WeakMap — see
 // quotes/reusable.ts). Seeds synchronous renders on re-mount.
@@ -263,7 +286,7 @@ function cacheFor(manager: Manager): Map<string, StandingPaymentRequest> {
 }
 
 function cacheKey(input: StandingPaymentRequestInput): string {
-  return `${standingPaymentRequestKey(input.unit)}|${input.lockP2pkPubkey ?? ""}|${input.displayMints?.join(",") ?? ""}|${input.mintsPreferred ?? ""}`;
+  return `${standingPaymentRequestKey(input.unit, input.purpose)}|${input.mints.join(",")}|${input.lockP2pkPubkey ?? ""}|${input.displayMints?.join(",") ?? ""}|${input.mintsPreferred ?? ""}`;
 }
 
 /** Synchronous read of the last resolved standing request (per lock state)
@@ -285,9 +308,13 @@ export async function ensureStandingPaymentRequest(
   input: StandingPaymentRequestInput,
   identityStore: ReusableQuoteIdentityStore,
 ): Promise<StandingPaymentRequest> {
-  const key = standingPaymentRequestKey(input.unit);
+  const key = standingPaymentRequestKey(input.unit, input.purpose);
+  const inFlight = flightsFor(manager);
   const pending = inFlight.get(key);
-  if (pending) return pending;
+  if (pending) {
+    await pending.catch(() => undefined);
+    return ensureStandingPaymentRequest(manager, input, identityStore);
+  }
 
   const startedAt = Date.now();
   const task = (async () => {
@@ -301,7 +328,10 @@ export async function ensureStandingPaymentRequest(
         operation &&
         operation.state === "active" &&
         !operation.singleUse &&
-        operation.unit === input.unit.trim().toLowerCase()
+        operation.unit === input.unit.trim().toLowerCase() &&
+        (!input.purpose ||
+          (operation.mints.length === input.mints.length &&
+            operation.mints.every((mint) => input.mints.includes(mint))))
       ) {
         // Mint list drift (mints trusted/untrusted since creation) is
         // tolerated: the QR advertises the creation-time list; a rotation
@@ -350,9 +380,13 @@ export async function rotateStandingPaymentRequest(
   input: StandingPaymentRequestInput,
   identityStore: ReusableQuoteIdentityStore,
 ): Promise<StandingPaymentRequest> {
-  const key = standingPaymentRequestKey(input.unit);
+  const key = standingPaymentRequestKey(input.unit, input.purpose);
+  const inFlight = flightsFor(manager);
   const pending = inFlight.get(key);
-  if (pending) await pending.catch(() => undefined);
+  if (pending) {
+    await pending.catch(() => undefined);
+    return rotateStandingPaymentRequest(manager, input, identityStore);
+  }
 
   const task = (async () => {
     const recordedId = identityStore.get(key);

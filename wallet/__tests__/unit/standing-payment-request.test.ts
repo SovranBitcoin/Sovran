@@ -255,25 +255,21 @@ describe("displayMints narrowing", () => {
     expect(standing.mints).toEqual(TWO_MINTS);
   });
 
-  it("keeps the op's mints when the intersection is empty (never 'any mint')", async () => {
+  it("fails closed when the display allowlist no longer intersects the request", async () => {
     const manager = mockManager({
       get: vi.fn().mockResolvedValue(twoMintOp()),
     });
-    const store = memoryStore({ [KEY]: "op-1" });
-
-    const standing = await ensureStandingPaymentRequest(
-      manager,
-      {
-        unit: "sat",
-        mints: TWO_MINTS,
-        displayMints: ["https://stray.mint.example"],
-      },
-      store,
-    );
-
-    expect(decodePaymentRequest(standing.encodedRequest).mints).toEqual(
-      TWO_MINTS,
-    );
+    await expect(
+      ensureStandingPaymentRequest(
+        manager,
+        {
+          unit: "sat",
+          mints: TWO_MINTS,
+          displayMints: ["https://stray.mint.example"],
+        },
+        memoryStore({ [KEY]: "op-1" }),
+      ),
+    ).rejects.toThrow("No accepted mints");
   });
 
   it("resolves per displayMints selection (cache keyed on the narrowed list)", async () => {
@@ -332,14 +328,21 @@ describe("rotateStandingPaymentRequest", () => {
   });
 });
 
-
 describe("standing mint preference encodings", () => {
   it("preserves preferred mints in both amountless encodings without changing the operation", async () => {
-    const manager = mockManager({ get: vi.fn().mockResolvedValue(operation()) });
+    const manager = mockManager({
+      get: vi.fn().mockResolvedValue(operation()),
+    });
     const store = memoryStore({ [standingPaymentRequestKey("sat")]: "op-1" });
-    const result = await ensureStandingPaymentRequest(manager, {
-      unit: "sat", mints: MINTS, mintsPreferred: true,
-    }, store);
+    const result = await ensureStandingPaymentRequest(
+      manager,
+      {
+        unit: "sat",
+        mints: MINTS,
+        mintsPreferred: true,
+      },
+      store,
+    );
     for (const encoded of [result.encodedRequest, result.encodedRequestB]) {
       const decoded = decodePaymentRequest(encoded);
       expect(decoded.mintsPreferred).toBe(true);
@@ -348,7 +351,61 @@ describe("standing mint preference encodings", () => {
       expect(decoded.id).toBe("req-1");
     }
     expect(manager.paymentRequests.incoming.create).not.toHaveBeenCalled();
-    const strict = await ensureStandingPaymentRequest(manager, { unit: "sat", mints: MINTS, mintsPreferred: false }, store);
-    expect(decodePaymentRequest(strict.encodedRequest).mintsPreferred).toBe(false);
+    const strict = await ensureStandingPaymentRequest(
+      manager,
+      { unit: "sat", mints: MINTS, mintsPreferred: false },
+      store,
+    );
+    expect(decodePaymentRequest(strict.encodedRequest).mintsPreferred).toBe(
+      false,
+    );
+  });
+});
+
+describe("standing request ownership under concurrency", () => {
+  it("never shares a request across managers", async () => {
+    const a = mockManager({
+      create: vi.fn(async () => operation({ id: "a" })),
+    });
+    const b = mockManager({
+      create: vi.fn(async () => operation({ id: "b" })),
+    });
+    const storeA = memoryStore(),
+      storeB = memoryStore();
+    const [left, right] = await Promise.all([
+      ensureStandingPaymentRequest(a, INPUT, storeA),
+      ensureStandingPaymentRequest(b, INPUT, storeB),
+    ]);
+    expect(left.operationId).toBe("a");
+    expect(right.operationId).toBe("b");
+    expect(storeA.map[KEY]).toBe("a");
+    expect(storeB.map[KEY]).toBe("b");
+  });
+  it("shares one operation but encodes each caller's lock", async () => {
+    const create = vi.fn(async () => operation());
+    const manager = mockManager({
+      create,
+      get: vi.fn(async () => operation()),
+    });
+    const store = memoryStore();
+    const [left, right] = await Promise.all([
+      ensureStandingPaymentRequest(
+        manager,
+        { ...INPUT, lockP2pkPubkey: "02" + "ab".repeat(32) },
+        store,
+      ),
+      ensureStandingPaymentRequest(
+        manager,
+        { ...INPUT, lockP2pkPubkey: "02" + "cd".repeat(32) },
+        store,
+      ),
+    ]);
+    expect(create).toHaveBeenCalledOnce();
+    expect(decodePaymentRequest(left.encodedRequest).nut10?.data).toBe(
+      "02" + "ab".repeat(32),
+    );
+    expect(decodePaymentRequest(right.encodedRequest).nut10?.data).toBe(
+      "02" + "cd".repeat(32),
+    );
   });
 });
