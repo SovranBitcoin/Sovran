@@ -28,6 +28,7 @@
  * `sendDirectMessageToRelays` is the app's `SimplePool` wiring.
  */
 
+import { z } from 'zod';
 import { SimplePool } from 'nostr-tools/pool';
 import * as nip19 from 'nostr-tools/nip19';
 
@@ -82,6 +83,20 @@ export class NoDirectMessageRelaysError extends Error {
   }
 }
 
+export const PreparedDirectMessageSchema = z.object({
+  event: z.object({
+    id: z.string().regex(/^[0-9a-f]{64}$/),
+    pubkey: z.string().regex(/^[0-9a-f]{64}$/),
+    sig: z.string().regex(/^[0-9a-f]{128}$/),
+    kind: z.literal(1059),
+    created_at: z.number().int(),
+    tags: z.array(z.array(z.string().max(2048)).max(8)).max(32),
+    content: z.string().max(256_000),
+  }),
+  relays: z.array(z.string().max(2048)).min(1).max(32),
+});
+type PreparedDirectMessage = z.infer<typeof PreparedDirectMessageSchema>;
+
 interface SendDirectMessageParams {
   senderPrivateKey: Uint8Array;
   nprofile: string;
@@ -115,8 +130,8 @@ export function createDirectMessageSender(deps: {
   openPool: () => DirectMessageRelayPool;
   /** NIP-17 `kind:10050` lookup, used only when the nprofile carries no hints. */
   resolveDmRelays: (pubkey: string) => Promise<string[]>;
-}): (params: SendDirectMessageParams) => Promise<void> {
-  return async function sendDirectMessage(params) {
+}) {
+  async function prepare(params: SendDirectMessageParams): Promise<PreparedDirectMessage> {
     const { pubkey, relays } = recipientOf(params.nprofile);
     const hinted = [...new Set(relays ?? [])];
     // No hints: ask the recipient where they read DMs. Never guess — a wrap on
@@ -143,18 +158,27 @@ export function createDirectMessageSender(deps: {
       recipientPublicKey: pubkey,
     });
 
+    return PreparedDirectMessageSchema.parse({ event: recipientWrap, relays: uniqueRelays });
+  }
+
+  async function publish(prepared: PreparedDirectMessage, timeoutMs = DEFAULT_PUBLISH_TIMEOUT_MS) {
     const pool = deps.openPool();
     try {
       await withTimeout(
-        Promise.any(pool.publish(uniqueRelays, recipientWrap)),
-        params.timeoutMs ?? DEFAULT_PUBLISH_TIMEOUT_MS,
+        Promise.any(pool.publish(prepared.relays, prepared.event)),
+        timeoutMs,
         'sendDirectMessage publish'
       );
       nostrLog.info('nostr.sendDirectMessage.published');
     } finally {
-      pool.close(uniqueRelays);
+      pool.close(prepared.relays);
     }
-  };
+  }
+  // Callers needing durable retries persist prepare() before the first publish.
+  return Object.assign(
+    async (params: SendDirectMessageParams) => publish(await prepare(params), params.timeoutMs),
+    { prepare, publish }
+  );
 }
 
 /** App wiring: a short-lived nostr-tools `SimplePool` per publish, and a

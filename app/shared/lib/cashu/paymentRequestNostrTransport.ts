@@ -45,7 +45,14 @@ const POLL_LIMIT = 50;
 const SEEN_CAP = 1000;
 const GIFT_WRAP_KIND = 1059;
 
+type InboxLayer = Pick<
+  NonNullable<
+    ReturnType<(typeof import('@/shared/lib/nostr/buildNostrDataLayer'))['buildNostrDataLayer']>
+  >,
+  'getDmEnvelopes' | 'subscribeDmEnvelopes'
+>;
 interface NostrTransportPluginConfig {
+  loadDataLayer?: () => Promise<InboxLayer | null>;
   /** Profile Nostr secret key (same key the P2PK import uses); captured per
    *  manager init so one profile's key never serves another's manager. */
   getSignerKey: () => Uint8Array | null;
@@ -91,11 +98,20 @@ export function createPaymentRequestNostrTransportPlugin(
     required: ['paymentRequestReceiveService', 'logger'] as const,
     onInit(ctx) {
       const service = ctx.services.paymentRequestReceiveService;
+      const loadDataLayer =
+        config.loadDataLayer ??
+        (async () => {
+          const { buildNostrDataLayer } = await import('@/shared/lib/nostr/buildNostrDataLayer');
+          return buildNostrDataLayer();
+        });
 
       const activeOps = new Set<string>();
       const seenWraps = new Set<string>();
+      const inFlightWraps = new Set<string>();
       let timer: ReturnType<typeof setInterval> | null = null;
       let polling = false;
+      let recoveryNeeded = false;
+      let recovering = false;
       let disposed = false;
       let liveUnsub: (() => void) | null = null;
       let liveStarting = false;
@@ -120,57 +136,75 @@ export function createPaymentRequestNostrTransportPlugin(
         envelope: { id: string; kind: number; content: string; pubkey: string },
         source: 'poll' | 'live'
       ): Promise<boolean> => {
-        if (envelope.kind !== GIFT_WRAP_KIND || seenWraps.has(envelope.id)) return false;
+        if (
+          disposed ||
+          activeOps.size === 0 ||
+          envelope.kind !== GIFT_WRAP_KIND ||
+          seenWraps.has(envelope.id) ||
+          inFlightWraps.has(envelope.id)
+        )
+          return false;
         const secretKey = config.getSignerKey();
         if (!secretKey) return false;
         const viewerPubkey = getPublicKey(secretKey);
-        seenWraps.add(envelope.id);
-        capSeenWraps();
-        const rumor = giftWrapCache.unwrap(
-          viewerPubkey,
-          { id: envelope.id, content: envelope.content, pubkey: envelope.pubkey },
-          secretKey
-        );
-        if (!rumor || !looksLikePaymentRequestPayload(rumor.content)) return false;
+        inFlightWraps.add(envelope.id);
         try {
-          await service.ingestPayload(withDefaultUnit(rumor.content), {
+          const rumor = giftWrapCache.unwrap(
+            viewerPubkey,
+            { id: envelope.id, content: envelope.content, pubkey: envelope.pubkey },
+            secretKey
+          );
+          if (!rumor || !looksLikePaymentRequestPayload(rumor.content)) {
+            inFlightWraps.delete(envelope.id);
+            seenWraps.add(envelope.id);
+            capSeenWraps();
+            return false;
+          }
+          if (disposed) return false;
+          const result = await service.ingestPayload(withDefaultUnit(rumor.content), {
             transport: 'nostr',
             transportMessageId: envelope.id,
             senderPubkey: rumor.senderPubkey,
           });
+          if (result.attempt.state !== 'finalized' && result.attempt.state !== 'rejected') {
+            recoveryNeeded = true;
+            return false;
+          }
+          seenWraps.add(envelope.id);
+          capSeenWraps();
           cashuLog.info('cashu.creq.transport.payload_ingested', {
             source,
             wrapIdLength: envelope.id.length,
             contentLength: rumor.content.length,
           });
-          return true;
+          return result.attempt.state === 'finalized';
         } catch (error) {
-          // Payloads for unknown/cancelled requests (or plain chat DMs that
-          // happened to look like payloads) are expected — log and move on; the
-          // wrap is marked seen so we never retry it.
+          recoveryNeeded = true;
+          // A concurrent BLE claim or transient mint failure must remain
+          // retryable. Only Coco terminal attempts enter the seen set.
           cashuLog.debug('cashu.creq.transport.payload_rejected', {
             source,
             error: error instanceof Error ? error.message : String(error),
           });
           return false;
+        } finally {
+          inFlightWraps.delete(envelope.id);
         }
       };
 
-      const pollOnce = async (): Promise<void> => {
-        if (polling || disposed) return;
+      const pollInbox = async (): Promise<void> => {
+        if (disposed) return;
         const secretKey = config.getSignerKey();
         if (!secretKey) return;
         const viewerPubkey = getPublicKey(secretKey);
         // Lazy import: the data-layer chain pulls native-only modules
         // (ndk-mobile) that must not load at manager-module import time
         // (node-side tests import the manager).
-        const { buildNostrDataLayer } = await import('@/shared/lib/nostr/buildNostrDataLayer');
-        const layer = buildNostrDataLayer();
+        const layer = await loadDataLayer();
         if (!layer) {
           cashuLog.debug('cashu.creq.transport.poll_no_tiers');
           return;
         }
-        polling = true;
         // This poll reads the viewer's whole gift-wrap inbox on a timer. It
         // carries the standard read lifecycle under its OWN surface so
         // log-doctor's `reads` mode can price it: without these, the poll shows
@@ -256,6 +290,33 @@ export function createPaymentRequestNostrTransportPlugin(
             // next one is the backstop.
             retained: false,
           });
+        }
+      };
+
+      const pollOnce = async () => {
+        if (polling || disposed) return;
+        polling = true;
+        // Re-ingestion alone returns a stored receiving attempt. Ask Coco to
+        // reconcile its child operation, without blocking inbox discovery on a
+        // stalled mint. Its operation locks serialize this with live claims.
+        if (recoveryNeeded && !recovering) {
+          recovering = true;
+          recoveryNeeded = false;
+          void service
+            .recoverPendingAttempts()
+            .catch(() => {
+              recoveryNeeded = true;
+            })
+            .finally(() => {
+              recovering = false;
+            });
+        }
+        try {
+          await pollInbox();
+        } catch (error) {
+          cashuLog.debug('cashu.creq.transport.poll_unavailable', {
+            error: error instanceof Error ? error.name : 'unknown',
+          });
         } finally {
           polling = false;
         }
@@ -288,8 +349,7 @@ export function createPaymentRequestNostrTransportPlugin(
             const secretKey = config.getSignerKey();
             if (!secretKey) return;
             const viewerPubkey = getPublicKey(secretKey);
-            const { buildNostrDataLayer } = await import('@/shared/lib/nostr/buildNostrDataLayer');
-            const layer = buildNostrDataLayer();
+            const layer = await loadDataLayer();
             // Deactivated / disposed / lost the key while the layer resolved.
             if (!layer || disposed || activeOps.size === 0) return;
             await giftWrapCache.cache.hydrate(viewerPubkey);
