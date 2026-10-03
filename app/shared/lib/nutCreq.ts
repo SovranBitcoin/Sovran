@@ -1,28 +1,6 @@
-import { PaymentRequest, type NUT10Option } from '@cashu/cashu-ts';
 import { decodePaymentRequestInfo, lockableMintsFromRequest } from 'wallet';
 
-import { CASHU_P2PK_PUBKEY_RE, type CashuP2pkPubkey } from '@/shared/lib/protocolIds';
 import { cashuLog } from '@/shared/lib/logger';
-
-/**
- * NUT-18 payment request (`creq…`) used as Nut Drop's capability + mint signal,
- * replacing the earlier `:nut` flag. A receiver advertises a *standing* request
- * (no amount, no transport, reusable) carrying:
- *  - the **mints it accepts** — so a sender never locks a token to a mint the
- *    receiver can't redeem at (the numo mint-advertisement pattern), and
- *  - a **P2PK lock** (`nut10`) to its identity key.
- *
- * coco doesn't build standing requests, so we build/parse via `@cashu/cashu-ts`
- * directly. `creqA…` is URL-safe base64 (no `:`), so it rides inside the
- * `[FAVORITED]:<npub>:<creq>` favorite. It exceeds 255 bytes — that's why the
- * favorite needs the extended private-message length.
- */
-
-/**
- * Cap the advertised mint list so the eager-favorite stays a sane size. The
- * list is cut in the order given: rank it with `rankAdvertisedMints` first.
- */
-const MAX_ADVERTISED_MINTS = 5;
 
 /**
  * Order the mints we accept so the cap keeps the ones a sender can most likely
@@ -33,8 +11,7 @@ const MAX_ADVERTISED_MINTS = 5;
  * sorted first, and a wallet with more than five could end up offering none
  * that its sender had money in.
  *
- * Ranks on "funded", not on the amount, so the list (and the favorite that
- * carries it) only changes when a mint gains or loses its whole balance.
+ * Ranks on "funded", not on the amount, so the advertised capability only changes when a mint gains or loses its whole balance.
  */
 export function rankAdvertisedMints(params: {
   mints: readonly string[];
@@ -47,55 +24,6 @@ export function rankAdvertisedMints(params: {
   return Array.from(new Set(params.mints.filter(Boolean))).sort(
     (a, b) => rank(a) - rank(b) || (a < b ? -1 : a > b ? 1 : 0)
   );
-}
-
-/**
- * Build our standing `creq` from the mints we accept + our P2PK key (branded —
- * produced by `cashuP2pkPubkeyFromNostrHex`, the one owner of the `02`+x-only
- * lift). Returns null if we have no mint or the key is malformed (→ caller
- * falls back to no creq, i.e. not advertised). The shape re-check here accepts
- * the general NUT-11 `02`/`03` compressed form as defense in depth.
- */
-export function buildStandingCreq(params: {
-  mints: string[];
-  pubkey33: CashuP2pkPubkey;
-}): string | null {
-  const mints = Array.from(new Set(params.mints.filter(Boolean))).slice(0, MAX_ADVERTISED_MINTS);
-  const base = {
-    inputMintCount: params.mints.length,
-    advertisedMintCount: mints.length,
-    pubkeyLength: params.pubkey33.length,
-    pubkeyValid: CASHU_P2PK_PUBKEY_RE.test(params.pubkey33),
-  };
-  if (mints.length === 0) {
-    cashuLog.info('cashu.creq.build.skipped', { ...base, reason: 'no-mints' });
-    return null;
-  }
-  if (!CASHU_P2PK_PUBKEY_RE.test(params.pubkey33)) {
-    cashuLog.warn('cashu.creq.build.skipped', { ...base, reason: 'invalid-p2pk-pubkey' });
-    return null;
-  }
-  try {
-    const request = new PaymentRequest(
-      undefined, // transports — delivery is the BLE DM, not Nostr/HTTP
-      undefined, // id
-      undefined, // amount — standing/reusable
-      'sat',
-      mints,
-      undefined, // description
-      false, // singleUse
-      { kind: 'P2PK', data: params.pubkey33, tags: [] } satisfies NUT10Option
-    );
-    const creq = request.toEncodedRequest();
-    cashuLog.info('cashu.creq.build.done', {
-      ...base,
-      creqLength: creq.length,
-    });
-    return creq;
-  } catch {
-    cashuLog.warn('cashu.creq.build.failed', base);
-    return null;
-  }
 }
 
 interface ParsedCreq {
@@ -136,8 +64,8 @@ export function parseCreq(creq: string): ParsedCreq | null {
 }
 
 /**
- * A peer is cashu-capable/lockable iff its favorite carried a valid `creq`
- * whose `nut10` P2PK key matches its announced identity (`02`+nostrPubkeyHex).
+ * Check request/key compatibility after the wallet directory authenticates
+ * identity. This parser alone does not authenticate a peer.
  * Returns the accepted mints when lockable, else null.
  */
 export function lockableMintsFromCreq(
