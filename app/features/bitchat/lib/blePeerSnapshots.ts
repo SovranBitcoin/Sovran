@@ -1,10 +1,19 @@
 import type { BLEPeer } from 'bitchat-module';
 
 function peerKey(peer: BLEPeer): string {
-  // `nostrPubkeyHex` participates so the moment a peer hands us its Nostr
-  // identity (favorites us back) the snapshot is not swallowed as equivalent —
-  // that transition flips the peer from bearer to lockable.
-  return `${peer.peerID}:${peer.nickname}:${peer.isConnected ? 1 : 0}:${peer.hasDirectLink ? 1 : 0}:${peer.nostrPubkeyHex ?? ''}`;
+  // Freshness and capability are observable state, even without a link change.
+  return JSON.stringify([
+    peer.peerID,
+    peer.nickname,
+    peer.isConnected,
+    peer.hasDirectLink,
+    peer.lastSeen,
+    peer.nostrPubkeyHex,
+    peer.creq,
+    peer.noisePublicKeyHex,
+    peer.authenticatedNoiseFingerprint,
+    peer.walletCapabilityExpiresAt,
+  ]);
 }
 
 export function areBLEPeerSnapshotsEquivalent(

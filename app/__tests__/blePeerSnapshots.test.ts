@@ -18,9 +18,9 @@ function peer(peerID: string, overrides: Partial<BLEPeer> = {}): BLEPeer {
 }
 
 describe('BLE peer snapshot equality', () => {
-  it('ignores lastSeen-only churn and order changes', () => {
+  it('ignores order changes', () => {
     const current = [peer('a', { lastSeen: 1 }), peer('b', { lastSeen: 2 })];
-    const next = [peer('b', { lastSeen: 99 }), peer('a', { lastSeen: 101 })];
+    const next = [peer('b', { lastSeen: 2 }), peer('a', { lastSeen: 1 })];
 
     expect(areBLEPeerSnapshotsEquivalent(current, next)).toBe(true);
   });
@@ -49,8 +49,16 @@ describe('BLE peer snapshot equality', () => {
       areBLEPeerSnapshotsEquivalent([identified], [{ ...identified, nostrPubkeyHex: undefined }])
     ).toBe(false);
     expect(areBLEPeerSnapshotsEquivalent([identified], [{ ...identified, lastSeen: 99 }])).toBe(
-      true
+      false
     );
+  });
+
+  it('retains fresh relayed sightings and changed payment capabilities', () => {
+    const current = peer('a', { hasDirectLink: false, lastSeen: 0 });
+    const next = { ...current, lastSeen: 200_000, creq: 'new-capability' };
+    const retained = areBLEPeerSnapshotsEquivalent([current], [next]) ? current : next;
+    expect(filterFreshBLEPeers([retained], 200_000)).toEqual([next]);
+    expect(areBLEPeerSnapshotsEquivalent([next], [{ ...next, creq: undefined }])).toBe(false);
   });
 });
 
