@@ -1,3 +1,4 @@
+import { create } from 'zustand';
 import { useState, useCallback, useMemo } from 'react';
 import {
   getBLEPeers,
@@ -22,6 +23,9 @@ import { amountToNumber } from '@/shared/lib/cashu/amount';
 import { buildStandingCreq, rankAdvertisedMints } from '@/shared/lib/nutCreq';
 import { useIsTestnutMint } from '@/shared/stores/global/mintTestnutStore';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
+
+/** Authenticated account directory; populated by the account discovery owner. */
+export const useBLEPeerDirectory = create<{ peers: BLEPeer[] }>(() => ({ peers: [] }));
 
 interface UseBLEPeersResult {
   peers: BLEPeer[];

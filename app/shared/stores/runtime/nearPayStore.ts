@@ -22,6 +22,7 @@ interface NearPayRecipient {
   lastSeen: number;
   /** Capability proof: the peer advertised a valid creq favorite before send. */
   creq?: string;
+  nostrPubkeyHex?: string;
   delivery: NearPayDelivery;
 }
 
