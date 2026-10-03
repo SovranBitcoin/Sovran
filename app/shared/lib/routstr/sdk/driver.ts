@@ -1,5 +1,5 @@
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
-import { createSecureVault } from '../secureVault';
+import { createSecureVault } from '../../persist/secureVault';
 
 /**
  * Key-value storage for `@routstr/sdk`, on the app's profile-scoped backing.

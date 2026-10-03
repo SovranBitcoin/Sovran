@@ -1,6 +1,6 @@
 import { createRoutstrPersistence } from '@/shared/lib/routstr/securePersistence';
 import { createSdkStorageDriver } from '@/shared/lib/routstr/sdk/driver';
-import { createSecureVault } from '@/shared/lib/routstr/secureVault';
+import { createSecureVault } from '@/shared/lib/persist/secureVault';
 import { clearAllSecureData } from '@/shared/lib/nostr/secureStorage';
 import * as SecureStore from 'expo-secure-store';
 

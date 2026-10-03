@@ -12,7 +12,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { nostrLog, redactError } from '../logger';
 import { useSecureStoreState } from '@/shared/stores/runtime/secureStoreState';
 import { maybeExportSeedForE2E } from './e2eSeedExport';
-import { SecureVaultManifest, secureVaultChunkKey } from '../routstr/secureVaultManifest';
+import { SecureVaultManifest, secureVaultChunkKey } from '../persist/secureVaultManifest';
 
 // Keys for secure storage
 const STORAGE_KEYS = {

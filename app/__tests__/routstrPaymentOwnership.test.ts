@@ -29,7 +29,7 @@ jest.mock('@/shared/stores/global/profileStore', () => ({
     }),
   },
 }));
-jest.mock('@/shared/lib/routstr/secureVault', () => ({
+jest.mock('@/shared/lib/persist/secureVault', () => ({
   createSecureVault: (owner: string) => ({
     read: async () => null,
     write: async (value: string) => {

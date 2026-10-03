@@ -5,7 +5,7 @@ import {
   captureProfileStorageOwner,
   createProfileScopedStorage,
 } from '@/shared/lib/cashu/profileScopedStorage';
-import { createSecureVault } from './secureVault';
+import { createSecureVault } from '../persist/secureVault';
 
 const Envelope = z.looseObject({ state: z.record(z.string(), z.unknown()) });
 const Secrets = z.object({

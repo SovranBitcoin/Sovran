@@ -12,6 +12,7 @@ const digest = (value: string) => bytesToHex(sha256(utf8ToBytes(value)));
 /** Two slots keep the old generation readable until the new manifest is verified. */
 export function createSecureVault(ownerPubkey: string, name: string) {
   if (!isNostrPubkeyHex(ownerPubkey)) throw new Error('A profile is required for payment storage');
+  // Keep the indexed storage namespace so existing vaults and Delete All remain compatible.
   const prefix = `routstr_v1_${ownerPubkey}_${digest(name)}`;
   const manifestKey = `${prefix}_manifest`;
   const chunkKey = (generation: number, index: number) =>

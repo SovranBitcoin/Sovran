@@ -75,7 +75,7 @@ jest.mock('@/shared/lib/routstr/securePersistence', () => ({
     removeItem: async () => {},
   }),
 }));
-jest.mock('@/shared/lib/routstr/secureVault', () => ({
+jest.mock('@/shared/lib/persist/secureVault', () => ({
   createSecureVault: () => ({ read: async () => null, write: async () => {} }),
 }));
 jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({
