@@ -47,10 +47,14 @@ function notify(key: string): void {
 }
 
 /** Shared, bounded reads for visible contacts and the nearby directory's warm-up. */
-export function checkNip05Identity(address: string, pubkey: string): Promise<Nip05Check> {
+export function checkNip05Identity(
+  address: string,
+  pubkey: string,
+  { refresh = false }: { refresh?: boolean } = {}
+): Promise<Nip05Check> {
   const key = keyFor(address, pubkey);
   const cached = cachedNip05Check(address, pubkey);
-  if (cached) return Promise.resolve(cached);
+  if (cached && !refresh) return Promise.resolve(cached);
   const existing = pending.get(key);
   if (existing) return existing;
   if (pending.size >= 64) {

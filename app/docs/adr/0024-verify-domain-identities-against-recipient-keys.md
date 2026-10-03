@@ -28,7 +28,9 @@ than serializing a trusted badge into route parameters. Known names and key-base
 avatars remain visible while optional enrichment runs.
 Domain endpoints learn that their identifiers were looked up; this is not
 anonymous discovery. Offline or suspended applications cannot guarantee a warm
-or current result. Provider-supplied validity flags never establish trust.
+or current result. Foreground nearby discovery renews successful checks before
+expiry and warms again on resume; an in-flight renewal never extends the old
+assertion's expiry. Provider-supplied validity flags never establish trust.
 
 Saving a changed, nonempty own NIP-05 claim requires a fresh check at the
 publishing boundary before signing. Clearing a claim remains possible. Unrelated

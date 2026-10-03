@@ -1,5 +1,4 @@
-import { checkNip05Identity } from '@/shared/lib/nostr/profile/nip05Verification';
-import { useSettingsStore } from '@/shared/stores/global/settingsStore';
+import { useWarmNip05Profiles } from '@/shared/hooks/useWarmNip05Profiles';
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { NEARBY_PAYMENT_PREFIX, nearbyPayments } from '../lib/nearbyPayments';
 import { useEffect, useMemo, useRef } from 'react';
@@ -114,15 +113,7 @@ export function useNearbyDiscovery(): void {
     [peers]
   );
   const { metadata: nearbyMetadata } = useNostrProfileMetadataMany(pubkeys);
-  const mockMode = useSettingsStore((state) => state.mockMode);
-  useEffect(() => {
-    if (mockMode || AppState.currentState !== 'active') return;
-    // Warm only authenticated nearby keys; the verifier caps concurrent reads.
-    for (const pubkey of pubkeys) {
-      const address = nearbyMetadata.get(pubkey)?.nip05;
-      if (address) void checkNip05Identity(address, pubkey);
-    }
-  }, [mockMode, nearbyMetadata, pubkeys]);
+  useWarmNip05Profiles(nearbyMetadata);
 
   useEffect(() => {
     if (!keys || !identityMaterial || !CocoManager.isInitialized()) return;
