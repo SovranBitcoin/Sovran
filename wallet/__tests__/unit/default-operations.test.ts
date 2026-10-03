@@ -19,6 +19,7 @@ import {
   PaymentRequest,
   PaymentRequestTransportType,
   decodePaymentRequest,
+  getEncodedToken,
 } from "@cashu/cashu-ts";
 import type { Manager } from "@cashu/coco-core";
 import { createDefaultOperations } from "../../src/operations/defaultOperations";
@@ -1389,6 +1390,21 @@ describe("executeSend — reservation rescue (BTC-07)", () => {
     expect(mockManager.ops.send.cancel).toHaveBeenCalledWith("prepared-send-1");
   });
 
+  it("does not create a token when durable delivery binding fails", async () => {
+    const mockManager = createMockManager();
+    const ops = createDefaultOperations({
+      getManager: () => mockManager as unknown as Manager,
+      captureSendDelivery: () => async () => {
+        throw new Error("storage unavailable");
+      },
+    });
+    await expect(ops.executeSend!(MINT1, 100)).rejects.toThrow(
+      "storage unavailable",
+    );
+    expect(mockManager.ops.send.execute).not.toHaveBeenCalled();
+    expect(mockManager.ops.send.cancel).toHaveBeenCalledWith("prepared-send-1");
+  });
+
   it("does not cancel when execute succeeds", async () => {
     const mockManager = createMockManager();
 
@@ -1630,5 +1646,51 @@ describe("buildMintListItems testnut split", () => {
     const test = byUrl(await build({ scope: "onchain" }, true));
     expect(test[TESTNUT].status).toBe("available");
     expect(test[MINT1]).toMatchObject(outside);
+  });
+});
+
+describe("legacy nearby receive history ownership", () => {
+  it("returns the canonical child receive id without scanning concurrent history", async () => {
+    const token = getEncodedToken({
+      mint: MINT1,
+      unit: "sat",
+      proofs: [
+        {
+          id: "00".repeat(8),
+          amount: Amount.from(1),
+          C: "02" + "ab".repeat(32),
+          secret: "synthetic",
+        },
+      ],
+    });
+    const manager = createMockManager({
+      ops: {
+        receive: {
+          prepare: vi.fn(async () => ({ id: "receive-a" })),
+          execute: vi.fn(async () => ({ id: "receive-a" })),
+        },
+      },
+      history: {
+        getPaginatedHistory: vi.fn(() => {
+          throw new Error("broad history scan forbidden");
+        }),
+        getHistoryEntryById: vi.fn(async () => ({
+          id: "receive:receive-a",
+          type: "receive",
+          amount: 1,
+        })),
+      },
+    });
+    const operations = createDefaultOperations({
+      getManager: () => manager as unknown as Manager,
+    });
+    const result = await operations.executeAutoRedeem!(token, MINT1);
+    expect(result.historyEntryId).toBe("receive:receive-a");
+    expect(JSON.parse(result.historyEntry!)).toEqual({
+      id: "receive:receive-a",
+      type: "receive",
+      amount: 1,
+    });
+    expect(manager.history.getPaginatedHistory).not.toHaveBeenCalled();
   });
 });

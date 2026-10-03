@@ -1147,9 +1147,8 @@ export interface MachineOperations {
 
   /**
    * Background mesh auto-redeem: receive a token and resolve the REAL
-   * persisted receive-history id (set-difference polling over history —
-   * coco's flush races the receive). Returns null ids when the linkage
-   * couldn't be resolved in time; the receive itself still succeeded.
+   * persisted receive-history id, derived from its receive operation.
+   * The history projection may still be flushing when receive completes.
    * Wire this into `createMeshRedeemOrchestrator`.
    */
   executeAutoRedeem?: (

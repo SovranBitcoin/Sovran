@@ -18,17 +18,12 @@
 //    public-broadcast bearer path and hostile senders can.)
 // ---------------------------------------------------------------------------
 
-import type { Manager } from '@cashu/coco-core';
-import { NetworkError, HttpResponseError } from '@cashu/coco-core';
-import { logger, mintUrlFields } from '../logger';
+import type { Manager } from "@cashu/coco-core";
+import { NetworkError, HttpResponseError } from "@cashu/coco-core";
+import { logger, mintUrlFields } from "../logger";
 
 export type MeshRedeemStatus =
-  | 'pending'
-  | 'redeeming'
-  | 'redeemed'
-  | 'spent'
-  | 'untrusted-mint'
-  | 'failed';
+  "pending" | "redeeming" | "redeemed" | "spent" | "untrusted-mint" | "failed";
 
 export interface MeshRedeemEntry {
   /** Full encoded cashu token. */
@@ -62,18 +57,20 @@ export interface MeshRedeemQueuePort {
   scheduleRetry(tokenHash: string, error: string): void;
 }
 
-export type MeshRedeemErrorKind = 'spent' | 'network' | 'retryable' | 'fatal';
+export type MeshRedeemErrorKind = "spent" | "network" | "retryable" | "fatal";
 
 export function classifyMeshRedeemError(err: unknown): MeshRedeemErrorKind {
   const message = err instanceof Error ? err.message : String(err);
-  if (/already.{0,8}spent|token.{0,8}spent|11001/i.test(message)) return 'spent';
-  if (err instanceof NetworkError) return 'network';
-  if (err instanceof HttpResponseError && err.status >= 500) return 'network';
-  if (err instanceof Error && err.name === 'MintFetchError') return 'network';
-  if (/network|timeout|timed out|fetch failed|abort/i.test(message)) return 'network';
+  if (/already.{0,8}spent|token.{0,8}spent|11001/i.test(message))
+    return "spent";
+  if (err instanceof NetworkError) return "network";
+  if (err instanceof HttpResponseError && err.status >= 500) return "network";
+  if (err instanceof Error && err.name === "MintFetchError") return "network";
+  if (/network|timeout|timed out|fetch failed|abort/i.test(message))
+    return "network";
   // Manager/keyring races (e.g. key pair not registered yet) — retry later.
-  if (/key pair not found/i.test(message)) return 'retryable';
-  return 'fatal';
+  if (/key pair not found/i.test(message)) return "retryable";
+  return "fatal";
 }
 
 export interface MeshRedeemOrchestratorConfig {
@@ -86,7 +83,8 @@ export interface MeshRedeemOrchestratorConfig {
    */
   executeAutoRedeem: (
     tokenString: string,
-    mintUrl: string
+    mintUrl: string,
+    manager: Manager,
   ) => Promise<{ historyEntryId: string | null }>;
   /** NUT-13 restore settled? Defaults to true (no restore concept). */
   isRestoreSettled?: () => boolean;
@@ -97,14 +95,14 @@ export interface MeshRedeemOrchestratorConfig {
   onRedeemed?: (
     tokenHash: string,
     entry: MeshRedeemEntry,
-    historyEntryId: string | null
+    historyEntryId: string | null,
   ) => void;
   /** Terminal or retry-scheduled failure (flip the toast here). */
   onFailed?: (
     tokenHash: string,
     entry: MeshRedeemEntry,
     kind: MeshRedeemErrorKind,
-    message: string
+    message: string,
   ) => void;
 }
 
@@ -114,7 +112,7 @@ export interface MeshRedeemOrchestrator {
 }
 
 export function createMeshRedeemOrchestrator(
-  config: MeshRedeemOrchestratorConfig
+  config: MeshRedeemOrchestratorConfig,
 ): MeshRedeemOrchestrator {
   const now = config.now ?? Date.now;
   let inFlight = false;
@@ -124,7 +122,7 @@ export function createMeshRedeemOrchestrator(
     const manager = config.getManager();
     if (!manager) return;
     if (config.isRestoreSettled && !config.isRestoreSettled()) {
-      logger.debug('transport.redeem.waitingForRestore');
+      logger.debug("transport.redeem.waitingForRestore");
       return;
     }
 
@@ -138,12 +136,12 @@ export function createMeshRedeemOrchestrator(
       // actually completed re-classifies as `spent`.
       const due = Object.entries(config.queue.entries()).filter(
         ([, entry]) =>
-          (entry.status === 'pending' || entry.status === 'redeeming') &&
-          entry.nextAttemptAt <= cutoff
+          (entry.status === "pending" || entry.status === "redeeming") &&
+          entry.nextAttemptAt <= cutoff,
       );
       if (due.length === 0) return;
 
-      logger.info('transport.redeem.drainStart', { dueCount: due.length });
+      logger.info("transport.redeem.drainStart", { dueCount: due.length });
 
       for (const [tokenHash, entry] of due) {
         // A profile switch swaps the manager (and the profile-scoped queue
@@ -151,57 +149,65 @@ export function createMeshRedeemOrchestrator(
         // profile's wallet would bleed funds across profiles — abort the
         // drain the moment the manager identity changes.
         if (config.getManager() !== manager) {
-          logger.warn('transport.redeem.managerChanged');
+          logger.warn("transport.redeem.managerChanged");
           return;
         }
         let trusted: boolean;
         try {
           trusted = await manager.mint.isTrustedMint(entry.mintUrl);
         } catch (err) {
+          if (config.getManager() !== manager) return;
           config.queue.scheduleRetry(
             tokenHash,
-            err instanceof Error ? err.message : String(err)
+            err instanceof Error ? err.message : String(err),
           );
           continue;
         }
+        if (config.getManager() !== manager) return;
         if (!trusted) {
           // Never auto-trust a mint pushed at us over the mesh. The entry
           // stays visible (untrusted-mint) for manual review.
-          config.queue.markStatus(tokenHash, 'untrusted-mint');
-          logger.warn('transport.redeem.untrustedMint', {
+          config.queue.markStatus(tokenHash, "untrusted-mint");
+          logger.warn("transport.redeem.untrustedMint", {
             tokenHash: tokenHash.slice(0, 12),
             ...mintUrlFields(entry.mintUrl),
           });
           continue;
         }
 
-        config.queue.markStatus(tokenHash, 'redeeming');
+        config.queue.markStatus(tokenHash, "redeeming");
         config.onRedeeming?.(tokenHash, entry);
         try {
-          const { historyEntryId } = await config.executeAutoRedeem(entry.token, entry.mintUrl);
-          config.queue.markStatus(tokenHash, 'redeemed');
-          logger.info('transport.redeem.success', {
+          const { historyEntryId } = await config.executeAutoRedeem(
+            entry.token,
+            entry.mintUrl,
+            manager,
+          );
+          if (config.getManager() !== manager) return;
+          config.queue.markStatus(tokenHash, "redeemed");
+          logger.info("transport.redeem.success", {
             tokenHash: tokenHash.slice(0, 12),
             amount: entry.amount,
             ...mintUrlFields(entry.mintUrl),
           });
           config.onRedeemed?.(tokenHash, entry, historyEntryId);
         } catch (err) {
+          if (config.getManager() !== manager) return;
           const kind = classifyMeshRedeemError(err);
           const message = err instanceof Error ? err.message : String(err);
-          logger.warn('transport.redeem.attemptFailed', {
+          logger.warn("transport.redeem.attemptFailed", {
             tokenHash: tokenHash.slice(0, 12),
             kind,
             error: message,
           });
-          if (kind === 'spent') {
+          if (kind === "spent") {
             // Duplicate delivery race (an equivalent token already redeemed)
             // or the sender reclaimed. Nothing actionable.
-            config.queue.markStatus(tokenHash, 'spent', message);
-          } else if (kind === 'network' || kind === 'retryable') {
+            config.queue.markStatus(tokenHash, "spent", message);
+          } else if (kind === "network" || kind === "retryable") {
             config.queue.scheduleRetry(tokenHash, message);
           } else {
-            config.queue.markStatus(tokenHash, 'failed', message);
+            config.queue.markStatus(tokenHash, "failed", message);
           }
           config.onFailed?.(tokenHash, entry, kind, message);
         }
