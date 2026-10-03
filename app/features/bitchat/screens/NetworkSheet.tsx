@@ -1,3 +1,5 @@
+import { useVisualActivityEffect } from '@/shared/hooks/useVisualActivityEffect';
+import { acquirePublicBLEMesh } from 'bitchat-module';
 import { Screen } from '@/shared/ui/composed/Screen';
 /**
  * @fileoverview Bluetooth mesh network / peer list
@@ -86,6 +88,7 @@ export default function NetworkSheet() {
   ] as const);
 
   const { peers, connectedCount } = useBLEPeers();
+  useVisualActivityEffect(acquirePublicBLEMesh);
   const bluetooth = useBluetoothState();
   const bluetoothBlocked = bluetooth.status !== 'ready' && bluetooth.status !== 'unknown';
 

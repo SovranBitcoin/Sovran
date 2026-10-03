@@ -35,6 +35,7 @@
     // their callers at all.
     "moduleSuffixes": [".ios", ""],
     "paths": {
+      "bitchat-module": ["./modules/bitchat-module/index.ts"],
       // Match Metro: workspace source, including worktrees with shared node_modules.
       "nostr": ["../nostr/src/index.ts"],
       "nostr/map": ["../nostr/src/map/index.ts"],

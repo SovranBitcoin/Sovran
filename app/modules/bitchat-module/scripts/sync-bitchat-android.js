@@ -95,6 +95,77 @@ const INCLUDE_ASSETS = ['nostr_relays.csv'];
 // cheap and uniform). A missed anchor means upstream changed shape: fail loudly.
 const PATCHES = [
   {
+    file: 'crypto/EncryptionService.kt',
+    name: 'AUTHENTICATED_SESSION_FINGERPRINT',
+    anchor: /    fun getPeerFingerprint\(peerID: String\): String\? \{/,
+    replacement: `    fun getAuthenticatedPeerFingerprint(peerID: String): String? {
+        if (!noiseService.hasEstablishedSession(peerID)) return null
+        val key = noiseService.getPeerPublicKeyData(peerID) ?: return null
+        return java.security.MessageDigest.getInstance("SHA-256").digest(key).joinToString("") { "%02x".format(it) }
+    }
+
+    fun getPeerFingerprint(peerID: String): String? {`,
+  },
+  {
+    file: 'mesh/BluetoothMeshService.kt',
+    name: 'DISCOVERY_DOMAIN',
+    anchor: /class BluetoothMeshService\(private val context: Context\)/,
+    replacement:
+      'class BluetoothMeshService(private val context: Context, private val discoveryServiceUUID: java.util.UUID = com.bitchat.android.util.AppConstants.Mesh.Gatt.SERVICE_UUID)',
+  },
+  {
+    file: 'mesh/BluetoothMeshService.kt',
+    name: 'DISCOVERY_DOMAIN_CONNECTION',
+    anchor: /BluetoothConnectionManager\(context, myPeerID, fragmentManager\)/,
+    replacement:
+      'BluetoothConnectionManager(context, myPeerID, fragmentManager, discoveryServiceUUID)',
+  },
+  {
+    file: 'mesh/BluetoothConnectionManager.kt',
+    name: 'DISCOVERY_DOMAIN_ARGUMENT',
+    anchor: /private val fragmentManager: FragmentManager\? = null/,
+    replacement:
+      'private val fragmentManager: FragmentManager? = null,\n    private val discoveryServiceUUID: java.util.UUID = com.bitchat.android.util.AppConstants.Mesh.Gatt.SERVICE_UUID',
+  },
+  {
+    file: 'mesh/BluetoothConnectionManager.kt',
+    name: 'DISCOVERY_DOMAIN_SERVER',
+    anchor: /componentDelegate, myPeerID\n/,
+    replacement: 'componentDelegate, myPeerID, discoveryServiceUUID\n',
+  },
+  {
+    file: 'mesh/BluetoothConnectionManager.kt',
+    name: 'DISCOVERY_DOMAIN_CLIENT',
+    anchor: /componentDelegate\n/,
+    replacement: 'componentDelegate, discoveryServiceUUID\n',
+  },
+  {
+    file: 'mesh/BluetoothGattClientManager.kt',
+    name: 'DISCOVERY_DOMAIN_USAGE',
+    anchor: /AppConstants\.Mesh\.Gatt\.SERVICE_UUID/g,
+    replacement: 'discoveryServiceUUID',
+  },
+  {
+    file: 'mesh/BluetoothGattClientManager.kt',
+    name: 'DISCOVERY_DOMAIN_ARGUMENT',
+    anchor: /private val delegate: BluetoothConnectionManagerDelegate\?/,
+    replacement:
+      'private val delegate: BluetoothConnectionManagerDelegate?,\n    private val discoveryServiceUUID: java.util.UUID = AppConstants.Mesh.Gatt.SERVICE_UUID',
+  },
+  {
+    file: 'mesh/BluetoothGattServerManager.kt',
+    name: 'DISCOVERY_DOMAIN_USAGE',
+    anchor: /AppConstants\.Mesh\.Gatt\.SERVICE_UUID/g,
+    replacement: 'discoveryServiceUUID',
+  },
+  {
+    file: 'mesh/BluetoothGattServerManager.kt',
+    name: 'DISCOVERY_DOMAIN_ARGUMENT',
+    anchor: /private val myPeerID: String/,
+    replacement:
+      'private val myPeerID: String,\n    private val discoveryServiceUUID: java.util.UUID = AppConstants.Mesh.Gatt.SERVICE_UUID',
+  },
+  {
     file: 'mesh/PowerManager.kt',
     name: 'CHARGING_BALANCED_DISCOVERY',
     anchor: /isCharging && !isAppInBackground -> PowerMode\.PERFORMANCE/,
