@@ -1,18 +1,6 @@
-/**
- * @fileoverview App-wide bitchat BLE DM listener lifecycle.
- *
- * Keeps inbound DM and delivery-status listeners mounted for the lifetime of
- * the account scope without starting the BLE mesh at app boot. Starting BLE
- * immediately announces to nearby bitchat clients, so discovery is now owned
- * by explicit peer-list/chat surfaces instead of ordinary app launch.
- *
- * Why a provider instead of per-screen start/stop:
- *   - Inbound DMs and delivery-status events should be captured once BLE has
- *     been explicitly started, even if the DM screen is closed.
- *   - `useBitChat(transport='ble')` does not call `stopBLE()` on cleanup,
- *     because other explicit BLE consumers may still be using the mesh.
- */
-
+import { NEARBY_PAYMENT_PREFIX } from '@/features/nearPay/lib/nearbyPayments';
+import { useNearbyDiscovery } from '@/features/nearPay/hooks/useNearbyDiscovery';
+import { CAPABILITY_PREFIX } from '@/features/nearPay/lib/nearbyCapability';
 import React, { useEffect } from 'react';
 import { addBLEDeliveryStatusListener, addBLEPrivateMessageListener } from 'bitchat-module';
 import { useBitchatDmMessagesStore } from '@/features/bitchat/stores/bitchatDmMessages';
@@ -39,6 +27,7 @@ initLog('Module', 'BitchatBLEProvider loaded');
  */
 export function BitchatBLEProvider({ children }: { children: React.ReactNode }) {
   useInitMount('BitchatBLEProvider');
+  useNearbyDiscovery();
 
   // Nut Drop auto-redeem: classifies every inbound private DM against the
   // active profile's P2PK lock key and redeems locked-to-me OR bearer tokens
@@ -64,7 +53,11 @@ export function BitchatBLEProvider({ children }: { children: React.ReactNode }) 
     const msgSub = addBLEPrivateMessageListener((event) => {
       // Nut Drop token DMs are handled by useNutDropAutoRedeem; keep them out
       // of the chat thread so a payment never shows up as a raw-token bubble.
-      if (isPureTokenDm(event.content)) {
+      if (
+        event.content.startsWith(CAPABILITY_PREFIX) ||
+        event.content.startsWith(NEARBY_PAYMENT_PREFIX) ||
+        isPureTokenDm(event.content)
+      ) {
         bitchatLog.info('bitchat.provider.dm_token_suppressed', {
           peerID: event.peerID,
           contentLen: event.content.length,
