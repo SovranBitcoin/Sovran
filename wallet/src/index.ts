@@ -578,7 +578,7 @@ export {
 } from "./lnurl";
 
 // Recipient identity resolution (Lightning Address → Nostr hex pubkey)
-export { fetchNip05Pubkey } from "./nip05";
+export { fetchNip05Pubkey, parseNip05Identifier, verifyNip05, type Nip05Verification } from "./nip05";
 export { normalizeNostrPubkey, resolveRecipientPubkey } from "./recipient";
 
 // Cancellable-fetch primitives (timeout + AbortSignal). Hermes lacks
