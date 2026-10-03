@@ -118,6 +118,29 @@ describe("NIP-05 recipient resolution", () => {
     ).resolves.toMatchObject({ status: "error", reason: "network" });
   });
 
+  it("cancels an oversized streaming response before consuming the rest", async () => {
+    let cancelled = false;
+    let chunks = 0;
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        chunks += 1;
+        controller.enqueue(new Uint8Array(16_384));
+      },
+      cancel() {
+        cancelled = true;
+      },
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(stream)),
+    );
+    await expect(
+      verifyNip05("alice@example.com", PUBKEY),
+    ).resolves.toMatchObject({ status: "error", reason: "response" });
+    expect(cancelled).toBe(true);
+    expect(chunks).toBeLessThan(6);
+  });
+
   it("rejects oversized response text", async () => {
     vi.stubGlobal(
       "fetch",

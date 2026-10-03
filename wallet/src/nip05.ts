@@ -42,6 +42,33 @@ type Lookup =
   | { status: "found"; pubkey: string; identifier: string }
   | Extract<Nip05Verification, { status: "error" }>;
 
+/** Stream-cap the response where supported (including Expo's native fetch). */
+async function readIdentityResponse(
+  response: Response,
+): Promise<string | null> {
+  const reader = response.body?.getReader();
+  if (!reader) {
+    const text = await response.text();
+    return text.length <= MAX_RESPONSE_LENGTH ? text : null;
+  }
+  const decoder = new TextDecoder();
+  let length = 0;
+  let text = "";
+  try {
+    for (;;) {
+      const chunk = await reader.read();
+      if (chunk.done) return text + decoder.decode();
+      length += chunk.value.byteLength;
+      if (length > MAX_RESPONSE_LENGTH) return null;
+      text += decoder.decode(chunk.value, { stream: true });
+    }
+  } finally {
+    // Cancellation is best effort; the enclosing request also aborts on exit.
+    void reader.cancel().catch(() => undefined);
+    reader.releaseLock();
+  }
+}
+
 async function lookupNip05(
   address: string,
   controls: RequestControls,
@@ -76,10 +103,8 @@ async function lookupNip05(
         const length = Number(response.headers.get("content-length"));
         if (length > MAX_RESPONSE_LENGTH)
           return { status: "error", reason: "response" };
-        // RN does not consistently expose a streaming body. Bound accepted text and
-        // the entire read deadline, including servers that stall after headers.
-        const text = await response.text();
-        if (text.length > MAX_RESPONSE_LENGTH || controller.signal.aborted)
+        const text = await readIdentityResponse(response);
+        if (text === null || controller.signal.aborted)
           return { status: "error", reason: "response" };
         let raw: unknown;
         try {
