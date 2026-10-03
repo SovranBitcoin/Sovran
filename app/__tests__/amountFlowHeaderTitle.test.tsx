@@ -18,10 +18,14 @@ import { AmountFlowContent } from '@/features/send/screens/AmountFlowScreen';
 const capturedOptions: Record<string, unknown>[] = [];
 let mockEntry: Record<string, unknown> = { destination: 'mintQuote' };
 let mockMintUrl: string | null = null;
+let mockMetadata: { nip05: string } | null = null;
+let mockAmountProps: { recipientProfile?: { nip05: string | null } } = {};
 
 beforeEach(() => {
   mockEntry = { destination: 'mintQuote' };
   mockMintUrl = null;
+  mockMetadata = null;
+  mockAmountProps = {};
 });
 
 jest.mock('expo-router', () => ({
@@ -32,16 +36,25 @@ jest.mock('expo-router', () => ({
     },
   },
 }));
-jest.mock('@/features/send/screens/AmountSelector', () => ({ AmountSelector: () => null }));
+jest.mock('@/features/send/screens/AmountSelector', () => ({
+  AmountSelector: (props: typeof mockAmountProps) => {
+    mockAmountProps = props;
+    return null;
+  },
+}));
 jest.mock('@/features/send/components/AmountSelectedMintProbe', () => ({
   AmountSelectedMintProbe: () => null,
 }));
 jest.mock('@/shared/lib/popup/E2EActionMenuProbe', () => ({ E2EActionMenuProbe: () => null }));
 jest.mock('@/shared/ui/composed/ScreenStates', () => ({ ScreenErrorState: () => null }));
 jest.mock('@/shared/ui/composed/ScreenHeaderAction', () => ({ ScreenHeaderAction: () => null }));
-jest.mock('@/shared/hooks/useThemeColor', () => ({ useThemeColor: () => 'white' }));
+jest.mock('@/shared/hooks/useThemeColor', () => ({
+  useThemeColor: () =>
+    jest.requireActual<typeof import('@/shared/lib/themeEngine')>('@/shared/lib/themeEngine')
+      .staticColor['shade-0'],
+}));
 jest.mock('@/shared/hooks/useNostrProfileMetadata', () => ({
-  useNostrProfileMetadata: () => ({ metadata: null }),
+  useNostrProfileMetadata: () => ({ metadata: mockMetadata }),
 }));
 jest.mock('@/shared/lib/identity', () => ({ resolveIdentityName: () => null }));
 jest.mock('@/shared/providers/WalletContextProvider', () => ({
@@ -190,4 +203,22 @@ test('inline, the status is handed to the host that owns the bar, then taken bac
     renderer!.unmount();
   });
   expect(onHeaderStatus).toHaveBeenLastCalledWith(null);
+});
+
+test.each([
+  ['selected@example.com', 'selected@example.com'],
+  [null, 'changed@example.com'],
+])('retains a known claim or enriches a missing claim %s for the same key', (nip05, expected) => {
+  mockEntry = {
+    destination: 'sendEcash',
+    recipientPubkey: 'ab'.repeat(32),
+    recipientProfile: { displayName: 'Alice', avatarUrl: null, nip05 },
+  };
+  mockMetadata = { nip05: 'changed@example.com' };
+  let renderer!: TestRenderer.ReactTestRenderer;
+  act(() => {
+    renderer = TestRenderer.create(<AmountFlowContent headerMode="native" />);
+  });
+  expect(mockAmountProps.recipientProfile?.nip05).toBe(expected);
+  act(() => renderer.unmount());
 });

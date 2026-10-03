@@ -231,7 +231,7 @@ export function TransactionDetailShell({
           ) : null}
           <PaymentIdentity
             pubkey={counterpartyPubkey}
-            address={counterpartyProfile?.nip05 ?? counterpartySnapshot?.nip05}
+            address={counterpartySnapshot?.nip05 ?? counterpartyProfile?.nip05}
           />
           {beforeStatus}
           {entry

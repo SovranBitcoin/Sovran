@@ -253,7 +253,7 @@ export function AmountFlowContent({
         ? {
             displayName: headerDisplayName,
             avatarUrl: headerAvatarUrl,
-            nip05: liveNostrMetadata?.nip05 ?? recipientProfile?.nip05 ?? null,
+            nip05: recipientProfile?.nip05 ?? liveNostrMetadata?.nip05 ?? null,
           }
         : undefined,
     [headerDisplayName, headerAvatarUrl, liveNostrMetadata?.nip05, recipientProfile?.nip05]

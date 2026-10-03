@@ -9,6 +9,7 @@ import { clearPaymentContext } from '@/shared/stores/runtime/clearPaymentContext
 import { readProfileRecord } from '@/shared/lib/nostr/useEntityCache';
 import { paymentLog } from '@/shared/lib/logger';
 import { peerDisplayName } from '../lib/peerProfile';
+import { resolveIdentityName } from '@/shared/lib/identity';
 import { planNearPaySend } from '../lib/nearPaySendDecision';
 import {
   notifyNoSharedMint,
@@ -34,7 +35,11 @@ export function useStartNearbySend() {
     }
     const profile = readProfileRecord(plan.recipientPubkey);
     const recipientProfile = {
-      displayName: name,
+      displayName: resolveIdentityName({
+        pubkey: plan.recipientPubkey,
+        nostrProfile: profile,
+        bleNickname: peer.nickname,
+      }),
       avatarUrl: profile?.picture ?? null,
       nip05: profile?.nip05 ?? null,
     };
@@ -42,7 +47,7 @@ export function useStartNearbySend() {
     useNearPaySessionStore.getState().start(
       {
         peerID: peer.peerID,
-        nickname: name,
+        nickname: recipientProfile.displayName,
         hasDirectLink: peer.hasDirectLink,
         lastSeen: peer.lastSeen,
         creq: peer.creq,
