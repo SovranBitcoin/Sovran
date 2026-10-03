@@ -1,11 +1,12 @@
 import { AppState } from 'react-native';
 import {
   createMeshRedeemOrchestrator,
+  classifyMeshToken,
   type MeshRedeemOrchestrator,
   TransactionAnnotation,
 } from 'wallet';
 import { createDefaultOperations } from 'wallet/operations';
-import { getBLEPeers } from 'bitchat-module';
+import { useBLEPeerDirectory } from '@/features/bitchat/hooks/useBLEPeers';
 
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { requireOfflineTokenDleq } from '@/shared/lib/cashu/offlineReceiveDleq';
@@ -24,7 +25,7 @@ import { paymentLog, mintUrlLogFields } from '@/shared/lib/logger';
  * orchestrator. Colada owns the gates (manager init, NUT-13 restore settled,
  * mint trust — never auto-trust a mint pushed at us over the mesh), the
  * retry ordering, and the receive itself (`executeAutoRedeem`, which
- * resolves the REAL persisted history id by set-difference polling —
+ * resolves the canonical operation-derived history id —
  * retiring the old direct-coco exception). This module owns what's
  * app-shaped: the persisted queue store behind the port and the toast
  * pipeline. Tokens arrive as private Noise DMs (classified in
@@ -48,16 +49,18 @@ function getOrchestrator(): MeshRedeemOrchestrator {
   // A dedicated default-operations bag just for the background receive —
   // the colada React instance lives in the provider tree and this drain
   // must run with no screen mounted.
-  const operations = createDefaultOperations({ getManager });
-  const executeAutoRedeemBase = operations.executeAutoRedeem;
-  if (!executeAutoRedeemBase) throw new Error('colada executeAutoRedeem operation missing');
-  const executeAutoRedeem: typeof executeAutoRedeemBase = async (token, mintUrl) => {
-    const manager = getManager();
-    if (!manager) throw new Error('Wallet manager is not available');
+  const executeAutoRedeem: Parameters<
+    typeof createMeshRedeemOrchestrator
+  >[0]['executeAutoRedeem'] = async (token, mintUrl, manager) => {
     // Nut Drop is an offline transport even when internet happens to be
     // available at redemption time. Verify every proof locally before the
     // orchestrator can treat the queued bearer value as received.
     await requireOfflineTokenDleq(manager, token, mintUrl);
+    if (getManager() !== manager) throw new Error('Wallet profile changed');
+    const executeAutoRedeemBase = createDefaultOperations({
+      getManager: () => manager,
+    }).executeAutoRedeem;
+    if (!executeAutoRedeemBase) throw new Error('colada executeAutoRedeem operation missing');
     return executeAutoRedeemBase(token, mintUrl);
   };
 
@@ -149,20 +152,22 @@ function getOrchestrator(): MeshRedeemOrchestrator {
     },
     onRedeemed: (_tokenHash, entry, historyEntryId) => {
       if (!historyEntryId) return;
-      // Nut Drop tokens are P2PK-locked to us. The redeemed proofs are swapped
+      // Legacy inputs can be bearer or locked. Redeemed proofs are swapped
       // for fresh ones, so the proof-secret fallback can't see the original
       // lock — annotate the resulting receive so it shows the lock badge.
       const patch: TransactionAnnotation = {
-        lock: { type: 'p2pk', direction: 'incoming' },
+        ...(classifyMeshToken(entry.token, '').classification === 'locked-to-other'
+          ? { lock: { type: 'p2pk' as const, direction: 'incoming' as const } }
+          : {}),
         // Arrived over the BLE/bitchat mesh — surfaces a bluetooth source badge.
         scan: { method: 'ble' },
       };
       // Resolve the sender's Nostr identity from the live BLE peer registry
-      // (peerID → nostrPubkeyHex via the bitchat favorite exchange) so the row
+      // (peerID → nostrPubkeyHex via the authenticated wallet capability) so the row
       // can show their avatar. Avatar URL comes from the warm kind-0 cache when
       // present; otherwise the row falls back to a pubkey-seeded identicon.
       const peer = entry.senderPeerID
-        ? getBLEPeers().find((p) => p.peerID === entry.senderPeerID)
+        ? useBLEPeerDirectory.getState().peers.find((p) => p.peerID === entry.senderPeerID)
         : undefined;
       const pubkey = peer ? peerNostrPubkey(peer) : null;
       if (pubkey) {

@@ -67,7 +67,6 @@ interface NutDropRedeemQueueActions {
 
 type NutDropRedeemQueueStore = NutDropRedeemQueueState & NutDropRedeemQueueActions;
 
-const ENTRY_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 /** Terminal entries only need to survive long enough to dedupe re-delivery. */
 const TERMINAL_TTL_MS = 24 * 60 * 60 * 1000;
 const MAX_ATTEMPTS = 5;
@@ -109,7 +108,7 @@ const PersistedNutDropRedeemQueueStore = z.object({
 });
 
 function isTerminal(status: NutDropRedeemStatus): boolean {
-  return status === 'redeemed' || status === 'spent' || status === 'failed';
+  return status === 'redeemed' || status === 'spent';
 }
 
 export const useNutDropRedeemQueueStore = create<NutDropRedeemQueueStore>()(
@@ -201,8 +200,8 @@ export const useNutDropRedeemQueueStore = create<NutDropRedeemQueueStore>()(
         set((state) => ({
           byTokenHash: Object.fromEntries(
             Object.entries(state.byTokenHash).filter(([, entry]) => {
-              const ttl = isTerminal(entry.status) ? TERMINAL_TTL_MS : ENTRY_TTL_MS;
-              return entry.receivedAt >= now - ttl;
+              // Retry exhaustion and age do not prove that ecash was spent.
+              return !isTerminal(entry.status) || entry.receivedAt >= now - TERMINAL_TTL_MS;
             })
           ),
         }));

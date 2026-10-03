@@ -14,10 +14,11 @@ jest.mock('wallet', () => ({
     (config: {
       executeAutoRedeem: (
         token: string,
-        mintUrl: string
+        mintUrl: string,
+        manager: unknown
       ) => Promise<{ historyEntryId: string | null }>;
     }) => ({
-      drain: () => config.executeAutoRedeem('cashu-test-token', MINT_URL),
+      drain: () => config.executeAutoRedeem('cashu-test-token', MINT_URL, mockManager),
     })
   ),
 }));

@@ -78,7 +78,7 @@ describe('nutDropRedeemQueueStore', () => {
     expect(Object.keys(useNutDropRedeemQueueStore.getState().byTokenHash)).toHaveLength(1);
   });
 
-  it('prunes terminal entries faster than pending ones', () => {
+  it('prunes settled entries but retains old unredeemed recovery material', () => {
     const dayMs = 24 * 60 * 60 * 1000;
     useNutDropRedeemQueueStore.setState({
       byTokenHash: {
@@ -108,7 +108,10 @@ describe('nutDropRedeemQueueStore', () => {
 
     useNutDropRedeemQueueStore.getState().prune();
     const remaining = Object.keys(useNutDropRedeemQueueStore.getState().byTokenHash);
-    expect(remaining).toEqual(['a'.repeat(64)]);
+    expect(remaining).toEqual(['a'.repeat(64), 'c'.repeat(64)]);
+    expect(useNutDropRedeemQueueStore.getState().byTokenHash['c'.repeat(64)].token).toBe(
+      ENTRY.token
+    );
   });
 
   it('degrades an unknown persisted status without discarding queued ecash', () => {

@@ -85,7 +85,7 @@ export function useNutDropAutoRedeem(): void {
     const subscription = addBLEPrivateMessageListener((event) => {
       if (event.isOwn) return;
       const token = extractCashuToken(event.content);
-      if (!token) return;
+      if (!token || token.trim() !== event.content.trim()) return;
 
       const classified = classifyMeshToken(token, myPubkey33);
       // A private DM is addressed to us, so redeem locked-to-me OR bearer; only
