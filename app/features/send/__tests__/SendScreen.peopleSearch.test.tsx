@@ -262,7 +262,6 @@ describe('SendScreen — People search unified with wallet/feed', () => {
       kind: 'nostr',
       pubkey: 'pkcalle',
       profile: expect.objectContaining({ lud16: 'calle@ln', followers: 2000 }),
-      isLoadingProfile: false,
     });
   });
 
@@ -278,13 +277,21 @@ describe('SendScreen — People search unified with wallet/feed', () => {
       expect.objectContaining({ pubkey: 'pkcalle', lud16: 'calle@ln' })
     );
     expect(mockStartSendEcash).toHaveBeenCalledWith(
-      expect.objectContaining({ recipientPubkey: 'pkcalle', meltTarget: 'calle@ln' })
+      expect.objectContaining({
+        recipientPubkey: 'pkcalle',
+        meltTarget: 'calle@ln',
+        recipientProfile: {
+          displayName: 'Calle',
+          avatarUrl: 'https://x/p.png',
+          nip05: 'calle@nostr',
+        },
+      })
     );
     expect(mockRouterPush).not.toHaveBeenCalled();
     expect(mockRouterNavigate).not.toHaveBeenCalled();
   });
 
-  it('paints skeleton rows while loading and does not flash "No people found"', () => {
+  it('omits unresolved search placeholders without flashing "No people found"', () => {
     mockLoading = true;
     mockContactRows = [
       {
@@ -306,9 +313,7 @@ describe('SendScreen — People search unified with wallet/feed', () => {
     type(renderer, 'cal');
 
     const skeleton = contactNode(renderer, 'placeholder-0');
-    expect(skeleton).toHaveLength(1);
-    expect(skeleton[0].props.identity.isLoadingProfile).toBe(true);
-    expect(skeleton[0].props.onPress).toBeUndefined();
+    expect(skeleton).toHaveLength(0);
     expect(hasText(renderer, 'No people found')).toBe(false);
   });
 
@@ -321,11 +326,12 @@ describe('SendScreen — People search unified with wallet/feed', () => {
   });
 
   it('shows recent people AT REST (unfocused, empty query), tappable into the payment seam', () => {
-    mockQuickPay = [REC];
+    mockQuickPay = [{ ...REC, isLoading: true }];
     const renderer = renderSend(); // no focus, no query
 
     const rows = contactNode(renderer, 'pkrec');
     expect(rows).toHaveLength(1);
+    expect(rows[0].props.identity.isLoadingProfile).not.toBe(true);
     act(() => {
       rows[0].props.onPress();
     });

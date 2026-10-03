@@ -39,7 +39,7 @@ const cases: [Nip05State, string, string][] = [
     staticColor['red-300'],
   ],
   [{ status: 'error', reason: 'network' }, 'Could not verify', staticColor['red-300']],
-  [{ status: 'pending' }, 'Checking identity', 'mock-theme-color'],
+  [{ status: 'pending' }, 'Not verified', 'mock-theme-color'],
 ];
 it.each(cases)(
   'renders the verification outcome %j without trusting a profile flag',

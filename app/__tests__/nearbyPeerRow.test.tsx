@@ -91,18 +91,17 @@ describe('NearbyPeerRow', () => {
         kind: 'nostr',
         pubkey: NOSTR_HEX,
         profile: expect.objectContaining({ picture: 'https://img.example/a.png' }),
-        isLoadingProfile: false,
       }),
     ]);
     expect(mockSingleCalls).toContain(NOSTR_HEX);
   });
 
-  it('holds the placeholder while the picture is still on its way', () => {
+  it('shows the known identity while the picture is still on its way', () => {
     mockSingle = { metadata: { displayName: 'Alice', fetchedAt: 0 }, isResolving: true };
 
     expect(renderedIdentity(blePeer({ nostrPubkeyHex: NOSTR_HEX }))).toEqual([
       expect.objectContaining({ kind: 'ble' }),
-      expect.objectContaining({ kind: 'nostr', isLoadingProfile: true }),
+      expect.objectContaining({ kind: 'nostr', profile: { displayName: 'Alice', fetchedAt: 0 } }),
     ]);
   });
 

@@ -64,8 +64,8 @@ describe('toLayoutPeer', () => {
 });
 
 describe('peerAvatarState', () => {
-  it('never flashes the identicon while the profile fetch is in flight', () => {
-    expect(peerAvatarState({ avatarUrl: null, profileLoading: true })).toBe('loading');
+  it('shows a stable fallback immediately and retains known pictures during enrichment', () => {
+    expect(peerAvatarState({ avatarUrl: null, profileLoading: true })).toBe('fallback');
     expect(peerAvatarState({ avatarUrl: 'https://x/p.png', profileLoading: false })).toBe('image');
     // Image wins even mid-refetch — never regress a known picture to a bar.
     expect(peerAvatarState({ avatarUrl: 'https://x/p.png', profileLoading: true })).toBe('image');

@@ -77,10 +77,10 @@ export function toLayoutPeer(peer: BLEPeer, profile?: RecentPeopleProfileRow): N
   };
 }
 
-/** Avatar state that never flashes the identicon while the profile fetch is in flight. */
+/** Show the stable key-based avatar immediately while optional profile enrichment runs. */
 export function peerAvatarState(
   peer: Pick<NearPayLayoutPeer, 'avatarUrl' | 'profileLoading'>
-): 'loading' | 'image' | 'fallback' {
+): 'image' | 'fallback' {
   if (peer.avatarUrl) return 'image';
-  return peer.profileLoading ? 'loading' : 'fallback';
+  return 'fallback';
 }

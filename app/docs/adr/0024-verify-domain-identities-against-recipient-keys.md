@@ -16,13 +16,16 @@ key. Transports without streaming can only cap accepted buffered text.
 
 Presentation attaches a blue check to the matching address, never to the name
 or avatar. A failed or mismatched lookup is red and names the failed check;
-pending is neutral. Selected payment screens also retain the public key.
+an unchecked address stays neutral without a loading indicator. Selected payment screens also retain the public key.
 This does not prove a real-world identity, a trustworthy domain, or that a person
 is the intended recipient. A domain controlled by an attacker can correctly
 verify that attacker's key.
 
 The app shares short-lived verification by address **and** key, with bounded
-concurrency and storage. Nearby profile warm-up also warms these checks.
+concurrency and storage. Nearby profile warm-up also warms these checks. Payment navigation carries the
+selected profile forward; screens read the shared check by address and key rather
+than serializing a trusted badge into route parameters. Known names and key-based
+avatars remain visible while optional enrichment runs.
 Domain endpoints learn that their identifiers were looked up; this is not
 anonymous discovery. Offline or suspended applications cannot guarantee a warm
 or current result. Provider-supplied validity flags never establish trust.

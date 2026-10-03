@@ -26,20 +26,11 @@ interface NearbyPeerRowProps {
  */
 export function NearbyPeerRow({ peer, subtitle, trailing, onPress, testID }: NearbyPeerRowProps) {
   const pubkey = peerNostrPubkey(peer);
-  const { metadata, isResolving } = useNostrProfileMetadata(pubkey ?? undefined);
+  const { metadata } = useNostrProfileMetadata(pubkey ?? undefined);
   // The BLE identity leads, so the row keeps its mesh reachability; the Nostr
   // identity rides along and supplies the face and name.
   const ble = bleIdentity({ ...peer, identitySeed: peerIdentitySeed(peer) });
-  const identity = pubkey
-    ? [
-        ble,
-        nostrIdentity(pubkey, metadata, {
-          // Hold the placeholder until the picture or the lookup lands, so the
-          // row goes placeholder → face without a silhouette in between.
-          isLoadingProfile: isResolving && !metadata?.picture,
-        }),
-      ]
-    : ble;
+  const identity = pubkey ? [ble, nostrIdentity(pubkey, metadata)] : ble;
   return (
     <ContactRow
       identity={identity}

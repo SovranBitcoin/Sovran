@@ -420,10 +420,12 @@ export function SendScreen({ unit }: { unit: string }) {
   // Set<string> (not the brand): membership is checked against unbranded
   // wire-row pubkeys; branded values assign into it fine.
   const pinnedPubkeys = useMemo(() => new Set<string>(livePeerPubkeys), [livePeerPubkeys]);
-  // Live search rows: keep placeholder rows (they paint the loading skeletons)
-  // but drop real rows already pinned in Nearby.
+  // Render actual results immediately; unresolved search placeholders carry no identity.
   const renderedPeople = useMemo(
-    () => contactRows.filter((r) => !(r.profile && pinnedPubkeys.has(r.pubkey))),
+    () =>
+      contactRows.flatMap((row) =>
+        row.profile && !pinnedPubkeys.has(row.pubkey) ? [{ ...row, profile: row.profile }] : []
+      ),
     [contactRows, pinnedPubkeys]
   );
 
@@ -590,13 +592,8 @@ export function SendScreen({ unit }: { unit: string }) {
             {renderedPeople.map((row) => (
               <ContactRow
                 key={row.pubkey}
-                identity={nostrIdentity(row.pubkey, row.profile, {
-                  isLoadingProfile: row.isLoadingProfile,
-                })}
-                // Placeholder rows (no profile) paint skeletons and aren't tappable.
-                onPress={
-                  row.profile ? () => handleSelectContact(row.pubkey, row.profile!) : undefined
-                }
+                identity={nostrIdentity(row.pubkey, row.profile)}
+                onPress={() => handleSelectContact(row.pubkey, row.profile)}
                 testID={`send-contact:${row.pubkey}`}
               />
             ))}
@@ -612,16 +609,12 @@ export function SendScreen({ unit }: { unit: string }) {
             {quickPayPeople.map((person) => (
               <ContactRow
                 key={person.pubkey}
-                identity={nostrIdentity(
-                  person.pubkey,
-                  {
-                    displayName: person.displayName,
-                    picture: person.picture ?? undefined,
-                    nip05: person.nip05 ?? undefined,
-                    lud16: person.lud16 ?? undefined,
-                  },
-                  { isLoadingProfile: person.isLoading }
-                )}
+                identity={nostrIdentity(person.pubkey, {
+                  displayName: person.displayName,
+                  picture: person.picture ?? undefined,
+                  nip05: person.nip05 ?? undefined,
+                  lud16: person.lud16 ?? undefined,
+                })}
                 onPress={() => handleSelectQuickPay(person)}
                 testID={`send-contact:${person.pubkey}`}
               />

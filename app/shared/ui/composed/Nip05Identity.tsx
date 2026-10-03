@@ -36,7 +36,7 @@ export function Nip05Status({
       color: staticColor['red-300'],
       label: 'Could not verify',
     },
-    pending: { icon: 'mdi:clock-outline', color: muted, label: 'Checking identity' },
+    pending: { icon: 'mdi:at', color: muted, label: 'Not verified' },
     none: { icon: 'mdi:at', color: muted, label: 'Not verified' },
   }[state.status];
   return (
