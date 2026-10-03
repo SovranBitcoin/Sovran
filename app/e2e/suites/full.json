@@ -58,6 +58,7 @@
     {"id":"mint.split.zero-balance","file":"scenarios/mint-split-zero-balance.json","order":180,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
     {"id":"send.zero-balance","file":"scenarios/send-zero-balance.json","order":190,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
     {"id":"send.nutdrop.scanning","file":"scenarios/send-nutdrop-scanning.json","order":192,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
+    {"id":"send.nearby.select","file":"scenarios/nearby-select-from-send.json","order":193,"newInstance":true,"lane":"physical","requires":["ble.transport","unit.sat"],"endState":"wallet"},
     {"id":"send.cashu.preselect-funded-mint","file":"scenarios/send-cashu-preselect-funded-mint.json","order":200,"newInstance":true,"lane":"funded","requires":["fresh-install","cocod.send.bolt11","cocod.receive.cashu","unit.sat"],"endState":"wallet"},
     {"id":"send.lightning.preselect-funded-mint","file":"scenarios/send-lightning-preselect-funded-mint.json","order":210,"newInstance":true,"lane":"funded","requires":["fresh-install","cocod.send.bolt11","cocod.receive.bolt11","cocod.receive.cashu","unit.sat"],"endState":"wallet"},
     {"id":"send.lnaddress.preselect-funded-mint","file":"scenarios/send-lnaddress-preselect-funded-mint.json","order":220,"newInstance":true,"lane":"funded","requires":["fresh-install","cocod.send.bolt11","cocod.npc.address","cocod.receive.cashu","unit.sat"],"endState":"wallet"},

@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "id": "send.nearby.select",
+  "name": "Select a nearby wallet directly from Send",
+  "description": "With a compatible receiver on its home screen, select its warmed nearby row and open the locked amount flow without visiting Nut Drop.",
+  "details": "Physical prerequisite: two configured wallets with a shared mint, receiver on Home, and only that receiver in range. This scenario stops before creating any payment. Stock chat peers must not appear as selectable recipients. Radio notification behavior and dual-transport settlement are separate device checks.",
+  "lane": "physical",
+  "tags": ["flow:send","instrument:cashu-token","outcome:dismissed","check:navigation","check:p2pk-keys"],
+  "requires": ["ble.transport","unit.sat"],
+  "steps": [
+    {"action":"tap","selector":{"id":"wallet-send"}},
+    {"action":"waitFor","selector":{"idPrefix":"send-peer-","captureSuffixAs":"peer"},"timeoutMs":30000},
+    {"action":"tap","selector":{"idPrefix":"send-peer-"}},
+    {"action":"waitFor","selector":{"id":"amount-header-lock"},"timeoutMs":30000},
+    {"action":"screenshot","name":"send-amount"},
+    {"action":"goHome"}
+  ],
+  "verify": [
+    {"action":"waitFor","selector":{"id":"wallet-send"},"timeoutMs":30000}
+  ],
+  "finally": [
+    {"use":"flow.return-to-wallet"}
+  ],
+  "endState": "wallet",
+  "deferredReason": "Requires two physical Bluetooth wallets; simulator execution cannot establish radio interoperability."
+}
