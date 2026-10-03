@@ -1,4 +1,6 @@
 /** @jest-environment node */
+import { useNip05Verification } from '@/shared/hooks/useNip05Verification';
+import { loadNpcIdentity } from '@/shared/lib/cashu/npcIdentity';
 import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { errAsync, okAsync } from 'neverthrow';
@@ -11,6 +13,10 @@ import {
 } from '@/shared/lib/nostr/profile/publishOwnProfileMetadata';
 import { guardedRouter } from '@/shared/hooks/useGuardedRouter';
 import { paramPopup } from '@/shared/lib/popup';
+
+jest.mock('@/shared/lib/cashu/npcIdentity', () => ({ loadNpcIdentity: jest.fn() }));
+jest.mock('@/shared/hooks/useNip05Verification', () => ({ useNip05Verification: jest.fn() }));
+jest.mock('@/shared/ui/composed/Nip05Identity', () => ({ Nip05Status: () => null }));
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 const mockProfile = { pubkey: 'a'.repeat(64), accountIndex: 0 };
@@ -109,6 +115,10 @@ jest.mock('heroui-native', () => ({
 let renderer: TestRenderer.ReactTestRenderer;
 beforeEach(() => {
   jest.clearAllMocks();
+  jest.mocked(useNip05Verification).mockReturnValue({
+    state: { status: 'verified', identifier: 'me@example.com' },
+    retry: jest.fn(),
+  });
   mockHistory = {};
   mockLatest = null;
   jest.mocked(loadOwnProfileMetadata).mockResolvedValue({ status: 'absent' });
@@ -330,4 +340,83 @@ it('offers previous values as one-tap chips and hides the current one', async ()
   expect(control('edit-profile-name').props.value).toBe('Older');
   expect(control('edit-profile-lud16').props.value).toBe('prev@ln.example');
   expect(control('edit-profile-save').props.disabled).toBe(false);
+});
+
+it('blocks saving a changed identity until verification succeeds, while allowing removal', async () => {
+  jest
+    .mocked(useNip05Verification)
+    .mockReturnValue({ state: { status: 'pending' }, retry: jest.fn() });
+  await act(async () => {
+    renderer = TestRenderer.create(<SettingsEditProfileScreen />);
+  });
+  const control = (testID: string) => renderer.root.findByProps({ testID });
+  act(() => {
+    control('edit-profile-nip05').props.onChangeText('alice@example.com');
+  });
+  expect(control('edit-profile-save').props.disabled).toBe(true);
+  await act(async () => {
+    await control('edit-profile-save').props.onPress();
+  });
+  expect(publishOwnProfileMetadata).not.toHaveBeenCalled();
+  jest.mocked(useNip05Verification).mockReturnValue({
+    state: { status: 'mismatch', identifier: 'alice@example.com' },
+    retry: jest.fn(),
+  });
+  act(() => {
+    control('edit-profile-name').props.onChangeText('Alice');
+  });
+  expect(control('edit-profile-save').props.disabled).toBe(true);
+  act(() => {
+    control('edit-profile-nip05').props.onChangeText('');
+  });
+  expect(control('edit-profile-save').props.disabled).toBe(false);
+});
+
+it('fills npub.cash only after the account username passes verification', async () => {
+  jest.mocked(loadNpcIdentity).mockResolvedValue({ status: 'no-username' });
+  await act(async () => {
+    renderer = TestRenderer.create(<SettingsEditProfileScreen />);
+  });
+  const control = (testID: string) => renderer.root.findByProps({ testID });
+  await act(async () => {
+    await control('edit-profile-nip05-npc').props.onPress();
+  });
+  expect(control('edit-profile-nip05').props.value).toBe('');
+  expect(control('edit-profile-nip05-error').props.children).toContain('custom npub.cash username');
+  jest
+    .mocked(loadNpcIdentity)
+    .mockResolvedValue({ status: 'verified', identifier: 'alice@npub.cash' });
+  await act(async () => {
+    await control('edit-profile-nip05-npc').props.onPress();
+  });
+  expect(control('edit-profile-nip05').props.value).toBe('alice@npub.cash');
+  expect(publishOwnProfileMetadata).not.toHaveBeenCalled();
+});
+
+it('does not re-save an unchanged identity while editing another field offline', async () => {
+  jest
+    .mocked(useNip05Verification)
+    .mockReturnValue({ state: { status: 'error', reason: 'network' }, retry: jest.fn() });
+  jest.mocked(loadOwnProfileMetadata).mockResolvedValue({
+    status: 'found',
+    snapshot: {
+      content: { name: 'Old', nip05: 'Me@Example.COM' },
+      createdAt: 10,
+      eventId: 'b'.repeat(64),
+    },
+  });
+  await act(async () => {
+    renderer = TestRenderer.create(<SettingsEditProfileScreen />);
+  });
+  const control = (testID: string) => renderer.root.findByProps({ testID });
+  act(() => {
+    control('edit-profile-name').props.onChangeText('New');
+  });
+  expect(control('edit-profile-save').props.disabled).toBe(false);
+  await act(async () => {
+    await control('edit-profile-save').props.onPress();
+  });
+  expect(publishOwnProfileMetadata).toHaveBeenCalledWith(
+    expect.objectContaining({ patch: { name: 'New' } })
+  );
 });

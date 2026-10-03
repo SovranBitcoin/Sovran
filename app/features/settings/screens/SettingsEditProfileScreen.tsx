@@ -1,3 +1,6 @@
+import { useNip05Verification } from '@/shared/hooks/useNip05Verification';
+import { Nip05Status } from '@/shared/ui/composed/Nip05Identity';
+import { loadNpcIdentity } from '@/shared/lib/cashu/npcIdentity';
 import { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
@@ -194,6 +197,10 @@ function ProfileEditor({
   );
   const [retrying, setRetrying] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [npcLoading, setNpcLoading] = useState(false);
+  const [identityError, setIdentityError] = useState<string | null>(null);
+  const npcController = useRef<AbortController | null>(null);
+  const nip05Check = useNip05Verification(nip05, pubkey);
   const [upload, setUpload] = useState<{ uri: string; progress: number } | null>(null);
   const controller = useRef<AbortController | null>(null);
   const mounted = useRef(true);
@@ -208,6 +215,7 @@ function ProfileEditor({
     return () => {
       mounted.current = false;
       controller.current?.abort();
+      npcController.current?.abort();
     };
   }, []);
   useEffect(() => {
@@ -384,17 +392,21 @@ function ProfileEditor({
     nip05: checkNip05(nip05),
     about: checkAbout(about),
   };
+  const needsVerification =
+    !!nip05.trim() && nip05 !== base.nip05 && nip05Check.state.status !== 'verified';
   const invalid = Object.values(checks).some((check) => !check.ok);
   const npub = nip19.npubEncode(pubkey);
   const npcAddress = getNpcAddress(undefined, npub);
   const save = useSingleFlight(async () => {
-    if (!ndk || !ready || upload || invalid || !isOwner()) return;
+    if (!ndk || !ready || upload || invalid || needsVerification || npcLoading || !isOwner())
+      return;
+    setIdentityError(null);
     setSaving(true);
     const normalized: ProfileDraft = {
       ...draft,
       name: name.trim(),
       lud16: checks.lud16.ok ? checks.lud16.value : lud16,
-      nip05: checks.nip05.ok ? checks.nip05.value : nip05,
+      nip05: nip05 === base.nip05 ? nip05 : checks.nip05.ok ? checks.nip05.value : nip05,
       about: checks.about.ok ? checks.about.value : about,
     };
     const result = await publishOwnProfileMetadata({
@@ -407,15 +419,44 @@ function ProfileEditor({
     if (!isOwner()) return;
     setSaving(false);
     if (result.isOk()) router.back();
-    else if (result.error.type === 'base-unavailable') setMissingBase(true);
+    else if (result.error.type === 'nip05-unverified') {
+      setIdentityError('This address could not be verified for your key. Check it and try again.');
+      nip05Check.retry();
+    } else if (result.error.type === 'base-unavailable') setMissingBase(true);
     else
       paramPopup('engagement-update-failed', 'profile', {
         failure: { service: 'nostr', error: result.error },
       });
   });
+  const applyNpcIdentity = useSingleFlight(async () => {
+    if (!ndk || !ready || saving || !isOwner()) return;
+    const request = new AbortController();
+    npcController.current = request;
+    setNpcLoading(true);
+    setIdentityError(null);
+    const result = await loadNpcIdentity(ndk, pubkey, request.signal);
+    if (!isOwner() || request.signal.aborted) return;
+    setNpcLoading(false);
+    switch (result.status) {
+      case 'verified':
+        setField('nip05', result.identifier);
+        break;
+      case 'no-username':
+        setIdentityError(
+          'A custom npub.cash username is needed. Your automatic Lightning address is not a NIP-05 identity.'
+        );
+        break;
+      case 'unverified':
+        setIdentityError('Your npub.cash username could not be verified for this key.');
+        break;
+      case 'unavailable':
+        setIdentityError('Could not check npub.cash. Try again when connected.');
+        break;
+    }
+  });
   const preview = upload?.uri ?? picture ?? undefined;
   const dirty = Object.keys(patchBetween(base, draft)).length > 0;
-  const fieldsLocked = !ready || saving;
+  const fieldsLocked = !ready || saving || npcLoading;
   return (
     <Screen
       name="SettingsEditProfileScreen"
@@ -428,7 +469,9 @@ function ProfileEditor({
               testID="edit-profile-save"
               onPress={save}
               loading={saving}
-              disabled={!ready || !dirty || !!upload || saving || invalid}
+              disabled={
+                !ready || !dirty || !!upload || saving || invalid || needsVerification || npcLoading
+              }
             />
             {ready && missingBase && (
               <>
@@ -596,7 +639,10 @@ function ProfileEditor({
             testID="edit-profile-nip05"
             accessibilityLabel="Nostr address"
             value={nip05}
-            onChangeText={(value) => setField('nip05', value)}
+            onChangeText={(value) => {
+              setIdentityError(null);
+              setField('nip05', value);
+            }}
             placeholder="name@domain.com"
             autoCapitalize="none"
             autoCorrect={false}
@@ -614,11 +660,58 @@ function ProfileEditor({
               lists this public key.
             </Description>
           )}
+          {nip05.trim() && checks.nip05.ok ? (
+            <View className="mt-2 gap-2">
+              <Nip05Status
+                address={nip05}
+                state={nip05Check.state}
+                testID="edit-profile-nip05-status"
+                detail
+              />
+              <CapsuleButton
+                label="Check again"
+                icon="mdi:refresh"
+                testID="edit-profile-nip05-retry"
+                disabled={fieldsLocked}
+                onPress={() => {
+                  setIdentityError(null);
+                  nip05Check.retry();
+                }}
+                fitContent
+                height={32}
+                textSize={13}
+              />
+            </View>
+          ) : null}
+          <View className="mt-2">
+            <CapsuleButton
+              label={npcLoading ? 'Checking npub.cash…' : 'Use my npub.cash username'}
+              icon="mdi:at"
+              testID="edit-profile-nip05-npc"
+              disabled={fieldsLocked}
+              onPress={applyNpcIdentity}
+              fitContent
+              height={32}
+              textSize={13}
+            />
+          </View>
+          {identityError ? (
+            <Text
+              testID="edit-profile-nip05-error"
+              size={12}
+              className="text-danger mt-1"
+              accessibilityRole="alert">
+              {identityError}
+            </Text>
+          ) : null}
           <HistoryChips
             field="nip05"
             current={nip05}
             disabled={fieldsLocked}
-            onPick={(value) => setField('nip05', value)}
+            onPick={(value) => {
+              setIdentityError(null);
+              setField('nip05', value);
+            }}
           />
         </TextField>
       </View>

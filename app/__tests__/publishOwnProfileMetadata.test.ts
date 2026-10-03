@@ -1,3 +1,4 @@
+import { verifyNip05 } from 'wallet';
 import { EventEmitter } from 'node:events';
 import { nostrLog } from '@/shared/lib/logger';
 import type { PublishResult, PublishError } from '@/shared/lib/nostr/publish/types';
@@ -13,6 +14,8 @@ import { useOwnProfileMetadataStore } from '@/shared/stores/profile/ownProfileMe
 import { publishEvent } from '@/shared/lib/nostr/publish/publishEvent';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 import NDK from '@nostr-dev-kit/ndk-mobile';
+
+jest.mock('wallet', () => ({ ...jest.requireActual('wallet'), verifyNip05: jest.fn() }));
 
 jest.mock('@/shared/lib/logger', () => ({
   nostrLog: { info: jest.fn(), warn: jest.fn() },
@@ -384,4 +387,49 @@ it('clamps a future base and logs only its delta once per publish', async () => 
     deltaSeconds: createdAtSec - 1000,
   });
   jest.useRealTimers();
+});
+
+it('refuses a changed identity before publishing when the domain does not match', async () => {
+  jest
+    .mocked(verifyNip05)
+    .mockResolvedValue({ status: 'mismatch', identifier: 'alice@example.com' });
+  const result = await publishOwnProfileMetadata({
+    ndk: makeNdk(),
+    pubkey,
+    accountIndex: 0,
+    patch: { nip05: 'alice@example.com' },
+    initialLoad: { status: 'absent' },
+  });
+  expect(result.isErr() && result.error.type).toBe('nip05-unverified');
+  expect(publishEvent).not.toHaveBeenCalled();
+  expect(useOwnProfileMetadataStore.getState().optimistic).toBeNull();
+});
+
+it('publishes only a freshly verified identity for the signing key', async () => {
+  jest
+    .mocked(verifyNip05)
+    .mockResolvedValue({ status: 'verified', identifier: 'alice@example.com' });
+  const result = await publishOwnProfileMetadata({
+    ndk: makeNdk(),
+    pubkey,
+    accountIndex: 0,
+    patch: { nip05: 'Alice@Example.com' },
+    initialLoad: { status: 'absent' },
+  });
+  expect(result.isOk()).toBe(true);
+  expect(verifyNip05).toHaveBeenCalledWith('Alice@Example.com', pubkey);
+  expect(useOwnProfileMetadataStore.getState().latest?.content.nip05).toBe('alice@example.com');
+});
+
+it('allows removing an identity without network verification', async () => {
+  const result = await publishOwnProfileMetadata({
+    ndk: makeNdk(),
+    pubkey,
+    accountIndex: 0,
+    patch: { nip05: null },
+    initialLoad: { status: 'absent' },
+  });
+  expect(result.isOk()).toBe(true);
+  expect(verifyNip05).not.toHaveBeenCalled();
+  expect(useOwnProfileMetadataStore.getState().latest?.content).not.toHaveProperty('nip05');
 });
