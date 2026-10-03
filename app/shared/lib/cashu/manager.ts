@@ -37,7 +37,7 @@ import { finalizeEvent, getPublicKey } from 'nostr-tools/pure';
 import type { EventTemplate, VerifiedEvent } from 'nostr-tools/core';
 import * as Sharing from 'expo-sharing';
 import { cashuLog, initLog, initPhase, redactError, mintUrlLogFields } from '../logger';
-import { resolveOutputDataCreator } from './nativeOutputDataCreator';
+import { resolveOutputDataCreator } from './outputDataCreator';
 import { drainSqlite } from './drainSqlite';
 import { logCocoVersions, reportCocoApiFailure, reportCocoIssue } from './cocoFeedback';
 import {
@@ -528,11 +528,7 @@ export class CocoManager {
 
         // 4. Create Manager
         initLog('CocoManager', 'creating Manager instance...');
-        // Always a creator, so every blinding call logs which implementation
-        // ran it (cashu.output_data.created: impl/outputs/duration_ms). Native
-        // CDK only behind EXPO_PUBLIC_CASHU_NATIVE_CRYPTO=1 plus a
-        // byte-identical self-test; otherwise instrumented stock cashu-ts,
-        // behaviorally identical to coco's own default.
+        // Resolve the release-gated backend once for the manager lifetime.
         const outputDataCreator = resolveOutputDataCreator();
 
         this.instance = new Manager(

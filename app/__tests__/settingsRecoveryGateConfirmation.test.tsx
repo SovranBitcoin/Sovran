@@ -17,7 +17,7 @@ jest.mock('react-native-safe-area-context', () => ({
 
 const MINT_URL = 'https://mint.sovran.money';
 // Real NUT-02 v1 ids — the screen now skips keysets whose id is not 16 or 66
-// hex chars, because the native CDK creator rejects those outright.
+// hex chars, matching the keyset ID wire format.
 const KEYSET_A = '00988fbe749ca4d1';
 const KEYSET_B = '00107937db0cc865';
 let mockMints = [{ mintUrl: MINT_URL, mintInfo: { name: 'Sovran Mint' } }];
@@ -33,19 +33,6 @@ const mockRestoreKeyset = jest.fn(async () => undefined);
 const mockBalancesByMint = jest.fn(async () => ({ [MINT_URL]: { total: 0 } }));
 const mockListPending = jest.fn(async () => []);
 const mockSetRestoreStatus = jest.fn();
-let mockExperimental = false;
-
-jest.mock('@/shared/stores/global/settingsStore', () => ({
-  useSettingsStore: (selector: (state: { experimental: boolean }) => unknown) =>
-    selector({ experimental: mockExperimental }),
-}));
-jest.mock('@/shared/lib/cashu/nativeOutputDataCreator', () => ({
-  ...jest.requireActual('@/shared/lib/cashu/nativeOutputDataCreator'),
-  isNativeCryptoAvailable: () => true,
-  setNativeCryptoEnabled: jest.fn(),
-}));
-jest.mock('@/shared/lib/cashu/cryptoMicroBench', () => ({ runCryptoMicroBench: jest.fn() }));
-
 jest.mock('@/features/mint', () => ({
   useMintManagement: () => ({ mints: mockMints, loadMints: mockLoadMints }),
 }));
@@ -195,7 +182,6 @@ jest.mock('heroui-native', () => {
 describe('SettingsRecoveryScreen gate confirmation', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockExperimental = false;
     mockMints = [{ mintUrl: MINT_URL, mintInfo: { name: 'Sovran Mint' } }];
     // clearAllMocks does not drop implementations, so a persistent
     // mockRejectedValue in one test would silently leak into the next.
@@ -211,22 +197,17 @@ describe('SettingsRecoveryScreen gate confirmation', () => {
     });
   });
 
-  it.each([
-    [false, false, false],
-    [true, false, true],
-    [true, true, false],
-    [false, true, false],
-  ])(
-    'experimental=%s, gateMode=%s shows developer controls=%s',
-    async (experimental, gateMode, visible) => {
-      mockExperimental = experimental;
+  it.each([false, true])(
+    'gateMode=%s exposes recovery without crypto development controls',
+    async (gateMode) => {
       let renderer: TestRenderer.ReactTestRenderer;
       await act(async () => {
         renderer = TestRenderer.create(<SettingsRecoveryScreen gateMode={gateMode} />);
       });
-      for (const testID of ['recovery-native-crypto-toggle', 'recovery-benchmark']) {
-        expect(renderer!.root.findAllByProps({ testID }).length > 0).toBe(visible);
-      }
+      expect(renderer!.root.findAllByProps({ testID: 'recovery-benchmark' })).toHaveLength(0);
+      expect(
+        renderer!.root.findAllByProps({ testID: 'recovery-native-crypto-toggle' })
+      ).toHaveLength(0);
       expect(
         renderer!.root.findAllByProps({ testID: 'recovery-search-all-toggle' }).length
       ).toBeGreaterThan(0);
@@ -344,11 +325,11 @@ describe('SettingsRecoveryScreen gate confirmation', () => {
     // makes per-keyset progress and per-keyset failure reporting possible.
     expect(mockAddMint).toHaveBeenCalledWith(MINT_URL, { trusted: true });
     expect(mockRestoreKeyset).toHaveBeenCalledTimes(2);
-    expect(mockRestoreKeyset).toHaveBeenCalledWith(
-      expect.anything(),
-      { mintUrl: MINT_URL, keysetId: KEYSET_A, unit: 'sat' },
-      expect.objectContaining({ ready: expect.any(Number), spent: expect.any(Number) })
-    );
+    expect(mockRestoreKeyset).toHaveBeenCalledWith(expect.anything(), {
+      mintUrl: MINT_URL,
+      keysetId: KEYSET_A,
+      unit: 'sat',
+    });
     expect(
       renderer!.root
         .findAll((node) => node.type === ('MockText' as unknown))
@@ -440,11 +421,11 @@ describe('SettingsRecoveryScreen gate confirmation', () => {
 
     // Only the valid keyset is attempted, and the mint still succeeds.
     expect(mockRestoreKeyset).toHaveBeenCalledTimes(1);
-    expect(mockRestoreKeyset).toHaveBeenCalledWith(
-      expect.anything(),
-      { mintUrl: MINT_URL, keysetId: KEYSET_A, unit: 'sat' },
-      expect.objectContaining({ ready: expect.any(Number), spent: expect.any(Number) })
-    );
+    expect(mockRestoreKeyset).toHaveBeenCalledWith(expect.anything(), {
+      mintUrl: MINT_URL,
+      keysetId: KEYSET_A,
+      unit: 'sat',
+    });
     const texts = renderer!.root
       .findAll((node) => node.type === ('MockText' as unknown))
       .map((node) => node.props.children);

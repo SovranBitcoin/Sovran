@@ -96,7 +96,6 @@
     "@cashu/coco-core": "2.0.0",
     "@cashu/coco-expo-sqlite": "2.0.0",
     "@cashu/coco-react": "2.0.0",
-    "@cashudevkit/react-native": "github:crodas/cdk-nitro#v0.17.3",
     "@expo/ui": "~56.0.18",
     "@gandlaf21/bc-ur": "^1.1.12",
     "@gorhom/bottom-sheet": "5.2.14",
