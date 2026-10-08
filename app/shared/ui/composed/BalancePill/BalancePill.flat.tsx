@@ -2,13 +2,12 @@ import React from 'react';
 import { StyleSheet } from 'react-native';
 
 import { PressableFeedback } from 'heroui-native';
-import { withAlpha } from '@/shared/lib/color';
 
 import { HEADER_LAYOUT } from '@/features/wallet/lib/walletHeader';
-import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { View } from '@/shared/ui/primitives/View/View';
 import BalanceDisplay from './BalanceDisplay';
 import type { BalancePillProps } from './BalancePill.types';
+import { useControlChrome } from '@/shared/styles/appStyle';
 import { useBalancePillDimensions } from './useBalancePillDimensions';
 
 const HORIZONTAL_PADDING = 12;
@@ -22,7 +21,7 @@ export default function BalancePillFlat({
   contentHeight: contentHeightOverride,
   ...display
 }: BalancePillProps): React.ReactElement {
-  const [surfaceSecondary, muted] = useThemeColor(['surface-secondary', 'muted'] as const);
+  const chrome = useControlChrome();
   const dimensions = useBalancePillDimensions({
     width,
     contentWidth: contentWidthOverride,
@@ -42,8 +41,7 @@ export default function BalancePillFlat({
           width: dimensions.buttonWidth,
           height: cardHeight,
           borderRadius: cardRadius,
-          backgroundColor: surfaceSecondary,
-          borderColor: withAlpha(muted, 0.3),
+          ...chrome,
         },
       ]}>
       <PressableFeedback

@@ -1,6 +1,7 @@
 import { MintSelector } from '@/features/wallet';
 import { useWalletMintListRequest } from '@/features/wallet/hooks/useWalletMintListRequest';
 import { SearchLayout } from '@/shared/ui/composed/SearchLayout';
+import { WALLET_HEADER_SCRIM_DISTANCE, walletScrollY } from '@/features/wallet/lib/walletScroll';
 
 export { useSearchContext } from '@/shared/ui/composed/SearchLayout';
 
@@ -17,6 +18,8 @@ export default function HomeLayout() {
       title="Wallet"
       placeholder="Search people..."
       transparent
+      scrimScrollY={walletScrollY}
+      scrimDistance={WALLET_HEADER_SCRIM_DISTANCE}
       searchTestIDPrefix="wallet"
       renderIdleTitle={() => (
         <MintSelector testID="wallet-mint-selector" onRequestMintList={handleRequestMintList} />

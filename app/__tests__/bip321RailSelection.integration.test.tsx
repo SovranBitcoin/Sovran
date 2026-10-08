@@ -55,7 +55,7 @@ jest.mock('@/features/receive/components/ReceiveRailPlaceholder', () => ({
 }));
 jest.mock('@/shared/ui/primitives/View/View', () => ({ View: 'View' }));
 jest.mock('@/shared/ui/primitives/Text', () => ({ Text: 'Text' }));
-jest.mock('@/shared/ui/composed/GradientCard', () => ({ GradientCard: 'GradientCard' }));
+jest.mock('@/shared/ui/composed/Surface', () => ({ Surface: 'Surface' }));
 jest.mock('@/shared/ui/composed/Section', () => ({ Section: 'Section' }));
 jest.mock('@/shared/ui/composed/CapsuleButton', () => ({ CapsuleButton: 'CapsuleButton' }));
 jest.mock('heroui-native', () => {

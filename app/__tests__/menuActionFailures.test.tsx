@@ -189,6 +189,48 @@ describe('menu action failure containment', () => {
     });
   });
 
+  it('tucks a supporting action behind the dots when two others are showing', async () => {
+    const details = { testID: 'details', text: 'Details', variant: 'secondary' as const };
+    const copy = { testID: 'copy', text: 'Copy', variant: 'primary' as const, onPress: jest.fn() };
+    const share = {
+      testID: 'share',
+      text: 'Share',
+      variant: 'secondary' as const,
+      onPress: jest.fn(),
+    };
+    const openDetails = jest.fn();
+    let renderer: TestRenderer.ReactTestRenderer;
+
+    // Written first, but it is the supporting one: Copy and Share take the row.
+    await act(async () => {
+      renderer = TestRenderer.create(
+        <ButtonHandler
+          buttons={[{ ...details, onPress: openDetails, prefersOverflow: true }, copy, share]}
+        />
+      );
+    });
+    expect(renderer!.root.findAllByProps({ testID: 'details' })).toHaveLength(0);
+    mockActionMenuSheet.mockClear();
+    act(() => {
+      findByTestID(renderer!, 'more-button').props.onPress();
+    });
+    const payload = mockActionMenuSheet.mock.calls[0][0] as {
+      buttons: { testID?: string; onPress: () => void }[];
+    };
+    expect(payload.buttons.map((button) => button.testID)).toEqual(['details']);
+
+    // With only one other button there is a free slot, and it takes it.
+    await act(async () => {
+      renderer!.update(
+        <ButtonHandler
+          buttons={[{ ...details, onPress: openDetails, prefersOverflow: true }, copy]}
+        />
+      );
+    });
+    expect(renderer!.root.findAllByProps({ testID: 'more-button' })).toHaveLength(0);
+    expect(renderer!.root.findAllByProps({ testID: 'details' }).length).toBeGreaterThan(0);
+  });
+
   it('contains async failures from ActionMenuButton menu variants', async () => {
     let renderer: TestRenderer.ReactTestRenderer;
     const failingVariant = jest.fn(async () => {

@@ -25,7 +25,9 @@ import { SwapTransactionRow } from '@/features/transactions/components/SwapTrans
 import { Transaction } from '@/features/transactions/components/Transaction';
 import { aiRequestDisplayAmount } from '@/features/transactions/lib/aiRequestPresentation';
 import { navigateToAiRequest } from '@/shared/lib/nav/transactionDetailRoutes';
-import { BlurCardFrame } from '@/shared/ui/composed/BlurCardFrame';
+import { SectionHeading } from '@/shared/ui/composed/SectionHeading';
+import { Surface } from '@/shared/ui/composed/Surface';
+import { useStylePaint } from '@/shared/styles/appStyle';
 import { Spinner } from '@/shared/ui/primitives/Spinner';
 import { Text } from '@/shared/ui/primitives/Text';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
@@ -59,7 +61,6 @@ import {
 } from 'wallet';
 import { log, Log } from '@/shared/lib/logger';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { spacing, zIndex } from '@/shared/styles/tokens';
 import { useRollbackStore } from '@/shared/stores/runtime/rollbackStore';
 import { belongsToAccount } from '@/shared/lib/cashu/accountScope';
 import { useIsTestnutMint } from '@/shared/stores/global/mintTestnutStore';
@@ -199,6 +200,9 @@ interface Props {
   ref?: React.Ref<TransactionsHandle>;
 }
 
+/** The gap between the list's cards, headings and status blocks. */
+const LIST_GAP = 8;
+
 export const Transactions = React.memo(
   ({
     header,
@@ -233,7 +237,7 @@ export const Transactions = React.memo(
       0,
       manualBottomPadding - (!disableContentInsetAdjustment && Platform.OS === 'ios' ? bottom : 0)
     );
-    const [muted, foreground] = useThemeColor(['muted', 'foreground'] as const);
+    const foreground = useThemeColor('foreground');
     const { height: screenHeight } = useWindowDimensions();
 
     // Operation ids that are still showing the post-success collapse
@@ -243,7 +247,6 @@ export const Transactions = React.memo(
     // its state flips to `rolledBack`, killing the animation mid-frame.
     const collapsing = useRollbackStore((s) => s.collapsing);
 
-    const borderColor = useMemo(() => withAlpha(muted, 0.3), [muted]);
     const mockMode = useSettingsStore((state) => state.mockMode);
     const liveSwapGroups = useSwapTransactionsStore((state) => state.groups);
     const swapGroupsById = mockMode ? MOCK_SWAP_GROUPS : liveSwapGroups;
@@ -704,14 +707,10 @@ export const Transactions = React.memo(
           <Text size={14} heavy color={withAlpha(foreground, 0.33)} style={styles.dateHeader}>
             {section.title}
           </Text>
-          <View style={[styles.card, { borderColor }]}>
-            <BlurCardFrame accentColor={muted}>
-              <View style={styles.content}>{section.data.map(renderTimelineItem)}</View>
-            </BlurCardFrame>
-          </View>
+          <Surface>{section.data.map(renderTimelineItem)}</Surface>
         </VStack>
       ),
-      [borderColor, foreground, muted, renderTimelineItem]
+      [foreground, renderTimelineItem]
     );
 
     const resolvedHeader = useMemo(
@@ -730,15 +729,12 @@ export const Transactions = React.memo(
         ) : (
           <View className="pt-8">
             <EmptyStateCard
-              borderColor={borderColor}
-              muted={muted}
-              foreground={foreground}
               title="No transactions found"
               subtitle="Try adjusting your filters or check back later"
             />
           </View>
         ),
-      [borderColor, foreground, isFetching, muted]
+      [isFetching]
     );
 
     if (embedded) {
@@ -746,10 +742,15 @@ export const Transactions = React.memo(
       // screen's ScrollView (one date header per date, no status containers).
       return (
         <View className="w-full">
+          {/* The date is the card's own heading, inside it: floating above the
+              card it read as belonging to whatever sat over it on the page. */}
           {embeddedSections.map((section) => (
-            <React.Fragment key={section.index ?? section.title}>
-              {renderSection({ item: section })}
-            </React.Fragment>
+            <View key={section.index ?? section.title} className="mb-2">
+              <Surface>
+                <SectionHeading tone="caption" label={section.title} />
+                {section.data.map(renderTimelineItem)}
+              </Surface>
+            </View>
           ))}
         </View>
       );
@@ -779,81 +780,45 @@ export const Transactions = React.memo(
         return (
           <View>
             <Spacer size={24} />
-            <EmptyStateCard
-              borderColor={borderColor}
-              muted={muted}
-              foreground={foreground}
-              title="No History"
-              subtitle="Your history will show up here"
-            />
+            <EmptyStateCard title="No History" subtitle="Your history will show up here" />
           </View>
         );
       }
 
-      const renderStatus = (label: string, sects: Section[]) => {
-        if (sects.length === 0) return null;
-        return (
-          <View>
-            <VStack gap={8}>
-              {sects.map((section) => (
-                <View key={section.title}>
-                  <VStack gap={8}>
-                    <View style={[styles.card, { borderColor }]}>
-                      <BlurCardFrame accentColor={muted}>
-                        <View style={styles.content}>
-                          <View style={styles.sectionHeader}>
-                            <Text heavy size={16} color={foreground}>
-                              {label}
-                            </Text>
-                            <Text size={12} color={withAlpha(foreground, 0.66)}>
-                              {section.title}
-                            </Text>
-                          </View>
-                          {section.data.map(renderTimelineItem)}
-                        </View>
-                      </BlurCardFrame>
-                    </View>
-                    {label === 'Confirmed' && !embedded && (
-                      <Pressable
-                        onPress={() =>
-                          router.navigate({
-                            pathname: '/transactions',
-                            params: { filterCurrency: account.unit, filterStatus: 'Confirmed' },
-                          })
-                        }
-                        testID="transactions-view-all"
-                        accessibilityRole="link"
-                        accessibilityLabel="View all transactions">
-                        <View style={[styles.viewAllButton, { borderColor }]}>
-                          <BlurCardFrame accentColor={muted}>
-                            <View style={styles.viewAllContent}>
-                              <Text size={14} bold>
-                                View all ({filteredHistory.length})
-                              </Text>
-                            </View>
-                          </BlurCardFrame>
-                        </View>
-                      </Pressable>
-                    )}
-                  </VStack>
-                </View>
-              ))}
-            </VStack>
-          </View>
-        );
-      };
-
-      const hasPending = sections.pending.length > 0;
-      const hasExpired = sections.expired.length > 0;
-      const hasConfirmed = sections.confirmed.length > 0;
+      // The home is two clearly named blocks: what is still in flight, then
+      // what has settled. Each card says which it is and, quietly beneath it,
+      // the day. Expired requests are neither, so they are not on the home at
+      // all; the history page lists them.
+      const renderStatus = (label: string, sects: Section[]) =>
+        sects.map((section) => (
+          <Surface key={section.index ?? section.title}>
+            <SectionHeading tone="status" label={label} detail={section.title} />
+            {section.data.map(renderTimelineItem)}
+          </Surface>
+        ));
 
       return (
         <View className="w-full">
-          {renderStatus('Pending', sections.pending)}
-          {hasPending && (hasExpired || hasConfirmed) && <Spacer size={spacing['sm']} />}
-          {renderStatus('Expired', sections.expired)}
-          {hasExpired && hasConfirmed && <Spacer size={spacing['sm']} />}
-          {renderStatus('Confirmed', sections.confirmed)}
+          {/* One tight step (8) between cards, as the list had before the
+              style tokens: at 24 and 12 it read as separate pages. */}
+          <VStack gap={LIST_GAP}>
+            {renderStatus('Pending', sections.pending)}
+            {renderStatus('Confirmed', sections.confirmed)}
+            {sections.confirmed.length > 0 ? (
+              <Pressable
+                onPress={() =>
+                  router.navigate({
+                    pathname: '/transactions',
+                    params: { filterCurrency: account.unit, filterStatus: 'Confirmed' },
+                  })
+                }
+                testID="transactions-view-all"
+                accessibilityRole="link"
+                accessibilityLabel="View all transactions">
+                <ViewAllButton count={filteredHistory.length} />
+              </Pressable>
+            ) : null}
+          </VStack>
         </View>
       );
     }
@@ -917,53 +882,44 @@ export const Transactions = React.memo(
 
 Transactions.displayName = 'Transactions';
 
-function EmptyStateCard({
-  borderColor,
-  muted,
-  foreground,
-  title,
-  subtitle,
-}: {
-  borderColor: string;
-  muted: string;
-  foreground: string;
-  title: string;
-  subtitle: string;
-}) {
+/** A full-width secondary button in the style's control paint. */
+function ViewAllButton({ count }: { count: number }) {
+  const paint = useStylePaint();
+  const { control } = paint.style.size;
   return (
-    <View style={[styles.card, { borderColor }]}>
-      <BlurCardFrame accentColor={muted}>
-        <View style={styles.emptyState}>
-          <Icon name="fluent:clock-12-filled" size={36} color={withAlpha(foreground, 0.33)} />
-          <Text size={16} bold color={withAlpha(foreground, 0.66)} style={{ textAlign: 'center' }}>
-            {title}
-          </Text>
-          <Text
-            size={14}
-            style={{
-              color: withAlpha(foreground, 0.4),
-              textAlign: 'center',
-            }}>
-            {subtitle}
-          </Text>
-        </View>
-      </BlurCardFrame>
+    <View
+      style={[
+        styles.viewAll,
+        paint.secondary.container,
+        { height: control, borderRadius: Math.min(paint.style.radius.control, control / 2) },
+      ]}>
+      <Text medium size={15} family={paint.style.type.family} color={paint.secondary.content}>
+        View all ({count})
+      </Text>
     </View>
   );
 }
 
+function EmptyStateCard({ title, subtitle }: { title: string; subtitle: string }) {
+  const paint = useStylePaint();
+  // On a bare surface the group above already supplies the breathing room.
+  const paddingVertical = paint.cardIsBare ? paint.style.space.item : paint.style.space.section;
+  return (
+    <Surface>
+      <View style={[styles.emptyState, { gap: paint.style.space.related, paddingVertical }]}>
+        <Icon name="fluent:clock-12-filled" size={28} color={paint.text.tertiary} />
+        <Text semibold size={16} color={paint.text.primary} style={styles.centered}>
+          {title}
+        </Text>
+        <Text size={14} color={paint.text.secondary} style={styles.centered}>
+          {subtitle}
+        </Text>
+      </View>
+    </Surface>
+  );
+}
+
 const styles = StyleSheet.create({
-  // Plain View, NOT SquircleView: react-native-fast-squircle's RN-0.83 source
-  // set has a no-op dispatchDraw (no child clipping), so squircle cards whose
-  // visible fill is a child (BlurCardFrame's absolute-fill) render SQUARE on
-  // Android. Plain View clips children to borderRadius correctly; iOS keeps
-  // continuous corners via borderCurve.
-  card: {
-    borderRadius: 20,
-    borderCurve: 'continuous',
-    overflow: 'hidden',
-    borderWidth: 1,
-  },
   listContainer: {
     flex: 1,
   },
@@ -980,33 +936,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  content: {
-    zIndex: zIndex.raised,
-  },
   dateHeader: {
     height: DATE_HEADER_HEIGHT,
   },
-  sectionHeader: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 4,
-  },
-  viewAllButton: {
-    borderRadius: 20,
-    borderCurve: 'continuous',
-    overflow: 'hidden',
-    borderWidth: 1,
-  },
-  viewAllContent: {
-    padding: 12,
+  viewAll: {
     alignItems: 'center',
-    zIndex: zIndex.raised,
+    justifyContent: 'center',
+  },
+  centered: {
+    textAlign: 'center',
   },
   emptyState: {
-    paddingVertical: 48,
-    paddingHorizontal: 24,
     alignItems: 'center',
-    gap: 8,
-    zIndex: zIndex.raised,
+    paddingHorizontal: 24,
   },
 });

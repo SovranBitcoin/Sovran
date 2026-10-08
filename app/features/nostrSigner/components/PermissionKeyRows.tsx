@@ -10,7 +10,8 @@
  */
 
 import { useCallback } from 'react';
-import { ListGroup, PressableFeedback, Switch as HeroSwitch } from 'heroui-native';
+import { ListGroup, PressableFeedback } from 'heroui-native';
+import { Switch as HeroSwitch } from '@/shared/ui/primitives/Switch';
 
 import Icon from 'assets/icons';
 import type { Nip46Connection } from '@/features/nostrSigner/data/nip46ConnectionsStore';

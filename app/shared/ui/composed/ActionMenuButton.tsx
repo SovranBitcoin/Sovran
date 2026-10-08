@@ -42,6 +42,7 @@ import { Menu, type MenuTriggerRef } from 'heroui-native';
 import { Button } from '@/shared/ui/primitives/Button';
 import { CircleActionButton } from '@/shared/ui/composed/CircleActionButton';
 import { View } from '@/shared/ui/primitives/View/View';
+import { FOOTER_GAP } from '@/shared/ui/composed/footerInset';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { MenuRowTint, SheetMenuRowContent } from '@/shared/lib/popup/popups/sheetMenuRow';
 import Icon from 'assets/icons';
@@ -322,7 +323,7 @@ export function ActionMenuButton({
 
   // Default — split button (primary + chevron menu trigger).
   return withMenu(
-    <HStack align="center" gap={0} style={[{ flex: 1 }, style]}>
+    <HStack align="center" gap={FOOTER_GAP} style={[{ flex: 1 }, style]}>
       <View style={{ flex: 1 }}>
         <Button
           testID={testID}

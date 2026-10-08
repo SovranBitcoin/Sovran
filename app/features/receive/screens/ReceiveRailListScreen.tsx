@@ -34,7 +34,7 @@ import {
   type ReceiveRailItem,
 } from '@/features/receive/lib/receiveRailItems';
 import { EmptyState } from '@/shared/ui/composed/EmptyState';
-import { GradientCard } from '@/shared/ui/composed/GradientCard';
+import { Surface } from '@/shared/ui/composed/Surface';
 import { MintIcon } from '@/shared/ui/composed/MintIcon';
 import { Badge } from '@/shared/ui/primitives/Badge';
 import { Button } from '@/shared/ui/primitives/Button';
@@ -352,7 +352,7 @@ export function ReceiveRailListScreen() {
             Nothing here yet.
           </Text>
         ) : (
-          <GradientCard>
+          <Surface>
             <ListGroup variant="transparent">
               {state.items.map((item, index) => (
                 <React.Fragment key={item.key}>
@@ -367,7 +367,7 @@ export function ReceiveRailListScreen() {
                 </React.Fragment>
               ))}
             </ListGroup>
-          </GradientCard>
+          </Surface>
         )}
       </ScreenScrollView>
     </View>

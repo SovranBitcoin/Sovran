@@ -6,7 +6,7 @@
  * scan history linking) is handled by the receiveToken.redeem handler.
  */
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 import type { ReceiveHistoryEntry } from '@cashu/coco-core';
 import { isReceiveTokenPending, isReceiveTokenRedeemed } from 'wallet';
@@ -19,6 +19,7 @@ import {
   transactionLeadDetailItems,
   amountDetailItem,
   mintDetailItem,
+  entryDetailItems,
 } from '@/features/transactions';
 import { MiddleEllipsisValue } from '@/shared/ui/composed/MiddleEllipsisValue';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
@@ -33,6 +34,8 @@ interface ReceiveTokenScreenProps {
 
 export function ReceiveTokenScreen({ receiveHistoryEntry }: ReceiveTokenScreenProps) {
   useLifecycleLogger('ReceiveTokenScreen');
+  // Details is opened from the footer, not from a row in the page.
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const { entry, error, actions, source, mintUrl } = useScreenActions(
     'receiveToken',
     receiveHistoryEntry
@@ -94,6 +97,17 @@ export function ReceiveTokenScreen({ receiveHistoryEntry }: ReceiveTokenScreenPr
       <ButtonHandler
         buttons={[
           {
+            // Every id and value behind this payment, each one copyable. It
+            // gives way to the screen's own actions: behind the dots when two
+            // of them are showing, in the free slot when they are not.
+            testID: 'receive-token-details',
+            text: 'Details',
+            icon: 'mdi:receipt-text-outline',
+            variant: 'secondary',
+            onPress: () => setDetailsOpen(true),
+            prefersOverflow: true,
+          },
+          {
             testID: 'receive-token-close',
             text: 'Close',
             icon: 'ri:close-circle-line',
@@ -114,7 +128,7 @@ export function ReceiveTokenScreen({ receiveHistoryEntry }: ReceiveTokenScreenPr
           },
           {
             testID: 'receive-token-redeem',
-            text: actions.redeem.loading ? 'Redeeming...' : 'Redeem Ecash',
+            text: actions.redeem.loading ? 'Redeeming...' : 'Redeem',
             variant: 'primary',
             onPress: async () => {
               await actions.redeem.execute();
@@ -137,6 +151,9 @@ export function ReceiveTokenScreen({ receiveHistoryEntry }: ReceiveTokenScreenPr
       footer={bottomButtons}
       beforeStatus={isRedeemed ? <TransactionLocationSection transactionId={entry.id} /> : null}>
       <DetailsSection
+        trigger="none"
+        open={detailsOpen}
+        onOpenChange={setDetailsOpen}
         items={[
           paymentRequest && { title: 'Type', value: 'Payment Request' },
           paymentRequest?.requestId && {
@@ -159,6 +176,7 @@ export function ReceiveTokenScreen({ receiveHistoryEntry }: ReceiveTokenScreenPr
             title: 'Token',
             value: <MiddleEllipsisValue value={entry.tokenString.toString()} />,
           },
+          ...entryDetailItems(entry),
         ]}
       />
     </TransactionDetailShell>

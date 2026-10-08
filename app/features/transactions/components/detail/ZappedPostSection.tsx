@@ -3,7 +3,7 @@
  *
  * The zap message rides as a pill (animated emoji + our message) absolutely
  * positioned across the post card's top edge, so it reads as stuck onto the
- * post. The pill lives OUTSIDE the GradientCard — the card clips its content
+ * post. The pill lives OUTSIDE the Surface — the card clips its content
  * (`overflow: hidden`), so a pill nested inside could never overhang it.
  *
  * The card itself is plain typography (author + preview), no box inside a
@@ -38,7 +38,7 @@ import {
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { Log } from '@/shared/lib/logger';
 import { zIndex } from '@/shared/styles/tokens';
-import { GradientCard } from '@/shared/ui/composed/GradientCard';
+import { Surface } from '@/shared/ui/composed/Surface';
 import { AnimatedEmoji } from '@/shared/ui/primitives/AnimatedEmoji';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
@@ -107,7 +107,7 @@ export function ZappedPostSection({ entry }: ZappedPostSectionProps) {
         accessibilityLabel={`Zapped post by ${authorName}. Opens the post.`}
         testID="zapped-post-section"
         style={styles.wrap}>
-        <GradientCard contentStyle={styles.cardContent}>
+        <Surface contentStyle={styles.cardContent}>
           <View style={styles.inner}>
             <HStack align="center" gap={8} style={styles.authorRow}>
               <Avatar
@@ -131,7 +131,7 @@ export function ZappedPostSection({ entry }: ZappedPostSectionProps) {
               </Text>
             ) : null}
           </View>
-        </GradientCard>
+        </Surface>
         {/* Declared after the card so it paints on top of it. */}
         <HStack gap={8} align="center" style={[styles.pill, { backgroundColor: surfaceTertiary }]}>
           <AnimatedEmoji emoji={emoji} size={18} />

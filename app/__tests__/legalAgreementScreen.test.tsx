@@ -4,6 +4,11 @@ import { LegalDocumentScreen } from '@/shared/blocks/LegalDocumentScreen';
 import { TermsAndConditionsScreen } from '@/features/onboarding/screens/TermsAndConditionsScreen';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+// The document sits on the app's glass surface; its frosted frame needs the
+// device capability provider, which this suite does not mount.
+jest.mock('@/shared/ui/composed/BlurCardFrame', () => ({
+  BlurCardFrame: ({ children }: { children: React.ReactNode }) => children,
+}));
 jest.mock('react-native', () => ({
   View: 'View',
   ScrollView: 'ScrollView',
@@ -27,6 +32,7 @@ jest.mock('react-native-web/dist/exports/ScrollView', () => 'ScrollView');
 jest.mock('@/features/settings/screens/SettingsProfileRecoveryScreen', () => ({
   SettingsProfileRecoveryScreen: 'Recovery',
 }));
+jest.mock('@/shared/ui/primitives/Button', () => ({ Button: 'Button' }));
 jest.mock('heroui-native', () => {
   const React = require('react');
   const host = (name: string) =>
@@ -50,10 +56,12 @@ function render(props: React.ComponentProps<typeof TermsAndConditionsScreen>) {
 function button(screen: TestRenderer.ReactTestRenderer, label: string) {
   return screen.root
     .findAll((node) => String(node.type) === 'Button')
-    .find((node) =>
-      node
-        .findAll((child) => String(child.type) === 'Label')
-        .some((child) => child.children.includes(label))
+    .find(
+      (node) =>
+        node.props.text === label ||
+        node
+          .findAll((child) => String(child.type) === 'Label')
+          .some((child) => child.children.includes(label))
     )!;
 }
 function check(screen: TestRenderer.ReactTestRenderer, id: string, selected: boolean) {
@@ -70,7 +78,7 @@ test('confirms Terms then Privacy without scrolling and saves only after both ex
   expect(step()).toBe('terms');
   expect(button(screen, 'Confirm and continue')).toBeUndefined();
   const next = () => button(screen, 'Continue to Privacy');
-  expect(next().props.isDisabled).toBe(true);
+  expect(next().props.disabled).toBe(true);
   void act(() => next().props.onPress());
   expect(step()).toBe('terms');
   check(screen, 'terms-acceptance', true);
@@ -78,18 +86,18 @@ test('confirms Terms then Privacy without scrolling and saves only after both ex
   expect(step()).toBe('privacy');
   expect(onClose).not.toHaveBeenCalled();
   const confirm = () => button(screen, 'Confirm and continue');
-  expect(confirm().props.isDisabled).toBe(true);
+  expect(confirm().props.disabled).toBe(true);
   void act(() => confirm().props.onPress());
   expect(onClose).not.toHaveBeenCalled();
   check(screen, 'privacy-acknowledgment', true);
-  expect(confirm().props.isDisabled).toBe(false);
+  expect(confirm().props.disabled).toBe(false);
   void act(() => button(screen, 'Back to Terms').props.onPress());
   expect(step()).toBe('terms');
   check(screen, 'terms-acceptance', false);
-  expect(next().props.isDisabled).toBe(true);
+  expect(next().props.disabled).toBe(true);
   check(screen, 'terms-acceptance', true);
   void act(() => next().props.onPress());
-  expect(confirm().props.isDisabled).toBe(true);
+  expect(confirm().props.disabled).toBe(true);
   check(screen, 'privacy-acknowledgment', true);
   void act(() => confirm().props.onPress());
   expect(onClose).toHaveBeenCalledTimes(1);
@@ -103,7 +111,7 @@ test('controls stay outside the scroller and can be checked immediately', () => 
   expect(scroller.findAll((node) => String(node.type) === 'Checkbox')).toHaveLength(0);
   expect(scroller.findAll((node) => String(node.type) === 'Button')).toHaveLength(0);
   check(screen, 'terms-acceptance', true);
-  expect(button(screen, 'Continue to Privacy').props.isDisabled).toBe(false);
+  expect(button(screen, 'Continue to Privacy').props.disabled).toBe(false);
   void act(() => button(screen, 'View existing recovery information').props.onPress());
   expect(screen.root.findAll((node) => String(node.type) === 'Recovery')).toHaveLength(1);
   expect(onClose).not.toHaveBeenCalled();
@@ -117,7 +125,7 @@ test('abandoning midway restarts at Terms without retaining partial agreement', 
   void act(() => first.unmount());
   const second = render({ onClose });
   expect(second.root.findByType(LegalDocumentScreen).props.documentId).toBe('terms');
-  expect(button(second, 'Continue to Privacy').props.isDisabled).toBe(true);
+  expect(button(second, 'Continue to Privacy').props.disabled).toBe(true);
   expect(onClose).not.toHaveBeenCalled();
   void act(() => second.unmount());
 });

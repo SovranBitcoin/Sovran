@@ -15,7 +15,10 @@ jest.mock('@/shared/ui/primitives/Text', () => ({ Text: 'Text' }));
 jest.mock('@/shared/ui/primitives/View/View', () => ({ View: 'View' }));
 jest.mock('assets/icons', () => 'Icon');
 jest.mock('@/shared/hooks/useThemeColor', () => ({ useThemeColor: () => ['white', 'grey'] }));
-jest.mock('@/shared/lib/color', () => ({ withAlpha: (value: string) => value }));
+jest.mock('@/shared/lib/color', () => ({
+  ...jest.requireActual('@/shared/lib/color'),
+  withAlpha: (value: string) => value,
+}));
 
 function rootOf(element: React.ReactElement) {
   let tree!: TestRenderer.ReactTestRenderer;

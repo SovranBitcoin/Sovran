@@ -61,6 +61,7 @@ jest.mock('wallet/react', () => ({
 }));
 
 jest.mock('@/features/transactions', () => ({
+  entryDetailItems: () => [],
   TransactionDetailShell: ({
     cancelling,
     timelineFocusKey,
@@ -154,7 +155,7 @@ jest.mock('@/shared/blocks/PaymentInfo', () => {
   };
 });
 jest.mock('@/shared/ui/composed/DetailsSection', () => ({ DetailsSection: () => null }));
-jest.mock('@/shared/ui/composed/GradientCard', () => ({ GradientCard: () => null }));
+jest.mock('@/shared/ui/composed/Surface', () => ({ Surface: () => null }));
 jest.mock('@/shared/ui/composed/ScreenStates', () => ({
   ScreenErrorState: () => null,
   ScreenLoadingState: () => null,

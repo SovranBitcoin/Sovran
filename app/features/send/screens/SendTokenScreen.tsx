@@ -27,13 +27,14 @@ import {
   amountDetailItem,
   stateDetailItem,
   mintDetailItem,
+  entryDetailItems,
 } from '@/features/transactions';
 import { MiddleEllipsisValue } from '@/shared/ui/composed/MiddleEllipsisValue';
 import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { DetailsSection } from '@/shared/ui/composed/DetailsSection';
-import { GradientCard } from '@/shared/ui/composed/GradientCard';
+import { Surface } from '@/shared/ui/composed/Surface';
 import { ScreenErrorState, ScreenLoadingState } from '@/shared/ui/composed/ScreenStates';
 import { View } from '@/shared/ui/primitives/View/View';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -72,6 +73,8 @@ export function SendTokenScreen({
   onNavigateBack,
 }: SendTokenScreenProps) {
   useLifecycleLogger('SendTokenScreen');
+  // Details is opened from the footer, not from a row in the page.
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [cancellationStarted, setCancellationStarted] = useState(false);
   const { entry, error, actions, source, mintUrl } = useScreenActions(
     'sendToken',
@@ -221,6 +224,17 @@ export function SendTokenScreen({
         <ButtonHandler
           buttons={[
             {
+              // Every id and value behind this payment, each one copyable. It
+              // gives way to the screen's own actions: behind the dots when two
+              // of them are showing, in the free slot when they are not.
+              testID: 'send-token-details',
+              text: 'Details',
+              icon: 'mdi:receipt-text-outline',
+              variant: 'secondary',
+              onPress: () => setDetailsOpen(true),
+              prefersOverflow: true,
+            },
+            {
               testID: 'send-token-copy',
               text: 'Copy',
               icon: 'lets-icons:copy',
@@ -327,7 +341,7 @@ export function SendTokenScreen({
           )}
 
           {tokenMemo ? (
-            <GradientCard
+            <Surface
               testID="send-token-memo"
               style={styles.memoCard}
               contentStyle={styles.memoContent}>
@@ -335,13 +349,16 @@ export function SendTokenScreen({
                 Memo
               </Text>
               <SendTokenMemoText memo={tokenMemo} />
-            </GradientCard>
+            </Surface>
           ) : null}
 
           {isComplete && <TransactionLocationSection transactionId={entry.id} />}
         </>
       }>
       <DetailsSection
+        trigger="none"
+        open={detailsOpen}
+        onOpenChange={setDetailsOpen}
         items={[
           ...spendingConditionDetailItems(spendingConditions),
           paymentRequest && { title: 'Type', value: 'Payment Request' },
@@ -366,6 +383,7 @@ export function SendTokenScreen({
             title: 'Token',
             value: <MiddleEllipsisValue value={entry.tokenString.toString()} />,
           },
+          ...entryDetailItems(entry),
         ]}
       />
     </TransactionDetailShell>

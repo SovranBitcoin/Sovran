@@ -36,7 +36,10 @@ jest.mock('@/shared/hooks/useThemeColor', () => ({
   useThemeColor: (value: string | string[]) =>
     Array.isArray(value) ? value.map(() => 'black') : 'black',
 }));
-jest.mock('@/shared/lib/color', () => ({ withAlpha: (color: string) => color }));
+jest.mock('@/shared/lib/color', () => ({
+  ...jest.requireActual('@/shared/lib/color'),
+  withAlpha: (color: string) => color,
+}));
 jest.mock('@/features/feed/lib/repostMenu', () => ({ openRepostMenu: jest.fn() }));
 jest.mock('@/shared/ui/primitives/Text', () => ({
   Text: ({ children, loading }: { children?: ReactNode; loading?: boolean }) =>

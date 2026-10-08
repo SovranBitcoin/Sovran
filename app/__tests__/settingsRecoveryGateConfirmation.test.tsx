@@ -148,6 +148,14 @@ jest.mock('@/shared/blocks/status', () => ({
 }));
 jest.mock('assets/icons', () => ({ __esModule: true, default: () => null }));
 
+jest.mock('@/shared/ui/primitives/Button', () => ({ Button: 'MockButton' }));
+jest.mock('@/shared/ui/composed/Surface', () => {
+  const ReactActual = jest.requireActual<typeof import('react')>('react');
+  return {
+    Surface: ({ children }: React.PropsWithChildren) =>
+      ReactActual.createElement('MockSurface', null, children),
+  };
+});
 jest.mock('heroui-native', () => {
   const ReactActual = jest.requireActual<typeof import('react')>('react');
   const Button = Object.assign(
@@ -164,17 +172,8 @@ jest.mock('heroui-native', () => {
         ReactActual.createElement('MockButtonLabel', null, children),
     }
   );
-  const Card = Object.assign(
-    ({ children }: React.PropsWithChildren) =>
-      ReactActual.createElement('MockCard', null, children),
-    {
-      Body: ({ children }: React.PropsWithChildren) =>
-        ReactActual.createElement('MockCardBody', null, children),
-    }
-  );
   return {
     Button,
-    Card,
     Switch: (props: Record<string, unknown>) => ReactActual.createElement('MockSwitch', props),
   };
 });
@@ -236,8 +235,8 @@ describe('SettingsRecoveryScreen gate confirmation', () => {
       await renderer!.root.findByProps({ testID: 'recovery-swipe' }).props.onConfirm();
     });
     const button = renderer!.root.findByProps({ testID: 'recovery-continue' });
-    expect(button.props.isDisabled).toBe(true);
-    expect(button.props.onPress).toBeUndefined();
+    expect(button.props.disabled).toBe(true);
+    button.props.onPress();
     expect(onComplete).not.toHaveBeenCalled();
     expect(mockRestoreKeyset).not.toHaveBeenCalled();
   });
@@ -271,7 +270,7 @@ describe('SettingsRecoveryScreen gate confirmation', () => {
       await renderer!.root.findByProps({ testID: 'recovery-swipe' }).props.onConfirm();
     });
     const button = renderer!.root.findByProps({ testID: 'recovery-continue' });
-    expect(button.props.isDisabled).toBe(false);
+    expect(button.props.disabled).toBe(false);
     await act(async () => {
       button.props.onPress();
     });

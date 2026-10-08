@@ -2146,13 +2146,6 @@ export function NearPayScreen() {
   const openPeerList = useCallback(() => {
     router.push('/(send-flow)/nearPayPeers');
   }, []);
-  const [amountHeaderStatus, setAmountHeaderStatus] = useState<(() => React.ReactNode) | null>(
-    null
-  );
-  // Wrapped: a bare function handed to a state setter is called as an updater.
-  const handleAmountHeaderStatus = useCallback((render: (() => React.ReactNode) | null) => {
-    setAmountHeaderStatus(() => render);
-  }, []);
   const renderHeaderRight = useCallback(
     () => <HeaderBadge count={headerBadgeCount} onPress={openPeerList} />,
     [headerBadgeCount, openPeerList]
@@ -2166,9 +2159,9 @@ export function NearPayScreen() {
         headerTitle: amountActive ? renderEmptyHeader : undefined,
         headerBackVisible: false,
         headerLeft: amountActive ? renderHeaderLeft : renderEmptyHeader,
-        // The amount step's lock and sendability status belong in the bar, and
-        // the bar is this screen's: the inline amount content hands them over.
-        headerRight: amountActive ? (amountHeaderStatus ?? renderEmptyHeader) : renderHeaderRight,
+        // The amount step shows its lock and network status in its own
+        // display, so the bar carries nothing beside the back button.
+        headerRight: amountActive ? renderEmptyHeader : renderHeaderRight,
         // The send flow's shared-element avatar lands inside the header band,
         // and Android's sheet header (FlowSheetHeader) composites its scrim
         // gradient ABOVE screen content — the avatar ended up underneath it.
@@ -2176,7 +2169,7 @@ export function NearPayScreen() {
         // the radar's faint dot field doesn't need the legibility fade.
         ...(Platform.OS === 'android' ? { headerBackground: renderNullHeaderBackground } : {}),
       }),
-    [amountActive, amountHeaderStatus, renderEmptyHeader, renderHeaderLeft, renderHeaderRight]
+    [amountActive, renderEmptyHeader, renderHeaderLeft, renderHeaderRight]
   );
 
   return (
@@ -2214,11 +2207,7 @@ export function NearPayScreen() {
                     hideAvatar={sharedAvatarVisible}
                   />
                   <Animated.View style={amountContentCombinedStyle}>
-                    <AmountFlowContent
-                      amountEntry={inlineAmountEntry}
-                      headerMode="none"
-                      onHeaderStatus={handleAmountHeaderStatus}
-                    />
+                    <AmountFlowContent amountEntry={inlineAmountEntry} headerMode="none" />
                   </Animated.View>
                 </Animated.View>
               ) : null}

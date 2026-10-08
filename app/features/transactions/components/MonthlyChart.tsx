@@ -1,10 +1,10 @@
 import { useEffect } from 'react';
 import { StyleSheet, useWindowDimensions, View as RNView } from 'react-native';
-import { SquircleView } from '@/shared/ui/primitives/SquircleView';
 import Svg, { Path, Defs, LinearGradient, Stop, Text as SvgText } from 'react-native-svg';
 import { Text } from '@/shared/ui/primitives/Text';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
-import { BlurCardFrame } from '@/shared/ui/composed/BlurCardFrame';
+import { Surface } from '@/shared/ui/composed/Surface';
+import { useStylePaint } from '@/shared/styles/appStyle';
 import { formatAmount } from '@/shared/lib/currency';
 import { amountToNumber } from '@/shared/lib/cashu/amount';
 import Icon from '@/assets/icons';
@@ -235,8 +235,7 @@ function MonthlyChart({ history, unit: accountUnit = 'sat', mode }: MonthlyChart
   // `unit` arrives as the ACCOUNT unit; amounts render in the mint unit behind it.
   const unit = toRealUnit(accountUnit);
   const isTestnutMint = useIsTestnutMint();
-  const [muted, foreground, dangerColor, successColor] = useThemeColor([
-    'muted',
+  const [foreground, dangerColor, successColor] = useThemeColor([
     'foreground',
     'danger',
     'success',
@@ -247,8 +246,6 @@ function MonthlyChart({ history, unit: accountUnit = 'sat', mode }: MonthlyChart
   const quoteIdToGroup = useSwapTransactionsStore((s) => s.quoteIdToGroup);
 
   const config = MODE_CONFIG[mode];
-
-  const borderColor = withAlpha(muted, 0.3);
 
   const actualLineColor = mode === 'spent' ? dangerColor : successColor;
   const projectedLineColor = withAlpha(foreground, 0.3);
@@ -336,115 +333,117 @@ function MonthlyChart({ history, unit: accountUnit = 'sat', mode }: MonthlyChart
 
   // Change indicator icon: spent = arrow-up (spending rising), received = arrow-up (income rising)
   const changeIcon = 'mdi:arrow-up';
+  // This component renders its own Surface, so it reads the inset the
+  // Surface will give its children rather than the context below it.
+  const paint = useStylePaint();
+  const inset = paint.cardIsBare ? 0 : paint.style.space.pad;
 
   return (
     <Log name="MonthlyChart">
-      <SquircleView style={[styles.card, { borderColor }]}>
-        <BlurCardFrame accentColor={muted}>
-          <RNView style={styles.container}>
-            {/* Header */}
-            <RNView style={styles.header}>
-              <RNView className="min-w-0 flex-1 gap-0.5">
-                <Text size={14} semibold color={withAlpha(foreground, 0.66)}>
-                  {config.title}
-                </Text>
-                <RNView className="flex-row flex-wrap items-center gap-2 gap-y-1">
-                  <AmountFormatter
-                    className="min-w-0 shrink flex-col items-stretch"
-                    amount={hasData ? totalAmount : 0}
-                    unit={unit}
-                    size={28}
-                    weight="heavy"
-                  />
-                  {dailyChange > 0 ? (
-                    <RNView
-                      testID={`monthly-chart-${mode}-change`}
+      <Surface>
+        <RNView style={[styles.container, { paddingHorizontal: inset, paddingVertical: inset }]}>
+          {/* Header */}
+          <RNView style={styles.header}>
+            <RNView className="min-w-0 flex-1 gap-0.5">
+              <Text size={14} semibold color={withAlpha(foreground, 0.66)}>
+                {config.title}
+              </Text>
+              <RNView className="flex-row flex-wrap items-center gap-2 gap-y-1">
+                <AmountFormatter
+                  className="min-w-0 shrink flex-col items-stretch"
+                  amount={hasData ? totalAmount : 0}
+                  unit={unit}
+                  size={28}
+                  weight="heavy"
+                />
+                {dailyChange > 0 ? (
+                  <RNView
+                    testID={`monthly-chart-${mode}-change`}
+                    className="min-w-0 shrink"
+                    style={[
+                      styles.changeChip,
+                      { backgroundColor: withAlpha(actualLineColor, 0.12) },
+                    ]}>
+                    <Icon name={changeIcon} size={14} color={actualLineColor} />
+                    <Text
                       className="min-w-0 shrink"
-                      style={[
-                        styles.changeChip,
-                        { backgroundColor: withAlpha(actualLineColor, 0.12) },
-                      ]}>
-                      <Icon name={changeIcon} size={14} color={actualLineColor} />
-                      <Text
-                        className="min-w-0 shrink"
-                        overpass
-                        size={13}
-                        semibold
-                        color={actualLineColor}>
-                        {formatAmount(
-                          { amount: dailyChange, unit },
-                          { useUserPreference: true, displayPreference }
-                        )}
-                      </Text>
-                    </RNView>
-                  ) : null}
-                </RNView>
+                      overpass
+                      size={13}
+                      semibold
+                      color={actualLineColor}>
+                      {formatAmount(
+                        { amount: dailyChange, unit },
+                        { useUserPreference: true, displayPreference }
+                      )}
+                    </Text>
+                  </RNView>
+                ) : null}
               </RNView>
-              {hasData && todayDay < daysInMonth ? (
-                <RNView className="max-w-1/2 ml-2 shrink-0 pt-1">
-                  <AmountFormatter
-                    className="min-w-0 shrink flex-col items-stretch"
-                    amount={projectedTotal}
-                    unit={unit}
-                    size={14}
-                    weight="medium"
-                    color={withAlpha(foreground, 0.66)}
-                  />
-                </RNView>
-              ) : null}
             </RNView>
-
-            {/* Chart */}
-            <Svg
-              width={chartWidth}
-              height={totalSvgHeight}
-              viewBox={`0 0 ${chartWidth} ${totalSvgHeight}`}>
-              <Defs>
-                <LinearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                  <Stop offset="0" stopColor={foreground} stopOpacity="0.08" />
-                  <Stop offset="1" stopColor={foreground} stopOpacity="0" />
-                </LinearGradient>
-              </Defs>
-
-              {hasData ? <Path d={projectedAreaPath} fill={`url(#${gradientId})`} /> : null}
-
-              {hasData && projectedPoints.length > 1 ? (
-                <Path
-                  d={projectedPath}
-                  stroke={projectedLineColor}
-                  strokeWidth={PROJECTED_LINE_WIDTH}
-                  strokeDasharray={[6, 4]}
-                  strokeLinecap="round"
-                  fill="none"
+            {hasData && todayDay < daysInMonth ? (
+              <RNView className="max-w-1/2 ml-2 shrink-0 pt-1">
+                <AmountFormatter
+                  className="min-w-0 shrink flex-col items-stretch"
+                  amount={projectedTotal}
+                  unit={unit}
+                  size={14}
+                  weight="medium"
+                  color={withAlpha(foreground, 0.66)}
                 />
-              ) : null}
-
-              {hasData ? (
-                <Path
-                  d={actualPath}
-                  stroke={actualLineColor}
-                  strokeWidth={ACTUAL_LINE_WIDTH}
-                  strokeLinecap="round"
-                  fill="none"
-                />
-              ) : null}
-
-              {xTickPositions.map(({ day, x }) => (
-                <SvgText
-                  key={day}
-                  x={x}
-                  y={totalSvgHeight - 4}
-                  fontSize={11}
-                  fontFamily="OxygenBold"
-                  fill={labelColor}
-                  textAnchor="middle">
-                  {day}
-                </SvgText>
-              ))}
-            </Svg>
+              </RNView>
+            ) : null}
           </RNView>
-        </BlurCardFrame>
-      </SquircleView>
+
+          {/* Chart */}
+          <Svg
+            width={chartWidth}
+            height={totalSvgHeight}
+            viewBox={`0 0 ${chartWidth} ${totalSvgHeight}`}>
+            <Defs>
+              <LinearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+                <Stop offset="0" stopColor={foreground} stopOpacity="0.08" />
+                <Stop offset="1" stopColor={foreground} stopOpacity="0" />
+              </LinearGradient>
+            </Defs>
+
+            {hasData ? <Path d={projectedAreaPath} fill={`url(#${gradientId})`} /> : null}
+
+            {hasData && projectedPoints.length > 1 ? (
+              <Path
+                d={projectedPath}
+                stroke={projectedLineColor}
+                strokeWidth={PROJECTED_LINE_WIDTH}
+                strokeDasharray={[6, 4]}
+                strokeLinecap="round"
+                fill="none"
+              />
+            ) : null}
+
+            {hasData ? (
+              <Path
+                d={actualPath}
+                stroke={actualLineColor}
+                strokeWidth={ACTUAL_LINE_WIDTH}
+                strokeLinecap="round"
+                fill="none"
+              />
+            ) : null}
+
+            {xTickPositions.map(({ day, x }) => (
+              <SvgText
+                key={day}
+                x={x}
+                y={totalSvgHeight - 4}
+                fontSize={11}
+                fontFamily="OxygenBold"
+                fill={labelColor}
+                textAnchor="middle">
+                {day}
+              </SvgText>
+            ))}
+          </Svg>
+        </RNView>
+      </Surface>
     </Log>
   );
 }
@@ -471,14 +470,7 @@ export function ReceivedThisMonth(props: ChartWrapperProps) {
 // ---------------------------------------------------------------------------
 
 const styles = StyleSheet.create({
-  card: {
-    borderRadius: 20,
-    borderCurve: 'continuous',
-    overflow: 'hidden',
-    borderWidth: 1,
-  },
   container: {
-    padding: 16,
     gap: 8,
     zIndex: zIndex.raised,
   },

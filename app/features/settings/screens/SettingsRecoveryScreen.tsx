@@ -9,9 +9,12 @@ import { SlideToConfirm } from '@/shared/ui/composed/SlideToConfirm';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
+import { Button } from '@/shared/ui/primitives/Button';
 import Icon from 'assets/icons';
 import { MintIcon } from '@/shared/ui/composed/MintIcon';
-import { Switch, Button, Card } from 'heroui-native';
+import { Surface } from '@/shared/ui/composed/Surface';
+import { useStylePaint } from '@/shared/styles/appStyle';
+import { Switch } from '@/shared/ui/primitives/Switch';
 import { cashuLog, useLifecycleLogger, mintUrlLogFields } from '@/shared/lib/logger';
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { useMintManagement } from '@/features/mint';
@@ -119,6 +122,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
   onComplete,
 }) => {
   useLifecycleLogger('SettingsRecoveryScreen');
+  const { pad } = useStylePaint().style.space;
   const [foreground, mutedColor, successColor, dangerColor, warningColor, surfaceSecondary] =
     useThemeColor([
       'foreground',
@@ -596,8 +600,8 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
   // ─── Mint preview list (shared by idle + complete) ───────────────────────
 
   const renderMintList = () => (
-    <Card variant="secondary" className="w-full">
-      <Card.Body>
+    <View className="w-full">
+      <Surface contentStyle={{ padding: pad }}>
         <VStack gap={12}>
           {mints.map((mint) => {
             const displayName = getMintDisplayName(mint, mint.mintUrl);
@@ -611,8 +615,8 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
             );
           })}
         </VStack>
-      </Card.Body>
-    </Card>
+      </Surface>
+    </View>
   );
 
   // ─── Idle state ─────────────────────────────────────────────────────────
@@ -673,13 +677,14 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
           />
         )}
         {!gateMode && (
-          <Button
-            testID="recovery-cancel"
-            variant="secondary"
-            className="w-full"
-            onPress={handleClose}>
-            <Button.Label>Cancel</Button.Label>
-          </Button>
+          <View className="w-full">
+            <Button
+              testID="recovery-cancel"
+              variant="secondary"
+              text="Cancel"
+              onPress={handleClose}
+            />
+          </View>
         )}
       </VStack>
     </VStack>
@@ -778,8 +783,8 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
             )}
           </VStack>
 
-          <Card variant="secondary" className="w-full">
-            <Card.Body>
+          <View className="w-full">
+            <Surface contentStyle={{ padding: pad }}>
               <VStack gap={12}>
                 {visibleResults.map((r, i) => (
                   <MintRecoveryRow
@@ -791,31 +796,35 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
                   />
                 ))}
               </VStack>
-            </Card.Body>
-          </Card>
+            </Surface>
+          </View>
         </VStack>
 
         <VStack gap={12} className="w-full pb-6">
           {isComplete ? (
             <Button
               variant="primary"
-              className="w-full"
+              text={gateMode ? 'Continue' : 'Close'}
               testID="recovery-continue"
-              isDisabled={gateMode && !canContinue}
-              onPress={gateMode ? (canContinue ? onComplete : undefined) : handleClose}>
-              <Button.Label>{gateMode ? 'Continue' : 'Close'}</Button.Label>
-            </Button>
+              disabled={gateMode && !canContinue}
+              onPress={
+                gateMode
+                  ? () => {
+                      if (canContinue) onComplete?.();
+                    }
+                  : handleClose
+              }
+            />
           ) : (
             // Stop between mints; a cancelled run stays available for retry.
             !gateMode && (
               <Button
                 variant="secondary"
-                className="w-full"
+                text={recoveryCancelled ? 'Stopping…' : 'Cancel'}
                 testID="recovery-stop"
-                isDisabled={recoveryCancelled}
-                onPress={handleCancelRecovery}>
-                <Button.Label>{recoveryCancelled ? 'Stopping…' : 'Cancel'}</Button.Label>
-              </Button>
+                disabled={recoveryCancelled}
+                onPress={handleCancelRecovery}
+              />
             )
           )}
         </VStack>
@@ -865,8 +874,8 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
           </VStack>
 
           {visibleResults.length > 0 && (
-            <Card variant="secondary" className="w-full">
-              <Card.Body>
+            <View className="w-full">
+              <Surface contentStyle={{ padding: pad }}>
                 <VStack gap={12}>
                   {visibleResults.map((result) => {
                     const mint = mintsByUrl[result.mint];
@@ -902,8 +911,8 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
                     );
                   })}
                 </VStack>
-              </Card.Body>
-            </Card>
+              </Surface>
+            </View>
           )}
         </VStack>
 
@@ -919,13 +928,14 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
             iconColor={surfaceSecondary}
           />
           {!gateMode && (
-            <Button
-              testID="recovery-close"
-              variant="secondary"
-              className="w-full"
-              onPress={handleClose}>
-              <Button.Label>Close</Button.Label>
-            </Button>
+            <View className="w-full">
+              <Button
+                testID="recovery-close"
+                variant="secondary"
+                text="Close"
+                onPress={handleClose}
+              />
+            </View>
           )}
         </VStack>
       </VStack>

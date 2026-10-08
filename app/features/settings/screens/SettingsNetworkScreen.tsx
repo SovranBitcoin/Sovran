@@ -20,9 +20,9 @@ import {
   ListGroup,
   PressableFeedback,
   Separator,
-  Switch,
   TextField,
 } from 'heroui-native';
+import { Switch } from '@/shared/ui/primitives/Switch';
 
 import Icon from 'assets/icons';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';

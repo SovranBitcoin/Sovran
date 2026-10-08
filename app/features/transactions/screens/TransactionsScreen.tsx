@@ -283,9 +283,10 @@ export function TransactionsScreen({
       <ButtonHandler
         buttons={[
           {
-            text: isSweeping
-              ? 'Cancelling...'
-              : `Cancel ${visiblePendingEcash.length} pending (${totalVisiblePendingAmount} ${visibleUnit.toUpperCase()})`,
+            text: isSweeping ? 'Cancelling...' : `Cancel ${visiblePendingEcash.length} pending`,
+            // The amount does not fit a pill on a small phone and grows
+            // without limit; it is spoken here and shown on the rows above.
+            accessibilityLabel: `Cancel ${visiblePendingEcash.length} pending, ${totalVisiblePendingAmount} ${visibleUnit.toUpperCase()}`,
             variant: 'primary',
             icon: 'mdi:broom',
             loading: isSweeping,

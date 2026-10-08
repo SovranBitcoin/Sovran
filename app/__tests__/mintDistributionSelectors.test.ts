@@ -56,7 +56,9 @@ describe('mint distribution e2e selectors', () => {
     expect(flowHeader).toContain(
       "testID={isFirstScreen ? 'flow-header-close' : 'flow-header-back'}"
     );
-    expect(flowHeader).toContain("accessibilityLabel={isFirstScreen ? 'Close screen' : 'Go back'}");
+    expect(flowHeader).toContain(
+      "accessibilityLabel={isFirstScreen || sheet ? 'Close screen' : 'Go back'}"
+    );
 
     // The row id's suffix is the swap group id; e2e captures it with
     // idPrefix "swap-row-" and matches it against the detail's swap-id probe.
