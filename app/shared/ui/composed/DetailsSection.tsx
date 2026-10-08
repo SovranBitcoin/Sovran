@@ -1,19 +1,17 @@
-import React, { useState } from 'react';
-import { StyleSheet } from 'react-native';
-import { Pressable } from '@/shared/ui/primitives/Pressable';
-import { Log } from '@/shared/lib/logger';
-import { HStack } from '@/shared/ui/primitives/View/HStack';
-import { View } from '@/shared/ui/primitives/View/View';
-import { Text } from '@/shared/ui/primitives/Text';
-import { DetailsList } from '@/shared/ui/composed/DetailsList';
-import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { withAlpha } from '@/shared/lib/color';
+import { useEffect, useId } from 'react';
+import { View } from 'react-native';
 import Icon from 'assets/icons';
 
-interface SectionItem {
-  title: string;
-  value: React.ReactNode;
-  direction?: 'row' | 'column';
+import { Log } from '@/shared/lib/logger';
+import { useStylePaint } from '@/shared/styles/appStyle';
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
+import { useLatestRef } from '@/shared/hooks/useLatestRef';
+import { useDetailsSheetStore } from '@/shared/stores/runtime/detailsSheetStore';
+import { DetailsTable, type DetailsSheetItem } from '@/shared/ui/composed/DetailsSheet';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
+import { Text } from '@/shared/ui/primitives/Text';
+
+interface SectionItem extends DetailsSheetItem {
   align?: 'left' | 'right';
 }
 
@@ -23,71 +21,107 @@ interface DetailsSectionProps {
    * `condition && { title, value }` without compacting the array themselves.
    */
   items: (SectionItem | false | 0 | '' | null | undefined)[];
-  /** Label for the toggle button (default: "Details") */
+  /** Label for the row that opens the modal, and the modal's title. */
   label?: string;
-  /** Whether to start expanded (default: false) */
+  /** Show the table in place, with no sheet. For previews. */
   initialExpanded?: boolean;
-  /** Camera mode for BlurView (default: false) */
-  camera?: boolean;
-  /** e2e selector for the toggle (default: `details-section-toggle`). */
+  /**
+   * Where the modal is opened from. `inline` (the default) draws a row in the
+   * page. `none` draws nothing: the screen opens it from somewhere else, such
+   * as a footer button, by setting `open`. The modal is a route and closes
+   * itself, so `onOpenChange(false)` is called as soon as it has been
+   * presented: `open` is a request to show it, not a record that it is showing.
+   */
+  trigger?: 'inline' | 'none';
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  /** e2e selector for the inline row (default: `details-section-toggle`). */
   testID?: string;
 }
 
 /**
- * A collapsible section for showing advanced/technical transaction details.
- * Collapsed by default to keep screens clean and simple.
+ * The technical facts of a payment: ids, quote, mint, state. Kept off the page
+ * and one tap away, in a modal (`app/details.tsx`) where every value can be
+ * copied.
  */
 export function DetailsSection({
   items,
   label = 'Details',
   initialExpanded = false,
-  camera = false,
+  trigger = 'inline',
+  open,
+  onOpenChange,
   testID = 'details-section-toggle',
 }: DetailsSectionProps) {
-  const [expanded, setExpanded] = useState(initialExpanded);
-  const foreground = useThemeColor('foreground');
-  const rows = items.filter((item): item is SectionItem => Boolean(item));
+  const paint = useStylePaint();
+  const owner = useId();
+  // First row with a title wins: screens append the shared debug rows after
+  // their own, and a screen's own wording for a fact should not be doubled.
+  const seen = new Set<string>();
+  const rows = items.filter((item): item is SectionItem => {
+    if (!item || seen.has(item.title)) return false;
+    seen.add(item.title);
+    return true;
+  });
+  const present = () => {
+    if (rows.length === 0) return;
+    useDetailsSheetStore.getState().present(owner, label, rows);
+    router.push('/details');
+  };
 
-  // Don't render if there are no items
+  // The effects below fire on a change of `open` or of what the rows say, and
+  // need this render's rows and callbacks when they do — without re-firing
+  // because those are new objects every render.
+  const latest = useLatestRef({ present, onOpenChange, rows });
+
+  // A footer button asks for the modal by setting `open`.
+  useEffect(() => {
+    if (!open) return;
+    latest.current.present();
+    latest.current.onOpenChange?.(false);
+  }, [open, latest]);
+
+  // While this section's modal is up, what it shows follows the payment: a
+  // state or a confirmation count that changes underneath changes there too.
+  const signature = rows
+    .map((row) => `${row.title}=${typeof row.value === 'string' ? row.value : ''}`)
+    .join('|');
+  useEffect(() => {
+    useDetailsSheetStore.getState().update(owner, latest.current.rows);
+  }, [owner, signature, latest]);
+
   if (rows.length === 0) return null;
+
+  if (initialExpanded) {
+    return (
+      <Log name="DetailsSection">
+        <View style={{ paddingHorizontal: paint.style.space.gutter }}>
+          <DetailsTable items={rows} />
+        </View>
+      </Log>
+    );
+  }
 
   return (
     <Log name="DetailsSection">
-      <View style={styles.container}>
+      {trigger === 'inline' ? (
         <Pressable
-          onPress={() => setExpanded((v) => !v)}
-          style={styles.toggle}
-          hitSlop={{ top: 8, bottom: 8, left: 16, right: 16 }}
+          onPress={present}
+          className="flex-row items-center justify-between"
+          style={{
+            minHeight: paint.style.size.control,
+            paddingHorizontal: paint.style.space.gutter,
+          }}
           testID={testID}
           accessibilityRole="button"
           accessibilityLabel={label}
-          accessibilityState={{ expanded }}>
-          <HStack align="center" gap={6}>
-            <Icon
-              name={expanded ? 'mdi:chevron-down' : 'mdi:chevron-right'}
-              color={withAlpha(foreground, 0.5)}
-              size={18}
-            />
-            <Text size={14} bold style={{ color: withAlpha(foreground, 0.5) }}>
-              {label}
-            </Text>
-          </HStack>
+          accessibilityHint="Opens every detail of this payment">
+          <Text size={16} semibold color={paint.text.secondary}>
+            {label}
+          </Text>
+          <Icon name="mdi:chevron-right" color={paint.text.tertiary} size={20} />
         </Pressable>
-        {expanded ? (
-          <DetailsList items={rows} camera={camera} gradient style={{ marginHorizontal: 0 }} />
-        ) : null}
-      </View>
+      ) : null}
     </Log>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    marginHorizontal: 16,
-    gap: 8,
-  },
-  toggle: {
-    paddingVertical: 8,
-    paddingHorizontal: 4,
-  },
-});

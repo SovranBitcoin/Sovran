@@ -11,7 +11,7 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { withAlpha } from '@/shared/lib/color';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { truncateMiddle } from '@/shared/lib/strings';
-import { GradientCard } from '@/shared/ui/composed/GradientCard';
+import { Surface } from '@/shared/ui/composed/Surface';
 import { formatDisplayValue } from '@/shared/lib/format/displayValue';
 
 interface ItemTitle {
@@ -61,9 +61,9 @@ export function DetailsList({ items, style, camera = false, special, gradient }:
   if (gradient) {
     return (
       <Log name="DetailsList">
-        <GradientCard style={{ marginHorizontal: 16, ...style }} contentStyle={{ padding: 8 }}>
+        <Surface style={{ marginHorizontal: 16, ...style }} contentStyle={{ padding: 8 }}>
           {rows}
-        </GradientCard>
+        </Surface>
       </Log>
     );
   }

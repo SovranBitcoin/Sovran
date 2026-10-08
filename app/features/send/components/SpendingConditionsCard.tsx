@@ -55,11 +55,20 @@ export function SpendingConditionsCard({
   );
 }
 
+/**
+ * A title for each key in a list. Each one is distinct: the Details page drops
+ * a row whose title an earlier row used, which hid every key after the second.
+ */
+const keyRowTitle = (first: string, rest: string, index: number) =>
+  index === 0 ? first : index === 1 ? rest : `${rest} (${index})`;
+
 export function spendingConditionDetailItems(
   conditions: SpendingConditions | null
 ): React.ComponentProps<typeof DetailsSection>['items'] {
   if (!conditions || conditions.kind === 'unlocked') return [];
-  return [
+  const rows: React.ComponentProps<typeof DetailsSection>['items'] = [
+    { title: 'Lock type', value: LOCK_KIND[conditions.kind] },
+    conditions.phase && { title: 'Lock state', value: LOCK_PHASE[conditions.phase] },
     conditions.mixed && {
       title: 'Conditions shown',
       value: 'First locked part; other parts may have different conditions',
@@ -67,7 +76,7 @@ export function spendingConditionDetailItems(
     // Keys are shown, not summarised: "locked to Alice" is our reading
     // of a key, and the key is the thing the mint will actually check.
     ...(conditions.main?.pubkeys ?? []).map((key, index) => ({
-      title: index === 0 ? 'Locked to' : 'Or to',
+      title: keyRowTitle('Locked to', 'Or to', index),
       value: <MiddleEllipsisValue value={key} />,
     })),
     (conditions.main?.requiredSignatures ?? 1) > 1 && {
@@ -86,7 +95,7 @@ export function spendingConditionDetailItems(
         value: 'Anyone holding the token can redeem it',
       },
     ...(conditions.refund?.pubkeys ?? []).map((key, index) => ({
-      title: index === 0 ? 'Can be reclaimed by' : 'Or by',
+      title: keyRowTitle('Can be reclaimed by', 'Or by', index),
       value: <MiddleEllipsisValue value={key} />,
     })),
     (conditions.refund?.requiredSignatures ?? 1) > 1 && {
@@ -105,5 +114,24 @@ export function spendingConditionDetailItems(
       title: 'Not understood',
       value: conditions.unknownTags.join(', '),
     },
+    conditions.limits.length > 0 && {
+      title: 'This wallet cannot',
+      value: conditions.limits.join(', '),
+    },
   ];
+  // Everything here is about the lock, and reads as one group on the page.
+  return rows.map((row) => (row ? { ...row, group: 'Lock' as const } : row));
 }
+
+const LOCK_KIND = {
+  p2pk: 'Public key (P2PK)',
+  htlc: 'Hash lock (HTLC)',
+  unknown: 'Not recognised',
+  unlocked: 'None',
+} as const;
+
+const LOCK_PHASE = {
+  permanent: 'Permanent',
+  'timed-active': 'Locked until its date',
+  'timed-expired': 'Past its date',
+} as const;
