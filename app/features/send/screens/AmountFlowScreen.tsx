@@ -7,20 +7,17 @@ import { Screen } from '@/shared/ui/composed/Screen';
  * passes it to useScreenActions, and renders UI.
  */
 
-import {
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-  useSyncExternalStore,
-  type ReactNode,
-} from 'react';
+import { useCallback, useContext, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { Stack } from 'expo-router';
 import { HeaderHeightContext } from 'expo-router/react-navigation';
 
 import { useExecutionState, useScreenActions, usePaymentFlowMachine } from 'wallet/react';
-import { fetchNip05Pubkey, type RecipientProfile } from 'wallet';
+import {
+  decodePaymentRequestInfo,
+  fetchNip05Pubkey,
+  minorToRawInput,
+  type RecipientProfile,
+} from 'wallet';
 
 import { useMints } from '@cashu/coco-react';
 
@@ -33,19 +30,23 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { withGlassHeaderItems } from '@/navigation/headerItems';
 import { ScreenErrorState } from '@/shared/ui/composed/ScreenStates';
 import { paymentLog, useLifecycleLogger, Log } from '@/shared/lib/logger';
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { useNearPaySessionStore } from '@/shared/stores/runtime/nearPayStore';
 import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useAmountDraftStore } from '@/shared/stores/runtime/amountDraftStore';
+import { useContactSendStore } from '@/shared/stores/runtime/contactSendStore';
+import { useRoutstrTopUpStore } from '@/shared/stores/runtime/routstrTopUpStore';
+import { useNotePickerStore } from '@/shared/stores/runtime/notePickerStore';
 import { zIndex } from '@/shared/styles/tokens';
 import { E2EActionMenuProbe } from '@/shared/lib/popup/E2EActionMenuProbe';
 import type { MintNuts } from '@/shared/lib/cashu/mintNuts';
 
 import { AmountSelectedMintProbe } from '../components/AmountSelectedMintProbe';
 
-import { AmountHeaderStatus } from '../components/AmountHeaderStatus';
 import { RecipientHeader, RecipientHeaderBand } from '../components/RecipientHeader';
 import { useSendLock } from '../hooks/useSendLock';
+import { describeSendDelivery, requestCarrierOf } from '../lib/sendDelivery';
 
 import { AmountSelector } from './AmountSelector';
 
@@ -56,13 +57,6 @@ interface AmountFlowScreenProps {
 interface AmountFlowContentProps {
   amountEntry?: string;
   headerMode?: 'native' | 'none';
-  /**
-   * For a host that owns the navigation bar (`headerMode="none"`, the Nut Drop
-   * radar): handed the lock and sendability status to put in its own
-   * `headerRight`, and `null` when this content goes away. The bar is the
-   * host's, but what belongs in it is known only here.
-   */
-  onHeaderStatus?: (render: (() => ReactNode) | null) => void;
 }
 
 const AMOUNT_FLOW_DIAGNOSTIC_LOGS_ENABLED = false;
@@ -75,11 +69,7 @@ export function AmountFlowScreen({ amountEntry }: AmountFlowScreenProps) {
   );
 }
 
-export function AmountFlowContent({
-  amountEntry,
-  headerMode = 'native',
-  onHeaderStatus,
-}: AmountFlowContentProps) {
+export function AmountFlowContent({ amountEntry, headerMode = 'native' }: AmountFlowContentProps) {
   useLifecycleLogger(headerMode === 'native' ? 'AmountFlowScreen' : 'NearPayInlineAmountFlow');
   // Read the context directly, like `Screen` does: this content also renders
   // inline (Nut Drop) where no navigator header exists, and the hook throws there.
@@ -327,24 +317,68 @@ export function AmountFlowContent({
     [headerAvatarUrl, headerDisplayName, headerSeed, recipientPubkey, recipientReady]
   );
   const isSendOperation = entry?.destination !== 'mintQuote';
-  const showHeaderStatus = (isSendOperation && !!mintUrl) || sendLock.mode !== 'hidden';
-  const { locked: lockLocked, label: lockLabel } = sendLock;
-  const lockShown = sendLock.mode !== 'hidden';
-  const renderHeaderRight = useCallback(
-    () => (
-      <AmountHeaderStatus
-        canSendOffline={canSendOffline}
-        {...(lockShown ? { lock: { locked: lockLocked, label: lockLabel } } : {})}
-      />
-    ),
-    [canSendOffline, lockShown, lockLocked, lockLabel]
+  // Who can take the ecash and whether sending it needs a network: the
+  // display's offline mark, and the sentence behind it.
+  const entryDestination = typeof entry?.destination === 'string' ? entry.destination : undefined;
+  const entryPaymentRequest =
+    typeof entry?.paymentRequest === 'string' ? entry.paymentRequest : null;
+  // How the ecash gets there is the flow's, decided before any amount: a
+  // request names its transport, a Nut Drop goes over the mesh, a contact is
+  // sent a Nostr message, and anything else is shown for the other phone.
+  const contactSendActive = useContactSendStore((state) => state.active !== null);
+  const routstrTopUpActive = useRoutstrTopUpStore((state) => state.phase === 'active');
+  const carrier = useMemo(() => {
+    if (entryPaymentRequest) {
+      return requestCarrierOf(decodePaymentRequestInfo(entryPaymentRequest)?.transports);
+    }
+    if (nearPayRecipient) return 'bluetooth' as const;
+    // An AI-credit top-up is ecash posted to the provider, never handed over.
+    if (routstrTopUpActive) return 'server' as const;
+    return contactSendActive ? ('nostr' as const) : ('scan' as const);
+  }, [contactSendActive, entryPaymentRequest, nearPayRecipient, routstrTopUpActive]);
+  const delivery = useMemo(
+    () =>
+      describeSendDelivery({
+        ...(entryDestination ? { destination: entryDestination } : {}),
+        lockMode: sendLock.mode,
+        locked: sendLock.locked,
+        recipientName: headerDisplayName,
+        canSendOffline,
+        carrier,
+      }),
+    [entryDestination, sendLock.mode, sendLock.locked, headerDisplayName, canSendOffline, carrier]
   );
-  // The inline host draws the bar; hand it the status to draw there.
-  useEffect(() => {
-    if (!onHeaderStatus) return;
-    onHeaderStatus(showHeaderStatus ? renderHeaderRight : null);
-    return () => onHeaderStatus(null);
-  }, [onHeaderStatus, showHeaderStatus, renderHeaderRight]);
+  // The notes held at the mint being sent from, for picking by hand. Only an
+  // ecash send offers it: the point of picking is an amount that needs no mint.
+  const heldNotes = mintUrl ? walletContext?.proofAmounts[mintUrl] : undefined;
+  const entryUnit = typeof entry?.unit === 'string' ? entry.unit : 'sat';
+  // In minor units of the account's unit, as the notes are. `numericValue`
+  // is the typed figure, which is dollars on a fiat account.
+  const effective = entry?.effectiveAmount as { value?: unknown } | undefined;
+  const effectiveAmount = typeof effective?.value === 'number' ? effective.value : 0;
+  // Offered on every ecash send from a mint, whatever the list holds at this
+  // instant: the list empties for a moment whenever the wallet reloads its
+  // proofs (creating ecash does), and a key that came and went with it made
+  // the keypad's function column jump. An empty picker says so itself.
+  const canPickNotes = entryDestination === 'sendEcash' && !!mintUrl;
+  const handlePickNotes = useCallback(() => {
+    const notes = heldNotes ?? [];
+    paymentLog.info('amount_flow.notes.open', { held: notes.length, unit: entryUnit });
+    useNotePickerStore.getState().present({
+      notes,
+      unit: entryUnit,
+      // An amount that can already leave offline opens with its notes picked,
+      // whichever currency it was typed in: a fiat entry resolves to a sat
+      // amount, and that is the one the notes make. Any other amount opens
+      // empty rather than on a near miss.
+      amount: canSendOffline === true ? effectiveAmount : 0,
+      onUse: (total) => {
+        paymentLog.info('amount_flow.notes.use', { total, unit: entryUnit });
+        void actions.setInput.execute({ input: minorToRawInput(total, entryUnit), mode: 'unit' });
+      },
+    });
+    router.push('/notes');
+  }, [actions.setInput, canSendOffline, effectiveAmount, entryUnit, heldNotes]);
   const stackOptions = useMemo(
     () =>
       withGlassHeaderItems({
@@ -354,9 +388,8 @@ export function AmountFlowContent({
         headerTitleAlign: 'center' as const,
         headerTitle: renderHeaderTitle,
         headerTintColor: foreground,
-        headerRight: showHeaderStatus ? renderHeaderRight : undefined,
       }),
-    [foreground, showHeaderStatus, renderHeaderRight, renderHeaderTitle]
+    [foreground, renderHeaderTitle]
   );
   const handleErrorGoBack = useCallback(() => {
     void actions.back.execute();
@@ -377,7 +410,11 @@ export function AmountFlowContent({
           body, so it is raised over it rather than painted under. */}
       {headerMode === 'native' && recipientReady ? (
         <View pointerEvents="none" className="absolute left-0 right-0" style={recipientBandStyle}>
-          <RecipientHeaderBand displayName={headerDisplayName!} />
+          <RecipientHeaderBand
+            displayName={headerDisplayName!}
+            pubkey={recipientPubkey}
+            nip05={forwardedRecipientProfile?.nip05}
+          />
         </View>
       ) : null}
       <View style={amountBodyStyle}>
@@ -397,6 +434,8 @@ export function AmountFlowContent({
           lockChoice={sendLock.lockChoice}
           confirmLock={sendLock.confirmLock}
           askLock={sendLock.askLock}
+          delivery={delivery}
+          onPickNotes={canPickNotes ? handlePickNotes : undefined}
           suppressNextVariants={!!nearPayRecipient}
         />
       </View>

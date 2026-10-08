@@ -1,4 +1,3 @@
-import { PaymentIdentity } from '@/shared/ui/composed/Nip05Identity';
 /**
  * Machine-driven adapter over the shared AmountEntryView primitive.
  * Unpacks colada's amountEntry screen state into the primitive's
@@ -11,6 +10,8 @@ import type { ActionVariant, P2pkLockSpec, RecipientProfile, ScreenActionName } 
 import type { BoundAction, QuickSendSuggestion } from 'wallet/react';
 
 import { MintSelector } from '@/features/wallet';
+import { useAppStyle } from '@/shared/styles/appStyle';
+import { FOOTER_GAP } from '@/shared/ui/composed/footerInset';
 import { UnitSwitcherPill } from '@/features/wallet/components/UnitSwitcherPill';
 import { formatAmount } from '@/shared/lib/currency';
 import type { ActionMenuVariant } from '@/shared/ui/composed/ActionMenuButton';
@@ -19,13 +20,21 @@ import {
   type AmountEntryTransactionType,
 } from '@/shared/ui/composed/AmountEntryView';
 import { Log, useLifecycleLogger, walletLog } from '@/shared/lib/logger';
+import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useRoutstrTopUpStore } from '@/shared/stores/runtime/routstrTopUpStore';
 import { hasP2PKLock } from '@/features/send/lib/p2pkLock';
+import type { SendDelivery } from '@/features/send/lib/sendDelivery';
 import { E2EToastProbe } from '@/shared/lib/popup/E2EToastProbe';
 
 import type { ButtonHandlerProps } from '@/shared/ui/composed/ButtonHandler';
 
 type AmountEntryActions = Record<ScreenActionName['amountEntry'], BoundAction>;
+
+/**
+ * Room for the recipient's name and domain, which hang under the navigation
+ * bar when the payment has a recipient: the amount is centred below them.
+ */
+const RECIPIENT_BAND_CLEARANCE = 44;
 
 const EMPTY_QUICK_SEND_SUGGESTIONS: QuickSendSuggestion[] = [];
 
@@ -210,6 +219,10 @@ interface AmountSelectorProps {
    * answered yet. Null means they backed out, and nothing is sent.
    */
   confirmLock?: () => Promise<P2pkLockSpec | null>;
+  /** Delivery status: the display's offline mark and the sentence behind it. */
+  delivery?: SendDelivery | null;
+  /** Opens the note picker. Set only when there are notes to pick from. */
+  onPickNotes?: () => void;
   /** Hide variant menu when the caller owns delivery after ecash creation. */
   suppressNextVariants?: boolean;
 }
@@ -230,6 +243,8 @@ export function AmountSelector({
   confirmLock,
   askLock,
   suppressNextVariants = false,
+  delivery = null,
+  onPickNotes,
 }: AmountSelectorProps) {
   useLifecycleLogger('AmountSelector', walletLog);
 
@@ -382,33 +397,35 @@ export function AmountSelector({
   // bottom-bar pill — same component the header uses, so balance, icon,
   // and liquid/blur/flat chrome stay consistent across the swap.
   //
-  // Sizing mirrors Button's `SIZES.default` so the pill and Next render
-  // with identical outer footprints:
-  //   • BottomButtons spans full window width (no horizontal padding),
-  //     so each 50% slot is `windowWidth / 2`.
-  //   • Button bakes `margin: 4` on all four sides + `marginBottom: 8`,
-  //     consuming 8 px of horizontal space inside its slot. The pill
-  //     gets the same margins on its wrapper, and `width = slot - 8`,
-  //     so visible button widths match to the pixel.
-  //   • Height 48 matches Button's `minHeight`; contentHeight 32 leaves
-  //     visible padding inside the SwiftUI liquid-glass button instead
-  //     of crowding the avatar + label + chevron row at 48 px.
+  // The pill and Next are the two halves of one row: the bar is inset by the
+  // gutter, the row keeps FOOTER_GAP between its halves, and each half takes
+  // what is left. Height is the style's primary-action height, the same value
+  // Button takes as its `minHeight`; the content sits 16px shorter so the
+  // avatar + label + chevron row keeps visible padding.
   const { width: windowWidth } = useWindowDimensions();
-  const mintBottomSlotWidth = PixelRatio.roundToNearestPixel(windowWidth / 2);
-  const mintBottomPillWidth = Math.max(0, mintBottomSlotWidth - 8);
+  const appStyle = useAppStyle();
+  const footerControlHeight = appStyle.size.cta;
+  const mintBottomSlotWidth = PixelRatio.roundToNearestPixel(
+    (windowWidth - 2 * appStyle.space.gutter - FOOTER_GAP) / 2
+  );
+  const mintBottomPillWidth = Math.max(0, mintBottomSlotWidth);
   const leadingBottomButton =
     showMintBottomButton && onRequestMintList ? (
-      <View style={[styles.mintBottomPillWrapper, { width: mintBottomPillWidth, height: 48 }]}>
+      <View style={{ width: mintBottomPillWidth, height: footerControlHeight }}>
         <MintSelector
           testID="amount-mint-selector"
           selectedMintUrl={mintUrl}
           onRequestMintList={onRequestMintList}
           width={mintBottomPillWidth}
-          height={48}
-          contentHeight={32}
+          height={footerControlHeight}
+          contentHeight={footerControlHeight - 16}
         />
       </View>
     ) : undefined;
+
+  // The swap key names the currency it switches to.
+  const displayCurrency = useSettingsStore((state) => state.displayCurrency);
+  const swapLabel = inputMode === 'fiat' ? 'sats' : displayCurrency.toUpperCase();
 
   return (
     <Log name="AmountSelector" style={styles.amountSelectorRoot}>
@@ -418,9 +435,6 @@ export function AmountSelector({
           mint-fault scenarios — same rule as ReceiveScreen. */}
       <E2EToastProbe />
       <AmountEntryView
-        recipientIdentity={
-          <PaymentIdentity pubkey={recipientPubkey} address={recipientProfile?.nip05} />
-        }
         rawInput={rawInput}
         numericValue={numericValue}
         unit={unit}
@@ -450,6 +464,10 @@ export function AmountSelector({
         nextVariants={nextVariants}
         leadingBottomButton={leadingBottomButton}
         transactionType={transactionTypeForView}
+        delivery={delivery}
+        swapLabel={swapLabel}
+        onPickNotes={onPickNotes}
+        topClearance={recipientProfile ? RECIPIENT_BAND_CLEARANCE : 0}
       />
     </Log>
   );
@@ -458,9 +476,5 @@ export function AmountSelector({
 const styles = StyleSheet.create({
   amountSelectorRoot: {
     flex: 1,
-  },
-  mintBottomPillWrapper: {
-    margin: 4,
-    marginBottom: 8,
   },
 });

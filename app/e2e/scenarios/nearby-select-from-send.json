@@ -11,7 +11,7 @@
     {"action":"tap","selector":{"id":"wallet-send"}},
     {"action":"waitFor","selector":{"idPrefix":"send-peer-","captureSuffixAs":"peer"},"timeoutMs":30000},
     {"action":"tap","selector":{"idPrefix":"send-peer-"}},
-    {"action":"waitFor","selector":{"id":"amount-header-lock"},"timeoutMs":30000},
+    {"action":"waitFor","selector":{"id":"amount-delivery"},"timeoutMs":30000},
     {"action":"screenshot","name":"send-amount"},
     {"action":"goHome"}
   ],

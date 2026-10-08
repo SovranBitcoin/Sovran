@@ -12,6 +12,7 @@ import CustomKeyboard from '@/shared/ui/composed/CustomKeyboard';
 jest.mock('@/shared/hooks/useThemeColor', () => ({
   useThemeColor: () => 'theme-foreground',
 }));
+jest.mock('@/shared/lib/color', () => ({ withAlpha: (color: string) => color }));
 
 jest.mock('@/shared/ui/primitives/Haptics', () => ({
   EnhancedHaptics: {
@@ -19,6 +20,23 @@ jest.mock('@/shared/ui/primitives/Haptics', () => ({
     buttonHaptic: jest.fn(() => Promise.resolve()),
   },
 }));
+
+jest.mock('react-native-reanimated', () => {
+  const ReactActual = jest.requireActual<typeof import('react')>('react');
+  const value = { get: () => 0, set: () => undefined };
+  return {
+    __esModule: true,
+    default: {
+      View: ({ children, ...props }: { children?: React.ReactNode }) =>
+        ReactActual.createElement('View', props, children),
+    },
+    cancelAnimation: () => undefined,
+    useAnimatedStyle: () => ({}),
+    useReducedMotion: () => false,
+    useSharedValue: () => value,
+    withTiming: (to: number) => to,
+  };
+});
 
 jest.mock('@/shared/lib/logger', () => ({
   Log: ({ children }: { children?: React.ReactNode }) => children,
@@ -68,12 +86,21 @@ type KeyProps = {
   onPress?: () => void;
 };
 
-function renderKeys(unit: string, loading = false) {
+const FUNCTIONS = [
+  {
+    testID: 'amount-currency-swapper',
+    accessibilityLabel: 'Type in USD instead',
+    label: 'USD',
+    onPress: jest.fn(),
+  },
+];
+
+function renderKeys(unit: string, loading = false, functions = FUNCTIONS) {
   const onKeyPress = jest.fn();
   let renderer!: TestRenderer.ReactTestRenderer;
   act(() => {
     renderer = TestRenderer.create(
-      <CustomKeyboard onKeyPress={onKeyPress} unit={unit} loading={loading} />
+      <CustomKeyboard onKeyPress={onKeyPress} unit={unit} loading={loading} functions={functions} />
     );
   });
   const keys = renderer.root
@@ -98,22 +125,28 @@ describe('CustomKeyboard accessibility', () => {
       'keypad-key-9',
       'keypad-key-decimal',
       'keypad-key-0',
+      'keypad-key-triple-zero',
       'keypad-key-backspace',
+      'amount-currency-swapper',
     ]);
     // Digits keep their digit as the label: e2e scenarios tap `{ label: "4" }`.
     expect(keys[3]?.accessibilityLabel).toBe('4');
     expect(keys[9]?.accessibilityLabel).toBe('Decimal point');
-    expect(keys[11]?.accessibilityLabel).toBe('Delete');
+    expect(keys[11]?.accessibilityLabel).toBe('Thousand');
+    expect(keys[12]?.accessibilityLabel).toBe('Delete');
+    expect(keys[13]?.accessibilityLabel).toBe('Type in USD instead');
     expect(keys.every((k) => k.accessibilityRole === 'button')).toBe(true);
 
     act(() => renderer.unmount());
   });
 
-  it('renders the sat keypad without an empty, unnamed key', () => {
-    const { keys, renderer } = renderKeys('sat');
+  it("fills the sat keypad's decimal slot instead of leaving an unnamed key", () => {
+    const { keys, renderer } = renderKeys('sat', false, []);
 
-    expect(keys).toHaveLength(11);
+    expect(keys).toHaveLength(13);
     expect(keys.some((k) => k.testID === 'keypad-key-decimal')).toBe(false);
+    expect(keys[9]?.testID).toBe('keypad-key-double-zero');
+    expect(keys.every((k) => !!k.accessibilityLabel)).toBe(true);
 
     act(() => renderer.unmount());
   });

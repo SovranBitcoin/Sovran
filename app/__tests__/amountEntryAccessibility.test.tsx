@@ -27,18 +27,20 @@ jest.mock('@/shared/ui/composed/AmountFormatter', () => ({
   AMOUNT_FONT_FAMILY: { heavy: 'MonaSans-Black' },
   AmountFormatter: () => null,
 }));
+let mockKeyboardFunctions: { testID: string }[] = [];
 jest.mock('@/shared/ui/composed/CustomKeyboard', () => ({
   __esModule: true,
-  default: () => null,
+  default: (props: { functions?: { testID: string }[] }) => {
+    mockKeyboardFunctions = props.functions ?? [];
+    return null;
+  },
 }));
 jest.mock('@/shared/ui/composed/BottomButtons', () => ({
   BottomButtons: ({ children }: React.PropsWithChildren) => <>{children}</>,
 }));
 jest.mock('@/shared/ui/composed/ButtonHandler', () => ({ ButtonHandler: () => null }));
 jest.mock('@/shared/ui/composed/ActionMenuButton', () => ({ ActionMenuButton: () => null }));
-jest.mock('@/features/wallet/components/CurrencySwapperPill', () => ({
-  CurrencySwapperPill: () => null,
-}));
+jest.mock('@/shared/ui/composed/EcashNote', () => ({ EcashNote: () => null }));
 jest.mock('@/shared/ui/primitives/Button', () => ({ Button: () => null }));
 jest.mock('@/shared/ui/primitives/Text', () => ({
   Text: ({ children, ...props }: React.PropsWithChildren<Record<string, unknown>>) => (
@@ -113,5 +115,55 @@ describe('AmountEntryView accessibility', () => {
     expect(state.props.accessible).toBe(true);
     expect(state.props.accessibilityLabel).toBe('Amount state 40');
     expect(state.props.accessibilityValue).toBeUndefined();
+  });
+
+  it('keeps a function key through a flicker and drops it once it stays gone', async () => {
+    jest.useFakeTimers();
+    const element = (onPickNotes: (() => void) | undefined) => (
+      <AmountEntryView
+        rawInput="40"
+        numericValue={40}
+        unit="sat"
+        keyboardUnit="sat"
+        inputMode="unit"
+        onKeyPress={jest.fn()}
+        onNext={jest.fn()}
+        secondaryDisplay="≈ $0.03"
+        swapLabel="USD"
+        onPickNotes={onPickNotes}
+      />
+    );
+    const keys = () => mockKeyboardFunctions.map((fn) => fn.testID);
+    let renderer: TestRenderer.ReactTestRenderer;
+    await act(async () => {
+      renderer = TestRenderer.create(element(jest.fn()));
+    });
+    expect(keys()).toEqual(['amount-currency-swapper', 'amount-pick-notes']);
+
+    // Gone for a few frames, then back: the column never changed.
+    await act(async () => {
+      renderer!.update(element(undefined));
+    });
+    await act(async () => {
+      jest.advanceTimersByTime(200);
+    });
+    expect(keys()).toEqual(['amount-currency-swapper', 'amount-pick-notes']);
+    await act(async () => {
+      renderer!.update(element(jest.fn()));
+    });
+    await act(async () => {
+      jest.advanceTimersByTime(2000);
+    });
+    expect(keys()).toEqual(['amount-currency-swapper', 'amount-pick-notes']);
+
+    // Gone and staying gone: dropped once it has settled.
+    await act(async () => {
+      renderer!.update(element(undefined));
+    });
+    await act(async () => {
+      jest.advanceTimersByTime(2000);
+    });
+    expect(keys()).toEqual(['amount-currency-swapper']);
+    jest.useRealTimers();
   });
 });
