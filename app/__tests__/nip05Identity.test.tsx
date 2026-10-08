@@ -39,7 +39,7 @@ const cases: [Nip05State, string, string][] = [
     staticColor['red-300'],
   ],
   [{ status: 'error', reason: 'network' }, 'Could not verify', staticColor['red-300']],
-  [{ status: 'pending' }, 'Not verified', 'mock-theme-color'],
+  [{ status: 'pending' }, 'Checking domain', 'mock-theme-color'],
 ];
 it.each(cases)(
   'renders the verification outcome %j without trusting a profile flag',
@@ -66,4 +66,19 @@ it('labels the public key correctly for both incoming and outgoing payments', ()
     .map((node) => node.props.accessibilityLabel);
   expect(labels.some((label: string) => label.startsWith('Public key npub1'))).toBe(true);
   expect(labels.some((label: string) => label.startsWith('Recipient'))).toBe(false);
+});
+it('draws no bare key on a finished payment, and nothing at all without a domain claim', () => {
+  act(() => {
+    renderer = TestRenderer.create(<PaymentIdentity pubkey={'a'.repeat(64)} showKey={false} />);
+  });
+  expect(renderer.toJSON()).toBeNull();
+  act(() => {
+    renderer.update(
+      <PaymentIdentity pubkey={'a'.repeat(64)} address="alice@example.com" showKey={false} />
+    );
+  });
+  expect(renderer.root.findAllByProps({ testID: 'payment-identity-key' })).toHaveLength(0);
+  expect(renderer.root.findAllByProps({ testID: 'payment-identity-nip05' }).length).toBeGreaterThan(
+    0
+  );
 });

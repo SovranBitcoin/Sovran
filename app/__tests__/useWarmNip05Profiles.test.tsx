@@ -79,7 +79,10 @@ it('reuses warm checks across payment mounts and renews before expiry without a 
   await act(async () => {
     await jest.advanceTimersByTimeAsync(30_000);
   });
-  expect(next.result.current.state.status).toBe('pending'); // never extend expired trust
+  // The renewal is still in flight at the 15 minute mark. A verified person
+  // keeps their mark while it runs (it is bounded by the hard expiry, covered
+  // in nip05Verification.test.ts) and loses it the moment the domain disagrees.
+  expect(next.result.current.state.status).toBe('verified');
   await act(async () => finish({ status: 'mismatch', identifier: address }));
   expect(next.result.current.state.status).toBe('mismatch');
   next.unmount();

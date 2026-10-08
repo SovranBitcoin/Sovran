@@ -7,20 +7,12 @@ import { useNip05Verification, type Nip05State } from '@/shared/hooks/useNip05Ve
 import { parseNip05Identifier } from 'wallet';
 import { staticColor } from '@/shared/lib/themeEngine';
 
-export function Nip05Status({
-  address,
-  state,
-  testID,
-  detail = false,
-}: {
-  address: string;
-  state: Nip05State;
-  testID?: string;
-  detail?: boolean;
-}) {
-  const muted = useThemeColor('muted');
-  const display = parseNip05Identifier(address)?.identifier ?? address;
-  const presentation = {
+/**
+ * How a domain claim is drawn, for every surface that shows one: the icon, the
+ * colour of the icon and the address alike, and the verdict in words.
+ */
+export function nip05Presentation(status: Nip05State['status'], muted: string) {
+  return {
     verified: {
       icon: 'mdi:check-decagram',
       color: staticColor['blue-300'],
@@ -36,9 +28,26 @@ export function Nip05Status({
       color: staticColor['red-300'],
       label: 'Could not verify',
     },
-    pending: { icon: 'mdi:at', color: muted, label: 'Not verified' },
+    // Not yet known is not the same claim as known-unverified.
+    pending: { icon: 'mdi:at', color: muted, label: 'Checking domain' },
     none: { icon: 'mdi:at', color: muted, label: 'Not verified' },
-  }[state.status];
+  }[status];
+}
+
+export function Nip05Status({
+  address,
+  state,
+  testID,
+  detail = false,
+}: {
+  address: string;
+  state: Nip05State;
+  testID?: string;
+  detail?: boolean;
+}) {
+  const muted = useThemeColor('muted');
+  const display = parseNip05Identifier(address)?.identifier ?? address;
+  const presentation = nip05Presentation(state.status, muted);
   return (
     <View
       testID={testID}
@@ -82,23 +91,40 @@ export function Nip05Identity({
 }
 
 /** Payment counterparties retain a key fingerprint even when they claim no domain identity. */
-export function PaymentIdentity({ pubkey, address }: { pubkey?: string; address?: string | null }) {
+export function PaymentIdentity({
+  pubkey,
+  address,
+  showKey = true,
+}: {
+  pubkey?: string;
+  address?: string | null;
+  /**
+   * Draw the key under the domain claim. On by default, for the screen where
+   * a recipient is being chosen. A finished payment's page turns it off: the
+   * key is on its Details page in both forms, and on its own above the QR
+   * code it was a line of characters with nothing to say what it was.
+   */
+  showKey?: boolean;
+}) {
   if (!pubkey || !/^[a-f0-9]{64}$/.test(pubkey)) return null;
+  if (!showKey && !address) return null;
   return (
     <View className="items-center gap-1 px-4 py-2">
       {address ? (
         <Nip05Identity address={address} pubkey={pubkey} testID="payment-identity-nip05" detail />
       ) : null}
-      <Text
-        testID="payment-identity-key"
-        size={12}
-        className="text-muted"
-        numberOfLines={1}
-        ellipsizeMode="middle"
-        selectable
-        accessibilityLabel={`Public key ${nip19.npubEncode(pubkey)}`}>
-        {nip19.npubEncode(pubkey)}
-      </Text>
+      {showKey ? (
+        <Text
+          testID="payment-identity-key"
+          size={12}
+          className="text-muted"
+          numberOfLines={1}
+          ellipsizeMode="middle"
+          selectable
+          accessibilityLabel={`Public key ${nip19.npubEncode(pubkey)}`}>
+          {nip19.npubEncode(pubkey)}
+        </Text>
+      ) : null}
     </View>
   );
 }

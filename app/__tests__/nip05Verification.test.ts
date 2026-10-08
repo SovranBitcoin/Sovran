@@ -55,3 +55,60 @@ it('deduplicates concurrent checks and bounds network concurrency', async () => 
   expect(peak).toBeLessThanOrEqual(4);
   expect(entries[0]).toBe(entries[12]);
 });
+
+describe('a verified mapping that cannot be re-checked', () => {
+  const identifier = 'alice@refresh.example';
+
+  it('stays verified through an unreachable refresh, until its hard expiry', async () => {
+    jest.useFakeTimers();
+    jest.mocked(verifyNip05).mockResolvedValue({ status: 'verified', identifier });
+    const first = await checkNip05Identity(identifier, pubkey);
+    expect(first.staleAt).toBeLessThan(first.expiresAt);
+
+    jest.setSystemTime(first.staleAt + 1);
+    jest.mocked(verifyNip05).mockResolvedValue({ status: 'error', reason: 'network' });
+    const refreshed = await checkNip05Identity(identifier, pubkey, { refresh: true });
+
+    expect(refreshed.result.status).toBe('verified');
+    // The unreachable check buys a retry, never more trust.
+    expect(refreshed.expiresAt).toBe(first.expiresAt);
+    expect(cachedNip05Check(identifier, pubkey)?.result.status).toBe('verified');
+
+    jest.setSystemTime(first.expiresAt);
+    expect(cachedNip05Check(identifier, pubkey)).toBeUndefined();
+  });
+
+  it('is removed at once when the domain answers with a different key', async () => {
+    jest.useFakeTimers();
+    const address = 'alice@contradiction.example';
+    jest.mocked(verifyNip05).mockResolvedValue({ status: 'verified', identifier: address });
+    await checkNip05Identity(address, pubkey);
+
+    jest.mocked(verifyNip05).mockResolvedValue({ status: 'mismatch', identifier: address });
+    const refreshed = await checkNip05Identity(address, pubkey, { refresh: true });
+
+    expect(refreshed.result.status).toBe('mismatch');
+    expect(cachedNip05Check(address, pubkey)?.result.status).toBe('mismatch');
+  });
+});
+
+it('does not record a failure for an identity it was too busy to check', async () => {
+  jest.useRealTimers();
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  jest.mocked(verifyNip05).mockImplementation(async (identifier) => {
+    await gate;
+    return { status: 'verified', identifier };
+  });
+  const inFlight = Array.from({ length: 64 }, (_, i) =>
+    checkNip05Identity(`busy${i}@overload.example`, pubkey)
+  );
+
+  await checkNip05Identity('late@overload.example', pubkey);
+  expect(cachedNip05Check('late@overload.example', pubkey)).toBeUndefined();
+
+  release();
+  await Promise.all(inFlight);
+});

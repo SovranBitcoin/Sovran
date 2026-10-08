@@ -1,4 +1,6 @@
 import { Screen } from '@/shared/ui/composed/Screen';
+import { useNip05Verification, type Nip05State } from '@/shared/hooks/useNip05Verification';
+import { nip05Presentation } from '@/shared/ui/composed/Nip05Identity';
 import { useIdentityHeader } from '@/shared/ui/composed/IdentityHeader';
 import { useHeaderHeight } from 'expo-router/react-navigation';
 import type { LayoutChangeEvent } from 'react-native';
@@ -62,6 +64,7 @@ import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { useModerationActions } from '@/features/feed/hooks/useModerationActions';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { withGlassHeaderItems } from '@/navigation/headerItems';
+import { hasFeature } from '@/shared/config/features';
 import { SendMessageMenu } from '@/features/user/components/SendMessageMenu';
 import { NDKEvent, useNDK } from '@nostr-dev-kit/ndk-mobile';
 import { Contacts } from 'nostr-tools/kinds';
@@ -74,7 +77,7 @@ import {
   getFollowerPicture,
   type TopFollower,
 } from '@/shared/hooks/useNostrProfile';
-import { UserFeed } from '@/features/feed';
+import { ProfileBody } from '@/features/user/components/ProfileBody';
 import { VisualLayoutProbe } from '@/shared/ui/composed/VisualLayoutProbe';
 import { formatDate } from '@/shared/lib/date';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -114,29 +117,44 @@ const AVATAR_SIZE = 90;
 const AVATAR_OVERLAP = AVATAR_SIZE / 4;
 const IDENTITY_LINE_HEIGHT = 20;
 
+/**
+ * A profile's Nostr address. The checkmark is earned: it shows only once the
+ * domain has confirmed the address maps to this key. Printing it beside
+ * whatever address a profile claims would let anyone borrow a trusted name.
+ * The address takes the verdict's colour, as it does everywhere else.
+ */
 export function UserProfileIdentityRow({
   nip05,
+  status,
   isLoading,
   foreground,
 }: {
   nip05?: string | null;
+  /** Result of checking `nip05` against this profile's key. */
+  status: Nip05State['status'];
   isLoading: boolean;
   foreground: string;
 }) {
+  const verdict = nip05Presentation(status, withAlpha(foreground, 0.4));
   return (
-    <View testID="user-profile-identity-row" className="min-h-5 self-center">
+    // The verdict is an icon; a screen reader and the native harness get it as
+    // words and as a value, so verified, mismatched and unchecked are distinct.
+    <View
+      testID="user-profile-identity-row"
+      className="min-h-5 self-center"
+      accessible={!!nip05}
+      accessibilityLabel={nip05 ? `${nip05}. ${verdict.label}` : undefined}
+      accessibilityValue={nip05 ? { text: status } : undefined}>
       <HStack align="center">
         <View testID="user-profile-identity-icon-slot" className="w-5 shrink-0">
-          {nip05 ? (
-            <Icon name="mdi:check-decagram" size={iconSize.md} color={withAlpha(foreground, 0.4)} />
-          ) : null}
+          {nip05 ? <Icon name={verdict.icon} size={iconSize.md} color={verdict.color} /> : null}
         </View>
         <Text
           loading={isLoading}
           placeholder="username@relay.example"
           fallback={'\u00A0'}
           size={fontSize.md}
-          style={{ color: withAlpha(foreground, 0.4), lineHeight: IDENTITY_LINE_HEIGHT }}>
+          style={{ color: verdict.color, lineHeight: IDENTITY_LINE_HEIGHT }}>
           {nip05 ?? undefined}
         </Text>
       </HStack>
@@ -229,7 +247,8 @@ function buildProfileInfoItems(
     const nip05 = cachedProfile.nip05;
     items.push({
       key: 'nip05',
-      prefix: <Icon name="mdi:check-decagram" size={20} color={iconColor} />,
+      // A copy row, not a claim: the verified mark lives on the header row.
+      prefix: <Icon name="mdi:at" size={20} color={iconColor} />,
       title: nip05,
       suffixIcon: 'lets-icons:copy',
       accessibilityLabel: `Copy Nostr address, ${nip05}`,
@@ -616,6 +635,7 @@ function BannerWithAvatar({
   /** The picture's own box within this header — what the handoff waits for. */
   onAvatarLayout?: (event: LayoutChangeEvent) => void;
 }) {
+  const { state: nip05State } = useNip05Verification(nip05, pubkey);
   const [foreground, surfaceSecondary, background] = useThemeColor([
     'foreground',
     'surface-secondary',
@@ -867,7 +887,12 @@ function BannerWithAvatar({
                 {displayName}
               </Text>
             </View>
-            <UserProfileIdentityRow nip05={nip05} isLoading={isLoading} foreground={foreground} />
+            <UserProfileIdentityRow
+              nip05={nip05}
+              status={nip05State.status}
+              isLoading={isLoading}
+              foreground={foreground}
+            />
           </Animated.View>
           {showFollowButton &&
             (isLoading ? (
@@ -949,7 +974,9 @@ function BannerWithAvatar({
                 testID="profile-send-money"
                 onPress={onSendMoney}
               />
-              <SendMessageMenu pubkey={pubkey} displayName={displayName} circle />
+              {hasFeature('directMessages') && (
+                <SendMessageMenu pubkey={pubkey} displayName={displayName} circle />
+              )}
             </>
           )}
           <CircleActionButton
@@ -1272,7 +1299,8 @@ export function UserProfileScreen() {
   };
 
   const handleAvatarStoryPress = () => {
-    if (userVideoPosts.length === 0) return;
+    // Stories belong to the feed module; without it the route is not shipped.
+    if (userVideoPosts.length === 0 || !hasFeature('feed')) return;
     nostrLog.info('user.profile.story.view', { pubkey, videoCount: userVideoPosts.length });
     const storyUser: StoryUser = {
       pubkey,
@@ -1524,7 +1552,7 @@ export function UserProfileScreen() {
 
       {morph.probe}
       {pubkey ? (
-        <UserFeed
+        <ProfileBody
           onScroll={morph.onScroll}
           pubkey={pubkey}
           authorName={displayName}

@@ -13,11 +13,11 @@ export function useWarmNip05Profiles(profiles: ReadonlyMap<string, { nip05?: str
       for (const [pubkey, profile] of profiles) {
         if (!profile.nip05) continue;
         const cached = cachedNip05Check(profile.nip05, pubkey);
-        // Renew a successful assertion before expiry without extending its trust
-        // while the request is pending. Allow for the poll interval and queued
-        // network work. Failures retain the normal retry TTL.
+        // Renew a successful assertion before it goes stale, allowing for the
+        // poll interval and queued network work. Failures retain the normal
+        // retry TTL.
         const refresh =
-          cached?.result.status === 'verified' && cached.expiresAt - Date.now() <= 120_000;
+          cached?.result.status === 'verified' && cached.staleAt - Date.now() <= 120_000;
         void checkNip05Identity(profile.nip05, pubkey, { refresh });
       }
     };

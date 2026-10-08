@@ -3,10 +3,16 @@ import TestRenderer, { act } from 'react-test-renderer';
 import Icon from '@/assets/icons';
 import { Text, UntranslatedText } from '@/shared/ui/primitives/Text';
 import { UserProfileIdentityRow } from '@/features/user/screens/UserProfileScreen';
+import { staticColor } from '@/shared/lib/themeEngine';
 
 // eslint-disable-next-line no-restricted-syntax -- parseable theme fixture color
 const mockForeground = '#ffffff';
 
+// The row takes the verification status as a prop; the hook that produces it
+// (and the settings store behind it) is not under test here.
+jest.mock('@/shared/hooks/useNip05Verification', () => ({
+  useNip05Verification: () => ({ state: { status: 'pending' }, retry: () => {} }),
+}));
 jest.mock('@/shared/hooks/useThemeColor', () => ({ useThemeColor: () => mockForeground }));
 jest.mock('@/shared/hooks/useColorScheme', () => ({ useColorScheme: () => 'dark' }));
 jest.mock('@/shared/lib/version', () => ({ supportsBlur: () => false }));
@@ -75,7 +81,12 @@ afterEach(() => {
 describe('UserProfileIdentityRow', () => {
   it('reserves the row and icon slot after loading finishes without a NIP-05', () => {
     const view = render(
-      <UserProfileIdentityRow nip05={undefined} isLoading={false} foreground={mockForeground} />
+      <UserProfileIdentityRow
+        nip05={undefined}
+        status="none"
+        isLoading={false}
+        foreground={mockForeground}
+      />
     );
 
     expect(
@@ -89,22 +100,97 @@ describe('UserProfileIdentityRow', () => {
     expect(view.root.findByType(UntranslatedText).props.children).toBe('\u00A0');
   });
 
-  it.each([false, true])('renders the check icon when NIP-05 exists (loading: %s)', (isLoading) => {
-    const view = render(
-      <UserProfileIdentityRow nip05="a@b.c" isLoading={isLoading} foreground={mockForeground} />
-    );
+  it.each([false, true])(
+    'shows the check only for a verified address (loading: %s)',
+    (isLoading) => {
+      const view = render(
+        <UserProfileIdentityRow
+          nip05="a@b.c"
+          status="verified"
+          isLoading={isLoading}
+          foreground={mockForeground}
+        />
+      );
 
-    expect(view.root.findByType(Icon).props).toMatchObject({
-      name: 'mdi:check-decagram',
-      size: 16,
-    });
-    expect(view.root.findByType(Text).props.children).toBe('a@b.c');
-    if (!isLoading) expect(view.root.findByType(UntranslatedText).props.children).toBe('a@b.c');
+      expect(view.root.findByType(Icon).props).toMatchObject({
+        name: 'mdi:check-decagram',
+        size: 16,
+      });
+      expect(view.root.findByType(Text).props.children).toBe('a@b.c');
+      if (!isLoading) expect(view.root.findByType(UntranslatedText).props.children).toBe('a@b.c');
+    }
+  );
+
+  it.each(['pending', 'error', 'none'] as const)(
+    'never shows a check for a claimed address that is %s',
+    (status) => {
+      const view = render(
+        <UserProfileIdentityRow
+          nip05="a@b.c"
+          status={status}
+          isLoading={false}
+          foreground={mockForeground}
+        />
+      );
+      expect(view.root.findByType(Icon).props.name).not.toBe('mdi:check-decagram');
+    }
+  );
+
+  it.each([
+    ['verified', staticColor['blue-300']],
+    ['mismatch', staticColor['red-300']],
+  ] as const)('draws a %s address in the colour of its verdict', (status, color) => {
+    const view = render(
+      <UserProfileIdentityRow
+        nip05="a@b.c"
+        status={status}
+        isLoading={false}
+        foreground={mockForeground}
+      />
+    );
+    expect(view.root.findByType(Icon).props.color).toBe(color);
+    expect(view.root.findByType(Text).props.style.color).toBe(color);
+  });
+
+  it.each([
+    ['verified', 'a@b.c. Domain matches this key'],
+    ['mismatch', 'a@b.c. Does not match this key'],
+    ['pending', 'a@b.c. Checking domain'],
+    ['none', 'a@b.c. Not verified'],
+  ] as const)('says the %s verdict in words, not only as an icon', (status, label) => {
+    const view = render(
+      <UserProfileIdentityRow
+        nip05="a@b.c"
+        status={status}
+        isLoading={false}
+        foreground={mockForeground}
+      />
+    );
+    const row = view.root.findByProps({ testID: 'user-profile-identity-row' });
+    expect(row.props.accessibilityLabel).toBe(label);
+    expect(row.props.accessibilityValue).toEqual({ text: status });
+  });
+
+  it('warns when the domain names a different key', () => {
+    const view = render(
+      <UserProfileIdentityRow
+        nip05="a@b.c"
+        status="mismatch"
+        isLoading={false}
+        foreground={mockForeground}
+      />
+    );
+    expect(view.root.findByType(Icon).props.name).toBe('mdi:alert-circle-outline');
   });
 
   it('keeps the same row, icon slot, and text metrics through loading and late metadata', () => {
     const row = (isLoading: boolean, nip05?: string) => (
-      <UserProfileIdentityRow nip05={nip05} isLoading={isLoading} foreground={mockForeground} />
+      <UserProfileIdentityRow
+        nip05={nip05}
+        status="pending"
+        isLoading={isLoading}
+        foreground={mockForeground}
+      />
     );
     const view = render(row(true));
     const identityRow = view.root.findByProps({ testID: 'user-profile-identity-row' });

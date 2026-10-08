@@ -2,8 +2,26 @@ import { parseNip05Identifier, verifyNip05, type Nip05Verification } from 'walle
 
 export interface Nip05Check {
   result: Nip05Verification;
+  /** When this result should be re-fetched. It is still shown until then and
+   *  while that re-fetch is in flight. */
+  staleAt: number;
+  /** When this result stops being shown at all. */
   expiresAt: number;
 }
+
+/** A verified mapping is re-checked every 15 minutes. */
+const VERIFIED_FRESH_MS = 900_000;
+/**
+ * How long a verified mapping stays on screen without a successful re-check.
+ * A refresh that cannot reach the domain (offline, timeout) does not remove
+ * the checkmark inside this window — only an answer that contradicts it does.
+ * Past it, an unreachable domain can no longer vouch for the key.
+ */
+const VERIFIED_HARD_MS = 3_600_000;
+/** Everything else is retried after a minute. */
+const UNVERIFIED_MS = 60_000;
+const MAX_PENDING = 64;
+
 // Public domain-to-key assertions only. Never persist trust or provider validity flags.
 const cache = new Map<string, Nip05Check>();
 const pending = new Map<string, Promise<Nip05Check>>();
@@ -57,22 +75,20 @@ export function checkNip05Identity(
   if (cached && !refresh) return Promise.resolve(cached);
   const existing = pending.get(key);
   if (existing) return existing;
-  if (pending.size >= 64) {
-    const entry: Nip05Check = {
-      result: { status: 'error', reason: 'network' },
-      expiresAt: Date.now() + 60_000,
-    };
-    remember(key, entry);
-    return Promise.resolve(entry);
+  if (pending.size >= MAX_PENDING) {
+    // Too busy to ask. That says nothing about this identity, so nothing is
+    // cached: the caller keeps whatever it had and asks again later. Caching
+    // a failure here painted unchecked people as "Could not verify".
+    const now = Date.now();
+    return Promise.resolve(
+      cached ?? { result: { status: 'error', reason: 'network' }, staleAt: now, expiresAt: now }
+    );
   }
   const job = new Promise<Nip05Check>((resolve) => {
     const start = () => {
       active += 1;
       const complete = (result: Nip05Verification) => {
-        const entry = {
-          result,
-          expiresAt: Date.now() + (result.status === 'verified' ? 900_000 : 60_000),
-        };
+        const entry = settle(cache.get(key), result, Date.now());
         remember(key, entry);
         pending.delete(key);
         active -= 1;
@@ -88,6 +104,22 @@ export function checkNip05Identity(
   });
   pending.set(key, job);
   return job;
+}
+
+/**
+ * The entry a finished check leaves behind. A verified mapping survives a
+ * check that could not reach the domain, until its hard expiry; it never
+ * survives an answer from the domain that disagrees.
+ */
+function settle(previous: Nip05Check | undefined, result: Nip05Verification, now: number) {
+  if (result.status === 'verified') {
+    return { result, staleAt: now + VERIFIED_FRESH_MS, expiresAt: now + VERIFIED_HARD_MS };
+  }
+  const unreachable = result.status === 'error' && result.reason === 'network';
+  if (unreachable && previous?.result.status === 'verified' && previous.expiresAt > now) {
+    return { ...previous, staleAt: Math.min(now + UNVERIFIED_MS, previous.expiresAt) };
+  }
+  return { result, staleAt: now + UNVERIFIED_MS, expiresAt: now + UNVERIFIED_MS };
 }
 
 function remember(key: string, entry: Nip05Check): void {

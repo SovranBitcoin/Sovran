@@ -29,8 +29,18 @@ avatars remain visible while optional enrichment runs.
 Domain endpoints learn that their identifiers were looked up; this is not
 anonymous discovery. Offline or suspended applications cannot guarantee a warm
 or current result. Foreground nearby discovery renews successful checks before
-expiry and warms again on resume; an in-flight renewal never extends the old
-assertion's expiry. Provider-supplied validity flags never establish trust.
+expiry and warms again on resume. Provider-supplied validity flags never
+establish trust.
+
+A verified mapping is re-checked after 15 minutes and stays on screen while
+that check runs, so a person already verified does not flicker back to an
+unchecked state (amended 2026-10-06; previously the mark was removed the moment
+the 15 minutes elapsed, even mid-renewal). The extension is bounded two ways. A
+check that cannot reach the domain keeps the mark only until one hour after the
+last successful check, and never moves that limit. A check the domain answers
+with a different key, or without the name, removes the mark at once. Results are
+held in memory only; nothing about trust is persisted, so a cold start begins
+unchecked.
 
 Saving a changed, nonempty own NIP-05 claim requires a fresh check at the
 publishing boundary before signing. Clearing a claim remains possible. Unrelated
