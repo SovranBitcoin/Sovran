@@ -118,7 +118,12 @@ export const NUT_DROP_QUEUE_LIMITS = {
   token: 60_000,
   mintUrl: 2048,
   unit: 16,
+  lastError: 500,
 } as const;
+
+/** An error as the queue stores it. A mint or proxy can answer with a whole
+ *  page, and one entry past its limit fails the stored queue on next launch. */
+const clipError = (error: string) => error.slice(0, NUT_DROP_QUEUE_LIMITS.lastError);
 
 const PersistedNutDropRedeemQueueStore = z.object({
   byTokenHash: z
@@ -137,7 +142,7 @@ const PersistedNutDropRedeemQueueStore = z.object({
         attempts: z.number().int().nonnegative(),
         nextAttemptAt: z.number().int().nonnegative(),
         receivedAt: z.number().int().nonnegative(),
-        lastError: z.string().max(500).optional(),
+        lastError: z.string().max(NUT_DROP_QUEUE_LIMITS.lastError).optional(),
         senderPeerID: z.string().max(128).optional(),
         paymentId: z.string().max(128).optional(),
         // Additive and tolerant: an unknown source from a newer build reads as
@@ -195,7 +200,7 @@ export const useNutDropRedeemQueueStore = create<NutDropRedeemQueueStore>()(
         set((state) => ({
           byTokenHash: {
             ...state.byTokenHash,
-            [tokenHash]: { ...existing, status, ...(error ? { lastError: error } : {}) },
+            [tokenHash]: { ...existing, status, ...(error ? { lastError: clipError(error) } : {}) },
           },
         }));
       },
@@ -229,7 +234,7 @@ export const useNutDropRedeemQueueStore = create<NutDropRedeemQueueStore>()(
           set((state) => ({
             byTokenHash: {
               ...state.byTokenHash,
-              [tokenHash]: { ...existing, status: 'failed', attempts, lastError: error },
+              [tokenHash]: { ...existing, status: 'failed', attempts, lastError: clipError(error) },
             },
           }));
           return;
@@ -251,7 +256,7 @@ export const useNutDropRedeemQueueStore = create<NutDropRedeemQueueStore>()(
               status: 'pending',
               attempts,
               nextAttemptAt,
-              lastError: error,
+              lastError: clipError(error),
             },
           },
         }));

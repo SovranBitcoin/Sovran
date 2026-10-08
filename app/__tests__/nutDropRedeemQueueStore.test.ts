@@ -66,6 +66,17 @@ describe('nutDropRedeemQueueStore', () => {
     });
   });
 
+  it('stores an error no longer than the stored queue allows', () => {
+    // A mint or proxy can answer with a whole page. One entry past its limit
+    // fails the persisted queue's schema, and with it every other entry.
+    const page = 'x'.repeat(5_000);
+    useNutDropRedeemQueueStore.getState().enqueue(HASH, ENTRY);
+    useNutDropRedeemQueueStore.getState().scheduleRetry(HASH, page);
+    expect(useNutDropRedeemQueueStore.getState().byTokenHash[HASH]?.lastError).toHaveLength(500);
+    useNutDropRedeemQueueStore.getState().markStatus(HASH, 'failed', page);
+    expect(useNutDropRedeemQueueStore.getState().byTokenHash[HASH]?.lastError).toHaveLength(500);
+  });
+
   it('marks statuses and records errors', () => {
     useNutDropRedeemQueueStore.getState().enqueue(HASH, ENTRY);
     useNutDropRedeemQueueStore.getState().markStatus(HASH, 'spent', 'already spent');
