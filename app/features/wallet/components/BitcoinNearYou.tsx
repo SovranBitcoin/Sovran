@@ -253,7 +253,13 @@ export const BitcoinNearYou = React.memo(function BitcoinNearYou() {
       void resolveNearbyCoords({
         isCancelled: () => cancelled,
         setPermStatus,
-        setCoords,
+        // The same place is the same object: the markers are filtered around
+        // these coords and the native map compares its marker list by
+        // reference, so a fresh object on every return reset the map.
+        setCoords: (next) =>
+          setCoords((prev) =>
+            prev.latitude === next.latitude && prev.longitude === next.longitude ? prev : next
+          ),
       });
 
       return () => {
