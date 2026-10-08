@@ -27,6 +27,7 @@ const ROUTE_FEATURE: Readonly<Record<string, Feature>> = {
   geohashChat: 'nutDrop',
   userMessages: 'directMessages',
   whitenoiseDM: 'directMessages',
+  whitenoiseSetup: 'directMessages',
   profile: 'nostr',
   claimUsername: 'nostr',
   composer: 'feed',

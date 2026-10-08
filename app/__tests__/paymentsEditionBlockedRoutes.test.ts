@@ -40,8 +40,10 @@ it('the payments edition turns away exactly the screens of the modules it leaves
       "(mint-flow)/userMessages",
       "(profile-flow)/userMessages",
       "(profile-flow)/whitenoiseDM",
+      "(profile-flow)/whitenoiseSetup",
       "(user-flow)/userMessages",
       "(user-flow)/whitenoiseDM",
+      "(user-flow)/whitenoiseSetup",
       "userMessages",
     ]
   `);
