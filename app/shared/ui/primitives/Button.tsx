@@ -47,7 +47,6 @@
 
 import React, { useState } from 'react';
 import { StyleProp, ViewStyle, GestureResponderEvent, Platform, StyleSheet } from 'react-native';
-import { withAlpha } from '@/shared/lib/color';
 import { Text } from '@/shared/ui/primitives/Text';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { controlHeight, fontSize } from '@/shared/styles/tokens';
@@ -55,12 +54,21 @@ import { Pressable, type HapticConfig } from './Pressable';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Spinner } from '@/shared/ui/primitives/Spinner';
+import { PressScale } from '@/shared/ui/primitives/PressScale';
+import { useStylePaint } from '@/shared/styles/appStyle';
 
 // Buttons sit close to the bottom-bar gradient and the home indicator, where
 // off-by-a-few-pixel taps are common. An 8pt slop on every side is small
 // enough not to overlap adjacent buttons in the standard footer layout but
 // catches the misses that previously felt like "the button isn't pressing."
 const BUTTON_HIT_SLOP = { top: 8, bottom: 8, left: 8, right: 8 } as const;
+
+// Press feedback. A button is a large target, so it moves very little: a 3%
+// squeeze with a slight dim reads as "pushed in" without the label visibly
+// shrinking. `PressScale` runs both legs at `duration.instant` on the UI
+// thread and stands down under reduced motion.
+const PRESS_SCALE = 0.97;
+const PRESS_OPACITY = 0.88;
 
 /**
  * Button variant types
@@ -80,7 +88,10 @@ type ButtonVariant = 'primary' | 'secondary' | 'dangerous' | 'underline';
  * - `default` is the chunky CTA used in modal sheets / page footers.
  * - `compact` is for inline chips that sit alongside other UI (chat
  *   composer action row, top bars). Smaller minimum height, tighter
- *   padding, no auto-margin so siblings stay flush.
+ *   padding.
+ *
+ * Neither size draws space outside its own edge: whatever lays buttons out
+ * (a footer bar, a row, a stack) owns the gap between them.
  */
 type ButtonSize = 'default' | 'compact';
 
@@ -101,8 +112,6 @@ const SIZES: Record<
     iconOnlyDimension: number;
     iconTextSpacing: number;
     fontSize: number;
-    margin: number;
-    marginBottom: number;
   }
 > = {
   default: {
@@ -112,8 +121,6 @@ const SIZES: Record<
     iconOnlyDimension: 52,
     iconTextSpacing: 8,
     fontSize: fontSize.md,
-    margin: 4,
-    marginBottom: 8,
   },
   compact: {
     paddingVertical: 10,
@@ -122,8 +129,6 @@ const SIZES: Record<
     iconOnlyDimension: 40,
     iconTextSpacing: 6,
     fontSize: fontSize.sm,
-    margin: 0,
-    marginBottom: 0,
   },
 };
 
@@ -172,6 +177,8 @@ interface ButtonProps {
   blur?: boolean | BlurConfig;
   /** Haptic feedback configuration (boolean or config object) */
   haptics?: boolean | HapticConfig;
+  /** Label and spinner colour override, for a button seated on a coloured panel. */
+  contentColor?: string;
   /** VoiceOver/TalkBack label. Defaults to `text` when `text` is a string;
    *  required for icon-only buttons since the glyph carries no name. */
   accessibilityLabel?: string;
@@ -212,10 +219,19 @@ export const Button = ({
   testID,
   blur = false,
   haptics = false,
+  contentColor,
   accessibilityLabel,
   accessibilityHint,
 }: ButtonProps) => {
-  const sz = SIZES[size];
+  const paint = useStylePaint();
+  // One button in every style, Glass included: radius, height, paint and type
+  // come from the style, and the look is Sovran's. The glass style used to
+  // keep an older capsule with a hairline edge, so the same screen showed two
+  // different buttons depending on the style worn.
+  const sz =
+    size !== 'default'
+      ? SIZES[size]
+      : { ...SIZES.default, minHeight: paint.style.size.cta, fontSize: 16 };
   // Hold the last non-loading content so the button keeps its width while the
   // spinner shows. Adjusted during render rather than cached in a ref: reading
   // a ref during render is the rule violation that made the React Compiler skip
@@ -249,11 +265,9 @@ export const Button = ({
     accessibilityHint,
     accessibilityState: { disabled: disabled || loading, busy: loading },
   };
-  const [foreground, foregroundSecondary, surfaceSecondary, background, danger] = useThemeColor([
+  const [foreground, foregroundSecondary, danger] = useThemeColor([
     'foreground',
     'muted',
-    'surface-secondary',
-    'background',
     'danger',
   ] as const);
 
@@ -289,8 +303,6 @@ export const Button = ({
     // text wrapper carried its own paddingHorizontal while the icon had
     // none, so the icon was always pulled to one side.
     const base = {
-      margin: sz.margin,
-      marginBottom: sz.marginBottom,
       alignItems: 'center' as const,
       justifyContent: 'center' as const,
       paddingVertical: sz.paddingVertical,
@@ -308,35 +320,28 @@ export const Button = ({
       };
     }
 
-    switch (variant) {
-      case 'underline':
-        return {
-          ...base,
-          backgroundColor: 'transparent',
-          borderWidth: 0,
-          overflow: 'visible' as const,
-        };
-      case 'primary':
-        return {
-          ...base,
-          backgroundColor: foreground,
-          borderColor: withAlpha(foregroundSecondary, 0.25),
-        };
-      case 'secondary':
-        return {
-          ...base,
-          backgroundColor: surfaceSecondary,
-          borderColor: withAlpha(foregroundSecondary, 0.25),
-        };
-      case 'dangerous':
-        return {
-          ...base,
-          backgroundColor: danger,
-          borderColor: danger,
-        };
-      default:
-        return base;
+    if (variant !== 'underline') {
+      const tone =
+        variant === 'primary'
+          ? paint.primary.container
+          : variant === 'secondary'
+            ? paint.secondary.container
+            : { backgroundColor: danger };
+      return {
+        ...base,
+        borderWidth: 0,
+        borderRadius: paint.style.radius.control,
+        borderCurve: 'continuous' as const,
+        ...tone,
+      };
     }
+
+    return {
+      ...base,
+      backgroundColor: 'transparent',
+      borderWidth: 0,
+      overflow: 'visible' as const,
+    };
   };
 
   /**
@@ -357,19 +362,10 @@ export const Button = ({
    * // With variant="secondary": Returns light color for dark background
    */
   const getTextColor = () => {
-    if (Platform.OS === 'android' && variant === 'secondary') {
-      return foreground;
-    }
-
-    switch (variant) {
-      case 'primary':
-        return background;
-      case 'secondary':
-      case 'dangerous':
-      case 'underline':
-      default:
-        return variant === 'underline' ? foregroundSecondary : foreground;
-    }
+    if (contentColor) return contentColor;
+    if (variant === 'primary') return paint.primary.content;
+    if (variant === 'secondary') return paint.secondary.content;
+    return variant === 'underline' ? foregroundSecondary : foreground;
   };
 
   // Re-entrancy guard, haptic timing, and opacity feedback all live in
@@ -385,25 +381,28 @@ export const Button = ({
         disabled={disabled || loading}
         onPress={onPress}
         haptics={haptics}
+        activeOpacity={PRESS_OPACITY}
         hitSlop={BUTTON_HIT_SLOP}
         {...a11yProps}>
-        <View
-          style={[
-            getButtonStyles(),
-            {
-              width: sz.iconOnlyDimension,
-              height: sz.iconOnlyDimension,
-              paddingVertical: 0,
-              paddingHorizontal: 0,
-            },
-            style,
-          ]}
-          blur={shouldUseBlur}
-          blurIntensity={intensity}
-          blurTint={tint}>
-          {/* Loading spinner or icon content */}
-          {loading ? <Spinner size={16} /> : layoutIcon}
-        </View>
+        <PressScale target={PRESS_SCALE}>
+          <View
+            style={[
+              getButtonStyles(),
+              {
+                width: sz.iconOnlyDimension,
+                height: sz.iconOnlyDimension,
+                paddingVertical: 0,
+                paddingHorizontal: 0,
+              },
+              style,
+            ]}
+            blur={shouldUseBlur}
+            blurIntensity={intensity}
+            blurTint={tint}>
+            {/* Loading spinner or icon content */}
+            {loading ? <Spinner size={16} color={contentColor} /> : layoutIcon}
+          </View>
+        </PressScale>
       </Pressable>
     );
   }
@@ -419,46 +418,60 @@ export const Button = ({
       disabled={disabled || loading}
       onPress={onPress}
       haptics={haptics}
+      activeOpacity={PRESS_OPACITY}
       hitSlop={BUTTON_HIT_SLOP}
       {...a11yProps}>
-      <View
-        style={[getButtonStyles(), { minHeight: sz.minHeight }, style]}
-        blur={shouldUseBlur}
-        blurIntensity={intensity}
-        blurTint={tint}>
-        <HStack
-          collapsable={false}
-          align="center"
-          justify="center"
-          gap={layoutText && layoutIcon ? sz.iconTextSpacing : 0}
-          style={loading ? styles.hiddenContent : undefined}>
-          <>
-            {layoutIcon}
-            {layoutText != null &&
-              (typeof layoutText === 'string' ? (
-                <Text
-                  bold
-                  color={getTextColor()}
-                  style={{
-                    textAlign: 'center',
-                    ...(variant === 'underline'
-                      ? { textDecorationLine: 'underline' as const }
-                      : undefined),
-                  }}
-                  size={sz.fontSize}>
-                  {layoutText}
-                </Text>
-              ) : (
-                layoutText
-              ))}
-          </>
-        </HStack>
-        {loading ? (
-          <View pointerEvents="none" style={styles.loadingOverlay}>
-            <Spinner size={16} />
-          </View>
-        ) : null}
-      </View>
+      <PressScale target={PRESS_SCALE}>
+        <View
+          style={[getButtonStyles(), { minHeight: sz.minHeight }, style]}
+          blur={shouldUseBlur}
+          blurIntensity={intensity}
+          blurTint={tint}>
+          <HStack
+            collapsable={false}
+            align="center"
+            justify="center"
+            gap={layoutText && layoutIcon ? sz.iconTextSpacing : 0}
+            style={loading ? styles.hiddenContent : undefined}>
+            <>
+              {layoutIcon}
+              {layoutText != null &&
+                (typeof layoutText === 'string' ? (
+                  <Text
+                    semibold
+                    family={paint.style.type.family}
+                    color={getTextColor()}
+                    // A pill is one line. Labels are written to fit (see
+                    // __tests__/buttonLabelBudget.test.ts); this is the net
+                    // under that for what a test cannot see — a count that
+                    // grows, a large system font. It shrinks a little before
+                    // it truncates, and it never wraps to a second line or
+                    // pushes its neighbour out of an equal share of the row.
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.8}
+                    maxFontSizeMultiplier={1.4}
+                    style={{
+                      textAlign: 'center',
+                      ...(variant === 'underline'
+                        ? { textDecorationLine: 'underline' as const }
+                        : undefined),
+                    }}
+                    size={sz.fontSize}>
+                    {layoutText}
+                  </Text>
+                ) : (
+                  layoutText
+                ))}
+            </>
+          </HStack>
+          {loading ? (
+            <View pointerEvents="none" style={styles.loadingOverlay}>
+              <Spinner size={16} color={contentColor ?? getTextColor()} />
+            </View>
+          ) : null}
+        </View>
+      </PressScale>
     </Pressable>
   );
 };

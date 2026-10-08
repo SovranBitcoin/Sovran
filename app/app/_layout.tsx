@@ -1,4 +1,5 @@
 import { Stack, DarkTheme, ThemeProvider as NavigationThemeProvider } from 'expo-router';
+import { DmEcashAutoRedeemProvider } from '@/features/payments/hooks/useDmEcashAutoRedeem';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
@@ -26,6 +27,8 @@ import { NostrSignerProvider } from '@/shared/providers/NostrSignerProvider';
 import { PricelistProvider } from '@/shared/providers/PricelistProvider';
 import { ThemeProvider, useTheme } from '@/shared/providers/ThemeProvider';
 import { CapabilityProvider, useCapabilities } from '@/shared/ui/capability';
+import { LayoutGuidesProvider } from '@/shared/providers/LayoutGuidesProvider';
+import { TouchIndicatorProvider } from '@/shared/providers/TouchIndicatorProvider';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import React, { useCallback, useEffect, useMemo } from 'react';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
@@ -92,6 +95,8 @@ const OuterProviders = compose([
   InitializationProvider,
   ThemeProvider,
   CapabilityProvider,
+  LayoutGuidesProvider,
+  TouchIndicatorProvider,
   HeroUINativeProvider,
   HeroTransitionProvider,
   OfflineStatusProvider,
@@ -132,6 +137,9 @@ function AccountScopedProviders({
         // bitchat clients, so explicit peer-list/chat surfaces own startup.
         // Proximity DMs ship only with Nut Drop (ADR 0021).
         ...(hasFeature('nutDrop') ? [BitchatBLEProvider] : []),
+        // Ecash sent as a Nostr message is redeemed here, with no chat screen
+        // involved, so the conversation pages can be switched off (ADR 0021).
+        ...(hasFeature('ecashMessages') ? [DmEcashAutoRedeemProvider] : []),
         AppGate,
       ]),
     [accountIndex]
@@ -217,6 +225,18 @@ const CloseButton = React.memo(function CloseButton() {
   return <ScreenHeaderAction icon="material-symbols:close-rounded" onPress={() => router.back()} />;
 });
 
+// A pushed Android route leaves with Back; same chrome as every header action.
+const BackButton = React.memo(function BackButton() {
+  return (
+    <ScreenHeaderAction
+      icon="material-symbols:arrow-back-rounded"
+      accessibilityLabel="Go back"
+      testID="flow-header-back"
+      onPress={() => router.back()}
+    />
+  );
+});
+
 // Inner component that can access theme context
 function RootLayoutContent() {
   useFeatureRouteGuard();
@@ -271,6 +291,9 @@ function RootLayoutContent() {
           ...(screen.title !== undefined ? { headerTitle: screen.title } : {}),
           // Add close button for modal presentations (only when header is shown)
           ...(isModalPresentation ? { headerLeft: () => <CloseButton /> } : {}),
+          ...(screen.androidPushed
+            ? { headerLeft: () => <BackButton />, headerBackVisible: false }
+            : {}),
         });
       }
 

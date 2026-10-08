@@ -17,7 +17,7 @@
  *     result into an `rgba()` string.
  */
 
-import { darken, lighten, withAlpha } from '@/shared/lib/color';
+import { darken, lighten, withAlpha, contrastRatio } from '@/shared/lib/color';
 
 /** Numeric channels from hex (3/6/8 digit) or an `rgba()` string. */
 function channels(value: string): [number, number, number, number] {
@@ -96,3 +96,21 @@ describe('color', () => {
     expect(() => withAlpha(validHex, -0.1)).toThrow();
   });
 });
+
+/* eslint-disable no-restricted-syntax -- hex literals are the fixtures under test */
+describe('contrastRatio', () => {
+  it('spans 1 for identical colours to 21 for black on white', () => {
+    expect(contrastRatio('#777777', '#777777')).toBeCloseTo(1, 5);
+    expect(contrastRatio('#000000', '#FFFFFF')).toBeCloseTo(21, 1);
+    expect(contrastRatio('#FFFFFF', '#000000')).toBeCloseTo(21, 1);
+  });
+
+  it('prefers black text on a saturated mid green, where brightness alone picks white', () => {
+    // The Panel style's accent over the Cosmic Purple wallpaper. BT.601
+    // brightness puts it under 0.6 and so chose white, at 2.5:1.
+    const accent = '#14BA73';
+    expect(contrastRatio(accent, '#000000')).toBeGreaterThan(4.5);
+    expect(contrastRatio(accent, '#FFFFFF')).toBeLessThan(3);
+  });
+});
+/* eslint-enable no-restricted-syntax */

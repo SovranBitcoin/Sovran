@@ -1,14 +1,15 @@
 import React from 'react';
 import { View } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
-import { GradientCard } from '@/shared/ui/composed/GradientCard';
+import { Surface } from '@/shared/ui/composed/Surface';
 import { BlurCardFrame } from '@/shared/ui/composed/BlurCardFrame';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 jest.mock('@/shared/hooks/useThemeColor', () => ({
-  // eslint-disable-next-line no-restricted-syntax -- parseable fixture color
-  useThemeColor: () => '#808080',
+  useThemeColor: (tokens: string | string[]) =>
+    // eslint-disable-next-line no-restricted-syntax -- parseable fixture color
+    Array.isArray(tokens) ? tokens.map(() => '#808080') : '#808080',
 }));
 jest.mock('@/shared/lib/logger', () => ({
   Log: ({ children }: React.PropsWithChildren) => children,
@@ -32,9 +33,9 @@ it('keeps the same frame and content mounted while loading blocks visibility and
     return <View testID="content" />;
   }
   const card = (loading: boolean) => (
-    <GradientCard loading={loading} variant="right" testID="frame">
+    <Surface loading={loading} variant="right" testID="frame">
       <Content />
-    </GradientCard>
+    </Surface>
   );
   let tree!: TestRenderer.ReactTestRenderer;
   act(() => {

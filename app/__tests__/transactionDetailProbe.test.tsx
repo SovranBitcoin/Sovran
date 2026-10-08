@@ -141,8 +141,8 @@ jest.mock('@/shared/ui/primitives/Haptics', () => ({ EnhancedHaptics: { copyHapt
 jest.mock('@/shared/ui/primitives/Pressable', () => ({
   Pressable: ({ children }: React.PropsWithChildren) => <>{children}</>,
 }));
-jest.mock('@/shared/ui/composed/GradientCard', () => ({
-  GradientCard: ({ children }: React.PropsWithChildren) => <>{children}</>,
+jest.mock('@/shared/ui/composed/Surface', () => ({
+  Surface: ({ children }: React.PropsWithChildren) => <>{children}</>,
 }));
 jest.mock('expo-linear-gradient', () => ({
   LinearGradient: ({ children }: React.PropsWithChildren) => <>{children}</>,

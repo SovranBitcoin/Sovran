@@ -42,6 +42,7 @@ import { Log } from '@/shared/lib/logger';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useDeferredMount } from '@/shared/hooks/useDeferredMount';
 import { ModalLayoutWrapper } from './ModalLayoutWrapper';
+import { TouchIndicatorLayer } from './TouchIndicator';
 import { FLOW_SHEET_SCRIM_OVERHANG, FlowSheetHeader } from './FlowSheetHeader';
 import { ScreenBackgroundContext, ScreenFooterContext } from './ScreenFooterContext';
 
@@ -251,29 +252,31 @@ export function Screen({
           <ScreenTopPaddingContext.Provider
             value={safeArea === 'scroll' && useCustomScrollView ? safeAreaTopPadding : 0}>
             <ScreenBottomPaddingContext.Provider value={footer ? resolvedBottomPadding : 0}>
-              <ModalLayoutWrapper
-                scrollViewRef={scrollViewRef}
-                scrollContentRef={scrollContentRef}
-                contentPadding={contentPadding}
-                headerGradient={headerGradient}
-                headerAppearance={headerAppearance}
-                headerGradientHeight={headerGradientHeight}
-                headerGradientStyle={headerGradientStyle}
-                stickyContent={stickyContent}
-                stickyContentHeight={stickyContentHeight}
-                headerBand={headerBand}
-                useAnimatedScroll={scroll === 'animated'}
-                scrollY={scrollY}
-                useCustomScrollView={useCustomScrollView}
-                bottomPadding={resolvedBottomPadding}
-                bottomPaddingIncludesInset={!!footer}
-                disableHeaderSpacer={disableHeaderSpacer}
-                onHeaderHeightChange={onHeaderHeightChange}
-                scrollIndicatorInsets={scrollIndicatorInsets}
-                bgColor={bgColor}
-                bottomContent={contentReady ? footer : undefined}>
-                {contentReady ? framedChildren : null}
-              </ModalLayoutWrapper>
+              <TouchIndicatorLayer>
+                <ModalLayoutWrapper
+                  scrollViewRef={scrollViewRef}
+                  scrollContentRef={scrollContentRef}
+                  contentPadding={contentPadding}
+                  headerGradient={headerGradient}
+                  headerAppearance={headerAppearance}
+                  headerGradientHeight={headerGradientHeight}
+                  headerGradientStyle={headerGradientStyle}
+                  stickyContent={stickyContent}
+                  stickyContentHeight={stickyContentHeight}
+                  headerBand={headerBand}
+                  useAnimatedScroll={scroll === 'animated'}
+                  scrollY={scrollY}
+                  useCustomScrollView={useCustomScrollView}
+                  bottomPadding={resolvedBottomPadding}
+                  bottomPaddingIncludesInset={!!footer}
+                  disableHeaderSpacer={disableHeaderSpacer}
+                  onHeaderHeightChange={onHeaderHeightChange}
+                  scrollIndicatorInsets={scrollIndicatorInsets}
+                  bgColor={bgColor}
+                  bottomContent={contentReady ? footer : undefined}>
+                  {contentReady ? framedChildren : null}
+                </ModalLayoutWrapper>
+              </TouchIndicatorLayer>
             </ScreenBottomPaddingContext.Provider>
           </ScreenTopPaddingContext.Provider>
         </ScreenFooterContext.Provider>

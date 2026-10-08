@@ -70,10 +70,10 @@ jest.mock('@/shared/ui/primitives/Skeleton', () => ({
   },
 }));
 
-jest.mock('@/shared/ui/composed/GradientCard', () => ({
-  GradientCard: ({ children }: { children?: React.ReactNode }) => {
+jest.mock('@/shared/ui/composed/Surface', () => ({
+  Surface: ({ children }: { children?: React.ReactNode }) => {
     const ReactActual = jest.requireActual<typeof import('react')>('react');
-    return ReactActual.createElement('GradientCard', null, children);
+    return ReactActual.createElement('Surface', null, children);
   },
 }));
 
@@ -227,7 +227,7 @@ describe('CopyRequestRow', () => {
 });
 
 describe('CopyRequestCard', () => {
-  it('wraps the row in the titled Section/GradientCard chrome', () => {
+  it('wraps the row in the titled Section/Surface chrome', () => {
     const renderer = render(
       <CopyRequestCard
         title="RECEIVE ADDRESS"
@@ -239,7 +239,7 @@ describe('CopyRequestCard', () => {
     );
 
     expect(findByType(renderer, 'Section').props.title).toBe('RECEIVE ADDRESS');
-    expect(findAllByType(renderer, 'GradientCard')).toHaveLength(1);
+    expect(findAllByType(renderer, 'Surface')).toHaveLength(1);
     expect(findByType(renderer, 'ListGroup').props.variant).toBe('transparent');
     expect(values(renderer)).toEqual(['npubcash@example.com']);
   });

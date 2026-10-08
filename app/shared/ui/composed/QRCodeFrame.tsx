@@ -14,7 +14,7 @@ import Animated, {
 import Svg, { Path } from 'react-native-svg';
 import Icon, { CurrencyIcon } from 'assets/icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { GradientCard } from '@/shared/ui/composed/GradientCard';
+import { Surface } from '@/shared/ui/composed/Surface';
 import { View } from '@/shared/ui/primitives/View/View';
 import { useColorScheme } from '@/shared/hooks/useColorScheme';
 import { INVARIANT_BLACK, INVARIANT_WHITE } from '@/shared/lib/brandColors';
@@ -36,7 +36,7 @@ export function qrCodeGeometry(screenWidth: number, padding: number, size?: numb
 export function QRCodeFrame({ children }: { children: ReactNode }) {
   const scheme = useColorScheme();
   return scheme === 'light' ? (
-    <GradientCard contentStyle={contentStyle}>{children}</GradientCard>
+    <Surface contentStyle={contentStyle}>{children}</Surface>
   ) : (
     <LinearGradient colors={[INVARIANT_WHITE, INVARIANT_WHITE]} style={frameStyle}>
       {children}

@@ -250,7 +250,7 @@
   },
   "features/nearPay/screens/NearPayPeerListScreen.tsx": {
     "stylesheet-create": 1,
-    "stack-layout-props": 3,
+    "stack-layout-props": 2,
     "content-container-style": 1
   },
   "features/nearPay/screens/NearPayScreen.tsx": {
@@ -273,7 +273,7 @@
     "inline-style": 1
   },
   "features/nostrSigner/screens/ShareSignerScreen.tsx": {
-    "inline-style": 7,
+    "inline-style": 6,
     "stack-layout-props": 1
   },
   "features/nostrSigner/screens/SignerActivityDetailScreen.tsx": {
@@ -349,7 +349,8 @@
     "stylesheet-create": 1
   },
   "features/send/screens/AmountSelector.tsx": {
-    "stylesheet-create": 1
+    "stylesheet-create": 1,
+    "inline-style": 1
   },
   "features/send/screens/LightningSendScreen.tsx": {
     "stack-layout-props": 1
@@ -376,13 +377,103 @@
     "stack-layout-props": 2
   },
   "features/settings/design-system/foundations.tsx": {
-    "stack-layout-props": 10
+    "stack-layout-props": 11
   },
   "features/settings/design-system/segmentedProgress.tsx": {
     "stack-layout-props": 2
   },
   "features/settings/design-system/skeletonCrossfade.tsx": {
     "stack-layout-props": 2
+  },
+  "features/settings/design-system/variations/timeline/L01.tsx": {
+    "inline-style": 3
+  },
+  "features/settings/design-system/variations/timeline/L02.tsx": {
+    "inline-style": 2
+  },
+  "features/settings/design-system/variations/timeline/L03.tsx": {
+    "inline-style": 3
+  },
+  "features/settings/design-system/variations/timeline/L04.tsx": {
+    "inline-style": 5
+  },
+  "features/settings/design-system/variations/timeline/L05.tsx": {
+    "inline-style": 10
+  },
+  "features/settings/design-system/variations/timeline/L06.tsx": {
+    "inline-style": 5
+  },
+  "features/settings/design-system/variations/timeline/L07.tsx": {
+    "inline-style": 3
+  },
+  "features/settings/design-system/variations/timeline/L08.tsx": {
+    "inline-style": 4
+  },
+  "features/settings/design-system/variations/timeline/L09.tsx": {
+    "inline-style": 4
+  },
+  "features/settings/design-system/variations/timeline/L10.tsx": {
+    "inline-style": 4
+  },
+  "features/settings/design-system/variations/timeline/L11.tsx": {
+    "inline-style": 7
+  },
+  "features/settings/design-system/variations/timeline/L12.tsx": {
+    "inline-style": 12
+  },
+  "features/settings/design-system/variations/timeline/L13.tsx": {
+    "inline-style": 4
+  },
+  "features/settings/design-system/variations/timeline/L14.tsx": {
+    "inline-style": 4
+  },
+  "features/settings/design-system/variations/timeline/L15.tsx": {
+    "inline-style": 4
+  },
+  "features/settings/design-system/variations/transaction/T01.tsx": {
+    "inline-style": 3
+  },
+  "features/settings/design-system/variations/transaction/T02.tsx": {
+    "inline-style": 5
+  },
+  "features/settings/design-system/variations/transaction/T03.tsx": {
+    "inline-style": 3
+  },
+  "features/settings/design-system/variations/transaction/T04.tsx": {
+    "inline-style": 3
+  },
+  "features/settings/design-system/variations/transaction/T05.tsx": {
+    "inline-style": 3
+  },
+  "features/settings/design-system/variations/transaction/T06.tsx": {
+    "inline-style": 4
+  },
+  "features/settings/design-system/variations/transaction/T07.tsx": {
+    "inline-style": 6
+  },
+  "features/settings/design-system/variations/transaction/T08.tsx": {
+    "inline-style": 6
+  },
+  "features/settings/design-system/variations/transaction/T09.tsx": {
+    "inline-style": 4
+  },
+  "features/settings/design-system/variations/transaction/T10.tsx": {
+    "inline-style": 5
+  },
+  "features/settings/design-system/variations/transaction/T11.tsx": {
+    "inline-style": 4
+  },
+  "features/settings/design-system/variations/transaction/T12.tsx": {
+    "inline-style": 5
+  },
+  "features/settings/design-system/variations/transaction/T13.tsx": {
+    "inline-style": 7
+  },
+  "features/settings/design-system/variations/transaction/T14.tsx": {
+    "inline-style": 8
+  },
+  "features/settings/design-system/variations/transaction/T15.tsx": {
+    "inline-style": 6
   },
   "features/settings/design-system/walletControls.tsx": {
     "stack-layout-props": 8
@@ -400,6 +491,10 @@
     "inline-style": 1,
     "stack-layout-props": 5
   },
+  "features/settings/screens/SettingsDesignSystemScreensScreen.tsx": {
+    "inline-style": 2,
+    "content-container-style": 1
+  },
   "features/settings/screens/SettingsDesignSystemSegmentedScreen.tsx": {
     "inline-style": 2,
     "stack-layout-props": 3
@@ -408,6 +503,10 @@
     "stylesheet-create": 1,
     "inline-style": 2,
     "stack-layout-props": 4
+  },
+  "features/settings/screens/SettingsDesignSystemVariationsScreen.tsx": {
+    "inline-style": 6,
+    "content-container-style": 1
   },
   "features/settings/screens/SettingsKeyringScreen.tsx": {
     "inline-style": 7,
@@ -423,7 +522,7 @@
   },
   "features/settings/screens/SettingsRecoveryScreen.tsx": {
     "inline-style": 15,
-    "stack-layout-props": 22
+    "stack-layout-props": 21
   },
   "features/settings/screens/SettingsRoutingScreen.tsx": {
     "stack-layout-props": 3
@@ -486,8 +585,8 @@
   },
   "features/transactions/components/Transactions.tsx": {
     "stylesheet-create": 1,
-    "inline-style": 6,
-    "stack-layout-props": 3,
+    "inline-style": 4,
+    "stack-layout-props": 2,
     "content-container-style": 1
   },
   "features/transactions/components/detail/AccelerateSection.tsx": {
@@ -495,8 +594,8 @@
     "stack-layout-props": 2
   },
   "features/transactions/components/detail/HistoryEntryHeader.tsx": {
-    "inline-style": 2,
-    "stack-layout-props": 2
+    "inline-style": 1,
+    "stack-layout-props": 1
   },
   "features/transactions/components/detail/HistoryEntryRefresh.tsx": {
     "stylesheet-create": 1
@@ -534,6 +633,9 @@
   "features/transactions/screens/TransactionsScreen.tsx": {
     "inline-style": 1
   },
+  "features/user/components/ProfileBody.tsx": {
+    "stylesheet-create": 1
+  },
   "features/user/screens/UserMessagesScreen.tsx": {
     "inline-style": 2
   },
@@ -548,7 +650,7 @@
   },
   "features/wallet/components/BitcoinNearYou.tsx": {
     "stylesheet-create": 1,
-    "inline-style": 2
+    "inline-style": 1
   },
   "features/wallet/components/FiatCurrencyPill/FiatCurrencyPill.liquid.tsx": {
     "inline-style": 3
@@ -568,6 +670,9 @@
   "features/wallet/components/UnitSwitcherPill/UnitSwitcherPill.liquid.tsx": {
     "stylesheet-create": 1,
     "inline-style": 1
+  },
+  "features/wallet/home/HomeLayouts.tsx": {
+    "stylesheet-create": 1
   },
   "features/wallet/screens/WalletScreen.tsx": {
     "stylesheet-create": 1,
@@ -696,9 +801,8 @@
   },
   "shared/ui/composed/AmountEntryView.tsx": {
     "stylesheet-create": 1,
-    "inline-style": 7,
-    "stack-layout-props": 5,
-    "content-container-style": 1
+    "inline-style": 3,
+    "stack-layout-props": 3
   },
   "shared/ui/composed/AmountFormatter.tsx": {
     "inline-style": 1
@@ -730,7 +834,6 @@
     "stylesheet-create": 1
   },
   "shared/ui/composed/ButtonHandler.tsx": {
-    "inline-style": 1,
     "stack-layout-props": 1
   },
   "shared/ui/composed/CapsuleButton/CapsuleButton.blur.tsx": {
@@ -769,17 +872,12 @@
     "inline-style": 1,
     "stack-layout-props": 1
   },
-  "shared/ui/composed/CustomKeyboard.tsx": {
-    "inline-style": 3
-  },
   "shared/ui/composed/DetailsList.tsx": {
     "inline-style": 10,
     "stack-layout-props": 5
   },
   "shared/ui/composed/DetailsSection.tsx": {
-    "stylesheet-create": 1,
-    "inline-style": 2,
-    "stack-layout-props": 1
+    "inline-style": 2
   },
   "shared/ui/composed/ElapsedSeconds.tsx": {
     "stylesheet-create": 1
@@ -810,17 +908,20 @@
     "stylesheet-create": 1,
     "inline-style": 1
   },
-  "shared/ui/composed/GradientCard.tsx": {
-    "stylesheet-create": 1
-  },
   "shared/ui/composed/GradientCardFrame.tsx": {
     "inline-style": 2
+  },
+  "shared/ui/composed/GroupedTable.tsx": {
+    "inline-style": 10
   },
   "shared/ui/composed/HeaderGlassCircle.ios.tsx": {
     "stylesheet-create": 1
   },
   "shared/ui/composed/LayoutDebugWrapper.tsx": {
     "content-container-style": 1
+  },
+  "shared/ui/composed/LayoutGuides.tsx": {
+    "stylesheet-create": 1
   },
   "shared/ui/composed/List.tsx": {
     "content-container-style": 1
@@ -856,7 +957,7 @@
     "stack-layout-props": 2
   },
   "shared/ui/composed/RowStatsAccent.tsx": {
-    "inline-style": 7,
+    "inline-style": 5,
     "stack-layout-props": 4
   },
   "shared/ui/composed/Screen.tsx": {
@@ -874,10 +975,16 @@
   "shared/ui/composed/ScrollEdgeFade.tsx": {
     "inline-style": 1
   },
+  "shared/ui/composed/Section.tsx": {
+    "inline-style": 2
+  },
   "shared/ui/composed/SectionAnchorList.tsx": {
     "stylesheet-create": 1,
     "inline-style": 4,
     "content-container-style": 2
+  },
+  "shared/ui/composed/SectionHeading.tsx": {
+    "inline-style": 1
   },
   "shared/ui/composed/SheetGrabber.tsx": {
     "stylesheet-create": 1
@@ -887,6 +994,9 @@
   },
   "shared/ui/composed/SlideToConfirm.tsx": {
     "inline-style": 2
+  },
+  "shared/ui/composed/Surface.tsx": {
+    "stylesheet-create": 1
   },
   "shared/ui/composed/UnderlineTabs.tsx": {
     "stylesheet-create": 1
