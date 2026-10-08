@@ -62,10 +62,18 @@ jest.mock('expo-camera', () => ({ scanFromURLAsync: jest.fn() }));
 jest.mock('expo-image-picker', () => ({ launchImageLibraryAsync: jest.fn() }));
 jest.mock('expo-clipboard', () => ({ setStringAsync: jest.fn() }));
 jest.mock('react-native', () => ({ Share: { share: jest.fn() } }));
+// Whether the mint picker is a sheet is the platform's call; a case sets it.
+const mockMintPickerIsSheet = jest.fn(() => true);
+jest.mock('@/features/send/lib/amountReturn', () => ({
+  ...jest.requireActual('@/features/send/lib/amountReturn'),
+  mintPickerIsSheet: () => mockMintPickerIsSheet(),
+}));
 jest.mock('@/shared/lib/interactions', () => ({
   // The DM-thread navigate is deferred behind the interaction settle; run it
   // synchronously here — the pinned contract is dismissAll-before-navigate.
   runAfterInteractions: (callback: () => void) => callback(),
+  // The picker's dismissal is followed a frame later; here, at once.
+  afterNextFrame: (callback: () => void) => callback(),
 }));
 jest.mock('@cashu/cashu-ts', () => ({ getDecodedToken: jest.fn(), getEncodedToken: jest.fn() }));
 jest.mock('@/features/bitchat/hooks/useBitchatNickname', () => ({
@@ -418,6 +426,46 @@ describe('createSovranHandlers profile routing', () => {
     });
     expect(calls).toEqual(['replace']);
   });
+
+  it.each([
+    [true, ['back', 'navigate']],
+    [false, ['navigate']],
+  ] as const)(
+    'a mint chosen in a picker over the send hub leaves the picker only where it is a sheet (sheet: %s)',
+    async (sheet, expected) => {
+      // On iPhone the stack presents every screen after a sheet as a modal
+      // over it. On Android the picker is a page and stays in the history.
+      mockMintPickerIsSheet.mockReturnValue(sheet);
+      // @ts-expect-error enterAmount only reads no machine methods.
+      const machine: PaymentMachine = { getContext: jest.fn(() => ({})) };
+      const handlers = createSovranHandlers({
+        machine,
+        getManager: () => null,
+        getRootNavigationState: () => ({
+          index: 0,
+          routes: [
+            {
+              name: '(send-flow)',
+              state: { index: 1, routes: [{ name: 'send' }, { name: 'mintSelect' }] },
+            },
+          ],
+        }),
+      });
+      const calls: string[] = [];
+      mockBack.mockReset().mockImplementation(() => calls.push('back'));
+      mockNavigate.mockReset().mockImplementation(() => calls.push('navigate'));
+      mockDismissTo.mockClear();
+
+      await handlers.enterAmount?.({
+        unit: 'sat',
+        preselectedMintUrl: `https://sheet-${sheet}-mint.example`,
+        constraints: { destination: 'sendEcash' },
+      });
+      expect(mockDismissTo).not.toHaveBeenCalled();
+      expect(calls).toEqual(expected);
+      mockMintPickerIsSheet.mockReturnValue(true);
+    }
+  );
 
   it('serializes the Create Ecash entry source into the amount route', async () => {
     // @ts-expect-error enterAmount only reads no machine methods.

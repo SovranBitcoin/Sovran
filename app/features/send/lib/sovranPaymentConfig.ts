@@ -11,7 +11,11 @@
  * via createColada in the library.
  */
 
-import { isMintPickerOverAmount, type AmountFlowGroup } from '@/features/send/lib/amountReturn';
+import {
+  mintPickerIsSheet,
+  mintPickerUnderlay,
+  type AmountFlowGroup,
+} from '@/features/send/lib/amountReturn';
 import { Share } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { scanFromURLAsync } from 'expo-camera';
@@ -21,7 +25,7 @@ import { hasFeature } from '@/shared/config/features';
 import { paymentLog, mintUrlLogFields } from '@/shared/lib/logger';
 import { parseHistoryEntryOnce, type ParsedHistoryEntry } from 'wallet/operations';
 import { z } from 'zod';
-import { runAfterInteractions } from '@/shared/lib/interactions';
+import { afterNextFrame, runAfterInteractions } from '@/shared/lib/interactions';
 import { mintLocalId } from '@/shared/lib/id';
 
 import { getEncodedToken, getTokenMetadata, type Token } from '@cashu/cashu-ts';
@@ -1321,7 +1325,7 @@ interface CreateSovranHandlersConfig {
   machine: PaymentMachine;
   onOptionDismiss?: () => void;
   /** The root navigator's current state, for telling where a screen sits. */
-  getRootNavigationState?: () => Parameters<typeof isMintPickerOverAmount>[0];
+  getRootNavigationState?: () => Parameters<typeof mintPickerUnderlay>[0];
   getManager: () => Manager | null;
   getNpub?: () => string | undefined;
   /**
@@ -1424,25 +1428,33 @@ export function createSovranHandlers({
   paymentLog.debug('payment.handlers.created');
 
   /**
-   * Move on from the amount step. A mint picker that step opened can still be
-   * on top when the flow continues: with the amount already known, choosing a
-   * mint goes straight to the next screen. The picker goes first, so the next
-   * screen takes its place over (or in place of) the amount screen, exactly as
-   * it does when no picker was shown. Replacing the picker itself left the
-   * amount screen underneath and, on iPhone where the picker is a system
-   * sheet, drew the next page inside the frame of the sheet it replaced.
+   * Move on from the mint picker when it is still the current screen. With
+   * the amount already known, choosing a mint goes straight to the next
+   * screen, and the picker has to go first.
    *
-   * The step waits for the dismissal to begin: a screen pushed in the same
-   * commit lands beneath a sheet that is still presented.
+   * Over the amount screen it was a detour from that screen, on both
+   * platforms: the next screen takes its place over (or in place of) the
+   * amount screen, exactly as it does when no picker was shown. Replacing the
+   * picker itself left the amount screen underneath.
+   *
+   * Over anything else it is a page in the flow's history on Android and
+   * stays there. On iPhone it is a system sheet, and the stack presents every
+   * screen that follows a sheet as a modal over it, so it goes there too.
+   *
+   * The step then waits for the dismissal to reach the screen: a page pushed
+   * in the same update lands beneath a sheet that is still presented.
    */
-  const leaveAmountStep = (flowGroup: AmountFlowGroup, go: () => void) => {
-    if (!isMintPickerOverAmount(getRootNavigationState?.(), flowGroup)) {
+  const leaveMintPicker = (flowGroup: AmountFlowGroup, go: () => void) => {
+    const beneath = mintPickerUnderlay(getRootNavigationState?.(), flowGroup);
+    if (beneath === null || (beneath === 'other' && !mintPickerIsSheet())) {
       go();
       return;
     }
-    paymentLog.info('navigate.leave_amount_step.dismiss_mint_picker', { flowGroup });
-    router.back();
-    runAfterInteractions(go);
+    paymentLog.info('navigate.leave_mint_picker', { flowGroup, beneath });
+    // Unguarded: the guard would drop this as a repeat of a back just made
+    // (closing mint details, say), and the step would land over the picker.
+    router.raw.back();
+    afterNextFrame(go);
   };
 
   return {
@@ -1619,7 +1631,7 @@ export function createSovranHandlers({
         paymentLog.warn('contact_send.delivery.fallback_to_hand_off');
       }
 
-      leaveAmountStep('(send-flow)', () =>
+      leaveMintPicker('(send-flow)', () =>
         router.navigate({
           pathname: '/(send-flow)/sendToken',
           params: {
@@ -1655,7 +1667,7 @@ export function createSovranHandlers({
       };
       const isFallback = (machine.getContext().failedOptionValues?.length ?? 0) > 0;
       const nav = isFallback ? router.replace : router.navigate;
-      leaveAmountStep('(send-flow)', () =>
+      leaveMintPicker('(send-flow)', () =>
         nav({
           pathname: '/(send-flow)/paymentRequest',
           params: { paymentRequestEntry: JSON.stringify(entry) },
@@ -1733,7 +1745,7 @@ export function createSovranHandlers({
       };
       const isFallback = (machine.getContext().failedOptionValues?.length ?? 0) > 0;
       const nav = isFallback ? router.replace : router.navigate;
-      leaveAmountStep('(send-flow)', () =>
+      leaveMintPicker('(send-flow)', () =>
         nav({
           pathname: isOnchain ? '/(send-flow)/onchainSend' : '/(send-flow)/lightningSend',
           params: { meltHistoryEntry: JSON.stringify(entry) },
@@ -1747,7 +1759,7 @@ export function createSovranHandlers({
       const pathname = getOnchainMintAddress(entry)
         ? '/(receive-flow)/onchainReceive'
         : '/(receive-flow)/lightningReceive';
-      leaveAmountStep('(receive-flow)', () =>
+      leaveMintPicker('(receive-flow)', () =>
         router.replace({
           pathname,
           params: { mintHistoryEntry: historyEntry, unit },
@@ -1760,7 +1772,7 @@ export function createSovranHandlers({
     // same router.replace lane as mintQuoteCreated (a step-handler navigation,
     // not a side-channel callback).
     paymentRequestReceived: ({ entry }) => {
-      leaveAmountStep('(receive-flow)', () =>
+      leaveMintPicker('(receive-flow)', () =>
         router.replace({
           pathname: '/(receive-flow)/paymentRequest',
           params: { paymentRequestEntry: entry },
@@ -1908,12 +1920,13 @@ export function createSovranHandlers({
       // still showing behind it. `dismissTo` pops to the route already there
       // and gives it the new params; `navigate` is for arriving fresh.
       const flowGroup = constraints.destination === 'mintQuote' ? '(receive-flow)' : '(send-flow)';
-      const returning = isMintPickerOverAmount(getRootNavigationState?.(), flowGroup);
-      (returning ? router.dismissTo : router.navigate)(
+      const returning = mintPickerUnderlay(getRootNavigationState?.(), flowGroup) === 'amount';
+      const href =
         constraints.destination === 'mintQuote'
-          ? { pathname: '/(receive-flow)/amount', params }
-          : { pathname: '/(send-flow)/amount', params }
-      );
+          ? ({ pathname: '/(receive-flow)/amount', params } as const)
+          : ({ pathname: '/(send-flow)/amount', params } as const);
+      if (returning) router.dismissTo(href);
+      else leaveMintPicker(flowGroup, () => router.navigate(href));
       paymentLog.info('navigate.enterAmount.done', {
         duration_ms: performance.now() - t0,
         returning,
