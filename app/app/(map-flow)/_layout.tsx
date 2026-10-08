@@ -16,7 +16,7 @@ const DETAIL_OPTIONS = { title: 'Merchant details' };
 
 export default function MapFlowLayout() {
   return (
-    <AndroidSheetFlowStack>
+    <AndroidSheetFlowStack flow="(map-flow)">
       <Stack.Screen name="index" options={INDEX_OPTIONS} />
       <Stack.Screen name="detail" options={DETAIL_OPTIONS} />
     </AndroidSheetFlowStack>

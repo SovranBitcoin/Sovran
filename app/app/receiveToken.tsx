@@ -12,7 +12,7 @@ import { FormSheetChrome } from '@/shared/ui/composed/FormSheetChrome';
 
 export default function ModalScreen() {
   return (
-    <FormSheetChrome title={railHeaderTitle('ecashReceive')}>
+    <FormSheetChrome route="receiveToken" title={railHeaderTitle('ecashReceive')}>
       <ReceiveTokenRoute where="app.receiveToken" />
     </FormSheetChrome>
   );

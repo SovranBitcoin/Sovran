@@ -6,7 +6,7 @@ import { BackupFlowProvider } from '@/features/backup/BackupFlowProvider';
 export default function PromptFlowLayout() {
   return (
     <BackupFlowProvider>
-      <AndroidSheetFlowStack>
+      <AndroidSheetFlowStack flow="(prompt-flow)">
         {/* Same header chrome as every other flow page: the shared close
             action on the left. CtaScreen removes it while a prompt blocks. */}
         <Stack.Screen name="cta" options={{ title: '' }} />

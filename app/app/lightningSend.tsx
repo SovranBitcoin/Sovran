@@ -8,7 +8,7 @@ import { FormSheetChrome } from '@/shared/ui/composed/FormSheetChrome';
 
 export default function LightningSendStandaloneRoute() {
   return (
-    <FormSheetChrome title={railHeaderTitle('lightningSend')}>
+    <FormSheetChrome route="lightningSend" title={railHeaderTitle('lightningSend')}>
       <LightningSendRoute where="app.lightningSend" />
     </FormSheetChrome>
   );

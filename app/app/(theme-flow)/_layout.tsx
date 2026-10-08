@@ -15,7 +15,7 @@ const GALLERY_OPTIONS = { title: 'Gallery' };
 
 export default function ThemeFlowLayout() {
   return (
-    <AndroidSheetFlowStack>
+    <AndroidSheetFlowStack flow="(theme-flow)">
       <Stack.Screen name="preview" options={PREVIEW_OPTIONS} />
       <Stack.Screen name="background" options={BACKGROUND_OPTIONS} />
       <Stack.Screen name="gallery" options={GALLERY_OPTIONS} />

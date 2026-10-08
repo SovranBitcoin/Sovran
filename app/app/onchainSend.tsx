@@ -8,7 +8,7 @@ import { FormSheetChrome } from '@/shared/ui/composed/FormSheetChrome';
 
 export default function OnchainSendStandaloneRoute() {
   return (
-    <FormSheetChrome title={railHeaderTitle('onchainSend')}>
+    <FormSheetChrome route="onchainSend" title={railHeaderTitle('onchainSend')}>
       <OnchainSendRoute where="app.onchainSend" />
     </FormSheetChrome>
   );

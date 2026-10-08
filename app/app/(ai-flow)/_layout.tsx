@@ -13,7 +13,7 @@ const PROVIDER_OPTIONS = { title: 'Provider details' };
 
 export default function AiFlowLayout() {
   return (
-    <AndroidSheetFlowStack>
+    <AndroidSheetFlowStack flow="(ai-flow)">
       <Stack.Screen name="providers" options={PROVIDERS_OPTIONS} />
       <Stack.Screen name="provider" options={PROVIDER_OPTIONS} />
     </AndroidSheetFlowStack>

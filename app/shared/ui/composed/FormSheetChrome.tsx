@@ -31,9 +31,12 @@ import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { SheetGrabber } from '@/shared/ui/composed/SheetGrabber';
 import { AndroidSheetRoot, SheetPageLayer } from '@/shared/ui/composed/AndroidSheetRoot';
 import { HeaderGradient } from '@/shared/ui/composed/HeaderGradient';
+import { androidFlowPresentation } from '@/config/androidFlowPresentation';
 import { FLOW_SHEET_HEADER_HEIGHT, SCRIM_TOTAL_HEIGHT } from '@/shared/ui/composed/FlowSheetHeader';
 
 interface FormSheetChromeProps {
+  /** The standalone route's file name, e.g. `lightningSend`. */
+  route: string;
   title?: string;
   children: React.ReactNode;
   /** Page background the scrim fades from — only needed when the hosted
@@ -41,7 +44,11 @@ interface FormSheetChromeProps {
   scrimColor?: string;
 }
 
-function AndroidFormSheetChrome({ title, children, scrimColor }: FormSheetChromeProps) {
+function AndroidFormSheetChrome({
+  title,
+  children,
+  scrimColor,
+}: Omit<FormSheetChromeProps, 'route'>) {
   const background = useThemeColor('surface');
   return (
     // AndroidSheetRoot pins the sheet to exact full height — RNS single-detent
@@ -76,8 +83,16 @@ function AndroidFormSheetChrome({ title, children, scrimColor }: FormSheetChrome
   );
 }
 
-export function FormSheetChrome({ title, children, scrimColor }: FormSheetChromeProps) {
-  if (Platform.OS !== 'android') return <>{children}</>;
+/**
+ * Chrome for a standalone route. Only an Android bottom sheet needs any: no
+ * native header renders inside one, so this draws the grabber, title and close
+ * button. iOS, and Android routes presented as pushed screens, use the native
+ * header and get their children back untouched.
+ */
+export function FormSheetChrome({ route, title, children, scrimColor }: FormSheetChromeProps) {
+  if (Platform.OS !== 'android' || androidFlowPresentation(route) !== 'sheet') {
+    return <>{children}</>;
+  }
   return (
     <AndroidFormSheetChrome title={title} scrimColor={scrimColor}>
       {children}
