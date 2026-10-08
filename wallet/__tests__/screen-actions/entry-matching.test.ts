@@ -539,3 +539,32 @@ describe('mergeEntryUpdate — error across out-of-order updates', () => {
     expect('error' in merged).toBe(false);
   });
 });
+
+describe('mergeEntryUpdate — what a turned-away or partial update may change', () => {
+  it('does not let the quote row erase why a credit failed', () => {
+    // coco parks an issued quote it could not restore as pending, with the
+    // reason. The quote row then reports ISSUED: a state and nothing else.
+    const merged = mergeEntryUpdate(
+      {
+        id: 'mint:1',
+        type: 'mint',
+        quoteId: 'q1',
+        state: 'UNPAID',
+        error: 'Recovered issued quote q1 but no proofs could be restored',
+      },
+      { type: 'mint', quoteId: 'q1', state: 'ISSUED', remoteState: 'ISSUED' }
+    );
+    expect(merged.state).toBe('ISSUED');
+    expect(merged.error).toMatch(/no proofs could be restored/);
+  });
+
+  it("does not stamp a turned-away update's error or time onto the entry", () => {
+    const merged = mergeEntryUpdate(
+      { id: 'mint:1', type: 'mint', state: 'ISSUED', updatedAt: 2_000 },
+      { id: 'mint:1', type: 'mint', state: 'PAID', error: 'earlier attempt failed', updatedAt: 1_000 }
+    );
+    expect(merged.state).toBe('ISSUED');
+    expect('error' in merged).toBe(false);
+    expect(merged.updatedAt).toBe(2_000);
+  });
+});

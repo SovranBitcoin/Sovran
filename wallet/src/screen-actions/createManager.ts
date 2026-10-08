@@ -764,7 +764,18 @@ export function mergeEntryUpdate(
   ) {
     const resolved = resolveEntryState(flow, updatedState, currentState);
     if (resolved && resolved !== updatedState) {
-      (merged as Record<string, unknown>).state = resolved;
+      const record = merged as Record<string, unknown>;
+      record.state = resolved;
+      // The update was turned away, so what it says about the moment it
+      // describes does not describe this entry: its error would mark a
+      // credited payment failed, and its time would date the ending early.
+      for (const key of ["error", "updatedAt"] as const) {
+        if (currentEntry && key in currentEntry) {
+          record[key] = (currentEntry as Record<string, unknown>)[key];
+        } else {
+          delete record[key];
+        }
+      }
       logger.info("mergeEntryUpdate.state.resolvedBy", {
         resolvedBy: "rank",
         flow,
@@ -778,13 +789,14 @@ export function mergeEntryUpdate(
   // An update that moves the state and carries no error has no error: coco's
   // projection leaves the key out once it is cleared. Keeping the old one
   // through the spread above would pin a failed attempt's reason onto the
-  // retry that succeeded. Decided after the rank guard: a late lower-rank
-  // update it turned away has not moved the state, so the error it would
-  // erase still describes where the entry stands.
+  // retry that succeeded. Only a whole entry can say that. The quote row's
+  // update is a state and nothing else (it has no id): it reports ISSUED for a
+  // quote whose proofs could not be restored, and must not erase that.
   if (
     currentEntry &&
     "error" in currentEntry &&
     !("error" in updatedEntry) &&
+    "id" in updatedEntry &&
     typeof updatedEntry.state === "string" &&
     getStringField(merged, "state") !== currentEntry.state
   ) {
