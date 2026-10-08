@@ -141,7 +141,7 @@ export const FOUNDATION_SCENARIOS = [
     title: 'Button variants',
     covers: [SOURCES.button],
     render: () => (
-      <VStack>
+      <VStack gap={8}>
         <Button text="Primary action" variant="primary" onPress={noop} />
         <Button text="Secondary action" variant="secondary" onPress={noop} />
         <Button text="Dangerous action" variant="dangerous" onPress={noop} />
