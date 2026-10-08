@@ -34,8 +34,6 @@ import {
 import { useStickyCurrencyTabs } from '@/features/mint/hooks/useStickyCurrencyTabs';
 import { useShiftLogger } from '@/shared/lib/contentShiftLog';
 import { Screen } from '@/shared/ui/composed/Screen';
-import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
-import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import {
   cashuLog,
@@ -83,14 +81,10 @@ interface MintListScreenProps {
   isExecuting?: boolean;
   /** Whether to show the details/inspect button on each mint (default: true) */
   showDetailsButton?: boolean;
-  /** Label for close/cancel button (default: "Close") */
-  closeButtonLabel?: string;
   /** Called when a selectable mint is tapped */
   onMintSelect: (item: MintListItem) => void;
   /** Called when inspect/details button is pressed on a mint */
   onInspectMint?: (mintUrl: string) => void;
-  /** Called when close/cancel button is pressed */
-  onClose: () => void;
 }
 
 function getMintDisabledReasonLabel(reason: MintListItem['reason']): string | null {
@@ -100,7 +94,7 @@ function getMintDisabledReasonLabel(reason: MintListItem['reason']): string | nu
 const keyExtractor = (item: MintListItem) => item.mintUrl;
 
 // Same liquid-glass circle as the send/receive modal action rows (icon-only,
-// `tabler:dots` + `ellipsis` mirrors CircleActionRow's "More" button). The
+// `tabler:dots` + `ellipsis` the same pair the old circle row used for "More"). The
 // liquid variant renders scroll-safe GlassView glass on supported devices and
 // the shared flat chip elsewhere.
 function MintInspectButton({ mintUrl, onPress }: { mintUrl: string; onPress: () => void }) {
@@ -122,10 +116,8 @@ export function MintListScreen({
   loading = false,
   isExecuting = false,
   showDetailsButton = true,
-  closeButtonLabel = 'Close',
   onMintSelect,
   onInspectMint,
-  onClose,
 }: MintListScreenProps) {
   useLifecycleLogger('MintListScreen', cashuLog);
   const mockMode = useSettingsStore((state) => state.mockMode);
@@ -291,21 +283,6 @@ export function MintListScreen({
     </Text>
   );
 
-  const bottomButtons = (
-    <BottomButtons>
-      <ButtonHandler
-        buttons={[
-          {
-            text: closeButtonLabel,
-            variant: 'secondary' as const,
-            testID: 'mint-list-close',
-            onPress: async () => onClose(),
-          },
-        ]}
-      />
-    </BottomButtons>
-  );
-
   const renderItem = ({ item }: { item: MintListItem }) => {
     const inspectable = showDetailsButton && !!onInspectMint;
     const trailing = inspectable ? (
@@ -398,7 +375,6 @@ export function MintListScreen({
       stickyContentHeight={CURRENCY_TABS_HEIGHT}
       scroll="custom"
       onHeaderHeightChange={setTotalHeaderHeight}
-      footer={bottomButtons}
       bgColor={surface}>
       {/* iOS modal AX hides the root probe; mirror toast evidence in-sheet. */}
       <E2EToastProbe />

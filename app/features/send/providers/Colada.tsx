@@ -1,3 +1,4 @@
+import { useNavigationContainerRef } from 'expo-router';
 import { captureNearbyDelivery } from '@/features/nearPay/lib/nearbyPayments';
 /**
  * @fileoverview Sovran ColadaProvider — wires colada to the app
@@ -230,6 +231,9 @@ function useColadaIdentity(
 
 export function SovranColadaProvider({ children }: { children: React.ReactNode }) {
   const manager = useManager();
+  // The payment handlers navigate, and one of them has to know what is under
+  // the screen it is leaving (features/send/lib/amountReturn.ts).
+  const navigationRef = useNavigationContainerRef();
   const { keys } = useNostrKeysContext();
   const { ndk } = useNDK();
   const { isOffline: contextOffline } = useOfflineStatus();
@@ -671,8 +675,10 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
         getManager,
         getNpub,
         deliverContactEcashDm,
+        getRootNavigationState: () =>
+          navigationRef.isReady() ? navigationRef.getRootState() : undefined,
       }),
-    [getManager, getNpub, deliverContactEcashDm]
+    [getManager, getNpub, deliverContactEcashDm, navigationRef]
   );
 
   // Built once per manager, not per render: it lands in Colada's context, so a

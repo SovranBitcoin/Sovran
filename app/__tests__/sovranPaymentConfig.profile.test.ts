@@ -16,7 +16,9 @@ import { useContactSendStore } from '@/shared/stores/runtime/contactSendStore';
 
 const mockNavigate = jest.fn();
 const mockBack = jest.fn();
+const mockReplace = jest.fn();
 const mockDismissAll = jest.fn();
+const mockDismissTo = jest.fn();
 const mockNearPayComplete = jest.fn();
 const mockNearPaySetAmountEntry = jest.fn();
 const mockNearPaySetMintPickerOpen = jest.fn();
@@ -43,13 +45,19 @@ jest.mock('expo-router', () => ({
   router: {
     navigate: (...args: unknown[]) => mockNavigate(...args),
     back: (...args: unknown[]) => mockBack(...args),
-    replace: jest.fn(),
+    replace: (...args: unknown[]) => mockReplace(...args),
     dismiss: jest.fn(),
     dismissAll: (...args: unknown[]) => mockDismissAll(...args),
+    dismissTo: (...args: unknown[]) => mockDismissTo(...args),
   },
   useSegments: jest.fn(() => []),
 }));
 
+// The build's modules (ADR 0021). Every module is on unless a case narrows it.
+const mockHasFeature = jest.fn((_feature: string) => true);
+jest.mock('@/shared/config/features', () => ({
+  hasFeature: (feature: string) => mockHasFeature(feature),
+}));
 jest.mock('expo-camera', () => ({ scanFromURLAsync: jest.fn() }));
 jest.mock('expo-image-picker', () => ({ launchImageLibraryAsync: jest.fn() }));
 jest.mock('expo-clipboard', () => ({ setStringAsync: jest.fn() }));
@@ -69,6 +77,7 @@ jest.mock('@/features/bitchat/lib/profileScope', () => ({
 jest.mock('@/shared/lib/logger', () => ({
   paymentLog: { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() },
   storeLog: { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() },
+  cashuLog: { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() },
 }));
 jest.mock('@/shared/lib/id', () => ({ mintLocalId: jest.fn((prefix: string) => `${prefix}-id`) }));
 jest.mock('@/shared/lib/cashu/utils', () => ({ buildReceiveHistoryEntry: jest.fn() }));
@@ -146,6 +155,7 @@ jest.mock('@/shared/stores/profile/transactionDistributionStore', () => ({
 
 describe('createSovranHandlers profile routing', () => {
   beforeEach(() => {
+    mockHasFeature.mockImplementation(() => true);
     mockNavigate.mockReset();
     mockDismissAll.mockReset();
     mockBack.mockReset();
@@ -317,6 +327,98 @@ describe('createSovranHandlers profile routing', () => {
     });
   });
 
+  it.each([
+    ['sendEcash', '(send-flow)', '/(send-flow)/amount'],
+    ['mintQuote', '(receive-flow)', '/(receive-flow)/amount'],
+  ] as const)(
+    'a mint chosen in the picker the %s amount screen opened comes back to that screen',
+    async (destination, flowGroup, pathname) => {
+      // @ts-expect-error enterAmount only reads no machine methods.
+      const machine: PaymentMachine = { getContext: jest.fn(() => ({})) };
+      const stack = (names: string[]) => ({
+        index: 0,
+        routes: [
+          {
+            name: flowGroup,
+            state: { index: names.length - 1, routes: names.map((name) => ({ name })) },
+          },
+        ],
+      });
+      let routes = ['amount', 'mintSelect'];
+      const handlers = createSovranHandlers({
+        machine,
+        getManager: () => null,
+        getRootNavigationState: () => stack(routes),
+      });
+      const step = {
+        unit: 'sat',
+        preselectedMintUrl: 'https://other-mint.example',
+        constraints: { destination },
+      };
+
+      mockNavigate.mockClear();
+      mockDismissTo.mockClear();
+      await handlers.enterAmount?.(step);
+      // Popped to, not pushed: a push here is the second amount screen.
+      expect(mockNavigate).not.toHaveBeenCalled();
+      expect(mockDismissTo).toHaveBeenCalledWith({
+        pathname,
+        params: { amountEntry: expect.stringContaining('https://other-mint.example') },
+      });
+
+      // The picker as the FIRST screen of the flow still goes forward.
+      routes = ['mintSelect'];
+      mockNavigate.mockClear();
+      mockDismissTo.mockClear();
+      await handlers.enterAmount?.(step);
+      expect(mockDismissTo).not.toHaveBeenCalled();
+      expect(mockNavigate).toHaveBeenCalledWith(expect.objectContaining({ pathname }));
+    }
+  );
+
+  it('an invoice made from the mint picker replaces the amount screen, not the picker', async () => {
+    // With the amount already entered, choosing a mint goes straight to the
+    // invoice. Replacing the picker left the amount screen underneath and, on
+    // iPhone, drew the invoice inside the frame of the sheet it replaced.
+    // @ts-expect-error mintQuoteCreated reads no machine methods.
+    const machine: PaymentMachine = { getContext: jest.fn(() => ({})) };
+    let routes = ['amount', 'mintSelect'];
+    const handlers = createSovranHandlers({
+      machine,
+      getManager: () => null,
+      getRootNavigationState: () => ({
+        index: 0,
+        routes: [
+          {
+            name: '(receive-flow)',
+            state: { index: routes.length - 1, routes: routes.map((name) => ({ name })) },
+          },
+        ],
+      }),
+    });
+    const step = { historyEntry: JSON.stringify({ type: 'mint', id: 'mint:1' }), unit: 'sat' };
+    const calls: string[] = [];
+    mockBack.mockReset().mockImplementation(() => calls.push('back'));
+    mockReplace.mockReset().mockImplementation(() => calls.push('replace'));
+
+    await handlers.mintQuoteCreated?.(step);
+    expect(calls).toEqual(['back', 'replace']);
+    expect(mockReplace).toHaveBeenCalledWith({
+      pathname: '/(receive-flow)/lightningReceive',
+      params: { mintHistoryEntry: step.historyEntry, unit: 'sat' },
+    });
+
+    // Straight from the amount screen there is no picker to dismiss. (A second
+    // invoice: the guarded router drops a repeat of the same navigation.)
+    routes = ['amount'];
+    calls.length = 0;
+    await handlers.mintQuoteCreated?.({
+      historyEntry: JSON.stringify({ type: 'mint', id: 'mint:2' }),
+      unit: 'sat',
+    });
+    expect(calls).toEqual(['replace']);
+  });
+
   it('serializes the Create Ecash entry source into the amount route', async () => {
     // @ts-expect-error enterAmount only reads no machine methods.
     const machine: PaymentMachine = { getContext: jest.fn(() => ({})) };
@@ -442,6 +544,43 @@ describe('createSovranHandlers profile routing', () => {
       mockNavigate.mock.invocationCallOrder[0]
     );
     expect(JSON.stringify(paymentLogCalls())).not.toContain(bearerToken);
+  });
+
+  it('delivers to the contact but ends on the wallet when the build has no DM pages', async () => {
+    mockHasFeature.mockImplementation((feature) => feature !== 'directMessages');
+    const recipientPubkey = 'cd'.repeat(32);
+    const bearerToken = 'cashuA-contact-token-no-dm-pages';
+    useContactSendStore
+      .getState()
+      .start({ pubkey: recipientPubkey, displayName: 'Bob', delivery: 'nip17' });
+    const deliverContactEcashDm = jest.fn(() => Promise.resolve());
+    // @ts-expect-error sendComplete only reads getContext.
+    const machine: PaymentMachine = { getContext: jest.fn(() => ({})) };
+    const handlers = createSovranHandlers({
+      machine,
+      getManager: () => null,
+      deliverContactEcashDm,
+    });
+
+    await handlers.sendComplete?.({
+      historyEntry: JSON.stringify({
+        id: 'send-contact-no-dm-pages',
+        type: 'send',
+        mintUrl: 'https://mint.example',
+        tokenString: bearerToken,
+      }),
+      createdOffline: false,
+      mintWasOffline: false,
+    });
+
+    // The rail is unchanged: the token still travels over the DM transport.
+    expect(deliverContactEcashDm).toHaveBeenCalledWith({ recipientPubkey, token: bearerToken });
+    expect(useContactSendStore.getState().active).toBeNull();
+    // Only the ending differs: the flow closes onto the wallet and nothing is
+    // pushed on top. `dismissAll` would stop at the send chooser.
+    expect(mockDismissTo).toHaveBeenCalledWith('/');
+    expect(mockDismissAll).not.toHaveBeenCalled();
+    expect(mockNavigate).not.toHaveBeenCalled();
   });
 
   it('still DMs a LOCKED token to the contact it was locked to', async () => {

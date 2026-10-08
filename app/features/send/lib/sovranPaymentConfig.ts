@@ -11,11 +11,13 @@
  * via createColada in the library.
  */
 
+import { isMintPickerOverAmount, type AmountFlowGroup } from '@/features/send/lib/amountReturn';
 import { Share } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { scanFromURLAsync } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
+import { hasFeature } from '@/shared/config/features';
 import { paymentLog, mintUrlLogFields } from '@/shared/lib/logger';
 import { parseHistoryEntryOnce, type ParsedHistoryEntry } from 'wallet/operations';
 import { z } from 'zod';
@@ -1318,6 +1320,8 @@ export function createSovranScanSources(nfcAdapter?: NfcIOAdapter): ScanSources 
 interface CreateSovranHandlersConfig {
   machine: PaymentMachine;
   onOptionDismiss?: () => void;
+  /** The root navigator's current state, for telling where a screen sits. */
+  getRootNavigationState?: () => Parameters<typeof isMintPickerOverAmount>[0];
   getManager: () => Manager | null;
   getNpub?: () => string | undefined;
   /**
@@ -1415,8 +1419,31 @@ export function createSovranHandlers({
   getManager,
   getNpub,
   deliverContactEcashDm,
+  getRootNavigationState,
 }: CreateSovranHandlersConfig): StepHandlerMap {
   paymentLog.debug('payment.handlers.created');
+
+  /**
+   * Move on from the amount step. A mint picker that step opened can still be
+   * on top when the flow continues: with the amount already known, choosing a
+   * mint goes straight to the next screen. The picker goes first, so the next
+   * screen takes its place over (or in place of) the amount screen, exactly as
+   * it does when no picker was shown. Replacing the picker itself left the
+   * amount screen underneath and, on iPhone where the picker is a system
+   * sheet, drew the next page inside the frame of the sheet it replaced.
+   *
+   * The step waits for the dismissal to begin: a screen pushed in the same
+   * commit lands beneath a sheet that is still presented.
+   */
+  const leaveAmountStep = (flowGroup: AmountFlowGroup, go: () => void) => {
+    if (!isMintPickerOverAmount(getRootNavigationState?.(), flowGroup)) {
+      go();
+      return;
+    }
+    paymentLog.info('navigate.leave_amount_step.dismiss_mint_picker', { flowGroup });
+    router.back();
+    runAfterInteractions(go);
+  };
 
   return {
     selectDestination: ({ unit }) => {
@@ -1570,13 +1597,21 @@ export function createSovranHandlers({
           deliverContactEcashDm
         );
         if (delivered) {
-          router.dismissAll();
-          // Let the modal dismissal settle before pushing the DM thread —
-          // navigating mid-dismissal triggers react-native-screens' modal
-          // header-visibility remount loop (blank DM thread).
-          runAfterInteractions(() => {
-            router.navigate({ pathname: '/userMessages', params: { pubkey: recipientPubkey } });
-          });
+          if (hasFeature('directMessages')) {
+            router.dismissAll();
+            // Let the modal dismissal settle before pushing the DM thread —
+            // navigating mid-dismissal triggers react-native-screens' modal
+            // header-visibility remount loop (blank DM thread).
+            runAfterInteractions(() => {
+              router.navigate({ pathname: '/userMessages', params: { pubkey: recipientPubkey } });
+            });
+          } else {
+            // Without DM pages the send ends on the wallet: the token is
+            // already with the contact, so there is no hand-off to show.
+            // `dismissAll` alone only pops this flow's stack to its first
+            // screen, the send chooser.
+            router.dismissTo('/');
+          }
           return;
         }
         // Delivery failed — fall through to the bearer hand-off screen so the
@@ -1584,14 +1619,16 @@ export function createSovranHandlers({
         paymentLog.warn('contact_send.delivery.fallback_to_hand_off');
       }
 
-      router.navigate({
-        pathname: '/(send-flow)/sendToken',
-        params: {
-          sendHistoryEntry: enrichedHistoryEntry,
-          ...(createdOffline ? { createdOffline: 'true' } : {}),
-          ...(mintWasOffline ? { mintWasOffline: 'true' } : {}),
-        },
-      });
+      leaveAmountStep('(send-flow)', () =>
+        router.navigate({
+          pathname: '/(send-flow)/sendToken',
+          params: {
+            sendHistoryEntry: enrichedHistoryEntry,
+            ...(createdOffline ? { createdOffline: 'true' } : {}),
+            ...(mintWasOffline ? { mintWasOffline: 'true' } : {}),
+          },
+        })
+      );
     },
 
     navigateToPaymentRequest: ({ mintUrl, paymentRequest, amount, unit, recipientPubkey }) => {
@@ -1618,10 +1655,12 @@ export function createSovranHandlers({
       };
       const isFallback = (machine.getContext().failedOptionValues?.length ?? 0) > 0;
       const nav = isFallback ? router.replace : router.navigate;
-      nav({
-        pathname: '/(send-flow)/paymentRequest',
-        params: { paymentRequestEntry: JSON.stringify(entry) },
-      });
+      leaveAmountStep('(send-flow)', () =>
+        nav({
+          pathname: '/(send-flow)/paymentRequest',
+          params: { paymentRequestEntry: JSON.stringify(entry) },
+        })
+      );
     },
 
     navigateToMeltPreview: ({
@@ -1694,10 +1733,12 @@ export function createSovranHandlers({
       };
       const isFallback = (machine.getContext().failedOptionValues?.length ?? 0) > 0;
       const nav = isFallback ? router.replace : router.navigate;
-      nav({
-        pathname: isOnchain ? '/(send-flow)/onchainSend' : '/(send-flow)/lightningSend',
-        params: { meltHistoryEntry: JSON.stringify(entry) },
-      });
+      leaveAmountStep('(send-flow)', () =>
+        nav({
+          pathname: isOnchain ? '/(send-flow)/onchainSend' : '/(send-flow)/lightningSend',
+          params: { meltHistoryEntry: JSON.stringify(entry) },
+        })
+      );
     },
 
     mintQuoteCreated: ({ historyEntry, unit }) => {
@@ -1706,10 +1747,12 @@ export function createSovranHandlers({
       const pathname = getOnchainMintAddress(entry)
         ? '/(receive-flow)/onchainReceive'
         : '/(receive-flow)/lightningReceive';
-      router.replace({
-        pathname,
-        params: { mintHistoryEntry: historyEntry, unit },
-      });
+      leaveAmountStep('(receive-flow)', () =>
+        router.replace({
+          pathname,
+          params: { mintHistoryEntry: historyEntry, unit },
+        })
+      );
     },
 
     // Receive "as Ecash": the machine created the single-use NUT-18 request and
@@ -1717,10 +1760,12 @@ export function createSovranHandlers({
     // same router.replace lane as mintQuoteCreated (a step-handler navigation,
     // not a side-channel callback).
     paymentRequestReceived: ({ entry }) => {
-      router.replace({
-        pathname: '/(receive-flow)/paymentRequest',
-        params: { paymentRequestEntry: entry },
-      });
+      leaveAmountStep('(receive-flow)', () =>
+        router.replace({
+          pathname: '/(receive-flow)/paymentRequest',
+          params: { paymentRequestEntry: entry },
+        })
+      );
     },
 
     reviewMint: ({ mintUrl, token, mintInfo }) => {
@@ -1856,12 +1901,23 @@ export function createSovranHandlers({
         });
         return;
       }
-      router.navigate(
+      // A mint chosen in the picker that the amount screen opened comes BACK
+      // to that amount screen, carrying the new mint. Navigating forward
+      // instead stacked a second amount screen over the picker — plain to see
+      // on iPhone, where the picker is a sheet and the first amount screen is
+      // still showing behind it. `dismissTo` pops to the route already there
+      // and gives it the new params; `navigate` is for arriving fresh.
+      const flowGroup = constraints.destination === 'mintQuote' ? '(receive-flow)' : '(send-flow)';
+      const returning = isMintPickerOverAmount(getRootNavigationState?.(), flowGroup);
+      (returning ? router.dismissTo : router.navigate)(
         constraints.destination === 'mintQuote'
           ? { pathname: '/(receive-flow)/amount', params }
           : { pathname: '/(send-flow)/amount', params }
       );
-      paymentLog.info('navigate.enterAmount.done', { duration_ms: performance.now() - t0 });
+      paymentLog.info('navigate.enterAmount.done', {
+        duration_ms: performance.now() - t0,
+        returning,
+      });
     },
 
     selectMint: ({
