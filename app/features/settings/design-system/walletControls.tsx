@@ -63,7 +63,7 @@ const DETAIL_ITEMS = [
 
 const PARKED_MESSAGE_ECASH = [
   {
-    tokenHash: 'designsystem-untrusted',
+    tokenHash: 'untrusted-designsystem',
     token: '',
     mintUrl: 'https://mint.minibits.cash/Bitcoin',
     amount: 2_100,
@@ -71,7 +71,7 @@ const PARKED_MESSAGE_ECASH = [
     reason: 'untrusted-mint',
   },
   {
-    tokenHash: 'designsystem-failed',
+    tokenHash: 'failed-designsystem',
     token: '',
     mintUrl: 'https://mint.sovran.example',
     amount: 21,
