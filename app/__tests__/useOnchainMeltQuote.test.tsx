@@ -202,6 +202,24 @@ describe('useOnchainMeltQuote', () => {
     unmount();
   });
 
+  it('stops asking an unreachable mint for the verdict after a few tries', async () => {
+    const refresh = jest
+      .fn()
+      .mockResolvedValueOnce({ state: 'PAID' })
+      .mockRejectedValue(new Error('mint unreachable'));
+    installRefresh(refresh);
+
+    const { unmount } = renderHook(() => useOnchainMeltQuote(MINT_URL, QUOTE_ID));
+    await flushEffects();
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(60 * 60_000);
+    });
+    // The first read, the confirm re-check, and six retries of it.
+    expect(refresh).toHaveBeenCalledTimes(8);
+
+    unmount();
+  });
+
   it('ignores a late quote A result after the hook switches to quote B', async () => {
     const quoteA = deferred<Record<string, unknown>>();
     const quoteB = deferred<Record<string, unknown>>();

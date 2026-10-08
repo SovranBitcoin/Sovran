@@ -26,10 +26,12 @@ const MELT_QUOTE_POLL_MS = 12_000;
 // One quick confirm re-check after the FIRST PAID-without-outpoint read — the
 // mint may publish the outpoint a beat after flipping PAID.
 const OFFCHAIN_CONFIRM_REFETCH_MS = 3_000;
-// A failed confirm re-check is tried again, each wait twice the last up to
-// this: a mint that went away is not asked every three seconds for as long as
-// the page stays open.
+// A failed confirm re-check is tried again a few times, each wait twice the
+// last up to this: a mint that went away is not asked every three seconds for
+// as long as the page stays open. Once the tries are spent the verdict stays
+// open, and the next time the page opens it is asked again.
 const OFFCHAIN_CONFIRM_RETRY_MAX_MS = 60_000;
+const OFFCHAIN_CONFIRM_MAX_RETRIES = 6;
 
 interface MeltQuoteWatchCtx {
   manager: {
@@ -188,7 +190,12 @@ function watchOnchainMeltQuote(ctx: MeltQuoteWatchCtx): () => void {
       paymentLog.warn('onchain.melt.quote.refresh_failed', {
         error: err instanceof Error ? err.message : String(err),
       });
-      if (mounted && awaitingVerdict && !confirmTimeout) {
+      if (
+        mounted &&
+        awaitingVerdict &&
+        !confirmTimeout &&
+        failedVerdictReads < OFFCHAIN_CONFIRM_MAX_RETRIES
+      ) {
         const wait = Math.min(
           OFFCHAIN_CONFIRM_REFETCH_MS * 2 ** failedVerdictReads,
           OFFCHAIN_CONFIRM_RETRY_MAX_MS
