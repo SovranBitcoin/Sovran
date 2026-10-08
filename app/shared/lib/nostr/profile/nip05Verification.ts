@@ -119,6 +119,13 @@ function settle(previous: Nip05Check | undefined, result: Nip05Verification, now
   if (unreachable && previous?.result.status === 'verified' && previous.expiresAt > now) {
     return { ...previous, staleAt: Math.min(now + UNVERIFIED_MS, previous.expiresAt) };
   }
+  // The domain named a different key. That warning is re-checked like any
+  // other unverified answer, and stays on screen while it is: dropping to
+  // "checking" every minute took the red mark off an impersonator's address
+  // for as long as the domain took to answer again.
+  if (result.status === 'mismatch') {
+    return { result, staleAt: now + UNVERIFIED_MS, expiresAt: now + VERIFIED_HARD_MS };
+  }
   return { result, staleAt: now + UNVERIFIED_MS, expiresAt: now + UNVERIFIED_MS };
 }
 

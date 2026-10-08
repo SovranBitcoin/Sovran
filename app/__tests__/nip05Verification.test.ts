@@ -92,6 +92,23 @@ describe('a verified mapping that cannot be re-checked', () => {
   });
 });
 
+it('keeps a mismatch on screen while it is re-checked', async () => {
+  jest.useFakeTimers();
+  const address = 'alice@impersonated.example';
+  jest.mocked(verifyNip05).mockResolvedValue({ status: 'mismatch', identifier: address });
+  const first = await checkNip05Identity(address, pubkey);
+  expect(first.staleAt).toBeLessThan(first.expiresAt);
+
+  // Due a re-check, and still a warning until the domain answers again.
+  jest.setSystemTime(first.staleAt + 1);
+  expect(cachedNip05Check(address, pubkey)?.result.status).toBe('mismatch');
+
+  jest.mocked(verifyNip05).mockResolvedValue({ status: 'verified', identifier: address });
+  const refreshed = await checkNip05Identity(address, pubkey, { refresh: true });
+  expect(refreshed.result.status).toBe('verified');
+  jest.useRealTimers();
+});
+
 it('does not record a failure for an identity it was too busy to check', async () => {
   jest.useRealTimers();
   let release!: () => void;
