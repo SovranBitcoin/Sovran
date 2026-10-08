@@ -8,7 +8,7 @@ import type { DesignSystemScenario } from './types';
 const TIMELINE_CARD_SOURCE = 'features/transactions/components/detail/timeline/TimelineCard.tsx';
 const TIMELINE_ROW_SOURCE = 'features/transactions/components/detail/timeline/TimelineRow.tsx';
 const LOADING_INDICATOR_SOURCE = 'shared/blocks/status/LoadingIndicator.tsx';
-const GRADIENT_CARD_SOURCE = 'shared/ui/composed/GradientCard.tsx';
+const SURFACE_SOURCE = 'shared/ui/composed/Surface.tsx';
 const BLUR_CARD_FRAME_SOURCE = 'shared/ui/composed/BlurCardFrame.tsx';
 
 const DESIGN_SYSTEM_TIMELINE_CREATED_AT = Date.UTC(2026, 4, 22, 12, 0, 0);
@@ -18,7 +18,7 @@ const TIMELINE_CASES = [
     id: 'cashu-send-pending',
     title: 'Cashu send · Pending',
     sourceId: 'ecash-send',
-    frame: 1,
+    frame: 2,
   },
   {
     id: 'cashu-send-success',
@@ -99,6 +99,7 @@ function TimelineScenarioPreview({
       nostrSent={frame.nostrSent}
       onchainConfirmationProgress={frame.onchainConfirmationProgress}
       onchainSettledInternally={frame.onchainSettledInternally}
+      cancelling={frame.cancelling}
     />
   );
 }
@@ -111,7 +112,7 @@ export const TIMELINE_SCENARIOS = TIMELINE_CASES.map(({ id, title, sourceId, fra
       TIMELINE_CARD_SOURCE,
       TIMELINE_ROW_SOURCE,
       LOADING_INDICATOR_SOURCE,
-      GRADIENT_CARD_SOURCE,
+      SURFACE_SOURCE,
       BLUR_CARD_FRAME_SOURCE,
     ],
     render: () => <TimelineScenarioPreview sourceId={sourceId} index={index} />,

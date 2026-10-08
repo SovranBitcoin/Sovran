@@ -2,91 +2,187 @@
 // Timeline engine — one algorithm for every flow
 // ---------------------------------------------------------------------------
 //
-// Resolve the flow variant → run its terminal outcomes in order (first match
-// displaces the timeline tail) → otherwise find the highest reached milestone
-// (max index over MONOTONE `reached` predicates, so out-of-order state
-// observations can only advance the position, never regress it) and style
-// steps as complete / active / upcoming. Every emitted step carries a stable
-// `id` and a `rowKey`; terminal steps INHERIT the rowKey of the milestone
-// slot they displace so in-place morph animations survive the swap.
+// A flow is an ordered list of EVENTS. The timeline is every event that has
+// happened, in the past tense, plus exactly one open slot: the event being
+// waited on, in the present tense. Nothing further ahead is drawn.
+//
+// That shape is add-only by construction. Progress finishes the open slot and
+// opens the next one below it; a failure, expiry or reversal lands IN the open
+// slot. No transition has a row to take away, so the renderer never has to
+// animate one out.
+//
+// "How far did it get" is the max over three sources, so it can only advance:
+// the events' own MONOTONE `done` predicates, the evidence a terminal outcome
+// can still read off the entry, and the rows the caller says it already drew
+// (`doneRowKeys`). Every row keeps a stable `rowKey`; whatever lands in the
+// open slot inherits that slot's key, so it morphs in place.
 
 import { logger } from "../../logger";
 import { createTimelineContext } from "./context";
-import { isSettledStepType } from "./classify";
 import { TIMELINE_FLOWS } from "./flows";
 import type {
   BuildTimelineInput,
   FlowDef,
+  MilestoneDef,
+  OutcomeDef,
   TimelineContext,
   TimelineItem,
   TimelineModel,
   TimelineStep,
-  TimelineStepType,
 } from "./types";
 
-function runOutcomeRows(
-  flow: FlowDef,
+/** How long a reversal may be in flight before the row says it is stuck. */
+const REVERSAL_SLOW_AFTER_MS = 60_000;
+
+function doneRow(
+  milestone: MilestoneDef,
   ctx: TimelineContext,
-): { steps: TimelineStep[]; kind: TimelineModel["outcome"]["kind"] } | null {
-  for (const outcome of flow.outcomes) {
-    if (!outcome.when(ctx)) continue;
-    const steps = outcome.rows(ctx).map((row): TimelineStep => {
-      const step: TimelineStep = {
-        id: row.id ?? row.slot,
-        rowKey: row.slot,
-        state: row.state,
-        displayLabel: row.label,
-        stepType: row.stepType,
-      };
-      if (row.timestamp !== undefined) step.timestamp = row.timestamp;
-      if (row.info !== undefined) step.info = row.info;
-      return step;
-    });
-    return { steps, kind: outcome.kind };
-  }
-  return null;
+  isFinal: boolean,
+): TimelineStep {
+  const copy = milestone.completed(ctx);
+  const step: TimelineStep = {
+    id: milestone.id,
+    rowKey: milestone.id,
+    state: milestone.state,
+    displayLabel: copy.label,
+    // The last event of a flow that ran to its end is the success row.
+    stepType: isFinal ? "success" : "complete",
+  };
+  if (copy.timestamp !== undefined) step.timestamp = copy.timestamp;
+  if (copy.info !== undefined) step.info = copy.info;
+  if (milestone.ring?.(ctx)) step.confirmationRing = true;
+  return step;
 }
 
-function runMilestones(flow: FlowDef, ctx: TimelineContext): TimelineStep[] {
+/**
+ * A state no flow knows (a newer coco, a corrupt row). An empty card says
+ * nothing and a guess could invent a payment, so it gets one row that claims
+ * exactly what is known: that we cannot read it.
+ */
+function unknownRow(ctx: TimelineContext): TimelineStep {
+  return {
+    id: "unknown",
+    rowKey: "unknown",
+    state: ctx.state,
+    displayLabel: ctx.paymentCopy.text("timeline.unknown.label"),
+    info: ctx.paymentCopy.text("timeline.unknown.info"),
+    stepType: "waiting",
+  };
+}
+
+/** How many leading events have happened. */
+function countDone(
+  milestones: MilestoneDef[],
+  ctx: TimelineContext,
+  outcome: OutcomeDef | undefined,
+): number {
+  let count = 0;
+  const through = outcome?.doneThrough?.(ctx) ?? null;
+  milestones.forEach((milestone, index) => {
+    if (
+      milestone.done(ctx) ||
+      milestone.id === through ||
+      ctx.doneRowKeys.includes(milestone.id)
+    ) {
+      count = index + 1;
+    }
+  });
+  return count;
+}
+
+function buildSteps(
+  flow: FlowDef,
+  ctx: TimelineContext,
+): {
+  steps: TimelineStep[];
+  kind: TimelineModel["outcome"]["kind"];
+  doneCount: number;
+  recheckAt?: number;
+} {
+  if (flow.known && !flow.known(ctx)) {
+    return { steps: [unknownRow(ctx)], kind: "pending", doneCount: 0 };
+  }
+
   const milestones = flow.milestones.filter(
     (milestone) => milestone.included?.(ctx) ?? true,
   );
-  let activeIndex = -1;
-  milestones.forEach((milestone, index) => {
-    if (milestone.reached(ctx)) activeIndex = index;
-  });
-  if (activeIndex === -1) return [];
+  const outcome = flow.outcomes.find((candidate) => candidate.when(ctx));
+  const doneCount = countDone(milestones, ctx, outcome);
+  const open = milestones[doneCount];
+  const ranToEnd = !outcome && !open;
+  const steps = milestones
+    .slice(0, doneCount)
+    .map((milestone, index) =>
+      doneRow(milestone, ctx, ranToEnd && index === doneCount - 1),
+    );
 
-  const lastIndex = milestones.length - 1;
-  return milestones.map((milestone, index): TimelineStep => {
-    // Resolve stepType BEFORE copy: the active style may log (e.g.
-    // onchainPaidStepType) and the old switch evaluated stepType before info.
-    let stepType: TimelineStepType;
-    if (index < activeIndex) {
-      stepType = "complete";
-    } else if (index === activeIndex) {
-      stepType =
-        milestone.activeStyle?.(ctx) ??
-        (index === lastIndex ? "success" : "current");
-    } else if (index === activeIndex + 1 && milestone.upcomingStyle) {
-      stepType = milestone.upcomingStyle(ctx);
-    } else {
-      stepType = "future-small";
-    }
-
-    const copy = milestone.copy(ctx);
+  if (outcome) {
+    const row = outcome.row(ctx);
     const step: TimelineStep = {
-      id: milestone.id,
-      rowKey: milestone.id,
-      state: copy.state,
-      displayLabel: copy.label,
-      stepType,
+      id: outcome.id,
+      // The open slot's key, so the outcome morphs the row that was waiting.
+      // An outcome with no slot left (it happened after the last event) gets
+      // a row of its own below everything else.
+      rowKey: open?.id ?? outcome.id,
+      state: row.state,
+      displayLabel: row.label,
+      stepType: row.stepType,
     };
-    if (copy.timestamp !== undefined) step.timestamp = copy.timestamp;
-    if (copy.info !== undefined) step.info = copy.info;
-    if (milestone.ring?.(ctx)) step.confirmationRing = true;
-    return step;
-  });
+    if (row.timestamp !== undefined) step.timestamp = row.timestamp;
+    if (row.info !== undefined) step.info = row.info;
+    steps.push(step);
+    return { steps, kind: outcome.kind, doneCount };
+  }
+
+  if (!open) {
+    return { steps, kind: steps.length === 0 ? "empty" : "settled", doneCount };
+  }
+
+  if (ctx.cancelling || flow.reversing?.(ctx)) {
+    // coco does not retry a reversal that threw; the entry just stays here.
+    // After a while the row has to stop implying it is about to finish.
+    const slowAt =
+      ctx.since === null ? null : ctx.since + REVERSAL_SLOW_AFTER_MS;
+    const slow =
+      !ctx.cancelling && slowAt !== null && ctx.currentTime >= slowAt;
+    steps.push({
+      id: "cancelling",
+      rowKey: open.id,
+      state: "rolling_back",
+      displayLabel: ctx.paymentCopy.text("timeline.cancelling.label"),
+      info: ctx.paymentCopy.text(
+        slow ? "timeline.cancelling.slowInfo" : "timeline.cancelling.info",
+      ),
+      stepType: slow ? "waiting" : "current",
+    });
+    return {
+      steps,
+      kind: "pending",
+      doneCount,
+      ...(slow || ctx.cancelling || slowAt === null
+        ? {}
+        : { recheckAt: slowAt }),
+    };
+  }
+
+  const copy = open.active(ctx);
+  const step: TimelineStep = {
+    id: open.id,
+    rowKey: open.id,
+    state: open.state,
+    displayLabel: copy.label,
+    stepType: copy.style ?? "current",
+  };
+  if (copy.timestamp !== undefined) step.timestamp = copy.timestamp;
+  if (copy.info !== undefined) step.info = copy.info;
+  if (open.ring?.(ctx)) step.confirmationRing = true;
+  steps.push(step);
+  return {
+    steps,
+    kind: "pending",
+    doneCount,
+    ...(copy.recheckAt !== undefined ? { recheckAt: copy.recheckAt } : {}),
+  };
 }
 
 function buildModel(ctx: TimelineContext): TimelineModel {
@@ -98,28 +194,26 @@ function buildModel(ctx: TimelineContext): TimelineModel {
       ? ctx.meltQuote.expiry * 1000
       : undefined;
 
-  if (!flow) return { steps: [], outcome: { kind: "empty" } };
-
-  const terminal = runOutcomeRows(flow, ctx);
-  if (terminal) {
+  if (!flow) {
     return {
-      steps: terminal.steps,
-      outcome: { kind: terminal.kind },
-      ...(expiresAt !== undefined ? { expiresAt } : {}),
+      steps: [unknownRow(ctx)],
+      outcome: { kind: "pending" },
+      doneRowKeys: [],
+      flow: ctx.variant,
     };
   }
 
-  const steps = runMilestones(flow, ctx);
-  const kind =
-    steps.length === 0
-      ? "empty"
-      : steps.every((step) => isSettledStepType(step.stepType))
-        ? "settled"
-        : "pending";
+  const { steps, kind, doneCount, recheckAt } = buildSteps(flow, ctx);
   return {
     steps,
     outcome: { kind },
+    flow: ctx.variant,
+    // Only events count, and by position rather than by name: the row after
+    // them is the open slot or the outcome standing in it, and an outcome may
+    // share its slot's id ("claimed").
+    doneRowKeys: steps.slice(0, doneCount).map((step) => step.rowKey),
     ...(expiresAt !== undefined ? { expiresAt } : {}),
+    ...(recheckAt !== undefined ? { recheckAt } : {}),
   };
 }
 

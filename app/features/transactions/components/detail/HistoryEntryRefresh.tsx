@@ -1,3 +1,4 @@
+import { getMintDisplayName } from '@/shared/lib/url';
 import { useEffect } from 'react';
 import { StyleSheet } from 'react-native';
 
@@ -12,8 +13,9 @@ import Icon from 'assets/icons';
 import { MintIcon } from '@/shared/ui/composed/MintIcon';
 import { Skeleton } from '@/shared/ui/primitives/Skeleton';
 import { SkeletonContentCrossfade } from '@/shared/ui/composed/SkeletonContentCrossfade';
-import { GradientCard } from '@/shared/ui/composed/GradientCard';
+import { Surface } from '@/shared/ui/composed/Surface';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { useStylePaint } from '@/shared/styles/appStyle';
 import { usePaymentCopyResolver } from '@/shared/hooks/usePaymentCopyResolver';
 import { Log, paymentLog } from '@/shared/lib/logger';
 
@@ -34,8 +36,17 @@ export function HistoryEntryRefresh({
   accessibilityLabel,
 }: HistoryEntryRefreshProps) {
   const foreground = useThemeColor('foreground');
+  // On a bare surface the row sits on the screen gutter like the amount
+  // above it; a framed surface keeps the item's own inset.
+  const { cardIsBare } = useStylePaint();
   const paymentCopy = usePaymentCopyResolver();
-  const loading = !mintInfo;
+  // A mint that cannot be reached never sends its info. Its address is known
+  // from the payment itself, so the row names the mint by host at once and
+  // takes the mint's own name if it arrives; it only waits when there is no
+  // address to show.
+  const mintName =
+    mintInfo?.name || (historyEntry.mintUrl ? getMintDisplayName(historyEntry.mintUrl) : '');
+  const loading = !mintInfo && mintName === '';
   const text = paymentCopy.text;
   const statusLabel = getHistoryEntryRefreshLabel(historyEntry, paymentCopy);
 
@@ -53,14 +64,14 @@ export function HistoryEntryRefresh({
   }, [historyEntry, loading, mintInfo, onPress, statusLabel.length]);
 
   const row = (
-    <ListGroup.Item disabled>
+    <ListGroup.Item disabled className={cardIsBare ? 'px-0' : undefined}>
       <ListGroup.ItemPrefix>
         <MintIcon
           iconUrl={mintInfo?.icon_url}
           size={40}
-          name={mintInfo?.name}
+          name={mintName}
           isLoading={loading}
-          alt={`${mintInfo?.name || text('history.refresh.mintAlt')} icon`}
+          alt={`${mintName || text('history.refresh.mintAlt')} icon`}
         />
       </ListGroup.ItemPrefix>
       <ListGroup.ItemContent>
@@ -73,7 +84,7 @@ export function HistoryEntryRefresh({
           renderSkeleton={() => <Skeleton className="mt-1 h-4 w-28 rounded-md" />}
           renderContent={() => (
             <ListGroup.ItemDescription className="text-foreground text-base font-bold">
-              {mintInfo?.name}
+              {mintName}
             </ListGroup.ItemDescription>
           )}
         />
@@ -88,7 +99,7 @@ export function HistoryEntryRefresh({
 
   return (
     <Log name="HistoryEntryRefresh">
-      <GradientCard style={styles.card}>
+      <Surface style={styles.card}>
         <ListGroup variant="transparent">
           {onPress ? (
             <PressableFeedback
@@ -110,7 +121,7 @@ export function HistoryEntryRefresh({
             row
           )}
         </ListGroup>
-      </GradientCard>
+      </Surface>
     </Log>
   );
 }

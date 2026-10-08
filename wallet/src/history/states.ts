@@ -111,8 +111,12 @@ export function normalizeTimelineMintState(
   } else if (rawState === "failed") {
     timelineState = MINT_FAILED_STATE;
     reason = "failed-alias";
-  } else if (isMintQuoteStateValue(remoteState)) {
-    timelineState = remoteState;
+  } else if (isMintQuoteStateValue(remoteState) && rawState !== "ISSUED") {
+    // The mint having ISSUED is not the wallet having the ecash: coco puts an
+    // operation back to `pending` when issued outputs cannot be restored. Only
+    // the operation finishing says the funds arrived, so a remote ISSUED on an
+    // unfinished operation proves the payment and nothing more.
+    timelineState = remoteState === "ISSUED" ? "PAID" : remoteState;
     reason = "remote-state";
   } else if (rawState === "pending") {
     timelineState = "UNPAID";
@@ -189,6 +193,23 @@ export function resolveEntryState(
   const rankB = entryStateRank(flow, b);
   const resolved = rankB > rankA ? b : rankA > rankB ? a : (a ?? b);
   return resolved ?? null;
+}
+
+/**
+ * Whether a rolled-back receive failed because the token was already spent.
+ *
+ * A receive rolls back for any terminal mint error: spent inputs, an inactive
+ * keyset, a failed witness, outputs the mint would not sign. Only the first is
+ * "someone redeemed this elsewhere", so that is the only case allowed to say
+ * so. The reason coco records is the mint's own message (NUT error 11001,
+ * "Token already spent") or its recovery verdict ("input proofs spent…").
+ * With no recorded reason the answer is no: unknown is not "spent".
+ */
+export function receiveFailedAsSpent(error: unknown): boolean {
+  return (
+    typeof error === "string" &&
+    /\b11001\b|already\s+(been\s+)?spent|proofs?\s+spent/i.test(error)
+  );
 }
 
 const FLOWS = new Set<TimelineFlow>(["mint", "melt", "send", "receive"]);

@@ -19,7 +19,7 @@ import {
   type PaymentCopyResolver,
 } from "../../copy";
 import { logger } from "../../logger";
-import { describeSendLock } from "../../annotations";
+import { describeSendLock, getPaymentRequest } from "../../annotations";
 import { normalizeTimelineMintState, normalizeTimelineMeltState } from "../states";
 import type {
   BuildTimelineInput,
@@ -211,6 +211,7 @@ export function onchainPaidStepType(
 
 export function mintHistoryEntryExpired(
   historyEntry: Extract<HistoryEntry, { type: "mint" }>,
+  currentTimeMs?: number,
 ): boolean {
   if (!historyEntry.paymentRequest) {
     logger.debug("history.timeline.mintExpired.result", {
@@ -232,7 +233,7 @@ export function mintHistoryEntryExpired(
   const timestampSec = decoded.timestampSec ?? 0;
   const expiresAt = (timestampSec + expirySec) * 1000;
 
-  const expired = Date.now() > expiresAt;
+  const expired = (currentTimeMs ?? Date.now()) > expiresAt;
   logger.debug("history.timeline.mintExpired.result", {
     reason: "decoded",
     expired,
@@ -271,8 +272,14 @@ export function getMintTimelineState(
   if (historyEntry.type !== "mint") return String(historyEntry.state);
   const remoteState =
     "remoteState" in historyEntry ? historyEntry.remoteState : undefined;
+  // A failed mint crosses the list boundary as UNPAID with its real verdict
+  // beside it (history/normalize.ts); the verdict is what the timeline draws.
+  const operationState = (historyEntry as { operationState?: unknown })
+    .operationState;
+  const rawState =
+    operationState === "failed" ? "failed" : String(historyEntry.state);
   // Aliasing + remoteState precedence live in history/states.ts (one owner).
-  return normalizeTimelineMintState(String(historyEntry.state), remoteState);
+  return normalizeTimelineMintState(rawState, remoteState);
 }
 
 /** Resolve the raw build input into the context the flow definitions read.
@@ -296,6 +303,25 @@ export function createTimelineContext(input: BuildTimelineInput): TimelineContex
   // state-resolution logs.
   const copy = createPaymentCopyGroups(paymentCopy);
   const state = String((entry as EntryRecord).state ?? "");
+
+  // A request we paid, reopened later, has none of the live screen's flags.
+  // The record written when it was handed over survives, and it is only
+  // written once the transport took the token: so it proves both steps.
+  const paidRequest =
+    entry.type === "send" &&
+    getPaymentRequest(entry as Parameters<typeof getPaymentRequest>[0])?.role ===
+      "payer"
+      ? getPaymentRequest(entry as Parameters<typeof getPaymentRequest>[0])
+      : null;
+  const tokenCreated = input.tokenCreated ?? (paidRequest ? true : undefined);
+  const nostrSent = input.nostrSent ?? (paidRequest ? true : undefined);
+  const entryMeta = (entry as { metadata?: Record<string, unknown> }).metadata;
+  const requestTransport =
+    paidRequest?.transport ??
+    (typeof entryMeta?.transportType === "string"
+      ? entryMeta.transportType
+      : null);
+  const updatedAt = (entry as { updatedAt?: unknown }).updatedAt;
 
   let variant: TimelineFlowVariant = "unknown";
   let mintState: string | null = null;
@@ -325,7 +351,7 @@ export function createTimelineContext(input: BuildTimelineInput): TimelineContex
       // A payment-request send keeps its own flow even when locked: its lock
       // shows in the conditions card, while its timeline is about delivery.
       variant =
-        input.tokenCreated !== undefined || input.nostrSent
+        tokenCreated !== undefined || nostrSent
           ? "payment-request-send"
           : lock && lock.kind !== "unlocked"
             ? "locked-send"
@@ -341,9 +367,7 @@ export function createTimelineContext(input: BuildTimelineInput): TimelineContex
       variant =
         prPendingFlag || meta?.source === "payment-request"
           ? "payment-request-receive"
-          : state === "executing"
-            ? "receive-recovery"
-            : "receive";
+          : "receive";
       break;
     }
     default:
@@ -357,13 +381,26 @@ export function createTimelineContext(input: BuildTimelineInput): TimelineContex
     amount: amountToNumber((entry as EntryRecord).amount as AmountValue),
     meltQuote: input.meltQuote,
     currentTime: input.currentTime,
-    tokenCreated: input.tokenCreated,
-    nostrSent: input.nostrSent,
+    tokenCreated,
+    nostrSent,
+    // Number(): timestamps reach here as plain numbers and as the app's
+    // number-subclass wrapper alike.
+    since:
+      updatedAt != null && Number.isFinite(Number(updatedAt))
+        ? Number(updatedAt)
+        : null,
+    requestTransport,
+    preview: entryMeta?.phase === "preview",
     progress: input.onchainConfirmationProgress,
     onchainSettledInternally: input.onchainSettledInternally,
     paymentCopy,
     copy,
     variant,
+    cancelling: !!input.cancelling,
+    doneRowKeys:
+      input.doneRowKeysFlow === undefined || input.doneRowKeysFlow === variant
+        ? (input.doneRowKeys ?? [])
+        : [],
     mintState,
     meltState,
     prPendingFlag,

@@ -220,10 +220,16 @@ export function normalizeSegmentedProgress(
     ? Math.max(0, Math.min(rawCompleted, segmentTotal))
     : 0;
   const segmentCount = Math.min(segmentTotal, MAX_SEGMENT_COUNT);
-  const completedSegments =
+  const scaledSegments =
     segmentTotal <= MAX_SEGMENT_COUNT
       ? sourceCompletedSegments
       : Math.round((sourceCompletedSegments / segmentTotal) * segmentCount);
+  // A full ring means done, so rounding must never fill it early: 49 of 50
+  // scales to 24 of 24 and would draw the success disc one block short.
+  const completedSegments =
+    sourceCompletedSegments < segmentTotal
+      ? Math.min(scaledSegments, segmentCount - 1)
+      : scaledSegments;
 
   return {
     segmentCount,
