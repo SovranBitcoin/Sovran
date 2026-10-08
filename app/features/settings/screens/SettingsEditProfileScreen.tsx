@@ -463,7 +463,7 @@ function ProfileEditor({
       contentPadding={16}
       footer={
         <BottomButtons>
-          <View className="gap-2 p-4">
+          <View className="gap-2">
             <Button
               text="Save"
               testID="edit-profile-save"
