@@ -2935,6 +2935,17 @@ exports[`persisted schema drift nut-drop-redeem-queue schema matches the golden 
                 "maxLength": 128,
                 "type": "string",
               },
+              "senderPubkey": {
+                "pattern": "^[a-f0-9]{64}$",
+                "type": "string",
+              },
+              "source": {
+                "enum": [
+                  "ble",
+                  "nostr",
+                ],
+                "type": "string",
+              },
               "status": {
                 "default": "pending",
                 "enum": [
@@ -3021,6 +3032,17 @@ exports[`persisted schema drift nut-drop-redeem-queue schema matches the golden 
               },
               "senderPeerID": {
                 "maxLength": 128,
+                "type": "string",
+              },
+              "senderPubkey": {
+                "pattern": "^[a-f0-9]{64}$",
+                "type": "string",
+              },
+              "source": {
+                "enum": [
+                  "ble",
+                  "nostr",
+                ],
                 "type": "string",
               },
               "status": {
@@ -5892,6 +5914,10 @@ exports[`persisted schema drift settings-store schema matches the golden snapsho
           ],
           "default": null,
         },
+        "layoutGuides": {
+          "default": false,
+          "type": "boolean",
+        },
         "legalAcceptance": {
           "anyOf": [
             {
@@ -6029,6 +6055,10 @@ exports[`persisted schema drift settings-store schema matches the golden snapsho
           "default": false,
           "type": "boolean",
         },
+        "showTouches": {
+          "default": false,
+          "type": "boolean",
+        },
         "termsAccepted": {
           "anyOf": [
             {
@@ -6134,6 +6164,10 @@ exports[`persisted schema drift settings-store schema matches the golden snapsho
             },
           ],
           "default": null,
+        },
+        "layoutGuides": {
+          "default": false,
+          "type": "boolean",
         },
         "legalAcceptance": {
           "anyOf": [
@@ -6274,6 +6308,10 @@ exports[`persisted schema drift settings-store schema matches the golden snapsho
           "default": false,
           "type": "boolean",
         },
+        "showTouches": {
+          "default": false,
+          "type": "boolean",
+        },
         "termsAccepted": {
           "anyOf": [
             {
@@ -6321,6 +6359,8 @@ exports[`persisted schema drift settings-store schema matches the golden snapsho
         "mockFailPaymentRequest",
         "whitenoiseEnabled",
         "mockNoGlass",
+        "layoutGuides",
+        "showTouches",
         "termsAccepted",
         "legalAcceptance",
         "hasSeenOnboarding",

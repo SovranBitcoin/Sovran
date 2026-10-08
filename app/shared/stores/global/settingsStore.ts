@@ -65,6 +65,18 @@ interface SettingsState {
    * a few module-level gates (native tabs, headers) need an app relaunch.
    */
   mockNoGlass: boolean;
+  /**
+   * Draw the layout guides over every screen: the gutter, the footer inset
+   * and the safe-area edges, as thin red lines. A review aid, so alignment in
+   * a screenshot is read off a line instead of judged by eye.
+   */
+  layoutGuides: boolean;
+  /**
+   * Draw a mark where the finger is, on every screen. A recording aid: iOS
+   * has no "show touches" setting, so a screen recording of the app would
+   * otherwise not show what was tapped.
+   */
+  showTouches: boolean;
   termsAccepted: TermsAccepted | null;
   legalAcceptance: LegalAcceptance | null;
   hasSeenOnboarding: boolean;
@@ -173,6 +185,8 @@ const PersistedSettings = z.object({
   mockFailPaymentRequest: z.boolean().default(false).catch(false),
   whitenoiseEnabled: z.boolean().default(false).catch(false),
   mockNoGlass: z.boolean().default(false).catch(false),
+  layoutGuides: z.boolean().default(false).catch(false),
+  showTouches: z.boolean().default(false).catch(false),
   // `.catch(null)` so a malformed terms record only resets terms (re-prompt),
   // never takes the rest of the store (real settings) down with it.
   termsAccepted: PersistedTermsAccepted.default(null).catch(null),
@@ -225,6 +239,8 @@ const DEFAULT_SETTINGS: SettingsState = {
   mockFailPaymentRequest: false,
   whitenoiseEnabled: false,
   mockNoGlass: false,
+  layoutGuides: false,
+  showTouches: false,
   termsAccepted: null,
   legalAcceptance: null,
   hasSeenOnboarding: false,
@@ -260,6 +276,8 @@ interface SettingsActions {
   setMockFailPaymentRequest: (enabled: boolean) => void;
   setWhitenoiseEnabled: (enabled: boolean) => void;
   setMockNoGlass: (enabled: boolean) => void;
+  setLayoutGuides: (enabled: boolean) => void;
+  setShowTouches: (enabled: boolean) => void;
 
   // Terms acceptance
   acceptLegalDocuments: () => void;
@@ -355,6 +373,14 @@ export const useSettingsStore = create<SettingsStore>()(
         setMockNoGlass: (enabled: boolean) => {
           storeLog.info('store.settings.set_mock_no_glass', { enabled });
           set({ mockNoGlass: enabled });
+        },
+        setLayoutGuides: (enabled: boolean) => {
+          storeLog.info('store.settings.set_layout_guides', { enabled });
+          set({ layoutGuides: enabled });
+        },
+        setShowTouches: (enabled: boolean) => {
+          storeLog.info('store.settings.set_show_touches', { enabled });
+          set({ showTouches: enabled });
         },
 
         // Terms
@@ -488,6 +514,8 @@ export const useSettingsStore = create<SettingsStore>()(
           mockFailPaymentRequest: state.mockFailPaymentRequest,
           whitenoiseEnabled: state.whitenoiseEnabled,
           mockNoGlass: state.mockNoGlass,
+          layoutGuides: state.layoutGuides,
+          showTouches: state.showTouches,
           termsAccepted: state.termsAccepted,
           legalAcceptance: state.legalAcceptance,
           hasSeenOnboarding: state.hasSeenOnboarding,
