@@ -26,6 +26,10 @@ const MELT_QUOTE_POLL_MS = 12_000;
 // One quick confirm re-check after the FIRST PAID-without-outpoint read — the
 // mint may publish the outpoint a beat after flipping PAID.
 const OFFCHAIN_CONFIRM_REFETCH_MS = 3_000;
+// A failed confirm re-check is tried again, each wait twice the last up to
+// this: a mint that went away is not asked every three seconds for as long as
+// the page stays open.
+const OFFCHAIN_CONFIRM_RETRY_MAX_MS = 60_000;
 
 interface MeltQuoteWatchCtx {
   manager: {
@@ -71,6 +75,7 @@ function watchOnchainMeltQuote(ctx: MeltQuoteWatchCtx): () => void {
   // between "no transaction" and "outpoint published late". If that read
   // fails nothing else is scheduled, so it has to be tried again.
   let awaitingVerdict = false;
+  let failedVerdictReads = 0;
   // Captured once per quote: an entry that was already finalized needs only
   // one fresh PAID-no-outpoint read (coco's finalize check was the other).
   const requiredVerdictReads = entrySettledRef.current ? 1 : 2;
@@ -95,6 +100,7 @@ function watchOnchainMeltQuote(ctx: MeltQuoteWatchCtx): () => void {
     try {
       const result = await manager.quotes.melt.refresh({ mintUrl, quoteId });
       if (!mounted) return;
+      failedVerdictReads = 0;
       const record = (result as unknown as Record<string, unknown> | null) ?? null;
       setQuote(record);
       const state = typeof record?.state === 'string' ? record.state : null;
@@ -183,10 +189,15 @@ function watchOnchainMeltQuote(ctx: MeltQuoteWatchCtx): () => void {
         error: err instanceof Error ? err.message : String(err),
       });
       if (mounted && awaitingVerdict && !confirmTimeout) {
+        const wait = Math.min(
+          OFFCHAIN_CONFIRM_REFETCH_MS * 2 ** failedVerdictReads,
+          OFFCHAIN_CONFIRM_RETRY_MAX_MS
+        );
+        failedVerdictReads += 1;
         confirmTimeout = setTimeout(() => {
           confirmTimeout = null;
           void fetchQuote();
-        }, OFFCHAIN_CONFIRM_REFETCH_MS);
+        }, wait);
       }
     } finally {
       if (mounted) setIsLoading(false);
