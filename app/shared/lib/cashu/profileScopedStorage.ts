@@ -72,7 +72,8 @@ async function ensureProfileStoreHydrated(): Promise<void> {
   });
 }
 
-function getActiveProfilePubkey(): string | undefined {
+/** The profile whose key the scoped stores are reading and writing under now. */
+export function getActiveProfilePubkey(): string | undefined {
   const state = useProfileStore.getState();
   return state.profiles.find((p) => p.accountIndex === state.activeAccountIndex)?.pubkey;
 }

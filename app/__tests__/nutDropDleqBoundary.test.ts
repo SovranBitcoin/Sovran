@@ -21,6 +21,7 @@ jest.mock('wallet', () => ({
       drain: () => config.executeAutoRedeem('cashu-test-token', MINT_URL, mockManager),
     })
   ),
+  meshTokenDedupeKey: (token: string) => `hash:${token}`,
 }));
 
 jest.mock('wallet/operations', () => ({
@@ -46,10 +47,12 @@ jest.mock('bitchat-module', () => ({ getBLEPeers: jest.fn(() => []) }));
 jest.mock('@/features/nearPay/lib/peerProfile', () => ({ peerNostrPubkey: jest.fn() }));
 jest.mock('@/shared/lib/popup', () => ({ paymentStatusPopup: jest.fn() }));
 jest.mock('@/shared/lib/nostr/useEntityCache', () => ({ readProfileRecord: jest.fn() }));
+// What the queue holds for the token under test; a test sets its source.
+const mockQueueEntries: Record<string, { source?: 'ble' | 'nostr' }> = {};
 jest.mock('@/shared/stores/profile/nutDropRedeemQueueStore', () => ({
   useNutDropRedeemQueueStore: {
     getState: jest.fn(() => ({
-      byTokenHash: {},
+      byTokenHash: mockQueueEntries,
       prune: jest.fn(),
       markStatus: jest.fn(),
       scheduleRetry: jest.fn(),
@@ -72,6 +75,7 @@ jest.mock('@/shared/lib/logger', () => ({
 describe('Nut Drop DLEQ receive boundary', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    for (const key of Object.keys(mockQueueEntries)) delete mockQueueEntries[key];
     mockRequireOfflineTokenDleq.mockResolvedValue(undefined);
     mockExecuteAutoRedeem.mockResolvedValue({ historyEntryId: 'receive-1' });
   });
@@ -95,5 +99,23 @@ describe('Nut Drop DLEQ receive boundary', () => {
 
     await expect(drainNutDropRedeemQueue()).rejects.toBe(verificationError);
     expect(mockExecuteAutoRedeem).not.toHaveBeenCalled();
+  });
+
+  it('still verifies a mesh entry that predates the source field', async () => {
+    mockQueueEntries['hash:cashu-test-token'] = {};
+    await drainNutDropRedeemQueue();
+    expect(mockRequireOfflineTokenDleq).toHaveBeenCalledTimes(1);
+  });
+
+  it('receives a Nostr-delivered token online, without the offline proof requirement', async () => {
+    // A token from another wallet may carry no DLEQ. It arrived while online,
+    // so the mint's swap verifies it, exactly as for a pasted token; requiring
+    // an offline proof here would strand the money.
+    mockQueueEntries['hash:cashu-test-token'] = { source: 'nostr' };
+    mockRequireOfflineTokenDleq.mockRejectedValue(new Error('missing DLEQ'));
+
+    await expect(drainNutDropRedeemQueue()).resolves.toBeUndefined();
+    expect(mockRequireOfflineTokenDleq).not.toHaveBeenCalled();
+    expect(mockExecuteAutoRedeem).toHaveBeenCalledWith('cashu-test-token', MINT_URL);
   });
 });

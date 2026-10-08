@@ -54,6 +54,8 @@ import { useNfcTapStore } from '@/shared/stores/runtime/nfcTapStore';
 import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
 import { useSecureStoreState } from '@/shared/stores/runtime/secureStoreState';
 import { useSendLockStore } from '@/shared/stores/runtime/sendLockStore';
+import { useDetailsSheetStore } from '@/shared/stores/runtime/detailsSheetStore';
+import { useNotePickerStore } from '@/shared/stores/runtime/notePickerStore';
 import { usePopupStore } from '@/shared/stores/runtime/popupStore';
 import { useRollbackStore } from '@/shared/stores/runtime/rollbackStore';
 import { useRoutstrTopUpStore } from '@/shared/stores/runtime/routstrTopUpStore';
@@ -104,6 +106,8 @@ export const E2E_STORE_MANIFEST: Record<string, MirrorableStore> = {
   'runtime/amountDraftStore': useAmountDraftStore,
   'runtime/contactSendStore': useContactSendStore,
   'runtime/sendLockStore': useSendLockStore,
+  'runtime/detailsSheetStore': useDetailsSheetStore,
+  'runtime/notePickerStore': useNotePickerStore,
   'runtime/debugTierStore': useDebugTierStore,
   'runtime/deleteStatusStore': useDeleteStatusStore,
   'runtime/mockDataStore': useMockDataStore,

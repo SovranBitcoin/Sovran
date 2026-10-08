@@ -4,6 +4,7 @@ import {
   classifyMeshToken,
   type MeshRedeemOrchestrator,
   TransactionAnnotation,
+  meshTokenDedupeKey,
 } from 'wallet';
 import { createDefaultOperations } from 'wallet/operations';
 import { useBLEPeerDirectory } from '@/features/bitchat/hooks/useBLEPeers';
@@ -55,7 +56,14 @@ function getOrchestrator(): MeshRedeemOrchestrator {
     // Nut Drop is an offline transport even when internet happens to be
     // available at redemption time. Verify every proof locally before the
     // orchestrator can treat the queued bearer value as received.
-    await requireOfflineTokenDleq(manager, token, mintUrl);
+    //
+    // A token that arrived as a Nostr message is not an offline receive: it is
+    // redeemed online, where the mint's swap is the verification, exactly as
+    // for a pasted token. Requiring an offline proof there would strand ecash
+    // from wallets that do not attach one.
+    const source =
+      useNutDropRedeemQueueStore.getState().byTokenHash[meshTokenDedupeKey(token)]?.source;
+    if (source !== 'nostr') await requireOfflineTokenDleq(manager, token, mintUrl);
     if (getManager() !== manager) throw new Error('Wallet profile changed');
     const executeAutoRedeemBase = createDefaultOperations({
       getManager: () => manager,
@@ -150,8 +158,11 @@ function getOrchestrator(): MeshRedeemOrchestrator {
           kind === 'spent' ? new Error('Token was already redeemed') : new Error('Redeem failed')
         );
     },
-    onRedeemed: (_tokenHash, entry, historyEntryId) => {
+    onRedeemed: (tokenHash, entry, historyEntryId) => {
       if (!historyEntryId) return;
+      // `source` and `senderPubkey` are app-side fields of the stored entry;
+      // the orchestrator's entry type only carries what it needs to redeem.
+      const stored = useNutDropRedeemQueueStore.getState().byTokenHash[tokenHash];
       // Legacy inputs can be bearer or locked. Redeemed proofs are swapped
       // for fresh ones, so the proof-secret fallback can't see the original
       // lock — annotate the resulting receive so it shows the lock badge.
@@ -160,8 +171,21 @@ function getOrchestrator(): MeshRedeemOrchestrator {
           ? { lock: { type: 'p2pk' as const, direction: 'incoming' as const } }
           : {}),
         // Arrived over the BLE/bitchat mesh — surfaces a bluetooth source badge.
-        scan: { method: 'ble' },
+        ...(stored?.source === 'nostr' ? {} : { scan: { method: 'ble' as const } }),
       };
+      if (stored?.source === 'nostr') {
+        // Sent to us as a Nostr message: the sender is the counterparty.
+        if (stored.senderPubkey) {
+          const cached = readProfileRecord(stored.senderPubkey);
+          patch.counterparty = {
+            pubkey: stored.senderPubkey,
+            direction: 'sender',
+            ...(cached?.picture ? { avatarUrl: cached.picture } : {}),
+          };
+        }
+        setTransactionAnnotation(`id:${historyEntryId}`, patch);
+        return;
+      }
       // Resolve the sender's Nostr identity from the live BLE peer registry
       // (peerID → nostrPubkeyHex via the authenticated wallet capability) so the row
       // can show their avatar. Avatar URL comes from the warm kind-0 cache when
