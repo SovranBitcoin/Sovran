@@ -510,3 +510,32 @@ describe('mergeEntryUpdate — rank guard', () => {
     expect(mergeEntryUpdate(current, updated).state).toBe('paymentRequestPending');
   });
 });
+
+describe('mergeEntryUpdate — error across out-of-order updates', () => {
+  const issued = {
+    id: 'mint:1',
+    type: 'mint',
+    mintUrl: MINT1,
+    amount: 10,
+    state: 'ISSUED',
+    error: 'no proofs could be restored',
+  };
+
+  it('keeps the error when a late lower-rank update is turned away', () => {
+    // The quote row and the operation report on separate streams. A PAID that
+    // lands after ISSUED does not move the entry, so it cannot clear the
+    // reason the credit failed.
+    const merged = mergeEntryUpdate(issued, { id: 'mint:1', type: 'mint', state: 'PAID' });
+    expect(merged.state).toBe('ISSUED');
+    expect(merged.error).toBe('no proofs could be restored');
+  });
+
+  it('clears the error when the state really moves', () => {
+    const merged = mergeEntryUpdate(
+      { ...issued, state: 'PAID', error: 'mint unreachable' },
+      { id: 'mint:1', type: 'mint', state: 'ISSUED' }
+    );
+    expect(merged.state).toBe('ISSUED');
+    expect('error' in merged).toBe(false);
+  });
+});
