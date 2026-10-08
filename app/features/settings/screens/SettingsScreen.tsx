@@ -24,7 +24,8 @@ import { actionMenuPopup, paramPopup } from '@/shared/lib/popup';
 import { useCtaStore } from '@/shared/stores/global/ctaStore';
 import { CTA_DEFINITIONS } from '@/shared/lib/cta/definitions';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
-import { ListGroup, PressableFeedback, Separator, Switch as HeroSwitch } from 'heroui-native';
+import { ListGroup, PressableFeedback, Separator } from 'heroui-native';
+import { Switch as HeroSwitch } from '@/shared/ui/primitives/Switch';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { log, useLifecycleLogger } from '@/shared/lib/logger';
 import { useNotificationPolicyStore } from '@/features/feed/stores/notificationPolicyStore';
@@ -215,6 +216,10 @@ export const SettingsScreen = () => {
   const setMockFailPaymentRequest = useSettingsStore((state) => state.setMockFailPaymentRequest);
   const whitenoiseEnabled = useSettingsStore((state) => state.whitenoiseEnabled);
   const setWhitenoiseEnabled = useSettingsStore((state) => state.setWhitenoiseEnabled);
+  const layoutGuides = useSettingsStore((state) => state.layoutGuides);
+  const setLayoutGuides = useSettingsStore((state) => state.setLayoutGuides);
+  const showTouches = useSettingsStore((state) => state.showTouches);
+  const setShowTouches = useSettingsStore((state) => state.setShowTouches);
   const mockNoGlass = useSettingsStore((state) => state.mockNoGlass);
   const setMockNoGlass = useSettingsStore((state) => state.setMockNoGlass);
   const notificationPolicy = useNotificationPolicyStore((state) => state.policy);
@@ -278,14 +283,18 @@ export const SettingsScreen = () => {
                 title="Swap routing"
                 testID="settings-routing-row"
               />
-              <Separator className="mx-4" />
-              <SettingsListLinkItem
-                href="/(settings-flow)/notification-policy"
-                title="Notifications"
-                testID="settings-notifications-row"
-                description={notificationPolicyLabel(notificationPolicy)}
-                descriptionNumberOfLines={1}
-              />
+              {hasFeature('feed') && (
+                <>
+                  <Separator className="mx-4" />
+                  <SettingsListLinkItem
+                    href="/(settings-flow)/notification-policy"
+                    title="Notifications"
+                    testID="settings-notifications-row"
+                    description={notificationPolicyLabel(notificationPolicy)}
+                    descriptionNumberOfLines={1}
+                  />
+                </>
+              )}
               {hasFeature('nostr') && (
                 <>
                   <Separator className="mx-4" />
@@ -447,6 +456,20 @@ export const SettingsScreen = () => {
                 />
                 <Separator className="mx-4" />
                 <SettingsToggleItem
+                  title="Layout guides"
+                  testID="settings-layout-guides-toggle"
+                  isSelected={layoutGuides}
+                  onSelectedChange={setLayoutGuides}
+                />
+                <Separator className="mx-4" />
+                <SettingsToggleItem
+                  title="Show taps"
+                  testID="settings-show-taps-toggle"
+                  isSelected={showTouches}
+                  onSelectedChange={setShowTouches}
+                />
+                <Separator className="mx-4" />
+                <SettingsToggleItem
                   title="Mock Mode"
                   testID="settings-mock-mode-toggle"
                   isSelected={mockMode}
@@ -480,13 +503,17 @@ export const SettingsScreen = () => {
                   isSelected={mockFailPaymentRequest}
                   onSelectedChange={setMockFailPaymentRequest}
                 />
-                <Separator className="mx-4" />
-                <SettingsToggleItem
-                  title="White Noise"
-                  testID="settings-white-noise-toggle"
-                  isSelected={whitenoiseEnabled}
-                  onSelectedChange={setWhitenoiseEnabled}
-                />
+                {hasFeature('directMessages') && (
+                  <>
+                    <Separator className="mx-4" />
+                    <SettingsToggleItem
+                      title="White Noise"
+                      testID="settings-white-noise-toggle"
+                      isSelected={whitenoiseEnabled}
+                      onSelectedChange={setWhitenoiseEnabled}
+                    />
+                  </>
+                )}
                 <Separator className="mx-4" />
                 <SettingsToggleItem
                   title="Mock no-glass"

@@ -7,6 +7,7 @@ import { SovranTabBar } from '@/shared/blocks/SovranTabBar';
 import { Expo55NativeTabs, isExpo55NativeTabsSupported } from '@/navigation/nativeTabs';
 import { TabBarInsetsProvider } from '@/shared/hooks/useScreenInsets';
 import { hasFeature, type Feature } from '@/shared/config/features';
+import { orderTabs, visibleTabState } from '@/navigation/tabOrder';
 
 export const unstable_settings = {
   anchor: 'index',
@@ -68,7 +69,13 @@ const ALL_TAB_DEFS: readonly TabDef[] = [
   },
 ];
 
-const TAB_DEFS = ALL_TAB_DEFS.filter((tab) => !tab.feature || hasFeature(tab.feature));
+const TAB_DEFS = orderTabs(ALL_TAB_DEFS, hasFeature);
+
+/** Tab folders this build does not ship; declared hidden so no bar renders them. */
+const HIDDEN_TAB_NAMES = ALL_TAB_DEFS.filter((tab) => !TAB_DEFS.includes(tab)).map(
+  (tab) => tab.name
+);
+const SHOWN_TAB_NAMES: ReadonlySet<string> = new Set(TAB_DEFS.map((tab) => tab.name));
 
 const NATIVE_TAB_PROPS = Object.fromEntries(
   TAB_DEFS.map((tab) => [
@@ -130,8 +137,11 @@ export default function TabLayout() {
       <BackgroundProvider>
         <View style={{ flex: 1 }}>
           <Tabs
+            initialRouteName={TAB_DEFS[0]?.name === 'index' ? 'index' : undefined}
             screenOptions={{ headerShown: false }}
-            tabBar={(props) => <SovranTabBar {...props} />}>
+            tabBar={(props) => (
+              <SovranTabBar {...props} state={visibleTabState(props.state, SHOWN_TAB_NAMES)} />
+            )}>
             {TAB_DEFS.map((tab) => (
               <Tabs.Screen
                 key={tab.name}
@@ -150,6 +160,9 @@ export default function TabLayout() {
                   ),
                 }}
               />
+            ))}
+            {HIDDEN_TAB_NAMES.map((name) => (
+              <Tabs.Screen key={name} name={name} options={{ href: null }} />
             ))}
           </Tabs>
         </View>

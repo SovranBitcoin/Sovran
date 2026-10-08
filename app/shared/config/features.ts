@@ -21,7 +21,8 @@ export const FEATURES = [
   // Nostr
   'nostr', // identity, profiles; every other Nostr module needs it
   'nostrSearch', // people / npub search
-  'ecashMessages', // send ecash to a contact over NIP-17 DMs
+  'ecashMessages', // send ecash to a contact over NIP-17 DMs (the transport, a payment rail)
+  'directMessages', // DM conversation pages: chat threads, message menus, DM lists
   'contacts', // Contacts tab
   'feed', // Feed + Notifications tabs, composer
   // Proximity
@@ -40,6 +41,7 @@ const REQUIRES: Partial<Record<Feature, readonly Feature[]>> = {
   paymentRequests: ['ecash'],
   nostrSearch: ['nostr'],
   ecashMessages: ['nostr', 'ecash'],
+  directMessages: ['nostr'],
   contacts: ['nostr'],
   feed: ['nostr'],
   nfc: ['ecash'],
@@ -61,6 +63,15 @@ const only = (...enabled: Feature[]): FeatureSet => {
 /** Named editions. Add one here to ship a new product shape. */
 export const EDITIONS = {
   full: all(true),
+  /**
+   * The focused payments app: no AI and no DM conversation pages. The feed
+   * stays, on the Feed tab and under each profile.
+   *
+   * `ecashMessages` stays on without them. Ecash that arrives as a message is
+   * redeemed by `useDmEcashAutoRedeem`, mounted at account scope whenever
+   * `ecashMessages` is on, so receiving money never depends on a chat screen.
+   */
+  payments: { ...all(true), ai: false, directMessages: false },
   lightningOnly: only('lightning', 'bolt12'),
   onchainOnly: only('onchain'),
   ecashLightning: only('ecash', 'lightning', 'bolt12', 'paymentRequests', 'nfc', 'nutDrop'),
@@ -70,12 +81,16 @@ export const EDITIONS = {
     nostr: false,
     nostrSearch: false,
     ecashMessages: false,
+    directMessages: false,
     contacts: false,
     feed: false,
   },
 } as const satisfies Record<string, FeatureSet>;
 
 export type Edition = keyof typeof EDITIONS;
+
+/** The edition a build ships when `EXPO_PUBLIC_SOVRAN_EDITION` is unset. */
+export const DEFAULT_EDITION: Edition = 'payments';
 
 /**
  * Apply `overrides` to an edition, then switch off anything whose
@@ -109,14 +124,14 @@ const overridesSchema = z.partialRecord(z.enum(FEATURES), z.boolean());
 /**
  * Read the build's feature set from `EXPO_PUBLIC_SOVRAN_EDITION` (an edition
  * name) and `EXPO_PUBLIC_SOVRAN_FEATURES` (JSON overrides, e.g.
- * `{"ecashMessages":false}`). Unknown values fail the build loudly rather
- * than silently shipping `full`.
+ * `{"ecashMessages":false}`). An unset edition ships `DEFAULT_EDITION`; unknown
+ * values fail the build loudly rather than silently shipping the default.
  */
 export function featureSetFromEnv(env: {
   edition?: string | undefined;
   features?: string | undefined;
 }): FeatureSet {
-  const edition = env.edition || 'full';
+  const edition = env.edition || DEFAULT_EDITION;
   if (!(edition in EDITIONS)) {
     throw new Error(`Unknown EXPO_PUBLIC_SOVRAN_EDITION "${edition}"`);
   }

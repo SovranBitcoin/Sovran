@@ -41,6 +41,7 @@ import { TierRow } from '@/shared/ui/composed/search/SearchResultRows';
 import { TierBadge } from '@/shared/ui/composed/TierBadge';
 import { UnderlineTabs } from '@/shared/ui/composed/UnderlineTabs';
 import { usePullToAiRefreshControl } from '@/shared/blocks/PullToAiRefreshControl';
+import { hasFeature } from '@/shared/config/features';
 import { ScreenContainer } from '../components/ScreenContainer';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { navigateToProfile } from '../lib/navigateToProfile';
@@ -134,7 +135,11 @@ export const ContactsScreen = () => {
   const { tiers: locationTiers } = useLocationTiers();
   const pullToAi = usePullToAiRefreshControl();
   const mockMode = useSettingsStore((state) => state.mockMode);
-  const whitenoiseEnabled = useSettingsStore((state) => state.whitenoiseEnabled) && !mockMode;
+  // White Noise is a DM surface: without DM pages its requests and threads stay hidden.
+  const whitenoiseEnabled =
+    useSettingsStore((state) => state.whitenoiseEnabled) &&
+    !mockMode &&
+    hasFeature('directMessages');
 
   const { keys: nostrKeys } = useNostrKeysContext();
   const { mints, getMintInfo } = useMintManagement();
@@ -374,8 +379,15 @@ export const ContactsScreen = () => {
     }
 
     const profile = item.pubkey ? profilesMap.get(item.pubkey) : undefined;
-    const previewLoading = item.type === 'contact' && item.previewLoading === true;
-    const rawMessage = typeof item.dmEvent?.content === 'string' ? item.dmEvent.content : undefined;
+    // Message previews make the row a conversation; without DM pages the row
+    // is a person and shows their profile line instead.
+    const showsDmPreview = hasFeature('directMessages');
+    const previewLoading =
+      showsDmPreview && item.type === 'contact' && item.previewLoading === true;
+    const rawMessage =
+      showsDmPreview && typeof item.dmEvent?.content === 'string'
+        ? item.dmEvent.content
+        : undefined;
     const lastMessage =
       rawMessage &&
       item.dmEvent?.isOwn !== true &&
@@ -454,7 +466,7 @@ export const ContactsScreen = () => {
           ) : undefined
         }
         onPress={() =>
-          mockMode && isMockContactPubkey(item.pubkey)
+          hasFeature('directMessages') && mockMode && isMockContactPubkey(item.pubkey)
             ? router.push({
                 pathname: '/(user-flow)/userMessages',
                 params: { pubkey: item.pubkey },
