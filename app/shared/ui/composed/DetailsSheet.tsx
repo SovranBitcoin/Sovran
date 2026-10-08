@@ -38,6 +38,12 @@ export interface DetailsSheetItem {
    * page is where a payment is read out for debugging.
    */
   copyText?: string;
+  /**
+   * The value is money to whoever holds it: an unredeemed ecash token. It
+   * copies from its own row, on purpose, and is left out of Copy all, which
+   * is what gets pasted into a bug report.
+   */
+  bearer?: boolean;
   direction?: 'row' | 'column';
 }
 
@@ -63,7 +69,7 @@ function textOf(value: ReactNode): string | null {
 }
 
 /** What a row copies: its own text, or the text it was given to stand for it. */
-const copyTextOf = (entry: DetailsSheetItem): string | null =>
+export const copyTextOf = (entry: DetailsSheetItem): string | null =>
   entry.copyText ?? textOf(entry.value);
 
 function detailRow(entry: DetailsSheetItem) {
@@ -140,6 +146,7 @@ export function DetailsSheetContent({ onClose, items }: DetailsSheetContentProps
   }, [copiedAll]);
 
   const copyable = items
+    .filter((entry) => !entry.bearer)
     .map((entry) => ({ title: entry.title, text: copyTextOf(entry) }))
     .filter((row) => row.text !== null && row.text.length > 0);
 

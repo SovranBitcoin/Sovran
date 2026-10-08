@@ -7,7 +7,11 @@ import { useStylePaint } from '@/shared/styles/appStyle';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import { useDetailsSheetStore } from '@/shared/stores/runtime/detailsSheetStore';
-import { DetailsTable, type DetailsSheetItem } from '@/shared/ui/composed/DetailsSheet';
+import {
+  copyTextOf,
+  DetailsTable,
+  type DetailsSheetItem,
+} from '@/shared/ui/composed/DetailsSheet';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Text } from '@/shared/ui/primitives/Text';
 
@@ -83,9 +87,9 @@ export function DetailsSection({
 
   // While this section's modal is up, what it shows follows the payment: a
   // state or a confirmation count that changes underneath changes there too.
-  const signature = rows
-    .map((row) => `${row.title}=${typeof row.value === 'string' ? row.value : ''}`)
-    .join('|');
+  // Read as the modal reads it: a value drawn as an element (an id shown
+  // shortened, a row of icons) changes underneath like any other.
+  const signature = rows.map((row) => `${row.title}=${copyTextOf(row) ?? ''}`).join('|');
   useEffect(() => {
     useDetailsSheetStore.getState().update(owner, latest.current.rows);
   }, [owner, signature, latest]);

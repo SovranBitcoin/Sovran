@@ -175,6 +175,7 @@ export function ReceiveTokenScreen({ receiveHistoryEntry }: ReceiveTokenScreenPr
           entry.tokenString && {
             title: 'Token',
             value: <MiddleEllipsisValue value={entry.tokenString.toString()} />,
+            bearer: true,
           },
           ...entryDetailItems(entry),
         ]}

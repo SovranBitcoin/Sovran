@@ -85,6 +85,23 @@ describe('transaction details', () => {
     );
   });
 
+  it('leaves an unredeemed token out of Copy all', async () => {
+    // Copy all is what gets pasted into a bug report, and a token is money to
+    // whoever reads it. Its own row still copies it, on purpose.
+    render(
+      <DetailsSheetContent
+        onClose={jest.fn()}
+        items={[...ITEMS, { title: 'Token', value: 'cashuBbearer', bearer: true }]}
+      />
+    );
+    fireEvent.press(screen.getByLabelText('Copy all'));
+    await waitFor(() =>
+      expect(Clipboard.setStringAsync).toHaveBeenCalledWith('State: PAID\nQuote ID: quote-000021')
+    );
+    fireEvent.press(screen.getByLabelText('Token: cashuBbearer'));
+    await waitFor(() => expect(Clipboard.setStringAsync).toHaveBeenCalledWith('cashuBbearer'));
+  });
+
   it('keeps the sheet closed until its row is tapped', () => {
     render(<DetailsSection items={ITEMS} />);
     expect(screen.getByLabelText('Details')).toBeTruthy();
