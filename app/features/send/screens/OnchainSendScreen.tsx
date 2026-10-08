@@ -12,7 +12,7 @@
  * the detail is instant.
  */
 
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { StyleSheet } from 'react-native';
 import { withAlpha } from '@/shared/lib/color';
 
@@ -38,6 +38,7 @@ import {
   amountDetailItem,
   stateDetailItem,
   mintDetailItem,
+  entryDetailItems,
 } from '@/features/transactions';
 import {
   canOnchainMeltQuoteExpire,
@@ -81,6 +82,8 @@ interface OnchainSendScreenProps {
 
 export function OnchainSendScreen({ meltHistoryEntry, onCancel }: OnchainSendScreenProps) {
   useLifecycleLogger('OnchainSendScreen');
+  // Details is opened from the footer, not from a row in the page.
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const { entry, error, actions, source, mintUrl } = useScreenActions(
     'meltQuote',
     meltHistoryEntry
@@ -228,6 +231,17 @@ export function OnchainSendScreen({ meltHistoryEntry, onCancel }: OnchainSendScr
         <ButtonHandler
           buttons={[
             {
+              // Every id and value behind this payment, each one copyable. It
+              // gives way to the screen's own actions: behind the dots when two
+              // of them are showing, in the free slot when they are not.
+              testID: 'onchain-send-details',
+              text: 'Details',
+              icon: 'mdi:receipt-text-outline',
+              variant: 'secondary',
+              onPress: () => setDetailsOpen(true),
+              prefersOverflow: true,
+            },
+            {
               testID: 'onchain-send-close',
               text: 'Close',
               icon: 'ri:close-circle-line',
@@ -235,15 +249,6 @@ export function OnchainSendScreen({ meltHistoryEntry, onCancel }: OnchainSendScr
               onPress: async () => onCancel(),
               // Only after settlement; before that, Pay / Cancel apply.
               condition: isPaid,
-            },
-            {
-              testID: 'onchain-send-pay',
-              text: actions.pay.loading ? 'Sending...' : 'Pay',
-              icon: actions.pay.loading ? 'ri:loader-line' : 'ri:send-plane-2-fill',
-              variant: 'primary',
-              onPress: () => actions.pay.execute(),
-              condition: actions.pay.available,
-              disabled: anyLoading,
             },
             {
               testID: 'onchain-send-cancel',
@@ -255,6 +260,15 @@ export function OnchainSendScreen({ meltHistoryEntry, onCancel }: OnchainSendScr
                 onCancel();
               },
               condition: actions.cancel.available,
+              disabled: anyLoading,
+            },
+            {
+              testID: 'onchain-send-pay',
+              text: actions.pay.loading ? 'Sending...' : 'Pay',
+              icon: actions.pay.loading ? 'ri:loader-line' : 'ri:send-plane-2-fill',
+              variant: 'primary',
+              onPress: () => actions.pay.execute(),
+              condition: actions.pay.available,
               disabled: anyLoading,
             },
           ]}
@@ -304,6 +318,9 @@ export function OnchainSendScreen({ meltHistoryEntry, onCancel }: OnchainSendScr
         </>
       }>
       <DetailsSection
+        trigger="none"
+        open={detailsOpen}
+        onOpenChange={setDetailsOpen}
         items={[
           ...transactionLeadDetailItems({
             source,
@@ -334,6 +351,7 @@ export function OnchainSendScreen({ meltHistoryEntry, onCancel }: OnchainSendScr
             value: <MiddleEllipsisValue value={outpoint.txid} />,
           },
           mintDetailItem(mintUrl),
+          ...entryDetailItems(entry),
         ]}
       />
     </TransactionDetailShell>
