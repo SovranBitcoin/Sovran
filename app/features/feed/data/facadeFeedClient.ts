@@ -15,6 +15,7 @@ import {
 import { recordDebugTiers } from '@/shared/stores/runtime/debugTierStore';
 import { emptyNotificationsResult } from '@/features/feed/lib/notificationResults';
 import {
+  createNotificationsResultMapper,
   resolvedNotificationsToResult,
   toFacadeNotificationsRequest,
 } from './facadeNotificationsAdapter';
@@ -344,8 +345,9 @@ export function createFacadeFeedClient(fallback: Omit<FeedClient, 'getThread'>):
         return null;
       }
       const session = layer.openNotificationsSession(facadeRequest);
+      const toResult = createNotificationsResultMapper();
       const map = (page: facade.ResolvedNotifications): FeedNotificationsResult => {
-        const mapped = resolvedNotificationsToResult(page);
+        const mapped = toResult(page);
         return { ...mapped, hasNextPage: session.hasMore() };
       };
       return {

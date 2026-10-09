@@ -8,7 +8,7 @@ import { collectReferencedIds } from '@/features/feed/components/nostr/feedParse
 import { DEMO_NOTIFICATIONS } from '@/shared/stores/runtime/mockPresentationData';
 import { E2EAccessibilityProbe } from '@/shared/lib/e2e/E2EAccessibilityProbe';
 import { useFeedIgnoreStore } from '@/features/feed/stores/ignoreStore';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { RefreshControl, StyleSheet } from 'react-native';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { withAlpha } from '@/shared/lib/color';
@@ -19,7 +19,7 @@ import type {
   FeedNotificationTab,
   FeedNotificationsResult,
 } from '@/features/feed/data/feedClient';
-import type { FeedEvent } from '@/features/feed/components/nostr/feedTypes';
+import type { FeedEvent, ProfileInfo } from '@/features/feed/components/nostr/feedTypes';
 import {
   notificationReasonLabel,
   notificationReplyScopeLabel,
@@ -33,8 +33,10 @@ import { List } from '@/shared/ui/composed/List';
 import { seedNotificationFollowers } from '@/features/feed/lib/notificationFollowersSeedCache';
 import {
   buildNotificationListItems,
+  notificationListItemsEqual,
   type NotificationListItem,
 } from '@/features/feed/lib/notificationGroups';
+import { useLatestGetter } from '@/shared/hooks/useLatestRef';
 import { seedThread } from '@/features/feed/lib/threadSeedCache';
 import { TierBadge } from '@/shared/ui/composed/TierBadge';
 import { useNotificationPolicyStore } from '@/features/feed/stores/notificationPolicyStore';
@@ -82,6 +84,9 @@ const NOTIFICATION_TABS: { id: NotificationTab; label: string }[] = [
 function isClientTab(tab: NotificationTab): tab is 'APP' | 'MINTS' {
   return tab === 'APP' || tab === 'MINTS';
 }
+
+/** The page's profiles, the one part of a notifications result a row reads. */
+type NotificationProfiles = Map<string, ProfileInfo> | undefined;
 
 const MAX_GROUP_AVATARS = 3;
 const EMPTY_NOTIFICATIONS: readonly FeedNotification[] = [];
@@ -219,8 +224,14 @@ function NotificationsContent({ demo }: { demo: boolean }) {
     [result]
   );
 
+  // Both press handlers read the page at press time through a getter, so they
+  // keep one identity across page updates and never invalidate a mounted row.
+  const getThreadContext = useLatestGetter(threadContext);
+  const getResult = useLatestGetter(result);
+
   const openNotification = useCallback(
     (notification: FeedNotification) => {
+      const threadContext = getThreadContext();
       if (notification.reason === 'follow') {
         router.push({
           pathname: '/(user-flow)/profile',
@@ -243,18 +254,18 @@ function NotificationsContent({ demo }: { demo: boolean }) {
         params: { eventId: openEventId },
       });
     },
-    [threadContext]
+    [getThreadContext]
   );
 
   const openFollowGroup = useCallback(
     (notifications: FeedNotification[]) => {
-      const seedId = seedNotificationFollowers({ notifications, result });
+      const seedId = seedNotificationFollowers({ notifications, result: getResult() });
       router.push({
         pathname: '/(drawer)/(tabs)/notifications/followers',
         params: { seedId },
       });
     },
-    [result]
+    [getResult]
   );
 
   const seedCreatedAt = useWalletLifecycleStore((s) => s.seedCreatedAt);
@@ -317,9 +328,13 @@ function NotificationsContent({ demo }: { demo: boolean }) {
   }, [notifications, viewerPubkey, demo]);
   const { metadata: cachedProfiles } = useNostrProfileMetadataMany(actorPubkeys);
 
-  const resultForRows = useMemo<FeedNotificationsResult | null>(() => {
-    if (!result || cachedProfiles.size === 0) return result;
-    const profilesMap = new Map(result.profilesMap);
+  // Rows read profiles and nothing else from the result, and the session keeps
+  // an unchanged profiles map's identity — so an update that only adds a
+  // notification leaves this map, and every mounted row, alone.
+  const tierProfiles = result?.profilesMap;
+  const profilesForRows = useMemo<NotificationProfiles>(() => {
+    if (!tierProfiles || cachedProfiles.size === 0) return tierProfiles;
+    const profilesMap = new Map(tierProfiles);
     for (const [pk, meta] of cachedProfiles) {
       const existing = profilesMap.get(pk);
       // Fill a missing actor, or upgrade a name-only tier entry that lacks a picture.
@@ -329,8 +344,8 @@ function NotificationsContent({ demo }: { demo: boolean }) {
       if (!name && !picture) continue;
       profilesMap.set(pk, { name: name ?? '', ...(picture ? { picture } : {}) });
     }
-    return { ...result, profilesMap };
-  }, [result, cachedProfiles]);
+    return profilesMap;
+  }, [tierProfiles, cachedProfiles]);
 
   const notificationItems = useMemo<NotificationListItem[]>(() => {
     // The App tab is purely app announcements — the welcome card lives here, not
@@ -347,6 +362,46 @@ function NotificationsContent({ demo }: { demo: boolean }) {
     return buildNotificationListItems(notifications);
   }, [notifications, activeTab, seedCreatedAt, termsAccepted, legalAcceptance]);
   const visualPhase = isInitialLoading ? 'initial-loading' : isRefreshing ? 'refreshing' : 'ready';
+
+  const pressedBackground = withAlpha(surfaceTertiary, 0.45);
+  const onPressNotification = demo ? ignorePress : openNotification;
+  const onPressFollowGroup = demo ? ignorePress : openFollowGroup;
+  // Stable for FlashList: a new renderItem re-renders every mounted cell.
+  const renderNotificationItem = useCallback(
+    ({ item, index }: { item: NotificationListItem; index: number }) => (
+      <VisualLayoutProbe
+        scope={notificationsVisualScope}
+        surface="notifications"
+        component="NotificationListRow"
+        itemKey={`notification:${item.id}`}
+        itemType={item.type}
+        index={index}
+        extra={{ tab: activeTab, phase: visualPhase }}>
+        <NotificationListRow
+          item={item}
+          profiles={profilesForRows}
+          foreground={foreground}
+          surface={surface}
+          muted={muted}
+          pressedBackground={pressedBackground}
+          onPressNotification={onPressNotification}
+          onPressFollowGroup={onPressFollowGroup}
+        />
+      </VisualLayoutProbe>
+    ),
+    [
+      notificationsVisualScope,
+      activeTab,
+      visualPhase,
+      profilesForRows,
+      foreground,
+      surface,
+      muted,
+      pressedBackground,
+      onPressNotification,
+      onPressFollowGroup,
+    ]
+  );
   const { onListLayout, onListContentSizeChange, onListScroll, onListViewableItemsChanged } =
     useVisualFlatListLogger<NotificationListItem>({
       scope: notificationsVisualScope,
@@ -531,27 +586,7 @@ function NotificationsContent({ demo }: { demo: boolean }) {
             scrollEventThrottle={250}
             viewabilityConfig={VISUAL_LIST_VIEWABILITY_CONFIG}
             onViewableItemsChanged={onListViewableItemsChanged}
-            renderItem={({ item, index }) => (
-              <VisualLayoutProbe
-                scope={notificationsVisualScope}
-                surface="notifications"
-                component="NotificationListRow"
-                itemKey={`notification:${item.id}`}
-                itemType={item.type}
-                index={index}
-                extra={{ tab: activeTab, phase: visualPhase }}>
-                <NotificationListRow
-                  item={item}
-                  result={resultForRows}
-                  foreground={foreground}
-                  surface={surface}
-                  muted={muted}
-                  pressedBackground={withAlpha(surfaceTertiary, 0.45)}
-                  onPressNotification={demo ? () => undefined : openNotification}
-                  onPressFollowGroup={demo ? () => undefined : openFollowGroup}
-                />
-              </VisualLayoutProbe>
-            )}
+            renderItem={renderNotificationItem}
           />
         )}
       </Log>
@@ -559,25 +594,49 @@ function NotificationsContent({ demo }: { demo: boolean }) {
   );
 }
 
-function NotificationListRow({
-  item,
-  result,
-  foreground,
-  surface,
-  muted,
-  pressedBackground,
-  onPressNotification,
-  onPressFollowGroup,
-}: {
+function ignorePress() {}
+
+type NotificationListRowProps = {
   item: NotificationListItem;
-  result: FeedNotificationsResult | null;
+  profiles: NotificationProfiles;
   foreground: string;
   surface: string;
   muted: string;
   pressedBackground: string;
   onPressNotification: (notification: FeedNotification) => void;
   onPressFollowGroup: (notifications: FeedNotification[]) => void;
-}) {
+};
+
+/**
+ * The list rebuilds its items on every page update, so an unchanged row arrives
+ * as a new object holding the same notification. Compare what the row shows.
+ */
+function notificationListRowPropsEqual(
+  previous: NotificationListRowProps,
+  next: NotificationListRowProps
+): boolean {
+  return (
+    notificationListItemsEqual(previous.item, next.item) &&
+    previous.profiles === next.profiles &&
+    previous.foreground === next.foreground &&
+    previous.surface === next.surface &&
+    previous.muted === next.muted &&
+    previous.pressedBackground === next.pressedBackground &&
+    previous.onPressNotification === next.onPressNotification &&
+    previous.onPressFollowGroup === next.onPressFollowGroup
+  );
+}
+
+const NotificationListRow = memo(function NotificationListRow({
+  item,
+  profiles,
+  foreground,
+  surface,
+  muted,
+  pressedBackground,
+  onPressNotification,
+  onPressFollowGroup,
+}: NotificationListRowProps) {
   if (item.type === 'welcome') {
     return (
       <WelcomeNotificationRow
@@ -595,7 +654,7 @@ function NotificationListRow({
     return (
       <NotificationGroupRow
         item={item}
-        result={result}
+        profiles={profiles}
         foreground={foreground}
         surface={surface}
         muted={muted}
@@ -611,14 +670,14 @@ function NotificationListRow({
   return (
     <NotificationRow
       notification={item.notification}
-      result={result}
+      profiles={profiles}
       foreground={foreground}
       muted={muted}
       pressedBackground={pressedBackground}
       onPress={() => onPressNotification(item.notification)}
     />
   );
-}
+}, notificationListRowPropsEqual);
 
 function WelcomeNotificationRow({
   installDate,
@@ -717,20 +776,20 @@ function NotificationAvatar(
 
 function NotificationRow({
   notification,
-  result,
+  profiles,
   foreground,
   muted,
   pressedBackground,
   onPress,
 }: {
   notification: FeedNotification;
-  result: FeedNotificationsResult | null;
+  profiles: NotificationProfiles;
   foreground: string;
   muted: string;
   pressedBackground: string;
   onPress: () => void;
 }) {
-  const profile = result?.profilesMap.get(notification.event.pubkey);
+  const profile = profiles?.get(notification.event.pubkey);
   const name = profile?.name || `${notification.event.pubkey.slice(0, 8)}...`;
   const title = notificationTitle(name, notification.reason, !!notification.targetEvent);
   const tone = notificationTone(notification.reason);
@@ -761,7 +820,7 @@ function NotificationRow({
         </HStack>
         <NotificationBody
           notification={notification}
-          result={result}
+          profiles={profiles}
           foreground={foreground}
           muted={muted}
         />
@@ -772,7 +831,7 @@ function NotificationRow({
 
 function NotificationGroupRow({
   item,
-  result,
+  profiles,
   foreground,
   surface,
   muted,
@@ -780,7 +839,7 @@ function NotificationGroupRow({
   onPress,
 }: {
   item: Extract<NotificationListItem, { type: 'group' }>;
-  result: FeedNotificationsResult | null;
+  profiles: NotificationProfiles;
   foreground: string;
   surface: string;
   muted: string;
@@ -788,7 +847,7 @@ function NotificationGroupRow({
   onPress: () => void;
 }) {
   const tone = notificationTone(item.reason);
-  const names = item.notifications.map((notification) => notificationName(notification, result));
+  const names = item.notifications.map((notification) => notificationName(notification, profiles));
   const title = groupedNotificationTitle(names, item.total, item.reason, item.totalCapped);
   const previewEvent =
     item.reason === 'repost' || item.reason === 'reaction' || item.reason === 'zap'
@@ -801,7 +860,11 @@ function NotificationGroupRow({
       <VStack className="gap-2">
         <HStack align="flex-start" className="gap-3">
           <NotificationReasonIcon reason={item.reason} color={tone} />
-          <AvatarCluster notifications={item.notifications} result={result} borderColor={surface} />
+          <AvatarCluster
+            notifications={item.notifications}
+            profiles={profiles}
+            borderColor={surface}
+          />
           <VStack className="flex-1 gap-1">
             <NotificationTitleLine
               title={title}
@@ -820,7 +883,7 @@ function NotificationGroupRow({
           <View style={styles.bodyContent}>
             <NotificationReferencedPost
               event={previewEvent}
-              result={result}
+              profiles={profiles}
               foreground={foreground}
               muted={muted}
               contained
@@ -834,18 +897,18 @@ function NotificationGroupRow({
 
 function AvatarCluster({
   notifications,
-  result,
+  profiles,
   borderColor,
 }: {
   notifications: FeedNotification[];
-  result: FeedNotificationsResult | null;
+  profiles: NotificationProfiles;
   borderColor: string;
 }) {
   const preview = notifications.slice(0, MAX_GROUP_AVATARS);
   return (
     <View style={[styles.avatarCluster, { width: 46 + Math.max(0, preview.length - 1) * 16 }]}>
       {preview.map((notification, index) => {
-        const profile = result?.profilesMap.get(notification.event.pubkey);
+        const profile = profiles?.get(notification.event.pubkey);
         const name = profile?.name || `${notification.event.pubkey.slice(0, 8)}...`;
         return (
           <View
@@ -922,12 +985,12 @@ function NotificationTitleLine({
 
 function NotificationBody({
   notification,
-  result,
+  profiles,
   foreground,
   muted,
 }: {
   notification: FeedNotification;
-  result: FeedNotificationsResult | null;
+  profiles: NotificationProfiles;
   foreground: string;
   muted: string;
 }) {
@@ -949,14 +1012,14 @@ function NotificationBody({
       <VStack gap={8} style={styles.bodyContent}>
         <NotificationEventText
           event={previewEvent}
-          result={result}
+          profiles={profiles}
           foreground={foreground}
           muted={muted}
         />
         {targetEvent ? (
           <NotificationReferencedPost
             event={targetEvent}
-            result={result}
+            profiles={profiles}
             foreground={foreground}
             muted={muted}
             showAuthorAvatar
@@ -970,7 +1033,7 @@ function NotificationBody({
     <View style={styles.bodyContent}>
       <NotificationReferencedPost
         event={previewEvent}
-        result={result}
+        profiles={profiles}
         foreground={foreground}
         muted={muted}
         contained={
@@ -985,16 +1048,16 @@ function NotificationBody({
 
 function NotificationEventText({
   event,
-  result,
+  profiles,
   foreground,
   muted,
 }: {
   event: FeedEvent;
-  result: FeedNotificationsResult | null;
+  profiles: NotificationProfiles;
   foreground: string;
   muted: string;
 }) {
-  const content = notificationPreviewText(event.content, result?.profilesMap);
+  const content = notificationPreviewText(event.content, profiles);
   return (
     <Text numberOfLines={4} size={15} style={{ color: content ? foreground : muted }}>
       {content || 'Post unavailable'}
@@ -1004,22 +1067,22 @@ function NotificationEventText({
 
 function NotificationReferencedPost({
   event,
-  result,
+  profiles,
   foreground,
   muted,
   showAuthorAvatar = false,
   contained = false,
 }: {
   event: FeedEvent;
-  result: FeedNotificationsResult | null;
+  profiles: NotificationProfiles;
   foreground: string;
   muted: string;
   showAuthorAvatar?: boolean;
   contained?: boolean;
 }) {
-  const profile = result?.profilesMap.get(event.pubkey);
+  const profile = profiles?.get(event.pubkey);
   const name = profile?.name || `${event.pubkey.slice(0, 8)}...`;
-  const content = notificationPreviewText(event.content, result?.profilesMap);
+  const content = notificationPreviewText(event.content, profiles);
   const isContained = showAuthorAvatar || contained;
   const targetPostBackground = isContained ? withAlpha(foreground, 0.055) : 'transparent';
 
@@ -1054,13 +1117,9 @@ function NotificationReferencedPost({
   );
 }
 
-function notificationName(
-  notification: FeedNotification,
-  result: FeedNotificationsResult | null
-): string {
+function notificationName(notification: FeedNotification, profiles: NotificationProfiles): string {
   return (
-    result?.profilesMap.get(notification.event.pubkey)?.name ||
-    `${notification.event.pubkey.slice(0, 8)}...`
+    profiles?.get(notification.event.pubkey)?.name || `${notification.event.pubkey.slice(0, 8)}...`
   );
 }
 

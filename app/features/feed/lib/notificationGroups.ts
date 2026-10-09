@@ -1,4 +1,5 @@
 import type { FeedNotification, FeedNotificationActor } from '@/features/feed/data/feedClient';
+import { feedNotificationsEqual } from '@/features/feed/data/feedNotificationEquality';
 
 type BatchableNotificationReason = 'follow' | 'repost' | 'reaction' | 'zap';
 
@@ -69,6 +70,50 @@ function syntheticActorNotification(
     reason,
     actorVertexScore: actor.actorVertexScore ?? 0,
   };
+}
+
+function notificationListsEqual(
+  a: readonly FeedNotification[],
+  b: readonly FeedNotification[]
+): boolean {
+  return (
+    a === b ||
+    (a.length === b.length &&
+      a.every((notification, index) => feedNotificationsEqual(notification, b[index]!)))
+  );
+}
+
+/** True when two list items are the same row showing the same thing. */
+export function notificationListItemsEqual(
+  a: NotificationListItem,
+  b: NotificationListItem
+): boolean {
+  if (a === b) return true;
+  if (a.id !== b.id) return false;
+  if (a.type === 'single') {
+    return b.type === 'single' && feedNotificationsEqual(a.notification, b.notification);
+  }
+  if (a.type === 'group') {
+    return (
+      b.type === 'group' &&
+      a.reason === b.reason &&
+      a.total === b.total &&
+      a.totalCapped === b.totalCapped &&
+      a.clientGrouped === b.clientGrouped &&
+      notificationListsEqual(a.notifications, b.notifications)
+    );
+  }
+  if (a.type === 'welcome') {
+    return b.type === 'welcome' && a.installDate === b.installDate && a.termsDate === b.termsDate;
+  }
+  return (
+    b.type === 'legal' &&
+    a.acceptedAtMs === b.acceptedAtMs &&
+    a.termsRevisionShort === b.termsRevisionShort &&
+    a.privacyRevisionShort === b.privacyRevisionShort &&
+    a.isCurrent === b.isCurrent &&
+    a.revisionKnown === b.revisionKnown
+  );
 }
 
 export function buildNotificationListItems(
