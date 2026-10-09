@@ -36,6 +36,18 @@ describe("NormalizingStore", () => {
     expect(store.size).toBe(2);
   });
 
+  it("peek reads a record without making it recently used", () => {
+    const store = createNormalizingStore<Row>({ maxEntries: 2 });
+    store.set("x", { a: "1" });
+    store.set("y", { a: "2" });
+    expect(store.peek("x")).toEqual({ a: "1" });
+    expect(store.peek("absent")).toBeUndefined();
+    store.set("z", { a: "3" }); // x was only peeked, so it is still the LRU
+    expect(store.has("x")).toBe(false);
+    expect(store.has("y")).toBe(true);
+    expect(store.peek("y")).toBe(store.get("y"));
+  });
+
   it("setMany notifies subscribers exactly once", () => {
     const store = createNormalizingStore<Row>({ maxEntries: 10 });
     const listener = vi.fn();

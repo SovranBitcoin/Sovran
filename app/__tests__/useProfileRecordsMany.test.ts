@@ -43,6 +43,37 @@ it('does not rerender a contact batch for unrelated feed-author writes', () => {
   expect(renders - before).toBe(1);
 });
 
+it('leaves LRU order alone when an unrelated profile is written', () => {
+  // Capacity 3: the two observed contacts plus one slot. Re-inserting the
+  // observed keys on every notification would keep them newest forever.
+  mockStore = facade.createNormalizingStore({ maxEntries: 3 });
+  mockStore.set('contact-a', { name: 'A', seenAt: 1 });
+  mockStore.set('contact-b', { name: 'B', seenAt: 1 });
+  const keys = ['contact-a', 'contact-b'];
+  const { result } = renderHook(() => useProfileRecordsMany(keys));
+  const touching = jest.spyOn(mockStore, 'get');
+
+  act(() => mockStore.set('unrelated-1', { name: 'Feed author', seenAt: 1 }));
+  expect(touching).not.toHaveBeenCalled();
+  expect([...mockStore.values()].map((record) => record.name)).toEqual(['A', 'B', 'Feed author']);
+
+  // The next new key evicts the oldest entry, and the consumer sees it go.
+  act(() => mockStore.set('unrelated-2', { name: 'Feed author', seenAt: 1 }));
+  expect(mockStore.has('contact-a')).toBe(false);
+  expect([...result.current.keys()]).toEqual(['contact-b']);
+});
+
+it('marks its profiles recently used when it mounts', () => {
+  mockStore = facade.createNormalizingStore({ maxEntries: 2 });
+  mockStore.set('contact', { name: 'Contact', seenAt: 1 });
+  mockStore.set('other', { name: 'Other', seenAt: 1 });
+  const keys = ['contact'];
+  renderHook(() => useProfileRecordsMany(keys));
+  act(() => mockStore.set('newcomer', { name: 'Newcomer', seenAt: 1 }));
+  expect(mockStore.has('contact')).toBe(true);
+  expect(mockStore.has('other')).toBe(false);
+});
+
 it('reads the new profile-owned store when requested keys stay identical', () => {
   mockStore.set('contact', { name: 'Old scope', seenAt: 1 });
   const keys = ['contact'];

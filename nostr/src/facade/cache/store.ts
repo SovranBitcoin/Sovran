@@ -33,6 +33,11 @@ export type NormalizingStoreOptions<T> = {
 
 export interface NormalizingStore<T> {
   get(key: string): T | undefined;
+  /**
+   * Read WITHOUT touching LRU recency. For a binding that re-checks its keys on
+   * every store notification: `get` there would re-insert each key per write.
+   */
+  peek(key: string): T | undefined;
   /** Resolve many keys at once; index-aligned, `undefined` where absent. */
   getMany(keys: readonly string[]): Array<T | undefined>;
   has(key: string): boolean;
@@ -156,6 +161,9 @@ export function createNormalizingStore<T>(options: NormalizingStoreOptions<T>): 
       const value = map.get(key);
       if (value !== undefined) touch(key, value);
       return value;
+    },
+    peek(key) {
+      return map.get(key);
     },
     getMany(keys) {
       return keys.map((key) => this.get(key));

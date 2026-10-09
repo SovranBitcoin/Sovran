@@ -163,9 +163,13 @@ export function useProfileRecordsMany(
     // only an unrelated key was written. But preserve our snapshot unless one
     // of the requested records actually changed, so feed ingestion does not
     // rerender every contact/profile consumer or re-map all their metadata.
+    //
+    // The first read of a scope uses `get`, so mounting a consumer marks its
+    // profiles as recently used. Every re-check after that peeks: `get` would
+    // re-insert each requested key into the LRU map on every unrelated write.
     let map = sameScope ? undefined : new Map<string, facade.CachedProfile>();
     for (const pk of pubkeys) {
-      const record = store?.get(pk);
+      const record = sameScope ? store?.peek(pk) : store?.get(pk);
       if (!map && cached?.map.get(pk) !== record) map = new Map(cached?.map);
       if (map) {
         if (record) map.set(pk, record);
