@@ -34,7 +34,7 @@ both dev builds; **nothing has run on a physical phone**, and nothing interactiv
 | CALC-2, 7, 8, 11, 12, 13, 14, 15, 16, 17, 18 | Done |
 | CALC-3 | Measured, not changed: the receive-recovery phase had a median of about 7.2 s on the emulator |
 | CALC-4, CALC-5 | Done: wallet polling pauses after ten seconds in the background and resumes at once. **Needs a pay-while-backgrounded check on a real phone** |
-| CALC-6 | **Partly done.** The inbox poll pauses in the background and its timeout is below its cadence. The cursor is blocked: nagg's DM envelopes endpoint takes only `until` and `limit`, so it needs a server change and a deploy |
+| CALC-6 | Done in code. A wrap already handled this session is skipped before decrypt or ingest; the poll pauses in the background, has a timeout below its cadence, and sends `since`. nagg accepts `since` on branch `feat/dm-envelopes-since` (local, not pushed). Gift wraps are back-dated by up to two days, so a quiet inbox's last two days are still refetched; `since` spares only older history, and only once nagg is deployed |
 | CALC-9, CALC-19 | Closed, no change: `inlineRequires` already defers marmot-ts, and the polyfills must load before anything else |
 | CALC-10 | Done with VIS-7 |
 | DEP-12 | Done |
@@ -42,7 +42,7 @@ both dev builds; **nothing has run on a physical phone**, and nothing interactiv
 | DEP-4, 5, 6, DEP-7 (pager-view), DEP-14 (`network-timeouts`, `expo-dev-client`, `expo-build-properties`, `cborg`) | Evaluated: keep. No installed package replaces Skia, image-colors, webview or pager-view; `cborg` is pinned for a Jest mapper |
 | DEP-13 | Evaluated: no change. Both are peers the app never imports; bun installs and locks them already |
 | DEP-9 (`jsdom`) | Evaluated by test: keep. Switching its three suites to the node environment fails the `SendScreen` people-search tests |
-| DEP-7 (`@react-native-menu/menu`) | **Open.** Used only by two `.liquid.tsx` variants (unit and fiat pills). Removing it needs a look at those pills on an iOS liquid-glass build |
+| DEP-7 (`@react-native-menu/menu`) | Evaluated from the code: keep. It is the documented fallback in the two liquid-glass pills for when the local `liquid-glass-menu` module is not supported (`UnitSwitcherPill.liquid.tsx:84`) |
 | ACCT-1 to ACCT-9, ACCT-11 | Done **inside the opt-in switch**. Settings has a developer toggle, off by default; with it off a profile switch restarts exactly as before. ADR 0029 |
 | ACCT-10 | Done as single-profile removal, refused unless the wallet is provably empty. No separate sign-out. ADR 0030 |
 
@@ -132,7 +132,20 @@ New findings from the capture:
 - `app/.expo/dev/logs/start.log`, Expo's own dev-server log, has grown to 4.7 GB since August and is
   never truncated. With the disk nearly full, it is the cheapest space to reclaim.
 
-### Still unproven or blocked
+### What is left, and what it needs
+
+Nothing below can be done from a development machine alone.
+
+| Left | Needs |
+| --- | --- |
+| Deploy nagg with `since` | A push and deploy of `feat/dm-envelopes-since` |
+| Background polling pause, checked for real | A physical iPhone and Android phone: pay an invoice from another app with this one backgrounded |
+| The in-process switch on iOS, with a funded wallet, an imported key, and Whitenoise groups | Hands on a device; funded and destructive scenarios are never run against a real wallet from automation |
+| Single-profile removal, run once | Hands on a device with a spare empty profile |
+| Rows for the pages a deep link cannot reach (those needing parameters, onboarding, backup and recovery, sheets) | The JSON e2e harness on a disposable simulator, since its lanes start from a fresh install |
+| Anything interactive on iOS | A way to tap the simulator (it has no scripted touch here) or a person |
+
+### Caveats on what is done
 
 - **The opt-in switch has completed on the Android emulator only**, between two derived profiles in
   mock mode: no reload, and the app was initialised again in about four seconds. The first attempt
