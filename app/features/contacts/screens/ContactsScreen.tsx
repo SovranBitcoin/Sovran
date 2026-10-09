@@ -205,7 +205,11 @@ export const ContactsScreen = () => {
           ...whitenoiseContactPubkeys,
         ]),
       ];
-  const { metadata: profilesMap } = useNostrProfileMetadataMany(allPubkeys);
+  const { metadata: profilesMap, loadingPubkeys } = useNostrProfileMetadataMany(allPubkeys);
+  const listExtraData = useMemo(
+    () => ({ profilesMap, loadingPubkeys }),
+    [profilesMap, loadingPubkeys]
+  );
 
   useEffect(() => {
     void prefetchImages(Array.from(profilesMap.values()).map((p) => p.picture));
@@ -354,10 +358,14 @@ export const ContactsScreen = () => {
       const profile = profilesMap.get(req.fromPubkey);
       // Strangers' kind-0 metadata may simply not be on the user's default
       // relay set — that's the whole point of a "request". So render with
-      // the seeded fallback immediately rather than a skeleton forever.
+      // grey until the first attempt settles, then the seeded fallback.
       return (
         <ContactRow
-          identity={[nostrIdentity(req.fromPubkey, profile, { isLoadingProfile: false })]}
+          identity={[
+            nostrIdentity(req.fromPubkey, profile, {
+              isLoadingProfile: loadingPubkeys.has(req.fromPubkey),
+            }),
+          ]}
           subtitle="Wants to start a White Noise chat"
           hideMetadata
           trailing={
@@ -412,8 +420,8 @@ export const ContactsScreen = () => {
           : undefined;
     // Don't drive the avatar's loading skeleton off "profile is missing":
     // for strangers (Marmot DM accept, Requests pill) kind-0 may simply not
-    // be on our relay set, so missing IS the steady state.
-    const isLoadingProfile = false;
+    // be on our relay set, so missing IS the steady state after the first attempt.
+    const isLoadingProfile = !!item.pubkey && loadingPubkeys.has(item.pubkey);
     const mintUrl = item.type === 'mint' ? item.mint?.mintUrl : undefined;
     // Dev-only data-source chip (n/c/r) for DM-backed rows, keyed by the
     // conversation's newest message id — same pattern as PostCard/notifications.
@@ -578,7 +586,7 @@ export const ContactsScreen = () => {
         screen
         bottomSpacing={Math.max(16, bannerClearance)}
         data={currentListData}
-        extraData={profilesMap}
+        extraData={listExtraData}
         refreshControl={pullToAi.refreshControl}
         onEndReached={hasMoreContacts ? loadMoreContacts : undefined}
         onEndReachedThreshold={0.4}

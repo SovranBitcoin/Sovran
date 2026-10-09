@@ -1,3 +1,4 @@
+import type { ProfileStatus } from '@/shared/lib/nostr/useEntityCache';
 import type { AvatarState } from '@/shared/ui/primitives/Avatar';
 
 /*
@@ -21,11 +22,18 @@ import type { AvatarState } from '@/shared/ui/primitives/Avatar';
  * Map a source URL plus whether its lookup has settled onto the Avatar's
  * three visual states. `resolved` means the metadata that would carry the
  * picture is known (cached, fetched, or the fetch gave up) — pass
- * `!isResolving` from `useNostrProfileMetadata`, `profile !== undefined` for
- * a feed profiles map, or `true` when the URL travels inside the record
- * itself (a signer app's icon, a pasted preview).
+ * `!isResolving` from `useNostrProfileMetadata`, or `true` when the URL
+ * travels inside the record itself (a signer app's icon, a pasted preview).
  */
 export function avatarStateFor(picture: string | null | undefined, resolved: boolean): AvatarState {
   if (picture) return 'image';
   return resolved ? 'fallback' : 'loading';
+}
+
+/** Resolve remote avatars from fetch status, never from a seed record's existence. */
+export function profileAvatarStateFor(
+  picture: string | null | undefined,
+  status: ProfileStatus
+): AvatarState {
+  return avatarStateFor(picture, status !== 'loading');
 }

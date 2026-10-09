@@ -1,5 +1,6 @@
 import { act, renderHook } from '@testing-library/react-native';
 import { facade } from 'nostr';
+import { ok } from 'neverthrow';
 import { DEMO_FEED, DEMO_PROFILES } from '@/shared/stores/runtime/mockPresentationData';
 import { useProfile, useProfileRecordsMany } from '@/shared/lib/nostr/useEntityCache';
 
@@ -7,13 +8,17 @@ let mockMode = false;
 jest.mock('@/shared/stores/global/settingsStore', () => ({
   useSettingsStore: (selector: (state: { mockMode: boolean }) => unknown) => selector({ mockMode }),
 }));
+let mockLayer: facade.NostrDataLayer | undefined;
+let mockCache: facade.NostrEntityCache;
 let mockStore: facade.NormalizingStore<facade.CachedProfile>;
 jest.mock('@/shared/lib/nostr/buildNostrDataLayer', () => ({
-  buildNostrDataLayer: () => ({ cache: { profiles: mockStore } }),
+  buildNostrDataLayer: () => mockLayer ?? { cache: { ...mockCache, profiles: mockStore } },
 }));
 
 beforeEach(() => {
   mockMode = false;
+  mockLayer = undefined;
+  mockCache = facade.createNostrEntityCache();
   mockStore = facade.createNormalizingStore({ maxEntries: 1000 });
 });
 
@@ -69,4 +74,78 @@ it('overlays demo authors without caching them and restores live names when disa
   mockMode = false;
   rerender(undefined);
   expect(result.current.profile?.name).toBe('Live author');
+});
+
+it('keeps a name-only seed grey through pending until kind-0 arrives', () => {
+  mockStore = mockCache.profiles;
+  mockCache.ingestProfileInfos({ author: { name: 'Seed' } }, 'cache');
+  const { result } = renderHook(() => useProfile('author'));
+  expect(result.current.status).toBe('loading');
+  act(() => mockCache.pendingProfiles.begin(['author']));
+  expect(result.current.status).toBe('loading');
+  act(() => mockCache.ingestProfileMetadata({ author: { picture: 'real.png' } }, 1, 'relay'));
+  expect(result.current.status).toBe('loading');
+  act(() => mockCache.pendingProfiles.end(['author']));
+  expect(result.current.status).toBe('cached');
+  expect(result.current.profile?.picture).toBe('real.png');
+});
+
+it('settles a missing stranger and a picture-less seed after a failed attempt', () => {
+  mockStore = mockCache.profiles;
+  mockCache.ingestProfileInfos({ seed: { name: 'Seed' } }, 'cache');
+  const missing = renderHook(() => useProfile('stranger'));
+  const seeded = renderHook(() => useProfile('seed'));
+  expect(missing.result.current.status).toBe('loading');
+  expect(seeded.result.current.status).toBe('loading');
+  act(() => mockCache.pendingProfiles.begin(['stranger', 'seed']));
+  act(() => mockCache.pendingProfiles.end(['stranger', 'seed']));
+  expect(missing.result.current.status).toBe('absent');
+  expect(seeded.result.current.status).toBe('cached');
+});
+
+it('backfills idle seed and missing authors in one batch, then never repeats after settlement', async () => {
+  let finish!: (events: facade.relay.RawRelayEvent[]) => void;
+  const response = new Promise<facade.relay.RawRelayEvent[]>((resolve) => {
+    finish = resolve;
+  });
+  const request = jest.fn(async () => ok(await response));
+  mockLayer = facade.createNostrDataLayer({
+    tiers: [facade.relay.createRelayTier({ connection: { request } })],
+  });
+  const seed = 'a'.repeat(64);
+  const missing = 'b'.repeat(64);
+  mockLayer.cache.ingestProfileInfos({ [seed]: { name: 'Seed' } }, 'cache');
+  const seeded = renderHook(() => useProfile(seed));
+  const stranger = renderHook(() => useProfile(missing));
+  const duplicate = renderHook(() => useProfile(seed));
+  expect(seeded.result.current.status).toBe('loading');
+  expect(stranger.result.current.status).toBe('loading');
+  await act(async () => {});
+  expect(request).toHaveBeenCalledTimes(1);
+  expect(request).toHaveBeenCalledWith(
+    [{ kinds: [0], authors: [seed, missing] }],
+    expect.anything()
+  );
+  await act(async () => {
+    finish([]);
+  });
+  expect(seeded.result.current.status).toBe('cached');
+  expect(stranger.result.current.status).toBe('absent');
+  expect(duplicate.result.current.status).toBe('cached');
+  seeded.rerender(undefined);
+  stranger.rerender(undefined);
+  seeded.unmount();
+  const remounted = renderHook(() => useProfile(seed));
+  await act(async () => {});
+  expect(remounted.result.current.status).toBe('cached');
+  expect(request).toHaveBeenCalledTimes(1);
+});
+
+it('settles an idle seed when every metadata tier is disabled', async () => {
+  mockLayer = facade.createNostrDataLayer({ tiers: [] });
+  mockLayer.cache.ingestProfileInfos({ author: { name: 'Seed' } }, 'cache');
+  const { result } = renderHook(() => useProfile('author'));
+  expect(result.current.status).toBe('loading');
+  await act(async () => {});
+  expect(result.current.status).toBe('cached');
 });

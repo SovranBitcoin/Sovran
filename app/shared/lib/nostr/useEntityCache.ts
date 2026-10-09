@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 
 import { facade } from 'nostr';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
@@ -6,6 +6,7 @@ import { DEMO_PROFILES } from '@/shared/stores/runtime/mockPresentationData';
 
 import type { NoteMetrics, ProfileInfo } from '@/features/feed/components/nostr/feedTypes';
 import { buildNostrDataLayer } from '@/shared/lib/nostr/buildNostrDataLayer';
+import { backfillProfile } from '@/shared/lib/nostr/fetchProfiles';
 import { peekNostrDataLayer } from '@/shared/lib/nostr/dataLayerRegistry';
 import {
   NOSTR_METADATA_STALE_TTL_MS,
@@ -24,7 +25,7 @@ import {
 // useSyncExternalStore needs to avoid render loops.
 // ---------------------------------------------------------------------------
 
-type ProfileStatus = 'cached' | 'loading' | 'absent';
+export type ProfileStatus = 'cached' | 'loading' | 'absent';
 
 const NOOP_UNSUB = () => {};
 
@@ -64,19 +65,36 @@ export function useProfile(pubkey: string | undefined): {
   profile: ProfileInfo | undefined;
   status: ProfileStatus;
 } {
-  const cache = buildNostrDataLayer()?.cache;
+  const layer = buildNostrDataLayer();
+  const cache = layer?.cache;
   const mockMode = useSettingsStore((state) => state.mockMode);
   const demoProfile = mockMode && pubkey ? DEMO_PROFILES.get(pubkey) : undefined;
   const record = useCachedRecord(cache?.profiles, pubkey);
   const pending = usePendingProfile(cache?.pendingProfiles, pubkey);
+  const settled = useCachedRecord(cache?.settledProfiles, pubkey);
+  const needsFetch =
+    !!layer &&
+    !!pubkey &&
+    !mockMode &&
+    !settled &&
+    (!record || (record.seenAt === 0 && !record.picture));
+  useEffect(() => {
+    if (layer && pubkey && needsFetch && !pending) backfillProfile(layer, pubkey);
+  }, [layer, pubkey, needsFetch, pending]);
   return useMemo(() => {
     if (demoProfile) return { profile: demoProfile, status: 'cached' as const };
     const profile: ProfileInfo | undefined = record
       ? { name: record.name ?? '', ...(record.picture ? { picture: record.picture } : {}) }
       : undefined;
-    const status: ProfileStatus = record ? 'cached' : pending ? 'loading' : 'absent';
+    const status: ProfileStatus = pending
+      ? 'loading'
+      : record && (record.picture || record.seenAt > 0 || settled)
+        ? 'cached'
+        : needsFetch
+          ? 'loading'
+          : 'absent';
     return { profile, status };
-  }, [record, pending, demoProfile]);
+  }, [record, pending, settled, needsFetch, demoProfile]);
 }
 
 /**
@@ -162,6 +180,26 @@ export function useProfileRecordsMany(
   }, [store, stableKey]);
 
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+}
+
+/** Remember settled misses across consumers, without subscribing rows to unrelated records. */
+export function useProfileFetchSettlements(pubkeys: readonly string[]): ReadonlySet<string> {
+  const store = buildNostrDataLayer()?.cache.settledProfiles;
+  const key = pubkeys.join(',');
+  const subscribe = useCallback(
+    (onChange: () => void) => (store ? store.subscribe(onChange) : NOOP_UNSUB),
+    [store]
+  );
+  const getSnapshot = useCallback(
+    () =>
+      key
+        .split(',')
+        .filter((pk) => store?.has(pk))
+        .join(','),
+    [store, key]
+  );
+  const settledKey = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+  return useMemo(() => new Set(settledKey ? settledKey.split(',') : []), [settledKey]);
 }
 
 /**

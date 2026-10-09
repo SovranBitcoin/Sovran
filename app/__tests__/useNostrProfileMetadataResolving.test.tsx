@@ -16,6 +16,7 @@ import { useCachedNostrProfile } from '@/shared/lib/nostr/useEntityCache';
 import { fetchProfilesViaFacade } from '@/shared/lib/nostr/fetchProfiles';
 
 jest.mock('@/shared/lib/nostr/useEntityCache', () => ({
+  useProfileFetchSettlements: () => new Set(),
   useCachedNostrProfile: jest.fn(),
   useProfileRecordsMany: jest.fn(() => new Map()),
 }));

@@ -5,7 +5,7 @@
  * Each "user" is a followed nostr account with video posts as their "stories".
  */
 
-import { avatarStateFor } from '@/shared/lib/imageLoadState';
+import { profileAvatarStateFor } from '@/shared/lib/imageLoadState';
 import React, { useCallback, useEffect, useRef, useState, type FC } from 'react';
 // Tolerated seam exception: horizontal story rail driven by Animated.FlatList
 // (reanimated scroll handler); the List seam wraps plain FlashList only.
@@ -570,6 +570,7 @@ const UserStoriesItem: FC<UserItemProps> = ({
     ? buildStoryCaption(currentVideo.content, currentVideo.videoUrl)
     : null;
   const profileName = user.profile?.name || user.pubkey.slice(0, 12) + '…';
+  // The route carries a fixed profile snapshot; story playback owns no metadata fetch.
   const profilePicture = user.profile?.picture;
   const visualKey = `story:${userIndex}:${user.pubkey.slice(0, 12)}`;
 
@@ -656,7 +657,7 @@ const UserStoriesItem: FC<UserItemProps> = ({
           </View>
           <View style={styles.profileRow} pointerEvents="box-none">
             <Avatar
-              state={avatarStateFor(profilePicture, user.profile !== undefined)}
+              state={profileAvatarStateFor(profilePicture, 'cached')}
               picture={profilePicture}
               seed={user.pubkey}
               name={profileName}

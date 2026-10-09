@@ -1,3 +1,5 @@
+import { profileAvatarStateFor } from '@/shared/lib/imageLoadState';
+import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata';
 /**
  * @fileoverview Zapped-post card on the transaction detail screen.
  *
@@ -31,10 +33,7 @@ import { withAlpha } from '@/shared/lib/color';
 import { getZap } from 'wallet';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { prefetchThread } from '@/features/feed/lib/prefetchThread';
-import {
-  seedLowConfidenceProfiles,
-  useCachedNostrProfile,
-} from '@/shared/lib/nostr/useEntityCache';
+import { seedLowConfidenceProfiles } from '@/shared/lib/nostr/useEntityCache';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { Log } from '@/shared/lib/logger';
 import { zIndex } from '@/shared/styles/tokens';
@@ -53,8 +52,8 @@ interface ZappedPostSectionProps {
 export function ZappedPostSection({ entry }: ZappedPostSectionProps) {
   const [foreground, surfaceTertiary] = useThemeColor(['foreground', 'surface-tertiary'] as const);
   const zap = entry ? getZap(entry) : null;
-  // Fetch-free warm-cache read so a bare annotation still shows a live avatar.
-  const { metadata: cachedProfile } = useCachedNostrProfile(zap?.authorPubkey ?? '');
+  // Resolve bare annotations before choosing the generated fallback.
+  const { metadata: cachedProfile, isResolving } = useNostrProfileMetadata(zap?.authorPubkey);
 
   const eventId = zap?.eventId;
   const authorPubkey = zap?.authorPubkey;
@@ -111,7 +110,7 @@ export function ZappedPostSection({ entry }: ZappedPostSectionProps) {
           <View style={styles.inner}>
             <HStack align="center" gap={8} style={styles.authorRow}>
               <Avatar
-                state={avatarPicture ? 'image' : 'fallback'}
+                state={profileAvatarStateFor(avatarPicture, isResolving ? 'loading' : 'cached')}
                 picture={avatarPicture}
                 seed={zap.authorPubkey}
                 name={authorName}

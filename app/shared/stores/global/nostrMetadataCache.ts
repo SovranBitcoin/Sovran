@@ -133,7 +133,7 @@ export const useNostrMetadataCache = create<NostrMetadataCacheState>()(
 
 /**
  * Map the single owner's CachedProfile (nagg-ts entity cache) to this module's
- * NostrProfileMetadata. `seenAt` plays `fetchedAt`'s staleness role. One place,
+ * NostrProfileMetadata. Fetch time is independent of the merge rank. One place,
  * so the non-feed hooks and the persistence sidecar agree on the shape.
  */
 export function cachedProfileToMetadata(
@@ -149,7 +149,7 @@ export function cachedProfileToMetadata(
     lud16: record.lud16,
     website: record.website,
     about: record.about,
-    fetchedAt: record.seenAt ?? 0,
+    fetchedAt: record.fetchedAt ?? 0,
   };
 }
 

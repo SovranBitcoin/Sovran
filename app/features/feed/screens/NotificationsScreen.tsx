@@ -1,5 +1,7 @@
+import { useProfile } from '@/shared/lib/nostr/useEntityCache';
+import type { ComponentProps } from 'react';
 import { notificationPreviewText } from '@/features/feed/lib/notificationPreviewText';
-import { avatarStateFor } from '@/shared/lib/imageLoadState';
+import { profileAvatarStateFor } from '@/shared/lib/imageLoadState';
 import { buildAppNotificationRows } from '@/features/feed/lib/appNotificationRows';
 import { legalRevisions } from '@/shared/lib/legal/legalDocuments';
 import { collectReferencedIds } from '@/features/feed/components/nostr/feedParse';
@@ -705,6 +707,14 @@ function LegalAcceptanceNotificationRow({
   );
 }
 
+function NotificationAvatar(
+  props: Omit<ComponentProps<typeof Avatar>, 'state'> & { seed: string }
+) {
+  const { profile, status } = useProfile(props.seed);
+  const picture = profile?.picture ?? props.picture;
+  return <Avatar {...props} picture={picture} state={profileAvatarStateFor(picture, status)} />;
+}
+
 function NotificationRow({
   notification,
   result,
@@ -732,8 +742,7 @@ function NotificationRow({
         <HStack align="flex-start" className="gap-3">
           <NotificationReasonIcon reason={notification.reason} color={tone} />
           <View>
-            <Avatar
-              state={avatarStateFor(profile?.picture, profile !== undefined)}
+            <NotificationAvatar
               picture={profile?.picture}
               name={name}
               seed={notification.event.pubkey}
@@ -849,8 +858,7 @@ function AvatarCluster({
                 left: index * 16,
               },
             ]}>
-            <Avatar
-              state={avatarStateFor(profile?.picture, profile !== undefined)}
+            <NotificationAvatar
               picture={profile?.picture}
               name={name}
               seed={notification.event.pubkey}
@@ -1028,8 +1036,7 @@ function NotificationReferencedPost({
       ]}>
       <HStack className="gap-1.5">
         {showAuthorAvatar ? (
-          <Avatar
-            state={avatarStateFor(profile?.picture, profile !== undefined)}
+          <NotificationAvatar
             picture={profile?.picture}
             name={name}
             seed={event.pubkey}

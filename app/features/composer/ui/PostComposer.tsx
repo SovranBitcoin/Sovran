@@ -1,3 +1,4 @@
+import { useProfile } from '@/shared/lib/nostr/useEntityCache';
 /**
  * @fileoverview The Nostr post composer surface.
  *
@@ -9,7 +10,7 @@
  */
 import { POST_AVATAR_SIZE } from '@/features/feed/lib/postTypography';
 import { useProfileDisplay } from '@/shared/hooks/useProfileDisplay';
-import { avatarStateFor } from '@/shared/lib/imageLoadState';
+import { avatarStateFor, profileAvatarStateFor } from '@/shared/lib/imageLoadState';
 import { useEffect, useRef, useState } from 'react';
 import {
   Keyboard,
@@ -720,6 +721,7 @@ function ReplyOriginalPost({
   foreground: string;
   muted: string;
 }) {
+  const { profile: cachedAuthor, status: authorStatus } = useProfile(event.pubkey);
   const name = profile?.name || `${tryNpubEncode(event.pubkey).slice(0, 12)}…`;
   const shift = useShiftLogger('ReplyOriginalPost');
   const profiles = buildSingleProfileMap(event, profile);
@@ -743,8 +745,8 @@ function ReplyOriginalPost({
       extra={{ contentLength: event.content.length }}>
       <View style={styles.gutterCol}>
         <Avatar
-          state={avatarStateFor(profile?.picture, profile !== undefined)}
-          picture={profile?.picture}
+          state={profileAvatarStateFor(cachedAuthor?.picture ?? profile?.picture, authorStatus)}
+          picture={cachedAuthor?.picture ?? profile?.picture}
           seed={event.pubkey}
           size={AVATAR_SIZE}
           name={name}

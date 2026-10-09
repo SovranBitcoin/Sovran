@@ -1,6 +1,6 @@
 import type { facade } from 'nostr';
 
-import { cachedProfileToMetadata } from '@/shared/stores/global/nostrMetadataCache';
+import { log } from '@/shared/lib/logger';
 import { buildNostrDataLayer } from '@/shared/lib/nostr/buildNostrDataLayer';
 
 type ProfileMetadata = facade.ProfileMetadata;
@@ -24,6 +24,14 @@ export async function fetchProfilesViaFacade(
   if (pubkeys.length === 0) return {};
   const layer = buildNostrDataLayer();
   if (!layer) return {};
+  return fetchProfilesFromLayer(layer, pubkeys, options);
+}
+
+async function fetchProfilesFromLayer(
+  layer: facade.NostrDataLayer,
+  pubkeys: string[],
+  options: { refresh?: boolean; readId?: string; signal?: AbortSignal }
+): Promise<ProfileBatch> {
   const fetch = async (keys: string[]): Promise<ProfileBatch> => {
     const result = await layer.getProfiles({
       pubkeys: keys,
@@ -34,7 +42,57 @@ export async function fetchProfilesViaFacade(
       () => ({})
     );
   };
-  if (!options.refresh || options.signal) return fetch(pubkeys);
+  const resolveProfile = async (
+    key: string,
+    profiles: ProfileBatch,
+    previous: facade.CachedProfile | undefined
+  ): Promise<ProfileMetadata | undefined> => {
+    const recordAtAnswer = layer.cache.getProfile(key);
+    const seedPending =
+      layer.cache.pendingProfiles.has(key) && (!recordAtAnswer || recordAtAnswer.seenAt === 0);
+    if (Object.hasOwn(profiles, key) && !seedPending) return profiles[key];
+    // A partial aggregate is not a miss. Wait for this key's remaining
+    // sources so joining screens do not spend retry attempts on one read.
+    if (layer.cache.pendingProfiles.has(key)) {
+      const settled = await new Promise<boolean>((resolve) => {
+        const finish = (settled: boolean) => {
+          unsubscribe();
+          options.signal?.removeEventListener('abort', onAbort);
+          resolve(settled);
+        };
+        const onAbort = () => finish(false);
+        const unsubscribe = layer.cache.pendingProfiles.subscribeKey(key, () => {
+          if (!layer.cache.pendingProfiles.has(key)) finish(true);
+        });
+        options.signal?.addEventListener('abort', onAbort, { once: true });
+        if (options.signal?.aborted) finish(false);
+        else if (!layer.cache.pendingProfiles.has(key)) finish(true);
+      });
+      if (!settled) return undefined;
+    }
+    const record = layer.cache.getProfile(key);
+    if (record === previous || !record?.seenAt) return undefined;
+    const {
+      pubkey: _pubkey,
+      seenAt: _seenAt,
+      srcRank: _srcRank,
+      fetchedAt: _fetchedAt,
+      ...metadata
+    } = record;
+    return metadata;
+  };
+  if (!options.refresh || options.signal) {
+    const previous = new Map(pubkeys.map((key) => [key, layer.cache.getProfile(key)]));
+    const profiles = await fetch(pubkeys);
+    const entries = await Promise.all(
+      pubkeys.map(
+        async (key) => [key, await resolveProfile(key, profiles, previous.get(key))] as const
+      )
+    );
+    return Object.fromEntries(
+      entries.filter((entry): entry is readonly [string, ProfileMetadata] => entry[1] !== undefined)
+    );
+  }
 
   const flights =
     profileFlights.get(layer) ?? new Map<string, Promise<ProfileMetadata | undefined>>();
@@ -45,26 +103,7 @@ export async function fetchProfilesViaFacade(
     const previous = new Map(missing.map((key) => [key, layer.cache.getProfile(key)]));
     const batch = fetch(missing);
     for (const key of missing) {
-      const flight = batch.then(async (profiles) => {
-        if (Object.hasOwn(profiles, key)) return profiles[key];
-        // A partial aggregate is not a miss. Wait for this key's remaining
-        // sources so joining screens do not spend retry attempts on one read.
-        if (layer.cache.pendingProfiles.has(key)) {
-          await new Promise<void>((resolve) => {
-            const unsubscribe = layer.cache.pendingProfiles.subscribeKey(key, () => {
-              if (layer.cache.pendingProfiles.has(key)) return;
-              unsubscribe();
-              resolve();
-            });
-          });
-        }
-        const record = layer.cache.getProfile(key);
-        if (record === previous.get(key) || !record?.seenAt) return undefined;
-        const cached = cachedProfileToMetadata(record);
-        if (!cached) return undefined;
-        const { fetchedAt: _fetchedAt, ...metadata } = cached;
-        return metadata;
-      });
+      const flight = batch.then((profiles) => resolveProfile(key, profiles, previous.get(key)));
       flights.set(key, flight);
       const release = () => {
         if (layer.cache.pendingProfiles.has(key)) {
@@ -84,6 +123,42 @@ export async function fetchProfilesViaFacade(
   return Object.fromEntries(
     entries.filter((entry): entry is readonly [string, ProfileMetadata] => entry[1] !== undefined)
   );
+}
+
+const queuedProfileBackfills = new WeakMap<facade.NostrDataLayer, Set<string>>();
+
+/** Batch idle row lookups in one microtask; the shared flight owns their settlement. */
+export function backfillProfile(layer: facade.NostrDataLayer, pubkey: string): void {
+  const queued = queuedProfileBackfills.get(layer);
+  if (queued) {
+    queued.add(pubkey);
+    return;
+  }
+  const batch = new Set([pubkey]);
+  queuedProfileBackfills.set(layer, batch);
+  void Promise.resolve().then(async () => {
+    queuedProfileBackfills.delete(layer);
+    const keys = [...batch].filter((key) => {
+      const record = layer.cache.getProfile(key);
+      return (
+        !layer.cache.settledProfiles.has(key) &&
+        !layer.cache.pendingProfiles.has(key) &&
+        (!record || (record.seenAt === 0 && !record.picture))
+      );
+    });
+    if (keys.length === 0) return;
+    try {
+      await fetchProfilesFromLayer(layer, keys, { refresh: true });
+    } catch (error) {
+      log.warn('nostr.profiles.backfill_failed', () => ({ count: keys.length, error }));
+    } finally {
+      for (const key of keys) {
+        if (!layer.cache.pendingProfiles.has(key) && !layer.cache.settledProfiles.has(key)) {
+          layer.cache.settledProfiles.set(key, { settledAt: Date.now() });
+        }
+      }
+    }
+  });
 }
 
 /**

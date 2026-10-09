@@ -30,14 +30,15 @@ beforeEach(() => {
 });
 
 describe('cachedProfileToMetadata', () => {
-  it('maps an owner record to metadata, using seenAt as fetchedAt', () => {
+  it('maps an owner record to metadata, keeping fetch time separate from merge order', () => {
     const record: facade.CachedProfile = {
       pubkey: 'pk1',
       name: 'alice',
       displayName: 'Alice',
       picture: 'http://x/a.png',
       nip05: 'alice@example.com',
-      seenAt: 1700,
+      seenAt: 1,
+      fetchedAt: 1700,
       srcRank: 3,
     };
     expect(cachedProfileToMetadata(record)).toEqual({
