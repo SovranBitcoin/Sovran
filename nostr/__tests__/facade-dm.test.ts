@@ -18,7 +18,7 @@ function wrap(id: string, created_at: number): RawRelayEvent {
 }
 
 describe('getDmEnvelopes — nagg index', () => {
-  test('returns opaque envelopes (no decryption) with an arrival-time cursor', async () => {
+  test('returns opaque envelopes (no decryption) with an event-time cursor', async () => {
     let lastUrl = '';
     const client = createNaggClient({
       appView: { baseUrl: 'https://nagg.test' },
@@ -28,7 +28,7 @@ describe('getDmEnvelopes — nagg index', () => {
           ok: true,
           status: 200,
           statusText: 'OK',
-          // v2 envelope: raw wraps in arrival order — and BY DESIGN no
+          // v2 envelope: raw wraps in event-time order — and BY DESIGN no
           // aggregates and no kind-0 profile hydration (privacy).
           json: async () => ({
             order: ['1'.repeat(64), '2'.repeat(64)],
@@ -143,5 +143,45 @@ test('getDmEnvelopes: a nagg without the nostr module (404) is unsupported, not 
     });
     const outcome = await createNaggTier({ client }).getDmEnvelopes!({ viewerPubkey: ME });
     expect(outcome.kind).toBe('unsupported');
+  });
+});
+
+
+describe('incremental DM envelopes', () => {
+  test('nagg sends since alongside the existing pagination parameters', async () => {
+    const urls: URL[] = [];
+    const client = createNaggClient({
+      appView: { baseUrl: 'https://nagg.test' },
+      fetchImpl: (async (url: string) => {
+        urls.push(new URL(String(url)));
+        return { ok: true, status: 200, json: async () => ({ order: [], orderBy: 'created_at', events: [], aggregates: {} }) } as unknown as Response;
+      }) as unknown as typeof fetch,
+    });
+    const tier = createNaggTier({ client });
+    await tier.getDmEnvelopes!({ viewerPubkey: ME, since: 100, cursor: { createdAt: 300, id: '1'.repeat(64) }, limit: 25 });
+    expect(urls[0].searchParams.get('since')).toBe('100');
+    expect(urls[0].searchParams.get('until')).toBe('300');
+    expect(urls[0].searchParams.get('limit')).toBe('25');
+    await tier.getDmEnvelopes!({ viewerPubkey: ME, since: 0 });
+    expect(urls[1].searchParams.get('since')).toBe('0');
+    await tier.getDmEnvelopes!({ viewerPubkey: ME });
+    expect(urls[2].searchParams.has('since')).toBe(false);
+  });
+
+  test('relay forwards an explicit since, including zero, without adding a limit', async () => {
+    const filters: NostrFilter[][] = [];
+    const connection: RelayConnection = {
+      request: (value) => {
+        filters.push(value);
+        return Promise.resolve(ok([]));
+      },
+    };
+    const tier = createRelayTier({ connection });
+    await tier.getDmEnvelopes!({ viewerPubkey: ME, since: 100, limit: 25 });
+    await tier.getDmEnvelopes!({ viewerPubkey: ME, since: 0 });
+    expect(filters).toEqual([
+      [{ kinds: [4, 1059], '#p': [ME], since: 100 }],
+      [{ kinds: [4, 1059], '#p': [ME], since: 0 }],
+    ]);
   });
 });

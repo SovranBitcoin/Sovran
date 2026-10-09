@@ -7,7 +7,7 @@ type PluginContext = Parameters<NonNullable<Plugin['onInit']>>[0];
 type ReceiveService = PluginContext['services']['paymentRequestReceiveService'];
 type Handler = Parameters<ReceiveService['registerTransportHandler']>[0];
 type Envelope = { id: string; kind: number; pubkey: string; content: string; createdAtSec: number };
-type InboxRequest = { timeoutMs?: number; signal?: AbortSignal };
+type InboxRequest = { timeoutMs?: number; signal?: AbortSignal; since?: number };
 
 const POLL_INTERVAL_MS = 15_000;
 const TWO_DAYS_SEC = 2 * 24 * 60 * 60;
@@ -58,11 +58,19 @@ function wrap(id: string, createdAtSec: number): Envelope {
   };
 }
 
-async function setup(options: { initial?: AppStateStatus } = {}) {
+async function setup(options: { initial?: AppStateStatus; honourSince?: boolean } = {}) {
   const app = createAppState(options.initial);
   let inbox: Envelope[] = [];
   const getDmEnvelopes = jest.fn(async (_request: InboxRequest) => ({
-    match: (ok: (value: { envelopes: Envelope[] }) => unknown) => ok({ envelopes: inbox }),
+    match: (ok: (value: { envelopes: Envelope[] }) => unknown) => {
+      const since = _request.since;
+      return ok({
+        envelopes:
+          options.honourSince && since !== undefined
+            ? inbox.filter((envelope) => envelope.createdAtSec >= since)
+            : inbox,
+      });
+    },
   }));
   const subscribeDmEnvelopes = jest.fn(() => jest.fn());
   const ingestPayload = jest.fn(
@@ -72,8 +80,9 @@ async function setup(options: { initial?: AppStateStatus } = {}) {
   );
   let handler: Handler | undefined;
   const layer = { getDmEnvelopes, subscribeDmEnvelopes };
+  let signerKey = new Uint8Array(32).fill(1);
   const plugin = createPaymentRequestNostrTransportPlugin({
-    getSignerKey: () => new Uint8Array(32).fill(1),
+    getSignerKey: () => signerKey,
     loadDataLayer: async () => layer as never,
     appState: app.appState,
   });
@@ -95,6 +104,9 @@ async function setup(options: { initial?: AppStateStatus } = {}) {
     getDmEnvelopes,
     subscribeDmEnvelopes,
     ingestPayload,
+    switchProfile: () => {
+      signerKey = new Uint8Array(32).fill(2);
+    },
     setInbox: (envelopes: Envelope[]) => {
       inbox = envelopes;
     },
@@ -264,5 +276,74 @@ describe('payment-request inbox poll', () => {
     await advance(POLL_INTERVAL_MS);
     expect(t.ingestPayload).toHaveBeenCalledTimes(2);
     await t.dispose();
+  });
+  it.each([false, true])(
+    'deduplicates overlap pages when the server honours since: %s',
+    async (honourSince) => {
+      const t = await setup({ honourSince });
+      const newest = wrap('a', 1_800_000_000);
+      const historic = wrap('b', 1_799_000_000);
+      t.setInbox([newest, historic]);
+      await t.activate();
+      expect(t.getDmEnvelopes.mock.calls[0][0]).not.toHaveProperty('since');
+      expect(mockUnwrap).toHaveBeenCalledTimes(2);
+      expect(t.ingestPayload).toHaveBeenCalledTimes(2);
+      await advance(POLL_INTERVAL_MS);
+      expect(t.getDmEnvelopes.mock.calls[1][0].since).toBe(1_799_827_200);
+      expect(mockUnwrap).toHaveBeenCalledTimes(2);
+      expect(t.ingestPayload).toHaveBeenCalledTimes(2);
+
+      // The lower bound is inclusive, and arrival order need not match event time.
+      const late = wrap('d', 1_799_827_200);
+      t.setInbox([newest, historic, late]);
+      await advance(POLL_INTERVAL_MS);
+      expect(t.ingestPayload.mock.calls.map((call) => call[1].transportMessageId)).toEqual([
+        newest.id,
+        historic.id,
+        late.id,
+      ]);
+      expect(mockUnwrap).toHaveBeenCalledTimes(3);
+      await t.dispose();
+    }
+  );
+
+  it('retains processed ids beyond 1000 wraps and does not advance the cursor with time', async () => {
+    const t = await setup();
+    t.setInbox(
+      Array.from({ length: 1001 }, (_, i) => ({
+        ...wrap('a', 1_800_000_000),
+        id: i.toString(16).padStart(64, '0'),
+      }))
+    );
+    await t.activate();
+    // Drain the sequential unwrap/ingest loop before advancing the poll timer.
+    for (let i = 0; i < 1001; i++) await settle();
+    expect(mockUnwrap).toHaveBeenCalledTimes(1001);
+    await advance(POLL_INTERVAL_MS);
+    for (let i = 0; i < 1001; i++) await settle();
+    expect(mockUnwrap).toHaveBeenCalledTimes(1001);
+    expect(t.ingestPayload).toHaveBeenCalledTimes(1001);
+    expect(t.getDmEnvelopes.mock.calls[1][0].since).toBe(1_799_827_200);
+    await t.dispose();
+  });
+
+  it('starts without a cursor after restart and profile switch', async () => {
+    const newest = wrap('a', 1_800_000_000);
+    const first = await setup();
+    first.setInbox([newest]);
+    await first.activate();
+    await advance(POLL_INTERVAL_MS);
+    expect(first.getDmEnvelopes.mock.calls[1][0].since).toBe(1_799_827_200);
+    await first.dispose();
+
+    const next = await setup();
+    next.setInbox([newest]);
+    await next.activate();
+    expect(next.getDmEnvelopes.mock.calls[0][0]).not.toHaveProperty('since');
+    next.switchProfile();
+    await advance(POLL_INTERVAL_MS);
+    expect(next.getDmEnvelopes.mock.calls[1][0]).not.toHaveProperty('since');
+    expect(next.ingestPayload).toHaveBeenCalledTimes(2);
+    await next.dispose();
   });
 });

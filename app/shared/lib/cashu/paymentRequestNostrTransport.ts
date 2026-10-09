@@ -52,7 +52,7 @@ const POLL_TIER_TIMEOUT_MS = 6_000;
  *  slow tick has always settled before the next one is due. */
 const POLL_DEADLINE_MS = 13_000;
 const POLL_LIMIT = 50;
-const SEEN_CAP = 1000;
+const GIFT_WRAP_OVERLAP_SEC = 2 * 24 * 60 * 60;
 const GIFT_WRAP_KIND = 1059;
 
 type InboxLayer = Pick<
@@ -121,8 +121,29 @@ export function createPaymentRequestNostrTransportPlugin(
         });
 
       const activeOps = new Set<string>();
-      const seenWraps = new Set<string>();
-      const inFlightWraps = new Set<string>();
+      // Terminal wraps stay deduplicated for the whole manager/profile session.
+      let inboxSession: {
+        viewerPubkey: string;
+        newestCreatedAtSec: number | undefined;
+        seenWraps: Set<string>;
+        inFlightWraps: Set<string>;
+      } = {
+        viewerPubkey: '',
+        newestCreatedAtSec: undefined,
+        seenWraps: new Set<string>(),
+        inFlightWraps: new Set<string>(),
+      };
+      const sessionFor = (viewerPubkey: string) => {
+        if (inboxSession.viewerPubkey !== viewerPubkey) {
+          inboxSession = {
+            viewerPubkey,
+            newestCreatedAtSec: undefined,
+            seenWraps: new Set<string>(),
+            inFlightWraps: new Set<string>(),
+          };
+        }
+        return inboxSession;
+      };
       const appState = config.appState ?? AppState;
       let timer: ReturnType<typeof setInterval> | null = null;
       let polling = false;
@@ -137,13 +158,6 @@ export function createPaymentRequestNostrTransportPlugin(
       /** Monotonic per-tick counter, so a `reads` report can order the poll's ticks. */
       let pollGeneration = 0;
 
-      const capSeenWraps = (): void => {
-        if (seenWraps.size <= SEEN_CAP) return;
-        for (const id of [...seenWraps].slice(0, seenWraps.size - SEEN_CAP)) {
-          seenWraps.delete(id);
-        }
-      };
-
       /**
        * Unwrap + ingest a single gift-wrap envelope. Shared by the poll and the
        * live subscription so dedupe (`seenWraps`), the unwrap cache, and coco's
@@ -153,19 +167,16 @@ export function createPaymentRequestNostrTransportPlugin(
        */
       const handleEnvelope = async (
         envelope: { id: string; kind: number; content: string; pubkey: string },
-        source: 'poll' | 'live'
+        source: 'poll' | 'live',
+        expectedViewerPubkey: string
       ): Promise<boolean> => {
-        if (
-          disposed ||
-          activeOps.size === 0 ||
-          envelope.kind !== GIFT_WRAP_KIND ||
-          seenWraps.has(envelope.id) ||
-          inFlightWraps.has(envelope.id)
-        )
-          return false;
+        if (disposed || activeOps.size === 0 || envelope.kind !== GIFT_WRAP_KIND) return false;
         const secretKey = config.getSignerKey();
         if (!secretKey) return false;
         const viewerPubkey = getPublicKey(secretKey);
+        if (viewerPubkey !== expectedViewerPubkey) return false;
+        const { seenWraps, inFlightWraps } = sessionFor(viewerPubkey);
+        if (seenWraps.has(envelope.id) || inFlightWraps.has(envelope.id)) return false;
         inFlightWraps.add(envelope.id);
         try {
           const rumor = giftWrapCache.unwrap(
@@ -176,7 +187,6 @@ export function createPaymentRequestNostrTransportPlugin(
           if (!rumor || !looksLikePaymentRequestPayload(rumor.content)) {
             inFlightWraps.delete(envelope.id);
             seenWraps.add(envelope.id);
-            capSeenWraps();
             return false;
           }
           if (disposed) return false;
@@ -190,7 +200,6 @@ export function createPaymentRequestNostrTransportPlugin(
             return false;
           }
           seenWraps.add(envelope.id);
-          capSeenWraps();
           cashuLog.info('cashu.creq.transport.payload_ingested', {
             source,
             wrapIdLength: envelope.id.length,
@@ -216,6 +225,7 @@ export function createPaymentRequestNostrTransportPlugin(
         const secretKey = config.getSignerKey();
         if (!secretKey) return;
         const viewerPubkey = getPublicKey(secretKey);
+        const session = sessionFor(viewerPubkey);
         // Lazy import: the data-layer chain pulls native-only modules
         // (ndk-mobile) that must not load at manager-module import time
         // (node-side tests import the manager).
@@ -262,6 +272,9 @@ export function createPaymentRequestNostrTransportPlugin(
             .getDmEnvelopes({
               viewerPubkey,
               limit: POLL_LIMIT,
+              ...(session.newestCreatedAtSec !== undefined
+                ? { since: session.newestCreatedAtSec - GIFT_WRAP_OVERLAP_SEC }
+                : {}),
               refresh: true,
               timeoutMs: POLL_TIER_TIMEOUT_MS,
               signal: deadline.signal,
@@ -271,10 +284,19 @@ export function createPaymentRequestNostrTransportPlugin(
             (resolved) => resolved.envelopes,
             () => []
           );
+          const currentKey = config.getSignerKey();
+          if (disposed || !currentKey || getPublicKey(currentKey) !== viewerPubkey) return;
           let ingested = 0;
           for (const envelope of envelopes) {
-            if (disposed || activeOps.size === 0) break;
-            if (await handleEnvelope(envelope, 'poll')) ingested += 1;
+            if (disposed || activeOps.size === 0 || inboxSession !== session) break;
+            // Never advance from the clock: late wraps may be two days older.
+            session.newestCreatedAtSec = Math.max(
+              session.newestCreatedAtSec ?? envelope.createdAtSec,
+              envelope.createdAtSec
+            );
+            if (session.seenWraps.has(envelope.id) || session.inFlightWraps.has(envelope.id))
+              continue;
+            if (await handleEnvelope(envelope, 'poll', viewerPubkey)) ingested += 1;
           }
           cashuLog.debug('cashu.creq.transport.poll_done', {
             envelopeCount: envelopes.length,
@@ -392,7 +414,9 @@ export function createPaymentRequestNostrTransportPlugin(
             await giftWrapCache.cache.hydrate(viewerPubkey);
             if (disposed || activeOps.size === 0 || liveUnsub) return;
             liveUnsub = layer.subscribeDmEnvelopes({ viewerPubkey }, (env) => {
-              void handleEnvelope(env, 'live');
+              const currentKey = config.getSignerKey();
+              if (!currentKey || getPublicKey(currentKey) !== viewerPubkey) return;
+              void handleEnvelope(env, 'live', viewerPubkey);
             });
             cashuLog.info('cashu.creq.transport.live_started', { activeOps: activeOps.size });
           } catch (error) {
