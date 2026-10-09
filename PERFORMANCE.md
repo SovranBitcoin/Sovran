@@ -16,60 +16,83 @@ Nothing in this file was measured on a device. Paths are relative to the repo ro
 
 ## Status
 
-Work on this register started on 2026-10-09. An entry below keeps its original wording as the record
-of what was found; this table says where each one stands. **Nothing marked done has been run on a
-device.** "Done" means implemented, reviewed and covered by tests, with type-check, lint, knip, the
-ratchets and the full test suites passing.
+Work on this register ran on 2026-10-09. An entry below keeps its original wording as the record of
+what was found; this section says where each one ended up.
 
-| Entries | State |
+"Done" means implemented, reviewed and covered by tests, with type-check, lint, knip, the ratchets
+and the full test suites passing. Device evidence is from one Android emulator session in a dev
+build; **nothing has run on iOS or on a physical phone.**
+
+### Every entry
+
+| Entries | Outcome |
 | --- | --- |
-| VIS-1, VIS-2, VIS-4, VIS-5, VIS-6, VIS-7, VIS-8 | Done. The `avatars` log-doctor mode is the regression guard |
-| VIS-3 | Done as a bounded loading state: grey until the row's first fetch attempt settles, then the fallback |
-| OBS-1, OBS-3, OBS-4, OBS-5, OBS-6, OBS-7, OBS-8, OBS-9, OBS-11 | Done |
-| OBS-2 | Done: `store.set` from `defineStore`, with a log-doctor `stores` mode |
-| OBS-10 | **Open.** No baseline walk of the 111 pages has been captured; it needs a device |
-| CALC-2, CALC-7, CALC-8, CALC-11, CALC-13, CALC-14, CALC-15, CALC-16, CALC-17 | Done |
-| CALC-1, CALC-3 | **Open.** Recorded figures only; measure with `coco.call` and the `pages` mode first |
-| CALC-4, CALC-5, CALC-6 | **Open, deliberately.** They change how the wallet and the payment-request inbox poll, where a mistake is a missed payment. They need a design decision, not a mechanical fix |
-| CALC-9, CALC-19 | **Open.** Unmeasured; `inlineRequires` may already defer CALC-9 |
+| VIS-1 to VIS-8 | Done. VIS-3 is a bounded loading state. On the emulator, 258 avatar instances across 86 app starts on the wallet home all went loading → image; none showed the fallback first. Other pages were not exercised |
+| OBS-1 to OBS-9, OBS-11 | Done, and seen working on the emulator: `coco.call`, `store.set`, `cache.store.write`, `perf.frame_drop`, `screen.mount`, `nav.transition`, `render.why`, and the `pages`, `stores` and `ingest` log-doctor modes on a real capture |
+| OBS-10 | **Partly done.** Four pages have a measured row (below). A walk of all 111 needs the JSON e2e harness, whose lanes start from a fresh install and would wipe the emulator's app data, so it was not run |
+| CALC-1 | Closed as stale: `history.filters.matchesFilters` did not appear once in the capture and has no emitter in source |
+| CALC-2, 7, 8, 11, 12, 13, 14, 15, 16, 17, 18 | Done |
+| CALC-3 | Measured, not changed: the receive-recovery phase had a median of about 7.2 s on the emulator |
+| CALC-4, CALC-5 | Done: wallet polling pauses after ten seconds in the background and resumes at once. **Needs a pay-while-backgrounded check on a real phone** |
+| CALC-6 | **Partly done.** The inbox poll pauses in the background and its timeout is below its cadence. The cursor is blocked: nagg's DM envelopes endpoint takes only `until` and `limit`, so it needs a server change and a deploy |
+| CALC-9, CALC-19 | Closed, no change: `inlineRequires` already defers marmot-ts, and the polyfills must load before anything else |
 | CALC-10 | Done with VIS-7 |
-| CALC-12, CALC-18 | **Open.** CALC-12 could not be narrowed without changing behaviour |
 | DEP-12 | Done |
-| DEP-13, DEP-14 and the evaluations (DEP-4 to DEP-7, DEP-9) | **Open** |
-| ACCT-9 (registry, enforcement, canary, leak check), ACCT-11 | Done. ADR 0029 |
-| ACCT-1, ACCT-2, ACCT-3, ACCT-6, ACCT-7 | Done **inside the opt-in switch only**. Settings has a developer toggle, off by default; with it off a profile switch restarts exactly as before |
-| ACCT-4, ACCT-5, ACCT-8 | Holders register a dispose function, which the opt-in switch runs. BLE mesh identity and native state are still unverified |
-| ACCT-10 | **Open.** No sign-out or single-profile delete |
+| DEP-1, 2, 3, 8, 10, 11 | Evaluated in review: keep |
+| DEP-4, 5, 6, DEP-7 (pager-view), DEP-14 (`network-timeouts`, `expo-dev-client`, `expo-build-properties`, `cborg`) | Evaluated: keep. No installed package replaces Skia, image-colors, webview or pager-view; `cborg` is pinned for a Jest mapper |
+| DEP-13 | Evaluated: no change. Both are peers the app never imports; bun installs and locks them already |
+| DEP-7 (`@react-native-menu/menu`), DEP-9 (`jsdom`) | **Open.** Likely removable, untested: the menu is used by two `.liquid.tsx` variants, `jsdom` by three tests that never touch `document` |
+| ACCT-1 to ACCT-9, ACCT-11 | Done **inside the opt-in switch**. Settings has a developer toggle, off by default; with it off a profile switch restarts exactly as before. ADR 0029 |
+| ACCT-10 | Done as single-profile removal, refused unless the wallet is provably empty. No separate sign-out. ADR 0030 |
 
-Limits of the opt-in switch as it stands:
+### Measured on the emulator
 
-- It falls back to a restart whenever a Whitenoise or Routstr client is active, because neither has a
-  shutdown that can be awaited. Until they do, the fast path will often not be taken.
-- The canary test plants an account-A marker in every profile and session store and asserts none
-  survives the switch or lands under account B's keys. Of the registered module-level holders, only
-  seven can be seeded with a marker; the rest are called without proof that they held account data
-  and dropped it.
-- If the in-process switch fails and the restart is also unavailable, providers stay suspended and
-  writes stay blocked. That is deliberate: a stuck app over a half-switched wallet.
-- Real relay shutdown, native cleanup, and what the theme and navigation look like after a switch
-  are unproven until it is run on both platforms.
+Dev build, debug logging and both monitors on, so absolute figures are inflated; use them to rank.
 
-Found by an independent review of the switch and not yet fixed. All apply only with the setting on:
+| Page | Content shown | Shell | Navigation | Dropped frames | Coco calls |
+| --- | --- | --- | --- | --- | --- |
+| Feed | 2,072 ms | 320 ms | — | 0 | 0 |
+| Contacts | 1,735 ms | 205 ms | 992 ms | 39 | 4 |
+| Notifications | 774 ms | 213 ms | 961 ms | 122 | 87 |
+| Receive | — | — | 2,153 ms | 113 | 127 |
 
-- **A Vertex budget store disables the fast path for the rest of the session.** Creating one records
-  a captured storage owner on a registry entry that is never removed
-  (`app/shared/stores/profile/vertexBudgetStore.ts:50`), and the switch refuses while any exists. With
-  the Whitenoise and Routstr refusals, the fast path may in practice never run yet.
-- **The new account's tree briefly sees the old NDK instance.** Teardown clears the signer,
-  subscriptions and relays, but ndk-mobile's store still holds the old instance until the new
-  provider's deferred init replaces it about 800 ms later. Signing is not possible in that window;
-  whether anything reads or writes the old account's cache database through it was not traced.
-- **The old account's late writes are dropped.** Writes are blocked before services and the wallet
-  core have stopped, so a profile-store update made during teardown (a receive completing, say) is
-  never persisted. The old account's blob is intact but can be stale against its wallet database.
-- **Only `ndk.pool` is disconnected**, not `ndk.outboxPool`.
-- **Navigation is replaced, not reset.** `router.replace('/')` may leave the old account's underlying
-  routes and params in the stack. Unverified in expo-router.
+New findings from the capture, not yet acted on:
+
+- **CALC-20 — the wallet home reads the same three queries about seven times per app start.**
+  `wallet.balances.byMint`, `ops.receive.listInFlight` and `history.getPaginatedHistory` each ran
+  about 614 times over 86 starts, at roughly 0.5 s each on the emulator. `useColadaBalance` and
+  `useColadaTransactions` (`wallet/src/react`) keep their snapshot per hook instance, so every
+  component that uses one runs its own reads. A per-manager shared snapshot would run them once.
+- **CALC-21 — the JS thread blocks at start.** 184 blocks over 86 starts, median 770 ms, worst
+  1.85 s. Not attributed yet; the `startup` and `coco` log-doctor modes are the place to start.
+- **CALC-22 — 12,730 `manager.on` calls against 7,396 `off`.** Either listeners are released through
+  the returned unsubscribe function, or about 5,000 are never released. Unverified.
+- **The logger was hiding screen names** (fixed): nested screen paths were summarised as base64 and
+  long names as base58, which made `ui.screen` and the new per-page events ungroupable.
+- **The avatar guard could not read real captures** (fixed): the whole seed was redacted, so the
+  `avatars` mode found nothing and would have passed on every device log.
+- **A deep link opened with the dev package name reloads the whole app** in the dev client. That is
+  why the first walk measured 86 cold starts and not 87 pages.
+- `app/.expo/dev/logs/start.log`, Expo's own dev-server log, has grown to 4.7 GB since August and is
+  never truncated. With the disk nearly full, it is the cheapest space to reclaim.
+
+### Still unproven or blocked
+
+- **The opt-in switch has never completed on a device.** It still restarts when Whitenoise has loaded
+  MLS groups, since Marmot cannot release their private state without deleting history. Its canary
+  proves 54 stores and 25 of 30 module-level holders empty after a switch; the session epoch, the
+  For You cache, quote flights, the melt target and the Cashu seed are disposed but not inspectable.
+  If the in-process switch fails and the restart is also unavailable, providers stay suspended and
+  writes stay blocked, by design.
+- **Background polling pause** changes the wallet core's lifecycle and carries two workarounds for
+  coco behaviours. Pay an invoice from another app with this one backgrounded, on both platforms,
+  before relying on it.
+- **Single-profile removal** has not run on a device. If the app is killed partway through, the next
+  attempt refuses, and the profile stays listed with no in-app way to finish.
+- **Behaviour changes that shipped with the fixes:** contact rows are grey until their first profile
+  fetch settles; feed rows start a batched profile fetch for authors with no known picture; an
+  observed profile can be evicted from a full cache; mint contacts keep a mint's first-loaded info
+  until remount; a card picks up cached engagement counts when its own entry changes.
 
 ## Contents
 
