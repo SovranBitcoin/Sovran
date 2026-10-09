@@ -1,6 +1,6 @@
 import { parseNip05Identifier, verifyNip05, type Nip05Verification } from 'wallet';
 
-export interface Nip05Check {
+interface Nip05Check {
   result: Nip05Verification;
   /** When this result should be re-fetched. It is still shown until then and
    *  while that re-fetch is in flight. */

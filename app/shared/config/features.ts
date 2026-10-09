@@ -33,7 +33,7 @@ export const FEATURES = [
 ] as const;
 
 export type Feature = (typeof FEATURES)[number];
-export type FeatureSet = Readonly<Record<Feature, boolean>>;
+type FeatureSet = Readonly<Record<Feature, boolean>>;
 
 /** A feature is only on when everything it needs is on. */
 const REQUIRES: Partial<Record<Feature, readonly Feature[]>> = {

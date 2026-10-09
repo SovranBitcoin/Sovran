@@ -10,7 +10,7 @@ const UserInfo = z.object({
   error: z.literal(false),
   data: z.object({ user: z.object({ pubkey: z.string(), name: z.string().optional() }) }),
 });
-export type NpcIdentityResult =
+type NpcIdentityResult =
   | { status: 'verified'; identifier: string }
   | { status: 'no-username' | 'unverified' | 'unavailable' };
 
