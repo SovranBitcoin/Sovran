@@ -52,8 +52,26 @@ Registering does nothing. Only the switch and profile removal act on the registr
 
 ## What changes the active account
 
-The flows are in `app/shared/lib/profile/profileSessionOrchestrator.ts`. Every flow takes the same
-lock first (`profileTransition.ts`), so two cannot overlap.
+The flows are in `app/shared/lib/profile/profileSessionOrchestrator.ts`. Every flow starts the same
+way, so two cannot overlap:
+
+```ts
+const lock = acquireTransition();          // in memory: one flow per runtime
+if (!lock) return false;
+if (!(await lock.takeDiskGuard())) { ... } // on disk: survives the restart most flows end in
+lock.holdSplash(...);                      // cover the app while it changes
+...
+await lock.release();                      // gives back exactly what this flow took
+```
+
+A flow that restarts the runtime does not release: the reload clears the in-memory guard and the
+next start clears the one on disk. Which of the three a flow takes is the difference between them:
+
+| Flow | In-memory guard | On-disk guard | Splash |
+| --- | --- | --- | --- |
+| Switch, add, delete everything | yes | yes | yes |
+| Remove one profile | yes | yes | no: the removed profile is not running |
+| Recover from a phrase | yes | no | no: it runs before any account is usable |
 
 | Flow | Function | How it finishes |
 | --- | --- | --- |

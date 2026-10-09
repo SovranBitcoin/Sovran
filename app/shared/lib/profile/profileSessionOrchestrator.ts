@@ -34,17 +34,14 @@ import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { useBTCMapStore } from '@/shared/stores/global/btcMapStore';
 
 import {
-  abandonTransition,
+  acquireTransition,
   activateProfileInMemory,
-  beginTransition,
   cleanupCocoWithTimeout,
-  endTransition,
   isTransitionInFlight,
   keyDerivation,
-  markTransitionInFlight,
   persistSwitchTargetToDisk,
+  splashControls,
   teardownAndRestart,
-  transitionControls,
   type KeyDerivationFn,
   type TransitionControls,
 } from './profileTransition';
@@ -74,20 +71,17 @@ export async function switchToExistingProfile(opts: {
     });
     return false;
   }
-  markTransitionInFlight(true);
-
-  const resetStages = opts.resetStages ?? transitionControls()?.resetStages;
-  const cancelResetStages = opts.cancelResetStages ?? transitionControls()?.cancelResetStages;
-
-  if (!(await beginTransition())) {
-    markTransitionInFlight(false);
+  const lock = acquireTransition();
+  if (!lock) return false;
+  if (!(await lock.takeDiskGuard())) {
+    await lock.release();
     return false;
   }
   try {
     log.info('profile.orchestrator.switch_start', { accountIndex: opts.accountIndex });
     // Without a restart, a stage owned above the account providers never
     // registers again, so it must survive the reset or its dependents never start.
-    resetStages?.({
+    lock.holdSplash(splashControls(opts), {
       holdUntilCancel: true,
       keepStagesThatOutliveAccount: useSettingsStore.getState().inProcessProfileSwitch,
     });
@@ -102,13 +96,13 @@ export async function switchToExistingProfile(opts: {
       throw new Error(`Target profile does not exist: ${opts.accountIndex}`);
     }
 
-    const release = () => abandonTransition(cancelResetStages);
+    const release = () => lock.release();
     return useSettingsStore.getState().inProcessProfileSwitch
       ? await switchWithoutRestart(opts.accountIndex, release)
       : await switchByRestart(opts.accountIndex, release);
   } catch (error) {
     log.error('profile.orchestrator.switch_failed', { error: redactError(error) });
-    await abandonTransition(cancelResetStages);
+    await lock.release();
     return false;
   }
 }
@@ -203,24 +197,22 @@ export async function createAndSwitchProfile(opts?: {
   cancelResetStages?: TransitionControls['cancelResetStages'];
 }): Promise<boolean> {
   const getKeysForAccount = opts?.getKeysForAccount ?? keyDerivation();
-  const resetStages = opts?.resetStages ?? transitionControls()?.resetStages;
-  const cancelResetStages = opts?.cancelResetStages ?? transitionControls()?.cancelResetStages;
 
-  if (isTransitionInFlight()) return false;
-  markTransitionInFlight(true);
+  const lock = acquireTransition();
+  if (!lock) return false;
 
   if (!getKeysForAccount) {
     log.error('profile.orchestrator.no_key_derivation');
-    markTransitionInFlight(false);
+    await lock.release();
     return false;
   }
 
-  if (!(await beginTransition())) {
-    markTransitionInFlight(false);
+  if (!(await lock.takeDiskGuard())) {
+    await lock.release();
     return false;
   }
   try {
-    resetStages?.({ holdUntilCancel: true });
+    lock.holdSplash(splashControls(opts), { holdUntilCancel: true });
     usePopupStore.getState().close();
 
     const profileStore = useProfileStore.getState();
@@ -228,7 +220,7 @@ export async function createAndSwitchProfile(opts?: {
     const newKeys = await getKeysForAccount(nextIndex);
     if (!newKeys?.pubkey) {
       log.warn('profile.orchestrator.key_derivation_failed');
-      await abandonTransition(cancelResetStages);
+      await lock.release();
       return false;
     }
 
@@ -237,7 +229,7 @@ export async function createAndSwitchProfile(opts?: {
     // nothing knows about — profile-scoped storage included.
     if (!profileStore.addProfile(nextIndex, newKeys.pubkey)) {
       log.warn('profile.orchestrator.at_capacity', { nextIndex });
-      await abandonTransition(cancelResetStages);
+      await lock.release();
       return false;
     }
 
@@ -254,12 +246,12 @@ export async function createAndSwitchProfile(opts?: {
       if (!switched) {
         throw new Error(`Failed to activate newly-created profile: ${nextIndex}`);
       }
-      await abandonTransition(cancelResetStages);
+      await lock.release();
     }
     return true;
   } catch (error) {
     log.error('profile.orchestrator.create_failed', { error: redactError(error) });
-    await abandonTransition(cancelResetStages);
+    await lock.release();
     return false;
   }
 }
@@ -268,8 +260,10 @@ export async function createAndSwitchProfile(opts?: {
 export async function recoverMnemonicSession(mnemonic: string): Promise<boolean> {
   if (!bip39.validateMnemonic(mnemonic, wordlist) || mnemonic.split(' ').length !== 12)
     return false;
-  if (isTransitionInFlight()) return false;
-  markTransitionInFlight(true);
+  // Recovery runs before any account is usable, so there is no splash to hold
+  // and no earlier runtime's transition to wait out: the in-memory lock only.
+  const lock = acquireTransition();
+  if (!lock) return false;
   try {
     const locked = useSecureStoreState.getState().secureStoreState === 'locked';
     const onboarding = !locked && !useSettingsStore.getState().hasSeenOnboarding;
@@ -326,7 +320,7 @@ export async function recoverMnemonicSession(mnemonic: string): Promise<boolean>
     nostrLog.warn('secure.mnemonic.recovery_failed');
     return false;
   } finally {
-    markTransitionInFlight(false);
+    await lock.release();
   }
 }
 
@@ -339,18 +333,14 @@ export async function deleteAllProfiles(opts?: {
   resetStages?: TransitionControls['resetStages'];
   cancelResetStages?: TransitionControls['cancelResetStages'];
 }): Promise<boolean> {
-  const resetStages = opts?.resetStages ?? transitionControls()?.resetStages;
-  const cancelResetStages = opts?.cancelResetStages ?? transitionControls()?.cancelResetStages;
-
-  if (isTransitionInFlight()) return false;
-  markTransitionInFlight(true);
-
-  if (!(await beginTransition())) {
-    markTransitionInFlight(false);
+  const lock = acquireTransition();
+  if (!lock) return false;
+  if (!(await lock.takeDiskGuard())) {
+    await lock.release();
     return false;
   }
   try {
-    resetStages?.({ holdUntilCancel: true });
+    lock.holdSplash(splashControls(opts), { holdUntilCancel: true });
     usePopupStore.getState().close();
 
     const profiles = useProfileStore.getState().profiles;
@@ -397,7 +387,7 @@ export async function deleteAllProfiles(opts?: {
 
     const restarted = await teardownAndRestart();
     if (!restarted) {
-      await abandonTransition(cancelResetStages);
+      await lock.release();
       const { Alert } = await import('react-native');
       Alert.alert('Restart Required', 'Please close and reopen the app to complete the reset.', [
         { text: 'OK' },
@@ -406,21 +396,21 @@ export async function deleteAllProfiles(opts?: {
     return true;
   } catch (error) {
     log.error('profile.orchestrator.delete_all_failed', { error: redactError(error) });
-    await abandonTransition(cancelResetStages);
+    await lock.release();
     return false;
   }
 }
 
 /** Single-profile removal shares admission with every account transition. */
 export async function removeInactiveProfile(accountIndex: number, importedKeyConfirmed = false) {
-  if (isTransitionInFlight()) return { kind: 'refused', reason: 'busy' } as const;
-  markTransitionInFlight(true);
-  let admitted = false;
+  // The removed profile is not running, so nothing is torn down and no splash
+  // is shown; both guards still keep a switch from starting underneath it.
+  const lock = acquireTransition();
+  if (!lock) return { kind: 'refused', reason: 'busy' } as const;
   try {
     if (!useProfileStore.persist.hasHydrated())
       return { kind: 'refused', reason: 'unreadable' } as const;
-    admitted = await beginTransition();
-    if (!admitted) return { kind: 'refused', reason: 'busy' } as const;
+    if (!(await lock.takeDiskGuard())) return { kind: 'refused', reason: 'busy' } as const;
     const { removeProfileData } = await import('./removeProfile');
     const { profileRemovalPorts } = await import('./profileRemovalStorage');
     return await removeProfileData(accountIndex, importedKeyConfirmed, profileRemovalPorts);
@@ -428,7 +418,6 @@ export async function removeInactiveProfile(accountIndex: number, importedKeyCon
     // Module/native initialization errors can carry sensitive context; disclose no records.
     return { kind: 'refused', reason: 'unreadable' } as const;
   } finally {
-    if (admitted) await endTransition();
-    markTransitionInFlight(false);
+    await lock.release();
   }
 }

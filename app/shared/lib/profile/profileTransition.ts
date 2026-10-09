@@ -6,7 +6,8 @@
  *   - a timestamp in AsyncStorage survives the native restart most flows end
  *     in, and is cleared on the next start (`clearTransitionGuardOnStartup`).
  *
- * `abandonTransition` releases both, and the splash a flow may be holding.
+ * A flow takes them through `acquireTransition()` and gives them back with
+ * `lock.release()`, which also drops the splash if the flow was holding it.
  * The flows themselves are in `profileSessionOrchestrator.ts`.
  *
  * The layout registers two things here at runtime, so no flow needs them
@@ -32,7 +33,7 @@ const TRANSITION_EXPIRY_MS = 10_000;
 
 type TransitionGuard = { startedAt: number };
 
-export async function beginTransition(): Promise<boolean> {
+async function beginTransition(): Promise<boolean> {
   try {
     const raw = await AsyncStorage.getItem(TRANSITION_KEY);
     if (raw) {
@@ -49,7 +50,7 @@ export async function beginTransition(): Promise<boolean> {
   }
 }
 
-export async function endTransition(): Promise<void> {
+async function endTransition(): Promise<void> {
   try {
     await AsyncStorage.removeItem(TRANSITION_KEY);
   } catch {
@@ -86,10 +87,6 @@ export function registerTransitionControls(controls: TransitionControls): void {
 
 export function registerKeyDerivation(fn: KeyDerivationFn): void {
   registeredKeyDerivation = fn;
-}
-
-export function transitionControls(): TransitionControls | null {
-  return registeredControls;
 }
 
 export function keyDerivation(): KeyDerivationFn | null {
@@ -153,10 +150,6 @@ export function isTransitionInFlight(): boolean {
   return transitionInFlight;
 }
 
-export function markTransitionInFlight(value: boolean): void {
-  transitionInFlight = value;
-}
-
 /**
  * coco's Manager.dispose() → NPC plugin shutdown awaits any in-flight sync
  * with NO timeout (BTC-14): a stalled sync would pin the profile switch on
@@ -187,19 +180,62 @@ export async function cleanupCocoWithTimeout(): Promise<void> {
   }
 }
 
-/**
- * Unwind a transition that got past `beginTransition()` and cannot continue.
- *
- * All three pieces, always. `transitionInFlight` is module-level and the first
- * thing every switch checks, so a bail that only cancels the held stages
- * leaves it set and refuses EVERY later profile switch for the rest of the
- * session — the guard only clears on the next app start. This is what the
- * `catch` below already does; the early returns have to match it.
- */
-export async function abandonTransition(
-  cancelResetStages: TransitionControls['cancelResetStages'] | undefined
-): Promise<void> {
-  cancelResetStages?.();
-  transitionInFlight = false;
-  await endTransition();
+/** What a flow holds while it changes accounts. See the header for the two guards. */
+interface TransitionLock {
+  /**
+   * Take the on-disk guard as well. False when a transition started in an
+   * earlier runtime is still recent; the caller then releases and gives up.
+   */
+  takeDiskGuard(): Promise<boolean>;
+  /** Cover the app with the splash until `release`. */
+  holdSplash(
+    controls: Partial<TransitionControls>,
+    options: Parameters<TransitionControls['resetStages']>[0]
+  ): void;
+  /**
+   * Give back everything this lock took: the splash if held, the in-memory
+   * guard, the on-disk guard if taken. Every exit from a flow that is not a
+   * restart goes through here. Leaving the in-memory guard set refuses every
+   * later flow for the rest of the session.
+   *
+   * A flow that restarts the runtime does not release: the reload clears the
+   * in-memory guard, and the next start clears the one on disk.
+   */
+  release(): Promise<void>;
+}
+
+/** Take the in-memory guard, or `null` when another flow holds it. */
+export function acquireTransition(): TransitionLock | null {
+  if (transitionInFlight) return null;
+  transitionInFlight = true;
+  let diskGuardTaken = false;
+  let cancelSplash: (() => void) | undefined;
+  let splashHeld = false;
+  return {
+    async takeDiskGuard() {
+      diskGuardTaken = await beginTransition();
+      return diskGuardTaken;
+    },
+    holdSplash(controls, options) {
+      splashHeld = true;
+      cancelSplash = controls.cancelResetStages;
+      controls.resetStages?.(options);
+    },
+    async release() {
+      if (splashHeld) cancelSplash?.();
+      transitionInFlight = false;
+      if (diskGuardTaken) {
+        diskGuardTaken = false;
+        await endTransition();
+      }
+    },
+  };
+}
+
+/** The splash controls a caller passed, or the ones the layout registered. */
+export function splashControls(opts?: Partial<TransitionControls>): Partial<TransitionControls> {
+  return {
+    resetStages: opts?.resetStages ?? registeredControls?.resetStages,
+    cancelResetStages: opts?.cancelResetStages ?? registeredControls?.cancelResetStages,
+  };
 }
