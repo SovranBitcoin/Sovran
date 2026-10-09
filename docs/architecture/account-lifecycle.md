@@ -73,6 +73,9 @@ next start clears the one on disk. Which of the three a flow takes is the differ
 | Remove one profile | yes | yes | no: the removed profile is not running |
 | Recover from a phrase | yes | no | no: it runs before any account is usable |
 
+These differences are deliberate (confirmed 2026-10-09). A new flow should take all three unless it
+has a reason like these not to.
+
 | Flow | Function | How it finishes |
 | --- | --- | --- |
 | Switch to a profile | `switchToExistingProfile` | restart (default), or in the same runtime (developer setting) |
