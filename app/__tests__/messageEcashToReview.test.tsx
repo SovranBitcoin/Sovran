@@ -102,9 +102,9 @@ describe('message ecash waiting to be received', () => {
     render(<MessageEcashToReview />);
     expect(screen.getByText('To receive')).toBeTruthy();
     expect(screen.getAllByText('Receive all')).toHaveLength(2);
-    expect(screen.getByText('Unknown mint · mint.example · 2 payments')).toBeTruthy();
+    expect(screen.getByText('mint.example')).toBeTruthy();
     expect(screen.getByText('+121')).toBeTruthy();
-    expect(screen.getByText('other.example · 1 payment')).toBeTruthy();
+    expect(screen.getByText('other.example')).toBeTruthy();
     expect(screen.getByText('+5')).toBeTruthy();
   });
 

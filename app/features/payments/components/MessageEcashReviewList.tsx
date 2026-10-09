@@ -6,13 +6,6 @@ import type { ParkedMintGroup } from '../lib/parkedMessageEcash';
 
 import { MessageEcashRow } from './MessageEcashRow';
 
-/** Mint first, then how much is behind the row. An unknown mint says so. */
-function detailFor(group: ParkedMintGroup): string {
-  const mint = getMintDisplayName(group.mintUrl);
-  const count = group.count === 1 ? '1 payment' : `${group.count} payments`;
-  return group.unknownMint ? `Unknown mint · ${mint} · ${count}` : `${mint} · ${count}`;
-}
-
 /**
  * Message ecash waiting on the person, as a card of payments beside Pending
  * and Confirmed: one row per mint, each standing for everything held there.
@@ -30,20 +23,25 @@ export function MessageEcashReviewList({
   return (
     <Surface testID="message-ecash-to-review">
       <SectionHeading tone="status" label="To receive" detail="Ecash from messages" />
-      {groups.map((group) => (
-        <MessageEcashRow
-          key={group.key}
-          testID={`message-ecash-mint-${group.key.replace(/[^a-z0-9]+/gi, '-')}`}
-          mintUrl={group.mintUrl}
-          showPicture={!group.unknownMint}
-          amount={group.total}
-          unit={group.unit}
-          title="Receive all"
-          detail={detailFor(group)}
-          accessibilityLabel={`Receive all. ${detailFor(group)}`}
-          onPress={() => onOpen(group)}
-        />
-      ))}
+      {groups.map((group) => {
+        // The mint and nothing else: the title says what the row does, and the
+        // amount says how much is behind it.
+        const mint = getMintDisplayName(group.mintUrl);
+        return (
+          <MessageEcashRow
+            key={group.key}
+            testID={`message-ecash-mint-${group.key.replace(/[^a-z0-9]+/gi, '-')}`}
+            mintUrl={group.mintUrl}
+            showPicture={!group.unknownMint}
+            amount={group.total}
+            unit={group.unit}
+            title="Receive all"
+            detail={mint}
+            accessibilityLabel={`Receive all from ${mint}`}
+            onPress={() => onOpen(group)}
+          />
+        );
+      })}
     </Surface>
   );
 }

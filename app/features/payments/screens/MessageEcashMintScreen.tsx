@@ -186,9 +186,9 @@ export function MessageEcashMintScreen() {
                 showPicture={!unknownMint}
                 amount={entry.amount}
                 unit={entry.unit}
-                title="Ecash from a message"
+                title="Ecash"
                 detail={detailFor(entry)}
-                accessibilityLabel={`Ecash from a message. ${detailFor(entry)}. Review`}
+                accessibilityLabel={`Ecash. ${detailFor(entry)}. Review`}
                 onPress={() => openOne(entry)}
               />
             ))}

@@ -35601,7 +35601,7 @@ exports[`Design System exact structural snapshots renders wallet-controls/messag
                       "children": [
                         {
                           "children": [
-                            "Unknown mint · mint.minibits.cash · 3 payments",
+                            "mint.minibits.cash",
                           ],
                           "props": {
                             "className": "css-text-146c3p1 r-maxWidth-dnmrzs r-overflow-1udh08x r-textOverflow-1udbk01 r-whiteSpace-3s2u2q r-wordWrap-1iln25a",
@@ -35652,7 +35652,7 @@ exports[`Design System exact structural snapshots renders wallet-controls/messag
             },
           ],
           "props": {
-            "aria-label": "Receive all. Unknown mint · mint.minibits.cash · 3 payments",
+            "aria-label": "Receive all from mint.minibits.cash",
             "className": "css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73",
             "data-testid": "message-ecash-mint-untrusted-designsystem",
             "dir": null,
@@ -35776,7 +35776,7 @@ exports[`Design System exact structural snapshots renders wallet-controls/messag
                       "children": [
                         {
                           "children": [
-                            "mint.sovran.example · 1 payment",
+                            "mint.sovran.example",
                           ],
                           "props": {
                             "className": "css-text-146c3p1 r-maxWidth-dnmrzs r-overflow-1udh08x r-textOverflow-1udbk01 r-whiteSpace-3s2u2q r-wordWrap-1iln25a",
@@ -35827,7 +35827,7 @@ exports[`Design System exact structural snapshots renders wallet-controls/messag
             },
           ],
           "props": {
-            "aria-label": "Receive all. mint.sovran.example · 1 payment",
+            "aria-label": "Receive all from mint.sovran.example",
             "className": "css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73",
             "data-testid": "message-ecash-mint-failed-designsystem",
             "dir": null,
