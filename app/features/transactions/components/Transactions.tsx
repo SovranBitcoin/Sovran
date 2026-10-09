@@ -59,7 +59,7 @@ import {
   type TransactionPaymentType,
   toRealUnit,
 } from 'wallet';
-import { log, Log } from '@/shared/lib/logger';
+import { log, Log, timedDerive } from '@/shared/lib/logger';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useRollbackStore } from '@/shared/stores/runtime/rollbackStore';
 import { belongsToAccount } from '@/shared/lib/cashu/accountScope';
@@ -200,6 +200,73 @@ interface Props {
   ref?: React.Ref<TransactionsHandle>;
 }
 
+/** A derivation slower than this is reported. */
+const SLOW_DERIVE_MS = 20;
+
+/** The entries of `history` that belong to the account and the chosen mint, in order. */
+export function scopeHistory(
+  history: readonly HistoryEntry[],
+  scope: {
+    accountUnit: string;
+    isTestnutMint: (mintUrl: string) => boolean;
+    mintUrlFilter: string;
+  }
+): HistoryEntry[] {
+  const { accountUnit, isTestnutMint, mintUrlFilter } = scope;
+  return history.filter(
+    (entry) =>
+      belongsToAccount(accountUnit, entry, isTestnutMint) &&
+      (mintUrlFilter === 'all' || entry.mintUrl === mintUrlFilter)
+  );
+}
+
+/** The scoped entries that render as their own row under the active filters, in order. */
+export function filterScopedHistory(
+  scopedHistory: readonly HistoryEntry[],
+  filters: Required<
+    Pick<Props, 'filter' | 'type' | 'source' | 'lock' | 'counterparty' | 'zap' | 'hideExpired'>
+  > & { groupedRowsShown: boolean }
+): HistoryEntry[] {
+  const { filter, type, source, lock, counterparty, zap, hideExpired, groupedRowsShown } = filters;
+  return scopedHistory.filter((historyEntry) => {
+    // Hide legs that belong to a swap group — colada surfaces the group as a
+    // single row. The swap annotation (merged onto the entry) is the signal,
+    // so the app no longer reaches into the swap store's quoteId index.
+    if (getSwap(historyEntry)?.groupId) return false;
+
+    // Same reason, for the two legs of one AI request: the send and the
+    // change it came back as are shown as one row — but only on the view
+    // that renders one.
+    if (groupedRowsShown && isAiRequestLeg(historyEntry)) return false;
+
+    if (!matchesTransactionFilters(historyEntry, { paymentType: type, direction: filter })) {
+      return false;
+    }
+
+    // Annotation-driven filters (source/transport, P2PK lock, counterparty, zap).
+    if (source !== 'all' && getScanSource(historyEntry)?.method !== source) return false;
+    if (lock !== 'all' && isP2PKLocked(historyEntry) !== (lock === 'locked')) return false;
+    if (counterparty === 'with' && !getCounterparty(historyEntry)?.pubkey) return false;
+    if (zap === 'zaps' && !getZap(historyEntry)?.eventId) return false;
+
+    // Filter out expired transactions if hideExpired is true
+    if (hideExpired) {
+      const isExpired =
+        historyEntry.type === 'mint' &&
+        String(historyEntry.state) === 'UNPAID' &&
+        mintHistoryEntryExpired(historyEntry);
+      if (isExpired) return false;
+
+      // Filter out unpaid melt quotes
+      if (historyEntry.type === 'melt' && String(historyEntry.state) === 'UNPAID') {
+        return false;
+      }
+    }
+
+    return true;
+  });
+}
+
 /** The gap between the list's cards, headings and status blocks. */
 const LIST_GAP = 8;
 
@@ -265,81 +332,61 @@ export const Transactions = React.memo(
 
     // Grouped from the SAME account/mint-filtered history the rows come from,
     // so a group never outlives the legs the list is showing.
-    const aiGroups = useMemo(() => {
-      if (!groupedRowsShown) return [];
-      const scoped = history.filter(
-        (entry: HistoryEntry) =>
-          belongsToAccount(account.unit, entry, isTestnutMint) &&
-          (mintUrlFilter === 'all' || entry.mintUrl === mintUrlFilter)
-      );
-      return groupAiRequests(scoped);
-    }, [groupedRowsShown, history, account.unit, isTestnutMint, mintUrlFilter]);
+    // The account and mint scope is walked once, and both the AI groups and the
+    // rows below read the result.
+    const scopedHistory = useMemo(
+      () =>
+        timedDerive(
+          {
+            event: 'transactions.scope.slow',
+            logger: log,
+            thresholdMs: SLOW_DERIVE_MS,
+            params: (result) => ({ input: history.length, output: result.length }),
+          },
+          () => scopeHistory(history, { accountUnit: account.unit, isTestnutMint, mintUrlFilter })
+        ),
+      [history, account.unit, isTestnutMint, mintUrlFilter]
+    );
 
-    const filteredHistory = useMemo(() => {
-      const t0 = performance.now();
-      const result = history.filter((historyEntry: HistoryEntry) => {
-        if (!belongsToAccount(account.unit, historyEntry, isTestnutMint)) return false;
-        if (mintUrlFilter !== 'all' && historyEntry.mintUrl !== mintUrlFilter) return false;
+    const aiGroups = useMemo(
+      () => (groupedRowsShown ? groupAiRequests(scopedHistory) : []),
+      [groupedRowsShown, scopedHistory]
+    );
 
-        // Hide legs that belong to a swap group — colada surfaces the group as a
-        // single row. The swap annotation (merged onto the entry) is the signal,
-        // so the app no longer reaches into the swap store's quoteId index.
-        if (getSwap(historyEntry)?.groupId) return false;
-
-        // Same reason, for the two legs of one AI request: the send and the
-        // change it came back as are shown as one row — but only on the view
-        // that renders one.
-        if (groupedRowsShown && isAiRequestLeg(historyEntry)) return false;
-
-        if (!matchesTransactionFilters(historyEntry, { paymentType: type, direction: filter })) {
-          return false;
-        }
-
-        // Annotation-driven filters (source/transport, P2PK lock, counterparty, zap).
-        if (source !== 'all' && getScanSource(historyEntry)?.method !== source) return false;
-        if (lock !== 'all' && isP2PKLocked(historyEntry) !== (lock === 'locked')) return false;
-        if (counterparty === 'with' && !getCounterparty(historyEntry)?.pubkey) return false;
-        if (zap === 'zaps' && !getZap(historyEntry)?.eventId) return false;
-
-        // Filter out expired transactions if hideExpired is true
-        if (hideExpired) {
-          const isExpired =
-            historyEntry.type === 'mint' &&
-            String(historyEntry.state) === 'UNPAID' &&
-            mintHistoryEntryExpired(historyEntry);
-          if (isExpired) return false;
-
-          // Filter out unpaid melt quotes
-          if (historyEntry.type === 'melt' && String(historyEntry.state) === 'UNPAID') {
-            return false;
-          }
-        }
-
-        return true;
-      });
-      const duration = Math.round((performance.now() - t0) * 100) / 100;
-      if (duration > 20) {
-        log.warn('transactions.filter.slow', {
-          duration_ms: duration,
-          input: history.length,
-          output: result.length,
-        });
-      }
-      return result;
-    }, [
-      history,
-      account.unit,
-      isTestnutMint,
-      mintUrlFilter,
-      filter,
-      type,
-      source,
-      lock,
-      counterparty,
-      hideExpired,
-      zap,
-      groupedRowsShown,
-    ]);
+    const filteredHistory = useMemo(
+      () =>
+        timedDerive(
+          {
+            event: 'transactions.filter.slow',
+            logger: log,
+            thresholdMs: SLOW_DERIVE_MS,
+            params: (result) => ({ input: history.length, output: result.length }),
+          },
+          () =>
+            filterScopedHistory(scopedHistory, {
+              filter,
+              type,
+              source,
+              lock,
+              counterparty,
+              zap,
+              hideExpired,
+              groupedRowsShown,
+            })
+        ),
+      [
+        history.length,
+        scopedHistory,
+        filter,
+        type,
+        source,
+        lock,
+        counterparty,
+        hideExpired,
+        zap,
+        groupedRowsShown,
+      ]
+    );
 
     // Build unified timeline: mix history entries + swap groups chronologically
     const timelineItems: TimelineItem[] = useMemo(() => {
@@ -392,59 +439,63 @@ export const Transactions = React.memo(
     );
 
     const sections = useMemo(() => {
-      const t0 = performance.now();
-      const createSections = (items: TimelineItem[], prefix: string) => {
-        // Group by date string for display, but keep track of the original date for sorting
-        const groupedByDate = groupBy(items, (item) =>
-          formatDate(getTimelineCreatedAt(item), 'long-date')
-        );
+      const buildSections = () => {
+        const createSections = (items: TimelineItem[], prefix: string) => {
+          // Group by date string for display, but keep track of the original date for sorting
+          const groupedByDate = groupBy(items, (item) =>
+            formatDate(getTimelineCreatedAt(item), 'long-date')
+          );
 
-        // Create an array of {dateString, originalDate} pairs for proper sorting
-        const dateEntries = Object.keys(groupedByDate).map((dateString) => {
-          const firstItem = groupedByDate[dateString][0];
-          return {
-            dateString,
-            originalDate: new Date(getTimelineCreatedAt(firstItem)),
-          };
-        });
+          // Create an array of {dateString, originalDate} pairs for proper sorting
+          const dateEntries = Object.keys(groupedByDate).map((dateString) => {
+            const firstItem = groupedByDate[dateString][0];
+            return {
+              dateString,
+              originalDate: new Date(getTimelineCreatedAt(firstItem)),
+            };
+          });
 
-        // Sort by original date in descending order (newest first)
-        const sortedDateEntries = [...dateEntries].sort(
-          (a, b) => b.originalDate.getTime() - a.originalDate.getTime()
-        );
+          // Sort by original date in descending order (newest first)
+          const sortedDateEntries = [...dateEntries].sort(
+            (a, b) => b.originalDate.getTime() - a.originalDate.getTime()
+          );
 
-        // Embedded mode shows every date group (no one-day cap).
-        const datesToShow =
-          showMore && !embedded ? sortedDateEntries.slice(0, 1) : sortedDateEntries;
+          // Embedded mode shows every date group (no one-day cap).
+          const datesToShow =
+            showMore && !embedded ? sortedDateEntries.slice(0, 1) : sortedDateEntries;
 
-        return datesToShow.map(({ dateString }) => ({
-          title: dateString,
-          data: groupedByDate[dateString],
-          index: `${prefix}-${dateString}`,
-          monthKey: monthKeyOf(getTimelineCreatedAt(groupedByDate[dateString][0])),
-        }));
+          return datesToShow.map(({ dateString }) => ({
+            title: dateString,
+            data: groupedByDate[dateString],
+            index: `${prefix}-${dateString}`,
+            monthKey: monthKeyOf(getTimelineCreatedAt(groupedByDate[dateString][0])),
+          }));
+        };
+
+        const pendingSections = createSections(pending || [], 'pending');
+        const confirmedSections = createSections(confirmed || [], 'confirmed');
+        const expiredSections = createSections(expired || [], 'expired');
+
+        return {
+          pending: pendingSections,
+          confirmed: confirmedSections,
+          expired: expiredSections,
+          all: [...pendingSections, ...confirmedSections, ...expiredSections],
+        };
       };
-
-      const pendingSections = createSections(pending || [], 'pending');
-      const confirmedSections = createSections(confirmed || [], 'confirmed');
-      const expiredSections = createSections(expired || [], 'expired');
-
-      const result = {
-        pending: pendingSections,
-        confirmed: confirmedSections,
-        expired: expiredSections,
-        all: [...pendingSections, ...confirmedSections, ...expiredSections],
-      };
-      const duration = Math.round((performance.now() - t0) * 100) / 100;
-      if (duration > 20) {
-        log.warn('transactions.sections.slow', {
-          duration_ms: duration,
-          pending: pendingSections.length,
-          confirmed: confirmedSections.length,
-          expired: expiredSections.length,
-        });
-      }
-      return result;
+      return timedDerive(
+        {
+          event: 'transactions.sections.slow',
+          logger: log,
+          thresholdMs: SLOW_DERIVE_MS,
+          params: (result) => ({
+            pending: result.pending.length,
+            confirmed: result.confirmed.length,
+            expired: result.expired.length,
+          }),
+        },
+        buildSections
+      );
     }, [pending, confirmed, expired, showMore, embedded]);
 
     const sectionsToDisplay = useMemo(() => {

@@ -64,6 +64,7 @@ export type { LogFileInfo } from './loggerFile';
 export { stopJSThreadMonitor } from './loggerJsThread';
 export { stopFrameDropMonitor } from './loggerUiThread';
 export { deferWork } from './loggerDefer';
+export { timedDerive } from './loggerTimedDerive';
 export { useRenderLogger, useLifecycleLogger, useMountLog } from './loggerHooks';
 // `flushRowRenderWindows` stays off the barrel deliberately: it is a teardown
 // hook for tests, which import it from './loggerRender' directly.
