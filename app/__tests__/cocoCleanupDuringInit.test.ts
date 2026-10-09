@@ -1,5 +1,8 @@
+import * as FileSystem from 'expo-file-system/legacy';
 import * as SQLite from 'expo-sqlite';
+import { createCashuSeedGetter } from 'wallet';
 import { CocoManager } from '@/shared/lib/cashu/manager';
+import { createSovranCocoRepositories } from '@/shared/lib/cashu/cocoRepositories';
 
 jest.mock('expo-sqlite', () => ({
   deleteDatabaseAsync: jest.fn().mockResolvedValue(undefined),
@@ -74,6 +77,8 @@ async function startParkedInitialise() {
 
 beforeEach(() => {
   jest.mocked(SQLite.openDatabaseAsync).mockReset();
+  jest.mocked(SQLite.deleteDatabaseAsync).mockClear();
+  jest.mocked(createCashuSeedGetter).mockReset();
   CocoManager.setAccountIndex(0);
   CocoManager.setCashuMnemonic('phrase of account a');
   CocoManager.setSignerKey(new Uint8Array(32).fill(1));
@@ -143,4 +148,100 @@ it('does not hand the old signer key to a provider that staged none', async () =
 
   expect(staged().cashuMnemonic).toBe('phrase of account b');
   expect(staged().signerKey).toBeNull();
+});
+
+it('pairs a wallet database with the identity staged when its initialise began', async () => {
+  let finishOpen!: (db: unknown) => void;
+  jest.mocked(SQLite.openDatabaseAsync).mockReturnValue(
+    new Promise((resolve) => {
+      finishOpen = resolve as (db: unknown) => void;
+    })
+  );
+  // Only `init` is reached before the seed getter is built.
+  const repositories = createSovranCocoRepositories as jest.Mock;
+  repositories.mockReturnValue({ init: async () => undefined });
+  const initialising = CocoManager.initialize().catch((error: Error) => error);
+  await tick();
+  expect(SQLite.openDatabaseAsync).toHaveBeenCalledWith('coco.db');
+
+  // Another account is staged while account a's database is still opening.
+  CocoManager.setAccountIndex(3, true);
+  CocoManager.setCashuMnemonic('phrase of account b');
+
+  finishOpen({
+    getAllAsync: async () => [],
+    getFirstAsync: async () => null,
+    execAsync: async () => undefined,
+    runAsync: async () => undefined,
+    closeAsync: async () => undefined,
+  });
+  for (let i = 0; i < 20 && !jest.mocked(createCashuSeedGetter).mock.calls.length; i++) {
+    await tick();
+  }
+
+  // The seed for coco.db must come from account a's phrase, never account b's.
+  const [seedOptions] = jest.mocked(createCashuSeedGetter).mock.calls[0];
+  await expect(seedOptions.getMnemonic()).resolves.toBe('phrase of account a');
+
+  await initialising;
+  await CocoManager.cleanup();
+});
+
+it('makes delete-all wait for a wallet that is still opening', async () => {
+  const { initialising } = await startParkedInitialise();
+
+  let reset = false;
+  const resetting = CocoManager.completeReset([0]).then(() => {
+    reset = true;
+  });
+  await tick();
+  // Deleting now would let the initialise recreate the database afterwards.
+  expect(reset).toBe(false);
+  expect(SQLite.deleteDatabaseAsync).not.toHaveBeenCalled();
+
+  failOpen(new Error('open failed'));
+  await initialising;
+  await resetting;
+
+  expect(SQLite.deleteDatabaseAsync).toHaveBeenCalledWith('coco.db');
+});
+
+it('does not let a wallet that was opening come back after delete-all', async () => {
+  let finishOpen!: (db: unknown) => void;
+  jest.mocked(SQLite.openDatabaseAsync).mockReturnValue(
+    new Promise((resolve) => {
+      finishOpen = resolve as (db: unknown) => void;
+    })
+  );
+  const closeAsync = jest.fn(async () => undefined);
+  const initialising = CocoManager.initialize().catch((error: Error) => error);
+  await tick();
+
+  const resetting = CocoManager.completeReset([0]);
+  await tick();
+  // The open finishes after the reset began.
+  finishOpen({
+    getAllAsync: async () => [],
+    getFirstAsync: async () => null,
+    execAsync: async () => undefined,
+    runAsync: async () => undefined,
+    closeAsync,
+  });
+
+  const outcome = await initialising;
+  await resetting;
+
+  expect(outcome).toBeInstanceOf(Error);
+  expect((outcome as Error).message).toMatch(/reset while it was opening/);
+  expect(closeAsync).toHaveBeenCalled();
+  expect(CocoManager.peekInstance()).toBeNull();
+  expect(SQLite.deleteDatabaseAsync).toHaveBeenCalledWith('coco.db');
+});
+
+it('reports a delete-all that could not remove a wallet database', async () => {
+  jest.mocked(SQLite.deleteDatabaseAsync).mockRejectedValueOnce(new Error('database is open'));
+  jest.mocked(FileSystem.deleteAsync).mockRejectedValueOnce(new Error('permission denied'));
+
+  // Reporting success here would clear the keys and leave the proofs on disk.
+  await expect(CocoManager.completeReset([0])).rejects.toThrow('permission denied');
 });

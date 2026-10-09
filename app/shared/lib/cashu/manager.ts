@@ -347,6 +347,9 @@ class NsecSigner implements Signer {
   }
 }
 
+/** How long delete-all waits for a wallet that is still opening. */
+const RESET_INIT_WAIT_MS = 10_000;
+
 /**
  * Coco Manager singleton for managing Cashu operations
  */
@@ -389,6 +392,14 @@ export class CocoManager {
    * old wallet is still closing stages its own first, and they must survive.
    */
   private static staged = { signerKey: 0, cashuMnemonic: 0, account: 0 };
+
+  /**
+   * Bumped by `completeReset`. An initialise notes it at its start and, if a
+   * reset has happened by the time it has a database or a manager in hand,
+   * closes what it opened instead of publishing it: a wallet must not come
+   * back to life after delete-all.
+   */
+  private static resetGeneration = 0;
 
   /**
    * Clear sensitive in-memory state that should not survive profile switches.
@@ -675,7 +686,15 @@ export class CocoManager {
     const initStart = performance.now();
     const doInitialize = async (): Promise<Manager> => {
       try {
+        // The whole identity is read here, before the first await. The database
+        // name is fixed on the next line; reading the phrase or the imported
+        // flag after the awaits below would let a credential staged for the
+        // next account be paired with this account's database.
         const p2pkImportSecretKey = this.signerKey ? new Uint8Array(this.signerKey) : null;
+        const accountIndex = this.accountIndex;
+        const isImported = this.isImportedProfile;
+        const cashuMnemonic = this.cashuMnemonic;
+        const resetGeneration = this.resetGeneration;
 
         // 1. SQLite database (async to avoid blocking JS thread during profile switch)
         const dbName = this.getDbName();
@@ -700,6 +719,10 @@ export class CocoManager {
           this.runPreInitSafetyRails(opened, dbName)
         );
         const db = drainSqlite(openedDb);
+        if (resetGeneration !== this.resetGeneration) {
+          await this.discardAfterReset(db, dbName);
+          throw new Error('Wallet was reset while it was opening');
+        }
         this.db = db;
         const database = db as unknown as ExpoSqliteRepositoriesOptions['database'];
         // The profile's signer key is imported into coco's keyring (p2pk-import
@@ -730,9 +753,6 @@ export class CocoManager {
 
         // 2. Seed getter (lazy — no crypto work until first call, cached after)
         // Tries SecureStore seed cache first (~5ms) before falling back to PBKDF2 (~5s).
-        const accountIndex = this.accountIndex;
-        const isImported = this.isImportedProfile;
-        const cashuMnemonic = this.cashuMnemonic;
         const seedGetter = createCashuSeedGetter({
           getMnemonic: async () => cashuMnemonic ?? (await retrieveMnemonic()),
           deriveSeed: (mnemonic) => {
@@ -844,6 +864,12 @@ export class CocoManager {
           undefined,
           outputDataCreator
         );
+        if (resetGeneration !== this.resetGeneration) {
+          await manager.dispose().catch(() => undefined);
+          if (this.db === db) this.db = null;
+          await this.discardAfterReset(db, dbName);
+          throw new Error('Wallet was reset while it was opening');
+        }
         // Opt-in with EXPO_PUBLIC_PERF_PROBES=1. An entry per coco call is
         // thousands a minute, which slows a dev build enough to matter.
         this.instance =
@@ -1557,8 +1583,20 @@ export class CocoManager {
     );
   }
 
+  /** Close and remove a database an initialise opened across a reset. */
+  private static async discardAfterReset(
+    db: { closeAsync(): Promise<void> },
+    dbName: string
+  ): Promise<void> {
+    cashuLog.warn('cashu.manager.initialize.discarded_after_reset', { dbName });
+    await db.closeAsync().catch(() => undefined);
+    await this.deleteDatabase(dbName).catch(() => undefined);
+  }
+
   /**
-   * Delete a single coco database by name.
+   * Delete a single coco database by name. Throws when the database or its
+   * backups could not be removed: both hold spendable proofs, and a delete-all
+   * that reported success over them would clear the keys and leave the money.
    */
   private static async deleteDatabase(dbName: string): Promise<void> {
     const { dbPath, backupPath, backupSidecars } = this.getDbPaths(dbName);
@@ -1575,6 +1613,7 @@ export class CocoManager {
         cashuLog.info('cashu.manager.db_deleted_fallback', { dbName });
       } catch (fsError) {
         cashuLog.warn('cashu.manager.db_delete_fallback_failed', { dbName, error: fsError });
+        throw fsError;
       }
     }
 
@@ -1587,6 +1626,7 @@ export class CocoManager {
       cashuLog.debug('cashu.manager.db_backup_deleted', { dbName });
     } catch (error) {
       cashuLog.warn('cashu.manager.db_backup_delete_failed', { dbName, error });
+      throw error;
     }
   }
 
@@ -1596,8 +1636,27 @@ export class CocoManager {
    * @param accountIndexes All profile account indexes (derived 0,1,2... and imported npubNumbers).
    */
   static async completeReset(accountIndexes: number[]): Promise<void> {
+    // From here an initialise that is still running discards its own result.
+    this.resetGeneration += 1;
     try {
       await this.disarmForegroundGate();
+      // An initialise in flight would finish after the databases are deleted
+      // and recreate one. Give it a bounded wait so it can be disposed below;
+      // one that never settles must not hold the wipe for good.
+      if (this.pendingInit) {
+        const settled = this.pendingInit.then(
+          () => undefined,
+          () => undefined
+        );
+        let timer: ReturnType<typeof setTimeout> | null = null;
+        await Promise.race([
+          settled,
+          new Promise<void>((resolve) => {
+            timer = setTimeout(resolve, RESET_INIT_WAIT_MS);
+          }),
+        ]);
+        if (timer) clearTimeout(timer);
+      }
       await this.disableWatchers();
       const instance = this.instance;
       if (instance) {
@@ -1607,6 +1666,16 @@ export class CocoManager {
       }
       this.instance = null;
       this.pendingInit = null;
+      // The native module refuses to delete a database that is still open.
+      if (this.db) {
+        const db = this.db;
+        this.db = null;
+        await db.closeAsync().catch((error: unknown) => {
+          cashuLog.warn('cashu.manager.reset_close_failed', {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        });
+      }
 
       const dbNames = new Set<string>();
       for (const i of accountIndexes) {
