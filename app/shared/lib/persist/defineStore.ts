@@ -28,7 +28,13 @@ function record<T>(definition: StoreDefinition, store: StoreApi<T>): void {
  * a level check is treated as silent rather than failing every store.
  */
 function writeLogEnabled(): boolean {
-  return typeof storeLog?.isLevelEnabled === 'function' && storeLog.isLevelEnabled('debug');
+  // Opt-in: one entry per write across every store is enough load on the JS
+  // thread, in a dev build, to trip the bottom-sheet open watchdog.
+  return (
+    process.env.EXPO_PUBLIC_PERF_PROBES === '1' &&
+    typeof storeLog?.isLevelEnabled === 'function' &&
+    storeLog.isLevelEnabled('debug')
+  );
 }
 
 /** Top-level keys whose value differs by reference. Names only, never values. */

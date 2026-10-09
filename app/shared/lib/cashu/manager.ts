@@ -830,11 +830,16 @@ export class CocoManager {
           undefined,
           outputDataCreator
         );
-        this.instance = withCallTiming(manager, {
-          event: 'coco.call',
-          logger: cashuLog,
-          namespaces: COCO_TIMED_NAMESPACES,
-        });
+        // Opt-in with EXPO_PUBLIC_PERF_PROBES=1. An entry per coco call is
+        // thousands a minute, which slows a dev build enough to matter.
+        this.instance =
+          process.env.EXPO_PUBLIC_PERF_PROBES === '1'
+            ? withCallTiming(manager, {
+                event: 'coco.call',
+                logger: cashuLog,
+                namespaces: COCO_TIMED_NAMESPACES,
+              })
+            : manager;
         await initPhase('CocoManager.initCorePlugins', () => this.instance!.initPlugins());
         initLog('CocoManager', 'Manager created');
         cashuLog.info('cashu.manager.initialized', {

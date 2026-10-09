@@ -35,6 +35,13 @@ function defineCounter(name: string) {
   }));
 }
 
+const probesBefore = process.env.EXPO_PUBLIC_PERF_PROBES;
+beforeAll(() => {
+  process.env.EXPO_PUBLIC_PERF_PROBES = '1';
+});
+afterAll(() => {
+  process.env.EXPO_PUBLIC_PERF_PROBES = probesBefore;
+});
 afterEach(() => storeLog.setLevel('debug'));
 
 it('logs each write with the store, its scope, the changed keys and the subscribers notified', () => {
@@ -161,4 +168,15 @@ it('returns what zustand returns from unsubscribe, and survives a throwing acces
   });
   expect(() => store.setState(trap as { value: number }, true)).not.toThrow();
   expect(writesTo(name).at(-1)).toMatchObject({ changed: ['(unreadable)'] });
+});
+
+it('logs nothing unless the perf probes are switched on', () => {
+  process.env.EXPO_PUBLIC_PERF_PROBES = '';
+  const name = uniqueName();
+  const store = defineCounter(name);
+  store.getState().bump();
+  process.env.EXPO_PUBLIC_PERF_PROBES = '1';
+
+  expect(store.getState().count).toBe(1);
+  expect(writesTo(name)).toEqual([]);
 });
