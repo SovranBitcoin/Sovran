@@ -23,6 +23,11 @@ what was found; this section says where each one ended up.
 and the full test suites passing. Device evidence is from an Android emulator and an iOS simulator,
 both dev builds; **nothing has run on a physical phone**, and nothing interactive has run on iOS.
 
+For how accounts, the registry and the switch fit together, read
+`docs/architecture/account-lifecycle.md`. Upgrades from v0.1.3 are guarded by
+`app/__tests__/releasedPersistedSurface.test.ts`, which pins the stores, keys and database names that
+release wrote.
+
 ### Every entry
 
 | Entries | Outcome |
