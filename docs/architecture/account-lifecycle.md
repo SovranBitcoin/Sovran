@@ -173,5 +173,7 @@ Rules that follow from them:
 | What removal deletes | `app/shared/lib/profile/profileRemovalStorage.ts` |
 | How a per-profile store finds its key | `app/shared/lib/cashu/profileScopedStorage.ts` |
 | Which providers remount with the account | `app/shared/providers/AccountProviders.tsx` |
+| How an account's keys and wallet phrase are found at startup | `app/shared/lib/nostr/loadAccountKeys.ts` |
+| How the wallet opens, closes and is wiped | `app/shared/lib/cashu/manager.ts` (`initialize`, `cleanup`, `completeReset`) |
 | The lock every flow takes, and the shared restart steps | `app/shared/lib/profile/profileTransition.ts` |
 | Decisions | ADR 0029 (registry and switch), ADR 0030 (removal) |
