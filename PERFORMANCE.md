@@ -57,17 +57,21 @@ Dev build, debug logging and both monitors on, so absolute figures are inflated;
 | Notifications | 774 ms | 213 ms | 961 ms | 122 | 87 |
 | Receive | — | — | 2,153 ms | 113 | 127 |
 
-New findings from the capture, not yet acted on:
+New findings from the capture:
 
 - **CALC-20 — the wallet home reads the same three queries about seven times per app start.**
   `wallet.balances.byMint`, `ops.receive.listInFlight` and `history.getPaginatedHistory` each ran
   about 614 times over 86 starts, at roughly 0.5 s each on the emulator. `useColadaBalance` and
   `useColadaTransactions` (`wallet/src/react`) keep their snapshot per hook instance, so every
   component that uses one runs its own reads. A per-manager shared snapshot would run them once.
+  **Done:** both hooks now share one snapshot and one set of subscriptions per manager and scope;
+  with seven consumers each query runs once per refresh. Not re-measured on a device.
 - **CALC-21 — the JS thread blocks at start.** 184 blocks over 86 starts, median 770 ms, worst
   1.85 s. Not attributed yet; the `startup` and `coco` log-doctor modes are the place to start.
-- **CALC-22 — 12,730 `manager.on` calls against 7,396 `off`.** Either listeners are released through
-  the returned unsubscribe function, or about 5,000 are never released. Unverified.
+- **CALC-22 — 12,730 `manager.on` calls against 7,396 `off`.** Closed as not a leak: other code
+  releases listeners through the function `on` returns (for example
+  `app/shared/hooks/usePaymentStatusListener.ts:904`), which bypasses the public `off` the timing
+  proxy counts.
 - **The logger was hiding screen names** (fixed): nested screen paths were summarised as base64 and
   long names as base58, which made `ui.screen` and the new per-page events ungroupable.
 - **The avatar guard could not read real captures** (fixed): the whole seed was redacted, so the
