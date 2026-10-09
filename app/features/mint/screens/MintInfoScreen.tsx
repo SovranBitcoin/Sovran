@@ -577,6 +577,26 @@ export function MintInfoScreen() {
                 key={mintUrl}
                 score={typeof kymScore === 'number' && kymScore >= 0 ? kymScore : -1}
               />
+            ) : detail.reviews === 'error' ? (
+              // A failed read says so and offers the read again, as the audit
+              // block below does. A mint with no reviews still shows nothing.
+              <VStack
+                className="w-full items-center gap-3 pb-3"
+                testID="mint-info-reviews-status"
+                accessibilityLabel="Reviews error">
+                <Notice
+                  status="warning"
+                  description="Couldn't load reviews right now."
+                  className="w-full"
+                />
+                <Button
+                  testID="mint-info-reviews-retry"
+                  text="Try again"
+                  variant="secondary"
+                  size="compact"
+                  onPress={detail.retry}
+                />
+              </VStack>
             ) : null}
 
             <StatsGrid status={detail.audit} onRetry={detail.retry} audit={audit} />

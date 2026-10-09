@@ -13,6 +13,18 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   setItem: jest.fn(() => Promise.resolve()),
   removeItem: jest.fn(() => Promise.resolve()),
 }));
+// Focus is mount here: the first focus runs the effect once, and a test
+// refocuses by calling what it was given.
+let mockRefocus: () => void = () => {};
+jest.mock('expo-router', () => ({
+  useFocusEffect: (effect: () => void) => {
+    const { useEffect } = jest.requireActual<typeof import('react')>('react');
+    mockRefocus = effect;
+    useEffect(() => {
+      effect();
+    }, [effect]);
+  },
+}));
 jest.mock('@/shared/lib/getDiscoveredMintMetadata', () => ({
   getDiscoveredMintMetadata: jest.fn(),
 }));
@@ -113,6 +125,17 @@ it('reports error for a failed reviews read only when no aggregate is known', as
   const warm = renderHook(() => useMintDetailRead(MINT, { mintUrl: MINT }));
   await waitFor(() => expect(fetchMintReviews).toHaveBeenCalledTimes(2));
   expect(warm.result.current.reviews).toBe('ready');
+});
+
+it('reads a failed group again when the page is returned to, and not before', async () => {
+  stampAudit();
+  jest.mocked(fetchMintReviews).mockResolvedValue(err(new Error('offline')));
+  const { result } = renderHook(() => useMintDetailRead(MINT, { mintUrl: MINT }));
+  await waitFor(() => expect(result.current.reviews).toBe('error'));
+  // The failure alone is not a reason to try again.
+  expect(fetchMintReviews).toHaveBeenCalledTimes(1);
+  act(() => mockRefocus());
+  await waitFor(() => expect(fetchMintReviews).toHaveBeenCalledTimes(2));
 });
 
 it('surfaces a failed identity read and routes retry to the bridge', () => {

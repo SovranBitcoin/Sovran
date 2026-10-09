@@ -11,7 +11,8 @@
  *   screen, so opening it afterwards is a cache hit).
  * - social: operator profile via `useMintProfiles` when stale.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
 
 import { mintReviewsCache, mintReviewsKey } from '@/features/mint/data/mintReviewsCache';
 import { useMintProfiles } from '@/features/mint/hooks/useMintProfiles';
@@ -161,6 +162,19 @@ export function useMintDetailRead(
     }
     return () => controller.abort();
   }, [mintUrl, attempt]);
+
+  // A read that failed is tried again when the page is returned to: it was
+  // the network's answer at one moment, not the mint's. Held in a ref so the
+  // failure itself does not re-run the focus effect and retry in a loop.
+  const failedRef = useRef(false);
+  useEffect(() => {
+    failedRef.current = audit.failed || reviews.failed;
+  }, [audit.failed, reviews.failed]);
+  useFocusEffect(
+    useCallback(() => {
+      if (failedRef.current) setAttempt((n) => n + 1);
+    }, [])
+  );
 
   // Social: operator profile from the NUT-06 contact, through the shared hook
   // (it writes `setSocial`, which re-renders us via the cached entry).
