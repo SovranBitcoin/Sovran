@@ -33601,8 +33601,8 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
                         "className": "items-center justify-center gap-0.5 rounded-[13px] border-t",
                         "style": [
                           {
-                            "backgroundColor": "rgba(16, 16, 16, 0.11)",
-                            "borderColor": "rgba(16, 16, 16, 0.1)",
+                            "backgroundColor": "rgba(16, 16, 16, 0.07)",
+                            "borderColor": "rgba(16, 16, 16, 0.07)",
                             "height": 46,
                           },
                           {
@@ -33667,8 +33667,8 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
                         "className": "items-center justify-center gap-0.5 rounded-[13px] border-t",
                         "style": [
                           {
-                            "backgroundColor": "rgba(16, 16, 16, 0.11)",
-                            "borderColor": "rgba(16, 16, 16, 0.1)",
+                            "backgroundColor": "rgba(16, 16, 16, 0.07)",
+                            "borderColor": "rgba(16, 16, 16, 0.07)",
                             "height": 46,
                           },
                           {
@@ -33733,8 +33733,8 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
                         "className": "items-center justify-center gap-0.5 rounded-[13px] border-t",
                         "style": [
                           {
-                            "backgroundColor": "rgba(16, 16, 16, 0.11)",
-                            "borderColor": "rgba(16, 16, 16, 0.1)",
+                            "backgroundColor": "rgba(16, 16, 16, 0.07)",
+                            "borderColor": "rgba(16, 16, 16, 0.07)",
                             "height": 46,
                           },
                           {
@@ -33808,8 +33808,8 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
                         "className": "items-center justify-center gap-0.5 rounded-[13px] border-t",
                         "style": [
                           {
-                            "backgroundColor": "rgba(16, 16, 16, 0.11)",
-                            "borderColor": "rgba(16, 16, 16, 0.1)",
+                            "backgroundColor": "rgba(16, 16, 16, 0.07)",
+                            "borderColor": "rgba(16, 16, 16, 0.07)",
                             "height": 46,
                           },
                           {
@@ -33874,8 +33874,8 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
                         "className": "items-center justify-center gap-0.5 rounded-[13px] border-t",
                         "style": [
                           {
-                            "backgroundColor": "rgba(16, 16, 16, 0.11)",
-                            "borderColor": "rgba(16, 16, 16, 0.1)",
+                            "backgroundColor": "rgba(16, 16, 16, 0.07)",
+                            "borderColor": "rgba(16, 16, 16, 0.07)",
                             "height": 46,
                           },
                           {
@@ -33940,8 +33940,8 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
                         "className": "items-center justify-center gap-0.5 rounded-[13px] border-t",
                         "style": [
                           {
-                            "backgroundColor": "rgba(16, 16, 16, 0.11)",
-                            "borderColor": "rgba(16, 16, 16, 0.1)",
+                            "backgroundColor": "rgba(16, 16, 16, 0.07)",
+                            "borderColor": "rgba(16, 16, 16, 0.07)",
                             "height": 46,
                           },
                           {
@@ -34015,8 +34015,8 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
                         "className": "items-center justify-center gap-0.5 rounded-[13px] border-t",
                         "style": [
                           {
-                            "backgroundColor": "rgba(16, 16, 16, 0.11)",
-                            "borderColor": "rgba(16, 16, 16, 0.1)",
+                            "backgroundColor": "rgba(16, 16, 16, 0.07)",
+                            "borderColor": "rgba(16, 16, 16, 0.07)",
                             "height": 46,
                           },
                           {
@@ -34081,8 +34081,8 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
                         "className": "items-center justify-center gap-0.5 rounded-[13px] border-t",
                         "style": [
                           {
-                            "backgroundColor": "rgba(16, 16, 16, 0.11)",
-                            "borderColor": "rgba(16, 16, 16, 0.1)",
+                            "backgroundColor": "rgba(16, 16, 16, 0.07)",
+                            "borderColor": "rgba(16, 16, 16, 0.07)",
                             "height": 46,
                           },
                           {
@@ -34147,8 +34147,8 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
                         "className": "items-center justify-center gap-0.5 rounded-[13px] border-t",
                         "style": [
                           {
-                            "backgroundColor": "rgba(16, 16, 16, 0.11)",
-                            "borderColor": "rgba(16, 16, 16, 0.1)",
+                            "backgroundColor": "rgba(16, 16, 16, 0.07)",
+                            "borderColor": "rgba(16, 16, 16, 0.07)",
                             "height": 46,
                           },
                           {
@@ -34222,8 +34222,8 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
                         "className": "items-center justify-center gap-0.5 rounded-[13px] border-t",
                         "style": [
                           {
-                            "backgroundColor": "rgba(16, 16, 16, 0.11)",
-                            "borderColor": "rgba(16, 16, 16, 0.1)",
+                            "backgroundColor": "rgba(16, 16, 16, 0.07)",
+                            "borderColor": "rgba(16, 16, 16, 0.07)",
                             "height": 46,
                           },
                           {
@@ -34288,8 +34288,8 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
                         "className": "items-center justify-center gap-0.5 rounded-[13px] border-t",
                         "style": [
                           {
-                            "backgroundColor": "rgba(16, 16, 16, 0.11)",
-                            "borderColor": "rgba(16, 16, 16, 0.1)",
+                            "backgroundColor": "rgba(16, 16, 16, 0.07)",
+                            "borderColor": "rgba(16, 16, 16, 0.07)",
                             "height": 46,
                           },
                           {
@@ -34354,8 +34354,8 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
                         "className": "items-center justify-center gap-0.5 rounded-[13px] border-t",
                         "style": [
                           {
-                            "backgroundColor": "rgba(16, 16, 16, 0.11)",
-                            "borderColor": "rgba(16, 16, 16, 0.1)",
+                            "backgroundColor": "rgba(16, 16, 16, 0.07)",
+                            "borderColor": "rgba(16, 16, 16, 0.07)",
                             "height": 46,
                           },
                           {
@@ -34440,8 +34440,8 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
                     "className": "items-center justify-center gap-0.5 rounded-[13px] border-t",
                     "style": [
                       {
-                        "backgroundColor": "rgba(16, 16, 16, 0.2)",
-                        "borderColor": "rgba(16, 16, 16, 0.1)",
+                        "backgroundColor": "rgba(16, 16, 16, 0.12)",
+                        "borderColor": "rgba(16, 16, 16, 0.07)",
                         "flex": 1,
                         "marginBottom": 4,
                       },
@@ -34530,8 +34530,8 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
                         "className": "items-center justify-center gap-0.5 rounded-[13px] border-t",
                         "style": [
                           {
-                            "backgroundColor": "rgba(16, 16, 16, 0.11)",
-                            "borderColor": "rgba(16, 16, 16, 0.1)",
+                            "backgroundColor": "rgba(16, 16, 16, 0.07)",
+                            "borderColor": "rgba(16, 16, 16, 0.07)",
                             "height": 46,
                           },
                           {
@@ -34594,8 +34594,8 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
                         "className": "items-center justify-center gap-0.5 rounded-[13px] border-t",
                         "style": [
                           {
-                            "backgroundColor": "rgba(16, 16, 16, 0.11)",
-                            "borderColor": "rgba(16, 16, 16, 0.1)",
+                            "backgroundColor": "rgba(16, 16, 16, 0.07)",
+                            "borderColor": "rgba(16, 16, 16, 0.07)",
                             "height": 46,
                           },
                           {
@@ -34658,8 +34658,8 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
                         "className": "items-center justify-center gap-0.5 rounded-[13px] border-t",
                         "style": [
                           {
-                            "backgroundColor": "rgba(16, 16, 16, 0.11)",
-                            "borderColor": "rgba(16, 16, 16, 0.1)",
+                            "backgroundColor": "rgba(16, 16, 16, 0.07)",
+                            "borderColor": "rgba(16, 16, 16, 0.07)",
                             "height": 46,
                           },
                           {
@@ -34731,8 +34731,8 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
                         "className": "items-center justify-center gap-0.5 rounded-[13px] border-t",
                         "style": [
                           {
-                            "backgroundColor": "rgba(16, 16, 16, 0.11)",
-                            "borderColor": "rgba(16, 16, 16, 0.1)",
+                            "backgroundColor": "rgba(16, 16, 16, 0.07)",
+                            "borderColor": "rgba(16, 16, 16, 0.07)",
                             "height": 46,
                           },
                           {
@@ -34795,8 +34795,8 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
                         "className": "items-center justify-center gap-0.5 rounded-[13px] border-t",
                         "style": [
                           {
-                            "backgroundColor": "rgba(16, 16, 16, 0.11)",
-                            "borderColor": "rgba(16, 16, 16, 0.1)",
+                            "backgroundColor": "rgba(16, 16, 16, 0.07)",
+                            "borderColor": "rgba(16, 16, 16, 0.07)",
                             "height": 46,
                           },
                           {
@@ -34859,8 +34859,8 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
                         "className": "items-center justify-center gap-0.5 rounded-[13px] border-t",
                         "style": [
                           {
-                            "backgroundColor": "rgba(16, 16, 16, 0.11)",
-                            "borderColor": "rgba(16, 16, 16, 0.1)",
+                            "backgroundColor": "rgba(16, 16, 16, 0.07)",
+                            "borderColor": "rgba(16, 16, 16, 0.07)",
                             "height": 46,
                           },
                           {
@@ -34932,8 +34932,8 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
                         "className": "items-center justify-center gap-0.5 rounded-[13px] border-t",
                         "style": [
                           {
-                            "backgroundColor": "rgba(16, 16, 16, 0.11)",
-                            "borderColor": "rgba(16, 16, 16, 0.1)",
+                            "backgroundColor": "rgba(16, 16, 16, 0.07)",
+                            "borderColor": "rgba(16, 16, 16, 0.07)",
                             "height": 46,
                           },
                           {
@@ -34996,8 +34996,8 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
                         "className": "items-center justify-center gap-0.5 rounded-[13px] border-t",
                         "style": [
                           {
-                            "backgroundColor": "rgba(16, 16, 16, 0.11)",
-                            "borderColor": "rgba(16, 16, 16, 0.1)",
+                            "backgroundColor": "rgba(16, 16, 16, 0.07)",
+                            "borderColor": "rgba(16, 16, 16, 0.07)",
                             "height": 46,
                           },
                           {
@@ -35060,8 +35060,8 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
                         "className": "items-center justify-center gap-0.5 rounded-[13px] border-t",
                         "style": [
                           {
-                            "backgroundColor": "rgba(16, 16, 16, 0.11)",
-                            "borderColor": "rgba(16, 16, 16, 0.1)",
+                            "backgroundColor": "rgba(16, 16, 16, 0.07)",
+                            "borderColor": "rgba(16, 16, 16, 0.07)",
                             "height": 46,
                           },
                           {
@@ -35133,8 +35133,8 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
                         "className": "items-center justify-center gap-0.5 rounded-[13px] border-t",
                         "style": [
                           {
-                            "backgroundColor": "rgba(16, 16, 16, 0.11)",
-                            "borderColor": "rgba(16, 16, 16, 0.1)",
+                            "backgroundColor": "rgba(16, 16, 16, 0.07)",
+                            "borderColor": "rgba(16, 16, 16, 0.07)",
                             "height": 46,
                           },
                           {
@@ -35197,8 +35197,8 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
                         "className": "items-center justify-center gap-0.5 rounded-[13px] border-t",
                         "style": [
                           {
-                            "backgroundColor": "rgba(16, 16, 16, 0.11)",
-                            "borderColor": "rgba(16, 16, 16, 0.1)",
+                            "backgroundColor": "rgba(16, 16, 16, 0.07)",
+                            "borderColor": "rgba(16, 16, 16, 0.07)",
                             "height": 46,
                           },
                           {
@@ -35261,8 +35261,8 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
                         "className": "items-center justify-center gap-0.5 rounded-[13px] border-t",
                         "style": [
                           {
-                            "backgroundColor": "rgba(16, 16, 16, 0.11)",
-                            "borderColor": "rgba(16, 16, 16, 0.1)",
+                            "backgroundColor": "rgba(16, 16, 16, 0.07)",
+                            "borderColor": "rgba(16, 16, 16, 0.07)",
                             "height": 46,
                           },
                           {
@@ -35345,8 +35345,8 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
                     "className": "items-center justify-center gap-0.5 rounded-[13px] border-t",
                     "style": [
                       {
-                        "backgroundColor": "rgba(16, 16, 16, 0.2)",
-                        "borderColor": "rgba(16, 16, 16, 0.1)",
+                        "backgroundColor": "rgba(16, 16, 16, 0.12)",
+                        "borderColor": "rgba(16, 16, 16, 0.07)",
                         "flex": 1,
                         "marginBottom": 4,
                       },

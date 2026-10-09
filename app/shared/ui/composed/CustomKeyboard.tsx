@@ -70,8 +70,8 @@ function Cap({
   };
   const cap = {
     ...(height === undefined ? { flex: 1, marginBottom: TRAVEL } : { height }),
-    backgroundColor: withAlpha(foreground, strong ? 0.2 : 0.11),
-    borderColor: withAlpha(foreground, 0.1),
+    backgroundColor: withAlpha(foreground, strong ? 0.12 : 0.07),
+    borderColor: withAlpha(foreground, 0.07),
   };
   return (
     <View className="rounded-[13px]" style={base} {...touch}>
