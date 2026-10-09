@@ -629,3 +629,8 @@ again and the wallet opened. That run found the title drawn under the status bar
 Both platforms were cold-started once more after the wallet lifecycle commit (`2513a2372`): gate
 complete, wallet initialised, first screen rendered. The one error event on iOS was a native call
 cut off by the dev-client reload.
+
+After the key-loading refactor (`5142682bb`) the Android emulator opened the same account with the
+same balance. After the store guard (`763a2fcae`) the iOS simulator cold-started with no store
+reporting a refused write, a preserved blob or a rejected merge; Android was not rechecked for that
+commit because the disk was nearly full again.
