@@ -19,6 +19,7 @@ import * as bip39 from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english.js';
 import { storeMnemonic, prepareSecureDataReset } from '@/shared/lib/nostr/secureStorage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Alert } from 'react-native';
 
 import { log, nostrLog, redactError } from '../logger';
 import { CocoManager } from '@/shared/lib/cashu/manager';
@@ -99,7 +100,7 @@ export async function switchToExistingProfile(opts: {
     const release = () => lock.release();
     return useSettingsStore.getState().inProcessProfileSwitch
       ? await switchWithoutRestart(opts.accountIndex, release)
-      : await switchByRestart(opts.accountIndex, release);
+      : await switchByRestart(opts.accountIndex);
   } catch (error) {
     log.error('profile.orchestrator.switch_failed', { error: redactError(error) });
     await lock.release();
@@ -160,17 +161,12 @@ async function switchWithoutRestart(
 }
 
 /** The default switch: close the wallet, record the target on disk, restart into it. */
-async function switchByRestart(
-  accountIndex: number,
-  release: () => Promise<void>
-): Promise<boolean> {
+async function switchByRestart(accountIndex: number): Promise<boolean> {
   await cleanupCocoWithTimeout();
 
   // The Routstr client holds a hydrated, profile-scoped store and a wallet
   // adapter bound to the Coco manager just torn down. A restart discards it
-  // anyway; this covers the in-process fallback below, where the module
-  // survives and would otherwise spend the new profile's wallet against the
-  // old profile's provider state.
+  // anyway; this covers the case where the restart does not happen.
   resetRoutstrClient();
 
   // Persist the switch target and restart into it WITHOUT the in-memory
@@ -180,15 +176,26 @@ async function switchByRestart(
   if (persisted.isErr()) {
     throw persisted.error;
   }
-  const restarted = await teardownAndRestart();
-  if (!restarted) {
-    // Restart unavailable: complete the switch in-process — the remount
-    // boots the new profile, the only boot in this configuration.
-    useProfileStore.getState().switchProfile(accountIndex);
-    await release();
-  }
-  // If restarted, leave transitionInFlight=true — the module is about to reload.
+  if (!(await teardownAndRestart())) await holdUntilReopened();
+  // Either way the lock stays held: the runtime is about to reload, or the app
+  // is held down until it is reopened.
   return true;
+}
+
+/**
+ * The restart did not happen. The target account is already on disk, so the
+ * next start boots into it. Until then nothing may run as either account:
+ * flipping the account in memory here would remount the providers over stores
+ * that still hold the old account's state. Hold the providers down, keep the
+ * splash and the lock, and ask for a reopen.
+ */
+async function holdUntilReopened(): Promise<void> {
+  await holdProfileSwitchForRestart().catch(() => {
+    log.warn('profile.switch.boundary_hold_failed');
+  });
+  Alert.alert('Restart Required', 'Please close and reopen the app to finish switching profiles.', [
+    { text: 'OK' },
+  ]);
 }
 
 export async function createAndSwitchProfile(opts?: {
@@ -235,19 +242,12 @@ export async function createAndSwitchProfile(opts?: {
 
     await cleanupCocoWithTimeout();
     // Persist-then-restart without the in-memory flip (BTC-13 — see
-    // switchToExistingProfile); the flip is the failed-restart fallback.
+    // switchToExistingProfile). If the restart fails the app is held, not flipped.
     const persisted = await persistSwitchTargetToDisk(nextIndex);
     if (persisted.isErr()) {
       throw persisted.error;
     }
-    const restarted = await teardownAndRestart();
-    if (!restarted) {
-      const switched = useProfileStore.getState().switchProfile(nextIndex);
-      if (!switched) {
-        throw new Error(`Failed to activate newly-created profile: ${nextIndex}`);
-      }
-      await lock.release();
-    }
+    if (!(await teardownAndRestart())) await holdUntilReopened();
     return true;
   } catch (error) {
     log.error('profile.orchestrator.create_failed', { error: redactError(error) });
@@ -398,7 +398,6 @@ export async function deleteAllProfiles(opts?: {
     const restarted = await teardownAndRestart();
     if (!restarted) {
       await lock.release();
-      const { Alert } = await import('react-native');
       Alert.alert('Restart Required', 'Please close and reopen the app to complete the reset.', [
         { text: 'OK' },
       ]);

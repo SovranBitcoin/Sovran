@@ -3,8 +3,8 @@
  * WITHOUT flipping the in-memory store first. The in-memory flip drives
  * RootLayout's keyed remount — flipping before restart double-boots the new
  * profile in-process (coco init, SQLite migrations, PBKDF2) racing the
- * native restart. The in-memory flip is allowed only as the failed-restart
- * fallback.
+ * native restart. If the restart itself fails, the app is held down until it
+ * is reopened; the account is never flipped in memory on this path.
  */
 import AsyncStorageMock from '@react-native-async-storage/async-storage';
 
@@ -98,15 +98,23 @@ describe('switchToExistingProfile — persist-before-restart (BTC-13)', () => {
     expect(useProfileStore.getState().activeAccountIndex).toBe(0);
   });
 
-  it('flips the in-memory store only when the restart fails (fallback boot)', async () => {
+  it('holds the app and never flips the account in memory when the restart fails', async () => {
     const { switchToExistingProfile, useProfileStore, mockRestart, AsyncStorage } = setup();
     mockRestart.mockReturnValue(false);
+    const { Alert } = require('react-native');
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
 
     const ok = await switchToExistingProfile({ accountIndex: 1 });
 
     expect(ok).toBe(true);
+    // The target is on disk, so reopening the app boots into it…
     expect(persistedActiveIndex(AsyncStorage)).toBe(1);
-    expect(useProfileStore.getState().activeAccountIndex).toBe(1);
+    // …but this runtime stays on the old account: a flip would remount the
+    // providers over stores still holding the old account's state.
+    expect(useProfileStore.getState().activeAccountIndex).toBe(0);
+    expect(alert).toHaveBeenCalledWith('Restart Required', expect.any(String), expect.any(Array));
+    // The lock stays held, so nothing else can run until the reopen.
+    expect(await switchToExistingProfile({ accountIndex: 0 })).toBe(false);
   });
 
   it('refuses an unknown target without touching anything', async () => {

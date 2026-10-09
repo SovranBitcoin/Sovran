@@ -89,6 +89,10 @@ has a reason like these not to.
 `switchByRestart`: close the wallet, write the target account to disk, restart. The new runtime
 boots as the target. Nothing in memory survives, so nothing can leak.
 
+If the restart call itself fails, the account is not flipped in memory. The account providers are
+held down, the lock is kept, and the app asks to be reopened; the target is already on disk, so the
+next start boots into it. Adding a profile behaves the same way.
+
 ### Switch without restart (developer setting, off by default)
 
 `switchWithoutRestart`, with the steps in `inProcessProfileSwitch.ts`:

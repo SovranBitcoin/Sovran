@@ -101,7 +101,8 @@ export function keyDerivation(): KeyDerivationFn | null {
  * SQLite migrations, PBKDF2 seed warm — only to race the restart: two full
  * boots per switch plus a native-crash window with expo-sqlite work in
  * flight (BTC-13). Persist-first lets the restart boot from the target
- * directly; the in-memory flip is kept only as the failed-restart fallback.
+ * directly. If the restart fails the app is held down until it is reopened; the
+ * account is never flipped in memory on this path.
  */
 export function persistSwitchTargetToDisk(accountIndex: number): ResultAsync<void, Error> {
   const { profiles } = useProfileStore.getState();
