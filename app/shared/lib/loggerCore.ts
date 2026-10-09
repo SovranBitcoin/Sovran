@@ -737,6 +737,19 @@ export function createLogger(options: LoggerOptions = {}): Logger {
   return makeLogger(core, context);
 }
 
+/**
+ * Events exempt from the dedup window. Each entry is a separate measurement —
+ * its own method, screen or batch, with its own numbers — and these arrive in
+ * bursts under one event name, so a `_suppressed: N` summary would discard
+ * exactly the data they exist to record.
+ */
+const MEASUREMENT_EVENTS: ReadonlySet<string> = new Set([
+  'coco.call',
+  'cache.store.write',
+  'nav.transition',
+  'screen.mount',
+]);
+
 function makeLogger(core: LoggerCore, context: Record<string, unknown>): Logger {
   function emit(logLevel: LogLevel, event: string, lazyParams?: LogParams): void {
     if (!SHOW_LOGS || !core.enabled) return;
@@ -752,6 +765,7 @@ function makeLogger(core: LoggerCore, context: Record<string, unknown>): Logger 
     if (
       core.dedupWindowMs > 0 &&
       !event.startsWith('visual.') &&
+      !MEASUREMENT_EVENTS.has(event) &&
       logLevel !== 'warn' &&
       logLevel !== 'error' &&
       logLevel !== 'fatal'

@@ -37,6 +37,7 @@ import { finalizeEvent, getPublicKey } from 'nostr-tools/pure';
 import type { EventTemplate, VerifiedEvent } from 'nostr-tools/core';
 import * as Sharing from 'expo-sharing';
 import { cashuLog, initLog, initPhase, redactError, mintUrlLogFields } from '../logger';
+import { withCallTiming } from '../loggerCallTiming';
 import { resolveOutputDataCreator } from './outputDataCreator';
 import { drainSqlite } from './drainSqlite';
 import { logCocoVersions, reportCocoApiFailure, reportCocoIssue } from './cocoFeedback';
@@ -65,6 +66,24 @@ const GIVEAWAY_P2PK_SECRET: string | null =
  * blackholed host cannot hold up the funds-recovery steps behind it.
  */
 const NPC_UNLOCK_CHECK_TIMEOUT_MS = 5_000;
+
+/**
+ * The Manager's public API objects. Calls through these (and the Manager's own
+ * methods) are timed as `coco.call`; its private services are not listed, so
+ * `managerInternals` reach-ins get the real objects.
+ */
+const COCO_TIMED_NAMESPACES = [
+  'mint',
+  'wallet',
+  'keyring',
+  'history',
+  'auth',
+  'ops',
+  'quotes',
+  'paymentRequests',
+  'subscriptions',
+  'ext',
+] as const satisfies readonly (keyof Manager)[];
 
 interface Signer {
   signEvent: (e: EventTemplate) => Promise<VerifiedEvent>;
@@ -531,7 +550,11 @@ export class CocoManager {
         // Resolve the release-gated backend once for the manager lifetime.
         const outputDataCreator = resolveOutputDataCreator();
 
-        this.instance = new Manager(
+        // The timing proxy IS the instance from here on: every hand-out
+        // (initialize, getInstance, peekInstance) returns this one object, so
+        // callers that key a WeakMap by the manager or compare it with `!==`
+        // across a profile switch see a single stable identity.
+        const manager = new Manager(
           repositories,
           seedGetter,
           new CocoCoreLogger('manager'),
@@ -546,6 +569,11 @@ export class CocoManager {
           undefined,
           outputDataCreator
         );
+        this.instance = withCallTiming(manager, {
+          event: 'coco.call',
+          logger: cashuLog,
+          namespaces: COCO_TIMED_NAMESPACES,
+        });
         await initPhase('CocoManager.initCorePlugins', () => this.instance!.initPlugins());
         initLog('CocoManager', 'Manager created');
         cashuLog.info('cashu.manager.initialized', {
