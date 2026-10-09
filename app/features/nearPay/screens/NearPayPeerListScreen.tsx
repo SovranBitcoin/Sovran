@@ -11,7 +11,7 @@ import { useFreshNearbyPeers } from '@/features/nearPay/hooks/useFreshNearbyPeer
 import { NearbyPeerRow } from '@/features/nearPay/components/NearbyPeerRow';
 
 import { BLUETOOTH_ACCENT } from '@/shared/lib/brandColors';
-import { paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
+import { Log, paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { List } from '@/shared/ui/composed/List';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -99,7 +99,7 @@ export function NearPayPeerListScreen() {
   );
 
   return (
-    <View style={rootStyle}>
+    <Log name="NearPayPeerListScreen" logger={paymentLog} style={rootStyle}>
       <Stack.Screen options={STACK_OPTIONS} />
       <View style={contentStyle}>
         <HStack align="center" gap={8} style={summaryStyle}>
@@ -120,7 +120,7 @@ export function NearPayPeerListScreen() {
           ListEmptyComponent={emptyContent}
         />
       </View>
-    </View>
+    </Log>
   );
 }
 

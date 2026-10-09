@@ -53,6 +53,7 @@ import { formatRelative } from '@/shared/lib/date';
 import { copyPopup, paramPopup } from '@/shared/lib/popup';
 import { navigateToTransactionDetail } from '@/shared/lib/nav/transactionDetailRoutes';
 import { paymentLog } from '@/shared/lib/logger';
+import { Log } from '@/shared/lib/loggerUI';
 import Icon from 'assets/icons';
 import { E2EAccessibilityProbe } from '@/shared/lib/e2e/E2EAccessibilityProbe';
 
@@ -302,7 +303,7 @@ export function ReceiveRailListScreen() {
   const topPad = insets.top + 48;
 
   return (
-    <View style={{ flex: 1, backgroundColor: background }}>
+    <Log name="ReceiveRailListScreen" style={{ flex: 1, backgroundColor: background }}>
       <Stack.Screen options={{ title: RAIL_TITLE[rail] }} />
       {__DEV__ && !state.loading && !state.failed && state.items.length === 0 && (
         <E2EAccessibilityProbe
@@ -370,6 +371,6 @@ export function ReceiveRailListScreen() {
           </Surface>
         )}
       </ScreenScrollView>
-    </View>
+    </Log>
   );
 }
