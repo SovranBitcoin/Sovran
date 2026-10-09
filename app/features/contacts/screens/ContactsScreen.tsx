@@ -82,6 +82,10 @@ function contactsListItemKey(item: ContactsListItem, index: number): string {
   return item.pubkey || `contact-${index}`;
 }
 
+function locationTierKey(tier: TierEntry): string {
+  return tier.key;
+}
+
 /** Rows for the active filter; All/Recent merge sources deduped by pubkey. */
 function buildContactsListData(
   activeFilter: ContactsFilter,
@@ -606,7 +610,7 @@ export const ContactsScreen = () => {
       screen
       bottomSpacing={Math.max(16, bannerClearance)}
       data={locationTiers}
-      keyExtractor={(item) => item.key}
+      keyExtractor={locationTierKey}
       refreshControl={pullToAi.refreshControl}
       renderItem={renderGroupItem}
       keyboardDismissMode="on-drag"

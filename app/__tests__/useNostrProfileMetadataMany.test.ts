@@ -118,6 +118,25 @@ it('does not refetch a tier-fetched profile inside its freshness TTL', () => {
   expect(mockFetchProfiles).not.toHaveBeenCalled();
 });
 
+it('keeps the list extraData inputs identical across unrelated cache writes and re-renders', () => {
+  // ContactsScreen hands { profilesMap, loadingPubkeys } to its list as
+  // extraData; a new identity for either redraws every row.
+  mockStore.set('contact', { name: 'Contact', picture: 'a.png', seenAt: Date.now() });
+  mockFetchProfiles.mockReturnValue(new Promise(() => {}));
+  const { result, rerender } = renderHook(() => useNostrProfileMetadataMany(['contact']));
+  const { metadata, loadingPubkeys } = result.current;
+
+  act(() => mockStore.set('feed-author', { name: 'Feed author', seenAt: Date.now() }));
+  act(() => mockCache.settledProfiles.set('feed-author', { settledAt: Date.now() }));
+  rerender(undefined);
+  expect(result.current.metadata).toBe(metadata);
+  expect(result.current.loadingPubkeys).toBe(loadingPubkeys);
+
+  act(() => mockStore.set('contact', { name: 'Renamed' }));
+  expect(result.current.metadata).not.toBe(metadata);
+  expect(result.current.metadata.get('contact')?.name).toBe('Renamed');
+});
+
 it('keeps a previously settled miss out of grey on a new consumer', () => {
   mockFetchProfiles.mockReturnValue(new Promise(() => {}));
   mockCache.pendingProfiles.begin(['stranger']);
