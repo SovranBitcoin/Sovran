@@ -71,6 +71,8 @@ function currentInstall(): StorageMap {
     }),
     [`mint-store:profile:${pubkey0}`]: blob({ mints: ['https://mint.zero'] }),
     [`mint-store:profile:${pubkey1}`]: blob({ mints: ['https://mint.one'] }),
+    // A global store today, on the bare key account 0 once used.
+    'own-profile-stats-cache': blob({ entries: { [pubkey0]: { followers: 3 } } }),
     [`theme-store:profile:${pubkey1}`]: blob({ activeAlbumSlug: 'dusk', unitWallpapers: {} }),
     [COMPLETED_KEY]: JSON.stringify(ALL_MIGRATIONS),
   };
@@ -158,4 +160,26 @@ it('replays every migration over a current install without changing account data
   const { [COMPLETED_KEY]: _marker, ...after } = mockStorage;
   const { [COMPLETED_KEY]: _oldMarker, ...expected } = before;
   expect(after).toEqual(expected);
+});
+
+it('fails a list entry that is global today unless the migration leaves its bare key alone', () => {
+  // Every name the index migration moves must still be per-profile, or be
+  // listed as now-global. Otherwise a replay takes a live global store's data.
+  const { declaredStores } = jest.requireActual('@/shared/lib/account/accountRegistry');
+  const source = jest
+    .requireActual('fs')
+    .readFileSync(require.resolve('@/shared/lib/migrations/globalMigrations'), 'utf8') as string;
+  const list = (start: string) => {
+    const from = source.indexOf(start);
+    const body = source.slice(from, source.indexOf(']', from));
+    return [...body.matchAll(/'([a-z0-9-]+)'/g)].map((match) => match[1]);
+  };
+  const moved = list('const INDEX_TO_PUBKEY_STORE_KEYS = [');
+  const exempt = new Set(list('const NOW_GLOBAL_STORE_KEYS'));
+  const globalNow = (declaredStores as { name: string; scope: string }[])
+    .filter((entry) => entry.scope === 'global')
+    .map((entry) => entry.name);
+
+  expect(moved.length).toBeGreaterThan(20);
+  expect(moved.filter((name) => globalNow.includes(name) && !exempt.has(name))).toEqual([]);
 });

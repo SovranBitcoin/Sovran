@@ -60,6 +60,15 @@ const INDEX_TO_PUBKEY_STORE_KEYS = [
   'own-profile-stats-cache',
 ] as const;
 
+/**
+ * Names from the list above that a later release turned into a global store,
+ * which reads and writes the bare key. For account 0 the bare key was also the
+ * old per-account key, so moving it would take a live global store's data away
+ * whenever this migration is replayed. All of them are caches: an index-keyed
+ * install that still has one loses nothing by leaving it where it is.
+ */
+const NOW_GLOBAL_STORE_KEYS: ReadonlySet<string> = new Set(['own-profile-stats-cache']);
+
 interface Migration {
   id: string;
   run: () => Promise<void>;
@@ -148,6 +157,7 @@ async function migrateIndexKeysToPubkeyKeys(): Promise<void> {
       const newKey = `${base}:profile:${profile.pubkey}`;
 
       if (oldKey === newKey) continue;
+      if (oldKey === base && NOW_GLOBAL_STORE_KEYS.has(base)) continue;
 
       const oldData = await AsyncStorage.getItem(oldKey);
       if (!oldData) continue;
