@@ -220,6 +220,8 @@ export const SettingsScreen = () => {
   const setLayoutGuides = useSettingsStore((state) => state.setLayoutGuides);
   const showTouches = useSettingsStore((state) => state.showTouches);
   const setShowTouches = useSettingsStore((state) => state.setShowTouches);
+  const inProcessProfileSwitch = useSettingsStore((state) => state.inProcessProfileSwitch);
+  const setInProcessProfileSwitch = useSettingsStore((state) => state.setInProcessProfileSwitch);
   const mockNoGlass = useSettingsStore((state) => state.mockNoGlass);
   const setMockNoGlass = useSettingsStore((state) => state.setMockNoGlass);
   const notificationPolicy = useNotificationPolicyStore((state) => state.policy);
@@ -514,6 +516,13 @@ export const SettingsScreen = () => {
                     />
                   </>
                 )}
+                <Separator className="mx-4" />
+                <SettingsToggleItem
+                  title="Switch profiles without restart"
+                  testID="settings-in-process-profile-switch-toggle"
+                  isSelected={inProcessProfileSwitch}
+                  onSelectedChange={setInProcessProfileSwitch}
+                />
                 <Separator className="mx-4" />
                 <SettingsToggleItem
                   title="Mock no-glass"

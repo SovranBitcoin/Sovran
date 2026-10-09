@@ -1,7 +1,7 @@
 # 29. Account state is declared before it is used
 
 Date: 2026-10-09
-Status: Accepted; the switch itself still restarts the runtime.
+Status: Accepted; in-process existing-profile switching is opt-in pending native validation.
 
 Account isolation needs an inventory that is complete even when a feature has
 never mounted. Store declarations go through `defineStore` (or
@@ -29,9 +29,37 @@ Scope describes ownership; it does not authorize changing a persistence adapter,
 key, schema, version or projection. Package-owned holders expose disposal to the
 app without importing app infrastructure.
 
-Profile switching continues to restart the runtime. Disposal registration is
-preparation for a later teardown protocol, not proof that in-process switching is
-safe. That protocol still needs to coordinate pending operations, reset stores,
-rehydrate them, and validate isolation on both native platforms. Holders without
-safe teardown must remain explicit coverage gaps rather than registering empty
-callbacks.
+## Switch protocol
+
+Existing-profile switches may opt into `inProcessProfileSwitch` in developer
+settings (default false). With it disabled, the persist-target/restart path is
+unchanged. Create, recover and delete continue to restart.
+
+The opt-in path blocks profile writes and drains admitted writes under their
+captured old key (including reads that migrate provider credentials); stops
+signing/account services; unmounts the account provider tree; awaits strict Coco cleanup (including otherwise swallowed teardown errors); invokes every registered holder; replaces every
+profile/session store with its recorded initial state without persistence; flips
+the account; rehydrates persisted profile stores; and releases writes before
+remounting providers and replacing navigation with the root. ThemeProvider stays
+above the boundary and applies the newly hydrated profile theme. Each awaited
+step has a five-second failure deadline. Hydration must also report success:
+Zustand may resolve its promise after a storage error. A second memory reset
+immediately before each rehydration prevents a late old-key hydration from
+becoming the merge baseline while another store is awaited.
+
+Any failure holds the provider boundary and write barrier, restores the old
+in-memory account index, persists the requested restart target, and attempts a
+runtime restart. An unavailable restart leaves the transition held, rather than
+booting partially reset state. A deadline never authorizes continuing teardown
+in process. Active Whitenoise and Routstr clients currently refuse this path:
+their APIs do not establish awaited quiescence. Instantiated captured-owner
+storage also refuses, because its immutable key cannot follow the new account.
+
+The registry canary loads profile/session declarations from generated metadata,
+seeds store memory, and verifies resets, old durable blobs and new storage keys.
+It observes all loaded holder disposals; opaque closure/native contents remain
+an explicit injection gap. The dev leak scan inspects account store memory and
+storage for the previous pubkey, logging identifiers only; retained old-account
+blobs and the global profile inventory are expected. This is bounded JavaScript
+evidence, not a native isolation guarantee. iPhone/Android lifecycle, relay,
+SQLite, navigation and theme behavior still require device validation.

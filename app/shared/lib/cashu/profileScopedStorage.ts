@@ -13,34 +13,25 @@
  * `shared/lib/migrations/globalMigrations.ts`.
  */
 
+import {
+  profilePersistWritesBlocked,
+  trackProfilePersistWrite,
+} from '@/shared/lib/persist/profileWriteBarrier';
 import { persistRegistry } from '@/shared/lib/persist/persistConfig';
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StateStorage } from 'zustand/middleware';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 
-/**
- * Module-level flag that keeps the persist middleware from writing while a
- * store is mutated. Raised by `withSkippedPersistWrites` so runtime-only
- * mutations (e.g. mock-mode demo data injection) stay out of the persisted
- * blob rather than overwriting the profile's stored data.
- */
-let _skipPersistWrite = false;
+/** The same barrier covers direct profile adapters and full persisted operations. */
+export {
+  blockProfilePersistWrites,
+  unblockProfilePersistWrites,
+  withSkippedPersistWrites,
+} from '@/shared/lib/persist/profileWriteBarrier';
 
-/**
- * Run `fn` with the persist-write gate raised. Synchronous: mutations queued
- * inside `fn` (`useStore.setState(...)`) bypass AsyncStorage; afterwards the
- * gate drops and normal persistence resumes. Use for runtime-only injections
- * into persisted profile-scoped stores.
- */
-export function withSkippedPersistWrites<T>(fn: () => T): T {
-  const prev = _skipPersistWrite;
-  _skipPersistWrite = true;
-  try {
-    return fn();
-  } finally {
-    _skipPersistWrite = prev;
-  }
+export function hasCapturedProfileStorage(): boolean {
+  return persistRegistry.some((entry) => entry.capturedOwner !== undefined);
 }
 
 /**
@@ -94,8 +85,12 @@ export async function captureProfileStorageOwner(): Promise<string> {
  * owner for async services that must survive active-profile changes.
  * Use this with `createJSONStorage(() => createProfileScopedStorage())` in Zustand persist.
  */
-export function createProfileScopedStorage(ownerPubkey?: string): StateStorage {
+export function createProfileScopedStorage(
+  ownerPubkey?: string,
+  admittedWrite = false
+): StateStorage & { profileStorageOwner?: string } {
   return {
+    profileStorageOwner: ownerPubkey,
     getItem: async (name: string) => {
       await _migrationGate;
       await ensureProfileStoreHydrated();
@@ -103,20 +98,31 @@ export function createProfileScopedStorage(ownerPubkey?: string): StateStorage {
       const key = pubkey ? `${name}:profile:${pubkey}` : name;
       return AsyncStorage.getItem(key);
     },
-    setItem: async (name: string, value: string) => {
-      if (_skipPersistWrite) return;
-      await _migrationGate;
-      await ensureProfileStoreHydrated();
+    setItem: (name: string, value: string) => {
+      if (profilePersistWritesBlocked() && !admittedWrite) return Promise.resolve();
+      // Capture ownership before yielding; a queued A write must never resolve B's key.
       const pubkey = ownerPubkey ?? getActiveProfilePubkey();
-      const key = pubkey ? `${name}:profile:${pubkey}` : name;
-      await AsyncStorage.setItem(key, value);
+      const write = (async () => {
+        await _migrationGate;
+        await ensureProfileStoreHydrated();
+        const owner = pubkey ?? ownerPubkey ?? getActiveProfilePubkey();
+        const key = owner ? `${name}:profile:${owner}` : name;
+        await AsyncStorage.setItem(key, value);
+      })();
+      return trackProfilePersistWrite(write);
     },
-    removeItem: async (name: string) => {
-      await _migrationGate;
-      await ensureProfileStoreHydrated();
+    removeItem: (name: string) => {
+      if (profilePersistWritesBlocked() && !admittedWrite) return Promise.resolve();
       const pubkey = ownerPubkey ?? getActiveProfilePubkey();
-      const key = pubkey ? `${name}:profile:${pubkey}` : name;
-      await AsyncStorage.removeItem(key);
+      return trackProfilePersistWrite(
+        (async () => {
+          await _migrationGate;
+          await ensureProfileStoreHydrated();
+          const owner = pubkey ?? ownerPubkey ?? getActiveProfilePubkey();
+          const key = owner ? `${name}:profile:${owner}` : name;
+          await AsyncStorage.removeItem(key);
+        })()
+      );
     },
   };
 }

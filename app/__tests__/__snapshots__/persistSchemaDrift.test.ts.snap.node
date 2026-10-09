@@ -5875,6 +5875,10 @@ exports[`persisted schema drift settings-store schema matches the golden snapsho
           "default": false,
           "type": "boolean",
         },
+        "inProcessProfileSwitch": {
+          "default": false,
+          "type": "boolean",
+        },
         "language": {
           "default": "en",
           "maxLength": 16,
@@ -6125,6 +6129,10 @@ exports[`persisted schema drift settings-store schema matches the golden snapsho
           "default": false,
           "type": "boolean",
         },
+        "inProcessProfileSwitch": {
+          "default": false,
+          "type": "boolean",
+        },
         "language": {
           "default": "en",
           "maxLength": 16,
@@ -6358,6 +6366,7 @@ exports[`persisted schema drift settings-store schema matches the golden snapsho
         "mockFailMelt",
         "mockFailPaymentRequest",
         "whitenoiseEnabled",
+        "inProcessProfileSwitch",
         "mockNoGlass",
         "layoutGuides",
         "showTouches",

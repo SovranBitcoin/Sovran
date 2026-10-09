@@ -1,3 +1,4 @@
+import { trackProfilePersistWrite } from '@/shared/lib/persist/profileWriteBarrier';
 import { z } from 'zod';
 import type { StateStorage } from 'zustand/middleware';
 
@@ -51,7 +52,8 @@ export function createRoutstrPersistence(): StateStorage {
   }
 
   async function load(owner: string, name: string) {
-    const storage = createProfileScopedStorage(owner);
+    // Persist's outer barrier owns and drains the whole secure-storage operation.
+    const storage = createProfileScopedStorage(owner, true);
     const vault = createSecureVault(owner, name);
     const raw = await storage.getItem(name);
     const secure = await vault.read();
@@ -84,18 +86,23 @@ export function createRoutstrPersistence(): StateStorage {
   }
 
   return {
-    async getItem(name) {
-      const owner = await captureProfileStorageOwner();
-      return run(owner, async () => {
-        const { envelope, secrets } = await load(owner, name);
-        read.add(`${owner}:${name}`);
-        if (!envelope && secrets === EMPTY) return null;
-        return JSON.stringify({
-          version: 1,
-          ...envelope,
-          state: { ...envelope?.state, ...secrets },
-        });
-      });
+    getItem(name) {
+      // Reads may migrate plaintext credentials. Drain that entire operation before switching.
+      return trackProfilePersistWrite(
+        (async () => {
+          const owner = await captureProfileStorageOwner();
+          return run(owner, async () => {
+            const { envelope, secrets } = await load(owner, name);
+            read.add(`${owner}:${name}`);
+            if (!envelope && secrets === EMPTY) return null;
+            return JSON.stringify({
+              version: 1,
+              ...envelope,
+              state: { ...envelope?.state, ...secrets },
+            });
+          });
+        })()
+      );
     },
     async setItem(name, value) {
       const owner = await captureProfileStorageOwner();

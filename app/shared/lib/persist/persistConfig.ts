@@ -1,3 +1,4 @@
+import { profilePersistWrite } from './profileWriteBarrier';
 import { type ZodType } from 'zod';
 import { createJSONStorage, type PersistOptions, type StateStorage } from 'zustand/middleware';
 
@@ -72,6 +73,7 @@ interface PersistRegistryEntry extends Partial<RegisteredStore> {
    * snapshot compares schemas to themselves, not to the data).
    */
   partialize: (state: never) => unknown;
+  capturedOwner?: string;
 }
 export type StoreScope = 'global' | 'profile' | 'session';
 
@@ -79,7 +81,13 @@ interface RegisteredStore {
   name: string;
   scope: StoreScope;
   persisted: boolean;
-  store: { getState: () => unknown; getInitialState: () => unknown };
+  store: {
+    getState: () => unknown;
+    getInitialState: () => unknown;
+    // The registry erases each store's state type; only its own recorded state is restored.
+    setState: (state: never, replace: true) => void;
+    persist?: { rehydrate: () => Promise<void> | void; hasHydrated: () => boolean };
+  };
   initialState: unknown;
   queryCache?: { clear: () => void };
 }
@@ -126,13 +134,28 @@ export function persistConfig<TFull, TPartial>(
       name: opts.name,
       version,
       schema: opts.schema,
+      capturedOwner:
+        'profileStorageOwner' in opts.storage &&
+        typeof opts.storage.profileStorageOwner === 'string'
+          ? opts.storage.profileStorageOwner
+          : undefined,
       partialize: opts.partialize as (state: never) => unknown,
     });
   }
 
+  const profileScoped = persistRegistry.definitions.some(
+    (entry) => entry.name === opts.name && entry.scope === 'profile'
+  );
+  const storage: StateStorage = profileScoped
+    ? {
+        getItem: (name) => opts.storage.getItem(name),
+        setItem: (name, value) => profilePersistWrite(() => opts.storage.setItem(name, value)),
+        removeItem: (name) => profilePersistWrite(() => opts.storage.removeItem(name)),
+      }
+    : opts.storage;
   return {
     name: opts.name,
-    storage: createJSONStorage(() => opts.storage),
+    storage: createJSONStorage(() => storage),
     version,
     partialize: opts.partialize,
     migrate,

@@ -15,7 +15,16 @@ export const accountScopedHolders: AccountScopedHolder[] = [];
  * Record teardown capability; registration never invokes it. Holders that
  * share a name are all kept (one per instance), so register a holder that is
  * rebuilt per session once, at module level, not each time it is rebuilt.
+ * Provider-owned instances unregister after teardown so dead closures do not accumulate.
  */
-export function registerAccountScoped(name: string, dispose: () => void | Promise<void>): void {
-  accountScopedHolders.push({ name, dispose });
+export function registerAccountScoped(
+  name: string,
+  dispose: () => void | Promise<void>
+): () => void {
+  const holder = { name, dispose };
+  accountScopedHolders.push(holder);
+  return () => {
+    const index = accountScopedHolders.indexOf(holder);
+    if (index !== -1) accountScopedHolders.splice(index, 1);
+  };
 }

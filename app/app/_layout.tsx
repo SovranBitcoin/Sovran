@@ -1,3 +1,4 @@
+import { registerProfileSwitchBoundary } from '@/shared/lib/profile/profileSwitchSession';
 import { Stack, DarkTheme, ThemeProvider as NavigationThemeProvider } from 'expo-router';
 import { DmEcashAutoRedeemProvider } from '@/features/payments/hooks/useDmEcashAutoRedeem';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
@@ -30,7 +31,7 @@ import { CapabilityProvider, useCapabilities } from '@/shared/ui/capability';
 import { LayoutGuidesProvider } from '@/shared/providers/LayoutGuidesProvider';
 import { TouchIndicatorProvider } from '@/shared/providers/TouchIndicatorProvider';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import React, { useCallback, useEffect, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { MODAL_SCREENS, ModalConfig } from '../config/modalScreens';
 import { getBaseModalHeaderOptions } from '../config/flowLayoutOptions';
@@ -146,6 +147,39 @@ function AccountScopedProviders({
   );
 
   return <InnerProviders>{children}</InnerProviders>;
+}
+
+/** Hold the old tree unmounted until all new-account stores have hydrated. */
+function AccountSwitchBoundary({ children }: { children: React.ReactNode }) {
+  const [suspended, setSuspended] = useState(false);
+  const suspendedRef = useRef(false);
+  const acknowledgement = useRef<(() => void) | null>(null);
+  useEffect(
+    () =>
+      registerProfileSwitchBoundary({
+        suspend: () =>
+          suspendedRef.current
+            ? Promise.resolve()
+            : new Promise<void>((resolve) => {
+                acknowledgement.current = resolve;
+                setSuspended(true);
+              }),
+        resume: () =>
+          new Promise<void>((resolve) => {
+            acknowledgement.current = resolve;
+            setSuspended(false);
+          }),
+      }),
+    []
+  );
+  useEffect(() => {
+    suspendedRef.current = suspended;
+    if (!acknowledgement.current) return;
+    if (!suspended) router.replace('/');
+    acknowledgement.current();
+    acknowledgement.current = null;
+  }, [suspended]);
+  return suspended ? null : children;
 }
 
 /** Registers resetStages/cancelResetStages with the orchestrator so profile transitions can show a splash. */
@@ -412,18 +446,20 @@ export default function RootLayout() {
         <TransitionGuardCleanup />
         <NativeSplashLayoutGate>
           <GlobalMigrationGate>
-            <AccountScopedProviders
-              key={`account-${activeAccountIndex}`}
-              accountIndex={activeAccountIndex}>
-              <RootLayoutContent />
-              <E2EToastProbe />
-              {/* Same-window host for the Android feed media lightbox; must
+            <AccountSwitchBoundary>
+              <AccountScopedProviders
+                key={`account-${activeAccountIndex}`}
+                accountIndex={activeAccountIndex}>
+                <RootLayoutContent />
+                <E2EToastProbe />
+                {/* Same-window host for the Android feed media lightbox; must
                     sit BEFORE PopupHost so popups triggered from inside the
                     lightbox stack above it. No-op on iOS / when empty. */}
-              <AndroidImageOverlayHost />
-              <PopupHost />
-              <ActionMenuHost />
-            </AccountScopedProviders>
+                <AndroidImageOverlayHost />
+                <PopupHost />
+                <ActionMenuHost />
+              </AccountScopedProviders>
+            </AccountSwitchBoundary>
           </GlobalMigrationGate>
         </NativeSplashLayoutGate>
       </OuterProviders>

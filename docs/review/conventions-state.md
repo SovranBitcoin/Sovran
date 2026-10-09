@@ -70,6 +70,15 @@ Scope: `repository-wide`
 
 Does `hunk` call `persist.rehydrate()` on a store whose storage key or contents can differ from what is in memory — after a profile switch, account change, storage swap (`persist.setOptions({ storage })`) or `clearStorage()` — without first replacing the state with `store.getInitialState()` (`setState(store.getInitialState(), true)`)?
 
+For an in-process account switch, raise the profile-storage write barrier and
+await admitted old-key writes before disposing services or resetting stores.
+Replace every registered profile/session store with its recorded initial state
+while writes remain blocked, then change account and await every persisted
+profile store's rehydration. Check `hasHydrated()` too: Zustand can swallow a
+storage rejection. Release writes and remount providers only after success; on
+failure or timeout hold the boundary and restart. Never persist an in-memory
+reset or resume a partially hydrated account.
+
 Allowed cases: `rehydrate()` used only to retry or await the first hydration of the same key (`if (!store.persist.hasHydrated()) await store.persist.rehydrate()`, the `AppGate` settings retry); tests that build a fresh store; flows that restart the JS runtime instead of switching in process.
 
 ## persist/partialize-allowlist

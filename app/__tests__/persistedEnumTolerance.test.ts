@@ -236,6 +236,7 @@ const NOT_A_CONCRETE_STORE = [
   // Readers of the registry, not stores.
   'shared/lib/cashu/profileScopedStorage.ts',
   'shared/lib/debug/storageInventory.ts',
+  'shared/lib/profile/inProcessProfileSwitch.ts',
 ];
 
 /** Every file that calls `persistConfig`, from the source tree. */

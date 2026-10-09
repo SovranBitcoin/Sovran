@@ -127,6 +127,7 @@ export class CocoManager {
   private static isBackgroundRunning = false;
   /** Tracks an in-flight cleanup() call so initialize() can await it before proceeding. */
   private static pendingCleanup: Promise<void> | null = null;
+  private static cleanupFailed = false;
   private static cashuMnemonic: string | null = null;
   private static signerKey: Uint8Array | null = null;
   private static npcPlugin: NPCPlugin | null = null;
@@ -937,16 +938,20 @@ export class CocoManager {
    * (e.g. from a new CocoProvider mounting during hot reload) can await it rather than
    * racing against an in-flight teardown.
    */
-  static async cleanup(): Promise<void> {
+  static async cleanup(options?: { requireSuccess: boolean }): Promise<void> {
     // Dedup concurrent cleanups: a second call returns the existing promise
     // rather than overwriting it. Without this, an initialize() awaiter that
     // sampled `pendingCleanup` only sees the second teardown and can race the
     // still-running first one (db.closeAsync / repository teardown).
     if (this.pendingCleanup) {
       cashuLog.info('cashu.manager.cleanup_join_pending');
-      return this.pendingCleanup;
+      if (!options?.requireSuccess) return this.pendingCleanup;
+      await this.pendingCleanup;
+      if (this.cleanupFailed) throw new Error('Coco teardown incomplete');
+      return;
     }
 
+    this.cleanupFailed = false;
     const doCleanup = async () => {
       if (!this.instance) {
         this.clearSensitiveRuntimeState();
@@ -996,7 +1001,8 @@ export class CocoManager {
             await db.closeAsync();
             cashuLog.debug('cashu.manager.sqlite_closed');
           } catch (error) {
-            // Already closed (e.g. hot reload or rapid profile switch) — safe to ignore
+            this.cleanupFailed = true;
+            // Restart callers retain their best-effort behavior; an in-process switch refuses.
             cashuLog.debug('cashu.manager.sqlite_close_skipped', {
               error: error instanceof Error ? error.message : String(error),
             });
@@ -1008,6 +1014,7 @@ export class CocoManager {
         this.clearSensitiveRuntimeState();
         cashuLog.info('cashu.manager.cleanup_done');
       } catch (error) {
+        this.cleanupFailed = true;
         cashuLog.error('cashu.manager.cleanup_failed', { error });
         // Null the instance on a partially-failed cleanup too — leaving it
         // set makes the next initialize() hand out a disposed Manager
@@ -1033,6 +1040,7 @@ export class CocoManager {
     } finally {
       this.pendingCleanup = null;
     }
+    if (options?.requireSuccess && this.cleanupFailed) throw new Error('Coco teardown incomplete');
   }
 
   private static getOrCreateNpcPlugin(): NPCPlugin {
@@ -1212,6 +1220,7 @@ export class CocoManager {
       await run();
       cashuLog.debug(okEvent);
     } catch (error) {
+      this.cleanupFailed = true;
       cashuLog.warn(failEvent, { error });
     }
   }

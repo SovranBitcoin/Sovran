@@ -1,3 +1,4 @@
+import { registerProfileSwitchService } from '@/shared/lib/profile/profileSwitchSession';
 import { registerAccountScoped } from '@/shared/lib/persist/accountScoped';
 // `@routstr/sdk/browser`, not `/client` or `/storage`: those entries reach for
 // `os` and `better-sqlite3` to persist Tinfoil's cache secret and its model
@@ -574,5 +575,10 @@ export function resetRoutstrClient(): void {
 }
 
 registerAccountScoped('routstr.client', () => {
+  resetRoutstrClient();
+});
+
+registerProfileSwitchService('routstr', () => {
+  if (built) throw new Error('Routstr has no awaited shutdown API');
   resetRoutstrClient();
 });

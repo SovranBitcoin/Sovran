@@ -38,6 +38,13 @@ import {
 } from '@/shared/stores/global/profileStore';
 import { useBTCMapStore } from '@/shared/stores/global/btcMapStore';
 
+import {
+  runInProcessProfileSwitch,
+  checkProfileSwitchLeaks,
+  holdProfileSwitchForRestart,
+  switchStep,
+} from './inProcessProfileSwitch';
+
 // ── AsyncStorage-based transition guard ──────────────────────────
 const TRANSITION_KEY = 'profile-transition-in-progress';
 const TRANSITION_EXPIRY_MS = 10_000;
@@ -119,6 +126,21 @@ function persistSwitchTargetToDisk(accountIndex: number): ResultAsync<void, Erro
     ),
     (error) => (error instanceof Error ? error : new Error(String(error)))
   );
+}
+
+/** The opt-in protocol awaits its explicit account-index write, including failures. */
+function activateProfileInMemory(accountIndex: number): void {
+  const profileOptions = useProfileStore.persist.getOptions();
+  useProfileStore.persist.setOptions({
+    storage: { getItem: () => null, setItem: () => {}, removeItem: () => {} },
+  });
+  try {
+    if (!useProfileStore.getState().switchProfile(accountIndex)) {
+      throw new Error('Profile activation failed');
+    }
+  } finally {
+    useProfileStore.persist.setOptions({ storage: profileOptions.storage });
+  }
 }
 
 async function teardownAndRestart(): Promise<boolean> {
@@ -205,6 +227,48 @@ export async function switchToExistingProfile(opts: {
       .profiles.some((p) => p.accountIndex === opts.accountIndex);
     if (!targetExists) {
       throw new Error(`Target profile does not exist: ${opts.accountIndex}`);
+    }
+
+    if (useSettingsStore.getState().inProcessProfileSwitch) {
+      const previousIndex = useProfileStore.getState().activeAccountIndex;
+      const previousPubkey = useProfileStore.getState().getActiveProfile()?.pubkey;
+      try {
+        await runInProcessProfileSwitch({
+          cleanupCoco: () => CocoManager.cleanup({ requireSuccess: true }),
+          flipAccount: async () => {
+            activateProfileInMemory(opts.accountIndex);
+            const persisted = await persistSwitchTargetToDisk(opts.accountIndex);
+            if (persisted.isErr()) throw persisted.error;
+          },
+        });
+        cancelResetStages?.();
+        transitionInFlight = false;
+        await endTransition();
+        if (previousPubkey) {
+          void checkProfileSwitchLeaks(previousPubkey).catch(() => {
+            log.warn('profile.switch.leak_check_failed');
+          });
+        }
+        return true;
+      } catch (error) {
+        // The reason is the only way to learn why a switch fell back.
+        log.warn('profile.switch.in_process_failed', { error: redactError(error) });
+        await holdProfileSwitchForRestart().catch(() => {
+          log.warn('profile.switch.boundary_hold_failed');
+        });
+        // Restore the active identity before restarting; never mount a partial B session.
+        activateProfileInMemory(previousIndex);
+        log.warn('profile.switch.restart_fallback');
+        try {
+          const persisted = await switchStep(() => persistSwitchTargetToDisk(opts.accountIndex));
+          if (persisted.isErr()) log.warn('profile.switch.restart_target_failed');
+        } catch {
+          log.warn('profile.switch.restart_target_failed');
+        }
+        // If restart is unavailable, keep the held boundary and write barrier.
+        // Resuming after failed teardown would expose a half-switched wallet.
+        return await teardownAndRestart();
+      }
     }
 
     await cleanupCocoWithTimeout();

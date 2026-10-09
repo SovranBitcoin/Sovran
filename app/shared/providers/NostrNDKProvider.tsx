@@ -1,3 +1,4 @@
+import { registerProfileSwitchService } from '@/shared/lib/profile/profileSwitchSession';
 import { clearForYouCache } from 'nostr';
 import { registerAccountScoped } from '@/shared/lib/persist/accountScoped';
 import { createContext, useContext, useEffect, useMemo, useRef, useState, ReactNode } from 'react';
@@ -44,10 +45,36 @@ export function NostrNDKProvider({
   const activeAccountIndex = accountIndexProp ?? 0;
   useEffect(() => {
     if (!ndk) return;
-    registerAccountScoped(`nostr.ndk:${activeAccountIndex}`, () => {
-      for (const relay of ndk.pool.relays.values()) relay.disconnect();
+    const stop = () => {
       ndk.signer = undefined;
-    });
+      let failed = false;
+      for (const sub of [...ndk.subManager.subscriptions.values()]) {
+        try {
+          sub.stop();
+        } catch {
+          failed = true;
+        }
+      }
+      for (const relay of ndk.pool.relays.values()) {
+        try {
+          relay.disconnect();
+        } catch {
+          failed = true;
+        }
+      }
+      if (failed) throw new Error('NDK teardown incomplete');
+    };
+    const unregister = registerProfileSwitchService('nostr.ndk', stop);
+    const unregisterHolder = registerAccountScoped(`nostr.ndk:${activeAccountIndex}`, stop);
+    return () => {
+      unregister();
+      unregisterHolder();
+      try {
+        stop();
+      } catch {
+        nostrLog.warn('provider.ndk.teardown_failed');
+      }
+    };
   }, [ndk, activeAccountIndex]);
   const hasInitialized = useRef(false);
   const [isInitialized, setIsInitialized] = useState(false);

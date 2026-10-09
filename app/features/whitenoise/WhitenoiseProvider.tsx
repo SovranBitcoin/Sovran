@@ -1,3 +1,4 @@
+import { registerProfileSwitchService } from '@/shared/lib/profile/profileSwitchSession';
 import React, { useEffect, useMemo } from 'react';
 import { useNDK } from '@nostr-dev-kit/ndk-mobile';
 import { InviteReader } from '@internet-privacy/marmot-ts';
@@ -114,6 +115,13 @@ export function WhitenoiseProvider({
   );
 
   const value = handle.value;
+  useEffect(
+    () =>
+      registerProfileSwitchService('whitenoise', () => {
+        if (handle.value.client) throw new Error('Whitenoise has no awaited shutdown API');
+      }),
+    [handle]
+  );
 
   // When the memoized client/inviteReader is replaced (privateKey or ndk
   // change) or the provider unmounts (profile-switch React-key remount):
