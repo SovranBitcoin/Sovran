@@ -76,16 +76,20 @@ export function createPubkeyScopedCache<T>(opts: PubkeyScopedCacheOpts<T>): Pubk
   const negEnabled = !!opts.storagePrefixNeg;
 
   const scopes = new Map<string, PerScopeCache<T>>();
-  registerAccountScoped(`plaintext-cache:${opts.storagePrefix}`, () => {
-    for (const state of scopes.values()) {
-      if (state.flushTimer) clearTimeout(state.flushTimer);
-      state.memory.clear();
-      state.negative.clear();
-      state.dirty = false;
-      state.dirtyNeg = false;
-    }
-    scopes.clear();
-  });
+  registerAccountScoped(
+    `plaintext-cache:${opts.storagePrefix}`,
+    () => {
+      for (const state of scopes.values()) {
+        if (state.flushTimer) clearTimeout(state.flushTimer);
+        state.memory.clear();
+        state.negative.clear();
+        state.dirty = false;
+        state.dirtyNeg = false;
+      }
+      scopes.clear();
+    },
+    () => scopes.size === 0
+  );
 
   function getScope(scope: string): PerScopeCache<T> {
     let s = scopes.get(scope);

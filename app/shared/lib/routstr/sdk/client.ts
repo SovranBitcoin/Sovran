@@ -1,3 +1,4 @@
+import { profileSwitchResource } from '@/shared/lib/profile/profileSwitchResource';
 import { registerProfileSwitchService } from '@/shared/lib/profile/profileSwitchSession';
 import { registerAccountScoped } from '@/shared/lib/persist/accountScoped';
 // `@routstr/sdk/browser`, not `/client` or `/storage`: those entries reach for
@@ -42,6 +43,19 @@ interface Built {
 
 let built: Promise<Built> | null = null;
 let builtOwner: string | null = null;
+let stoppedOwner: string | null = null;
+const clients = new Set<WeakRef<RoutstrClient>>();
+const clientResources = new WeakMap<
+  RoutstrClient,
+  {
+    stop: () => Promise<void>;
+    release: () => void;
+    hasRefundTimer: () => boolean;
+  }
+>();
+let stopping = false;
+const buildingClients = new Set<Promise<unknown>>();
+const sweeps = new Set<Promise<void>>();
 
 /** The SDK keys every provider cache by a trailing-slash URL, but its setters
  *  store what they are given. Seeding has to match the lookup or the catalog
@@ -81,9 +95,11 @@ async function build(owner: string): Promise<Built> {
 
 async function ensure(): Promise<Built> {
   const owner = await captureProfileStorageOwner();
+  if (owner === stoppedOwner) throw new Error('Routstr profile stopped');
   if (builtOwner !== owner) {
     built = null;
     builtOwner = owner;
+    stopping = false;
   }
   built ??= build(owner).catch((error) => {
     // Never cache a failed build: a transient storage error at boot would
@@ -94,8 +110,20 @@ async function ensure(): Promise<Built> {
   return built;
 }
 
-export async function getRoutstrClient(baseUrl: string, canDispatch: () => boolean = () => true) {
+export function getRoutstrClient(baseUrl: string, canDispatch: () => boolean = () => true) {
+  if (stopping) return Promise.reject(new Error('Routstr profile stopping'));
+  const work = buildRoutstrClient(baseUrl, canDispatch);
+  buildingClients.add(work);
+  void work.then(
+    () => buildingClients.delete(work),
+    () => buildingClients.delete(work)
+  );
+  return work;
+}
+
+async function buildRoutstrClient(baseUrl: string, canDispatch: () => boolean = () => true) {
   const built = await ensure();
+  if (built.owner === stoppedOwner) throw new Error('Routstr profile stopped');
   const key = providerKey(baseUrl);
   const assertOwner = () => {
     const profile = useProfileStore.getState();
@@ -203,8 +231,64 @@ export async function getRoutstrClient(baseUrl: string, canDispatch: () => boole
       }),
     }
   );
+  const streams = new Set<Promise<void>>();
+  const settleStreams = new Set<() => void>();
+  const routeRequest = client.routeRequest.bind(client);
+  client.routeRequest = async (...args: Parameters<typeof routeRequest>) => {
+    const response = await routeRequest(...args);
+    if ('finalize' in response && typeof response.finalize === 'function') {
+      let complete = () => {};
+      const stream = new Promise<void>((resolve) => {
+        complete = resolve;
+      });
+      streams.add(stream);
+      const settled = () => {
+        streams.delete(stream);
+        settleStreams.delete(settled);
+        complete();
+      };
+      settleStreams.add(settled);
+    }
+    return response;
+  };
+  const resource = profileSwitchResource(client, ['getCashuSpender', 'getBalanceManager']);
+  // The SDK interval invokes this public method dynamically. Track its calls
+  // even after the interval clears itself while an earlier callback is pending.
+  const spender = client.getCashuSpender();
+  const refunds = profileSwitchResource({ refund: spender.refundXcashuTokens.bind(spender) });
+  spender.refundXcashuTokens = refunds.value.refund;
+  const registration = {
+    stop: async () => {
+      const calls = resource.stop();
+      const recovery = refunds.stop();
+      const spender = client.getCashuSpender();
+      if (Reflect.get(spender, '_refundRetryInterval')) {
+        // This is the installed SDK's private release hook, checked at the
+        // boundary. Refund calls were instrumented before any timer could start.
+        const stop: unknown = Reflect.get(spender, '_stopRefundRetryInterval');
+        if (typeof stop !== 'function')
+          throw new Error('Routstr SDK refund interval has no release hook');
+        Reflect.apply(stop, spender, []);
+      }
+      await Promise.all([calls, recovery]);
+      const topups: unknown = Reflect.get(client, '_inflightTopups');
+      if (topups instanceof Map) await Promise.all([...topups.values()]);
+      await Promise.all([...streams]);
+    },
+    release: () => {
+      refunds.release();
+      resource.release();
+    },
+    hasRefundTimer: () => {
+      // A changed SDK hook must not silently leave its interval armed.
+      const spender = client.getCashuSpender();
+      return Boolean(Reflect.get(spender, '_refundRetryInterval'));
+    },
+  };
+  clientResources.set(client, registration);
+  clients.add(new WeakRef(client));
   return {
-    client,
+    client: resource.value,
     baseUrl: key,
     /** The node's last refusal of this request, or `null` if it never refused. */
     refusal() {
@@ -244,8 +328,14 @@ export async function getRoutstrClient(baseUrl: string, canDispatch: () => boole
       };
     },
     async finish() {
-      await built.driver.flush();
-      if (receiveFailed) throw new Error('Payment change is awaiting recovery');
+      try {
+        await built.driver.flush();
+        if (receiveFailed) throw new Error('Payment change is awaiting recovery');
+      } finally {
+        // API settlement records no-change consumption after SDK finalization.
+        // Do not release A until that last journal write has also flushed.
+        for (const settled of [...settleStreams]) settled();
+      }
     },
   };
 }
@@ -373,6 +463,7 @@ let recoveryTimers: ReturnType<typeof setTimeout>[] = [];
  * call while a schedule is running restarts it from the top.
  */
 export function scheduleRecoverySweeps(): void {
+  if (stopping) return;
   for (const timer of recoveryTimers) clearTimeout(timer);
   recoveryTimers = RECOVERY_SWEEP_DELAYS_MS.map((delay) =>
     setTimeout(() => {
@@ -392,7 +483,17 @@ export function scheduleRecoverySweeps(): void {
  * the node never took it. Safe to call repeatedly; it is the question a local
  * reclaim cannot answer.
  */
-export async function sweepUnsettledPayments(
+export function sweepUnsettledPayments(
+  reason: 'launch' | 'failure' | 'scheduled' = 'launch'
+): Promise<void> {
+  if (stopping) return Promise.resolve();
+  const work = sweepUnsettledPaymentsImpl(reason);
+  sweeps.add(work);
+  void work.finally(() => sweeps.delete(work));
+  return work;
+}
+
+async function sweepUnsettledPaymentsImpl(
   /**
    * What prompted the sweep. A `scheduled` one is itself the follow-up and
    * must not schedule another, or a token the node never settles would keep
@@ -453,7 +554,7 @@ async function runRecoverySweep(
 
     for (const [node, tokens] of Object.entries(built.storage.getXcashuTokens())) {
       assertOwner();
-      const bound = await getRoutstrClient(node);
+      const bound = await buildRoutstrClient(node);
       const host = hostOf(node);
       for (const { token, createdAt } of tokens) {
         assertOwner();
@@ -567,6 +668,8 @@ async function runRecoverySweep(
 /** Drop the client so the next call rebuilds it. Used on profile switch, where
  *  the store, the wallet and the provider list all belong to someone else. */
 export function resetRoutstrClient(): void {
+  stoppedOwner = null;
+  stopping = false;
   built = null;
   builtOwner = null;
   pendingThisSession.clear();
@@ -574,11 +677,40 @@ export function resetRoutstrClient(): void {
   recoveryTimers = [];
 }
 
-registerAccountScoped('routstr.client', () => {
+async function shutdownRoutstrClient(): Promise<void> {
+  // Disable scheduled admission before joining work already admitted for A.
+  stopping = true;
+  for (const timer of recoveryTimers) clearTimeout(timer);
+  recoveryTimers = [];
+  await Promise.all([...sweeps, ...buildingClients]);
+  const state = built ? await built : null;
+  stoppedOwner = builtOwner ?? stoppedOwner;
+  const active = [...clients].flatMap((ref) => {
+    const client = ref.deref();
+    const resource = client && clientResources.get(client);
+    return resource ? [resource] : [];
+  });
+  await Promise.all(active.map((client) => client.stop()));
+  if (active.some((client) => client.hasRefundTimer())) {
+    throw new Error('Routstr SDK refund interval did not stop');
+  }
+  await state?.driver.flush();
+  for (const client of active) client.release();
+  clients.clear();
+  const owner = stoppedOwner;
   resetRoutstrClient();
-});
+  stoppedOwner = owner;
+  stopping = true;
+}
 
-registerProfileSwitchService('routstr', () => {
-  if (built) throw new Error('Routstr has no awaited shutdown API');
-  resetRoutstrClient();
-});
+registerAccountScoped(
+  'routstr.client',
+  shutdownRoutstrClient,
+  () =>
+    built === null &&
+    clients.size === 0 &&
+    recoveryTimers.length === 0 &&
+    sweeps.size === 0 &&
+    buildingClients.size === 0
+);
+registerProfileSwitchService('routstr', shutdownRoutstrClient);

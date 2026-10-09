@@ -65,6 +65,10 @@ export async function resolveOutboxRelays(ndk: NDK, input: OutboxInput): Promise
   });
 }
 
-registerAccountScoped('nostr.recipient-relays', () => {
-  cache.clear();
-});
+registerAccountScoped(
+  'nostr.recipient-relays',
+  () => {
+    cache.clear();
+  },
+  () => cache.size === 0
+);

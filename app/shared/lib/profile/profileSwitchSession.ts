@@ -34,3 +34,12 @@ export function registerProfileSwitchBoundary(value: ProviderBoundary): () => vo
 export function profileSwitchBoundary(): ProviderBoundary | undefined {
   return boundary;
 }
+
+// One lifecycle signal also covers providers initialized after the service snapshot.
+let quiescing = false;
+export function setProfileSwitchQuiescing(value: boolean): void {
+  quiescing = value;
+}
+export function profileSwitchQuiescing(): boolean {
+  return quiescing;
+}

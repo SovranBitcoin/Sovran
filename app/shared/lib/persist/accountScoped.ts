@@ -7,6 +7,7 @@
 interface AccountScopedHolder {
   name: string;
   dispose: () => void | Promise<void>;
+  inspect?: () => boolean;
 }
 
 export const accountScopedHolders: AccountScopedHolder[] = [];
@@ -19,9 +20,10 @@ export const accountScopedHolders: AccountScopedHolder[] = [];
  */
 export function registerAccountScoped(
   name: string,
-  dispose: () => void | Promise<void>
+  dispose: () => void | Promise<void>,
+  inspect?: () => boolean
 ): () => void {
-  const holder = { name, dispose };
+  const holder = { name, dispose, inspect };
   accountScopedHolders.push(holder);
   return () => {
     const index = accountScopedHolders.indexOf(holder);

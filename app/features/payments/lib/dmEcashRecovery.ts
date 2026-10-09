@@ -104,6 +104,10 @@ export async function reconcileParkedMessageEcash(
   return requeued;
 }
 
-registerAccountScoped('payments.dm-ecash-reviewed', () => {
-  reviewed.clear();
-});
+registerAccountScoped(
+  'payments.dm-ecash-reviewed',
+  () => {
+    reviewed.clear();
+  },
+  () => reviewed.size === 0
+);

@@ -1,5 +1,11 @@
+import { resetProfileNavigation } from '@/shared/lib/profile/resetProfileNavigation';
 import { registerProfileSwitchBoundary } from '@/shared/lib/profile/profileSwitchSession';
-import { Stack, DarkTheme, ThemeProvider as NavigationThemeProvider } from 'expo-router';
+import {
+  Stack,
+  DarkTheme,
+  useNavigationContainerRef,
+  ThemeProvider as NavigationThemeProvider,
+} from 'expo-router';
 import { DmEcashAutoRedeemProvider } from '@/features/payments/hooks/useDmEcashAutoRedeem';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import * as SplashScreen from 'expo-splash-screen';
@@ -151,22 +157,25 @@ function AccountScopedProviders({
 
 /** Hold the old tree unmounted until all new-account stores have hydrated. */
 function AccountSwitchBoundary({ children }: { children: React.ReactNode }) {
+  const navigation = useNavigationContainerRef();
   const [suspended, setSuspended] = useState(false);
   const suspendedRef = useRef(false);
-  const acknowledgement = useRef<(() => void) | null>(null);
+  const acknowledgement = useRef<{ resolve: () => void; reject: (error: unknown) => void } | null>(
+    null
+  );
   useEffect(
     () =>
       registerProfileSwitchBoundary({
         suspend: () =>
           suspendedRef.current
             ? Promise.resolve()
-            : new Promise<void>((resolve) => {
-                acknowledgement.current = resolve;
+            : new Promise<void>((resolve, reject) => {
+                acknowledgement.current = { resolve, reject };
                 setSuspended(true);
               }),
         resume: () =>
-          new Promise<void>((resolve) => {
-            acknowledgement.current = resolve;
+          new Promise<void>((resolve, reject) => {
+            acknowledgement.current = { resolve, reject };
             setSuspended(false);
           }),
       }),
@@ -175,10 +184,15 @@ function AccountSwitchBoundary({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     suspendedRef.current = suspended;
     if (!acknowledgement.current) return;
-    if (!suspended) router.replace('/');
-    acknowledgement.current();
+    const pending = acknowledgement.current;
     acknowledgement.current = null;
-  }, [suspended]);
+    try {
+      if (!suspended) resetProfileNavigation(navigation);
+      pending.resolve();
+    } catch (error) {
+      pending.reject(error);
+    }
+  }, [suspended, navigation]);
   return suspended ? null : children;
 }
 

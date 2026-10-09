@@ -159,8 +159,12 @@ export function deriveCashuWalletSeedForImported(mnemonic: string, npubNumber: n
   return seed;
 }
 
-registerAccountScoped('nostr.root-key-cache', () => {
-  _cachedRootSeed?.fill(0);
-  _cachedRootSeed = null;
-  _cachedMnemonic = null;
-});
+registerAccountScoped(
+  'nostr.root-key-cache',
+  () => {
+    _cachedRootSeed?.fill(0);
+    _cachedRootSeed = null;
+    _cachedMnemonic = null;
+  },
+  () => _cachedRootSeed === null && _cachedMnemonic === null
+);

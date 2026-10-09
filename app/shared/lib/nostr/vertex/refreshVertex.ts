@@ -119,6 +119,10 @@ export async function refreshVertex(
   return parsed.success ? parsed.data : null;
 }
 
-registerAccountScoped('nostr.vertex-attempted', () => {
-  attempted.clear();
-});
+registerAccountScoped(
+  'nostr.vertex-attempted',
+  () => {
+    attempted.clear();
+  },
+  () => attempted.size === 0
+);

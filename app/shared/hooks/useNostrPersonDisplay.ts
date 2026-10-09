@@ -64,6 +64,10 @@ export function useNostrPersonDisplay(pubkey: string | undefined): NostrPersonDi
   };
 }
 
-registerAccountScoped('nostr.person-lookup-attempted', () => {
-  attempted.clear();
-});
+registerAccountScoped(
+  'nostr.person-lookup-attempted',
+  () => {
+    attempted.clear();
+  },
+  () => attempted.size === 0
+);

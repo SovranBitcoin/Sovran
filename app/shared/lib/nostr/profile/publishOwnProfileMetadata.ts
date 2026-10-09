@@ -295,6 +295,10 @@ export function publishOwnProfileMetadata({
   return result;
 }
 
-registerAccountScoped('nostr.profile-publish-flights', () => {
-  inFlight.clear();
-});
+registerAccountScoped(
+  'nostr.profile-publish-flights',
+  () => {
+    inFlight.clear();
+  },
+  () => inFlight.size === 0
+);

@@ -1,3 +1,4 @@
+import { profileSwitchResource } from '@/shared/lib/profile/profileSwitchResource';
 import NDK, {
   NDKEvent,
   NDKRelaySet,
@@ -69,13 +70,15 @@ function nostrEventToNdk(event: ApplesauceEvent, ndk: NDK): NDKEvent {
 export function createWhitenoiseNetwork(
   ndk: NDK,
   fallbackRelays: readonly string[]
-): NostrNetworkInterface {
+): NostrNetworkInterface & { shutdown: () => Promise<void> } {
+  const subscriptions = new Set<Unsubscribable>();
+  let stopped = false;
   function relaySet(urls: string[]): NDKRelaySet {
     const target = urls.length > 0 ? urls : [...fallbackRelays];
     return NDKRelaySet.fromRelayUrls(target, ndk);
   }
 
-  return {
+  const network: NostrNetworkInterface = {
     async publish(relays, event) {
       const target = relays.length > 0 ? [...relays] : [...fallbackRelays];
       const ndkEvent = nostrEventToNdk(event, ndk);
@@ -135,6 +138,7 @@ export function createWhitenoiseNetwork(
       const filterArr = toFilterArray(filters);
       return {
         subscribe(observer): Unsubscribable {
+          if (stopped) throw new Error('Whitenoise network stopped');
           let subRef: NDKSubscription | null = null;
           try {
             const sub = ndk.subscribe(filterArr, { closeOnEose: false }, set, false);
@@ -156,12 +160,15 @@ export function createWhitenoiseNetwork(
           } catch (err) {
             observer.error?.(err);
           }
-          return {
+          const handle = {
             unsubscribe() {
+              subscriptions.delete(handle);
               subRef?.stop();
               subRef = null;
             },
           };
+          subscriptions.add(handle);
+          return handle;
         },
       };
     },
@@ -178,6 +185,17 @@ export function createWhitenoiseNetwork(
         .filter((t: string[]) => t[0] === 'relay' && typeof t[1] === 'string')
         .map((t: string[]) => t[1]);
       return urls.length > 0 ? urls : [...fallbackRelays];
+    },
+  };
+  const resource = profileSwitchResource(network);
+  return {
+    ...resource.value,
+    async shutdown() {
+      stopped = true;
+      const draining = resource.stop();
+      for (const sub of [...subscriptions]) sub.unsubscribe();
+      await draining;
+      resource.release();
     },
   };
 }

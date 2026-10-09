@@ -141,6 +141,10 @@ export async function encodeChatImage(attachment: ChatAttachment): Promise<strin
   }
 }
 
-registerAccountScoped('ai.attachment-encode-cache', () => {
-  encodeCache.clear();
-});
+registerAccountScoped(
+  'ai.attachment-encode-cache',
+  () => {
+    encodeCache.clear();
+  },
+  () => encodeCache.size === 0
+);

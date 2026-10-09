@@ -83,6 +83,10 @@ export function useTurnTruncation(messageId: string): TurnTruncation | null {
   );
 }
 
-registerAccountScoped('ai.turn-truncations', () => {
-  resetTurnTruncations();
-});
+registerAccountScoped(
+  'ai.turn-truncations',
+  () => {
+    resetTurnTruncations();
+  },
+  () => truncationByMessageId.size === 0
+);

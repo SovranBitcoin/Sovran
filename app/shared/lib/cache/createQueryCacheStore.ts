@@ -393,9 +393,18 @@ export function createQueryCacheStore<TData>(opts: QueryCacheStoreOptions): Quer
   };
   const entry = persistRegistry.stores.find((entry) => entry.store === use);
   if (entry) entry.queryCache = store;
-  registerAccountScoped(`query-cache:${opts.name}`, () => {
-    store.clear();
-    touchedEpochByKey.clear();
-  });
+  registerAccountScoped(
+    `query-cache:${opts.name}`,
+    () => {
+      store.clear();
+      touchedEpochByKey.clear();
+    },
+    () =>
+      Object.keys(use.getState().byKey).length === 0 &&
+      touchedEpochByKey.size === 0 &&
+      inFlight.size === 0 &&
+      latestRun.size === 0 &&
+      genByKey.size === 0
+  );
   return store;
 }

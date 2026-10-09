@@ -48,20 +48,16 @@ const mockIngest = jest.fn();
 const mockDelete = jest.fn();
 jest.mock('@/shared/lib/nostr/publish/publishEvent', () => ({ publishEvent: jest.fn() }));
 jest.mock('@/shared/lib/nostr/outbox/relayListStore', () => ({ getOwnWriteRelays: () => [] }));
-jest.mock(
-  '@nostr-dev-kit/ndk-mobile',
-  () => ({
-    __esModule: true,
-    default: jest.fn(),
-    normalizeRelayUrl: (url: string) => url,
-    NDKSubscriptionCacheUsage: { ONLY_RELAY: 'ONLY_RELAY' },
-    NDKEvent: class {
-      id = 'e'.repeat(64);
-      sign = jest.fn(async () => {});
-    },
-  }),
-  { virtual: true }
-);
+jest.mock('@nostr-dev-kit/ndk-mobile', () => ({
+  __esModule: true,
+  default: jest.fn(),
+  normalizeRelayUrl: (url: string) => url,
+  NDKSubscriptionCacheUsage: { ONLY_RELAY: 'ONLY_RELAY' },
+  NDKEvent: class {
+    id = 'e'.repeat(64);
+    sign = jest.fn(async () => {});
+  },
+}));
 
 const pubkey = 'a'.repeat(64);
 const accepted = {

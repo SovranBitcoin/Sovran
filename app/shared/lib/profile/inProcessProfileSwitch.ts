@@ -6,7 +6,11 @@ import {
   hasCapturedProfileStorage,
 } from '@/shared/lib/cashu/profileScopedStorage';
 import { log } from '@/shared/lib/logger';
-import { profileSwitchBoundary, profileSwitchServices } from './profileSwitchSession';
+import {
+  profileSwitchBoundary,
+  profileSwitchServices,
+  setProfileSwitchQuiescing,
+} from './profileSwitchSession';
 
 const STEP_TIMEOUT_MS = 5_000;
 
@@ -28,6 +32,7 @@ export async function switchStep<T>(operation: () => T | Promise<T>): Promise<T>
 }
 
 export async function holdProfileSwitchForRestart(): Promise<void> {
+  setProfileSwitchQuiescing(true);
   const boundary = profileSwitchBoundary();
   // Suspend even if an admitted write never drains. Neither failure permits a remount.
   await Promise.all([
@@ -41,10 +46,10 @@ export async function runInProcessProfileSwitch(options: {
   cleanupCoco: () => Promise<void>;
   flipAccount: () => void | Promise<void>;
 }): Promise<void> {
-  await switchStep(blockProfilePersistWrites);
+  setProfileSwitchQuiescing(true);
   const boundary = profileSwitchBoundary();
-  const services = profileSwitchServices();
-  if (!boundary || hasCapturedProfileStorage()) throw new Error('Unsafe account boundary');
+  const services = new Map(profileSwitchServices());
+  if (!boundary) throw new Error('Unsafe account boundary');
   // NIP-46 must relinquish signing authority before the shared NDK pool closes.
   const signer = services.get('nostr.nip46');
   if (signer) await switchStep(signer);
@@ -53,7 +58,10 @@ export async function runInProcessProfileSwitch(options: {
   }
   await switchStep(boundary.suspend);
   await switchStep(options.cleanupCoco);
+  // Owner-bound holders flush and detach while the old identity still owns writes.
   for (const holder of [...persistRegistry.accountScoped]) await switchStep(holder.dispose);
+  if (hasCapturedProfileStorage()) throw new Error('Undisposed captured profile storage');
+  await switchStep(blockProfilePersistWrites);
   const stores = persistRegistry.stores.filter((entry) => entry.scope !== 'global');
   for (const entry of stores) {
     // State types are erased in the registry. Only this handle's recorded initial state is valid.
@@ -75,6 +83,7 @@ export async function runInProcessProfileSwitch(options: {
   }
   unblockProfilePersistWrites();
   await switchStep(boundary.resume);
+  setProfileSwitchQuiescing(false);
 }
 
 function containsPubkey(value: unknown, pubkey: string, seen = new Set<unknown>()): boolean {

@@ -367,6 +367,10 @@ export function publishEvent(opts: PublishOptions): ResultAsync<PublishResult, P
   return new ResultAsync(runPublish(opts));
 }
 
-registerAccountScoped('nostr.publish-in-flight', () => {
-  inFlight.clear();
-});
+registerAccountScoped(
+  'nostr.publish-in-flight',
+  () => {
+    inFlight.clear();
+  },
+  () => inFlight.size === 0
+);

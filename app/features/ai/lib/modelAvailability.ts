@@ -93,6 +93,10 @@ export function resetModelAvailability(): void {
   unavailable.clear();
 }
 
-registerAccountScoped('ai.model-availability', () => {
-  unavailable.clear();
-});
+registerAccountScoped(
+  'ai.model-availability',
+  () => {
+    unavailable.clear();
+  },
+  () => unavailable.size === 0
+);

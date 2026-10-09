@@ -169,7 +169,11 @@ export function prefetchNutzapProfile(pubkeyHex: string | undefined | null): voi
   });
 }
 
-registerAccountScoped('nostr.nutzap-profile-cache', () => {
-  cache.clear();
-  inflight.clear();
-});
+registerAccountScoped(
+  'nostr.nutzap-profile-cache',
+  () => {
+    cache.clear();
+    inflight.clear();
+  },
+  () => cache.size === 0 && inflight.size === 0
+);

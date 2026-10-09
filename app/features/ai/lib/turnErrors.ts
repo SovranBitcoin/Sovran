@@ -97,6 +97,10 @@ export function useTurnError(messageId: string): TurnError | null {
   );
 }
 
-registerAccountScoped('ai.turn-errors', () => {
-  resetTurnErrors();
-});
+registerAccountScoped(
+  'ai.turn-errors',
+  () => {
+    resetTurnErrors();
+  },
+  () => errorsByMessageId.size === 0
+);

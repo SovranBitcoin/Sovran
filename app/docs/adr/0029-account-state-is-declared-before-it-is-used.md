@@ -35,30 +35,56 @@ Existing-profile switches may opt into `inProcessProfileSwitch` in developer
 settings (default false). With it disabled, the persist-target/restart path is
 unchanged. Create, recover and delete continue to restart.
 
-The opt-in path blocks profile writes and drains admitted writes under their
-captured old key (including reads that migrate provider credentials); stops
-signing/account services; unmounts the account provider tree; awaits strict Coco cleanup (including otherwise swallowed teardown errors); invokes every registered holder; replaces every
-profile/session store with its recorded initial state without persistence; flips
-the account; rehydrates persisted profile stores; and releases writes before
-remounting providers and replacing navigation with the root. ThemeProvider stays
-above the boundary and applies the newly hydrated profile theme. Each awaited
-step has a five-second failure deadline. Hydration must also report success:
-Zustand may resolve its promise after a storage error. A second memory reset
-immediately before each rehydration prevents a late old-key hydration from
-becoming the merge baseline while another store is awaited.
+The opt-in path quiesces signing/account services, unmounts the account provider
+tree, and awaits strict Coco cleanup (including otherwise swallowed teardown
+errors) while A still owns persistence. Holder disposal drains final owner-bound
+writes before captured-owner stores detach from the registry. Only then does the
+write barrier drain admitted writes and block reset writes. The switch resets
+profile/session memory, activates and persists B, rehydrates B's profile stores,
+and releases writes before remounting. Navigation uses Expo Router's root
+navigation ref and React Navigation `resetRoot` with a single drawer root route,
+without inherited params or nested state. ThemeProvider stays above the boundary
+and applies the hydrated profile theme. Every awaited step has a five-second
+failure deadline. Hydration must report success: Zustand can resolve after a
+storage error. A second memory reset immediately before each rehydration prevents
+late A hydration from becoming B's merge baseline.
+
+NDK teardown stops subscriptions and both relay pools, drops signing authority
+and event listeners, and replaces ndk-mobile's private store through public
+`init`/`logout` after provider suspension. The old instance loses its cache
+reference. An inert cache with no SQLite handle clears unpublished events;
+the new tree sees this inert instance until B initializes its own cache. No
+account database is erased to accomplish teardown. The session quiescence signal
+also retains a deferred NDK initialized after the service snapshot for disposal
+after suspension.
+
+Whitenoise shutdown stops its owned network subscriptions, drains client,
+key-package and invitation work, removes listeners and zeroes the signer's key.
+This integration uses AsyncStorage and owns no database handle. Marmot 0.4 has no
+non-destructive release for loaded groups' private MLS state: that precise case
+still refuses, rather than deleting group history. Routstr shutdown stops recovery
+admission and timers, joins pending builds, recovery calls, SDK calls and stream
+finalization, flushes the captured owner's driver, and revokes client handles.
+The installed SDK's private refund-timer release hook is checked before use;
+instrumentation of its public refund method joins callbacks already in flight.
+An armed interval refuses only if that release hook is missing or fails to stop
+it. Unsettled work times out to restart.
 
 Any failure holds the provider boundary and write barrier, restores the old
 in-memory account index, persists the requested restart target, and attempts a
 runtime restart. An unavailable restart leaves the transition held, rather than
 booting partially reset state. A deadline never authorizes continuing teardown
-in process. Active Whitenoise and Routstr clients currently refuse this path:
-their APIs do not establish awaited quiescence. Instantiated captured-owner
-storage also refuses, because its immutable key cannot follow the new account.
+in process. Captured-owner storage without registered disposal still refuses;
+a Vertex instance flushes to its immutable A key, cancels old hydration, disables
+its retained handle's persistence, and unregisters before B's stores hydrate.
 
 The registry canary loads profile/session declarations from generated metadata,
 seeds store memory, and verifies resets, old durable blobs and new storage keys.
-It observes all loaded holder disposals; opaque closure/native contents remain
-an explicit injection gap. The dev leak scan inspects account store memory and
+Every loaded holder must supply an empty-state inspection or appear in the
+test's explicit uninspectable list with a reason. Inspection covers app-owned
+Maps and caches; package-private wallet/for-you holders and the monotonic cache
+epoch remain named gaps. Seven holders additionally receive payload canaries.
+The dev leak scan inspects account store memory and
 storage for the previous pubkey, logging identifiers only; retained old-account
 blobs and the global profile inventory are expected. This is bounded JavaScript
 evidence, not a native isolation guarantee. iPhone/Android lifecycle, relay,

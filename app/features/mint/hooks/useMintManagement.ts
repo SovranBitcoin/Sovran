@@ -162,11 +162,15 @@ export function useMintManagement() {
   };
 }
 
-registerAccountScoped('mint.management-cache', async () => {
-  try {
-    await inflightLoad;
-  } finally {
-    inflightLoad = null;
-    lastLoad = null;
-  }
-});
+registerAccountScoped(
+  'mint.management-cache',
+  async () => {
+    try {
+      await inflightLoad;
+    } finally {
+      inflightLoad = null;
+      lastLoad = null;
+    }
+  },
+  () => inflightLoad === null && lastLoad === null
+);

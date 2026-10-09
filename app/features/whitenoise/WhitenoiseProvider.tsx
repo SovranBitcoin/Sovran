@@ -1,3 +1,6 @@
+import { registerAccountScoped } from '@/shared/lib/persist/accountScoped';
+import { useSettingsStore } from '@/shared/stores/global/settingsStore';
+import { profileSwitchResource } from '@/shared/lib/profile/profileSwitchResource';
 import { registerProfileSwitchService } from '@/shared/lib/profile/profileSwitchSession';
 import React, { useEffect, useMemo } from 'react';
 import { useNDK } from '@nostr-dev-kit/ndk-mobile';
@@ -13,6 +16,8 @@ import { WhitenoiseContext, type WhitenoiseContextValue } from './WhitenoiseCont
 type WhitenoiseHandle = {
   value: WhitenoiseContextValue;
   disposeSigner: (() => void) | null;
+  shutdown: (() => Promise<void>) | null;
+  release: (() => void) | null;
 };
 
 /**
@@ -35,10 +40,12 @@ function createWhitenoiseHandle({
     return {
       value: { client: null, inviteReader: null, relays: defaultRelays, accountIndex },
       disposeSigner: null,
+      shutdown: null,
+      release: null,
     };
   }
   try {
-    const { client, disposeSigner } = createWhitenoiseClient({
+    const { client, disposeSigner, shutdown, release } = createWhitenoiseClient({
       accountIndex,
       privateKey,
       ndk,
@@ -48,10 +55,21 @@ function createWhitenoiseHandle({
       signer: client.signer,
       store: createWhitenoiseInviteStore(accountIndex),
     });
+    const reader = profileSwitchResource(inviteReader);
     wnLog.info('whitenoise.client.created', { accountIndex });
     return {
-      value: { client, inviteReader, relays: defaultRelays, accountIndex },
+      value: { client, inviteReader: reader.value, relays: defaultRelays, accountIndex },
       disposeSigner,
+      shutdown: async () => {
+        // Stop invitation admission, then drain its decrypt/storage work before zeroing keys.
+        await reader.stop();
+        inviteReader.removeAllListeners();
+        await shutdown();
+      },
+      release: () => {
+        reader.release();
+        release();
+      },
     };
   } catch (err) {
     wnLog.error('whitenoise.client.create_failed', {
@@ -60,6 +78,8 @@ function createWhitenoiseHandle({
     return {
       value: { client: null, inviteReader: null, relays: defaultRelays, accountIndex },
       disposeSigner: null,
+      shutdown: null,
+      release: null,
     };
   }
 }
@@ -115,13 +135,29 @@ export function WhitenoiseProvider({
   );
 
   const value = handle.value;
-  useEffect(
-    () =>
-      registerProfileSwitchService('whitenoise', () => {
-        if (handle.value.client) throw new Error('Whitenoise has no awaited shutdown API');
-      }),
-    [handle]
-  );
+  useEffect(() => {
+    let released = false;
+    const stop = async () => {
+      await handle.shutdown?.();
+    };
+    const dispose = async () => {
+      await stop();
+      handle.release?.();
+      released = true;
+      unregisterHolder();
+    };
+    const unregisterHolder = registerAccountScoped('whitenoise.client', dispose, () => released);
+    const unregisterService = registerProfileSwitchService('whitenoise', stop);
+    return () => {
+      unregisterService();
+      if (useSettingsStore.getState().inProcessProfileSwitch) {
+        // Async release runs after descendants have removed their listeners.
+        void dispose().catch(() => wnLog.warn('whitenoise.shutdown.failed'));
+      } else {
+        unregisterHolder();
+      }
+    };
+  }, [handle]);
 
   // When the memoized client/inviteReader is replaced (privateKey or ndk
   // change) or the provider unmounts (profile-switch React-key remount):
@@ -134,8 +170,13 @@ export function WhitenoiseProvider({
     const { client, inviteReader, accountIndex: idx } = handle.value;
     const { disposeSigner } = handle;
     if (!client && !inviteReader && !disposeSigner) return;
-    return () =>
-      disposeWhitenoiseHandle({ client, inviteReader, disposeSigner, accountIndex: idx });
+    return () => {
+      if (useSettingsStore.getState().inProcessProfileSwitch) {
+        return;
+      } else {
+        disposeWhitenoiseHandle({ client, inviteReader, disposeSigner, accountIndex: idx });
+      }
+    };
   }, [handle]);
 
   return (

@@ -1,4 +1,7 @@
-import { registerProfileSwitchService } from '@/shared/lib/profile/profileSwitchSession';
+import {
+  profileSwitchQuiescing,
+  registerProfileSwitchService,
+} from '@/shared/lib/profile/profileSwitchSession';
 import { clearForYouCache } from 'nostr';
 import { registerAccountScoped } from '@/shared/lib/persist/accountScoped';
 import { createContext, useContext, useEffect, useMemo, useRef, useState, ReactNode } from 'react';
@@ -40,13 +43,14 @@ export function NostrNDKProvider({
   accountIndex: accountIndexProp,
 }: NostrNDKProviderProps) {
   useInitMount('NostrNDKProvider');
-  const { init: initializeNDK, ndk } = useNDK();
+  const { init: initializeNDK, logout, ndk } = useNDK();
   const { keys: nostrKeys } = useNostrKeysContext();
   const activeAccountIndex = accountIndexProp ?? 0;
   useEffect(() => {
     if (!ndk) return;
-    const stop = () => {
+    const stop = (switching = false) => {
       ndk.signer = undefined;
+      if (switching) ndk.removeAllListeners();
       let failed = false;
       for (const sub of [...ndk.subManager.subscriptions.values()]) {
         try {
@@ -55,7 +59,10 @@ export function NostrNDKProvider({
           failed = true;
         }
       }
-      for (const relay of ndk.pool.relays.values()) {
+      for (const relay of new Set([
+        ...ndk.pool.relays.values(),
+        ...(switching ? (ndk.outboxPool?.relays.values() ?? []) : []),
+      ])) {
         try {
           relay.disconnect();
         } catch {
@@ -64,18 +71,54 @@ export function NostrNDKProvider({
       }
       if (failed) throw new Error('NDK teardown incomplete');
     };
-    const unregister = registerProfileSwitchService('nostr.ndk', stop);
-    const unregisterHolder = registerAccountScoped(`nostr.ndk:${activeAccountIndex}`, stop);
-    return () => {
-      unregister();
+    const unregister = registerProfileSwitchService('nostr.ndk', () => {
+      stop(true);
+    });
+    const dispose = () => {
+      stop(true);
+      ndk.cacheAdapter = undefined;
+      // ndk-mobile's store is private. Public init replaces its NDK/initialParams;
+      // onReady clears unpublished events, and logout clears currentUser. The
+      // inert cache owns no SQLite handle and logout cannot erase A's database.
+      initializeNDK({
+        explicitRelayUrls: [],
+        settingsStore: {
+          getSync: () => null,
+          get: async () => null,
+          set: async () => {},
+          delete: async () => {},
+        },
+        cacheAdapter: {
+          locking: false,
+          ready: true,
+          query: async () => {},
+          setEvent: async () => {},
+          getUnpublishedEvents: async () => [],
+          onReady: (callback) => callback(),
+        },
+      });
+      logout();
       unregisterHolder();
+    };
+    const unregisterHolder = registerAccountScoped(
+      `nostr.ndk:${activeAccountIndex}`,
+      dispose,
+      () =>
+        ndk.signer === undefined &&
+        ndk.cacheAdapter === undefined &&
+        ndk.subManager.subscriptions.size === 0
+    );
+    return () => {
+      const switching = profileSwitchQuiescing();
+      unregister();
+      if (!switching) unregisterHolder();
       try {
-        stop();
+        stop(switching);
       } catch {
         nostrLog.warn('provider.ndk.teardown_failed');
       }
     };
-  }, [ndk, activeAccountIndex]);
+  }, [ndk, activeAccountIndex, initializeNDK, logout]);
   const hasInitialized = useRef(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const cacheAdapterRef = useRef<{

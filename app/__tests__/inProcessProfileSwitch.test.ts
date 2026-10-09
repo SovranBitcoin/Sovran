@@ -1,7 +1,27 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 import { readdirSync, readFileSync } from 'fs';
 import { join } from 'path';
+import type { WhitenoiseContextValue } from '@/features/whitenoise/WhitenoiseContext';
 import type { persistRegistry as Registry } from '@/shared/lib/persist/persistConfig';
+
+jest.mock('@internet-privacy/marmot-ts', () => ({
+  KeyPackageStore: class {},
+  KeyValueGroupStateBackend: class {},
+  InviteReader: class {
+    removeAllListeners = jest.fn();
+  },
+  MarmotClient: class {
+    signer;
+    groups: unknown[] = [];
+    removeAllListeners = jest.fn();
+    constructor(options: { signer: unknown }) {
+      this.signer = options.signer;
+    }
+  },
+}));
+jest.mock('@/features/whitenoise/hooks/useWhitenoiseInbox', () => ({
+  useWhitenoiseInbox: () => {},
+}));
 
 jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock')
@@ -198,7 +218,7 @@ it('canary resets every registered profile/session store and invokes every reach
   loadHolderModules(join(__dirname, '../features'));
   // Import registrations without creating a manager or opening any native database.
   jest.requireActual('@/shared/lib/cashu/manager');
-  // Captured-owner factory is exercised separately: its immutable key must refuse switching.
+  // Owner-bound budget instances are tested separately without mutating the schema canary.
   const entries = env.persistRegistry.stores.filter((entry) => entry.scope !== 'global');
   const sentinel = 'ACCOUNT_A_CANARY_5d71';
   const attachments = require('@/features/ai/lib/attachments');
@@ -262,6 +282,24 @@ it('canary resets every registered profile/session store and invokes every reach
       version: 2,
     })
   );
+  const uninspectable: Record<string, string> = {
+    'cache.session-epoch':
+      'A monotonic generation, not an account-data holder; disposal is observed.',
+    'nostr.for-you-cache': 'Package-private Map; nostr package edits are excluded from this task.',
+    'wallet.reusable-quote-flights': 'Package-private flights; wallet package edits are excluded.',
+    'wallet.melt-target': 'Wallet closure; manager and wallet edits are excluded.',
+    'wallet.cashu-seed': 'Manager-private seed; manager edits are excluded.',
+  };
+  const holders = [...env.persistRegistry.accountScoped];
+  for (const holder of holders) {
+    expect(Boolean(holder.inspect) || Boolean(uninspectable[holder.name])).toBe(true);
+  }
+  expect(
+    holders
+      .filter((holder) => !holder.inspect)
+      .map((holder) => holder.name)
+      .sort()
+  ).toEqual(Object.keys(uninspectable).sort());
   const holderCanaries = new Set(env.persistRegistry.accountScoped);
   for (const holder of holderCanaries) {
     const dispose = holder.dispose;
@@ -274,6 +312,7 @@ it('canary resets every registered profile/session store and invokes every reach
   expect(env.restartApp).not.toHaveBeenCalled();
   expect(env.resume).toHaveBeenCalledTimes(1);
   expect(holderCanaries.size).toBe(0);
+  for (const holder of holders) if (holder.inspect) expect(holder.inspect()).toBe(true);
   require('expo-image-manipulator').ImageManipulator.manipulate.mockReturnValue({
     renderAsync: async () => ({
       saveAsync: async () => ({ base64: 'ACCOUNT_B', width: 1, height: 1 }),
@@ -292,6 +331,9 @@ it('canary resets every registered profile/session store and invokes every reach
       stores: entries.length,
       holders: env.persistRegistry.accountScoped.length,
       seededHolders: 7,
+      inspectedHolders: holders.filter((holder) => holder.inspect).length,
+      inspectedNames: holders.filter((holder) => holder.inspect).map((holder) => holder.name),
+      uninspectable: Object.keys(uninspectable),
     }) + '\n'
   );
   for (const entry of entries) {
@@ -307,10 +349,13 @@ it('canary resets every registered profile/session store and invokes every reach
   expect(entries.length).toBeGreaterThan(40);
 });
 
-it('refuses an instantiated immutable-owner store and restarts', async () => {
+it('refuses captured storage without a registered disposal and restarts', async () => {
   const env = await setup();
   const { createVertexBudgetStore } = require('@/shared/stores/profile/vertexBudgetStore');
   createVertexBudgetStore('a'.repeat(64));
+  const captured = env.persistRegistry.find((entry) => entry.name === 'vertex-budget-store');
+  if (!captured) throw new Error('Missing budget registration');
+  env.persistRegistry.push({ ...captured, store: undefined, name: 'unsupported-owner' });
   expect(await env.switchToExistingProfile({ accountIndex: 1 })).toBe(true);
   expect(env.restartApp).toHaveBeenCalledTimes(1);
   expect(env.useProfileStore.getState().activeAccountIndex).toBe(0);
@@ -378,6 +423,7 @@ it('NDK provider unmount stops subscriptions, disconnects relays and drops the s
   const disconnect = jest.fn();
   const ndk = {
     signer: { account: 'A' },
+    removeAllListeners: jest.fn(),
     pool: { relays: new Map([['relay', { disconnect }]]) },
     subManager: { subscriptions: new Map([['subscription', { stop }]]) },
   };
@@ -476,4 +522,365 @@ it('restarts without exposing account B when persisting the active index fails',
   expect(env.restartApp).toHaveBeenCalledTimes(1);
   expect(env.useProfileStore.getState().activeAccountIndex).toBe(0);
   expect(env.resume).not.toHaveBeenCalled();
+});
+
+it('flushes and unregisters Vertex instances without allowing retained handles to write as B', async () => {
+  const env = await setup();
+  const {
+    createVertexBudgetStore,
+    getVertexBudgetStore,
+  } = require('@/shared/stores/profile/vertexBudgetStore');
+  const stores = [createVertexBudgetStore('a'.repeat(64)), getVertexBudgetStore('a'.repeat(64))];
+  await Promise.all(stores.map((store) => store.persist.rehydrate()));
+  stores[0].getState().reserve();
+  expect(env.scoped.hasCapturedProfileStorage()).toBe(true);
+  expect(await env.switchToExistingProfile({ accountIndex: 1 })).toBe(true);
+  expect(env.restartApp).not.toHaveBeenCalled();
+  expect(env.scoped.hasCapturedProfileStorage()).toBe(false);
+  expect(env.persistRegistry.stores.some((entry) => entry.name === 'vertex-budget-store')).toBe(
+    false
+  );
+  expect(
+    JSON.parse(await env.storage.getItem(`vertex-budget-store:profile:${'a'.repeat(64)}`)).state
+      .used
+  ).toBe(1);
+  for (const store of stores) {
+    expect(store.getState().reserve()).toBe(false);
+    store.setState({ used: 10 });
+  }
+  expect(await env.storage.getItem(`vertex-budget-store:profile:${'b'.repeat(64)}`)).toBeNull();
+});
+
+it('persists a final teardown write under A before raising the reset barrier', async () => {
+  const env = await setup();
+  const { useThemeStore } = require('@/shared/stores/profile/themeStore');
+  await useThemeStore.persist.rehydrate();
+  env.CocoManager.cleanup.mockImplementation(async () => {
+    useThemeStore.setState({ activeAlbumSlug: 'final-A-write' });
+  });
+  expect(await env.switchToExistingProfile({ accountIndex: 1 })).toBe(true);
+  expect(env.restartApp).not.toHaveBeenCalled();
+  expect(
+    JSON.parse(await env.storage.getItem(`theme-store:profile:${'a'.repeat(64)}`)).state
+      .activeAlbumSlug
+  ).toBe('final-A-write');
+  expect(useThemeStore.getState().activeAlbumSlug).toBeNull();
+  expect(await env.storage.getItem(`theme-store:profile:${'b'.repeat(64)}`)).toBeNull();
+});
+
+it('replaces the old NDK/cache through public init before exposing B', async () => {
+  const env = await setup();
+  const React = require('react');
+  const renderer = require('react-test-renderer');
+  const mobile = require('@nostr-dev-kit/ndk-mobile');
+  require('@/shared/lib/logger').useInitMount = jest.fn();
+  require('@/shared/providers/InitializationProvider').useInitializationStage.mockReturnValue({
+    canStart: false,
+  });
+  require('@/shared/providers/NostrKeysProvider').useNostrKeysContext.mockReturnValue({
+    keys: null,
+  });
+  const old = {
+    cacheAdapter: { database: 'A' },
+    signer: {},
+    removeAllListeners: jest.fn(),
+    subManager: { subscriptions: new Map() },
+    pool: { relays: new Map() },
+    outboxPool: { relays: new Map([['outbox', { disconnect: jest.fn() }]]) },
+  };
+  let current = old;
+  const init = jest.fn((params) => {
+    current = { ...params };
+  });
+  const logout = jest.fn();
+  const spy = jest
+    .spyOn(mobile, 'useNDK')
+    .mockImplementation(() => ({ ndk: current, init, logout }));
+  const { NostrNDKProvider } = require('@/shared/providers/NostrNDKProvider');
+  let tree: ReturnType<typeof renderer.create>;
+  try {
+    await renderer.act(async () => {
+      tree = renderer.create(React.createElement(NostrNDKProvider, { accountIndex: 0 }, null));
+    });
+    await env.protocol.profileSwitchServices().get('nostr.ndk')();
+    const holder = env.persistRegistry.accountScoped.find((entry) => entry.name === 'nostr.ndk:0');
+    await renderer.act(async () => {
+      tree.unmount();
+    });
+    await holder?.dispose();
+    expect(mobile.useNDK().ndk).not.toBe(old);
+    expect(mobile.useNDK().ndk.cacheAdapter).not.toBe(old.cacheAdapter);
+    expect(init).toHaveBeenCalledWith(expect.objectContaining({ explicitRelayUrls: [] }));
+    expect(logout).toHaveBeenCalledTimes(1);
+    expect(old.outboxPool.relays.get('outbox')?.disconnect).toHaveBeenCalled();
+  } finally {
+    await renderer.act(async () => {
+      tree?.unmount();
+    });
+    spy.mockRestore();
+  }
+});
+
+it('completes the fast path with an active idle Routstr SDK client and scheduled recovery', async () => {
+  const env = await setup();
+  const sdk = require('@/shared/lib/routstr/sdk/client');
+  const bound = await sdk.getRoutstrClient('https://example.invalid');
+  sdk.scheduleRecoverySweeps();
+  expect(bound.client.getCashuSpender()).toBeDefined();
+  expect(await env.switchToExistingProfile({ accountIndex: 1 })).toBe(true);
+  expect(env.restartApp).not.toHaveBeenCalled();
+  expect(() => bound.client.getCashuSpender()).toThrow();
+  expect(
+    env.persistRegistry.accountScoped
+      .find((holder) => holder.name === 'routstr.client')
+      ?.inspect?.()
+  ).toBe(true);
+});
+
+it('completes the fast path with an active Whitenoise client and zeroes its signer', async () => {
+  const env = await setup();
+  const stop = jest.fn().mockResolvedValue(undefined);
+  jest.doMock('@/features/whitenoise/client/network', () => ({
+    createWhitenoiseNetwork: () => ({ shutdown: stop }),
+  }));
+  jest.doMock('@internet-privacy/marmot-ts', () => ({
+    KeyPackageStore: class {},
+    KeyValueGroupStateBackend: class {},
+    MarmotClient: class {
+      signer;
+      groups = [];
+      removeAllListeners = jest.fn();
+      constructor(options: { signer: unknown }) {
+        this.signer = options.signer;
+      }
+    },
+  }));
+  const { createWhitenoiseClient } = require('@/features/whitenoise/client');
+  const handle = createWhitenoiseClient({
+    accountIndex: 0,
+    privateKey: new Uint8Array(32).fill(1),
+    ndk: {},
+    fallbackRelays: [],
+  });
+  const signer = handle.client.signer;
+  env.protocol.registerProfileSwitchService('whitenoise', handle.shutdown);
+  env.persistRegistry.accountScoped.push({ name: 'whitenoise.client', dispose: handle.release });
+  expect(await env.switchToExistingProfile({ accountIndex: 1 })).toBe(true);
+  expect(env.restartApp).not.toHaveBeenCalled();
+  expect(stop).toHaveBeenCalledTimes(1);
+  expect(() => signer.signEvent({ kind: 1, content: '', tags: [], created_at: 0 })).toThrow(
+    'disposed'
+  );
+  expect(() => handle.client.groups).toThrow();
+});
+
+it('refuses only Whitenoise loaded MLS state that Marmot cannot release non-destructively', async () => {
+  const env = await setup();
+  const { createWhitenoiseClient } = require('@/features/whitenoise/client');
+  const handle = createWhitenoiseClient({
+    accountIndex: 0,
+    privateKey: new Uint8Array(32).fill(1),
+    ndk: {},
+    fallbackRelays: [],
+  });
+  handle.client.groups.push({ state: 'private MLS state' });
+  env.protocol.registerProfileSwitchService('whitenoise', handle.shutdown);
+  expect(await env.switchToExistingProfile({ accountIndex: 1 })).toBe(true);
+  expect(env.restartApp).toHaveBeenCalledTimes(1);
+  expect(env.useProfileStore.getState().activeAccountIndex).toBe(0);
+  expect(env.resume).not.toHaveBeenCalled();
+});
+
+it('refuses only an armed SDK refund interval missing its release hook', async () => {
+  const env = await setup();
+  const bound = await require('@/shared/lib/routstr/sdk/client').getRoutstrClient(
+    'https://example.invalid'
+  );
+  const sdk = require('@routstr/sdk/browser');
+  const spy = jest
+    .spyOn(sdk.RoutstrClient.prototype, 'getCashuSpender')
+    .mockReturnValue({ _refundRetryInterval: 1 });
+  try {
+    expect(bound.client).toBeDefined();
+    expect(await env.switchToExistingProfile({ accountIndex: 1 })).toBe(true);
+    expect(env.restartApp).toHaveBeenCalledTimes(1);
+    expect(env.useProfileStore.getState().activeAccountIndex).toBe(0);
+    expect(env.resume).not.toHaveBeenCalled();
+  } finally {
+    spy.mockRestore();
+  }
+});
+
+it('registers the live Whitenoise provider for awaited switch disposal', async () => {
+  const env = await setup();
+  jest.doMock('@internet-privacy/marmot-ts', () => ({
+    KeyPackageStore: class {},
+    KeyValueGroupStateBackend: class {},
+    InviteReader: class {
+      removeAllListeners = jest.fn();
+    },
+    MarmotClient: class {
+      signer;
+      groups = [];
+      removeAllListeners = jest.fn();
+      constructor(options: { signer: unknown }) {
+        this.signer = options.signer;
+      }
+    },
+  }));
+  const React = require('react');
+  const renderer = require('react-test-renderer');
+  const mobile = require('@nostr-dev-kit/ndk-mobile');
+  require('@/shared/providers/NostrKeysProvider').useNostrKeysContext.mockReturnValue({
+    keys: { privateKey: new Uint8Array(32).fill(1) },
+  });
+  const spy = jest.spyOn(mobile, 'useNDK').mockReturnValue({ ndk: {} });
+  const { WhitenoiseProvider } = require('@/features/whitenoise/WhitenoiseProvider');
+  const { WhitenoiseContext } = require('@/features/whitenoise/WhitenoiseContext');
+  let client;
+  let tree: ReturnType<typeof renderer.create>;
+  try {
+    await renderer.act(async () => {
+      tree = renderer.create(
+        React.createElement(
+          WhitenoiseProvider,
+          { accountIndex: 0 },
+          React.createElement(WhitenoiseContext.Consumer, null, (value: WhitenoiseContextValue) => {
+            client = value.client;
+            return null;
+          })
+        )
+      );
+    });
+    expect(client).toBeDefined();
+    expect(client).not.toBeNull();
+    const holder = env.persistRegistry.accountScoped.find(
+      (entry) => entry.name === 'whitenoise.client'
+    );
+    expect(holder?.inspect?.()).toBe(false);
+    expect(await env.switchToExistingProfile({ accountIndex: 1 })).toBe(true);
+    expect(env.restartApp).not.toHaveBeenCalled();
+    expect(holder?.inspect?.()).toBe(true);
+  } finally {
+    await renderer.act(async () => {
+      tree?.unmount();
+    });
+    spy.mockRestore();
+  }
+});
+
+it('awaits SDK stream finalization before allowing B to mount', async () => {
+  const env = await setup();
+  const sdk = require('@routstr/sdk/browser');
+  let finish: () => void = () => {};
+  const work = new Promise<void>((resolve) => {
+    finish = resolve;
+  });
+  const finalize = jest.fn(() => work);
+  const spy = jest
+    .spyOn(sdk.RoutstrClient.prototype, 'routeRequest')
+    .mockResolvedValue({ finalize });
+  try {
+    const bound = await require('@/shared/lib/routstr/sdk/client').getRoutstrClient(
+      'https://example.invalid'
+    );
+    const response = await bound.client.routeRequest({});
+    const pending = env.switchToExistingProfile({ accountIndex: 1 });
+    const settlement = response.finalize();
+    await Promise.resolve();
+    expect(env.useProfileStore.getState().activeAccountIndex).toBe(0);
+    expect(env.resume).not.toHaveBeenCalled();
+    finish();
+    await settlement;
+    expect(env.resume).not.toHaveBeenCalled();
+    await bound.finish();
+    expect(await pending).toBe(true);
+    expect(env.restartApp).not.toHaveBeenCalled();
+  } finally {
+    spy.mockRestore();
+  }
+});
+
+it('stops the installed SDK refund timer hook and awaits its running refund', async () => {
+  const env = await setup();
+  const sdk = require('@routstr/sdk/browser');
+  let refundComplete: () => void = () => {};
+  const refund = new Promise<void>((resolve) => {
+    refundComplete = resolve;
+  });
+  const spender = {
+    _refundRetryInterval: 1,
+    _stopRefundRetryInterval: jest.fn(() => {
+      spender._refundRetryInterval = 0;
+    }),
+    refundXcashuTokens: jest.fn(() => refund),
+  };
+  const spy = jest.spyOn(sdk.RoutstrClient.prototype, 'getCashuSpender').mockReturnValue(spender);
+  try {
+    const bound = await require('@/shared/lib/routstr/sdk/client').getRoutstrClient(
+      'https://example.invalid'
+    );
+    const active = bound.client.getCashuSpender().refundXcashuTokens();
+    const pending = env.switchToExistingProfile({ accountIndex: 1 });
+    for (let turn = 0; turn < 15; turn++) await Promise.resolve();
+    expect(env.useProfileStore.getState().activeAccountIndex).toBe(0);
+    expect(env.resume).not.toHaveBeenCalled();
+    refundComplete();
+    await active;
+    expect(await pending).toBe(true);
+    expect(spender._stopRefundRetryInterval).toHaveBeenCalledTimes(1);
+    expect(env.restartApp).not.toHaveBeenCalled();
+  } finally {
+    spy.mockRestore();
+  }
+});
+
+it('disposes an NDK initialized after quiescence has taken the service snapshot', async () => {
+  const env = await setup();
+  const React = require('react');
+  const renderer = require('react-test-renderer');
+  const mobile = require('@nostr-dev-kit/ndk-mobile');
+  require('@/shared/lib/logger').useInitMount = jest.fn();
+  require('@/shared/providers/InitializationProvider').useInitializationStage.mockReturnValue({
+    canStart: false,
+  });
+  require('@/shared/providers/NostrKeysProvider').useNostrKeysContext.mockReturnValue({
+    keys: null,
+  });
+  const old = {
+    cacheAdapter: { database: 'A' },
+    signer: {},
+    removeAllListeners: jest.fn(),
+    subManager: { subscriptions: new Map() },
+    pool: { relays: new Map() },
+    outboxPool: { relays: new Map([['relay', { disconnect: jest.fn() }]]) },
+  };
+  let current = old;
+  const init = jest.fn((params) => {
+    current = { ...params };
+  });
+  const spy = jest
+    .spyOn(mobile, 'useNDK')
+    .mockImplementation(() => ({ ndk: current, init, logout: jest.fn() }));
+  const { NostrNDKProvider } = require('@/shared/providers/NostrNDKProvider');
+  let tree: ReturnType<typeof renderer.create>;
+  env.protocol.registerProfileSwitchService('deferred-provider', async () => {
+    await renderer.act(async () => {
+      tree = renderer.create(React.createElement(NostrNDKProvider, { accountIndex: 0 }, null));
+    });
+  });
+  env.suspend.mockImplementation(async () => {
+    await renderer.act(async () => {
+      tree.unmount();
+    });
+  });
+  try {
+    expect(await env.switchToExistingProfile({ accountIndex: 1 })).toBe(true);
+    expect(env.restartApp).not.toHaveBeenCalled();
+    expect(current).not.toBe(old);
+    expect(old.cacheAdapter).toBeUndefined();
+    expect(old.outboxPool.relays.get('relay')?.disconnect).toHaveBeenCalled();
+  } finally {
+    spy.mockRestore();
+  }
 });

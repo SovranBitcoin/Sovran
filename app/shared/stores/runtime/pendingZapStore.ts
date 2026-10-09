@@ -100,4 +100,4 @@ export function clearPendingZaps(): void {
   pendingByTarget.clear();
 }
 
-registerAccountScoped('payments.pending-zaps', clearPendingZaps);
+registerAccountScoped('payments.pending-zaps', clearPendingZaps, () => pendingByTarget.size === 0);
