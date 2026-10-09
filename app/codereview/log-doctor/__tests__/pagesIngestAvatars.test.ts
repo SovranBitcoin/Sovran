@@ -271,4 +271,17 @@ describe('analyzeAvatarSequences (avatars mode)', () => {
     ]);
     expect(analysis.flickers).toHaveLength(1);
   });
+
+  it('counts entries whose seed the logger redacted, so the guard cannot pass on them', () => {
+    const analysis = analyzeAvatarSequences([
+      {
+        event: 'visual.avatar.sequence',
+        params: { seed: { _kind: 'hex', len: 64 }, branch: 'loading', instance: 'row-1' },
+      },
+      avatar('alice', 'loading'),
+    ] as Parameters<typeof analyzeAvatarSequences>[0]);
+
+    expect(analysis.unreadable).toBe(1);
+    expect(analysis.sequences).toBe(1);
+  });
 });

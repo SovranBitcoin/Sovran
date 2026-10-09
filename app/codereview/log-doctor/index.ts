@@ -4513,6 +4513,11 @@ function modePages(entries: LogEntry[], _opts: Options): string {
 
 function modeAvatars(entries: LogEntry[], _opts: Options): string {
   const analysis = analyzeAvatarSequences(entries);
+  if (analysis.unreadable > 0) {
+    // A guard that cannot read its input must not report a pass.
+    process.exitCode = 1;
+    return `FAIL: ${analysis.unreadable} visual.avatar.sequence entries have no readable seed or branch (redacted by the logger?), so the sequences cannot be checked.`;
+  }
   if (analysis.sequences === 0) {
     return 'No visual.avatar.sequence events found. (Avatar sequences log at debug level in dev builds.)';
   }

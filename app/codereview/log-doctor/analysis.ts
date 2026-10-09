@@ -769,6 +769,8 @@ interface AvatarAnalysis {
   seeds: number;
   /** Distinct avatar instance + seed pairs seen. */
   sequences: number;
+  /** Entries with no readable seed or branch, which cannot be checked. */
+  unreadable: number;
   flickers: AvatarFlicker[];
 }
 
@@ -779,11 +781,15 @@ export function analyzeAvatarSequences(entries: AnalyzableEntry[]): AvatarAnalys
   const recent = new Map<string, string[]>();
   const seeds = new Set<string>();
   const flickers: AvatarFlicker[] = [];
+  let unreadable = 0;
 
   for (const entry of entries) {
     if (entry.event !== 'visual.avatar.sequence') continue;
     const params = entry.params ?? {};
-    if (typeof params.seed !== 'string' || typeof params.branch !== 'string') continue;
+    if (typeof params.seed !== 'string' || typeof params.branch !== 'string') {
+      unreadable += 1;
+      continue;
+    }
     const seed = params.seed;
     const instance = typeof params.instance === 'string' ? params.instance : '';
     seeds.add(seed);
@@ -799,5 +805,5 @@ export function analyzeAvatarSequences(entries: AnalyzableEntry[]): AvatarAnalys
     }
   }
 
-  return { seeds: seeds.size, sequences: recent.size, flickers };
+  return { seeds: seeds.size, sequences: recent.size, unreadable, flickers };
 }
