@@ -111,8 +111,19 @@ New findings from the capture:
 
 ### Still unproven or blocked
 
-- **The opt-in switch has never completed on a device.** It still restarts when Whitenoise has loaded
-  MLS groups, since Marmot cannot release their private state without deleting history. Its canary
+- **The opt-in switch has completed on the Android emulator only**, between two derived profiles in
+  mock mode: no reload, and the app was initialised again in about four seconds. The first attempt
+  sat on the splash screen forever, because the switch cleared a startup stage owned above the
+  account providers; that is fixed. Still untested: iOS, a physical phone, a funded wallet, an
+  imported-key profile, and a profile with Whitenoise groups, which still forces a restart since
+  Marmot cannot release their private state without deleting history.
+- **The dev leak scan flagged `nostr-metadata-cache`** as containing the previous account's pubkey
+  after that switch. It is probably the other profile's public metadata, which the profile switcher
+  shows, but that has not been confirmed. The scan matches any occurrence of the pubkey, so it cannot
+  tell public data from a leak.
+- **The profile sheet stalls on the instrumented dev build.** `actionMenuHost.open_stalled` fired
+  repeatedly on the emulator and the sheet dismissed itself after about five seconds. Not
+  investigated; this work did not touch that component. Its canary
   proves 54 stores and 25 of 30 module-level holders empty after a switch; the session epoch, the
   For You cache, quote flights, the melt target and the Cashu seed are disposed but not inspectable.
   If the in-process switch fails and the restart is also unavailable, providers stay suspended and
