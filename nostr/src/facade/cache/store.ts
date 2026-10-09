@@ -14,6 +14,8 @@
 // binding (React or otherwise) revalidate on change without the core knowing it.
 // ---------------------------------------------------------------------------
 
+import { isNostrLogActive, nostrLog } from '../../log';
+
 /** Combine a partial write with the existing record into the stored record. */
 export type Merge<T> = (existing: T | undefined, patch: Partial<T>) => T;
 
@@ -25,6 +27,8 @@ export type NormalizingStoreOptions<T> = {
    * additive (undefined-preserving), last-writer-wins.
    */
   merge?: Merge<T>;
+  /** Names this store in `cache.store.write` log events. */
+  name?: string;
 };
 
 export interface NormalizingStore<T> {
@@ -81,6 +85,7 @@ function shallowEqual<T>(a: T, b: T): boolean {
 export function createNormalizingStore<T>(options: NormalizingStoreOptions<T>): NormalizingStore<T> {
   const { maxEntries } = options;
   const merge = options.merge ?? fieldLevelMerge;
+  const name = options.name ?? 'unnamed';
   // Map preserves insertion order; we re-insert on touch so the first key is
   // always the least-recently-used, giving O(1) eviction.
   const map = new Map<string, T>();
@@ -91,9 +96,28 @@ export function createNormalizingStore<T>(options: NormalizingStoreOptions<T>): 
     for (const listener of listeners) listener();
   }
 
-  function notifyKey(key: string): void {
+  /** Notify one key's listeners; returns how many were called. */
+  function notifyKey(key: string): number {
     const set = keyListeners.get(key);
-    if (set) for (const listener of set) listener();
+    if (!set) return 0;
+    for (const listener of set) listener();
+    return set.size;
+  }
+
+  /**
+   * One event per write batch: how much of it was new, and how many listeners
+   * it woke. `written` far above `changed` is redundant ingest; a small
+   * `changed` with a large listener count is fan-out. Counts only — never keys
+   * or records.
+   */
+  function logWrite(written: number, changed: number, keyListenersNotified: number): void {
+    nostrLog.debug('cache.store.write', {
+      store: name,
+      written,
+      changed,
+      keyListenersNotified,
+      globalListenersNotified: changed > 0 ? listeners.size : 0,
+    });
   }
 
   /** Move a key to the most-recently-used position. */
@@ -142,20 +166,24 @@ export function createNormalizingStore<T>(options: NormalizingStoreOptions<T>): 
     set(key, patch) {
       const changed = write(key, patch);
       evict();
-      if (changed) {
-        notifyKey(key);
-        notifyGlobal();
-      }
+      const keyListenersNotified = changed ? notifyKey(key) : 0;
+      if (changed) notifyGlobal();
+      if (isNostrLogActive()) logWrite(1, changed ? 1 : 0, keyListenersNotified);
     },
     setMany(entries) {
       const changedKeys: string[] = [];
+      let written = 0;
+      let keyListenersNotified = 0;
       for (const [key, patch] of entries) {
+        written += 1;
         if (write(key, patch)) changedKeys.push(key);
       }
-      if (changedKeys.length === 0) return;
-      evict();
-      for (const key of changedKeys) notifyKey(key);
-      notifyGlobal();
+      if (changedKeys.length > 0) {
+        evict();
+        for (const key of changedKeys) keyListenersNotified += notifyKey(key);
+        notifyGlobal();
+      }
+      if (isNostrLogActive()) logWrite(written, changedKeys.length, keyListenersNotified);
     },
     delete(key) {
       if (map.delete(key)) {
