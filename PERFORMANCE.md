@@ -34,7 +34,7 @@ both dev builds; **nothing has run on a physical phone**, and nothing interactiv
 | CALC-2, 7, 8, 11, 12, 13, 14, 15, 16, 17, 18 | Done |
 | CALC-3 | Measured, not changed: the receive-recovery phase had a median of about 7.2 s on the emulator |
 | CALC-4, CALC-5 | Done: wallet polling pauses after ten seconds in the background and resumes at once. **Needs a pay-while-backgrounded check on a real phone** |
-| CALC-6 | Done in code. A wrap already handled this session is skipped before decrypt or ingest; the poll pauses in the background, has a timeout below its cadence, and sends `since`. nagg accepts `since` on branch `feat/dm-envelopes-since` (local, not pushed). Gift wraps are back-dated by up to two days, so a quiet inbox's last two days are still refetched; `since` spares only older history, and only once nagg is deployed |
+| CALC-6 | Done in code. A wrap already handled this session is skipped before decrypt or ingest; the poll pauses in the background, has a timeout below its cadence, and sends `since`. nagg accepts `since` as of `426d356`, pushed to `v2` on 2026-10-09 and not yet deployed. Gift wraps are back-dated by up to two days, so a quiet inbox's last two days are still refetched; `since` spares only older history, and only once nagg is deployed |
 | CALC-9, CALC-19 | Closed, no change: `inlineRequires` already defers marmot-ts, and the polyfills must load before anything else |
 | CALC-10 | Done with VIS-7 |
 | DEP-12 | Done |
@@ -138,7 +138,7 @@ Nothing below can be done from a development machine alone.
 
 | Left | Needs |
 | --- | --- |
-| Deploy nagg with `since` | A push and deploy of `feat/dm-envelopes-since` |
+| Deploy nagg with `since` | A deploy of `v2` (`426d356` is pushed) |
 | Background polling pause, checked for real | A physical iPhone and Android phone: pay an invoice from another app with this one backgrounded |
 | The in-process switch on iOS, with a funded wallet, an imported key, and Whitenoise groups | Hands on a device; funded and destructive scenarios are never run against a real wallet from automation |
 | Single-profile removal and an imported-key switch, run once | Hands on a device; the emulator already has a spare empty derived profile (index 1) to remove |
