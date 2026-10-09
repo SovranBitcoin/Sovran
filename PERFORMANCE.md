@@ -41,7 +41,8 @@ build; **nothing has run on iOS or on a physical phone.**
 | DEP-1, 2, 3, 8, 10, 11 | Evaluated in review: keep |
 | DEP-4, 5, 6, DEP-7 (pager-view), DEP-14 (`network-timeouts`, `expo-dev-client`, `expo-build-properties`, `cborg`) | Evaluated: keep. No installed package replaces Skia, image-colors, webview or pager-view; `cborg` is pinned for a Jest mapper |
 | DEP-13 | Evaluated: no change. Both are peers the app never imports; bun installs and locks them already |
-| DEP-7 (`@react-native-menu/menu`), DEP-9 (`jsdom`) | **Open.** Likely removable, untested: the menu is used by two `.liquid.tsx` variants, `jsdom` by three tests that never touch `document` |
+| DEP-9 (`jsdom`) | Evaluated by test: keep. Switching its three suites to the node environment fails the `SendScreen` people-search tests |
+| DEP-7 (`@react-native-menu/menu`) | **Open.** Used only by two `.liquid.tsx` variants (unit and fiat pills). Removing it needs a look at those pills on an iOS liquid-glass build |
 | ACCT-1 to ACCT-9, ACCT-11 | Done **inside the opt-in switch**. Settings has a developer toggle, off by default; with it off a profile switch restarts exactly as before. ADR 0029 |
 | ACCT-10 | Done as single-profile removal, refused unless the wallet is provably empty. No separate sign-out. ADR 0030 |
 
