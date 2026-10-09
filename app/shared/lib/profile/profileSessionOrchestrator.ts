@@ -189,13 +189,13 @@ async function switchByRestart(accountIndex: number): Promise<boolean> {
  * that still hold the old account's state. Hold the providers down, keep the
  * splash and the lock, and ask for a reopen.
  */
-async function holdUntilReopened(): Promise<void> {
+async function holdUntilReopened(
+  message = 'Please close and reopen the app to finish switching profiles.'
+): Promise<void> {
   await holdProfileSwitchForRestart().catch(() => {
     log.warn('profile.switch.boundary_hold_failed');
   });
-  Alert.alert('Restart Required', 'Please close and reopen the app to finish switching profiles.', [
-    { text: 'OK' },
-  ]);
+  Alert.alert('Restart Required', message, [{ text: 'OK' }]);
 }
 
 export async function createAndSwitchProfile(opts?: {
@@ -339,6 +339,8 @@ export async function deleteAllProfiles(opts?: {
     await lock.release();
     return false;
   }
+  // Set once the first irreversible deletion starts.
+  let erasing = false;
   try {
     lock.holdSplash(splashControls(opts), { holdUntilCancel: true });
     usePopupStore.getState().close();
@@ -350,6 +352,7 @@ export async function deleteAllProfiles(opts?: {
     const clearSecureData = await prepareSecureDataReset(accountIndexes, importedPubkeys);
 
     // 1. Close SQLite and destroy all Coco databases
+    erasing = true;
     await CocoManager.completeReset(accountIndexes);
 
     // 2. Clear ALL secure storage (mnemonic, derived keys, cashu mnemonics, imported nsecs)
@@ -395,17 +398,21 @@ export async function deleteAllProfiles(opts?: {
     // the in-flight closure rechecks before commit.
     useBTCMapStore.getState().reset();
 
-    const restarted = await teardownAndRestart();
-    if (!restarted) {
-      await lock.release();
-      Alert.alert('Restart Required', 'Please close and reopen the app to complete the reset.', [
-        { text: 'OK' },
-      ]);
+    if (!(await teardownAndRestart())) {
+      await holdUntilReopened('Please close and reopen the app to complete the reset.');
     }
     return true;
   } catch (error) {
-    log.error('profile.orchestrator.delete_all_failed', { error: redactError(error) });
-    await lock.release();
+    log.error('profile.orchestrator.delete_all_failed', { erasing, error: redactError(error) });
+    if (!erasing) {
+      await lock.release();
+      return false;
+    }
+    // Part of the installation is gone. The account providers must not come
+    // back over it, so the lock is kept and the app waits to be reopened.
+    await holdUntilReopened(
+      'The reset did not finish. Please close and reopen the app, then try again.'
+    );
     return false;
   }
 }

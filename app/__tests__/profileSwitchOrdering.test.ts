@@ -23,6 +23,7 @@ jest.mock('@/shared/lib/profile/appRestart', () => ({
 jest.mock('@/shared/lib/cashu/manager', () => ({
   CocoManager: {
     cleanup: jest.fn().mockResolvedValue(undefined),
+    completeReset: jest.fn().mockResolvedValue(undefined),
     isReadyForCleanup: jest.fn(() => true),
     isInitialized: jest.fn(() => true),
   },
@@ -68,6 +69,7 @@ function setup() {
   return {
     switchToExistingProfile: orchestrator.switchToExistingProfile,
     createAndSwitchProfile: orchestrator.createAndSwitchProfile,
+    deleteAllProfiles: orchestrator.deleteAllProfiles,
     useProfileStore,
     mockRestart: jest.mocked(restartApp),
     AsyncStorage,
@@ -261,5 +263,73 @@ describe('createAndSwitchProfile — capacity', () => {
     expect(created).toBe(true);
     expect(useProfileStore.getState().profiles).toHaveLength(3);
     expect(persistedActiveIndex(AsyncStorage)).toBe(2);
+  });
+});
+
+describe('deleteAllProfiles — a wipe that does not finish', () => {
+  function mockSecureReset(prepare: () => Promise<() => Promise<boolean>>) {
+    jest.doMock('@/shared/lib/nostr/secureStorage', () => ({
+      ...jest.requireActual('@/shared/lib/nostr/secureStorage'),
+      prepareSecureDataReset: jest.fn(prepare),
+    }));
+  }
+
+  afterEach(() => jest.dontMock('@/shared/lib/nostr/secureStorage'));
+
+  it('gives the app back when it fails before anything is erased', async () => {
+    mockSecureReset(async () => {
+      throw new Error('keychain unavailable');
+    });
+    const { deleteAllProfiles, switchToExistingProfile, mockRestart } = setup();
+    mockRestart.mockReturnValue(true);
+    const { Alert } = require('react-native');
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+
+    expect(await deleteAllProfiles()).toBe(false);
+
+    expect(alert).not.toHaveBeenCalled();
+    // Nothing was erased, so the lock is released and the app carries on.
+    expect(await switchToExistingProfile({ accountIndex: 1 })).toBe(true);
+  });
+
+  it('holds the app once erasing has started', async () => {
+    mockSecureReset(async () => async () => false);
+    const {
+      deleteAllProfiles,
+      switchToExistingProfile,
+      useProfileStore,
+      mockRestart,
+      AsyncStorage,
+    } = setup();
+    mockRestart.mockReturnValue(true);
+    const clear = jest.spyOn(AsyncStorage, 'clear');
+    const { Alert } = require('react-native');
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+
+    // The wallet databases are gone and secure storage did not clear.
+    expect(await deleteAllProfiles()).toBe(false);
+
+    // Preferences are not erased and the app is not restarted into a wallet
+    // whose keys are still there but whose databases are not.
+    expect(clear).not.toHaveBeenCalled();
+    expect(mockRestart).not.toHaveBeenCalled();
+    expect(alert).toHaveBeenCalledWith('Restart Required', expect.any(String), expect.any(Array));
+    // The profiles are still listed, and nothing may run as them over a
+    // deleted wallet: the lock stays held until the app is reopened.
+    expect(useProfileStore.getState().profiles).toHaveLength(2);
+    expect(await switchToExistingProfile({ accountIndex: 1 })).toBe(false);
+  });
+
+  it('holds the app when the wipe finishes but the restart does not happen', async () => {
+    mockSecureReset(async () => async () => true);
+    const { deleteAllProfiles, switchToExistingProfile, mockRestart } = setup();
+    mockRestart.mockReturnValue(false);
+    const { Alert } = require('react-native');
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+
+    expect(await deleteAllProfiles()).toBe(true);
+
+    expect(alert).toHaveBeenCalledWith('Restart Required', expect.any(String), expect.any(Array));
+    expect(await switchToExistingProfile({ accountIndex: 0 })).toBe(false);
   });
 });

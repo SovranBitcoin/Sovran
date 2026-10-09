@@ -116,14 +116,6 @@ it('discards only the unused onboarding profile projection before replacing the 
   expect(useSettingsStore.persist.getOptions().storage!.setItem).toHaveBeenCalled();
 });
 
-it('does not erase preferences or restart when secure deletion fails', async () => {
-  jest.mocked(clearAllSecureData).mockResolvedValue(false);
-  await expect(deleteAllProfiles()).resolves.toBe(false);
-  expect(clearAllSecureData).toHaveBeenCalled();
-  expect(AsyncStorage.clear).not.toHaveBeenCalled();
-  expect(restartApp).not.toHaveBeenCalled();
-});
-
 it('leaves databases and keys intact when reset enumeration fails', async () => {
   jest.mocked(prepareSecureDataReset).mockRejectedValueOnce(new Error('index unreadable'));
   await expect(deleteAllProfiles()).resolves.toBe(false);

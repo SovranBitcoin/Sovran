@@ -111,6 +111,13 @@ Any step that fails or takes longer than five seconds ends in a restart instead.
 also unavailable, the providers stay suspended and writes stay blocked: a stuck app, never a
 half-switched wallet.
 
+### Delete everything
+
+`deleteAllProfiles` erases the wallet databases, then secure storage, then everything else, and
+restarts. A failure before the first deletion gives the app back unchanged. A failure after it, or a
+restart that does not happen, holds the app exactly as a failed switch does: the account providers
+must not come back over a partly erased installation.
+
 ### Remove one profile
 
 Only a profile that is not active and not the last. Refused unless its wallet is provably empty,
@@ -133,6 +140,9 @@ Rules that follow from them:
   old release wrote, copies the secrets across, verifies them, and only then strips the plaintext
   (`routstrSecurePersistence.test.ts`).
 - Never rename, remove or tighten a persisted field. Add fields with a default and tolerance.
+- A limit belongs on the code that writes, never on the schema that reads. A stored blob the
+  schema rejects is replaced by defaults, so a ceiling on read deletes what it was meant to bound
+  (`profileStoreCapacity.test.ts`).
 - Never change a store's name, a storage key format, a SecureStore key name or a database name.
 - A one-time storage migration keeps its own frozen list of names. It records what old installs
   wrote, so it must not follow the live registry (`globalMigrations.ts`).
