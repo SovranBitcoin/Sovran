@@ -984,7 +984,7 @@
     "content-container-style": 2
   },
   "shared/ui/composed/SectionHeading.tsx": {
-    "inline-style": 1
+    "inline-style": 2
   },
   "shared/ui/composed/SheetGrabber.tsx": {
     "stylesheet-create": 1
