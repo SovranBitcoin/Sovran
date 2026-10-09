@@ -1,3 +1,4 @@
+import { registerAccountScoped } from '@/shared/lib/persist/accountScoped';
 /**
  * Two-tier cache (in-memory + AsyncStorage) keyed by an external "scope"
  * identifier — typically a Nostr recipient pubkey, but the factory is
@@ -75,6 +76,16 @@ export function createPubkeyScopedCache<T>(opts: PubkeyScopedCacheOpts<T>): Pubk
   const negEnabled = !!opts.storagePrefixNeg;
 
   const scopes = new Map<string, PerScopeCache<T>>();
+  registerAccountScoped(`plaintext-cache:${opts.storagePrefix}`, () => {
+    for (const state of scopes.values()) {
+      if (state.flushTimer) clearTimeout(state.flushTimer);
+      state.memory.clear();
+      state.negative.clear();
+      state.dirty = false;
+      state.dirtyNeg = false;
+    }
+    scopes.clear();
+  });
 
   function getScope(scope: string): PerScopeCache<T> {
     let s = scopes.get(scope);

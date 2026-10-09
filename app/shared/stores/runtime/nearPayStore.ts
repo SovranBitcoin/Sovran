@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 
 import { storeLog } from '@/shared/lib/logger';
 
@@ -57,7 +57,10 @@ function createSessionId(peerID: string): string {
   return `${peerID}-${Date.now()}`;
 }
 
-export const useNearPaySessionStore = create<NearPaySessionStore>((set, get) => ({
+export const useNearPaySessionStore = create<NearPaySessionStore>({
+  name: 'useNearPaySessionStore',
+  scope: 'session',
+})((set, get) => ({
   active: null,
   radarVisible: false,
 

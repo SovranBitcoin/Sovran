@@ -30,7 +30,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Manager } from '@cashu/coco-core';
 import type { GetInfoResponse } from '@cashu/cashu-ts';
 import { z } from 'zod';
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { persist, subscribeWithSelector } from 'zustand/middleware';
 
 import { auditGroupFromDiscover } from '@/features/mint/lib/auditInfo';
@@ -217,7 +217,10 @@ function auditScalarsFrom(auditData: LegacyMintAudit): Partial<MintMetadataEntry
   };
 }
 
-export const useMintMetadataStore = create<MintMetadataState>()(
+export const useMintMetadataStore = create<MintMetadataState>({
+  name: 'mint-metadata-store',
+  scope: 'global',
+})(
   subscribeWithSelector(
     persist(
       (set, get) => ({

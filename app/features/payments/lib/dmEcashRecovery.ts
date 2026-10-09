@@ -1,3 +1,4 @@
+import { registerAccountScoped } from '@/shared/lib/persist/accountScoped';
 /**
  * @fileoverview Recovery for message ecash the redeem queue has parked.
  *
@@ -102,3 +103,7 @@ export async function reconcileParkedMessageEcash(
   }
   return requeued;
 }
+
+registerAccountScoped('payments.dm-ecash-reviewed', () => {
+  reviewed.clear();
+});

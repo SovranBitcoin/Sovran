@@ -13,6 +13,8 @@
  * `shared/lib/migrations/globalMigrations.ts`.
  */
 
+import { persistRegistry } from '@/shared/lib/persist/persistConfig';
+
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StateStorage } from 'zustand/middleware';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
@@ -121,39 +123,9 @@ export function createProfileScopedStorage(ownerPubkey?: string): StateStorage {
 
 /** All profile-scoped store persistence keys. */
 export const PROFILE_SCOPED_STORE_KEYS = [
-  'mint-store',
-  'mint-distribution-store',
-  'npc-mint-store',
-  'routstr-store',
-  'ai-provider-directory-store',
-  'scan-history-store',
-  'search-history-store',
-  'recent-people-store',
-  'dm-last-message-store',
-  'swap-transactions-store',
-  'transaction-location-store',
-  'transaction-distribution-store',
-  'nostr-social-store',
-  'own-content-store',
-  'own-profile-metadata-store',
-  'vertex-budget-store',
-  'nostr-relay-list-store',
-  'nostr-media-server-store',
-  'nostr-metadata-cache',
-  'theme-store',
-  'bitchat-dm-messages-store',
-  'feed-ignore-store',
-  'notification-policy-store',
-  'nip46-connections-store',
-  'nip46-activity-store',
-  'transaction-annotation-store',
-  'owned-media-store',
-  'data-migration-store',
-  // Generic query caches (createQueryCacheStore). Profile-scoped because their
-  // entries are keyed by the viewer pubkey.
-  'feed-cache',
-  'notifications-cache',
-  'dm-conversations-cache',
-  'dm-messages-cache',
-  'own-profile-stats-cache',
+  ...new Set(
+    persistRegistry.definitions
+      .filter((entry) => entry.profileStorage && (entry.persisted || entry.queryCache))
+      .map((entry) => entry.name)
+  ),
 ];

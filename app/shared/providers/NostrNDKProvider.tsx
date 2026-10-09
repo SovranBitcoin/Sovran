@@ -1,3 +1,5 @@
+import { clearForYouCache } from 'nostr';
+import { registerAccountScoped } from '@/shared/lib/persist/accountScoped';
 import { createContext, useContext, useEffect, useMemo, useRef, useState, ReactNode } from 'react';
 import { NDKCacheAdapterSqlite, NDKPrivateKeySigner, useNDK } from '@nostr-dev-kit/ndk-mobile';
 import { relays } from '@/shared/ndk';
@@ -37,9 +39,16 @@ export function NostrNDKProvider({
   accountIndex: accountIndexProp,
 }: NostrNDKProviderProps) {
   useInitMount('NostrNDKProvider');
-  const { init: initializeNDK } = useNDK();
+  const { init: initializeNDK, ndk } = useNDK();
   const { keys: nostrKeys } = useNostrKeysContext();
   const activeAccountIndex = accountIndexProp ?? 0;
+  useEffect(() => {
+    if (!ndk) return;
+    registerAccountScoped(`nostr.ndk:${activeAccountIndex}`, () => {
+      for (const relay of ndk.pool.relays.values()) relay.disconnect();
+      ndk.signer = undefined;
+    });
+  }, [ndk, activeAccountIndex]);
   const hasInitialized = useRef(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const cacheAdapterRef = useRef<{
@@ -159,3 +168,5 @@ export function NostrNDKProvider({
 
   return <NostrNDKContext.Provider value={contextValue}>{children}</NostrNDKContext.Provider>;
 }
+
+registerAccountScoped('nostr.for-you-cache', clearForYouCache);

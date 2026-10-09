@@ -6,7 +6,7 @@
  * because the content address maps directly to the imeta `x` field and the user
  * can point at any server (including self-hosted).
  */
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { persist } from 'zustand/middleware';
 import { z } from 'zod';
 
@@ -46,7 +46,10 @@ export function isValidHttpsUrl(server: string): boolean {
   );
 }
 
-export const useMediaServerStore = create<MediaServerState>()(
+export const useMediaServerStore = create<MediaServerState>({
+  name: 'nostr-media-server-store',
+  scope: 'profile',
+})(
   persist(
     (set) => ({
       server: DEFAULT_BLOSSOM_SERVER,

@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { persist, subscribeWithSelector } from 'zustand/middleware';
 import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
@@ -158,7 +158,10 @@ function redistributeDelta(
  */
 export const EMPTY_DISTRIBUTION: Readonly<Record<string, number>> = Object.freeze({});
 
-export const useMintDistributionStore = create<MintDistributionStore>()(
+export const useMintDistributionStore = create<MintDistributionStore>({
+  name: 'mint-distribution-store',
+  scope: 'profile',
+})(
   subscribeWithSelector(
     persist(
       (set, get) => ({

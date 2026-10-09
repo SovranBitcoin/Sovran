@@ -1,3 +1,4 @@
+import { registerAccountScoped } from '@/shared/lib/persist/accountScoped';
 /**
  * App-session epoch for the query cache's cold-start detection.
  *
@@ -9,7 +10,11 @@
  * treated as cold (network-first, no stale first paint). The epoch resets to 1
  * on every JS runtime start (cold reopen) and on a profile switch (full reload).
  */
-const epoch = 1;
+let epoch = 1;
+
+registerAccountScoped('cache.session-epoch', () => {
+  epoch += 1;
+});
 
 export function currentCacheEpoch(): number {
   return epoch;

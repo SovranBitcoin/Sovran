@@ -1,3 +1,4 @@
+import { registerAccountScoped } from '@/shared/lib/persist/accountScoped';
 import { verifyNip05 } from 'wallet';
 import NDK, { NDKEvent, NDKSubscriptionCacheUsage } from '@nostr-dev-kit/ndk-mobile';
 import { Result, ResultAsync, err, ok, type Result as ResultType } from 'neverthrow';
@@ -293,3 +294,7 @@ export function publishOwnProfileMetadata({
   });
   return result;
 }
+
+registerAccountScoped('nostr.profile-publish-flights', () => {
+  inFlight.clear();
+});

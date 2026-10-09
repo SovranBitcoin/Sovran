@@ -1,3 +1,4 @@
+import { registerAccountScoped } from '@/shared/lib/persist/accountScoped';
 /**
  * @fileoverview NIP-61 nutzap-info discovery (`kind:10019` lookup).
  *
@@ -167,3 +168,8 @@ export function prefetchNutzapProfile(pubkeyHex: string | undefined | null): voi
     /* resolveNutzapProfile degrades rather than rejects; this is belt-and-braces */
   });
 }
+
+registerAccountScoped('nostr.nutzap-profile-cache', () => {
+  cache.clear();
+  inflight.clear();
+});

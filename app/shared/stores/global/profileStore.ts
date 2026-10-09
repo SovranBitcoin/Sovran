@@ -9,7 +9,7 @@
  * and which one is currently active.
  */
 
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { persist } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { z } from 'zod';
@@ -147,7 +147,7 @@ function migrateProfileStore(state: unknown, version: number): V2Persisted {
   return state as V2Persisted;
 }
 
-export const useProfileStore = create<ProfileStore>()(
+export const useProfileStore = create<ProfileStore>({ name: 'profile-store', scope: 'global' })(
   persist(
     (set, get) => ({
       activeAccountIndex: 0,

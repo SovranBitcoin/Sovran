@@ -12,7 +12,7 @@
  */
 
 import { err, ok, type Result } from 'neverthrow';
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { persist } from 'zustand/middleware';
 import { z } from 'zod';
 
@@ -372,7 +372,10 @@ function sanitizeGrants(
   return out;
 }
 
-export const useNip46ConnectionsStore = create<Nip46ConnectionsStore>()(
+export const useNip46ConnectionsStore = create<Nip46ConnectionsStore>({
+  name: 'nip46-connections-store',
+  scope: 'profile',
+})(
   persist(
     (set, get) => {
       const patchApp = (

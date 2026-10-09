@@ -1,3 +1,4 @@
+import { registerAccountScoped } from '@/shared/lib/persist/accountScoped';
 // `@routstr/sdk/browser`, not `/client` or `/storage`: those entries reach for
 // `os` and `better-sqlite3` to persist Tinfoil's cache secret and its model
 // database on a filesystem. React Native has neither. The browser build carries
@@ -571,3 +572,7 @@ export function resetRoutstrClient(): void {
   for (const timer of recoveryTimers) clearTimeout(timer);
   recoveryTimers = [];
 }
+
+registerAccountScoped('routstr.client', () => {
+  resetRoutstrClient();
+});

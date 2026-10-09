@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 
 import { describeError } from '@/shared/lib/errors';
 import { paymentLog } from '@/shared/lib/logger';
@@ -57,7 +57,10 @@ function withoutStatusCopy(active: ActivePaymentStatus): ActivePaymentStatus {
   return next;
 }
 
-export const usePaymentStatusStore = create<PaymentStatusStore>((set) => ({
+export const usePaymentStatusStore = create<PaymentStatusStore>({
+  name: 'usePaymentStatusStore',
+  scope: 'session',
+})((set) => ({
   active: null,
   setActive: (payment) => {
     set((s) => {

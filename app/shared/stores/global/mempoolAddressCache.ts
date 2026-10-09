@@ -7,7 +7,7 @@
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { z } from 'zod';
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { persist } from 'zustand/middleware';
 
 import { evictLruOverCap } from '@/shared/lib/cache/evictLruOverCap';
@@ -49,7 +49,10 @@ function summarizeAddress(address: string): Record<string, unknown> {
   return { addressLength: address.trim().length };
 }
 
-export const useMempoolAddressCache = create<MempoolAddressCacheState>()(
+export const useMempoolAddressCache = create<MempoolAddressCacheState>({
+  name: 'mempool-address-cache',
+  scope: 'global',
+})(
   persist(
     (set) => ({
       byAddress: {},

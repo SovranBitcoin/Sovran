@@ -15,6 +15,7 @@ import type { MintChangesResponse } from '@/shared/lib/apiClient';
 export const MINT_CHANGES_CACHE_KEY = 'global';
 
 export const mintChangesCache = createQueryCacheStore<MintChangesResponse>({
+  scope: 'global',
   name: 'mint-changes-cache',
   logKey: 'mint_changes_cache',
   // nagg re-polls each mint roughly daily; 30 minutes keeps a tab revisit warm

@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 
 import { storeLog } from '@/shared/lib/logger';
 
@@ -46,7 +46,10 @@ interface ContactSendStore {
   clear: () => void;
 }
 
-export const useContactSendStore = create<ContactSendStore>((set) => ({
+export const useContactSendStore = create<ContactSendStore>({
+  name: 'useContactSendStore',
+  scope: 'session',
+})((set) => ({
   active: null,
 
   start: (target) => {

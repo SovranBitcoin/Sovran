@@ -9,7 +9,7 @@
  * - Quick re-access to previously scanned data
  */
 
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { persist, subscribeWithSelector } from 'zustand/middleware';
 import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
@@ -124,7 +124,10 @@ const PersistedScanHistoryStore = z.object({
   entries: z.array(PersistedScanEntry).max(MAX_SCAN_HISTORY).default([]),
 });
 
-export const useScanHistoryStore = create<ScanHistoryStore>()(
+export const useScanHistoryStore = create<ScanHistoryStore>({
+  name: 'scan-history-store',
+  scope: 'profile',
+})(
   subscribeWithSelector(
     persist(
       (set) => ({

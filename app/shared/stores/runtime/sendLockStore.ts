@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 
 import { storeLog } from '@/shared/lib/logger';
 import type { CashuP2pkPubkey } from '@/shared/lib/protocolIds';
@@ -44,7 +44,10 @@ interface SendLockStore {
   clear: () => void;
 }
 
-export const useSendLockStore = create<SendLockStore>((set, get) => ({
+export const useSendLockStore = create<SendLockStore>({
+  name: 'useSendLockStore',
+  scope: 'session',
+})((set, get) => ({
   draft: null,
   set: (draft) => {
     storeLog.info('store.sendLock.set', {

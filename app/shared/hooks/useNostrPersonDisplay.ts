@@ -1,3 +1,4 @@
+import { registerAccountScoped } from '@/shared/lib/persist/accountScoped';
 /**
  * @fileoverview Person display (name + picture) — relay cache first, nagg fallback
  *
@@ -62,3 +63,7 @@ export function useNostrPersonDisplay(pubkey: string | undefined): NostrPersonDi
     isLoading,
   };
 }
+
+registerAccountScoped('nostr.person-lookup-attempted', () => {
+  attempted.clear();
+});

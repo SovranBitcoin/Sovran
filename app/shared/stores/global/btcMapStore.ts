@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { persist } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { z } from 'zod';
@@ -146,7 +146,7 @@ const PersistedBtcMapStore = z.object({
   placeDetailsCache: z.record(z.string().max(32), PersistedPlaceDetailEntry).default({}),
 });
 
-export const useBTCMapStore = create<BTCMapStore>()(
+export const useBTCMapStore = create<BTCMapStore>({ name: 'btcmap-store', scope: 'global' })(
   persist(
     (set, get) => ({
       placesCache: null,

@@ -11,7 +11,7 @@
  * - show a detail view with per-leg local status/errors
  */
 
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { persist } from 'zustand/middleware';
 import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
@@ -171,7 +171,10 @@ const PersistedSwapStore = z.object({
   quoteIdToGroup: PersistedQuoteIndex,
 });
 
-export const useSwapTransactionsStore = create<SwapTransactionsStore>()(
+export const useSwapTransactionsStore = create<SwapTransactionsStore>({
+  name: 'swap-transactions-store',
+  scope: 'profile',
+})(
   persist(
     (set, get) => ({
       groups: {},

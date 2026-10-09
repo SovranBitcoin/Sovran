@@ -1,3 +1,4 @@
+import { registerAccountScoped } from '@/shared/lib/persist/accountScoped';
 /**
  * Image attach for the AI chat composer: pick + encode.
  *
@@ -139,3 +140,7 @@ export async function encodeChatImage(attachment: ChatAttachment): Promise<strin
     return null;
   }
 }
+
+registerAccountScoped('ai.attachment-encode-cache', () => {
+  encodeCache.clear();
+});

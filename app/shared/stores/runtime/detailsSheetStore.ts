@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 
 import type { DetailsSheetItem } from '@/shared/ui/composed/DetailsSheet';
 
@@ -20,7 +20,10 @@ interface DetailsSheetState {
   clear: () => void;
 }
 
-export const useDetailsSheetStore = create<DetailsSheetState>((set, get) => ({
+export const useDetailsSheetStore = create<DetailsSheetState>({
+  name: 'useDetailsSheetStore',
+  scope: 'session',
+})((set, get) => ({
   title: 'Details',
   items: [],
   owner: null,

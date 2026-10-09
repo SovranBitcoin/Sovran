@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { persist } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { z } from 'zod';
@@ -52,7 +52,10 @@ const PersistedPricelistStore = z.object({
   serverUpdatedAt: z.number().int().nonnegative().nullable().default(null).catch(null),
 });
 
-export const usePricelistStore = create<PricelistStore>()(
+export const usePricelistStore = create<PricelistStore>({
+  name: 'pricelist-store',
+  scope: 'global',
+})(
   persist(
     (set, get) => ({
       pricelist: null,

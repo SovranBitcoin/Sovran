@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { persist } from 'zustand/middleware';
 import { z } from 'zod';
 
@@ -411,7 +411,10 @@ const PersistedNostrSocialStore = z.object({
   zappedByEventId: z.record(z.string().max(128), PersistedZappedRecord).default({}),
 });
 
-export const useNostrSocialStore = create<NostrSocialStore>()(
+export const useNostrSocialStore = create<NostrSocialStore>({
+  name: 'nostr-social-store',
+  scope: 'profile',
+})(
   persist(
     (set) => ({
       ...INITIAL_STATE,

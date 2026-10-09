@@ -654,3 +654,7 @@ export type {
 // auto-redeem orchestrator. Ecash is locked to the recipient's announced
 // P2PK key and broadcast on the public mesh — no in-band handshake.
 export * from "./transport";
+
+export { disposeReusableQuoteFlights } from "./quotes/reusable";
+export { resetMeltTarget } from "./melt-target";
+export { disposeCashuSeedGetter } from "./wallet-seed";

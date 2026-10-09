@@ -7,7 +7,7 @@
  * class; durable drafts go through NIP-37 instead. `open()` resets so a stale
  * quote never leaks into a new post.
  */
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 
 import type { ComposerBlock, PollDraft } from '@/features/composer/config/types';
 import type { ComposerTarget } from '@/features/composer/publish/buildNoteEvent';
@@ -51,7 +51,10 @@ interface ComposerState {
   addMention: (pubkey: string) => void;
 }
 
-export const useComposerStore = create<ComposerState>((set, get) => ({
+export const useComposerStore = create<ComposerState>({
+  name: 'useComposerStore',
+  scope: 'session',
+})((set, get) => ({
   target: null,
   blocks: [emptyTextBlock()],
   contentWarning: undefined,

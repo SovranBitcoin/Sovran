@@ -1,3 +1,4 @@
+import { registerAccountScoped } from '@/shared/lib/persist/accountScoped';
 /**
  * Module-level record of which assistant turns ran out of completion budget.
  *
@@ -81,3 +82,7 @@ export function useTurnTruncation(messageId: string): TurnTruncation | null {
     () => null
   );
 }
+
+registerAccountScoped('ai.turn-truncations', () => {
+  resetTurnTruncations();
+});

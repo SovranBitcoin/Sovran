@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 
 // Two-phase rollback state, kept out of React props so per-row spinner /
 // collapse changes don't bust the surrounding list memo.
@@ -41,7 +41,10 @@ const withValue = <T>(set: Set<T>, value: T): Set<T> => {
   return next;
 };
 
-export const useRollbackStore = create<RollbackStore>((set, get) => ({
+export const useRollbackStore = create<RollbackStore>({
+  name: 'useRollbackStore',
+  scope: 'session',
+})((set, get) => ({
   inFlight: new Set<string>(),
   collapsing: new Set<string>(),
   start: (operationId) => set((s) => ({ inFlight: withValue(s.inFlight, operationId) })),

@@ -4,6 +4,9 @@ import { createJSONStorage, type PersistOptions, type StateStorage } from 'zusta
 import { redactError, storeLog } from '@/shared/lib/logger';
 import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
 
+import { accountScopedHolders } from './accountScoped';
+import { storeRegistryManifest } from './storeRegistryManifest';
+
 const DEFAULT_VERSION = 1;
 
 interface PersistConfigOptions<TFull, TPartial> {
@@ -57,7 +60,7 @@ function deriveLogKey(name: string): string {
  * the one thing standing between a routine schema change and silent data loss
  * on the durable stores (createMergeWithSchema drops a whole blob it can't parse).
  */
-interface PersistRegistryEntry {
+interface PersistRegistryEntry extends Partial<RegisteredStore> {
   name: string;
   version: number;
   schema: ZodType<unknown>;
@@ -70,7 +73,34 @@ interface PersistRegistryEntry {
    */
   partialize: (state: never) => unknown;
 }
-export const persistRegistry: PersistRegistryEntry[] = [];
+export type StoreScope = 'global' | 'profile' | 'session';
+
+interface RegisteredStore {
+  name: string;
+  scope: StoreScope;
+  persisted: boolean;
+  store: { getState: () => unknown; getInitialState: () => unknown };
+  initialState: unknown;
+  queryCache?: { clear: () => void };
+}
+
+// Array iteration retains the persisted-schema contract used by the existing
+// compatibility guards. All runtime holders live on this same registry.
+export const persistRegistry = Object.assign([] as PersistRegistryEntry[], {
+  definitions: storeRegistryManifest,
+  stores: [] as RegisteredStore[],
+  accountScoped: accountScopedHolders,
+});
+
+export function persistedStoreKeys(scope: StoreScope): string[] {
+  return [
+    ...new Set(
+      persistRegistry.definitions
+        .filter((entry) => entry.persisted && entry.scope === scope)
+        .map((entry) => entry.name)
+    ),
+  ];
+}
 
 /**
  * Standard Zustand `persist` options for a Sovran store.

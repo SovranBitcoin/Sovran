@@ -13,7 +13,7 @@
  * cross-store import; no cycle).
  */
 
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { persist } from 'zustand/middleware';
 import { storeLog } from '@/shared/lib/logger';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
@@ -79,7 +79,7 @@ interface ThemeActions {
 
 type ThemeStore = ThemeState & ThemeActions;
 
-export const useThemeStore = create<ThemeStore>()(
+export const useThemeStore = create<ThemeStore>({ name: 'theme-store', scope: 'profile' })(
   persist(
     (set) => ({
       _hasHydrated: false,

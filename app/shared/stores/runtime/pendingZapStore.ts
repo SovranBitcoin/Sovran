@@ -1,3 +1,4 @@
+import { registerAccountScoped } from '@/shared/lib/persist/accountScoped';
 /**
  * Pending-zap registry — plain module state, never persisted.
  *
@@ -98,3 +99,5 @@ export function clearPendingZaps(): void {
   }
   pendingByTarget.clear();
 }
+
+registerAccountScoped('payments.pending-zaps', clearPendingZaps);

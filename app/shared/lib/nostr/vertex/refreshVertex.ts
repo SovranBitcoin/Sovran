@@ -1,3 +1,4 @@
+import { registerAccountScoped } from '@/shared/lib/persist/accountScoped';
 import type NDK from '@nostr-dev-kit/ndk-mobile';
 import {
   createNaggClient,
@@ -117,3 +118,7 @@ export async function refreshVertex(
   const parsed = NaggProfilesEnvelopeSchema.safeParse(result.value);
   return parsed.success ? parsed.data : null;
 }
+
+registerAccountScoped('nostr.vertex-attempted', () => {
+  attempted.clear();
+});

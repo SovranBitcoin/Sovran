@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { persist } from 'zustand/middleware';
 import { z } from 'zod';
 
@@ -87,7 +87,10 @@ export const PersistedFeedIgnoreStore = z.object({
   dmFilterWords: z.array(z.string().max(100)).max(100).default([]),
 });
 
-export const useFeedIgnoreStore = create<FeedIgnoreStore>()(
+export const useFeedIgnoreStore = create<FeedIgnoreStore>({
+  name: 'feed-ignore-store',
+  scope: 'profile',
+})(
   persist(
     (set, get) => ({
       ignoredPubkeys: [],

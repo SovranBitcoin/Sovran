@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { persist } from 'zustand/middleware';
 import { z } from 'zod';
 
@@ -162,7 +162,10 @@ function isTerminal(status: NutDropRedeemStatus): boolean {
   return status === 'redeemed' || status === 'spent';
 }
 
-export const useNutDropRedeemQueueStore = create<NutDropRedeemQueueStore>()(
+export const useNutDropRedeemQueueStore = create<NutDropRedeemQueueStore>({
+  name: 'nut-drop-redeem-queue',
+  scope: 'profile',
+})(
   persist(
     (set, get) => ({
       byTokenHash: {},

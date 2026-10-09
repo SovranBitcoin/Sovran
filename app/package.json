@@ -59,6 +59,7 @@
     "check:styling": "node scripts/check-styling.mjs",
     "check:react-compiler": "bun scripts/check-react-compiler.mjs",
     "check:react-compiler:update": "bun scripts/check-react-compiler.mjs --update",
+    "store-registry:update": "node scripts/storeRegistryManifest.cjs && prettier --write shared/lib/persist/storeRegistryManifest.ts",
     "check:perf-coverage": "bun scripts/check-perf-coverage.mjs",
     "check:perf-coverage:update": "bun scripts/check-perf-coverage.mjs --update",
     "react-doctor": "bunx react-doctor@0.9.12 --verbose --no-telemetry",

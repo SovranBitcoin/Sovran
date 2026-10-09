@@ -1,7 +1,8 @@
-import { createStore } from 'zustand/vanilla';
+import { defineVanillaStore as createStore } from '@/shared/lib/persist/defineStore';
 import { persist } from 'zustand/middleware';
 import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
+import { registerAccountScoped } from '@/shared/lib/persist/accountScoped';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
 
 export const VERTEX_DAILY_CAP = 20;
@@ -20,7 +21,7 @@ type Store = Budget & {
 
 /** Each instance captures its storage owner before any async work or hydration. */
 export function createVertexBudgetStore(ownerPubkey: string) {
-  return createStore<Store>()(
+  return createStore<Store>({ name: 'vertex-budget-store', scope: 'profile' })(
     persist(
       (set, get) => ({
         day: '',
@@ -67,3 +68,7 @@ export function getVertexBudgetStore(ownerPubkey: string) {
   }
   return store;
 }
+
+registerAccountScoped('vertex.owner-stores', () => {
+  stores.clear();
+});

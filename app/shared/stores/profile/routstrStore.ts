@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { persist } from 'zustand/middleware';
 import { z } from 'zod';
 import { createRoutstrPersistence } from '@/shared/lib/routstr/securePersistence';
@@ -975,7 +975,7 @@ const PersistedRoutstrStore = z.object({
     .catch(null),
 });
 
-export const useRoutstrStore = create<RoutstrStore>()(
+export const useRoutstrStore = create<RoutstrStore>({ name: 'routstr-store', scope: 'profile' })(
   persist(
     (set, get) => ({
       apiKey: null,

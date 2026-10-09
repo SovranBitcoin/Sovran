@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import type { ReactNode } from 'react';
 import { redactError, storeLog } from '@/shared/lib/logger';
 import type { PopupIcon, PopupTextSegment } from '@/shared/lib/popup';
@@ -79,7 +79,10 @@ type PopupStore = {
   updateActionMenu: (expectedSeq: number, payload: ActionSheetPayloads['action-menu']) => void;
 };
 
-export const usePopupStore = create<PopupStore>((set, get) => {
+export const usePopupStore = create<PopupStore>({ name: 'usePopupStore', scope: 'session' })((
+  set,
+  get
+) => {
   const fireOnClose = (reason: SheetCloseReason) => {
     const { current } = get();
     if (!current || isCustomSheetPayload(current) || !current.onClose) return;

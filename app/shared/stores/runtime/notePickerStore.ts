@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 
 /** What the note picker was opened for. */
 interface NotePickerRequest {
@@ -25,7 +25,10 @@ interface NotePickerState {
   clear: () => void;
 }
 
-export const useNotePickerStore = create<NotePickerState>((set) => ({
+export const useNotePickerStore = create<NotePickerState>({
+  name: 'useNotePickerStore',
+  scope: 'session',
+})((set) => ({
   request: null,
   present: (request) => set({ request }),
   clear: () => set({ request: null }),

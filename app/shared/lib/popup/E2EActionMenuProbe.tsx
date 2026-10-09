@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Platform, View as NativeView } from 'react-native';
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 
 import { View } from '@/shared/ui/primitives/View/View';
 import { isCustomSheetPayload, usePopupStore } from '@/shared/stores/runtime/popupStore';
@@ -27,7 +27,10 @@ type E2EActionMenuRenderState = {
 
 /** Render/present gate for the FWO action-menu probe, driven only by the
  * render marker and `markE2EActionMenuPresented` (dev-only). */
-const useE2EActionMenuRenderStore = create<E2EActionMenuRenderState>((set, get) => ({
+const useE2EActionMenuRenderStore = create<E2EActionMenuRenderState>({
+  name: 'useE2EActionMenuRenderStore',
+  scope: 'global',
+})((set, get) => ({
   sequence: 0,
   renderedSequence: null,
   renderedOpenSeq: null,
@@ -67,7 +70,10 @@ type E2EActionMenuTargetState = {
 /** Measured menu-row centres, written only by `E2EActionMenuTargetMarker`.
  * Coordinates are transient, non-secret screen geometry; the store is
  * populated only by an owned e2e Metro on iOS. */
-const useE2EActionMenuTargetStore = create<E2EActionMenuTargetState>((set) => ({
+const useE2EActionMenuTargetStore = create<E2EActionMenuTargetState>({
+  name: 'useE2EActionMenuTargetStore',
+  scope: 'global',
+})((set) => ({
   targets: {},
   setTarget: (target) =>
     set((state) => ({ targets: { ...state.targets, [target.actionId]: target } })),
@@ -190,7 +196,10 @@ export function E2EActionMenuRenderMarker({
 // host publishes its open payload title here and a root-tree mirror exposes
 // it. Only the non-secret payload title crosses this DEV-only seam.
 
-const useE2EHerouiMenuStore = create<{ title: string | null }>(() => ({ title: null }));
+const useE2EHerouiMenuStore = create<{ title: string | null }>({
+  name: 'useE2EHerouiMenuStore',
+  scope: 'global',
+})(() => ({ title: null }));
 
 /** Published by ActionMenuHost whenever its payload opens (title, '' when the
  * payload has none) or closes (null). */

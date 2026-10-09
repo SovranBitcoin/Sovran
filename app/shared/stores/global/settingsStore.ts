@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { persist, subscribeWithSelector } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { z } from 'zod';
@@ -9,7 +9,10 @@ import { tolerantArray } from '@/shared/lib/persist/tolerant';
 import { legalRevisions, type LegalAcceptance } from '@/shared/lib/legal/legalDocuments';
 
 // Separate, non-persisted status: setting an error must never write default settings over unreadable data.
-export const useSettingsHydration = create<{ status: 'loading' | 'ready' | 'error' }>(() => ({
+export const useSettingsHydration = create<{ status: 'loading' | 'ready' | 'error' }>({
+  name: 'useSettingsHydration',
+  scope: 'global',
+})(() => ({
   status: 'loading',
 }));
 
@@ -311,7 +314,7 @@ interface SettingsActions {
 
 type SettingsStore = SettingsState & SettingsActions;
 
-export const useSettingsStore = create<SettingsStore>()(
+export const useSettingsStore = create<SettingsStore>({ name: 'settings-store', scope: 'global' })(
   subscribeWithSelector(
     persist(
       (set, get) => ({

@@ -11,7 +11,7 @@
  * profile-A's contact metadata doesn't leak into profile-B's view.
  */
 
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { persist } from 'zustand/middleware';
 import { z } from 'zod';
 import type { facade } from 'nostr';
@@ -112,7 +112,10 @@ const PersistedNostrMetadataCache = z.object({
   byPubkey: z.record(z.string().max(128), PersistedNostrMetadataEntry).default({}),
 });
 
-export const useNostrMetadataCache = create<NostrMetadataCacheState>()(
+export const useNostrMetadataCache = create<NostrMetadataCacheState>({
+  name: 'nostr-metadata-cache',
+  scope: 'profile',
+})(
   persist(
     (set) => ({
       byPubkey: {},

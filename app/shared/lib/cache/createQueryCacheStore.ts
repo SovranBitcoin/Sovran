@@ -20,12 +20,18 @@
  * `clear()` cannot resurrect a wiped entry.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { create, type StateCreator, type StoreApi, type UseBoundStore } from 'zustand';
+import { type StateCreator, type StoreApi, type UseBoundStore } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
 import { monotonicNow, storeLog } from '@/shared/lib/logger';
-import { persistConfig } from '@/shared/lib/persist/persistConfig';
+import { defineStore } from '@/shared/lib/persist/defineStore';
+import { registerAccountScoped } from '@/shared/lib/persist/accountScoped';
+import {
+  persistRegistry,
+  persistConfig,
+  type StoreScope,
+} from '@/shared/lib/persist/persistConfig';
 import { currentCacheEpoch } from './cacheSession';
 import { evictLruOverCap } from './evictLruOverCap';
 import type { QueryCacheEntry } from './queryCacheTypes';
@@ -33,6 +39,7 @@ import type { QueryCacheEntry } from './queryCacheTypes';
 interface QueryCacheStoreOptions {
   /** Kebab-case AsyncStorage key, e.g. `'feed-cache'`. */
   name: string;
+  scope: StoreScope;
   /** Snake_case log slug; defaults to `name` with dashes replaced. */
   logKey?: string;
   /** How long a written entry stays fresh before it's revalidated. */
@@ -128,11 +135,10 @@ export interface QueryCacheStore<TData> {
 
 // Every store created this session, so a profile wipe can invalidate all
 // in-flight completions at once (`clearAllQueryCaches`).
-const registry = new Set<{ clear: () => void }>();
 
 /** Clear every query cache and reject every in-flight completion. */
 export function clearAllQueryCaches(): void {
-  for (const store of registry) store.clear();
+  for (const entry of persistRegistry.stores) entry.queryCache?.clear();
 }
 
 const PersistedEntry = z.looseObject({
@@ -231,8 +237,8 @@ export function createQueryCacheStore<TData>(opts: QueryCacheStoreOptions): Quer
 
   const use =
     opts.persist === false
-      ? create<QueryCacheState<TData>>()(creator)
-      : create<QueryCacheState<TData>>()(
+      ? defineStore<QueryCacheState<TData>>({ name: opts.name, scope: opts.scope })(creator)
+      : defineStore<QueryCacheState<TData>>({ name: opts.name, scope: opts.scope })(
           persist(
             creator,
             persistConfig<QueryCacheState<TData>, Pick<QueryCacheState<TData>, 'byKey'>>({
@@ -385,6 +391,11 @@ export function createQueryCacheStore<TData>(opts: QueryCacheStoreOptions): Quer
     generation,
     staleTtlMs: opts.staleTtlMs,
   };
-  registry.add(store);
+  const entry = persistRegistry.stores.find((entry) => entry.store === use);
+  if (entry) entry.queryCache = store;
+  registerAccountScoped(`query-cache:${opts.name}`, () => {
+    store.clear();
+    touchedEpochByKey.clear();
+  });
   return store;
 }

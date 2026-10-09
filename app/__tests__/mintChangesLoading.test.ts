@@ -17,6 +17,7 @@ jest.mock('@/features/mint/data/mintChangesCache', () => {
   return {
     MINT_CHANGES_CACHE_KEY: 'global',
     mintChangesCache: createQueryCacheStore({
+      scope: 'global',
       name: 'mint-changes-cache-test',
       staleTtlMs: 30 * 60 * 1000,
       persist: false,

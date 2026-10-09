@@ -11,6 +11,7 @@ import { createQueryCacheStore } from '@/shared/lib/cache/createQueryCacheStore'
 import type { FeedParseResult } from './feedClient';
 
 export const feedPageCache = createQueryCacheStore<FeedParseResult>({
+  scope: 'session',
   name: 'feed-page-cache',
   logKey: 'feed_page_cache',
   staleTtlMs: 2 * 60 * 1000, // personalized ranked feed rotates fast

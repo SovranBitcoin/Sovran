@@ -231,7 +231,12 @@ const APP_DIR = resolve(__dirname, '..');
  * Files that call `persistConfig` but register no fixed store name, so they
  * cannot be imported above. Mirrors `persistRoundTrip`'s list.
  */
-const NOT_A_CONCRETE_STORE = ['shared/lib/cache/createQueryCacheStore.ts'];
+const NOT_A_CONCRETE_STORE = [
+  'shared/lib/cache/createQueryCacheStore.ts',
+  // Readers of the registry, not stores.
+  'shared/lib/cashu/profileScopedStorage.ts',
+  'shared/lib/debug/storageInventory.ts',
+];
 
 /** Every file that calls `persistConfig`, from the source tree. */
 function persistConfigCallSites(): string[] {

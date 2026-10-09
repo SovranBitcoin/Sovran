@@ -14,11 +14,51 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { z } from 'zod';
 
-import { PROFILE_SCOPED_STORE_KEYS } from '@/shared/lib/cashu/profileScopedStorage';
 import { PROFILE_PRIMARY_UNIT_ID, isBuiltinColorTheme } from '@/shared/lib/theme/builtinAlbums';
 import { log } from '../logger';
 
 const GLOBAL_MIGRATIONS_COMPLETED_KEY = 'global-migrations-completed';
+
+/**
+ * The store keys the index-to-pubkey migration moves. Frozen as they stood when
+ * the migration shipped: it is a record of what older installs wrote, so it
+ * must not follow the live store registry. Some names no longer have a store.
+ */
+const INDEX_TO_PUBKEY_STORE_KEYS = [
+  'mint-store',
+  'mint-distribution-store',
+  'npc-mint-store',
+  'routstr-store',
+  'ai-provider-directory-store',
+  'scan-history-store',
+  'search-history-store',
+  'recent-people-store',
+  'dm-last-message-store',
+  'swap-transactions-store',
+  'transaction-location-store',
+  'transaction-distribution-store',
+  'nostr-social-store',
+  'own-content-store',
+  'own-profile-metadata-store',
+  'vertex-budget-store',
+  'nostr-relay-list-store',
+  'nostr-media-server-store',
+  'nostr-metadata-cache',
+  'theme-store',
+  'bitchat-dm-messages-store',
+  'feed-ignore-store',
+  'notification-policy-store',
+  'nip46-connections-store',
+  'nip46-activity-store',
+  'transaction-annotation-store',
+  'owned-media-store',
+  'data-migration-store',
+  'feed-cache',
+  'notifications-cache',
+  'dm-conversations-cache',
+  'dm-messages-cache',
+  'own-profile-stats-cache',
+] as const;
 
 interface Migration {
   id: string;
@@ -103,7 +143,7 @@ async function migrateIndexKeysToPubkeyKeys(): Promise<void> {
   let migratedCount = 0;
 
   for (const profile of profiles) {
-    for (const base of PROFILE_SCOPED_STORE_KEYS) {
+    for (const base of INDEX_TO_PUBKEY_STORE_KEYS) {
       const oldKey = profile.accountIndex === 0 ? base : `${base}:profile:${profile.accountIndex}`;
       const newKey = `${base}:profile:${profile.pubkey}`;
 

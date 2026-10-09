@@ -17,7 +17,7 @@
  * profile-scoped, never logged.
  */
 
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { persist } from 'zustand/middleware';
 import { z } from 'zod';
 
@@ -117,7 +117,10 @@ function pruneExpired(entries: Nip46ActivityEntry[], nowMs: number): Nip46Activi
   return entries.filter((entry) => entry.at >= cutoff);
 }
 
-export const useNip46ActivityStore = create<Nip46ActivityStore>()(
+export const useNip46ActivityStore = create<Nip46ActivityStore>({
+  name: 'nip46-activity-store',
+  scope: 'profile',
+})(
   persist(
     (set) => ({
       entries: [],

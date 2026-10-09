@@ -7,7 +7,7 @@
  * and where the current state came from. Isolated per pubkey by
  * `createProfileScopedStorage` (no cross-profile bleed).
  */
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { persist } from 'zustand/middleware';
 import { z } from 'zod';
 
@@ -76,7 +76,10 @@ function upsert(
   return next;
 }
 
-export const useRelayListStore = create<RelayListStore>()(
+export const useRelayListStore = create<RelayListStore>({
+  name: 'nostr-relay-list-store',
+  scope: 'profile',
+})(
   persist(
     (set, get) => ({
       entries: [],

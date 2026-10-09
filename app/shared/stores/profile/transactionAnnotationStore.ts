@@ -15,7 +15,7 @@
  * its import and tracks completion via a numeric level.
  */
 
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { persist, subscribeWithSelector } from 'zustand/middleware';
 import { z } from 'zod';
 
@@ -41,7 +41,10 @@ const PersistedTransactionAnnotationStore = z.object({
 
 // Exported only for the dev-gated e2e state mirror; app code goes through the
 // adapter/function API below.
-export const useTransactionAnnotationStore = create<TransactionAnnotationState>()(
+export const useTransactionAnnotationStore = create<TransactionAnnotationState>({
+  name: 'transaction-annotation-store',
+  scope: 'profile',
+})(
   subscribeWithSelector(
     persist(
       (): TransactionAnnotationState => ({

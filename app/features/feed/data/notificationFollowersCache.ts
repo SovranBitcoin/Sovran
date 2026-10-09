@@ -8,6 +8,7 @@ import { createQueryCacheStore } from '@/shared/lib/cache/createQueryCacheStore'
 import type { FeedNotificationsResult } from './feedClient';
 
 export const notificationFollowersCache = createQueryCacheStore<FeedNotificationsResult>({
+  scope: 'session',
   name: 'notification-followers-page-cache',
   logKey: 'notification_followers_page_cache',
   staleTtlMs: 2 * 60 * 1000,

@@ -1,6 +1,14 @@
+import { registerAccountScoped } from '@/shared/lib/persist/accountScoped';
 import { Manager } from '@cashu/coco-core';
 import type { Plugin } from '@cashu/coco-core/plugin';
-import { createCashuSeedGetter, deriveStandardCashuSeed, withTimeout } from 'wallet';
+import {
+  createCashuSeedGetter,
+  deriveStandardCashuSeed,
+  withTimeout,
+  disposeCashuSeedGetter,
+  disposeReusableQuoteFlights,
+  resetMeltTarget,
+} from 'wallet';
 import { CocoCoreLogger } from './cocoLogger';
 import {
   ExpoSqliteRepositories,
@@ -126,6 +134,11 @@ export class CocoManager {
   private static npcPluginRegistered = false;
   /** Stored reference to seed getter for pre-warming during background init */
   private static seedGetter: (() => Promise<Uint8Array>) | null = null;
+
+  /** Zero and drop the current session's memoized Cashu seed, if one exists. */
+  static disposeSeed(): void {
+    if (this.seedGetter) disposeCashuSeedGetter(this.seedGetter);
+  }
   /** Current account index — controls which DB file and NPC signer to use */
   private static accountIndex = 0;
   /** True when the active profile is an imported nsec (affects signer/seed fallback paths) */
@@ -1379,3 +1392,7 @@ export class CocoManager {
     }
   }
 }
+
+registerAccountScoped('wallet.reusable-quote-flights', disposeReusableQuoteFlights);
+registerAccountScoped('wallet.melt-target', resetMeltTarget);
+registerAccountScoped('wallet.cashu-seed', () => CocoManager.disposeSeed());

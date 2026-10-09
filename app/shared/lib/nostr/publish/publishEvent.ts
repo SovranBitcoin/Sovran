@@ -1,3 +1,4 @@
+import { registerAccountScoped } from '@/shared/lib/persist/accountScoped';
 /**
  * @fileoverview `publishEvent` — the single seam every Nostr write routes
  * through.
@@ -365,3 +366,7 @@ async function runPublish(opts: PublishOptions): Promise<Result<PublishResult, P
 export function publishEvent(opts: PublishOptions): ResultAsync<PublishResult, PublishError> {
   return new ResultAsync(runPublish(opts));
 }
+
+registerAccountScoped('nostr.publish-in-flight', () => {
+  inFlight.clear();
+});
