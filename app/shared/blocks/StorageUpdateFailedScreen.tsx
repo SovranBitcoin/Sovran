@@ -10,7 +10,9 @@ import { Button } from '@/shared/ui/primitives/Button';
 export function StorageUpdateFailedScreen({ onRetry }: { onRetry: () => void }) {
   return (
     <Screen name="StorageUpdateFailed" safeArea>
-      <VStack testID="storage-update-failed-screen" className="gap-5">
+      {/* Above the navigator there is no header and, on Android, no top inset
+          yet, so the content clears the status bar by its own padding. */}
+      <VStack testID="storage-update-failed-screen" className="gap-5 pt-16">
         <Text size={24} bold>
           {"The update couldn't finish"}
         </Text>

@@ -621,3 +621,7 @@ fail-closed change, the hold-on-failure changes and the provider guards in place
 completed, the wallet opened and the first screen rendered on both, with no startup error events.
 On iOS a reload during the run exercised the wallet close-then-reopen path. Not exercised on a
 device: the retry screen itself, a failed restart, a partial delete-all, and any physical phone.
+
+The retry screen was then checked on the Android emulator by forcing one migration failure with a
+temporary edit (reverted): the screen appeared once the boot splash faded, Retry ran the migrations
+again and the wallet opened. That run found the title drawn under the status bar, which is fixed.
