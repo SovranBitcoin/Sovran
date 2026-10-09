@@ -3,6 +3,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as SQLite from 'expo-sqlite';
 import { z } from 'zod';
 import { persistRegistry } from '@/shared/lib/persist/persistConfig';
+import { unreadableKey } from '@/shared/lib/persist/preserveUnreadable';
 import { withSkippedPersistWrites } from '@/shared/lib/persist/profileWriteBarrier';
 import { sdkRecoveryVaultNames } from '@/shared/lib/routstr/sdk/driver';
 import { NEARBY_PAYMENT_JOURNAL_KEY } from '@/features/nearPay/lib/nearbyPaymentStorage';
@@ -204,7 +205,11 @@ export const profileRemovalPorts: RemovalPorts = {
     const prefixes = Object.values(WhitenoiseNamespace).map(
       (ns) => `${whitenoisePrefix(profile.accountIndex, ns)}:`
     );
-    const scoped = persistedStoreKeys('profile').map((name) => `${name}:profile:${profile.pubkey}`);
+    const scoped = persistedStoreKeys('profile').flatMap((name) => [
+      `${name}:profile:${profile.pubkey}`,
+      // A blob the store could not load, kept beside it.
+      `${unreadableKey(name)}:profile:${profile.pubkey}`,
+    ]);
     // Include retired query-cache blobs using registry metadata, even if never mounted.
     for (const entry of declaredStores) {
       if (entry.profileStorage && entry.queryCache)

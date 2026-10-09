@@ -160,6 +160,10 @@ Rules that follow from them:
   (`StorageUpdateFailedScreen`). Profile storage opens only after every migration has run, so no
   store can load defaults and write them over data that was still being moved
   (`globalMigrationsRunner.test.ts`).
+- A store that cannot load its saved data never destroys it. Data that was read but rejected is
+  copied to `<store>:unreadable` before the store saves again; data that could not be read at all
+  is left alone until a read succeeds (`app/shared/lib/persist/preserveUnreadable.ts`). Caches that
+  can be fetched again opt out.
 - A one-time storage migration keeps its own frozen list of names. It records what old installs
   wrote, so it must not follow the live registry (`globalMigrations.ts`).
 

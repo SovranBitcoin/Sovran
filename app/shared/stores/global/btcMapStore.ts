@@ -318,6 +318,8 @@ export const useBTCMapStore = create<BTCMapStore>({ name: 'btcmap-store', scope:
     persistConfig({
       name: 'btcmap-store',
       storage: AsyncStorage,
+      // A cache of public map data: a bad blob is simply replaced.
+      preserveUnreadable: false,
       schema: PersistedBtcMapStore,
       logKey: 'btc_map',
       partialize: (state) => ({

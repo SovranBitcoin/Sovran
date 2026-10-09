@@ -1487,6 +1487,8 @@ export const useRoutstrStore = create<RoutstrStore>({ name: 'routstr-store', sco
     persistConfig({
       name: 'routstr-store',
       storage: createRoutstrPersistence(),
+      // The adapter rebuilds the blob with its secrets; see `preserveUnreadable`.
+      preserveUnreadable: false,
       schema: PersistedRoutstrStore,
       // v2: bring back the spend prompt for everyone who had turned it off.
       //

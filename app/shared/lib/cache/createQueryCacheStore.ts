@@ -247,6 +247,8 @@ export function createQueryCacheStore<TData>(opts: QueryCacheStoreOptions): Quer
               schema: PersistedSchema,
               logKey,
               partialize: (state) => ({ byKey: state.byKey }),
+              // Fetched again on demand: a bad blob is simply replaced.
+              preserveUnreadable: false,
             })
           )
         );

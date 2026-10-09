@@ -6,6 +6,7 @@ import { redactError, storeLog } from '@/shared/lib/logger';
 import type { LiveStore } from '@/shared/lib/account/accountRegistry';
 import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
 import { declaredStores } from '@/shared/lib/account/accountRegistry';
+import { guardUnreadable } from '@/shared/lib/persist/preserveUnreadable';
 
 const DEFAULT_VERSION = 1;
 
@@ -46,6 +47,14 @@ interface PersistConfigOptions<TFull, TPartial> {
    * or marking `_hasHydrated`.
    */
   afterHydrate?: (state: TFull | undefined, error: unknown) => void;
+  /**
+   * False in two cases. A store whose storage adapter keeps secrets out of the
+   * blob it writes (`routstr-store`): what such an adapter hands back is rebuilt
+   * with the secrets in it, and copying that to plain storage would expose
+   * them, so the adapter has to protect unreadable data itself. And a cache
+   * that can be fetched again, where replacing a bad blob is the right outcome.
+   */
+  preserveUnreadable?: boolean;
 }
 
 /** Derive a snake_case log slug from the kebab-case `<name>-store` storage key. */
@@ -119,15 +128,25 @@ export function persistConfig<TFull, TPartial>(
         removeItem: (name) => profilePersistWrite(() => opts.storage.removeItem(name)),
       }
     : opts.storage;
+  const guard =
+    opts.preserveUnreadable === false ? null : guardUnreadable(opts.name, logKey, storage);
+  const mergeWithSchema = createMergeWithSchema(logKey, opts.schema);
   return {
     name: opts.name,
-    storage: createJSONStorage(() => storage),
+    storage: createJSONStorage(() => guard?.storage ?? storage),
     version,
     partialize: opts.partialize,
     migrate,
-    merge: createMergeWithSchema(logKey, opts.schema),
+    merge: (persisted, current) => {
+      const merged = mergeWithSchema(persisted, current);
+      // The schema merge hands back `current` itself when it turns a blob down.
+      if (persisted && typeof persisted === 'object' && merged === current) guard?.reject();
+      return merged;
+    },
     onRehydrateStorage: () => (state, error) => {
       if (error) {
+        // An unparseable blob or a throwing `migrate` ends up here, not in `merge`.
+        guard?.reject();
         storeLog.warn(`store.${logKey}.rehydrate_failed`, { error: redactError(error) });
       }
       opts.afterHydrate?.(state, error);
