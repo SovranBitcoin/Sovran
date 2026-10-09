@@ -111,6 +111,53 @@ function MintInspectButton({ mintUrl, onPress }: { mintUrl: string; onPress: () 
   );
 }
 
+type MintRowInfo = { item: MintRow; extraData?: boolean };
+
+// A component, not a closure in `renderItem`: the identity it builds is cached
+// per row, so a row re-rendered for `isExecuting` hands ContactRow the same
+// identity object and its identity-keyed effects stay quiet.
+function MintListRow({
+  item,
+  mockMode,
+  presence,
+  isExecuting,
+  onInspectMint,
+  onPress,
+}: {
+  item: MintListItem;
+  mockMode: boolean;
+  presence: ReturnType<typeof useMintPresence>[string] | undefined;
+  isExecuting: boolean;
+  onInspectMint: ((mintUrl: string) => void) | undefined;
+  onPress: (item: MintListItem, isExecuting: boolean) => void;
+}) {
+  const identity = mintIdentity({
+    ...(mockMode ? { ...item, balance: getMockMintBalance(item.mintUrl, item.unit) } : item),
+    presence,
+  });
+  const inspectable = !!onInspectMint;
+  const trailing = onInspectMint ? (
+    <MintInspectButton mintUrl={item.mintUrl} onPress={() => onInspectMint(item.mintUrl)} />
+  ) : null;
+  return (
+    <ContactRow
+      identity={identity}
+      stats={MINT_ROW_STATS}
+      disabled={isExecuting || item.status !== 'available'}
+      disabledReason={getMintDisabledReasonLabel(item.reason) ?? undefined}
+      trailing={trailing}
+      trailingInteractive={inspectable}
+      trailingVariant={inspectable ? undefined : 'none'}
+      accentPosition="below"
+      // Stats roll in when cached values are replaced by fresh ones; the
+      // accent is keyed by mintUrl inside ContactRow against FlashList recycle.
+      animate
+      onPress={() => onPress(item, isExecuting)}
+      testID={`contact-row:mint:${item.mintUrl}`}
+    />
+  );
+}
+
 export function MintListScreen({
   items,
   loading = false,
@@ -227,11 +274,13 @@ export function MintListScreen({
     }
   }, [hasSelectedCurrency, selectedCurrency]);
 
-  const handleMintPress = (item: MintListItem) => {
-    if (isExecuting || item.status !== 'available') {
+  // Takes `executing` from the row rather than closing over it, so neither
+  // this handler nor `renderItem` changes identity when a flow starts or ends.
+  const handleMintPress = (item: MintListItem, executing: boolean) => {
+    if (executing || item.status !== 'available') {
       cashuLog.debug('mint.list.select.blocked', {
         ...mintUrlLogFields(item.mintUrl),
-        isExecuting,
+        isExecuting: executing,
         status: item.status,
       });
       return;
@@ -283,32 +332,18 @@ export function MintListScreen({
     </Text>
   );
 
-  const renderItem = ({ item }: { item: MintListItem }) => {
-    const inspectable = showDetailsButton && !!onInspectMint;
-    const trailing = inspectable ? (
-      <MintInspectButton mintUrl={item.mintUrl} onPress={() => onInspectMint!(item.mintUrl)} />
-    ) : null;
-    return (
-      <ContactRow
-        identity={mintIdentity({
-          ...(mockMode ? { ...item, balance: getMockMintBalance(item.mintUrl, item.unit) } : item),
-          presence: presence[normalizeMintUrlKey(item.mintUrl)],
-        })}
-        stats={MINT_ROW_STATS}
-        disabled={isExecuting || item.status !== 'available'}
-        disabledReason={getMintDisabledReasonLabel(item.reason) ?? undefined}
-        trailing={trailing}
-        trailingInteractive={inspectable}
-        trailingVariant={inspectable ? undefined : 'none'}
-        accentPosition="below"
-        // Stats roll in when cached values are replaced by fresh ones; the
-        // accent is keyed by mintUrl inside ContactRow against FlashList recycle.
-        animate
-        onPress={() => handleMintPress(item)}
-        testID={`contact-row:mint:${item.mintUrl}`}
-      />
-    );
-  };
+  // `isExecuting` reaches the rows as FlashList `extraData`, the one channel
+  // that re-renders mounted cells without a new `renderItem`.
+  const renderItem = ({ item, extraData }: MintRowInfo) => (
+    <MintListRow
+      item={item}
+      mockMode={mockMode}
+      presence={presence[normalizeMintUrlKey(item.mintUrl)]}
+      isExecuting={extraData === true}
+      onInspectMint={showDetailsButton ? onInspectMint : undefined}
+      onPress={handleMintPress}
+    />
+  );
 
   // Skeleton row through the SAME ContactRow path (pulsing avatar + title /
   // subtitle bars), so the crossfade to real rows shifts nothing.
@@ -326,12 +361,13 @@ export function MintListScreen({
   // ContactRow; a cached/live row renders the real one. This is what guarantees
   // we never paint a bare url + bank-icon fallback — a row is either a skeleton
   // or carries a real cached/live name + icon.
-  const renderRow = ({ item }: { item: MintRow }) => {
+  const renderRow = (info: MintRowInfo) => {
+    const { item } = info;
     // Aggregated per second, so a fifty-mint list costs one log line, not
     // fifty. `wasted` rising with `rows` means enrichment redrew rows that did
     // not change.
     countRowRender('MintListScreen', item.mintUrl, ROW_LOG_OPTIONS);
-    return item.metaState === 'cold' ? renderSkeletonItem({ item }) : renderItem({ item });
+    return item.metaState === 'cold' ? renderSkeletonItem(info) : renderItem(info);
   };
 
   // The cohesive full-list shimmer wave shows only when EVERY row is cold (cold
