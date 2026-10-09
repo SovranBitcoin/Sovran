@@ -634,3 +634,25 @@ After the key-loading refactor (`5142682bb`) the Android emulator opened the sam
 same balance. After the store guard (`763a2fcae`) the iOS simulator cold-started with no store
 reporting a refused write, a preserved blob or a rejected merge; Android was not rechecked for that
 commit because the disk was nearly full again.
+
+### Upgrade from v0.1.3 on a device, 2026-10-10
+
+A second, fresh Android emulator ran the v0.1.3 code (the tag, loaded into the dev build) through
+onboarding and created a second profile. Its storage was copied off, then the current code was
+loaded over the same data:
+
+- The migration gate completed, the wallet opened on the active profile and the wallet screen
+  showed, with no error events.
+- All 29 stored keys v0.1.3 wrote were still present; both profiles, the active account, terms
+  acceptance, onboarding, the restore decision and the migration marker were unchanged; no
+  `:unreadable` copy was made; the database files were the same.
+- A profile switch under the current code restarted into the other profile.
+- Delete-all deleted both wallet databases and both Nostr caches and restarted into onboarding.
+- Removing the second profile was refused (see F80): it is refused for any opened profile.
+
+After the store guard, the first emulator also cold-started with no store refusing a write. Both
+emulators show the map cache failing to load on Android (F81), which v0.1.3 does too.
+
+Limits: this was v0.1.3's JavaScript in the current native build, not the released binary, so
+native-side changes between releases were not covered. iOS was not put through the same upgrade.
+A failed restart and a wipe that stops partway are still covered by tests only.
