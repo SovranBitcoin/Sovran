@@ -183,3 +183,49 @@ it('fails a list entry that is global today unless the migration leaves its bare
   expect(moved.length).toBeGreaterThan(20);
   expect(moved.filter((name) => globalNow.includes(name) && !exempt.has(name))).toEqual([]);
 });
+
+describe('upgrading from a released build', () => {
+  // v0.1.0 through v0.1.3 shipped these three migrations and wrote the marker
+  // as a sorted JSON array, read from those tags. Every install that has
+  // launched one of them once has all three recorded.
+  const RELEASED_MARKER = JSON.stringify([
+    'index-to-pubkey-keys-v2',
+    'legacy-global-theme-to-profile-v1',
+    'wallet-lifecycle-stamp-existing-users-v1',
+  ]);
+
+  it('opens storage without touching anything a released build wrote', async () => {
+    mockStorage = { ...currentInstall(), [COMPLETED_KEY]: RELEASED_MARKER };
+    const before = { ...mockStorage };
+    jest.mocked(AsyncStorage.setItem).mockClear();
+    jest.mocked(AsyncStorage.removeItem).mockClear();
+
+    // Resolving is what lets the gate open: no retry screen on upgrade.
+    await expect(runGlobalMigrations()).resolves.toBeUndefined();
+
+    expect(AsyncStorage.setItem).not.toHaveBeenCalled();
+    expect(AsyncStorage.removeItem).not.toHaveBeenCalled();
+    expect(mockStorage).toEqual(before);
+  });
+
+  it('still runs every migration the released builds recorded, under the same ids', () => {
+    // Renaming an id would replay that migration on every upgraded install.
+    expect(ALL_MIGRATIONS.slice().sort()).toEqual(JSON.parse(RELEASED_MARKER));
+  });
+
+  it('finishes a released build whose first launch was cut short', async () => {
+    // Killed after the first migration was recorded: the rest run now, once.
+    mockStorage = {
+      ...currentInstall(),
+      [COMPLETED_KEY]: JSON.stringify(['index-to-pubkey-keys-v2']),
+    };
+    const before = { ...mockStorage };
+
+    await expect(runGlobalMigrations()).resolves.toBeUndefined();
+
+    expect(JSON.parse(mockStorage[COMPLETED_KEY])).toEqual(JSON.parse(RELEASED_MARKER));
+    const { [COMPLETED_KEY]: _marker, ...after } = mockStorage;
+    const { [COMPLETED_KEY]: _oldMarker, ...expected } = before;
+    expect(after).toEqual(expected);
+  });
+});
