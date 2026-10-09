@@ -20,8 +20,8 @@ Work on this register ran on 2026-10-09. An entry below keeps its original wordi
 what was found; this section says where each one ended up.
 
 "Done" means implemented, reviewed and covered by tests, with type-check, lint, knip, the ratchets
-and the full test suites passing. Device evidence is from one Android emulator session in a dev
-build; **nothing has run on iOS or on a physical phone.**
+and the full test suites passing. Device evidence is from an Android emulator and an iOS simulator,
+both dev builds; **nothing has run on a physical phone**, and nothing interactive has run on iOS.
 
 ### Every entry
 
@@ -29,7 +29,7 @@ build; **nothing has run on iOS or on a physical phone.**
 | --- | --- |
 | VIS-1 to VIS-8 | Done. VIS-3 is a bounded loading state. On the emulator, 258 avatar instances across 86 app starts on the wallet home all went loading → image; none showed the fallback first. Other pages were not exercised |
 | OBS-1 to OBS-9, OBS-11 | Done, and seen working on the emulator: `coco.call`, `store.set`, `cache.store.write`, `perf.frame_drop`, `screen.mount`, `nav.transition`, `render.why`, and the `pages`, `stores` and `ingest` log-doctor modes on a real capture |
-| OBS-10 | Done for the pages a deep link can reach: 43 screens have a measured row (below). Pages that need parameters, the onboarding, backup and recovery flows and imperative sheets need the JSON e2e harness, whose lanes start from a fresh install |
+| OBS-10 | Done for the pages a deep link can reach: 43 screens have a measured row on Android and 56 on iOS (below). Pages that need parameters, the onboarding, backup and recovery flows and imperative sheets need the JSON e2e harness, whose lanes start from a fresh install |
 | CALC-1 | Closed as stale: `history.filters.matchesFilters` did not appear once in the capture and has no emitter in source |
 | CALC-2, 7, 8, 11, 12, 13, 14, 15, 16, 17, 18 | Done |
 | CALC-3 | Measured, not changed: the receive-recovery phase had a median of about 7.2 s on the emulator |
@@ -75,7 +75,30 @@ per route and `bun run log-doctor pages` on the capture. Pages that need paramet
 backup, recovery and delete flows, and imperative sheets were not visited, so about 43 of 111 pages
 have a row.
 
-From the same session:
+### Measured on the iOS simulator
+
+iPhone 17 Pro, iOS 26.1, a dev build installed on 2026-09-16 running today's JavaScript, an empty test
+wallet. Same deep-link walk; no reloads. On iOS a deep link does dispatch the navigation action, so
+navigation time is present. 56 screens produced a row; the slowest to show content:
+
+| Screen | Content shown | Shell | Navigation | Dropped frames |
+| --- | --- | --- | --- | --- |
+| SettingsDesignSystemScreensScreen | 2,882 ms | 40 ms | 103 ms | 84 |
+| SettingsDesignSystemSegmentedScreen | 1,984 ms | 38 ms | 98 ms | 158 |
+| SettingsDesignSystemTimelineScreen | 1,767 ms | 600 ms | 669 ms | 144 |
+| BackgroundScreen | 1,705 ms | 637 ms | 778 ms | 123 |
+| SettingsDesignSystemPostsScreen | 1,054 ms | 349 ms | 404 ms | 28 |
+| SignerAppPersonScreen | 896 ms | 481 ms | 575 ms | 400 |
+| SettingsNetworkScreen | 838 ms | 234 ms | 349 ms | 185 |
+| SettingsKeyringScreen | 739 ms | 335 ms | 419 ms | 114 |
+| SendScreen | 705 ms | 105 ms | 165 ms | 9 |
+| SettingsProfileScreen | 675 ms | 116 ms | 229 ms | 159 |
+
+Everything else showed content in under 620 ms. The avatar guard read 17 seeds across 102 avatar
+instances: none showed the fallback before its picture. The simulator cannot be tapped from a
+script, so nothing interactive was exercised on iOS: no profile switch, no payment, no menus.
+
+From the Android session:
 
 - After CALC-20, `wallet.balances.byMint` ran 116 times over 87 navigations and 15 reloads, against
   about 614 over 86 starts before: roughly one read per navigation where there were seven.
