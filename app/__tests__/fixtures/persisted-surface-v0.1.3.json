@@ -138,5 +138,32 @@
       "version": 1,
       "profileScoped": false
     }
-  }
+  },
+  "secureStoreKeys": [
+    "user_mnemonic",
+    "migrations_complete_",
+    "migrations_complete",
+    "derived_keys_",
+    "cashu_mnemonic_",
+    "cashu_seed_",
+    "imported_nsec_",
+    "secure_key_index"
+  ],
+  "sourcePins": [
+    {
+      "what": "wallet database name per account",
+      "file": "shared/lib/cashu/manager.ts",
+      "text": "this.accountIndex === 0 ? 'coco.db' : `coco-${this.accountIndex}.db`"
+    },
+    {
+      "what": "Nostr cache database name per account",
+      "file": "shared/providers/NostrNDKProvider.tsx",
+      "text": "activeAccountIndex === 0 ? 'nostr' : `nostr-${activeAccountIndex}`"
+    },
+    {
+      "what": "per-profile storage key format",
+      "file": "shared/lib/cashu/profileScopedStorage.ts",
+      "text": "`${name}:profile:${"
+    }
+  ]
 }

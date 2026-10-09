@@ -55,3 +55,17 @@ describe('stores released in v0.1.3 are still found after an upgrade', () => {
     expect(Object.keys(released.stores)).toHaveLength(34);
   });
 });
+
+describe('keys and databases released in v0.1.3 are still read', () => {
+  const read = (file: string) => readFileSync(join(APP_DIR, file), 'utf8');
+
+  it.each(released.secureStoreKeys)('SecureStore key %s', (key) => {
+    // Seeds and keys live under these names. A renamed key is a wallet the
+    // upgraded app cannot open.
+    expect(read('shared/lib/nostr/secureStorage.ts')).toContain(`'${key}'`);
+  });
+
+  it.each(released.sourcePins)('$what', ({ file, text }) => {
+    expect(read(file)).toContain(text);
+  });
+});

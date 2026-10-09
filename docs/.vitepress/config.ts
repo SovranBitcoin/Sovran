@@ -58,7 +58,10 @@ export default defineConfig({
       },
       {
         text: 'Architecture',
-        items: [{ text: 'Overview', link: '/architecture/overview' }],
+        items: [
+          { text: 'Overview', link: '/architecture/overview' },
+          { text: 'How accounts work', link: '/architecture/account-lifecycle' },
+        ],
       },
       {
         text: 'Reference',
