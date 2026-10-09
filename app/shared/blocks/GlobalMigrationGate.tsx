@@ -4,6 +4,7 @@ import { signalMigrationsComplete } from '@/shared/lib/cashu/profileScopedStorag
 import { runGlobalMigrations } from '@/shared/lib/migrations/globalMigrations';
 import { initLog } from '@/shared/lib/logger';
 import { InitializationGate } from '@/shared/blocks/InitializationGate';
+import { StorageUpdateFailedScreen } from '@/shared/blocks/StorageUpdateFailedScreen';
 
 initLog('Module', 'GlobalMigrationGate loaded');
 
@@ -20,6 +21,9 @@ interface GlobalMigrationGateProps {
  * Zustand persist waits on. It MUST fire only on success — opening the gate
  * after a partial migration causes stores to load empty defaults and then
  * overwrite the migrated data on first write (audit-46 F-001).
+ *
+ * A failed run therefore stops here, on a screen with a retry. Nothing below
+ * mounts and no store reads or writes until a run succeeds.
  */
 export default function GlobalMigrationGate({ children }: GlobalMigrationGateProps) {
   return (
@@ -30,7 +34,8 @@ export default function GlobalMigrationGate({ children }: GlobalMigrationGatePro
       message="Running global migrations..."
       logEvent="gate.global_migration"
       run={runGlobalMigrations}
-      onSuccess={signalMigrationsComplete}>
+      onSuccess={signalMigrationsComplete}
+      renderFailure={(retry) => <StorageUpdateFailedScreen onRetry={retry} />}>
       {children}
     </InitializationGate>
   );

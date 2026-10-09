@@ -144,6 +144,10 @@ Rules that follow from them:
   schema rejects is replaced by defaults, so a ceiling on read deletes what it was meant to bound
   (`profileStoreCapacity.test.ts`).
 - Never change a store's name, a storage key format, a SecureStore key name or a database name.
+- A startup storage migration that fails stops the app on a retry screen
+  (`StorageUpdateFailedScreen`). Profile storage opens only after every migration has run, so no
+  store can load defaults and write them over data that was still being moved
+  (`globalMigrationsRunner.test.ts`).
 - A one-time storage migration keeps its own frozen list of names. It records what old installs
   wrote, so it must not follow the live registry (`globalMigrations.ts`).
 

@@ -25,6 +25,8 @@ interface InitializationGateProps {
    * fire when `run` rejects — see audit-46 F-001 for the catch-branch pitfall.
    */
   onSuccess?: () => void;
+  /** Shown when `run` rejects. `retry` runs it again; without this the gate renders nothing. */
+  renderFailure?: (retry: () => void) => ReactNode;
   children: ReactNode;
 }
 
@@ -35,7 +37,7 @@ interface InitializationGateProps {
  * hasStarted ref, the stage wiring, the success/error fork, and the children
  * Log wrapper — callers supply only the async `run` and the per-gate metadata.
  *
- * Failure semantics: when `run` rejects, the gate renders `errorFallback`
+ * Failure semantics: when `run` rejects, the gate renders `renderFailure`
  * (or `null`) and `onSuccess` is NOT called. Audit-46 F-001 documents why
  * downstream signal calls (e.g. `signalMigrationsComplete()`) must not fire
  * from a catch branch — they would open profile-scoped storage on top of an
@@ -97,6 +99,7 @@ export function InitializationGate({
   run,
   onSuccess,
   outlivesAccount,
+  renderFailure,
   children,
 }: InitializationGateProps) {
   useInitMount(tag);
@@ -108,17 +111,19 @@ export function InitializationGate({
     outlivesAccount,
   });
   const [status, setStatus] = useState<'pending' | 'complete' | 'failed'>('pending');
-  const hasStarted = useRef(false);
+  // Bumped by a retry; the effect runs once per attempt.
+  const [attempt, setAttempt] = useState(0);
+  const startedAttempt = useRef(-1);
   // `run`/`onSuccess` are fresh closures on every render but must NOT retrigger
-  // the gate — it runs exactly once per AccountScopedProviders lifecycle, which
-  // `hasStarted` enforces. Mirroring them keeps the dep list honest instead of
+  // the gate — it runs exactly once per attempt, which `startedAttempt`
+  // enforces. Mirroring them keeps the dep list honest instead of
   // suppressed.
   const runRef = useLatestRef(run);
   const onSuccessRef = useLatestRef(onSuccess);
 
   useEffect(() => {
-    if (hasStarted.current) return;
-    hasStarted.current = true;
+    if (startedAttempt.current === attempt) return;
+    startedAttempt.current = attempt;
 
     void runInitializationGate({
       stage,
@@ -129,9 +134,15 @@ export function InitializationGate({
       onSuccess: onSuccessRef.current,
       setStatus,
     });
-  }, [stage, tag, message, logEvent, runRef, onSuccessRef]);
+  }, [stage, tag, message, logEvent, runRef, onSuccessRef, attempt]);
 
-  if (status === 'failed') return null;
+  if (status === 'failed') {
+    if (!renderFailure) return null;
+    return renderFailure(() => {
+      setStatus('pending');
+      setAttempt((current) => current + 1);
+    });
+  }
   if (status !== 'complete') return null;
 
   return <Log name={tag}>{children}</Log>;

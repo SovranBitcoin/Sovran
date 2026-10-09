@@ -119,7 +119,8 @@ describe('legacy theme migration', () => {
       'profile-store': profileStoreBlob,
     };
     jest.mocked(AsyncStorage.setItem).mockRejectedValueOnce(new Error('disk full'));
-    await runMigration(store);
+    // The run reports the failure so the gate keeps storage closed.
+    await expect(runMigration(store)).rejects.toThrow('disk full');
     expect(JSON.parse(store['settings-store']).state.theme).toBe('flowers-1');
     expect(JSON.parse(store[COMPLETED_KEY])).not.toContain('legacy-global-theme-to-profile-v1');
     await runMigration(store);

@@ -329,16 +329,23 @@ const MIGRATIONS: Migration[] = [
   { id: 'wallet-lifecycle-stamp-existing-users-v1', run: stampSeedCreatedForExistingUsers },
 ];
 
+/**
+ * A read that throws is not an empty marker: it propagates, the run stops and
+ * storage stays closed. A marker that reads but does not parse cannot be
+ * retried into health, so it is treated as empty and every migration is
+ * replayed; each one is safe to replay (`globalMigrationsRunner.test.ts`).
+ */
 async function readCompletedMigrationIds(): Promise<Set<string>> {
-  try {
-    const raw = await AsyncStorage.getItem(GLOBAL_MIGRATIONS_COMPLETED_KEY);
-    if (!raw) return new Set();
+  const raw = await AsyncStorage.getItem(GLOBAL_MIGRATIONS_COMPLETED_KEY);
+  if (!raw) return new Set();
 
-    const parsed = JSON.parse(raw);
+  try {
+    const parsed: unknown = JSON.parse(raw);
     return new Set(
       Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string') : []
     );
   } catch {
+    log.warn('migrations.global.marker_unparseable');
     return new Set();
   }
 }
@@ -350,6 +357,14 @@ async function writeCompletedMigrationIds(completedIds: Set<string>): Promise<vo
   );
 }
 
+/**
+ * Runs every pending migration in order and throws on the first that fails.
+ *
+ * Throwing is what keeps profile storage closed: `GlobalMigrationGate` opens it
+ * only when this resolves. Carrying on would let stores load defaults and
+ * write them over the keys a half-finished migration was still moving. A
+ * migration that completed keeps its marker, so a retry resumes at the failure.
+ */
 export async function runGlobalMigrations(): Promise<void> {
   const completedIds = await readCompletedMigrationIds();
 
@@ -363,6 +378,7 @@ export async function runGlobalMigrations(): Promise<void> {
       log.info('migrations.global.completed', { migrationId: migration.id });
     } catch (error) {
       log.error('migrations.global.failed', { migrationId: migration.id, error });
+      throw error;
     }
   }
 }
