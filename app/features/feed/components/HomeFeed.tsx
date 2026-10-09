@@ -46,6 +46,7 @@ import { usePostActions } from '@/features/feed/hooks/usePostActions';
 import { useNostrSocialStore } from '@/shared/stores/profile/nostrSocialStore';
 import { EmptyState } from '@/shared/ui/composed/EmptyState';
 import {
+  countFollowing,
   selectFeedEmptyMode,
   feedFooterCopy,
   FEED_EMPTY_COPY,
@@ -260,7 +261,10 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
   const [pageStatus, setPageStatus] = useState<FeedPageStatus>({});
   const clientRef = useRef<FeedClient | null>(null);
   const [retryTimer] = useState(() => createFeedRetryTimer());
-  const followCount = useNostrSocialStore((s) => Object.keys(s.followingPubkeys).length);
+  // Subscribe to the map itself: it is replaced only when a newer contact list
+  // lands, so the count is taken then rather than on every social-store write.
+  const followingPubkeys = useNostrSocialStore((s) => s.followingPubkeys);
+  const followCount = countFollowing(followingPubkeys);
   const isFollowingFeed =
     activeFilter === FEED_FILTER_FOLLOWING_POPULAR || activeFilter === FEED_FILTER_FOLLOWING_RECENT;
   const openPostActions = usePostActions();

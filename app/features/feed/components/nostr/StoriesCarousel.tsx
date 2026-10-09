@@ -274,6 +274,25 @@ export const StoriesCarousel: FC<CarouselProps> = ({
     reportCarouselMetrics('state');
   }, [listCurrentIndex, reportCarouselMetrics, storyUsers.length, width]);
 
+  const totalUsers = storyUsers.length;
+  // Stable for FlatList: a new renderItem re-renders every mounted page.
+  const renderStoryUser = useCallback(
+    ({ item, index }: { item: StoryUser; index: number }) => (
+      <UserStoriesItem
+        user={item}
+        userIndex={index}
+        totalUsers={totalUsers}
+        listAnimatedIndex={listAnimatedIndex}
+        listCurrentIndex={listCurrentIndex}
+        isDragging={isDragging}
+        scrollRef={scrollRef}
+        onClose={onClose}
+        isClosing={isClosing}
+      />
+    ),
+    [totalUsers, listAnimatedIndex, listCurrentIndex, isDragging, scrollRef, onClose, isClosing]
+  );
+
   return (
     <Log name="StoriesCarousel">
       <VisualLayoutProbe
@@ -294,19 +313,7 @@ export const StoriesCarousel: FC<CarouselProps> = ({
           ref={scrollRef as any}
           data={storyUsers}
           keyExtractor={(item) => item.pubkey}
-          renderItem={({ item, index }) => (
-            <UserStoriesItem
-              user={item}
-              userIndex={index}
-              totalUsers={storyUsers.length}
-              listAnimatedIndex={listAnimatedIndex}
-              listCurrentIndex={listCurrentIndex}
-              isDragging={isDragging}
-              scrollRef={scrollRef}
-              onClose={onClose}
-              isClosing={isClosing}
-            />
-          )}
+          renderItem={renderStoryUser}
           horizontal
           showsHorizontalScrollIndicator={false}
           onLayout={handleCarouselLayout}
@@ -646,9 +653,9 @@ const UserStoriesItem: FC<UserItemProps> = ({
 
         <View style={styles.header} pointerEvents="box-none">
           <View testID="story-progress" style={styles.progressRow} pointerEvents="none">
-            {user.videoPosts.map((_, idx) => (
+            {user.videoPosts.map((post, idx) => (
               <StoryProgressBar
-                key={idx}
+                key={post.eventId}
                 index={idx}
                 currentStoryIndex={currentStoryIndex}
                 storyProgress={storyProgress}

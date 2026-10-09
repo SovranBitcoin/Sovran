@@ -523,7 +523,9 @@ function TopFollowers({
   );
 
   const renderSkeleton = (index: number) => (
-    <View key={index} style={[styles.topFollowerGridItem, { width: itemWidth }]}>
+    <View
+      key={`top-follower-skeleton-${index}`}
+      style={[styles.topFollowerGridItem, { width: itemWidth }]}>
       <Avatar state="loading" size={avatarSize} />
       <View
         style={{
