@@ -354,12 +354,13 @@ export const useMintMetadataStore = create<MintMetadataState>()(
                 ...(m.description ? { description: m.description } : {}),
                 ...(m.supportedUnits ? { supportedUnits: m.supportedUnits } : {}),
                 ...(m.nuts ? { nuts: m.nuts } : {}),
-                // reviews aggregate — discover always carries it (null score = no
-                // scored reviews); overwriting a stale aggregate is intended (F3).
-                averageScore: m.averageScore ?? null,
+                // A scored aggregate refreshes stale reviews (F3); unknown is
+                // not a reason to erase a score or suppress a needed read.
+                ...(typeof m.averageScore === 'number' || m.reviewCount === 0
+                  ? { averageScore: m.averageScore ?? null, reviewsAt: now }
+                  : {}),
                 ...(m.reviewCount !== undefined ? { reviewCount: m.reviewCount } : {}),
                 ...(m.favouriteCount !== undefined ? { favouriteCount: m.favouriteCount } : {}),
-                reviewsAt: now,
                 // audit — the whole group at once. Its `undefined` keys are
                 // deliberate: they drop what the previous auditor's row left
                 // behind (a mint moving from ucash to 8333 loses its latency).

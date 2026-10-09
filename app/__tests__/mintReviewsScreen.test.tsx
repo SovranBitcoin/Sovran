@@ -1,4 +1,6 @@
 import React from 'react';
+import type { facade } from 'nostr';
+import { readMintReviews } from '@/features/mint/data/readMintReviews';
 import TestRenderer, { act } from 'react-test-renderer';
 import { err, ok } from 'neverthrow';
 import { MintReviewsScreen } from '@/features/mint/screens/MintReviewsScreen';
@@ -6,7 +8,7 @@ import { RatingBarChart } from '@/features/mint/components/RatingBarChart';
 import { reviewMint, type MintRecommendation } from '@/shared/lib/apiClient';
 import { formatRelative } from '@/shared/lib/date';
 import { useMintMetadataStore } from '@/shared/stores/global/mintMetadataStore';
-import { mintReviewsCache } from '@/features/mint/data/mintReviewsCache';
+import { mintReviewsCache, mintReviewsKey } from '@/features/mint/data/mintReviewsCache';
 import { flushRowRenderWindows } from '@/shared/lib/loggerRender';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -17,8 +19,11 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   removeItem: jest.fn(() => Promise.resolve()),
 }));
 jest.mock('@/shared/lib/apiClient', () => ({ reviewMint: jest.fn() }));
-// No data layer in Jest: the facade path falls back to the REST seam mocked above.
-jest.mock('@/shared/lib/nostr/buildNostrDataLayer', () => ({ buildNostrDataLayer: () => null }));
+const mockGetMintReviews = jest.fn();
+let mockUseFacade = false;
+jest.mock('@/shared/lib/nostr/buildNostrDataLayer', () => ({
+  buildNostrDataLayer: () => (mockUseFacade ? { getMintReviews: mockGetMintReviews } : null),
+}));
 jest.mock('expo-router', () => ({
   Stack: { Screen: () => null },
   useFocusEffect: (effect: () => void | (() => void)) =>
@@ -164,12 +169,14 @@ function seedAggregate(favouriteCount?: number) {
   useMintMetadataStore.getState().mergeCached(MINT, { favouriteCount }, ['reviews']);
 }
 beforeEach(() => {
+  jest.useFakeTimers();
   jest.clearAllMocks();
+  mockUseFacade = false;
   mintReviewsCache.clear();
   useMintMetadataStore.setState({ byMintUrl: {} });
   jest.mocked(reviewMint).mockImplementation(() => new Promise(() => {}));
 });
-afterEach(() => {
+afterEach(async () => {
   act(() => renderer?.unmount());
   // This screen's rows are counted by `useRowRenderLogger`, which aggregates
   // over a one-second window and flushes on a timer. Unmounting does not close
@@ -177,6 +184,13 @@ afterEach(() => {
   // worker is running by then — surfacing as Jest's "Cannot log after tests
   // are done" against a file that never touched a mint review.
   flushRowRenderWindows();
+  // RN's requestAnimationFrame stub reads jest.now(): flush callbacks before
+  // environment teardown, even when a scored update scheduled a new frame.
+  try {
+    await act(async () => jest.runOnlyPendingTimersAsync());
+  } finally {
+    jest.useRealTimers();
+  }
 });
 
 it('shows the shared chart and cached favourites while fresh rows are loading', async () => {
@@ -299,7 +313,137 @@ it('aborts an unfinished fetch on unmount and writes nothing from its late resul
   // Neither the durable aggregate nor the session rows: an aborted run is
   // never written (generation guard), so the next open fetches again.
   expect(useMintMetadataStore.getState().getCached(MINT)).toBeUndefined();
-  expect(mintReviewsCache.getEntry(`reviews:${MINT}`)).toBeUndefined();
+  expect(mintReviewsCache.getEntry(mintReviewsKey(MINT))).toBeUndefined();
   await renderScreen();
   expect(reviewMint).toHaveBeenCalledTimes(2);
+});
+
+it('keeps a later scored facade answer in the cache and durable aggregate', async () => {
+  mockUseFacade = true;
+  let update: facade.MintReviewsRequest['onUpdate'];
+  const first: facade.ResolvedMintReviews = {
+    tier: 'relay',
+    mintUrl: MINT,
+    averageScore: null,
+    reviewCount: 1,
+    reviews: [
+      {
+        eventId: review.eventId!,
+        reviewerPubkey: review.pubkey,
+        mintUrl: MINT,
+        content: 'Recommended',
+        score: null,
+        createdAtSec: 1789070400,
+      },
+    ],
+  };
+  mockGetMintReviews.mockImplementation(async (request: facade.MintReviewsRequest) => {
+    update = request.onUpdate;
+    return ok(first);
+  });
+  await renderScreen();
+  expect(mintReviewsCache.getEntry(mintReviewsKey(MINT))?.data.score).toBeNull();
+  await act(async () => update?.({ ...first, tier: 'nagg', averageScore: 4.5, reviewCount: 90 }));
+  expect(mintReviewsCache.getEntry(mintReviewsKey(MINT))?.data).toMatchObject({
+    score: 4.5,
+    reviewCount: 90,
+  });
+  expect(useMintMetadataStore.getState().getCached(MINT)).toMatchObject({
+    averageScore: 4.5,
+    reviewCount: 90,
+  });
+});
+
+it('fills an unknown score from a fallback without replacing the authoritative count', async () => {
+  useMintMetadataStore.getState().setReviewsAggregate(MINT, null, 90);
+  jest.mocked(reviewMint).mockResolvedValue(
+    ok({
+      ...response([review]).value,
+      tier: 'relay',
+      reviewCount: 1,
+      score: 4,
+    })
+  );
+  await renderScreen();
+  expect(useMintMetadataStore.getState().getCached(MINT)).toMatchObject({
+    averageScore: 4,
+    reviewCount: 90,
+  });
+});
+
+it('drops a superseded facade update from both stores', async () => {
+  mockUseFacade = true;
+  const updates: NonNullable<facade.MintReviewsRequest['onUpdate']>[] = [];
+  const first: facade.ResolvedMintReviews = {
+    tier: 'nagg',
+    mintUrl: MINT,
+    averageScore: 4.5,
+    reviewCount: 90,
+    reviews: [],
+  };
+  mockGetMintReviews.mockImplementation(async (request: facade.MintReviewsRequest) => {
+    if (request.onUpdate) updates.push(request.onUpdate);
+    return ok(first);
+  });
+  await renderScreen();
+  const key = mintReviewsKey(MINT);
+  await act(async () => {
+    await mintReviewsCache.run(key, (ctx) => readMintReviews(MINT, ctx), '', { force: true });
+    updates[0]({ ...first, averageScore: 2, reviewCount: 3 });
+  });
+  expect(mintReviewsCache.getEntry(key)?.data).toMatchObject({ score: 4.5, reviewCount: 90 });
+  expect(useMintMetadataStore.getState().getCached(MINT)).toMatchObject({
+    averageScore: 4.5,
+    reviewCount: 90,
+  });
+  await act(async () => {
+    mintReviewsCache.clear();
+    updates[1]({ ...first, averageScore: 2, reviewCount: 3 });
+  });
+  expect(mintReviewsCache.getEntry(key)).toBeUndefined();
+  expect(useMintMetadataStore.getState().getCached(MINT)).toMatchObject({
+    averageScore: 4.5,
+    reviewCount: 90,
+  });
+});
+
+it('retains a known authoritative score and count when a fallback is smaller', async () => {
+  seedAggregate();
+  jest.mocked(reviewMint).mockResolvedValue(
+    ok({
+      ...response([review]).value,
+      tier: 'relay',
+      reviewCount: 1,
+      score: 1,
+    })
+  );
+  await renderScreen();
+  expect(useMintMetadataStore.getState().getCached(MINT)).toMatchObject({
+    averageScore: 4.2,
+    reviewCount: 7,
+  });
+});
+
+it('keeps the newer update when it arrives before first paint settles', async () => {
+  mockUseFacade = true;
+  const first: facade.ResolvedMintReviews = {
+    tier: 'relay',
+    mintUrl: MINT,
+    averageScore: null,
+    reviewCount: 1,
+    reviews: [],
+  };
+  mockGetMintReviews.mockImplementation(async (request: facade.MintReviewsRequest) => {
+    request.onUpdate?.({ ...first, tier: 'nagg', averageScore: 4.5, reviewCount: 90 });
+    return ok(first);
+  });
+  await renderScreen();
+  expect(mintReviewsCache.getEntry(mintReviewsKey(MINT))?.data).toMatchObject({
+    score: 4.5,
+    reviewCount: 90,
+  });
+  expect(useMintMetadataStore.getState().getCached(MINT)).toMatchObject({
+    averageScore: 4.5,
+    reviewCount: 90,
+  });
 });

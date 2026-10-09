@@ -66,11 +66,11 @@ export interface QueryCacheRunOptions {
   readId?: string;
 }
 
-/** What a `run` fetcher receives. `partial` writes an early value under the same generation guard. */
+/** What a `run` fetcher receives. `partial` writes under the generation guard and returns whether it was accepted. */
 export interface QueryCacheRunContext<TData> {
   signal: AbortSignal | undefined;
   readId: string;
-  partial: (data: TData, cursor?: string) => void;
+  partial: (data: TData, cursor?: string) => boolean;
 }
 
 type QueryCacheSupersededReason = 'newer-request' | 'clear' | 'abort';
@@ -305,10 +305,11 @@ export function createQueryCacheStore<TData>(opts: QueryCacheStoreOptions): Quer
       return 'ok';
     };
 
-    const partial = (data: TData, cursor?: string): void => {
-      if (currency() !== 'ok') return;
+    const partial = (data: TData, cursor?: string): boolean => {
+      if (currency() !== 'ok') return false;
       use.getState().setEntry(key, data, { viewerKey, cursor });
       storeLog.debug('query_cache.run.partial', { ...logCtx, ...keyMeta(key), readId, gen });
+      return currency() === 'ok';
     };
 
     const promise = fetcher({ signal: runOpts.signal, readId, partial }).then(

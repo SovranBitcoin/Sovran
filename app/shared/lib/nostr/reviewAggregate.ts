@@ -6,17 +6,21 @@ import type { MintReviewsResponse } from '@/shared/lib/apiClient';
  * not the mint's total. Persisting it over nagg's aggregate is how Minibits
  * showed "1 review" on one selector open and ~90 on the next. nagg's answer
  * always overwrites (including a count that genuinely fell); a fallback tier
- * only fills a mint nothing has counted yet.
+ * fills an uncounted mint or an unknown score, retaining any stored total.
  */
 export function reviewAggregateOf(
   response: MintReviewsResponse,
-  storedCount: number | undefined
+  storedCount: number | undefined,
+  storedScore: number | null | undefined
 ): { score: number | null; reviewCount: number; authoritative: boolean } {
   const reviewCount = response.reviewCount ?? response.recommendations.length;
   const authoritative = response.tier === 'nagg' || response.tier === undefined;
   return {
     score: response.score,
-    reviewCount,
-    authoritative: authoritative || storedCount === undefined,
+    reviewCount: authoritative ? reviewCount : (storedCount ?? reviewCount),
+    authoritative:
+      authoritative ||
+      storedCount === undefined ||
+      (storedScore == null && response.score !== null),
   };
 }

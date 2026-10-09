@@ -238,7 +238,7 @@ async function fetchEntry(
   if (reviewRes && reviewRes.isOk()) {
     const review = reviewRes.value;
     const stored = useMintMetadataStore.getState().getCached(mintUrl);
-    const aggregate = reviewAggregateOf(review, stored?.reviewCount);
+    const aggregate = reviewAggregateOf(review, stored?.reviewCount, stored?.averageScore);
     if (aggregate.authoritative) {
       if (review.score !== null) entry.kymScore = review.score;
       else delete entry.kymScore;
@@ -246,7 +246,7 @@ async function fetchEntry(
       // ALWAYS overwrite the persisted aggregate with a fresh AUTHORITATIVE
       // result — including a null score / empty list. The old `score !== null`
       // guard let a stale snapshot outlive the source (audit F3). A fallback
-      // tier's partial answer is not authoritative: see `reviewAggregateOf`.
+      // tier may fill an unknown score while retaining the stored count.
       // Only the aggregate (score + count) is persisted — never the raw rows.
       useMintMetadataStore
         .getState()
