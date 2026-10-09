@@ -13,7 +13,9 @@
  *      inbox for NUT-18 payloads via TWO paths sharing one unwrap→ingest body
  *      (`handleEnvelope`): a LIVE relay subscription (`subscribeDmEnvelopes`) so
  *      a paid request is claimed the instant the wrap arrives, plus a 15s poll
- *      (nagg DM index → relay floor) as the offline/reconnect backstop. Each
+ *      (nagg DM index → relay floor) as the offline/reconnect backstop. The
+ *      poll stops while the app is backgrounded and runs once immediately on
+ *      return to the foreground. Each
  *      kind-1059 envelope is unwrapped and NUT-18-looking rumor contents fed to
  *      `paymentRequestReceiveService.ingestPayload` with the wrap event id as
  *      `transportMessageId` (coco's idempotency key, so poll+live can't
@@ -25,6 +27,7 @@
  * so polling resumes automatically after restart.
  */
 
+import { AppState, type AppStateStatus } from 'react-native';
 import { getPublicKey } from 'nostr-tools/pure';
 import * as nip19 from 'nostr-tools/nip19';
 import { PaymentRequestTransportType, type PaymentRequestTransport } from '@cashu/cashu-ts';
@@ -41,6 +44,13 @@ import { reportCocoIssue } from '@/shared/lib/cashu/cocoFeedback';
  *  (nagg stores wraps), so payments received while offline are caught on the
  *  next tick — no live socket to babysit. */
 const POLL_INTERVAL_MS = 15_000;
+/** Ceiling for one tier's answer. The facade tries its tiers in sequence and
+ *  applies this to each, so a hung nagg hands over to the relay floor inside
+ *  the same tick instead of holding the default 30s across two of them. */
+const POLL_TIER_TIMEOUT_MS = 6_000;
+/** Ceiling for the whole read, below the cadence whatever the tier count, so a
+ *  slow tick has always settled before the next one is due. */
+const POLL_DEADLINE_MS = 13_000;
 const POLL_LIMIT = 50;
 const SEEN_CAP = 1000;
 const GIFT_WRAP_KIND = 1059;
@@ -56,6 +66,11 @@ interface NostrTransportPluginConfig {
   /** Profile Nostr secret key (same key the P2PK import uses); captured per
    *  manager init so one profile's key never serves another's manager. */
   getSignerKey: () => Uint8Array | null;
+  /** Foreground signal; injected by tests. */
+  appState?: {
+    currentState: AppStateStatus;
+    addEventListener(type: 'change', listener: (state: AppStateStatus) => void): { remove(): void };
+  };
 }
 
 /** Structural match for coco's PaymentRequestReceiveTransportHandler (the
@@ -108,8 +123,12 @@ export function createPaymentRequestNostrTransportPlugin(
       const activeOps = new Set<string>();
       const seenWraps = new Set<string>();
       const inFlightWraps = new Set<string>();
+      const appState = config.appState ?? AppState;
       let timer: ReturnType<typeof setInterval> | null = null;
       let polling = false;
+      /** A poll was asked for while one was in flight; run it when that settles. */
+      let pollQueued = false;
+      let backgrounded = appState.currentState === 'background';
       let recoveryNeeded = false;
       let recovering = false;
       let disposed = false;
@@ -237,11 +256,17 @@ export function createPaymentRequestNostrTransportPlugin(
           // switch / reload), and re-unwrapping ~50 envelopes serially costs
           // ~8-10s of JS-thread NIP-44 crypto per re-init without it.
           await giftWrapCache.cache.hydrate(viewerPubkey);
-          const outcome = await layer.getDmEnvelopes({
-            viewerPubkey,
-            limit: POLL_LIMIT,
-            refresh: true,
-          });
+          const deadline = new AbortController();
+          const deadlineTimer = setTimeout(() => deadline.abort(), POLL_DEADLINE_MS);
+          const outcome = await layer
+            .getDmEnvelopes({
+              viewerPubkey,
+              limit: POLL_LIMIT,
+              refresh: true,
+              timeoutMs: POLL_TIER_TIMEOUT_MS,
+              signal: deadline.signal,
+            })
+            .finally(() => clearTimeout(deadlineTimer));
           const envelopes = outcome.match(
             (resolved) => resolved.envelopes,
             () => []
@@ -319,13 +344,25 @@ export function createPaymentRequestNostrTransportPlugin(
           });
         } finally {
           polling = false;
+          if (pollQueued) {
+            pollQueued = false;
+            if (timer) void pollOnce();
+          }
         }
       };
 
+      /** The immediate poll on start. One already in flight began before this
+       *  was asked for (before the app came back, say), so it cannot stand in
+       *  for it: queue a fresh one behind it rather than drop the request. */
+      const pollNow = () => {
+        if (polling) pollQueued = true;
+        else void pollOnce();
+      };
+
       const startPolling = () => {
-        if (timer || disposed) return;
+        if (timer || disposed || backgrounded) return;
         timer = setInterval(() => void pollOnce(), POLL_INTERVAL_MS);
-        void pollOnce();
+        pollNow();
         cashuLog.info('cashu.creq.transport.polling_started', { activeOps: activeOps.size });
       };
 
@@ -424,11 +461,28 @@ export function createPaymentRequestNostrTransportPlugin(
         },
       };
 
+      // Nothing can be claimed while the app is backgrounded that the first
+      // poll back in the foreground does not find, so the timer only runs in
+      // the foreground. `inactive` (iOS app switcher, a system sheet) keeps
+      // polling: the app is still on screen. The live subscription is left
+      // alone; the relay socket's fate in the background is the OS's.
+      const appStateSubscription = appState.addEventListener('change', (state) => {
+        if (state === 'background') {
+          backgrounded = true;
+          stopPolling();
+        } else if (state === 'active' && backgrounded) {
+          backgrounded = false;
+          if (activeOps.size > 0) startPolling();
+        }
+      });
+
       const unregister = service.registerTransportHandler(handler);
       cashuLog.info('cashu.creq.transport.registered');
 
       return () => {
         disposed = true;
+        // Jest's react-native mock hands back no subscription.
+        appStateSubscription?.remove();
         stopPolling();
         stopLive();
         activeOps.clear();

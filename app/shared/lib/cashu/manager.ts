@@ -1,5 +1,6 @@
 import { registerAccountScoped } from '@/shared/lib/persist/accountScoped';
-import { Manager } from '@cashu/coco-core';
+import { AppState, type AppStateStatus } from 'react-native';
+import { Manager, type WebSocketFactory, type WebSocketLike } from '@cashu/coco-core';
 import type { Plugin } from '@cashu/coco-core/plugin';
 import {
   createCashuSeedGetter,
@@ -31,6 +32,8 @@ import {
   AsyncStorageSinceStore,
   createNpcClient,
   getNpcSinceStoreKey,
+  pauseNpcSync,
+  resumeNpcSync,
 } from './npc';
 import {
   deriveNostrKeys,
@@ -93,6 +96,236 @@ const COCO_TIMED_NAMESPACES = [
   'ext',
 ] as const satisfies readonly (keyof Manager)[];
 
+/**
+ * Passed to the Manager's constructor as well as to the explicit enable call:
+ * coco's `resumeSubscriptions` rebuilds the processor from its constructor
+ * config, so both must describe the same processor.
+ */
+const MINT_OPERATION_PROCESSOR_OPTIONS = {
+  processIntervalMs: 5000,
+  maxRetries: 3,
+  baseRetryDelayMs: 1000,
+  initialEnqueueDelayMs: 2000,
+};
+
+/** How long a resume waits for the sockets the pause closed to report it. */
+const SOCKET_CLOSE_WAIT_MS = 2_000;
+const FOREGROUND_GATE_ATTEMPTS = 3;
+const FOREGROUND_GATE_RETRY_MS = 2_000;
+/**
+ * How long the app must stay backgrounded before wallet polling is paused.
+ * Android reports `background` for system dialogs, the biometric prompt and
+ * the share sheet while the app is still on screen, and a user copying an
+ * invoice into another app is back within seconds. Pausing for those would
+ * close and reopen every mint socket for nothing.
+ */
+const BACKGROUND_PAUSE_GRACE_MS = 10_000;
+
+interface ForegroundSignal {
+  currentState: AppStateStatus;
+  addEventListener(type: 'change', listener: (state: AppStateStatus) => void): { remove(): void };
+}
+
+/**
+ * Keep background work paused while the app is backgrounded.
+ *
+ * Transitions run one at a time and the loop re-reads the wanted state after
+ * each, so a quick background → foreground never overlaps a pause with a
+ * resume and never runs either twice. `inactive` is ignored: the app is still
+ * on screen. A failed transition is retried; after the last attempt the state
+ * is taken as reached so the next transition (a resume, after a failed pause)
+ * still runs.
+ */
+export function createForegroundGate(options: {
+  appState: ForegroundSignal;
+  pause: () => Promise<void>;
+  resume: () => Promise<void>;
+  /** Stay backgrounded this long before pausing. Default 0: pause at once. */
+  pauseAfterMs?: number;
+}): { dispose: () => Promise<void> } {
+  const pauseAfterMs = options.pauseAfterMs ?? 0;
+  let graceTimer: ReturnType<typeof setTimeout> | null = null;
+  const clearGrace = () => {
+    if (graceTimer) clearTimeout(graceTimer);
+    graceTimer = null;
+  };
+  let wantPaused = options.appState.currentState === 'background';
+  let paused = false;
+  let disposed = false;
+  let settling: Promise<void> | null = null;
+
+  const settle = async (): Promise<void> => {
+    let failures = 0;
+    try {
+      while (!disposed && paused !== wantPaused) {
+        const next = wantPaused;
+        try {
+          await (next ? options.pause() : options.resume());
+        } catch (error) {
+          failures += 1;
+          cashuLog.warn('cashu.manager.foreground_gate.failed', {
+            pausing: next,
+            failures,
+            error: redactError(error),
+          });
+          if (failures < FOREGROUND_GATE_ATTEMPTS) {
+            await new Promise((resolve) => setTimeout(resolve, FOREGROUND_GATE_RETRY_MS));
+            continue;
+          }
+        }
+        failures = 0;
+        paused = next;
+      }
+    } finally {
+      settling = null;
+    }
+  };
+
+  const request = (): void => {
+    if (settling || disposed || paused === wantPaused) return;
+    settling = settle();
+  };
+
+  const subscription = options.appState.addEventListener('change', (state) => {
+    if (state === 'background') {
+      if (pauseAfterMs > 0) {
+        if (graceTimer || wantPaused) return;
+        graceTimer = setTimeout(() => {
+          graceTimer = null;
+          wantPaused = true;
+          request();
+        }, pauseAfterMs);
+        return;
+      }
+      wantPaused = true;
+    } else if (state === 'active') {
+      clearGrace();
+      wantPaused = false;
+    } else return;
+    request();
+  });
+  request();
+
+  return {
+    async dispose() {
+      disposed = true;
+      clearGrace();
+      subscription.remove();
+      await settling;
+    },
+  };
+}
+
+/**
+ * Wrap a WebSocket factory so a caller can wait for sockets to report closed.
+ *
+ * coco's connection manager handles `close` without checking which socket
+ * closed: a close that arrives after a replacement was opened drops the
+ * replacement and its queued subscriptions, leaving that mint on HTTP polling.
+ * Closing is asynchronous on React Native, so a resume straight after a pause
+ * can open the replacements first. Waiting here keeps the two in order.
+ */
+export function trackSocketCloses(create: WebSocketFactory): {
+  factory: WebSocketFactory;
+  open: () => WebSocketLike[];
+  closed: (sockets: readonly WebSocketLike[], timeoutMs: number) => Promise<boolean>;
+} {
+  const open = new Set<WebSocketLike>();
+  const waiters = new Set<() => void>();
+  return {
+    factory(url) {
+      const socket = create(url);
+      open.add(socket);
+      socket.addEventListener('close', () => {
+        open.delete(socket);
+        for (const waiter of [...waiters]) waiter();
+      });
+      return socket;
+    },
+    open: () => [...open],
+    closed(sockets, timeoutMs) {
+      const pending = () => sockets.some((socket) => open.has(socket));
+      if (!pending()) return Promise.resolve(true);
+      return new Promise((resolve) => {
+        const finish = (settled: boolean) => {
+          clearTimeout(timer);
+          waiters.delete(check);
+          // A socket that never reports is not waited for again.
+          for (const socket of sockets) open.delete(socket);
+          // Next task: coco's own `close` listeners run after this one.
+          setTimeout(() => resolve(settled), 0);
+        };
+        const check = () => {
+          if (!pending()) finish(true);
+        };
+        const timer = setTimeout(() => finish(false), timeoutMs);
+        waiters.add(check);
+      });
+    },
+  };
+}
+
+/**
+ * Pause coco's subscriptions and NPC sync while the app is backgrounded, and
+ * bring both back with an immediate check when it returns.
+ *
+ * Pausing stops NPC first: a sync that lands after coco has stopped its mint
+ * processor would queue quotes nothing is listening for. Resuming goes through
+ * coco's own `resumeSubscriptions`, which reconnects the mint sockets, restarts
+ * every watcher with a rescan of what is pending and recovers pending mint
+ * operations: the checks a cold start makes, so anything paid while
+ * backgrounded is found on return. NPC restarts after it, once the processor
+ * is listening again.
+ */
+export function createWalletForegroundGate(options: {
+  appState: ForegroundSignal;
+  manager: Pick<Manager, 'pauseSubscriptions' | 'resumeSubscriptions' | 'requeuePaidMintQuotes'>;
+  npcAccount: () => NPCAccountApi | null;
+  socketCloses: ReturnType<typeof trackSocketCloses> | null;
+  pauseAfterMs?: number;
+}): { dispose: () => Promise<void> } {
+  const { manager, socketCloses } = options;
+  /** Mint sockets the last pause closed that had not yet reported it. */
+  let closingSockets: WebSocketLike[] = [];
+
+  return createForegroundGate({
+    appState: options.appState,
+    pauseAfterMs: options.pauseAfterMs,
+    async pause() {
+      cashuLog.info('cashu.manager.background_pause.start');
+      const npcAccount = options.npcAccount();
+      if (npcAccount) await pauseNpcSync(npcAccount);
+      await manager.pauseSubscriptions();
+      closingSockets = socketCloses?.open() ?? [];
+      cashuLog.info('cashu.manager.background_pause.done', {
+        closingSockets: closingSockets.length,
+      });
+    },
+    async resume() {
+      const t0 = performance.now();
+      const socketsClosed =
+        (await socketCloses?.closed(closingSockets, SOCKET_CLOSE_WAIT_MS)) ?? true;
+      closingSockets = [];
+      await manager.resumeSubscriptions();
+      const npcAccount = options.npcAccount();
+      if (npcAccount) {
+        void resumeNpcSync(npcAccount).catch((error) =>
+          cashuLog.warn('cashu.manager.npc_sync_failed', { error })
+        );
+      }
+      try {
+        await manager.requeuePaidMintQuotes();
+      } catch (error) {
+        cashuLog.warn('cashu.manager.paid_mint_quote_requeue_failed', { error });
+      }
+      cashuLog.info('cashu.manager.foreground_resume.done', {
+        socketsClosed,
+        duration_ms: Math.round((performance.now() - t0) * 100) / 100,
+      });
+    },
+  });
+}
+
 interface Signer {
   signEvent: (e: EventTemplate) => Promise<VerifiedEvent>;
 }
@@ -133,6 +366,10 @@ export class CocoManager {
   private static npcPlugin: NPCPlugin | null = null;
   private static npcAccount: NPCAccountApi | null = null;
   private static npcPluginRegistered = false;
+  /** Pauses coco and NPC polling while the app is backgrounded. Armed only
+   *  once enableNpcSyncAndProcessor has run; see armForegroundGate. */
+  private static foregroundGate: ReturnType<typeof createForegroundGate> | null = null;
+  private static socketCloses: ReturnType<typeof trackSocketCloses> | null = null;
   /** Stored reference to seed getter for pre-warming during background init */
   private static seedGetter: (() => Promise<Uint8Array>) | null = null;
 
@@ -568,18 +805,28 @@ export class CocoManager {
         // (initialize, getInstance, peekInstance) returns this one object, so
         // callers that key a WeakMap by the manager or compare it with `!==`
         // across a profile switch see a single stable identity.
+        // Outside e2e mint-fault sessions this is the socket coco would open
+        // itself (its fallback is the global WebSocket); it is only wrapped
+        // so a resume can wait for the sockets a pause closed.
+        const createSocket: WebSocketFactory | undefined =
+          maybeCreateMintFaultWebSocketFactory() ??
+          (typeof globalThis.WebSocket === 'undefined'
+            ? undefined
+            : (url) => new globalThis.WebSocket(url));
+        this.socketCloses = createSocket ? trackSocketCloses(createSocket) : null;
+
         const manager = new Manager(
           repositories,
           seedGetter,
           new CocoCoreLogger('manager'),
-          // undefined outside e2e mint-fault sessions → coco's own global-
-          // WebSocket fallback, i.e. today's behavior exactly.
-          maybeCreateMintFaultWebSocketFactory(),
+          this.socketCloses?.factory,
           plugins,
-          // watchers / processors / subscriptions keep their defaults;
-          // outputDataCreator is the 9th positional parameter.
+          // The constructor starts nothing; watchers and processors are
+          // enabled explicitly in the two phases below. The watchers'
+          // defaults match what those calls pass, and the subscription
+          // intervals stay coco's (20s beside a websocket, 5s without one).
           undefined,
-          undefined,
+          { mintOperationProcessor: MINT_OPERATION_PROCESSOR_OPTIONS },
           undefined,
           outputDataCreator
         );
@@ -778,16 +1025,11 @@ export class CocoManager {
 
       try {
         initLog('CocoManager', 'enabling mint quote processor...');
-        await manager.enableMintOperationProcessor({
-          processIntervalMs: 5000,
-          maxRetries: 3,
-          baseRetryDelayMs: 1000,
-          initialEnqueueDelayMs: 2000,
-        });
+        await manager.enableMintOperationProcessor(MINT_OPERATION_PROCESSOR_OPTIONS);
         initLog('CocoManager', 'mint quote processor enabled');
         cashuLog.info('cashu.manager.quote_processor_enabled', {
-          processIntervalMs: 5000,
-          maxRetries: 3,
+          processIntervalMs: MINT_OPERATION_PROCESSOR_OPTIONS.processIntervalMs,
+          maxRetries: MINT_OPERATION_PROCESSOR_OPTIONS.maxRetries,
         });
       } catch (error) {
         cashuLog.warn('cashu.manager.quote_processor_failed', { error });
@@ -859,12 +1101,44 @@ export class CocoManager {
         }
       }
 
+      this.armForegroundGate(manager);
+
       cashuLog.info('cashu.manager.npc_sync_and_processor.done', {
         duration_ms: Math.round((performance.now() - t0) * 100) / 100,
       });
     } finally {
       this.isBackgroundRunning = false;
     }
+  }
+
+  /**
+   * Start pausing wallet polling while the app is backgrounded.
+   *
+   * Armed here and not at initialize() because coco's `resumeSubscriptions`
+   * turns every watcher and processor back on, including the mint-operation
+   * pair that must stay off until the NUT-13 restore has finished. Once
+   * enableNpcSyncAndProcessor has run they are all meant to be on, so a resume
+   * can only restore what was already enabled. Before that point backgrounding
+   * pauses nothing, as it always has.
+   */
+  private static armForegroundGate(manager: Manager): void {
+    if (this.foregroundGate || this.instance !== manager) return;
+    this.foregroundGate = createWalletForegroundGate({
+      appState: AppState,
+      manager,
+      npcAccount: () => this.npcAccount,
+      socketCloses: this.socketCloses,
+      pauseAfterMs: BACKGROUND_PAUSE_GRACE_MS,
+    });
+  }
+
+  /** Stop following the foreground and wait out a transition in flight, so
+   *  teardown never runs beside a pause or a resume. */
+  private static async disarmForegroundGate(): Promise<void> {
+    const gate = this.foregroundGate;
+    this.foregroundGate = null;
+    this.socketCloses = null;
+    await gate?.dispose();
   }
 
   /**
@@ -953,6 +1227,7 @@ export class CocoManager {
 
     this.cleanupFailed = false;
     const doCleanup = async () => {
+      await this.disarmForegroundGate();
       if (!this.instance) {
         this.clearSensitiveRuntimeState();
         cashuLog.debug('cashu.manager.cleanup_skipped', { reason: 'no_instance' });
@@ -1294,6 +1569,7 @@ export class CocoManager {
    */
   static async completeReset(accountIndexes: number[]): Promise<void> {
     try {
+      await this.disarmForegroundGate();
       await this.disableWatchers();
       const instance = this.instance;
       if (instance) {

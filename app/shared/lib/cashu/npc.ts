@@ -19,6 +19,7 @@
 import * as nip19 from 'nostr-tools/nip19';
 import { JWTAuthProvider, NPCClient } from 'npubcash-sdk';
 import type { SigningFunc } from 'npubcash-sdk';
+import type { NPCAccountApi } from 'coco-cashu-plugin-npc';
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -36,6 +37,34 @@ export const NPC_SYNC_INTERVAL_MS = 25_000;
  */
 export function createNpcClient(signer: SigningFunc): NPCClient {
   return new NPCClient(NPC_BASE_URL, new JWTAuthProvider(NPC_BASE_URL, signer));
+}
+
+/** The part of the plugin's account API that owns its sync lifecycle. */
+type NpcSyncLifecycle = Pick<NPCAccountApi, 'start' | 'stop' | 'sync'>;
+
+/**
+ * Stop an account's sync while the app is backgrounded.
+ *
+ * `stop`, not the plugin's `pauseSubscriptions`: that one only drops the
+ * websocket, and the interval re-arms after every sync whether or not it is
+ * paused. `stop` clears the timer and the socket and waits for a sync that is
+ * already running, so nothing is cut off half-claimed.
+ */
+export async function pauseNpcSync(account: NpcSyncLifecycle): Promise<void> {
+  await account.stop();
+}
+
+/**
+ * Restart an account's sync on return to the foreground and sync once now.
+ *
+ * `start` reconnects the websocket and arms the interval; the sync that
+ * follows re-arms it when it finishes, so the next tick is one full
+ * `NPC_SYNC_INTERVAL_MS` after this one. Nothing is missed in between: sync is
+ * a pull from the persisted `since` cursor.
+ */
+export async function resumeNpcSync(account: NpcSyncLifecycle): Promise<void> {
+  account.start();
+  await account.sync();
 }
 
 /** Build the user-facing Lightning address for the active account. */
