@@ -406,16 +406,12 @@ export async function createAndSwitchProfile(opts?: {
       if (!switched) {
         throw new Error(`Failed to activate newly-created profile: ${nextIndex}`);
       }
-      cancelResetStages?.();
-      transitionInFlight = false;
-      await endTransition();
+      await abandonTransition(cancelResetStages);
     }
     return true;
   } catch (error) {
     log.error('profile.orchestrator.create_failed', { error: redactError(error) });
-    cancelResetStages?.();
-    transitionInFlight = false;
-    await endTransition();
+    await abandonTransition(cancelResetStages);
     return false;
   }
 }
@@ -553,9 +549,7 @@ export async function deleteAllProfiles(opts?: {
 
     const restarted = await teardownAndRestart();
     if (!restarted) {
-      cancelResetStages?.();
-      transitionInFlight = false;
-      await endTransition();
+      await abandonTransition(cancelResetStages);
       const { Alert } = await import('react-native');
       Alert.alert('Restart Required', 'Please close and reopen the app to complete the reset.', [
         { text: 'OK' },
@@ -564,9 +558,7 @@ export async function deleteAllProfiles(opts?: {
     return true;
   } catch (error) {
     log.error('profile.orchestrator.delete_all_failed', { error: redactError(error) });
-    cancelResetStages?.();
-    transitionInFlight = false;
-    await endTransition();
+    await abandonTransition(cancelResetStages);
     return false;
   }
 }
