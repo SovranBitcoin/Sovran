@@ -54,6 +54,23 @@ Limits of the opt-in switch as it stands:
 - Real relay shutdown, native cleanup, and what the theme and navigation look like after a switch
   are unproven until it is run on both platforms.
 
+Found by an independent review of the switch and not yet fixed. All apply only with the setting on:
+
+- **A Vertex budget store disables the fast path for the rest of the session.** Creating one records
+  a captured storage owner on a registry entry that is never removed
+  (`app/shared/stores/profile/vertexBudgetStore.ts:50`), and the switch refuses while any exists. With
+  the Whitenoise and Routstr refusals, the fast path may in practice never run yet.
+- **The new account's tree briefly sees the old NDK instance.** Teardown clears the signer,
+  subscriptions and relays, but ndk-mobile's store still holds the old instance until the new
+  provider's deferred init replaces it about 800 ms later. Signing is not possible in that window;
+  whether anything reads or writes the old account's cache database through it was not traced.
+- **The old account's late writes are dropped.** Writes are blocked before services and the wallet
+  core have stopped, so a profile-store update made during teardown (a receive completing, say) is
+  never persisted. The old account's blob is intact but can be stale against its wallet database.
+- **Only `ndk.pool` is disconnected**, not `ndk.outboxPool`.
+- **Navigation is replaced, not reset.** `router.replace('/')` may leave the old account's underlying
+  routes and params in the stack. Unverified in expo-router.
+
 ## Contents
 
 0. [Status](#status)
