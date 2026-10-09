@@ -124,6 +124,16 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
   const inFlightKeys = useRef<Map<number, Promise<NostrKeys>>>(new Map());
   const inFlightCashu = useRef<Map<number, Promise<string>>>(new Map());
   const hasStarted = useRef(false);
+  // Startup outlives the mount that began it: a remount for another account
+  // must not have this one's index and wallet phrase written into the wallet
+  // core, or its profile row added, after the fact.
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
 
   const getMnemonicForDerivation = useCallback(async (): Promise<string | null> => {
     if (mnemonic) {
@@ -253,6 +263,7 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
       cachedCashuMnemonics.current.clear();
       const defaultKeys = await deriveKeys(defaultAccountIndex);
       const defaultCashuMnemonic = await deriveCashuMnemonic(defaultAccountIndex);
+      if (!mounted.current) return;
       setKeys(defaultKeys);
       setCashuMnemonic(defaultCashuMnemonic);
 
@@ -323,6 +334,7 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
         let nsecValue: string | null = null;
         if (isImported && activeProfile) {
           nsecValue = await retrieveImportedNsec(activeProfile.pubkey);
+          if (!nsecValue && !mounted.current) return;
           if (!nsecValue) {
             const candidate = deriveNostrKeys(mnemonicToUse, activeProfile.accountIndex);
             if (
@@ -449,6 +461,11 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
           log.warn('nostr.keys.profile_pubkey_mismatch', { defaultAccountIndex });
         }
 
+        if (!mounted.current) {
+          log.info('nostr.keys.init_abandoned', { defaultAccountIndex });
+          return;
+        }
+
         initLog('NostrKeys', 'setting keys in state...');
         setKeys(defaultKeys);
         setCashuMnemonic(defaultCashuMnemonic);
@@ -475,13 +492,16 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
         stage.complete();
         initLog('NostrKeys', 'stage complete');
       } catch (err) {
+        // The stage is keyed by id, not by mount: reporting a failure after
+        // unmount would mark the remounted provider's stage as failed.
+        if (!mounted.current) return;
         log.error('nostr.keys.init_failed', { error: redactError(err) });
         // Display text for the init screen and KeyRecoveryScreen.
         const errorMessage = err instanceof Error ? err.message : 'Failed to initialize keys';
         setError(errorMessage);
         stage.error(errorMessage);
       } finally {
-        setIsLoading(false);
+        if (mounted.current) setIsLoading(false);
       }
     };
 

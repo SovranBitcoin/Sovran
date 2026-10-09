@@ -52,6 +52,8 @@ type CocoPhase1Args = {
   onManager: (manager: Manager) => void;
   onReady: () => void;
   onFailure: (error: Error) => void;
+  /** False once the effect that started this phase has been cleaned up. */
+  isCurrent: () => boolean;
 };
 
 /**
@@ -69,6 +71,7 @@ async function runCocoPhase1({
   onManager,
   onReady,
   onFailure,
+  isCurrent,
 }: CocoPhase1Args): Promise<void> {
   try {
     stage.log('Initializing Coco...');
@@ -83,6 +86,13 @@ async function runCocoPhase1({
     }
 
     const mgr = await initPhase('Coco.managerInit', () => CocoManager.initialize());
+    // The effect that started this was cleaned up while the wallet was opening.
+    // Its cleanup tears the manager down; publishing it here would hand a
+    // disposed wallet to a provider that is gone or already re-running.
+    if (!isCurrent()) {
+      log.info('coco.phase1.stale');
+      return;
+    }
     onManager(mgr);
     log.info('coco.phase1.manager_ready');
 
@@ -92,6 +102,7 @@ async function runCocoPhase1({
     initLog('Coco', 'Phase 1 complete');
     log.info('coco.phase1.done');
   } catch (caught) {
+    if (!isCurrent()) return;
     const failure = caught instanceof Error ? caught : new Error('Initialization failed');
     initLog('Coco', `Phase 1 ERROR: ${caught}`);
     // Log what was actually thrown, not the substituted message — a non-Error
@@ -238,6 +249,7 @@ export function CocoProvider({ children }: CocoProviderProps) {
     if (hasStarted.current) return;
     hasStarted.current = true;
 
+    const run = { current: true };
     void runCocoPhase1({
       stage,
       hasPubkey: !!keys?.pubkey,
@@ -245,9 +257,11 @@ export function CocoProvider({ children }: CocoProviderProps) {
       onManager: setManager,
       onReady: () => setIsReady(true),
       onFailure: setMigrationError,
+      isCurrent: () => run.current,
     });
 
     return () => {
+      run.current = false;
       // Reset the start-guard so a deps change (e.g. profile switch flipping
       // keys.pubkey) re-runs init for the new identity. Without this, the
       // cleanup tears down the singleton but the re-run sees hasStarted=true

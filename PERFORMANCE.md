@@ -613,3 +613,11 @@ Each phase is independently shippable.
   not independently checked by either reviewer.
 - **Discovery tooling.** `jg` returned no output during the survey, so discovery used grep and file
   reads; a semantic pass may surface more.
+
+### Device check, 2026-10-09 (after the audit fixes)
+
+Cold start on the existing dev installs, Android emulator and iOS simulator, with the migration
+fail-closed change, the hold-on-failure changes and the provider guards in place: the migration gate
+completed, the wallet opened and the first screen rendered on both, with no startup error events.
+On iOS a reload during the run exercised the wallet close-then-reopen path. Not exercised on a
+device: the retry screen itself, a failed restart, a partial delete-all, and any physical phone.

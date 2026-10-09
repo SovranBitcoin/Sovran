@@ -382,15 +382,26 @@ export class CocoManager {
   /** True when the active profile is an imported nsec (affects signer/seed fallback paths) */
   private static isImportedProfile = false;
 
-  /** Clear sensitive in-memory state that should not survive profile switches. */
-  private static clearSensitiveRuntimeState(): void {
-    this.signerKey = null;
-    this.cashuMnemonic = null;
+  /**
+   * Bumped whenever a credential is staged for the next initialise. A cleanup
+   * notes the values at its start and, when it finishes, clears only the
+   * credentials nobody has replaced since: a provider that remounts while the
+   * old wallet is still closing stages its own first, and they must survive.
+   */
+  private static staged = { signerKey: 0, cashuMnemonic: 0, account: 0 };
+
+  /**
+   * Clear sensitive in-memory state that should not survive profile switches.
+   * With `since`, a credential staged after that snapshot is left in place.
+   */
+  private static clearSensitiveRuntimeState(since?: typeof CocoManager.staged): void {
+    if (!since || since.signerKey === this.staged.signerKey) this.signerKey = null;
+    if (!since || since.cashuMnemonic === this.staged.cashuMnemonic) this.cashuMnemonic = null;
+    if (!since || since.account === this.staged.account) this.isImportedProfile = false;
     this.npcPlugin = null;
     this.npcAccount = null;
     this.npcPluginRegistered = false;
     this.seedGetter = null;
-    this.isImportedProfile = false;
   }
 
   /**
@@ -401,6 +412,7 @@ export class CocoManager {
   static setAccountIndex(index: number, imported = false): void {
     this.accountIndex = index;
     this.isImportedProfile = imported;
+    this.staged.account += 1;
     cashuLog.info('cashu.manager.account_index_set', {
       accountIndex: index,
       imported,
@@ -603,6 +615,7 @@ export class CocoManager {
    */
   static setCashuMnemonic(mnemonic: string): void {
     this.cashuMnemonic = mnemonic;
+    this.staged.cashuMnemonic += 1;
     cashuLog.debug('cashu.manager.cashu_mnemonic_set', {
       hasMnemonic: mnemonic.length > 0,
     });
@@ -614,6 +627,7 @@ export class CocoManager {
    */
   static setSignerKey(sk: Uint8Array): void {
     this.signerKey = new Uint8Array(sk);
+    this.staged.signerKey += 1;
     cashuLog.debug('cashu.manager.signer_key_set', {
       byteLength: sk.length,
     });
@@ -1232,9 +1246,18 @@ export class CocoManager {
 
     this.cleanupFailed = false;
     const doCleanup = async () => {
+      const stagedAtStart = { ...this.staged };
+      // An initialise still in flight sets `instance` when it finishes. Returning
+      // now would report a closed wallet while one is still being opened, for
+      // the account that was current when it started, and would clear the keys
+      // it is reading. Wait for it and tear down what it built.
+      if (this.pendingInit) {
+        cashuLog.info('cashu.manager.cleanup_wait_init');
+        await this.pendingInit.catch(() => undefined);
+      }
       await this.disarmForegroundGate();
       if (!this.instance) {
-        this.clearSensitiveRuntimeState();
+        this.clearSensitiveRuntimeState(stagedAtStart);
         cashuLog.debug('cashu.manager.cleanup_skipped', { reason: 'no_instance' });
         return;
       }
@@ -1291,7 +1314,7 @@ export class CocoManager {
 
         // Clear the instance
         this.instance = null;
-        this.clearSensitiveRuntimeState();
+        this.clearSensitiveRuntimeState(stagedAtStart);
         cashuLog.info('cashu.manager.cleanup_done');
       } catch (error) {
         this.cleanupFailed = true;
@@ -1310,7 +1333,7 @@ export class CocoManager {
           }
           this.db = null;
         }
-        this.clearSensitiveRuntimeState();
+        this.clearSensitiveRuntimeState(stagedAtStart);
       }
     };
 
