@@ -54,6 +54,13 @@ interface StageConfig {
    * is already visible (e.g. relay connections, recovery operations).
    */
   blocking?: boolean;
+  /**
+   * Set by a stage whose owner sits above the account providers, so it stays
+   * mounted across an in-process profile switch and never registers again.
+   * Such a stage keeps its status through a reset that asks to keep them;
+   * dropping it would leave every stage that depends on it waiting forever.
+   */
+  outlivesAccount?: boolean;
 }
 
 interface Stage {
@@ -62,6 +69,16 @@ interface Stage {
   dependsOn?: string[];
   /** When true (the default), this stage must complete before the app renders. */
   blocking: boolean;
+  outlivesAccount: boolean;
+}
+
+interface ResetStagesOptions {
+  holdUntilCancel?: boolean;
+  /**
+   * Keep stages registered above the account providers. An in-process profile
+   * switch passes this; a switch that restarts the runtime does not need it.
+   */
+  keepStagesThatOutliveAccount?: boolean;
 }
 
 interface InitializationContextValue {
@@ -73,7 +90,7 @@ interface InitializationContextValue {
   ) => void;
   canStageStart: (id: string) => boolean;
   /** Clear all stages, forcing the splash to show again until inner providers re-register. */
-  resetStages: (options?: { holdUntilCancel?: boolean }) => void;
+  resetStages: (options?: ResetStagesOptions) => void;
   /** Cancel a held reset when a profile switch/add flow aborts before stages re-register. */
   cancelResetStages: () => void;
 }
@@ -113,6 +130,8 @@ export function InitializationProvider({ children }: InitializationProviderProps
   // Synchronous map of stage id → blocking flag. Updated immediately in
   // registerStage so updateStage can check it before the next React render.
   const blockingFlagsRef = useRef<Map<string, boolean>>(new Map());
+  // Stage ids whose owner outlives the account providers (see StageConfig).
+  const outlivesAccountRef = useRef<Set<string>>(new Set());
   // Track when each stage first transitioned to 'loading' so we can log a
   // duration when it reaches 'complete'.
   const stageStartTimes = useRef<Map<string, number>>(new Map());
@@ -120,6 +139,7 @@ export function InitializationProvider({ children }: InitializationProviderProps
   const registerStage = useCallback((id: string, config: StageConfig) => {
     const isBlocking = config.blocking !== false;
     blockingFlagsRef.current.set(id, isBlocking);
+    if (config.outlivesAccount === true) outlivesAccountRef.current.add(id);
 
     initLog(
       'registerStage',
@@ -136,6 +156,7 @@ export function InitializationProvider({ children }: InitializationProviderProps
         status: 'pending',
         dependsOn: config.dependsOn,
         blocking: isBlocking,
+        outlivesAccount: config.outlivesAccount === true,
       });
       return newStages;
     });
@@ -237,12 +258,32 @@ export function InitializationProvider({ children }: InitializationProviderProps
     }
   }, [forceReinitialize, holdSplashVisible, stages.size]);
 
-  const resetStages = useCallback((options?: { holdUntilCancel?: boolean }) => {
-    log.info('init.provider.reset_stages');
+  const resetStages = useCallback((options?: ResetStagesOptions) => {
+    log.info('init.provider.reset_stages', {
+      holdUntilCancel: options?.holdUntilCancel === true,
+      kept: options?.keepStagesThatOutliveAccount ? Array.from(outlivesAccountRef.current) : [],
+    });
     setForceReinitialize(true);
     setHoldSplashVisible(options?.holdUntilCancel === true);
-    setStages(new Map());
-    blockingFlagsRef.current.clear();
+    if (options?.keepStagesThatOutliveAccount) {
+      // Iterated with forEach, not spread: the React Native Babel preset
+      // compiles array spread loosely, and spreading a Map there does not
+      // yield its entries.
+      setStages((prev) => {
+        const kept = new Map<string, Stage>();
+        prev.forEach((stage, id) => {
+          if (stage.outlivesAccount) kept.set(id, stage);
+        });
+        return kept;
+      });
+      const flags = blockingFlagsRef.current;
+      flags.forEach((_blocking, id) => {
+        if (!outlivesAccountRef.current.has(id)) flags.delete(id);
+      });
+    } else {
+      setStages(new Map());
+      blockingFlagsRef.current.clear();
+    }
     stageStartTimes.current.clear();
   }, []);
 
@@ -301,7 +342,7 @@ export function useInitializationStage(stageId: string, config: StageConfig = {}
   // The join/split round-trip is lossless because stage IDs are the closed,
   // comma-free set in the table at the top of this file. A stage ID containing
   // a comma would split into two phantom dependencies that never complete.
-  const { message, dependsOn, blocking } = config;
+  const { message, dependsOn, blocking, outlivesAccount } = config;
   const dependsOnKey = dependsOn?.join(',') ?? '';
 
   useEffect(() => {
@@ -310,9 +351,10 @@ export function useInitializationStage(stageId: string, config: StageConfig = {}
     registerStage(stageId, {
       message,
       blocking,
+      outlivesAccount,
       dependsOn: dependsOnKey ? dependsOnKey.split(',') : undefined,
     });
-  }, [stageId, registerStage, message, blocking, dependsOnKey]);
+  }, [stageId, registerStage, message, blocking, outlivesAccount, dependsOnKey]);
 
   const log = useCallback(
     (message: string) => {

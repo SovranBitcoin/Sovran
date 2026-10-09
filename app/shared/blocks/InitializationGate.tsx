@@ -9,6 +9,8 @@ interface InitializationGateProps {
   tag: string;
   /** Stage id registered with the InitializationProvider; must be unique. */
   stageId: string;
+  /** The gate is mounted above the account providers. See `StageConfig.outlivesAccount`. */
+  outlivesAccount?: boolean;
   /** Splash message shown while the stage is loading. */
   message: string;
   /** Stage IDs this stage waits on. Used as a splash hint, not as a render gate. */
@@ -94,6 +96,7 @@ export function InitializationGate({
   logEvent,
   run,
   onSuccess,
+  outlivesAccount,
   children,
 }: InitializationGateProps) {
   useInitMount(tag);
@@ -102,6 +105,7 @@ export function InitializationGate({
     message,
     blocking: true,
     dependsOn,
+    outlivesAccount,
   });
   const [status, setStatus] = useState<'pending' | 'complete' | 'failed'>('pending');
   const hasStarted = useRef(false);

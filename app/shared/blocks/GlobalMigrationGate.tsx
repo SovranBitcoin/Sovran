@@ -26,6 +26,7 @@ export default function GlobalMigrationGate({ children }: GlobalMigrationGatePro
     <InitializationGate
       tag="GlobalMigrationGate"
       stageId="global-migrations"
+      outlivesAccount
       message="Running global migrations..."
       logEvent="gate.global_migration"
       run={runGlobalMigrations}

@@ -87,7 +87,10 @@ export async function clearTransitionGuardOnStartup(): Promise<void> {
 
 // ── Registered controls (set at runtime by layout components) ────
 type TransitionControls = {
-  resetStages: (options?: { holdUntilCancel?: boolean }) => void;
+  resetStages: (options?: {
+    holdUntilCancel?: boolean;
+    keepStagesThatOutliveAccount?: boolean;
+  }) => void;
   cancelResetStages: () => void;
 };
 
@@ -217,7 +220,12 @@ export async function switchToExistingProfile(opts: {
   }
   try {
     log.info('profile.orchestrator.switch_start', { accountIndex: opts.accountIndex });
-    resetStages?.({ holdUntilCancel: true });
+    // Without a restart, a stage owned above the account providers never
+    // registers again, so it must survive the reset or its dependents never start.
+    resetStages?.({
+      holdUntilCancel: true,
+      keepStagesThatOutliveAccount: useSettingsStore.getState().inProcessProfileSwitch,
+    });
     usePopupStore.getState().close();
 
     // Validate the target up front — the same existence check
@@ -245,8 +253,8 @@ export async function switchToExistingProfile(opts: {
         transitionInFlight = false;
         await endTransition();
         if (previousPubkey) {
-          void checkProfileSwitchLeaks(previousPubkey).catch(() => {
-            log.warn('profile.switch.leak_check_failed');
+          void checkProfileSwitchLeaks(previousPubkey).catch((error) => {
+            log.warn('profile.switch.leak_check_failed', { error: redactError(error) });
           });
         }
         return true;

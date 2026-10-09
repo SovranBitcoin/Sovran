@@ -105,9 +105,18 @@ export async function checkProfileSwitchLeaks(previousPubkey: string): Promise<v
       log.warn('profile.switch.leak', { store: entry.name });
     }
   }
+  let unreadable = 0;
   for (const key of await AsyncStorage.getAllKeys()) {
     if (key.endsWith(`:profile:${previousPubkey}`)) continue;
-    const value = await AsyncStorage.getItem(key);
+    let value: string | null;
+    try {
+      value = await AsyncStorage.getItem(key);
+    } catch {
+      // Android cannot read a row larger than its cursor window (about 2 MB).
+      // One such row must not end the scan of every other key.
+      unreadable += 1;
+      continue;
+    }
     if (key.includes(previousPubkey) || value?.includes(previousPubkey)) {
       // Global profile inventory intentionally retains all account identities.
       if (key === 'profile-store') continue;
@@ -118,4 +127,5 @@ export async function checkProfileSwitchLeaks(previousPubkey: string): Promise<v
       log.warn('profile.switch.leak', { key: name });
     }
   }
+  if (unreadable > 0) log.warn('profile.switch.leak_scan_incomplete', { unreadable });
 }
