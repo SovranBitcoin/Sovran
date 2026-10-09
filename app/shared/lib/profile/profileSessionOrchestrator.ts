@@ -237,86 +237,99 @@ export async function switchToExistingProfile(opts: {
       throw new Error(`Target profile does not exist: ${opts.accountIndex}`);
     }
 
-    if (useSettingsStore.getState().inProcessProfileSwitch) {
-      const previousIndex = useProfileStore.getState().activeAccountIndex;
-      const previousPubkey = useProfileStore.getState().getActiveProfile()?.pubkey;
-      try {
-        await runInProcessProfileSwitch({
-          cleanupCoco: () => CocoManager.cleanup({ requireSuccess: true }),
-          flipAccount: async () => {
-            activateProfileInMemory(opts.accountIndex);
-            const persisted = await persistSwitchTargetToDisk(opts.accountIndex);
-            if (persisted.isErr()) throw persisted.error;
-          },
-        });
-        cancelResetStages?.();
-        transitionInFlight = false;
-        await endTransition();
-        if (previousPubkey) {
-          void checkProfileSwitchLeaks(previousPubkey).catch((error) => {
-            log.warn('profile.switch.leak_check_failed', { error: redactError(error) });
-          });
-        }
-        return true;
-      } catch (error) {
-        // The reason is the only way to learn why a switch fell back.
-        log.warn('profile.switch.in_process_failed', { error: redactError(error) });
-        await holdProfileSwitchForRestart().catch(() => {
-          log.warn('profile.switch.boundary_hold_failed');
-        });
-        // Restore the active identity before restarting; never mount a partial B session.
-        activateProfileInMemory(previousIndex);
-        log.warn('profile.switch.restart_fallback');
-        try {
-          const persisted = await switchStep(() => persistSwitchTargetToDisk(opts.accountIndex));
-          if (persisted.isErr()) log.warn('profile.switch.restart_target_failed');
-        } catch {
-          log.warn('profile.switch.restart_target_failed');
-        }
-        // Holding the boundary unmounts the wallet provider, which starts a
-        // cleanup nobody awaits. Wait for the wallet database to close, as the
-        // restart path below does, before the runtime is torn down.
-        await cleanupCocoWithTimeout();
-        // If restart is unavailable, keep the held boundary and write barrier.
-        // Resuming after failed teardown would expose a half-switched wallet.
-        return await teardownAndRestart();
-      }
-    }
-
-    await cleanupCocoWithTimeout();
-
-    // The Routstr client holds a hydrated, profile-scoped store and a wallet
-    // adapter bound to the Coco manager just torn down. A restart discards it
-    // anyway; this covers the in-process fallback below, where the module
-    // survives and would otherwise spend the new profile's wallet against the
-    // old profile's provider state.
-    resetRoutstrClient();
-
-    // Persist the switch target and restart into it WITHOUT the in-memory
-    // store flip — the flip remounts the whole provider tree and would boot
-    // the new profile in-process, racing the native restart (BTC-13).
-    const persisted = await persistSwitchTargetToDisk(opts.accountIndex);
-    if (persisted.isErr()) {
-      throw persisted.error;
-    }
-    const restarted = await teardownAndRestart();
-    if (!restarted) {
-      // Restart unavailable: complete the switch in-process — the remount
-      // boots the new profile, the only boot in this configuration.
-      useProfileStore.getState().switchProfile(opts.accountIndex);
-      cancelResetStages?.();
-      transitionInFlight = false;
-      await endTransition();
-    }
-    // If restarted, leave transitionInFlight=true — the module is about to reload.
-    return true;
+    const release = () => abandonTransition(cancelResetStages);
+    return useSettingsStore.getState().inProcessProfileSwitch
+      ? await switchWithoutRestart(opts.accountIndex, release)
+      : await switchByRestart(opts.accountIndex, release);
   } catch (error) {
     log.error('profile.orchestrator.switch_failed', { error: redactError(error) });
-    cancelResetStages?.();
-    transitionInFlight = false;
-    await endTransition();
+    await abandonTransition(cancelResetStages);
     return false;
   }
+}
+
+/**
+ * The opt-in switch: stop the old account and start the new one in the same
+ * runtime. On any failure it holds the account providers down and restarts,
+ * so a half-switched wallet is never mounted.
+ */
+async function switchWithoutRestart(
+  accountIndex: number,
+  release: () => Promise<void>
+): Promise<boolean> {
+  const previousIndex = useProfileStore.getState().activeAccountIndex;
+  const previousPubkey = useProfileStore.getState().getActiveProfile()?.pubkey;
+  try {
+    await runInProcessProfileSwitch({
+      cleanupCoco: () => CocoManager.cleanup({ requireSuccess: true }),
+      flipAccount: async () => {
+        activateProfileInMemory(accountIndex);
+        const persisted = await persistSwitchTargetToDisk(accountIndex);
+        if (persisted.isErr()) throw persisted.error;
+      },
+    });
+    await release();
+    if (previousPubkey) {
+      void checkProfileSwitchLeaks(previousPubkey).catch((error) => {
+        log.warn('profile.switch.leak_check_failed', { error: redactError(error) });
+      });
+    }
+    return true;
+  } catch (error) {
+    // The reason is the only way to learn why a switch fell back.
+    log.warn('profile.switch.in_process_failed', { error: redactError(error) });
+    await holdProfileSwitchForRestart().catch(() => {
+      log.warn('profile.switch.boundary_hold_failed');
+    });
+    // Restore the active identity before restarting; never mount a partial B session.
+    activateProfileInMemory(previousIndex);
+    log.warn('profile.switch.restart_fallback');
+    try {
+      const persisted = await switchStep(() => persistSwitchTargetToDisk(accountIndex));
+      if (persisted.isErr()) log.warn('profile.switch.restart_target_failed');
+    } catch {
+      log.warn('profile.switch.restart_target_failed');
+    }
+    // Holding the boundary unmounts the wallet provider, which starts a
+    // cleanup nobody awaits. Wait for the wallet database to close, as the
+    // restart path does, before the runtime is torn down.
+    await cleanupCocoWithTimeout();
+    // If restart is unavailable, keep the held boundary and write barrier.
+    // Resuming after failed teardown would expose a half-switched wallet.
+    return await teardownAndRestart();
+  }
+}
+
+/** The default switch: close the wallet, record the target on disk, restart into it. */
+async function switchByRestart(
+  accountIndex: number,
+  release: () => Promise<void>
+): Promise<boolean> {
+  await cleanupCocoWithTimeout();
+
+  // The Routstr client holds a hydrated, profile-scoped store and a wallet
+  // adapter bound to the Coco manager just torn down. A restart discards it
+  // anyway; this covers the in-process fallback below, where the module
+  // survives and would otherwise spend the new profile's wallet against the
+  // old profile's provider state.
+  resetRoutstrClient();
+
+  // Persist the switch target and restart into it WITHOUT the in-memory
+  // store flip — the flip remounts the whole provider tree and would boot
+  // the new profile in-process, racing the native restart (BTC-13).
+  const persisted = await persistSwitchTargetToDisk(accountIndex);
+  if (persisted.isErr()) {
+    throw persisted.error;
+  }
+  const restarted = await teardownAndRestart();
+  if (!restarted) {
+    // Restart unavailable: complete the switch in-process — the remount
+    // boots the new profile, the only boot in this configuration.
+    useProfileStore.getState().switchProfile(accountIndex);
+    await release();
+  }
+  // If restarted, leave transitionInFlight=true — the module is about to reload.
+  return true;
 }
 
 /**
