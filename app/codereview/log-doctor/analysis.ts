@@ -786,11 +786,11 @@ export function analyzeAvatarSequences(entries: AnalyzableEntry[]): AvatarAnalys
   for (const entry of entries) {
     if (entry.event !== 'visual.avatar.sequence') continue;
     const params = entry.params ?? {};
-    if (typeof params.seed !== 'string' || typeof params.branch !== 'string') {
+    if (typeof params.subject !== 'string' || typeof params.branch !== 'string') {
       unreadable += 1;
       continue;
     }
-    const seed = params.seed;
+    const seed = params.subject;
     const instance = typeof params.instance === 'string' ? params.instance : '';
     seeds.add(seed);
     // A recycled cell reuses its instance for another seed; that is a new sequence.

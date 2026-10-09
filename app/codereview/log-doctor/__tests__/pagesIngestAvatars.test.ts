@@ -212,7 +212,7 @@ describe('analyzePages (pages mode)', () => {
 
 describe('analyzeAvatarSequences (avatars mode)', () => {
   const avatar = (seed: string, branch: string, instance = 'row-1', _t = 0) =>
-    entry('visual.avatar.sequence', { seed, branch, instance }, _t);
+    entry('visual.avatar.sequence', { subject: seed, branch, instance }, _t);
 
   it('flags a seed that shows the fallback between loading and its image', () => {
     const analysis = analyzeAvatarSequences([
@@ -276,7 +276,7 @@ describe('analyzeAvatarSequences (avatars mode)', () => {
     const analysis = analyzeAvatarSequences([
       {
         event: 'visual.avatar.sequence',
-        params: { seed: { _kind: 'hex', len: 64 }, branch: 'loading', instance: 'row-1' },
+        params: { subject: { _kind: 'secret', len: 12 }, branch: 'loading', instance: 'row-1' },
       },
       avatar('alice', 'loading'),
     ] as Parameters<typeof analyzeAvatarSequences>[0]);

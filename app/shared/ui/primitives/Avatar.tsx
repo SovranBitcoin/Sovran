@@ -284,9 +284,10 @@ export const Avatar = ({
     lastSequence.current = { seed: fallbackSeed, branch };
     log.debug('visual.avatar.sequence', () => ({
       instance: visualInstanceKey,
-      // A prefix: the whole seed is a pubkey, which the logger summarises as
-      // opaque hex and so hides the one thing a sequence is grouped by.
-      seed: fallbackSeed.slice(0, 12),
+      // Named `subject`, and a prefix: the logger treats any field called
+      // `seed` as key material and a whole pubkey as opaque hex, and either
+      // would hide the one thing a sequence is grouped by.
+      subject: fallbackSeed.slice(0, 12),
       branch,
       state,
       imageStatus,
