@@ -15,16 +15,19 @@ import { useRecentPeopleStore } from '@/shared/stores/profile/recentPeopleStore'
 import { useNotificationPolicyStore } from '@/features/feed/stores/notificationPolicyStore';
 import { log } from '@/shared/lib/logger';
 
+// One in-memory disk behind both storage adapters, so a released blob can be
+// loaded through the real persist pipeline as well as through migrate + merge.
+const mockDisk = new Map<string, string>();
 jest.mock('@react-native-async-storage/async-storage', () => ({
-  getItem: async () => null,
-  setItem: async () => {},
-  removeItem: async () => {},
+  getItem: async (key: string) => mockDisk.get(key) ?? null,
+  setItem: async (key: string, value: string) => void mockDisk.set(key, value),
+  removeItem: async (key: string) => void mockDisk.delete(key),
 }));
 jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({
   createProfileScopedStorage: () => ({
-    getItem: async () => null,
-    setItem: async () => {},
-    removeItem: async () => {},
+    getItem: async (key: string) => mockDisk.get(key) ?? null,
+    setItem: async (key: string, value: string) => void mockDisk.set(key, value),
+    removeItem: async (key: string) => void mockDisk.delete(key),
   }),
 }));
 jest.mock('@/shared/lib/logger', () => ({
@@ -53,7 +56,50 @@ async function upgrade<T>(
   const migrated =
     version === options.version ? diskState : await options.migrate?.(diskState, version);
   if (!options.merge) throw new Error('missing persisted schema merge');
+  await loadsThroughThePipeline(store, version, state);
   return options.merge(migrated, store.getInitialState());
+}
+
+/**
+ * The same released blob, loaded the way the app loads it: from storage,
+ * through zustand's persist and the guard that keeps unreadable data. A
+ * released blob must load, must not be set aside as unreadable, and the store
+ * must be able to save afterwards.
+ */
+async function loadsThroughThePipeline(
+  store: {
+    getInitialState(): unknown;
+    persist: { getOptions(): { name?: string; version?: number } };
+  },
+  version: number,
+  state: unknown
+): Promise<void> {
+  const pipeline = store as unknown as {
+    persist: { rehydrate(): Promise<void> | void };
+    setState(state: unknown, replace?: boolean): void;
+  };
+  const { name, version: currentVersion } = store.persist.getOptions();
+  // Routstr's adapter moves secrets into secure storage, which this file does
+  // not model; `routstrSecurePersistence.test.ts` covers its upgrade.
+  if (!name || name === 'routstr-store') return;
+  const flush = async () => {
+    for (let i = 0; i < 20; i++) await new Promise((resolve) => setImmediate(resolve));
+  };
+  mockDisk.clear();
+  mockDisk.set(name, JSON.stringify({ state, version }));
+  jest.mocked(log.warn).mockClear();
+
+  await pipeline.persist.rehydrate();
+  await flush();
+  pipeline.setState({});
+  await flush();
+
+  expect([...mockDisk.keys()].filter((key) => key.includes(':unreadable'))).toEqual([]);
+  const saved = JSON.parse(mockDisk.get(name) ?? 'null') as { version?: number } | null;
+  expect(saved?.version).toBe(currentVersion);
+  pipeline.setState(store.getInitialState(), true);
+  await flush();
+  mockDisk.clear();
 }
 
 const PUBKEY = 'ab'.repeat(32);
