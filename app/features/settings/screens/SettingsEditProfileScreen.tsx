@@ -23,7 +23,7 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useNostrNDKContext } from '@/shared/providers/NostrNDKProvider';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
-import { useProfileStore } from '@/shared/stores/global/profileStore';
+import { selectActiveProfile, useProfileStore } from '@/shared/stores/global/profileStore';
 import { useOwnedMediaStore } from '@/shared/stores/profile/ownedMediaStore';
 import {
   useOwnProfileMetadataStore,
@@ -149,7 +149,7 @@ function HistoryChips({
 }
 
 export function SettingsEditProfileScreen() {
-  const profile = useProfileStore((s) => s.getActiveProfile());
+  const profile = useProfileStore(selectActiveProfile);
   // Remount the draft and abort old I/O if identity changes while this route is open.
   return profile ? (
     <ProfileEditor

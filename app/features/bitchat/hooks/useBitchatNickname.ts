@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
-import { useProfileStore } from '@/shared/stores/global/profileStore';
+import { selectActiveProfile, useProfileStore } from '@/shared/stores/global/profileStore';
 import { resolveIdentityName } from '@/shared/lib/identity';
 
 /**
@@ -13,7 +13,7 @@ import { resolveIdentityName } from '@/shared/lib/identity';
  */
 export function useBitchatNickname(): string {
   const { keys } = useNostrKeysContext();
-  const activeProfile = useProfileStore((s) => s.getActiveProfile());
+  const activeProfile = useProfileStore(selectActiveProfile);
 
   return useMemo(() => {
     if (!keys?.pubkey) return '';

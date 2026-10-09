@@ -48,7 +48,7 @@ import { PostProgressBar } from '@/features/composer/ui/PostProgressBar';
 import type { ComposerBlock } from '@/features/composer/config/types';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { Text } from '@/shared/ui/primitives/Text';
-import { useProfileStore } from '@/shared/stores/global/profileStore';
+import { selectActiveProfile, useProfileStore } from '@/shared/stores/global/profileStore';
 import { NoteContent, QuotedPostCard } from '@/features/feed/components/nostr/NoteContent';
 import { THREAD_CONNECTOR_LINE_STYLE } from '@/features/feed/components/nostr/threadConnectorStyle';
 import {
@@ -234,7 +234,7 @@ export function PostComposer() {
     'danger',
     'default',
   ] as const);
-  const ownProfile = useProfileStore((s) => s.getActiveProfile());
+  const ownProfile = useProfileStore(selectActiveProfile);
   const { pictureResolved: ownPictureResolved } = useProfileDisplay(ownProfile?.pubkey ?? '');
 
   const isReply = target?.mode === 'reply' && !!parentEvent;

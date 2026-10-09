@@ -53,6 +53,7 @@ jest.mock('@/shared/stores/global/profileStore', () => ({
       getState: () => mockState,
     }
   ),
+  selectActiveProfile: (state: typeof mockState) => state.getActiveProfile(),
 }));
 jest.mock('@nostr-dev-kit/ndk-mobile', () => ({ useNDK: () => ({ ndk: mockNdk }) }), {
   virtual: true,
