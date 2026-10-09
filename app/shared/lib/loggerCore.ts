@@ -457,6 +457,28 @@ function compactSensitiveField(value: unknown, fieldName: string | undefined): u
   return { _kind: kind };
 }
 
+/**
+ * Fields that name a screen or component. A long PascalCase name, or a path of
+ * them, is made only of letters and slashes, which is also what base64 and
+ * base58 look like, so the opaque-encoding rule was hiding the one value these
+ * entries exist to carry. Only that rule is lifted, only for these fields, and
+ * only for a value that is an identifier path: anything recognised as a secret
+ * is still summarised.
+ */
+const COMPONENT_NAME_FIELDS: ReadonlySet<string> = new Set(['screen', 'component']);
+const COMPONENT_PATH_MAX_LENGTH = 400;
+const COMPONENT_PATH =
+  /^[A-Z][A-Za-z0-9]*(?:\([A-Za-z0-9]+\))?(?:\/[A-Z][A-Za-z0-9]*(?:\([A-Za-z0-9]+\))?)*$/;
+
+function isComponentName(value: string, fieldName: string | undefined): boolean {
+  return (
+    fieldName !== undefined &&
+    COMPONENT_NAME_FIELDS.has(fieldName) &&
+    COMPONENT_PATH.test(value) &&
+    secretStringKind(value) === null
+  );
+}
+
 function compactValue(
   value: unknown,
   opts: { maxStringLength: number; maxArrayItems: number; maxDepth: number; maxObjectKeys: number },
@@ -472,7 +494,15 @@ function compactValue(
     typeof value === 'number'
   )
     return value;
-  if (typeof value === 'string') return summarizeString(value, opts.maxStringLength);
+  if (typeof value === 'string') {
+    if (isComponentName(value, fieldName)) {
+      // A nested screen path runs past the general limit and is useless cut short.
+      return value.length <= COMPONENT_PATH_MAX_LENGTH
+        ? value
+        : { _kind: 'long_string', len: value.length, preview: value.slice(0, 32) + '…' };
+    }
+    return summarizeString(value, opts.maxStringLength);
+  }
   if (value instanceof Error) {
     return {
       _kind: 'error',
