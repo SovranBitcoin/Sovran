@@ -1,5 +1,6 @@
 import { create, type StateCreator, type StoreApi, type StoreMutatorIdentifier } from 'zustand';
 import { createStore } from 'zustand/vanilla';
+import { storeLog } from '@/shared/lib/logger';
 import { persistRegistry, type StoreScope } from './persistConfig';
 
 interface StoreDefinition {
@@ -20,12 +21,80 @@ function record<T>(definition: StoreDefinition, store: StoreApi<T>): void {
   }
 }
 
+/**
+ * Whether `store.set` entries would be emitted. Every store in the app is
+ * built through this module, so it also runs under each suite's logger double,
+ * most of which carry only the methods that suite asserts on. A logger without
+ * a level check is treated as silent rather than failing every store.
+ */
+function writeLogEnabled(): boolean {
+  return typeof storeLog?.isLevelEnabled === 'function' && storeLog.isLevelEnabled('debug');
+}
+
+/** Top-level keys whose value differs by reference. Names only, never values. */
+function changedKeys(before: unknown, after: unknown): string[] {
+  if (Object.is(before, after)) return [];
+  if (typeof before !== 'object' || before === null || typeof after !== 'object' || after === null)
+    return ['(state)'];
+  const prev = before as Record<string, unknown>;
+  const next = after as Record<string, unknown>;
+  const changed = Object.keys(next).filter((key) => !Object.is(prev[key], next[key]));
+  for (const key of Object.keys(prev)) if (!(key in next)) changed.push(key);
+  return changed;
+}
+
+/**
+ * One `store.set` debug entry per write: the store, its scope, which top-level
+ * keys changed and how many subscribers zustand notified. An empty `changed`
+ * is a write that changed nothing; with `subscribers` above zero it still woke
+ * every subscriber, because zustand notifies whenever the state object is new.
+ *
+ * Returns the initializer itself when debug entries would not be emitted, so a
+ * release build runs the store exactly as zustand built it. A write made by a
+ * subscriber during a notification is logged first, and the write that
+ * triggered it then reports both sets of keys.
+ */
+function withWriteLog<T, Mos extends [StoreMutatorIdentifier, unknown][]>(
+  definition: StoreDefinition,
+  initializer: StateCreator<T, [], Mos>
+): StateCreator<T, [], Mos> {
+  if (!writeLogEnabled()) return initializer;
+  return (set, get, api) => {
+    // Mirrors zustand's own listener Set, which it does not expose.
+    const listeners = new Set<unknown>();
+    const subscribe = api.subscribe;
+    api.subscribe = (listener) => {
+      listeners.add(listener);
+      const unsubscribe = subscribe(listener);
+      return () => {
+        listeners.delete(listener);
+        unsubscribe();
+      };
+    };
+    const write = set as (partial: unknown, replace?: boolean) => void;
+    const loggedSet = ((partial: unknown, replace?: boolean) => {
+      if (!writeLogEnabled()) return write(partial, replace);
+      const before = get();
+      write(partial, replace);
+      const after = get();
+      storeLog.debug('store.set', () => ({
+        store: definition.name,
+        scope: definition.scope,
+        changed: changedKeys(before, after),
+        subscribers: Object.is(before, after) ? 0 : listeners.size,
+      }));
+    }) as StoreApi<T>['setState'];
+    api.setState = loggedSet;
+    return initializer(loggedSet, get, api);
+  };
+}
+
 /** The initializer and middleware are passed through unchanged. */
 export function defineStore<T>(definition: StoreDefinition) {
   return <Mos extends [StoreMutatorIdentifier, unknown][] = []>(
     initializer: StateCreator<T, [], Mos>
   ) => {
-    const store = create<T>()(initializer);
+    const store = create<T>()(withWriteLog(definition, initializer));
     record(definition, store);
     return store;
   };
@@ -36,7 +105,7 @@ export function defineVanillaStore<T>(definition: StoreDefinition) {
   return <Mos extends [StoreMutatorIdentifier, unknown][] = []>(
     initializer: StateCreator<T, [], Mos>
   ) => {
-    const store = createStore<T>()(initializer);
+    const store = createStore<T>()(withWriteLog(definition, initializer));
     record(definition, store);
     return store;
   };

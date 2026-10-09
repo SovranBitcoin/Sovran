@@ -748,6 +748,7 @@ const MEASUREMENT_EVENTS: ReadonlySet<string> = new Set([
   'cache.store.write',
   'nav.transition',
   'screen.mount',
+  'store.set',
 ]);
 
 function makeLogger(core: LoggerCore, context: Record<string, unknown>): Logger {

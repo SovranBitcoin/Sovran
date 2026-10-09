@@ -566,10 +566,99 @@ export function analyzeIngest(entries: AnalyzableEntry[]): IngestAnalysis {
   };
 }
 
+// ─── Zustand store writes (`stores` mode) ────────────────────────────────────
+// One `store.set` per write to a store declared through defineStore
+// (app/shared/lib/persist/defineStore.ts): the top-level keys whose value
+// changed and how many subscribers zustand notified. Rolled up per store.
+
+interface StoreWriteSummary {
+  store: string;
+  scope: string;
+  writes: number;
+  /** Writes that changed no top-level key. */
+  noopWrites: number;
+  /** No-op writes that still notified subscribers, because the state object was new. */
+  noopNotifying: number;
+  /** Sum of subscribers notified across all writes. */
+  subscribersNotified: number;
+  /** Most-written top-level keys, most frequent first. */
+  topKeys: { key: string; writes: number }[];
+}
+
+interface StoreWriteAnalysis {
+  stores: StoreWriteSummary[];
+  /** The same stores, most writes first. */
+  byWrites: StoreWriteSummary[];
+  /** Only stores with a no-op write, most no-op writes first. */
+  byNoop: StoreWriteSummary[];
+}
+
+/** The logger truncates long arrays with a trailing `…N more` marker. */
+const TRUNCATION_MARKER = /^…\d+ more$/;
+
+/** `changed` from a `store.set` entry, or null when the entry carries none. */
+function changedKeysParam(params: Record<string, unknown>): string[] | null {
+  if (!Array.isArray(params.changed)) return null;
+  return params.changed.filter(
+    (key): key is string => typeof key === 'string' && !TRUNCATION_MARKER.test(key)
+  );
+}
+
+export function analyzeStoreWrites(entries: AnalyzableEntry[]): StoreWriteAnalysis {
+  const byStore = new Map<string, StoreWriteSummary>();
+  const keyCounts = new Map<string, Map<string, number>>();
+  for (const entry of entries) {
+    if (entry.event !== 'store.set') continue;
+    const params = entry.params ?? {};
+    const store = typeof params.store === 'string' ? params.store : '?';
+    let summary = byStore.get(store);
+    if (!summary) {
+      summary = {
+        store,
+        scope: typeof params.scope === 'string' ? params.scope : '?',
+        writes: 0,
+        noopWrites: 0,
+        noopNotifying: 0,
+        subscribersNotified: 0,
+        topKeys: [],
+      };
+      byStore.set(store, summary);
+      keyCounts.set(store, new Map());
+    }
+    const changed = changedKeysParam(params);
+    const subscribers = numberParam(params, 'subscribers');
+    summary.writes += 1;
+    summary.subscribersNotified += subscribers;
+    if (changed?.length === 0) {
+      summary.noopWrites += 1;
+      if (subscribers > 0) summary.noopNotifying += 1;
+    }
+    const counts = keyCounts.get(store)!;
+    for (const key of changed ?? []) counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  const stores = [...byStore.values()];
+  for (const summary of stores) {
+    summary.topKeys = [...keyCounts.get(summary.store)!]
+      .map(([key, writes]) => ({ key, writes }))
+      .sort((a, b) => b.writes - a.writes || a.key.localeCompare(b.key))
+      .slice(0, 3);
+  }
+  // Ties fall back to the store name so the ranking is stable across runs.
+  const byName = (a: StoreWriteSummary, b: StoreWriteSummary) => a.store.localeCompare(b.store);
+  return {
+    stores,
+    byWrites: [...stores].sort((a, b) => b.writes - a.writes || byName(a, b)),
+    byNoop: stores
+      .filter((summary) => summary.noopWrites > 0)
+      .sort((a, b) => b.noopWrites - a.noopWrites || byName(a, b)),
+  };
+}
+
 // ─── Per-page scorecard (`pages` mode) ───────────────────────────────────────
 // Keyed by the `Screen` name (app/shared/lib/loggerScreen.ts). A page becomes
 // current when its Screen logs `nav.transition` or `screen.mount`, and stays
-// current until another does; frame drops and coco calls are charged to it.
+// current until another does; frame drops, coco calls and store writes are
+// charged to it.
 // A back or pop mounts nothing, so time on a revealed page is charged to the
 // page that was left — read those two columns as "since this page mounted".
 
@@ -588,6 +677,10 @@ interface PageSummary {
   droppedFrames: number;
   cocoCalls: number;
   cocoMs: number;
+  /** `store.set` entries logged while this page was current. */
+  storeWrites: number;
+  /** Of those, the writes that changed no top-level key. */
+  storeNoopWrites: number;
 }
 
 const SCREEN_RENDER_KEY = /^Screen\((.+)\)$/;
@@ -608,6 +701,8 @@ export function analyzePages(entries: AnalyzableEntry[]): PageSummary[] {
         droppedFrames: 0,
         cocoCalls: 0,
         cocoMs: 0,
+        storeWrites: 0,
+        storeNoopWrites: 0,
       };
       byScreen.set(screen, summary);
     }
@@ -643,6 +738,10 @@ export function analyzePages(entries: AnalyzableEntry[]): PageSummary[] {
       const summary = page(current);
       summary.cocoCalls += 1;
       summary.cocoMs += numberParam(params, 'duration_ms');
+    } else if (entry.event === 'store.set' && current) {
+      const summary = page(current);
+      summary.storeWrites += 1;
+      if (changedKeysParam(params)?.length === 0) summary.storeNoopWrites += 1;
     }
   }
 

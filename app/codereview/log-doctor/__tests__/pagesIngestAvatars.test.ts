@@ -2,6 +2,7 @@ import {
   analyzeAvatarSequences,
   analyzeIngest,
   analyzePages,
+  analyzeStoreWrites,
   type AnalyzableEntry,
 } from '../analysis';
 
@@ -71,6 +72,67 @@ describe('analyzeIngest (ingest mode)', () => {
   });
 });
 
+describe('analyzeStoreWrites (stores mode)', () => {
+  const set = (store: string, changed: unknown, subscribers: number, scope = 'global') =>
+    entry('store.set', { store, scope, changed, subscribers });
+
+  it('totals writes, no-op writes, subscribers and the most-written keys per store', () => {
+    const { stores } = analyzeStoreWrites([
+      set('settings', ['theme'], 3),
+      set('settings', ['theme', 'currency'], 3),
+      set('settings', [], 3),
+      set('settings', [], 0),
+      entry('store.mint_metadata.info.miss', { key: 'm' }),
+    ]);
+
+    expect(stores).toEqual([
+      {
+        store: 'settings',
+        scope: 'global',
+        writes: 4,
+        noopWrites: 2,
+        noopNotifying: 1,
+        subscribersNotified: 9,
+        topKeys: [
+          { key: 'theme', writes: 2 },
+          { key: 'currency', writes: 1 },
+        ],
+      },
+    ]);
+  });
+
+  it('ranks by writes and, separately, by writes that changed nothing', () => {
+    const { byWrites, byNoop } = analyzeStoreWrites([
+      set('busy', ['a'], 1),
+      set('busy', ['a'], 1),
+      set('busy', ['a'], 1),
+      set('wasteful', [], 1, 'profile'),
+      set('wasteful', [], 1, 'profile'),
+      set('quiet', ['a'], 1),
+    ]);
+
+    expect(byWrites.map((s) => s.store)).toEqual(['busy', 'wasteful', 'quiet']);
+    // A store with no no-op write is not a finding, so it is left out.
+    expect(byNoop.map((s) => [s.store, s.scope, s.noopWrites])).toEqual([
+      ['wasteful', 'profile', 2],
+    ]);
+  });
+
+  it('does not count the logger truncation marker as a key, or a missing list as a no-op', () => {
+    const { stores } = analyzeStoreWrites([
+      set('wide', ['a', 'b', 'c', 'd', 'e', '…3 more'], 1),
+      set('wide', undefined, 1),
+    ]);
+
+    expect(stores[0].noopWrites).toBe(0);
+    expect(stores[0].topKeys.map((k) => k.key)).toEqual(['a', 'b', 'c']);
+  });
+
+  it('reports nothing for a log with no store writes', () => {
+    expect(analyzeStoreWrites([entry('ui.screen', {})]).stores).toEqual([]);
+  });
+});
+
 describe('analyzePages (pages mode)', () => {
   it('collects mount, navigation and render counts under the Screen name', () => {
     const [home] = analyzePages([
@@ -119,6 +181,24 @@ describe('analyzePages (pages mode)', () => {
       frameDropReports: 2,
       droppedFrames: 8,
     });
+  });
+
+  it('charges store writes, and the ones that changed nothing, to the page that mounted last', () => {
+    const set = (changed: string[]) =>
+      entry('store.set', { store: 'settings', scope: 'global', changed, subscribers: 2 });
+    const pages = analyzePages([
+      set(['hydrated']),
+      entry('screen.mount', { screen: 'Home', shell_ms: 1, content_ms: 2 }),
+      set(['balance']),
+      set([]),
+      entry('screen.mount', { screen: 'Send', shell_ms: 1, content_ms: 2 }),
+      set([]),
+      set([]),
+      set(['amount', 'mint']),
+    ]);
+
+    expect(pages[0]).toMatchObject({ screen: 'Home', storeWrites: 2, storeNoopWrites: 1 });
+    expect(pages[1]).toMatchObject({ screen: 'Send', storeWrites: 3, storeNoopWrites: 2 });
   });
 
   it('counts a render.why logged before the screen names itself', () => {

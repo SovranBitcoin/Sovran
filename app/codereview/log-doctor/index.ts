@@ -49,7 +49,8 @@
  *   reads        Read lifecycle per surface: cache-hit rate, refetch-while-fresh, TTFUD, superseded, blank flashes
  *   redaction    Read-side redaction audit: confirms secrets stripped, flags raw un-redacted values
  *   ingest       Entity-cache writes per store: written vs changed vs listeners notified, by wasted writes and fan-out
- *   pages        Per-Screen scorecard: mount/nav ms, render.why count, dropped frames, coco time while current
+ *   pages        Per-Screen scorecard: mount/nav ms, render.why count, dropped frames, coco time, store writes while current
+ *   stores       Zustand store writes per store: by writes and by writes that changed nothing, with subscribers notified
  *   avatars      Fails (non-zero exit) when an avatar goes loading → fallback → image
  *   budget       Token cost meta-analysis — shows which modes fit in which context windows
  *   phone        Drive a real iPhone via WebDriverAgent (subcommands: tap, tap-id, tree, shot, …)
@@ -128,6 +129,7 @@ import {
   analyzeAvatarSequences,
   analyzeIngest,
   analyzePages,
+  analyzeStoreWrites,
   type RedactionAudit,
 } from './analysis';
 
@@ -306,7 +308,8 @@ Modes:
   budget     Token cost of each mode for this log
   redaction  Secret-redaction audit
   ingest     Entity-cache writes: wasted writes + listener fan-out
-  pages      Per-Screen mount/nav/render/frame/coco scorecard
+  pages      Per-Screen mount/nav/render/frame/coco/store-write scorecard
+  stores     Zustand store writes: most written + writes that changed nothing
   avatars    Fails when an avatar flickers loading → fallback → image
   diff       Compare last two sessions in one file
   full       Dense whole-log dump (--format json|yaml|md)
@@ -4439,6 +4442,42 @@ function modeIngest(entries: LogEntry[], _opts: Options): string {
   return lines.join('\n');
 }
 
+function modeStores(entries: LogEntry[], _opts: Options): string {
+  const { stores, byWrites, byNoop } = analyzeStoreWrites(entries);
+  if (stores.length === 0) {
+    return 'No store.set events found. (Store writes log at debug level in dev builds.)';
+  }
+  const header =
+    '  Store                         Scope    Writes   No-op  No-op notifying  Subscribers notified  Top changed keys';
+  const row = (s: (typeof stores)[number]) =>
+    `  ${s.store.padEnd(28).slice(0, 28)}  ${s.scope.padEnd(7).slice(0, 7)}  ${String(s.writes).padStart(6)}  ${String(s.noopWrites).padStart(6)}  ${String(s.noopNotifying).padStart(15)}  ${String(s.subscribersNotified).padStart(20)}  ${s.topKeys.map((k) => `${k.key}×${k.writes}`).join(', ')}`;
+
+  const lines: string[] = [];
+  lines.push('=== ZUSTAND STORE WRITES (per store) ===');
+  lines.push('');
+  lines.push('BY WRITES');
+  lines.push(header);
+  lines.push('  ' + '-'.repeat(header.length - 2));
+  for (const s of byWrites) lines.push(row(s));
+  lines.push('');
+  lines.push('BY WRITES THAT CHANGED NOTHING');
+  if (byNoop.length === 0) {
+    lines.push('  None: every write changed at least one top-level key.');
+  } else {
+    lines.push(header);
+    lines.push('  ' + '-'.repeat(header.length - 2));
+    for (const s of byNoop) lines.push(row(s));
+  }
+  lines.push('');
+  lines.push(
+    'No-op = a write after which every top-level key holds the same reference. No-op notifying = the state object was still replaced, so every subscriber ran its selector.'
+  );
+  lines.push(
+    'Subscribers notified is summed over writes; a subscriber is a subscription, not a render. Top changed keys shows at most three.'
+  );
+  return lines.join('\n');
+}
+
 function modePages(entries: LogEntry[], _opts: Options): string {
   const pages = analyzePages(entries);
   if (pages.length === 0) {
@@ -4450,12 +4489,12 @@ function modePages(entries: LogEntry[], _opts: Options): string {
   lines.push('=== PAGE SCORECARD (per Screen name) ===');
   lines.push('');
   const header =
-    '  Screen                            Mounts  Mount ms  Shell ms  Nav ms  render.why  Dropped frames  Coco calls  Coco ms';
+    '  Screen                            Mounts  Mount ms  Shell ms  Nav ms  render.why  Dropped frames  Coco calls  Coco ms  Store writes  No-op writes';
   lines.push(header);
   lines.push('  ' + '-'.repeat(header.length - 2));
   for (const page of pages) {
     lines.push(
-      `  ${page.screen.padEnd(32).slice(0, 32)}  ${String(page.mounts).padStart(6)}  ${p50(page.mountMs).padStart(8)}  ${p50(page.shellMs).padStart(8)}  ${p50(page.navMs).padStart(6)}  ${String(page.renderWhy).padStart(10)}  ${String(page.droppedFrames).padStart(14)}  ${String(page.cocoCalls).padStart(10)}  ${page.cocoMs.toFixed(0).padStart(7)}`
+      `  ${page.screen.padEnd(32).slice(0, 32)}  ${String(page.mounts).padStart(6)}  ${p50(page.mountMs).padStart(8)}  ${p50(page.shellMs).padStart(8)}  ${p50(page.navMs).padStart(6)}  ${String(page.renderWhy).padStart(10)}  ${String(page.droppedFrames).padStart(14)}  ${String(page.cocoCalls).padStart(10)}  ${page.cocoMs.toFixed(0).padStart(7)}  ${String(page.storeWrites).padStart(12)}  ${String(page.storeNoopWrites).padStart(12)}`
     );
   }
   lines.push('');
@@ -4463,7 +4502,10 @@ function modePages(entries: LogEntry[], _opts: Options): string {
     'Mount / Shell / Nav ms are medians. Mount = screen.mount content_ms, Shell = shell_ms, Nav = nav.transition duration_ms.'
   );
   lines.push(
-    'Dropped frames and coco time are charged to the page that mounted last; a back or pop mounts nothing, so they stay with the page that was left.'
+    'Dropped frames, coco time and store writes are charged to the page that mounted last; a back or pop mounts nothing, so they stay with the page that was left.'
+  );
+  lines.push(
+    'Store writes = store.set entries; No-op writes changed no top-level key. Run the stores mode for the per-store ranking.'
   );
   lines.push('Dropped frames need the opt-in frame monitor; without it the column is 0.');
   return lines.join('\n');
@@ -4538,6 +4580,7 @@ function modeBudget(entries: LogEntry[], opts: Options): string {
     { name: 'redaction', fn: modeRedaction },
     { name: 'ingest', fn: modeIngest },
     { name: 'pages', fn: modePages },
+    { name: 'stores', fn: modeStores },
     { name: 'avatars', fn: modeAvatars },
     { name: 'full (json)', fn: (e, o) => modeFull(e, { ...o, format: 'json' }) },
     { name: 'full (md)', fn: (e, o) => modeFull(e, { ...o, format: 'md' }) },
@@ -5144,7 +5187,7 @@ async function main() {
     console.error('  2. Pipe logs: cat logs.jsonl | npm run log-doctor -- stats');
     console.error('');
     console.error(
-      'Modes: stats, timeline, errors, slow, renders, screens, startup, coco, network, feed, visual, full, diff, devices, payment, toasts, flows, ws, gc, budget, crypto, ops, perf, spans, waste, tiers, reads, redaction, ingest, pages, avatars, phone. Run --help for details.'
+      'Modes: stats, timeline, errors, slow, renders, screens, startup, coco, network, feed, visual, full, diff, devices, payment, toasts, flows, ws, gc, budget, crypto, ops, perf, spans, waste, tiers, reads, redaction, ingest, pages, stores, avatars, phone. Run --help for details.'
     );
     process.exit(1);
   }
@@ -5264,6 +5307,9 @@ async function main() {
     case 'pages':
       output = modePages(entries, opts);
       break;
+    case 'stores':
+      output = modeStores(entries, opts);
+      break;
     case 'avatars':
       output = modeAvatars(entries, opts);
       // A guard, not only a report: a flicker fails the run.
@@ -5272,7 +5318,7 @@ async function main() {
     default:
       console.error(`Unknown mode: ${opts.mode}`);
       console.error(
-        'Valid modes: stats, timeline, errors, slow, renders, screens, startup, coco, network, feed, visual, full, diff, devices, payment, toasts, flows, ws, gc, budget, crypto, ops, perf, spans, waste, tiers, reads, redaction, ingest, pages, avatars, phone. Run --help for details.'
+        'Valid modes: stats, timeline, errors, slow, renders, screens, startup, coco, network, feed, visual, full, diff, devices, payment, toasts, flows, ws, gc, budget, crypto, ops, perf, spans, waste, tiers, reads, redaction, ingest, pages, stores, avatars, phone. Run --help for details.'
       );
       process.exit(1);
   }
