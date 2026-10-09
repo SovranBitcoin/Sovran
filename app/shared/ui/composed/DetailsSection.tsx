@@ -7,11 +7,7 @@ import { useStylePaint } from '@/shared/styles/appStyle';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import { useDetailsSheetStore } from '@/shared/stores/runtime/detailsSheetStore';
-import {
-  copyTextOf,
-  DetailsTable,
-  type DetailsSheetItem,
-} from '@/shared/ui/composed/DetailsSheet';
+import { copyTextOf, DetailsTable, type DetailsSheetItem } from '@/shared/ui/composed/DetailsSheet';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Text } from '@/shared/ui/primitives/Text';
 
