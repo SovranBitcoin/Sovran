@@ -29,7 +29,7 @@ build; **nothing has run on iOS or on a physical phone.**
 | --- | --- |
 | VIS-1 to VIS-8 | Done. VIS-3 is a bounded loading state. On the emulator, 258 avatar instances across 86 app starts on the wallet home all went loading → image; none showed the fallback first. Other pages were not exercised |
 | OBS-1 to OBS-9, OBS-11 | Done, and seen working on the emulator: `coco.call`, `store.set`, `cache.store.write`, `perf.frame_drop`, `screen.mount`, `nav.transition`, `render.why`, and the `pages`, `stores` and `ingest` log-doctor modes on a real capture |
-| OBS-10 | **Partly done.** Four pages have a measured row (below). A walk of all 111 needs the JSON e2e harness, whose lanes start from a fresh install and would wipe the emulator's app data, so it was not run |
+| OBS-10 | Done for the pages a deep link can reach: 43 screens have a measured row (below). Pages that need parameters, the onboarding, backup and recovery flows and imperative sheets need the JSON e2e harness, whose lanes start from a fresh install |
 | CALC-1 | Closed as stale: `history.filters.matchesFilters` did not appear once in the capture and has no emitter in source |
 | CALC-2, 7, 8, 11, 12, 13, 14, 15, 16, 17, 18 | Done |
 | CALC-3 | Measured, not changed: the receive-recovery phase had a median of about 7.2 s on the emulator |
@@ -49,13 +49,41 @@ build; **nothing has run on iOS or on a physical phone.**
 ### Measured on the emulator
 
 Dev build, debug logging and both monitors on, so absolute figures are inflated; use them to rank.
+Pages were opened by deep link, one every six seconds, so navigation time is mostly absent (a deep
+link does not dispatch the navigation action the timer listens for) and each link also runs the
+payment-intent handler. 43 screens produced a row; the slowest to show content:
 
-| Page | Content shown | Shell | Navigation | Dropped frames | Coco calls |
-| --- | --- | --- | --- | --- | --- |
-| Feed | 2,072 ms | 320 ms | — | 0 | 0 |
-| Contacts | 1,735 ms | 205 ms | 992 ms | 39 | 4 |
-| Notifications | 774 ms | 213 ms | 961 ms | 122 | 87 |
-| Receive | — | — | 2,153 ms | 113 | 127 |
+| Screen | Content shown | Shell | Dropped frames | Coco calls |
+| --- | --- | --- | --- | --- |
+| ThemePreviewScreen | 3,675 ms | 318 ms | 104 | 8 |
+| NotificationFollowersScreen | 3,531 ms | 413 ms | 231 | 173 |
+| SettingsStorageScreen | 3,244 ms | 267 ms | 201 | 1 |
+| SignerRequestsScreen | 2,263 ms | 301 ms | 193 | 132 |
+| SettingsDesignSystemScreensScreen | 2,149 ms | 22 ms | 20 | 6 |
+| MintDistributionScreen | 2,045 ms | 226 ms | 39 | 19 |
+| SignerHubScreen | 2,017 ms | 615 ms | 14 | 18 |
+| BackgroundScreen | 1,772 ms | 548 ms | 27 | 19 |
+| FiltersScreen | 1,735 ms | 243 ms | 55 | 45 |
+| BitchatNetworkSheet | 1,494 ms | 167 ms | 133 | 268 |
+| AiRequestScreen | 1,384 ms | 308 ms | 74 | 18 |
+| MintInfoScreen | 1,227 ms | 141 ms | 75 | 67 |
+| SignerActivityScreen | 1,217 ms | 481 ms | 327 | 322 |
+
+Everything else measured showed content in under 1.2 s. Reproduce with
+`adb shell am start -n com.sovranbitcoin.dev/.MainActivity -a android.intent.action.VIEW -d sovran://<route>`
+per route and `bun run log-doctor pages` on the capture. Pages that need parameters, the onboarding,
+backup, recovery and delete flows, and imperative sheets were not visited, so about 43 of 111 pages
+have a row.
+
+From the same session:
+
+- After CALC-20, `wallet.balances.byMint` ran 116 times over 87 navigations and 15 reloads, against
+  about 614 over 86 starts before: roughly one read per navigation where there were seven.
+- The avatar guard read 18 seeds across 25 avatar instances in the feed, contacts and notifications:
+  none showed the fallback before its picture.
+- Each incoming deep link writes about eight stores, half of them no-ops (`useAmountDraftStore`,
+  `useContactSendStore`, `useRoutstrTopUpStore` and `useNearPaySessionStore` are set to what they
+  already hold), and `transaction-annotation-store` woke 792 subscribers over 82 writes.
 
 New findings from the capture:
 
