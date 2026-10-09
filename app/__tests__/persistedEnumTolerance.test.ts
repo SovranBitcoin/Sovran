@@ -232,6 +232,7 @@ const APP_DIR = resolve(__dirname, '..');
  * cannot be imported above. Mirrors `persistRoundTrip`'s list.
  */
 const NOT_A_CONCRETE_STORE = [
+  'shared/lib/profile/profileRemovalStorage.ts', // Registry consumer, no store declaration.
   'shared/lib/cache/createQueryCacheStore.ts',
   // Readers of the registry, not stores.
   'shared/lib/cashu/profileScopedStorage.ts',

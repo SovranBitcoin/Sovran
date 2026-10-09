@@ -11,6 +11,7 @@ import {
 } from 'bitchat-module';
 import type { DefaultOperationsConfig } from 'wallet/operations';
 import { classifyMeshToken, normalizeMintUrl } from 'wallet';
+import { NEARBY_PAYMENT_JOURNAL_KEY } from './nearbyPaymentStorage';
 import { createSecureVault } from '@/shared/lib/persist/secureVault';
 import { bitchatLog } from '@/shared/lib/logger';
 import { getBitchatProfileScope } from '@/features/bitchat/lib/profileScope';
@@ -27,7 +28,6 @@ import { useWalletLifecycleStore } from '@/shared/stores/global/walletLifecycleS
 import { isPayableNearbyPeer } from './nearbyCapability';
 
 export const NEARBY_PAYMENT_PREFIX = 'sovran:payment:1:';
-const JOURNAL_KEY = 'nearby-payment-journal';
 const wireProof = z.object({
   id: z.string().min(1).max(128),
   secret: z.string().min(1).max(4096),
@@ -80,7 +80,7 @@ class NearbyPayments {
     private readonly manager: Manager,
     private readonly owner: string
   ) {
-    this.storage = createSecureVault(owner, JOURNAL_KEY);
+    this.storage = createSecureVault(owner, NEARBY_PAYMENT_JOURNAL_KEY);
   }
   private isCurrent() {
     return (

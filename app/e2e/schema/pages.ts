@@ -24,6 +24,7 @@ export const CANONICAL_PAGES = [
   'wallet', // wallet home (WalletScreen)
   'drawer', // profile drawer (drawer-profile-name)
   'profile-switcher', // independently tested action-menu sheet
+  'profile-removal', // removal confirmation sheet; cancellation-only scenario
   // receive flow
   'receive', // receive method hub sheet (receive-method-*)
   'receive-qr', // standing receive rails QR display (ReceiveScreen: Unified/Lightning/Onchain/Cashu)

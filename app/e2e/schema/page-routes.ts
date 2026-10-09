@@ -11,6 +11,7 @@ export const PAGE_ROUTES: Partial<Record<(typeof CANONICAL_PAGES)[number], reado
   'backup-done': ['(prompt-flow)/backup-done.tsx'],
   'secure-locked': [], // boot gate; no route alias
   'profile-keys-error': [], // key-provider gate; no route alias
+  'profile-removal': [], // Imperative confirmation; no route alias.
   'profile-switcher': [], // Imperative sheet entered from the drawer; no route alias.
   ai: ['(drawer)/(tabs)/ai/index.tsx'],
   contacts: ['(drawer)/(tabs)/contacts/index.tsx'],

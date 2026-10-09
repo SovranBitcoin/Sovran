@@ -20,6 +20,11 @@ const SENSITIVE_KEYS = new Set([
   'cached_receive_tokens',
 ]);
 
+/** Vault inventory follows the SDK driver's authoritative sensitive-key set. */
+export function sdkRecoveryVaultNames(): string[] {
+  return [...SENSITIVE_KEYS].map(scoped);
+}
+
 export function createSdkStorageDriver(ownerPubkey: string) {
   const storage = createProfileScopedStorage(ownerPubkey);
   let pending = Promise.resolve();

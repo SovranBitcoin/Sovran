@@ -3,7 +3,11 @@ import { bytesToHex, utf8ToBytes } from '@noble/hashes/utils.js';
 
 import { readSensitiveValue, writeSensitiveValue } from '@/shared/lib/nostr/secureStorage';
 import { isNostrPubkeyHex } from '@/shared/lib/protocolIds';
-import { SecureVaultManifest as Manifest, secureVaultChunkKey } from './secureVaultManifest';
+import {
+  SecureVaultManifest as Manifest,
+  secureVaultChunkKey,
+  secureVaultManifestKey,
+} from './secureVaultManifest';
 
 const CHUNK_CHARACTERS = 512;
 const queues = new Map<string, Promise<void>>();
@@ -13,8 +17,8 @@ const digest = (value: string) => bytesToHex(sha256(utf8ToBytes(value)));
 export function createSecureVault(ownerPubkey: string, name: string) {
   if (!isNostrPubkeyHex(ownerPubkey)) throw new Error('A profile is required for payment storage');
   // Keep the indexed storage namespace so existing vaults and Delete All remain compatible.
-  const prefix = `routstr_v1_${ownerPubkey}_${digest(name)}`;
-  const manifestKey = `${prefix}_manifest`;
+  const manifestKey = secureVaultManifestKey(ownerPubkey, name);
+  const prefix = manifestKey.slice(0, -'_manifest'.length);
   const chunkKey = (generation: number, index: number) =>
     secureVaultChunkKey(manifestKey, generation % 2, index);
 

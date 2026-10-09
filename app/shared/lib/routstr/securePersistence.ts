@@ -27,6 +27,20 @@ const Secrets = z.object({
 });
 const EMPTY = { apiKey: null, legacyAccounts: {}, pendingPayments: {} };
 
+/** Inspect legacy plaintext payment fields without hydrating or migrating the account. */
+export function assertRoutstrStorageEmptyForRemoval(raw: string | null): void {
+  if (raw === null) return;
+  const envelope = Envelope.parse(JSON.parse(raw));
+  const secrets = Secrets.parse(envelope.state);
+  if (
+    secrets.apiKey !== null ||
+    Object.keys(secrets.legacyAccounts).length > 0 ||
+    Object.keys(secrets.pendingPayments).length > 0
+  ) {
+    throw new Error('Provider payment records require review');
+  }
+}
+
 /** Keep credentials out of the chat blob without changing its public store shape. */
 export function createRoutstrPersistence(): StateStorage {
   const queues = new Map<string, Promise<void>>();

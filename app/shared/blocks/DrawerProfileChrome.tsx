@@ -1,3 +1,5 @@
+import { profileRemovalCopy } from 'copy/onboarding';
+import { actionMenuPopup } from '@/shared/lib/popup/popups/actionMenu';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 /**
  * Drawer profile chrome: the top-of-drawer header. A single row with the
@@ -38,6 +40,7 @@ import { storeImportedNsec } from '@/shared/lib/nostr/secureStorage';
 import { truncateMiddle } from '@/shared/lib/strings';
 import {
   createAndSwitchProfile,
+  removeInactiveProfile,
   switchToExistingProfile,
 } from '@/shared/lib/profile/profileSessionOrchestrator';
 import { useProfileStore, type ProfileEntry } from '@/shared/stores/global/profileStore';
@@ -75,6 +78,32 @@ function useProfileSwitcher(closeDrawer: () => void) {
         if (!switched) {
           switchingRef.current = false;
           staticPopup('wallet-still-loading');
+        }
+        break;
+      }
+      case 'remove': {
+        const result = await removeInactiveProfile(
+          action.accountIndex,
+          action.importedKeyConfirmed
+        );
+        switchingRef.current = false;
+        if (result.kind !== 'removed') {
+          const reason =
+            result.kind === 'refused'
+              ? profileRemovalCopy.refusals[result.reason]
+              : `Removal stopped at: ${result.failed}. Completed: ${result.completed.join(', ') || 'nothing'}. Not completed (the failed step may be partial): ${result.remaining.join(', ')}. The profile is still listed. You can try again.`;
+          actionMenuPopup({
+            title: 'Profile not removed',
+            buttons: [
+              {
+                text: 'Close',
+                description: reason,
+                testID: 'profile-remove-result-close',
+                accessibilityLabel: 'Close removal result',
+                onPress: (close) => close(),
+              },
+            ],
+          });
         }
         break;
       }

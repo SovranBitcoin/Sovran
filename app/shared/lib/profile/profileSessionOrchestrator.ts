@@ -549,3 +549,25 @@ export async function deleteAllProfiles(opts?: {
     return false;
   }
 }
+
+/** Single-profile removal shares admission with every account transition. */
+export async function removeInactiveProfile(accountIndex: number, importedKeyConfirmed = false) {
+  if (transitionInFlight) return { kind: 'refused', reason: 'busy' } as const;
+  transitionInFlight = true;
+  let admitted = false;
+  try {
+    if (!useProfileStore.persist.hasHydrated())
+      return { kind: 'refused', reason: 'unreadable' } as const;
+    admitted = await beginTransition();
+    if (!admitted) return { kind: 'refused', reason: 'busy' } as const;
+    const { removeProfileData } = await import('./removeProfile');
+    const { profileRemovalPorts } = await import('./profileRemovalStorage');
+    return await removeProfileData(accountIndex, importedKeyConfirmed, profileRemovalPorts);
+  } catch {
+    // Module/native initialization errors can carry sensitive context; disclose no records.
+    return { kind: 'refused', reason: 'unreadable' } as const;
+  } finally {
+    if (admitted) await endTransition();
+    transitionInFlight = false;
+  }
+}

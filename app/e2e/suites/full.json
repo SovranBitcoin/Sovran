@@ -3,6 +3,7 @@
   "name": "full",
   "defaultEndState": "wallet",
   "scenarios": [
+    {"id":"profile.remove.cancel","file":"scenarios/profile-remove-cancel.json","order":915,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
     {"id":"capture.receive-qr-tabs","file":"scenarios/capture-receive-qr-tabs.json","order":911,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
     {"id":"capture.mint-details","file":"scenarios/capture-mint-details.json","order":912,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
     {"id":"capture.mint-updates","file":"scenarios/capture-mint-updates.json","order":913,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},

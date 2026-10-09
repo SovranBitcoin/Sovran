@@ -260,7 +260,7 @@ export function createQueryCacheStore<TData>(opts: QueryCacheStoreOptions): Quer
   const inFlight = new Map<string, { gen: number; promise: Promise<TData> }>();
   // The newest run per key, kept after it settles so a superseded older run can
   // still hand its awaiters the result that actually won (cleared on clear()).
-  const latestRun = new Map<string, { gen: number; promise: Promise<TData> }>();
+  const latestRun = new Map<string, { gen: number; promise: Promise<TData>; viewerKey: string }>();
 
   const getEntry = (key: string): QueryCacheEntry<TData> | undefined => use.getState().byKey[key];
   const isFresh = (entry: QueryCacheEntry<TData> | undefined): boolean =>
@@ -363,7 +363,7 @@ export function createQueryCacheStore<TData>(opts: QueryCacheStoreOptions): Quer
       }
     );
     inFlight.set(key, { gen, promise });
-    latestRun.set(key, { gen, promise });
+    latestRun.set(key, { gen, promise, viewerKey });
     const cleanup = () => {
       if (inFlight.get(key)?.promise === promise) {
         inFlight.delete(key);
@@ -392,7 +392,25 @@ export function createQueryCacheStore<TData>(opts: QueryCacheStoreOptions): Quer
     staleTtlMs: opts.staleTtlMs,
   };
   const entry = persistRegistry.stores.find((entry) => entry.store === use);
-  if (entry) entry.queryCache = store;
+  if (entry)
+    entry.queryCache = {
+      clear: store.clear,
+      removeViewer: (pubkey) => {
+        const keys = new Set([
+          ...Object.entries(use.getState().byKey)
+            .filter(([, cached]) => cached.viewerKey === pubkey)
+            .map(([key]) => key),
+          ...[...latestRun].filter(([, run]) => run.viewerKey === pubkey).map(([key]) => key),
+        ]);
+        for (const key of keys) {
+          genByKey.set(key, generation(key) + 1);
+          inFlight.delete(key);
+          latestRun.delete(key);
+          touchedEpochByKey.delete(key);
+          store.removeEntry(key);
+        }
+      },
+    };
   registerAccountScoped(
     `query-cache:${opts.name}`,
     () => {

@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "id": "profile.remove.cancel",
+  "name": "Enter profile removal and cancel",
+  "description": "Create a second empty derived profile, enter removal of the inactive first profile, and cancel without confirming any deletion.",
+  "lane": "simulator",
+  "tags": ["flow:wallet","check:navigation"],
+  "requires": ["fresh-install"],
+  "setup": [
+    {"use":"flow.onboard"}
+  ],
+  "steps": [
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"id":"wallet-send"},"timeoutMs":45000},
+    {"action":"tap","selector":{"id":"header-profile-avatar"}},
+    {"action":"waitFor","selector":{"id":"drawer-profile-switcher-open"}},
+    {"action":"tap","selector":{"id":"drawer-profile-switcher-open"}},
+    {"action":"waitFor","selector":{"id":"profile-create"}},
+    {"action":"tap","selector":{"id":"profile-create"}},
+    {"action":"waitFor","selector":{"id":"wallet-send"},"timeoutMs":120000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"header-profile-avatar"}}],"until":{"id":"drawer-profile-switch-0"},"attempts":6,"settleMs":6000},
+    {"action":"tap","selector":{"id":"drawer-profile-switcher-open"}},
+    {"action":"waitFor","selector":{"id":"profile-row-0"}},
+    {"action":"tap","selector":{"id":"profile-row-0"}},
+    {"action":"waitFor","selector":{"id":"profile-remove-0"}},
+    {"action":"tap","selector":{"id":"profile-remove-0"}},
+    {"action":"waitFor","selector":{"id":"profile-remove-cancel"}},
+    {"action":"screenshot","name":"profile-removal"},
+    {"action":"tap","selector":{"id":"profile-remove-cancel"}},
+    {"action":"assert","that":"notVisible","selector":{"id":"profile-remove-confirm"}}
+  ],
+  "verify": [
+    {"action":"assert","that":"notVisible","selector":{"id":"profile-remove-confirm"}}
+  ],
+  "finally": [
+    {"use":"flow.return-to-wallet"}
+  ],
+  "endState": "wallet"
+}

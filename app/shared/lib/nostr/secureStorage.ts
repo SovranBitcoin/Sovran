@@ -12,7 +12,11 @@ import { useCallback, useEffect, useState } from 'react';
 import { nostrLog, redactError } from '../logger';
 import { useSecureStoreState } from '@/shared/stores/runtime/secureStoreState';
 import { maybeExportSeedForE2E } from './e2eSeedExport';
-import { SecureVaultManifest, secureVaultChunkKey } from '../persist/secureVaultManifest';
+import {
+  SecureVaultManifest,
+  secureVaultChunkKey,
+  secureVaultManifestKey,
+} from '../persist/secureVaultManifest';
 
 // Keys for secure storage
 const STORAGE_KEYS = {
@@ -762,4 +766,69 @@ export function useMnemonic(autoLoad: boolean = true): UseMnemonicReturn {
   }, [autoLoad, refresh]);
 
   return { value, loading, error, refresh };
+}
+
+/** Read and validate the account's manifests before any destructive step. */
+export async function prepareProfileSecureRemoval(
+  accountIndex: number,
+  pubkey: string,
+  vaultNames: readonly string[]
+): Promise<() => Promise<void>> {
+  assertAccountIndex(accountIndex);
+  assertPubkeyHex(pubkey);
+  await keyIndexQueue;
+  const indexed = await readKeyIndex(true);
+  const keys = new Set([
+    derivedKeysKey(accountIndex),
+    cashuMnemonicKey(accountIndex),
+    cashuSeedKey(accountIndex),
+    migrationsCompleteKey(accountIndex),
+    importedNsecKey(pubkey),
+  ]);
+  const chunks: string[] = [];
+  const manifests = new Set([
+    ...vaultNames.map((name) => secureVaultManifestKey(pubkey, name)),
+    ...indexed.filter((key) => key.startsWith(`routstr_v1_${pubkey}_`)),
+  ]);
+  for (const key of manifests) {
+    // Every indexed vault must have a readable manifest; unclassified records refuse.
+    if (!key.endsWith('_manifest')) throw new Error('Unclassified account recovery record');
+    const raw = await readSensitiveValue(key);
+    if (raw === null) continue;
+    const manifest = SecureVaultManifest.parse(JSON.parse(raw));
+    function empty(record: unknown): boolean {
+      if (record === null) return true;
+      if (Array.isArray(record)) return record.length === 0;
+      if (typeof record === 'object') return Object.values(record).every(empty);
+      return false;
+    }
+    if (manifest.generation === null) throw new Error('Uncommitted account recovery record');
+    for (let slot = 0; slot < manifest.slots.length; slot++) {
+      let value = '';
+      for (let index = 0; index < manifest.slots[slot]; index++) {
+        const chunk = secureVaultChunkKey(key, slot, index);
+        chunks.push(chunk);
+        const part = await readSensitiveValue(chunk);
+        if (part === null) throw new Error('Incomplete account recovery record');
+        value += part;
+      }
+      if (
+        slot === manifest.generation % 2 &&
+        bytesToHex(sha256(utf8ToBytes(value))) !== manifest.digest
+      )
+        throw new Error('Corrupt account recovery record');
+      // Retained alternate generations may also contain bearer proofs. Never guess spentness.
+      if (value !== '' && !empty(JSON.parse(value)))
+        throw new Error('Account recovery requires review');
+    }
+    keys.add(key);
+  }
+  return async () => {
+    // Delete chunks before manifests; retaining the manifest makes retry enumeration safe.
+    for (const key of [...chunks, ...keys]) {
+      if (!(await secureDelete(key, 'remove_profile')))
+        throw new Error('Account key deletion failed');
+    }
+    // Keep the shared index and mnemonic: missing entries are harmless deletion hints.
+  };
 }

@@ -34,3 +34,24 @@ export const backupIntroCopy = {
   description:
     "Write your 12 recovery words on paper, not in a screenshot or note. Keep them secret: they can give access to your wallet. Keep your mint URLs and back up imported keys separately. Recovery needs the relevant mints and supported records; words alone cannot guarantee every balance or message. Sovran cannot reset lost words.",
 } as const;
+
+export const profileRemovalCopy = {
+  title: "Remove profile from this device?",
+  derived: "This profile can be added again from your recovery phrase. Its local wallet records, messages and settings will be deleted.",
+  imported: "This profile's local wallet records, messages and settings will be deleted. Continue to review what happens to its imported key.",
+  importedTitle: "Delete the imported key?",
+  importedConsequence: "The key is deleted from this device and cannot be recovered from the recovery phrase. Keep a separate backup of the imported key before removing this profile.",
+  remove: "Remove profile",
+  deleteKey: "Delete key and remove profile",
+  cancel: "Cancel",
+  refusals: {
+    active: "Switch to another profile before removing this one.",
+    last: "The last profile cannot be removed here. Delete Account removes everything, including your recovery phrase.",
+    missing: "This profile is no longer in the profile list.",
+    busy: "An account change is in progress. Try again after it finishes.",
+    balance: "This profile still holds ecash. Switch to it and transfer all funds before removing it.",
+    pending: "This profile has pending operations or quotes. Switch to it and resolve them before removing it.",
+    unreadable: "The wallet or payment recovery records could not be safely checked without starting this profile. No further data was removed. Switch to it and resolve its wallet state first.",
+    'imported-confirmation': "Confirm separately that the imported key will be deleted and cannot be recovered from your recovery phrase.",
+  },
+} as const;

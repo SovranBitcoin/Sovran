@@ -89,7 +89,7 @@ interface RegisteredStore {
     persist?: { rehydrate: () => Promise<void> | void; hasHydrated: () => boolean };
   };
   initialState: unknown;
-  queryCache?: { clear: () => void };
+  queryCache?: { clear: () => void; removeViewer: (pubkey: string) => void };
 }
 
 // Array iteration retains the persisted-schema contract used by the existing

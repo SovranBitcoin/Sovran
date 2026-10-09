@@ -68,6 +68,11 @@ interface PerScopeCache<T> {
   flushTimer: ReturnType<typeof setTimeout> | null;
 }
 
+const scopedCacheRemovers: ((pubkey: string) => Promise<void>)[] = [];
+export async function removePlaintextCaches(pubkey: string): Promise<void> {
+  for (const remove of scopedCacheRemovers) await remove(pubkey);
+}
+
 export function createPubkeyScopedCache<T>(opts: PubkeyScopedCacheOpts<T>): PubkeyScopedCache<T> {
   const maxEntries = opts.maxEntries ?? 1000;
   const maxNegEntries = opts.maxNegEntries ?? 200;
@@ -76,6 +81,16 @@ export function createPubkeyScopedCache<T>(opts: PubkeyScopedCacheOpts<T>): Pubk
   const negEnabled = !!opts.storagePrefixNeg;
 
   const scopes = new Map<string, PerScopeCache<T>>();
+  const pendingFlushes = new Set<Promise<void>>();
+  scopedCacheRemovers.push(async (pubkey) => {
+    const state = scopes.get(pubkey);
+    if (state?.flushTimer) clearTimeout(state.flushTimer);
+    await state?.hydratePromise;
+    await Promise.all([...pendingFlushes]);
+    scopes.delete(pubkey);
+    await AsyncStorage.removeItem(`${opts.storagePrefix}:${pubkey}`);
+    if (opts.storagePrefixNeg) await AsyncStorage.removeItem(`${opts.storagePrefixNeg}:${pubkey}`);
+  });
   registerAccountScoped(
     `plaintext-cache:${opts.storagePrefix}`,
     () => {
@@ -123,7 +138,9 @@ export function createPubkeyScopedCache<T>(opts: PubkeyScopedCacheOpts<T>): Pubk
     if (s.flushTimer) return;
     s.flushTimer = setTimeout(() => {
       s.flushTimer = null;
-      void flush(s);
+      const pending = flush(s);
+      pendingFlushes.add(pending);
+      void pending.finally(() => pendingFlushes.delete(pending));
     }, flushDebounceMs);
   }
 
