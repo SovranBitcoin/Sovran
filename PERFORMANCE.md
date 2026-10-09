@@ -14,8 +14,49 @@ DEP). Their corrections are merged; where a reviewer's finding was not re-read i
 
 Nothing in this file was measured on a device. Paths are relative to the repo root.
 
+## Status
+
+Work on this register started on 2026-10-09. An entry below keeps its original wording as the record
+of what was found; this table says where each one stands. **Nothing marked done has been run on a
+device.** "Done" means implemented, reviewed and covered by tests, with type-check, lint, knip, the
+ratchets and the full test suites passing.
+
+| Entries | State |
+| --- | --- |
+| VIS-1, VIS-2, VIS-4, VIS-5, VIS-6, VIS-7, VIS-8 | Done. The `avatars` log-doctor mode is the regression guard |
+| VIS-3 | Done as a bounded loading state: grey until the row's first fetch attempt settles, then the fallback |
+| OBS-1, OBS-3, OBS-4, OBS-5, OBS-6, OBS-7, OBS-8, OBS-9, OBS-11 | Done |
+| OBS-2 | Done: `store.set` from `defineStore`, with a log-doctor `stores` mode |
+| OBS-10 | **Open.** No baseline walk of the 111 pages has been captured; it needs a device |
+| CALC-2, CALC-7, CALC-8, CALC-11, CALC-13, CALC-14, CALC-15, CALC-16, CALC-17 | Done |
+| CALC-1, CALC-3 | **Open.** Recorded figures only; measure with `coco.call` and the `pages` mode first |
+| CALC-4, CALC-5, CALC-6 | **Open, deliberately.** They change how the wallet and the payment-request inbox poll, where a mistake is a missed payment. They need a design decision, not a mechanical fix |
+| CALC-9, CALC-19 | **Open.** Unmeasured; `inlineRequires` may already defer CALC-9 |
+| CALC-10 | Done with VIS-7 |
+| CALC-12, CALC-18 | **Open.** CALC-12 could not be narrowed without changing behaviour |
+| DEP-12 | Done |
+| DEP-13, DEP-14 and the evaluations (DEP-4 to DEP-7, DEP-9) | **Open** |
+| ACCT-9 (registry, enforcement, canary, leak check), ACCT-11 | Done. ADR 0029 |
+| ACCT-1, ACCT-2, ACCT-3, ACCT-6, ACCT-7 | Done **inside the opt-in switch only**. Settings has a developer toggle, off by default; with it off a profile switch restarts exactly as before |
+| ACCT-4, ACCT-5, ACCT-8 | Holders register a dispose function, which the opt-in switch runs. BLE mesh identity and native state are still unverified |
+| ACCT-10 | **Open.** No sign-out or single-profile delete |
+
+Limits of the opt-in switch as it stands:
+
+- It falls back to a restart whenever a Whitenoise or Routstr client is active, because neither has a
+  shutdown that can be awaited. Until they do, the fast path will often not be taken.
+- The canary test plants an account-A marker in every profile and session store and asserts none
+  survives the switch or lands under account B's keys. Of the registered module-level holders, only
+  seven can be seeded with a marker; the rest are called without proof that they held account data
+  and dropped it.
+- If the in-process switch fails and the restart is also unavailable, providers stay suspended and
+  writes stay blocked. That is deliberate: a stuck app over a half-switched wallet.
+- Real relay shutdown, native cleanup, and what the theme and navigation look like after a switch
+  are unproven until it is run on both platforms.
+
 ## Contents
 
+0. [Status](#status)
 1. [What already exists](#1-what-already-exists)
 2. [VIS — avatar and banner flicker](#2-vis--avatar-and-banner-flicker)
 3. [OBS — observability gaps](#3-obs--observability-gaps)
