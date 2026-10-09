@@ -48,6 +48,9 @@
  *   perf         Per-event latency distribution (p50/p95/p99 + histogram) from params.ms
  *   reads        Read lifecycle per surface: cache-hit rate, refetch-while-fresh, TTFUD, superseded, blank flashes
  *   redaction    Read-side redaction audit: confirms secrets stripped, flags raw un-redacted values
+ *   ingest       Entity-cache writes per store: written vs changed vs listeners notified, by wasted writes and fan-out
+ *   pages        Per-Screen scorecard: mount/nav ms, render.why count, dropped frames, coco time while current
+ *   avatars      Fails (non-zero exit) when an avatar goes loading → fallback → image
  *   budget       Token cost meta-analysis — shows which modes fit in which context windows
  *   phone        Drive a real iPhone via WebDriverAgent (subcommands: tap, tap-id, tree, shot, …)
  *
@@ -122,6 +125,9 @@ import {
   summarizeDurations,
   analyzeReads,
   summarizeReads,
+  analyzeAvatarSequences,
+  analyzeIngest,
+  analyzePages,
   type RedactionAudit,
 } from './analysis';
 
@@ -299,6 +305,9 @@ Modes:
   devices    Device/session labels in a mixed log
   budget     Token cost of each mode for this log
   redaction  Secret-redaction audit
+  ingest     Entity-cache writes: wasted writes + listener fan-out
+  pages      Per-Screen mount/nav/render/frame/coco scorecard
+  avatars    Fails when an avatar flickers loading → fallback → image
   diff       Compare last two sessions in one file
   full       Dense whole-log dump (--format json|yaml|md)
   phone      Drive the device via WDA (tap/tree/shot/test ...)
@@ -4395,6 +4404,98 @@ function modeReads(entries: LogEntry[], _opts: Options): string {
   return lines.join('\n');
 }
 
+// ─── Ingest fan-out, per-page scorecard, avatar flicker guard ────────────────
+// The analysis lives in ./analysis; these only lay it out.
+
+function modeIngest(entries: LogEntry[], _opts: Options): string {
+  const { stores, byWasted, byFanOut } = analyzeIngest(entries);
+  if (stores.length === 0) {
+    return 'No cache.store.write events found. (Entity-cache writes log at debug level.)';
+  }
+  const header =
+    '  Store                 Batches   No-op  Written  Changed   Wasted  KeyListeners  GlobalListeners  Fan-out';
+  const row = (s: (typeof stores)[number]) =>
+    `  ${s.store.padEnd(20).slice(0, 20)}  ${String(s.batches).padStart(7)}  ${String(s.noopBatches).padStart(6)}  ${String(s.written).padStart(7)}  ${String(s.changed).padStart(7)}  ${String(s.wasted).padStart(7)}  ${String(s.keyListenersNotified).padStart(12)}  ${String(s.globalListenersNotified).padStart(15)}  ${s.fanOut.toFixed(1).padStart(7)}`;
+
+  const lines: string[] = [];
+  lines.push('=== ENTITY-CACHE INGEST (per store) ===');
+  lines.push('');
+  lines.push('BY WASTED WRITES (keys written again with nothing new)');
+  lines.push(header);
+  lines.push('  ' + '-'.repeat(header.length - 2));
+  for (const s of byWasted) lines.push(row(s));
+  lines.push('');
+  lines.push('BY FAN-OUT (listeners woken per changed key)');
+  lines.push(header);
+  lines.push('  ' + '-'.repeat(header.length - 2));
+  for (const s of byFanOut) lines.push(row(s));
+  lines.push('');
+  lines.push(
+    'Wasted = written − changed. No-op = batches that changed no key and so notified nobody.'
+  );
+  lines.push(
+    'Fan-out = (key + global listeners notified) ÷ changed keys; a listener is a subscription, not a render.'
+  );
+  return lines.join('\n');
+}
+
+function modePages(entries: LogEntry[], _opts: Options): string {
+  const pages = analyzePages(entries);
+  if (pages.length === 0) {
+    return 'No screen.mount or nav.transition events found. (Screen instrumentation logs at debug level.)';
+  }
+  const p50 = (samples: number[]) =>
+    samples.length ? summarizeDurations(samples).p50.toFixed(0) : '—';
+  const lines: string[] = [];
+  lines.push('=== PAGE SCORECARD (per Screen name) ===');
+  lines.push('');
+  const header =
+    '  Screen                            Mounts  Mount ms  Shell ms  Nav ms  render.why  Dropped frames  Coco calls  Coco ms';
+  lines.push(header);
+  lines.push('  ' + '-'.repeat(header.length - 2));
+  for (const page of pages) {
+    lines.push(
+      `  ${page.screen.padEnd(32).slice(0, 32)}  ${String(page.mounts).padStart(6)}  ${p50(page.mountMs).padStart(8)}  ${p50(page.shellMs).padStart(8)}  ${p50(page.navMs).padStart(6)}  ${String(page.renderWhy).padStart(10)}  ${String(page.droppedFrames).padStart(14)}  ${String(page.cocoCalls).padStart(10)}  ${page.cocoMs.toFixed(0).padStart(7)}`
+    );
+  }
+  lines.push('');
+  lines.push(
+    'Mount / Shell / Nav ms are medians. Mount = screen.mount content_ms, Shell = shell_ms, Nav = nav.transition duration_ms.'
+  );
+  lines.push(
+    'Dropped frames and coco time are charged to the page that mounted last; a back or pop mounts nothing, so they stay with the page that was left.'
+  );
+  lines.push('Dropped frames need the opt-in frame monitor; without it the column is 0.');
+  return lines.join('\n');
+}
+
+function modeAvatars(entries: LogEntry[], _opts: Options): string {
+  const analysis = analyzeAvatarSequences(entries);
+  if (analysis.sequences === 0) {
+    return 'No visual.avatar.sequence events found. (Avatar sequences log at debug level in dev builds.)';
+  }
+  const lines: string[] = [];
+  lines.push('=== AVATAR SEQUENCES ===');
+  lines.push('');
+  lines.push(
+    `${analysis.seeds} seeds across ${analysis.sequences} avatar instances; ${analysis.flickers.length} went loading → fallback → image.`
+  );
+  if (analysis.flickers.length === 0) {
+    lines.push('');
+    lines.push('PASS: no avatar showed the fallback before its picture.');
+    return lines.join('\n');
+  }
+  lines.push('');
+  for (const flicker of analysis.flickers.slice(0, 50)) {
+    const at = flicker.t === null ? '' : `[${Math.round(flicker.t)}ms] `;
+    lines.push(`  ${at}${flicker.seed}  ${flicker.instance}`);
+  }
+  if (analysis.flickers.length > 50) lines.push(`  … +${analysis.flickers.length - 50} more`);
+  lines.push('');
+  lines.push('FAIL: the fallback was painted while a picture was still on its way.');
+  return lines.join('\n');
+}
+
 function pct(part: number, whole: number): string {
   if (whole === 0) return '—';
   return `${Math.round((part / whole) * 100)}%`;
@@ -4435,6 +4536,9 @@ function modeBudget(entries: LogEntry[], opts: Options): string {
     { name: 'tiers', fn: modeTiers },
     { name: 'reads', fn: modeReads },
     { name: 'redaction', fn: modeRedaction },
+    { name: 'ingest', fn: modeIngest },
+    { name: 'pages', fn: modePages },
+    { name: 'avatars', fn: modeAvatars },
     { name: 'full (json)', fn: (e, o) => modeFull(e, { ...o, format: 'json' }) },
     { name: 'full (md)', fn: (e, o) => modeFull(e, { ...o, format: 'md' }) },
     { name: 'full (yaml)', fn: (e, o) => modeFull(e, { ...o, format: 'yaml' }) },
@@ -5040,7 +5144,7 @@ async function main() {
     console.error('  2. Pipe logs: cat logs.jsonl | npm run log-doctor -- stats');
     console.error('');
     console.error(
-      'Modes: stats, timeline, errors, slow, renders, screens, startup, coco, network, feed, visual, full, diff, devices, payment, toasts, flows, ws, gc, budget, crypto, ops, perf, spans, waste, tiers, reads, redaction, phone. Run --help for details.'
+      'Modes: stats, timeline, errors, slow, renders, screens, startup, coco, network, feed, visual, full, diff, devices, payment, toasts, flows, ws, gc, budget, crypto, ops, perf, spans, waste, tiers, reads, redaction, ingest, pages, avatars, phone. Run --help for details.'
     );
     process.exit(1);
   }
@@ -5154,10 +5258,21 @@ async function main() {
     case 'redaction':
       output = modeRedaction(entries, opts);
       break;
+    case 'ingest':
+      output = modeIngest(entries, opts);
+      break;
+    case 'pages':
+      output = modePages(entries, opts);
+      break;
+    case 'avatars':
+      output = modeAvatars(entries, opts);
+      // A guard, not only a report: a flicker fails the run.
+      if (analyzeAvatarSequences(entries).flickers.length > 0) process.exitCode = 1;
+      break;
     default:
       console.error(`Unknown mode: ${opts.mode}`);
       console.error(
-        'Valid modes: stats, timeline, errors, slow, renders, screens, startup, coco, network, feed, visual, full, diff, devices, payment, toasts, flows, ws, gc, budget, crypto, ops, perf, spans, waste, tiers, reads, redaction, phone. Run --help for details.'
+        'Valid modes: stats, timeline, errors, slow, renders, screens, startup, coco, network, feed, visual, full, diff, devices, payment, toasts, flows, ws, gc, budget, crypto, ops, perf, spans, waste, tiers, reads, redaction, ingest, pages, avatars, phone. Run --help for details.'
       );
       process.exit(1);
   }
