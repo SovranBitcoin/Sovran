@@ -24,9 +24,10 @@ lazy feature or native dependency. The registry therefore includes generated
 metadata from store declarations. The filesystem completeness test compares the
 metadata with those declarations and checks persisted keys. Regenerate it with
 `bun run store-registry:update` (in `app/`) after changing a declaration.
-Storage inventory and legacy profile-key migration consume the registry rather
-than independent key lists. Memory-only query caches retain their storage-name
-metadata so migration can still find blobs from their persisted predecessors.
+Storage inventory consumes the registry rather than an independent key list. The
+one-time legacy profile-key migration does not: it keeps its own frozen list of
+the names it shipped with, because it records what older installs wrote and must
+not follow declarations that change (`globalMigrations.ts`).
 
 Scope describes ownership; it does not authorize changing a persistence adapter,
 key, schema, version or projection. Package-owned holders expose disposal to the
