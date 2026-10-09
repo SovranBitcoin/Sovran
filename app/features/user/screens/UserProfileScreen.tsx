@@ -663,18 +663,19 @@ function BannerWithAvatar({
   // `isResolving` (not just isLoading) gates the fallback so a seeded
   // name-only record revalidating in the background never flashes the seeded
   // gradient before the real banner arrives — always placeholder → final.
-  const bannerState: 'loading' | 'image' | 'fallback' = hasBannerImage
-    ? bannerStatus === 'loaded'
-      ? 'image'
-      : 'loading'
-    : isLoading || isResolving
-      ? 'loading'
-      : 'fallback';
   const pfpColors = useDominantColor(pictureUrl, fallbackIndex);
   const bannerColors = useDominantColor(
     !pictureUrl && hasBannerImage ? bannerUrl : undefined,
     fallbackIndex
   );
+
+  const bannerState: 'loading' | 'image' | 'fallback' = hasBannerImage
+    ? bannerStatus === 'loaded'
+      ? 'image'
+      : 'loading'
+    : isLoading || isResolving || (!!pictureUrl && !pfpColors.hasLoaded)
+      ? 'loading'
+      : 'fallback';
 
   const bannerGradientTheme = generateSeededGradient(`${pubkey || 'default'}`);
 
@@ -825,9 +826,7 @@ function BannerWithAvatar({
                   style={StyleSheet.absoluteFill}
                 />
               </View>
-            ) : (
-              seededGradientFill
-            )}
+            ) : null}
           </>
         ) : imageGradientColors ? (
           <View style={StyleSheet.absoluteFill}>
@@ -1562,6 +1561,7 @@ export function UserProfileScreen() {
           ListHeaderComponent={
             <View>
               <BannerWithAvatar
+                key={`${pubkey}:${cachedProfile?.banner ?? ''}:${cachedProfile?.picture ?? ''}`}
                 identityStyle={morph.contentStyle}
                 onIdentityLayout={(event) => {
                   bannerTopRef.current = event.nativeEvent.layout.y;
