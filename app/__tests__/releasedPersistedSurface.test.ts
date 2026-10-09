@@ -27,8 +27,13 @@ function declaredVersion(entry: Declared): number {
   // The name appears twice: in `defineStore` and in `persistConfig`. The
   // version sits in the persist options, so read from the last one.
   const at = source.lastIndexOf(`name: '${entry.name}'`);
-  const version = /version:\s*(\d+)/.exec(source.slice(at, at + 900));
-  return version ? Number(version[1]) : 1;
+  const version = /version:\s*(\w+)/.exec(source.slice(at, at + 900));
+  if (!version) return 1;
+  if (/^\d+$/.test(version[1])) return Number(version[1]);
+  // A named constant, e.g. `version: PROFILE_STORE_PERSIST_VERSION`.
+  const constant = new RegExp(`const ${version[1]} = (\\d+)`).exec(source);
+  if (!constant) throw new Error(`Cannot resolve the version of ${entry.name}`);
+  return Number(constant[1]);
 }
 
 describe('stores released in v0.1.3 are still found after an upgrade', () => {
