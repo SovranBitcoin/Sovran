@@ -10,7 +10,7 @@ import { Text } from '@/shared/ui/primitives/Text';
  */
 
 import { COMPOSE_FAB_CLEARANCE } from '@/features/composer/ui/ComposeFab';
-import { useMemo, useRef, useEffect, useCallback, useState, type ReactNode } from 'react';
+import React, { useMemo, useRef, useEffect, useCallback, useState, type ReactNode } from 'react';
 import { StyleSheet, type LayoutChangeEvent } from 'react-native';
 import { usePullToAiRefreshControl } from '@/shared/blocks/PullToAiRefreshControl';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -56,21 +56,18 @@ import {
 import type { FeedEvent, FeedItem, NoteMetrics } from './nostr/feedTypes';
 import { DEFAULT_METRICS } from './nostr/feedTypes';
 import { tryNpubEncode } from './nostr/feedParse';
-import {
-  DEFAULT_ENGAGEMENT_STATE,
-  getFeedRowItemType,
-  getFeedRowKey,
-  type FeedRow,
-} from '@/features/feed/lib/feedRows';
+import { getFeedRowItemType, getFeedRowKey, type FeedRow } from '@/features/feed/lib/feedRows';
+import type { ThreadSeed } from '@/features/feed/lib/threadSeedCache';
 
-import { PostCard, PostCardSkeleton } from './nostr/PostCard';
+import { FeedPostCard } from './nostr/LivePostCard';
+import { PostCardSkeleton } from './nostr/PostCard';
 import {
   POST_AVATAR_SIZE,
   POST_PADDING_H,
   POST_PADDING_TOP,
   postType,
 } from '@/features/feed/lib/postTypography';
-import { RepostCard } from './UserFeed';
+import { FeedRepostCard } from './UserFeed';
 import {
   ImageOverlayProvider,
   useImageOverlay,
@@ -197,6 +194,130 @@ function FeedThreadPair({
     </View>
   );
 }
+
+type FeedCardWiring = ReturnType<typeof useFeedCardProps>;
+
+/**
+ * One row of the home feed. Everything it is handed keeps its identity when a
+ * note is liked, so the like re-renders the card that follows that note and
+ * nothing else in the list.
+ */
+// Memoized at the list boundary; `engagementRowRenders.test` pins the count.
+const HomeFeedRow = React.memo(function HomeFeedRow({
+  row,
+  index,
+  feedPostCardProps,
+  repostCardProps,
+  getMetrics,
+  getThreadContext,
+  openPostActions,
+}: {
+  row: FeedRow;
+  index: number;
+  feedPostCardProps: FeedCardWiring['feedPostCardProps'];
+  repostCardProps: FeedCardWiring['repostCardProps'];
+  /** The feed's own counts, for the reply previews a row does not carry counts for. */
+  getMetrics: (eventId: string) => NoteMetrics;
+  getThreadContext: (replyPreviewEvents?: readonly FeedEvent[]) => ThreadSeed | null;
+  openPostActions: (event: FeedEvent) => void;
+}) {
+  const item = row.item;
+  const contextRootEvent = row.rootEvent;
+  const getOwnThreadContext = () => getThreadContext();
+  // Both root-context pairs (reply-with-root, repost-with-root) open with
+  // the same "root post as first card" head.
+  const rootFirstCard = contextRootEvent ? (
+    <FeedPostCard
+      variant="feed"
+      row={row}
+      index={index}
+      event={contextRootEvent}
+      fallbackMetrics={row.rootMetrics ?? DEFAULT_METRICS}
+      cardProps={feedPostCardProps}
+      getThreadContext={getOwnThreadContext}
+      showFooterBorder={false}
+    />
+  ) : null;
+  if (item.type === 'note') {
+    const replyPreviewEvents = item.replyPreviewEvents ?? [];
+    if (!rootFirstCard && replyPreviewEvents.length > 0) {
+      return (
+        <FeedThreadPair
+          first={
+            <FeedPostCard
+              variant="feed"
+              row={row}
+              index={index}
+              event={item.event}
+              fallbackMetrics={row.metrics}
+              cardProps={feedPostCardProps}
+              getThreadContext={() => getThreadContext(replyPreviewEvents)}
+              showFooterBorder={false}
+            />
+          }
+          second={
+            <>
+              {replyPreviewEvents.map((replyEvent, replyIndex) => (
+                <FeedPostCard
+                  key={replyEvent.id}
+                  variant="feed"
+                  row={row}
+                  index={index}
+                  event={replyEvent}
+                  fallbackMetrics={getMetrics(replyEvent.id)}
+                  cardProps={feedPostCardProps}
+                  getThreadContext={getOwnThreadContext}
+                  showFooterBorder={replyIndex === replyPreviewEvents.length - 1}
+                />
+              ))}
+            </>
+          }
+        />
+      );
+    }
+    const noteCard = (
+      <FeedPostCard
+        variant="feed"
+        row={row}
+        index={index}
+        event={item.event}
+        fallbackMetrics={row.metrics}
+        cardProps={feedPostCardProps}
+        getThreadContext={getOwnThreadContext}
+      />
+    );
+    return rootFirstCard ? <FeedThreadPair first={rootFirstCard} second={noteCard} /> : noteCard;
+  }
+
+  const originalEvent = item.originalEvent;
+  if (rootFirstCard && originalEvent) {
+    return (
+      <FeedThreadPair
+        secondAvatarCenterY={FEED_REPOST_ORIGINAL_AVATAR_CENTER_Y}
+        first={rootFirstCard}
+        second={
+          <FeedRepostCard
+            row={row}
+            index={index}
+            item={item}
+            cardProps={repostCardProps}
+            onMorePress={() => openPostActions(originalEvent)}
+            getThreadContext={getOwnThreadContext}
+          />
+        }
+      />
+    );
+  }
+  return (
+    <FeedRepostCard
+      row={row}
+      index={index}
+      item={item}
+      cardProps={repostCardProps}
+      getThreadContext={getOwnThreadContext}
+    />
+  );
+});
 
 type HomeFeedListRow = FeedRow | { key: string; skeleton: true };
 
@@ -443,7 +564,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
   // ── Derived data ──
 
   // Read the live `metricsMap` state (not `metricsRef`): this accessor feeds the
-  // render path via `getDisplayMetrics` → `feedRows`. `useLatestRef` writes its
+  // render path via `feedRows`. `useLatestRef` writes its
   // ref in `useInsertionEffect`, i.e. AFTER commit, so during the render where a
   // late `setMetricsMap` lands, `metricsRef.current` is still the previous map.
   // Reading the ref here left rows rendered with DEFAULT_METRICS until an
@@ -457,8 +578,6 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
   );
 
   const {
-    getDisplayMetrics,
-    getEngagementState,
     getZapState,
     toggleLikeRef,
     toggleRepostRef,
@@ -519,8 +638,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
     profilesMap,
     quotedEventsMap,
     metricsMap,
-    getDisplayMetrics,
-    getEngagementState,
+    getMetrics,
     resolveReposter,
   });
 
@@ -549,123 +667,24 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
     fallbackReposterName: '',
   });
 
-  const renderFeedItem = useCallback(
-    ({ item: row, index }: { item: FeedRow; index: number }) => {
-      const item = row.item;
-      // Both root-context pairs (reply-with-root, repost-with-root) open with
-      // the same "root post as first card" head.
-      const rootFirstCard = (rootEvent: FeedEvent) => (
-        <PostCard
-          variant="feed"
-          {...feedPostCardProps(
-            row,
-            index,
-            rootEvent,
-            row.rootMetrics ?? DEFAULT_METRICS,
-            row.rootEngagement ?? DEFAULT_ENGAGEMENT_STATE
-          )}
-          getThreadContext={() => getThreadContextRef.current()}
-          showFooterBorder={false}
-        />
-      );
-      if (item.type === 'note') {
-        const metrics = row.metrics;
-        const engagement = row.engagement;
-        const contextRootEvent = row.rootEvent;
-        const replyPreviewEvents = item.replyPreviewEvents ?? [];
-        if (!contextRootEvent && replyPreviewEvents.length > 0) {
-          return (
-            <FeedThreadPair
-              first={
-                <PostCard
-                  variant="feed"
-                  {...feedPostCardProps(row, index, item.event, metrics, engagement)}
-                  getThreadContext={() => getThreadContextRef.current(replyPreviewEvents)}
-                  showFooterBorder={false}
-                />
-              }
-              second={
-                <>
-                  {replyPreviewEvents.map((replyEvent, replyIndex) => {
-                    const replyMetrics = getDisplayMetrics(replyEvent.id);
-                    const replyEngagement = getEngagementState(replyEvent.id);
-                    const isLastReply = replyIndex === replyPreviewEvents.length - 1;
-                    return (
-                      <PostCard
-                        key={replyEvent.id}
-                        variant="feed"
-                        {...feedPostCardProps(
-                          row,
-                          index,
-                          replyEvent,
-                          replyMetrics,
-                          replyEngagement
-                        )}
-                        getThreadContext={() => getThreadContextRef.current()}
-                        showFooterBorder={isLastReply}
-                      />
-                    );
-                  })}
-                </>
-              }
-            />
-          );
-        }
-        if (contextRootEvent) {
-          return (
-            <FeedThreadPair
-              first={rootFirstCard(contextRootEvent)}
-              second={
-                <PostCard
-                  variant="feed"
-                  {...feedPostCardProps(row, index, item.event, metrics, engagement)}
-                  getThreadContext={() => getThreadContextRef.current()}
-                />
-              }
-            />
-          );
-        }
-        return (
-          <PostCard
-            variant="feed"
-            {...feedPostCardProps(row, index, item.event, metrics, engagement)}
-            getThreadContext={() => getThreadContextRef.current()}
-          />
-        );
-      }
+  const getRowThreadContext = useCallback(
+    (replyPreviewEvents?: readonly FeedEvent[]) => getThreadContextRef.current(replyPreviewEvents),
+    [getThreadContextRef]
+  );
 
-      const originalEvent = item.originalEvent;
-      const contextRootEvent = row.rootEvent;
-      if (contextRootEvent && originalEvent) {
-        return (
-          <FeedThreadPair
-            secondAvatarCenterY={FEED_REPOST_ORIGINAL_AVATAR_CENTER_Y}
-            first={rootFirstCard(contextRootEvent)}
-            second={
-              <RepostCard
-                {...repostCardProps(row, index, item)}
-                onMorePress={() => openPostActions(originalEvent)}
-                getThreadContext={() => getThreadContextRef.current()}
-              />
-            }
-          />
-        );
-      }
-      return (
-        <RepostCard
-          {...repostCardProps(row, index, item)}
-          getThreadContext={() => getThreadContextRef.current()}
-        />
-      );
-    },
-    [
-      feedPostCardProps,
-      repostCardProps,
-      getDisplayMetrics,
-      getEngagementState,
-      getThreadContextRef,
-      openPostActions,
-    ]
+  const renderFeedItem = useCallback(
+    ({ item: row, index }: { item: FeedRow; index: number }) => (
+      <HomeFeedRow
+        row={row}
+        index={index}
+        feedPostCardProps={feedPostCardProps}
+        repostCardProps={repostCardProps}
+        getMetrics={getMetrics}
+        getThreadContext={getRowThreadContext}
+        openPostActions={openPostActions}
+      />
+    ),
+    [feedPostCardProps, repostCardProps, getMetrics, getRowThreadContext, openPostActions]
   );
 
   const listRows: HomeFeedListRow[] = isLoading && feedRows.length === 0 ? SKELETON_ROWS : feedRows;
@@ -783,8 +802,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
   return (
     <Log name="HomeFeed">
       <ImageOverlayProvider
-        getDisplayMetrics={getDisplayMetrics}
-        getEngagementState={getEngagementState}
+        getBaseMetrics={getMetrics}
         onSwipeUpToNextPost={onSwipeUpToNextPost}
         getVideoFeedLayoutsAndIndex={getVideoFeedLayoutsAndIndex}>
         <View style={styles.flex1}>

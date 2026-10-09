@@ -19,12 +19,8 @@
     "features/feed/hooks/useCardTapGesture.ts": ["Cannot access refs during render"],
     "features/feed/hooks/useFeedCardProps.ts": ["Cannot access refs during render"],
     "features/feed/hooks/useFeedRows.ts": ["Cannot access refs during render"],
-    "features/feed/hooks/useNostrEngagement.ts": [
-      "React Compiler has skipped optimizing this component because one or more React ESLint rules were disabled"
-    ],
     "features/mint/hooks/useMintRebalanceOrchestrator.ts": [
       "(BuildHIR::lowerStatement) Handle TryStatement with a finalizer ('finally') clause",
-      "(BuildHIR::lowerStatement) Support ThrowStatement inside of try/catch",
       "(BuildHIR::lowerStatement) Handle TryStatement without a catch clause"
     ],
     "features/mint/hooks/useStickyMintSelectorItems.ts": ["Cannot access refs during render"],
@@ -46,8 +42,7 @@
       "Hooks must be the same function on every render, but this value may change over time to a different function. See https://react.dev/reference/rules/react-calls-"
     ],
     "features/settings/screens/SettingsRecoveryScreen.tsx": [
-      "(BuildHIR::lowerStatement) Handle TryStatement with a finalizer ('finally') clause",
-      "(BuildHIR::lowerStatement) Handle TryStatement without a catch clause"
+      "(BuildHIR::lowerStatement) Handle TryStatement with a finalizer ('finally') clause"
     ],
     "features/transactions/components/detail/timeline/TimelineCard.tsx": [
       "Cannot access refs during render"
@@ -79,6 +74,7 @@
     "shared/providers/NostrKeysProvider.tsx": [
       "(BuildHIR::lowerStatement) Handle TryStatement with a finalizer ('finally') clause",
       "(BuildHIR::lowerStatement) Support ThrowStatement inside of try/catch",
+      "(BuildHIR::lowerExpression) Handle ??= operators in AssignmentExpression",
       "(BuildHIR::lowerExpression) Handle Import expressions"
     ],
     "shared/ui/composed/CapsuleButton/CapsuleButton.liquid.tsx": [

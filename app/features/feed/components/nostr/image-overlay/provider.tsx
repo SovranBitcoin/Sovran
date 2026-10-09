@@ -26,7 +26,6 @@ import {
 } from 'react-native-reanimated';
 import { scheduleOnRN, scheduleOnUI } from 'react-native-worklets';
 import { useScrollViewOffset } from '@/features/feed/hooks/useScrollViewOffset';
-import type { EngagementViewState } from '@/features/feed/hooks/useNostrEngagement';
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import type { NoteMetrics } from '../feedTypes';
 import {
@@ -48,6 +47,7 @@ import type {
   ThumbnailLayout,
   ImageOverlayContextValue,
 } from './types';
+import { useLiveOverlayPost } from './useLiveOverlayPost';
 
 const TIMING_CONFIG = {
   duration: CLOSE_BLUR_AND_BTN_DURATION_MS,
@@ -204,10 +204,12 @@ function measureWithTimeout(
 
 type ImageOverlayProviderProps = {
   children: React.ReactNode;
-  /** When provided, overlay panel shows live metrics (optimistic counts) for the active post. */
-  getDisplayMetrics?: (eventId: string) => NoteMetrics;
-  /** When provided, overlay panel shows live engagement (liked, reposted, pending) for the active post. */
-  getEngagementState?: (eventId: string) => EngagementViewState;
+  /**
+   * The surface's own counts for a note. When provided, the overlay panel
+   * follows the active post's engagement (optimistic counts, liked, reposted,
+   * pending) instead of showing the snapshot it was opened with.
+   */
+  getBaseMetrics?: (eventId: string) => NoteMetrics;
   /** When on a video page, swipe up calls this with openNext. Feed calls openNext(nextLayout) to show next video in overlay. */
   onSwipeUpToNextPost?: (openNext: (layout: ImageOverlayReplaceLayout) => void) => void;
   /** When provided, overlay can request layouts for TikTok-style vertical feed. Return layouts from current post onward; initialIndex is 0. */
@@ -221,8 +223,7 @@ type ImageOverlayProviderProps = {
 
 export function ImageOverlayProvider({
   children,
-  getDisplayMetrics,
-  getEngagementState,
+  getBaseMetrics,
   onSwipeUpToNextPost,
   getVideoFeedLayoutsAndIndex,
   mediaSource = null,
@@ -1030,24 +1031,7 @@ export function ImageOverlayProvider({
     closeTargetHeight,
   ]);
 
-  /** When the feed supplies getters, show live metrics/engagement so overlay updates on like/repost. */
-  const effectiveOverlayPost = useMemo((): ImageOverlayPost | null => {
-    if (!activeOverlayPost) return null;
-    if (getDisplayMetrics && getEngagementState) {
-      const eventId = activeOverlayPost.event.id;
-      return {
-        ...activeOverlayPost,
-        metrics: getDisplayMetrics(eventId),
-        liked: getEngagementState(eventId).liked,
-        reposted: getEngagementState(eventId).reposted,
-        likePending: getEngagementState(eventId).likePending,
-        repostPending: getEngagementState(eventId).repostPending,
-        likePendingDirection: getEngagementState(eventId).likePendingDirection,
-        repostPendingDirection: getEngagementState(eventId).repostPendingDirection,
-      };
-    }
-    return activeOverlayPost;
-  }, [activeOverlayPost, getDisplayMetrics, getEngagementState]);
+  const effectiveOverlayPost = useLiveOverlayPost(activeOverlayPost, getBaseMetrics);
 
   const stateValue = useMemo<ImageOverlayStateValue>(
     () => ({

@@ -70,6 +70,7 @@ exports[`Design System component inventory tracks the complete reusable componen
     "features/feed/components/ThreadView.tsx",
     "features/feed/components/UserFeed.tsx",
     "features/feed/components/nostr/DeletedTombstone.tsx",
+    "features/feed/components/nostr/LivePostCard.tsx",
     "features/feed/components/nostr/MetricsFooter.tsx",
     "features/feed/components/nostr/NoteContent.tsx",
     "features/feed/components/nostr/StoriesCarousel.tsx",
@@ -285,6 +286,6 @@ exports[`Design System component inventory tracks the complete reusable componen
     "shared/ui/primitives/View/Stack.tsx",
     "shared/ui/primitives/icon-symbol.tsx",
   ],
-  "total": 279,
+  "total": 280,
 }
 `;

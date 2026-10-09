@@ -7,6 +7,7 @@ export type FeedRow = {
   key: string;
   item: FeedItem;
   rootEvent?: FeedEvent;
+  /** Whatever `getDisplayMetrics` answered: in a feed list, the surface's own counts. */
   metrics: NoteMetrics;
   /** False when no source has supplied this note's counts yet (render a placeholder, not 0). */
   metricsKnown: boolean;
@@ -21,7 +22,7 @@ export type FeedRow = {
   reposters?: { name: string; pubkey: string }[];
 };
 
-export const DEFAULT_ENGAGEMENT_STATE: EngagementViewState = Object.freeze({
+const DEFAULT_ENGAGEMENT_STATE: EngagementViewState = Object.freeze({
   liked: false,
   reposted: false,
   replied: false,
@@ -37,7 +38,8 @@ export type BuildFeedRowsOptions = {
   getDisplayMetrics: (eventId: string) => NoteMetrics;
   /** Whether a page/enrichment supplied counts for the id. Default: always known. */
   hasMetrics?: (eventId: string) => boolean;
-  getEngagementState: (eventId: string) => EngagementViewState;
+  /** Default: no viewer state — the card reads its own note's (see `useFeedRows`). */
+  getEngagementState?: (eventId: string) => EngagementViewState;
   resolveReposter?: (item: Extract<FeedItem, { type: 'repost' }>) => {
     name: string;
     pubkey: string;
@@ -51,7 +53,7 @@ export function buildFeedRows({
   quotedEventsMap,
   getDisplayMetrics,
   hasMetrics = () => true,
-  getEngagementState,
+  getEngagementState = () => DEFAULT_ENGAGEMENT_STATE,
   resolveReposter = defaultResolveReposter,
 }: BuildFeedRowsOptions): FeedRow[] {
   const previousByKey = new Map(previousRows.map((row) => [row.key, row]));

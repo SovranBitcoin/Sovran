@@ -148,11 +148,15 @@ jest.mock('@/features/composer/publish/useComposerActions', () => ({
 jest.mock('../hooks/useNostrEngagement', () => ({
   useNostrEngagement: () => ({
     getDisplayMetrics: () => ({ likeCount: 0, repostCount: 0, replyCount: 0, satsZapped: 0 }),
-    getEngagementState: () => ({}),
-    getZapState: () => ({}),
     toggleLike: jest.fn(),
     toggleRepost: jest.fn(),
-    engagementRevision: 0,
+  }),
+}));
+jest.mock('../hooks/useNoteEngagement', () => ({
+  useNoteEngagement: (_eventId: string, fallbackMetrics: unknown) => ({
+    metrics: fallbackMetrics,
+    state: {},
+    zap: {},
   }),
 }));
 jest.mock('@/shared/stores/profile/nostrSocialStore', () => ({
