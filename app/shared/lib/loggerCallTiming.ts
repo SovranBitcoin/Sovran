@@ -48,12 +48,12 @@ function isOpaque(value: object): boolean {
   );
 }
 
-function isThenable(value: unknown): value is PromiseLike<unknown> {
-  return (
-    value !== null &&
-    (typeof value === 'object' || typeof value === 'function') &&
-    typeof (value as { then?: unknown }).then === 'function'
-  );
+/**
+ * Native promises only. Reading or calling `then` on an arbitrary thenable can
+ * run its code early or throw, which an unwrapped call would never do.
+ */
+function isThenable(value: unknown): value is Promise<unknown> {
+  return value instanceof Promise;
 }
 
 /**
@@ -96,9 +96,11 @@ export function withCallTiming<T extends object>(target: T, options: CallTimingO
         const isFunction = typeof raw === 'function';
         if (!isFunction && (typeof raw !== 'object' || raw === null)) return raw;
 
+        // Checked on every read, before the cache: an object frozen after a
+        // wrapper was handed out must get its real value back from then on.
+        if (isFrozenProperty(nodeTarget, prop)) return raw;
         const cached = cache.get(prop);
         if (cached && cached.raw === raw) return cached.wrapped;
-        if (isFrozenProperty(nodeTarget, prop)) return raw;
 
         const childPath = path ? `${path}.${prop}` : prop;
         let wrapped: unknown = raw;

@@ -143,3 +143,22 @@ it('stops logging, but keeps writing, when the level is raised after the store e
   expect(store.getState().count).toBe(1);
   expect(writesTo(name)).toEqual([]);
 });
+
+it('returns what zustand returns from unsubscribe, and survives a throwing accessor in state', () => {
+  const name = uniqueName();
+  const store = defineVanillaStore<{ value: number }>({ name, scope: 'session' })(() => ({
+    value: 0,
+  }));
+
+  const unsubscribe = store.subscribe(() => {});
+  expect(unsubscribe()).toBe(true);
+
+  const trap = Object.defineProperty({ value: 1 }, 'value', {
+    enumerable: true,
+    get() {
+      throw new Error('unreadable');
+    },
+  });
+  expect(() => store.setState(trap as { value: number }, true)).not.toThrow();
+  expect(writesTo(name).at(-1)).toMatchObject({ changed: ['(unreadable)'] });
+});

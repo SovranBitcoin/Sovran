@@ -136,4 +136,28 @@ describe('withCallTiming', () => {
     expect(timed.wallet.getBalance()).toBe(21);
     expect(calls()).toEqual([]);
   });
+
+  it('hands back the real value once its owner is frozen after a wrapper was read', () => {
+    const { manager, timed } = setup();
+    const wrapped = timed.wallet;
+    expect(wrapped).not.toBe(manager.wallet);
+
+    Object.freeze(manager);
+
+    // A Proxy must report a frozen property's real value, or the read throws.
+    expect(timed.wallet).toBe(manager.wallet);
+  });
+
+  it('returns a custom thenable untouched, without reading or calling its then', () => {
+    const logger = createLogger({ level: 'debug', async: false, transports: [], pretty: false });
+    const then = jest.fn();
+    const lazy = { then };
+    const timed = withCallTiming(
+      { ops: { start: () => lazy } },
+      { event: 'coco.call', logger, namespaces: ['ops'] }
+    );
+
+    expect(timed.ops.start()).toBe(lazy);
+    expect(then).not.toHaveBeenCalled();
+  });
 });

@@ -68,7 +68,7 @@ function withWriteLog<T, Mos extends [StoreMutatorIdentifier, unknown][]>(
       const unsubscribe = subscribe(listener);
       return () => {
         listeners.delete(listener);
-        unsubscribe();
+        return unsubscribe();
       };
     };
     const write = set as (partial: unknown, replace?: boolean) => void;
@@ -77,12 +77,22 @@ function withWriteLog<T, Mos extends [StoreMutatorIdentifier, unknown][]>(
       const before = get();
       write(partial, replace);
       const after = get();
-      storeLog.debug('store.set', () => ({
-        store: definition.name,
-        scope: definition.scope,
-        changed: changedKeys(before, after),
-        subscribers: Object.is(before, after) ? 0 : listeners.size,
-      }));
+      storeLog.debug('store.set', () => {
+        // Comparing reads the state's properties, which an unwrapped write
+        // never does. A throwing accessor must not turn a write into a throw.
+        let changed: string[];
+        try {
+          changed = changedKeys(before, after);
+        } catch {
+          changed = ['(unreadable)'];
+        }
+        return {
+          store: definition.name,
+          scope: definition.scope,
+          changed,
+          subscribers: Object.is(before, after) ? 0 : listeners.size,
+        };
+      });
     }) as StoreApi<T>['setState'];
     api.setState = loggedSet;
     return initializer(loggedSet, get, api);
