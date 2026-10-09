@@ -42,7 +42,10 @@ describe('feature set', () => {
     // redeemed by a provider that mounts with `ecashMessages`, not with
     // `directMessages`. If that mount is ever gated on the DM pages, an edition
     // without them would accept money nobody can claim.
-    const layout = readFileSync(join(__dirname, '..', 'app', '_layout.tsx'), 'utf8');
+    const layout = readFileSync(
+      join(__dirname, '..', 'shared', 'providers', 'AccountProviders.tsx'),
+      'utf8'
+    );
     expect(layout).toContain("hasFeature('ecashMessages') ? [DmEcashAutoRedeemProvider] : []");
     expect(resolveFeatureSet('payments').ecashMessages).toBe(true);
   });

@@ -22,7 +22,7 @@ The list of profiles and which one is active is itself a global store, `profile-
 
 The last two rows are the hazard. Disk is keyed, so two accounts never collide there. Memory is not.
 
-- The account providers in `app/app/_layout.tsx` are keyed by account index, so React state is
+- The account providers (`app/shared/providers/AccountProviders.tsx`) are keyed by account index, so React state is
   replaced when the active account changes.
 - Zustand stores and module-level state live outside React. A per-profile store works out its
   storage key on every write but loads its contents once. Flip the account underneath it and it
@@ -52,8 +52,8 @@ Registering does nothing. Only the switch and profile removal act on the registr
 
 ## What changes the active account
 
-All of it is in `app/shared/lib/profile/profileSessionOrchestrator.ts`. Every flow takes the same
-lock first, so two cannot overlap.
+The flows are in `app/shared/lib/profile/profileSessionOrchestrator.ts`. Every flow takes the same
+lock first (`profileTransition.ts`), so two cannot overlap.
 
 | Flow | Function | How it finishes |
 | --- | --- | --- |
@@ -104,6 +104,9 @@ Nothing in this design may strand data written by v0.1.3 or earlier. Three tests
 
 Rules that follow from them:
 
+- `routstr-store` moved its secrets into secure storage after v0.1.3. It still reads the key the
+  old release wrote, copies the secrets across, verifies them, and only then strips the plaintext
+  (`routstrSecurePersistence.test.ts`).
 - Never rename, remove or tighten a persisted field. Add fields with a default and tolerance.
 - Never change a store's name, a storage key format, a SecureStore key name or a database name.
 - A one-time storage migration keeps its own frozen list of names. It records what old installs
@@ -118,5 +121,6 @@ Rules that follow from them:
 | The in-process switch, step by step | `app/shared/lib/profile/inProcessProfileSwitch.ts` |
 | What removal deletes | `app/shared/lib/profile/profileRemovalStorage.ts` |
 | How a per-profile store finds its key | `app/shared/lib/cashu/profileScopedStorage.ts` |
-| Which providers remount with the account | `AccountScopedProviders` in `app/app/_layout.tsx` |
+| Which providers remount with the account | `app/shared/providers/AccountProviders.tsx` |
+| The lock every flow takes, and the shared restart steps | `app/shared/lib/profile/profileTransition.ts` |
 | Decisions | ADR 0029 (registry and switch), ADR 0030 (removal) |

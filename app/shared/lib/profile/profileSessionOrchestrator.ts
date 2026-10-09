@@ -19,7 +19,6 @@ import * as bip39 from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english.js';
 import { storeMnemonic, prepareSecureDataReset } from '@/shared/lib/nostr/secureStorage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ResultAsync } from 'neverthrow';
 
 import { log, nostrLog, redactError } from '../logger';
 import { CocoManager } from '@/shared/lib/cashu/manager';
@@ -30,165 +29,31 @@ import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { restartApp } from '@/shared/lib/profile/appRestart';
 import { clearAllQueryCaches } from '@/shared/lib/cache/createQueryCacheStore';
 import { resetRoutstrClient } from '@/shared/lib/routstr/sdk/client';
-import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
 import { usePopupStore } from '@/shared/stores/runtime/popupStore';
-import {
-  PROFILE_STORE_PERSIST_VERSION,
-  useProfileStore,
-} from '@/shared/stores/global/profileStore';
+import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { useBTCMapStore } from '@/shared/stores/global/btcMapStore';
 
+import {
+  abandonTransition,
+  activateProfileInMemory,
+  beginTransition,
+  cleanupCocoWithTimeout,
+  endTransition,
+  isTransitionInFlight,
+  keyDerivation,
+  markTransitionInFlight,
+  persistSwitchTargetToDisk,
+  teardownAndRestart,
+  transitionControls,
+  type KeyDerivationFn,
+  type TransitionControls,
+} from './profileTransition';
 import {
   runInProcessProfileSwitch,
   checkProfileSwitchLeaks,
   holdProfileSwitchForRestart,
   switchStep,
 } from './inProcessProfileSwitch';
-
-// ── AsyncStorage-based transition guard ──────────────────────────
-const TRANSITION_KEY = 'profile-transition-in-progress';
-const TRANSITION_EXPIRY_MS = 10_000;
-
-type TransitionGuard = { startedAt: number };
-
-async function beginTransition(): Promise<boolean> {
-  try {
-    const raw = await AsyncStorage.getItem(TRANSITION_KEY);
-    if (raw) {
-      const guard: TransitionGuard = JSON.parse(raw);
-      if (Date.now() - guard.startedAt < TRANSITION_EXPIRY_MS) {
-        return false;
-      }
-      log.warn('profile.orchestrator.stale_guard');
-    }
-    await AsyncStorage.setItem(TRANSITION_KEY, JSON.stringify({ startedAt: Date.now() }));
-    return true;
-  } catch {
-    return true;
-  }
-}
-
-async function endTransition(): Promise<void> {
-  try {
-    await AsyncStorage.removeItem(TRANSITION_KEY);
-  } catch {
-    // best-effort
-  }
-}
-
-/** Call on app startup to clear any stale transition guard left by a previous run. */
-export async function clearTransitionGuardOnStartup(): Promise<void> {
-  try {
-    await AsyncStorage.removeItem(TRANSITION_KEY);
-  } catch {
-    // best-effort
-  }
-}
-
-// ── Registered controls (set at runtime by layout components) ────
-type TransitionControls = {
-  resetStages: (options?: {
-    holdUntilCancel?: boolean;
-    keepStagesThatOutliveAccount?: boolean;
-  }) => void;
-  cancelResetStages: () => void;
-};
-
-type KeyDerivationFn = (accountIndex: number) => Promise<{ pubkey: string } | null>;
-
-let registeredControls: TransitionControls | null = null;
-let registeredKeyDerivation: KeyDerivationFn | null = null;
-
-export function registerTransitionControls(controls: TransitionControls): void {
-  registeredControls = controls;
-}
-
-export function registerKeyDerivation(fn: KeyDerivationFn): void {
-  registeredKeyDerivation = fn;
-}
-
-/**
- * Persist the switch target WITHOUT flipping the in-memory store. The
- * in-memory flip drives RootLayout's keyed remount
- * (`key={account-${activeAccountIndex}}`), and a remount before the native
- * restart boots the new profile in-process — SecureStore reads, coco init,
- * SQLite migrations, PBKDF2 seed warm — only to race the restart: two full
- * boots per switch plus a native-crash window with expo-sqlite work in
- * flight (BTC-13). Persist-first lets the restart boot from the target
- * directly; the in-memory flip is kept only as the failed-restart fallback.
- */
-function persistSwitchTargetToDisk(accountIndex: number): ResultAsync<void, Error> {
-  const { profiles } = useProfileStore.getState();
-  return ResultAsync.fromPromise(
-    AsyncStorage.setItem(
-      'profile-store',
-      JSON.stringify({
-        state: { activeAccountIndex: accountIndex, profiles },
-        version: PROFILE_STORE_PERSIST_VERSION,
-      })
-    ),
-    (error) => (error instanceof Error ? error : new Error(String(error)))
-  );
-}
-
-/** The opt-in protocol awaits its explicit account-index write, including failures. */
-function activateProfileInMemory(accountIndex: number): void {
-  const profileOptions = useProfileStore.persist.getOptions();
-  useProfileStore.persist.setOptions({
-    storage: { getItem: () => null, setItem: () => {}, removeItem: () => {} },
-  });
-  try {
-    if (!useProfileStore.getState().switchProfile(accountIndex)) {
-      throw new Error('Profile activation failed');
-    }
-  } finally {
-    useProfileStore.persist.setOptions({ storage: profileOptions.storage });
-  }
-}
-
-async function teardownAndRestart(): Promise<boolean> {
-  usePopupStore.getState().destroySheet();
-  usePaymentStatusStore.getState().setActive(null);
-
-  const restarted = restartApp();
-  if (!restarted) {
-    log.error('profile.orchestrator.restart_failed');
-  }
-  return restarted;
-}
-
-// ── Synchronous in-memory guard (supplements the async AsyncStorage guard) ──
-let transitionInFlight = false;
-
-/**
- * coco's Manager.dispose() → NPC plugin shutdown awaits any in-flight sync
- * with NO timeout (BTC-14): a stalled sync would pin the profile switch on
- * the transition splash until the user force-kills (reported as a crash).
- * Bound the teardown wait — the native restart that follows reclaims
- * everything native-side anyway.
- */
-const COCO_CLEANUP_TIMEOUT_MS = 5_000;
-
-async function cleanupCocoWithTimeout(): Promise<void> {
-  let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
-  try {
-    await Promise.race([
-      CocoManager.cleanup(),
-      new Promise<void>((resolve) => {
-        timeoutHandle = setTimeout(() => {
-          log.warn('profile.orchestrator.cleanup_timeout', {
-            timeoutMs: COCO_CLEANUP_TIMEOUT_MS,
-          });
-          resolve();
-        }, COCO_CLEANUP_TIMEOUT_MS);
-      }),
-    ]);
-  } catch (error) {
-    log.warn('profile.orchestrator.cleanup_failed', { error: redactError(error) });
-  } finally {
-    if (timeoutHandle) clearTimeout(timeoutHandle);
-  }
-}
 
 // ── Public API ───────────────────────────────────────────────────
 
@@ -197,7 +62,7 @@ export async function switchToExistingProfile(opts: {
   resetStages?: TransitionControls['resetStages'];
   cancelResetStages?: TransitionControls['cancelResetStages'];
 }): Promise<boolean> {
-  if (transitionInFlight) {
+  if (isTransitionInFlight()) {
     log.warn('profile.orchestrator.switch_blocked_in_flight');
     return false;
   }
@@ -209,13 +74,13 @@ export async function switchToExistingProfile(opts: {
     });
     return false;
   }
-  transitionInFlight = true;
+  markTransitionInFlight(true);
 
-  const resetStages = opts.resetStages ?? registeredControls?.resetStages;
-  const cancelResetStages = opts.cancelResetStages ?? registeredControls?.cancelResetStages;
+  const resetStages = opts.resetStages ?? transitionControls()?.resetStages;
+  const cancelResetStages = opts.cancelResetStages ?? transitionControls()?.cancelResetStages;
 
   if (!(await beginTransition())) {
-    transitionInFlight = false;
+    markTransitionInFlight(false);
     return false;
   }
   try {
@@ -332,43 +197,26 @@ async function switchByRestart(
   return true;
 }
 
-/**
- * Unwind a transition that got past `beginTransition()` and cannot continue.
- *
- * All three pieces, always. `transitionInFlight` is module-level and the first
- * thing every switch checks, so a bail that only cancels the held stages
- * leaves it set and refuses EVERY later profile switch for the rest of the
- * session — the guard only clears on the next app start. This is what the
- * `catch` below already does; the early returns have to match it.
- */
-async function abandonTransition(
-  cancelResetStages: TransitionControls['cancelResetStages'] | undefined
-): Promise<void> {
-  cancelResetStages?.();
-  transitionInFlight = false;
-  await endTransition();
-}
-
 export async function createAndSwitchProfile(opts?: {
   getKeysForAccount?: KeyDerivationFn;
   resetStages?: TransitionControls['resetStages'];
   cancelResetStages?: TransitionControls['cancelResetStages'];
 }): Promise<boolean> {
-  const getKeysForAccount = opts?.getKeysForAccount ?? registeredKeyDerivation;
-  const resetStages = opts?.resetStages ?? registeredControls?.resetStages;
-  const cancelResetStages = opts?.cancelResetStages ?? registeredControls?.cancelResetStages;
+  const getKeysForAccount = opts?.getKeysForAccount ?? keyDerivation();
+  const resetStages = opts?.resetStages ?? transitionControls()?.resetStages;
+  const cancelResetStages = opts?.cancelResetStages ?? transitionControls()?.cancelResetStages;
 
-  if (transitionInFlight) return false;
-  transitionInFlight = true;
+  if (isTransitionInFlight()) return false;
+  markTransitionInFlight(true);
 
   if (!getKeysForAccount) {
     log.error('profile.orchestrator.no_key_derivation');
-    transitionInFlight = false;
+    markTransitionInFlight(false);
     return false;
   }
 
   if (!(await beginTransition())) {
-    transitionInFlight = false;
+    markTransitionInFlight(false);
     return false;
   }
   try {
@@ -420,8 +268,8 @@ export async function createAndSwitchProfile(opts?: {
 export async function recoverMnemonicSession(mnemonic: string): Promise<boolean> {
   if (!bip39.validateMnemonic(mnemonic, wordlist) || mnemonic.split(' ').length !== 12)
     return false;
-  if (transitionInFlight) return false;
-  transitionInFlight = true;
+  if (isTransitionInFlight()) return false;
+  markTransitionInFlight(true);
   try {
     const locked = useSecureStoreState.getState().secureStoreState === 'locked';
     const onboarding = !locked && !useSettingsStore.getState().hasSeenOnboarding;
@@ -478,7 +326,7 @@ export async function recoverMnemonicSession(mnemonic: string): Promise<boolean>
     nostrLog.warn('secure.mnemonic.recovery_failed');
     return false;
   } finally {
-    transitionInFlight = false;
+    markTransitionInFlight(false);
   }
 }
 
@@ -491,14 +339,14 @@ export async function deleteAllProfiles(opts?: {
   resetStages?: TransitionControls['resetStages'];
   cancelResetStages?: TransitionControls['cancelResetStages'];
 }): Promise<boolean> {
-  const resetStages = opts?.resetStages ?? registeredControls?.resetStages;
-  const cancelResetStages = opts?.cancelResetStages ?? registeredControls?.cancelResetStages;
+  const resetStages = opts?.resetStages ?? transitionControls()?.resetStages;
+  const cancelResetStages = opts?.cancelResetStages ?? transitionControls()?.cancelResetStages;
 
-  if (transitionInFlight) return false;
-  transitionInFlight = true;
+  if (isTransitionInFlight()) return false;
+  markTransitionInFlight(true);
 
   if (!(await beginTransition())) {
-    transitionInFlight = false;
+    markTransitionInFlight(false);
     return false;
   }
   try {
@@ -565,8 +413,8 @@ export async function deleteAllProfiles(opts?: {
 
 /** Single-profile removal shares admission with every account transition. */
 export async function removeInactiveProfile(accountIndex: number, importedKeyConfirmed = false) {
-  if (transitionInFlight) return { kind: 'refused', reason: 'busy' } as const;
-  transitionInFlight = true;
+  if (isTransitionInFlight()) return { kind: 'refused', reason: 'busy' } as const;
+  markTransitionInFlight(true);
   let admitted = false;
   try {
     if (!useProfileStore.persist.hasHydrated())
@@ -581,6 +429,6 @@ export async function removeInactiveProfile(accountIndex: number, importedKeyCon
     return { kind: 'refused', reason: 'unreadable' } as const;
   } finally {
     if (admitted) await endTransition();
-    transitionInFlight = false;
+    markTransitionInFlight(false);
   }
 }
