@@ -186,6 +186,14 @@ async function deleteFiles(name: string): Promise<void> {
   }
 }
 
+/**
+ * Delete the Nostr cache database of each account, by file. Used by delete-all:
+ * the cache is still open then, and unlinking the file does not need it closed.
+ */
+export async function deleteNostrCaches(accountIndexes: readonly number[]): Promise<void> {
+  for (const index of accountIndexes) await deleteFiles(nostrName(index));
+}
+
 export const profileRemovalPorts: RemovalPorts = {
   inventory: () => useProfileStore.getState(),
   inspect: inspectWallet,

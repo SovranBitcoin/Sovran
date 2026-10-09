@@ -368,6 +368,16 @@ export async function deleteAllProfiles(opts?: {
       log.warn('profile.orchestrator.wipe_whitenoise_failed', { error: redactError(e) });
     }
 
+    // The Nostr cache databases are named by account index, like the wallet
+    // ones. Left behind, the next identity created at index 0 would open the
+    // deleted identity's cache.
+    try {
+      const { deleteNostrCaches } = await import('./profileRemovalStorage');
+      await deleteNostrCaches(accountIndexes);
+    } catch (e) {
+      log.warn('profile.orchestrator.wipe_nostr_cache_failed', { error: redactError(e) });
+    }
+
     // 3b. Nuclear AsyncStorage wipe — every key, every store, everything.
     // Query caches first, so an in-flight read that completes after this
     // point is rejected by its generation guard instead of re-writing a key.
