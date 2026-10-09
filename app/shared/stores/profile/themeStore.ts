@@ -19,6 +19,7 @@ import { storeLog } from '@/shared/lib/logger';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
 import { PersistedThemeStore, ThemeMode } from '@sovranbitcoin/schemas';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
+import { withSkippedPersistWrites } from '@/shared/lib/persist/profileWriteBarrier';
 
 const profileStorage = createProfileScopedStorage();
 
@@ -105,7 +106,12 @@ export const useThemeStore = create<ThemeStore>({ name: 'theme-store', scope: 'p
         unitWallpapers: state.unitWallpapers,
         mode: state.mode,
       }),
-      afterHydrate: () => useThemeStore.setState({ _hasHydrated: true }),
+      // After a failed read the store holds defaults. Marking it hydrated must
+      // not persist them over the wallpaper choices that could not be read.
+      afterHydrate: (_state, error) =>
+        error
+          ? withSkippedPersistWrites(() => useThemeStore.setState({ _hasHydrated: true }))
+          : useThemeStore.setState({ _hasHydrated: true }),
     })
   )
 );
