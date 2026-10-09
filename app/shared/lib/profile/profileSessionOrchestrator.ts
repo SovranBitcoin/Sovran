@@ -41,8 +41,10 @@ import {
   isTransitionInFlight,
   keyDerivation,
   persistSwitchTargetToDisk,
+  settleWithin,
   splashControls,
   teardownAndRestart,
+  TIMED_OUT,
   type KeyDerivationFn,
   type TransitionControls,
 } from './profileTransition';
@@ -54,6 +56,10 @@ import {
 } from './inProcessProfileSwitch';
 
 // ── Public API ───────────────────────────────────────────────────
+
+/** Key derivation is slow on old phones; this is a ceiling, not an expectation. */
+const KEY_DERIVATION_TIMEOUT_MS = 30_000;
+const WALLET_CLOSE_TIMEOUT_MS = 10_000;
 
 export async function switchToExistingProfile(opts: {
   accountIndex: number;
@@ -224,9 +230,12 @@ export async function createAndSwitchProfile(opts?: {
 
     const profileStore = useProfileStore.getState();
     const nextIndex = profileStore.getNextAccountIndex();
-    const newKeys = await getKeysForAccount(nextIndex);
+    // Bounded: a derivation that never settles would hold the lock for good.
+    // Finishing late is harmless, it only stores keys for an index not in use.
+    const derived = await settleWithin(getKeysForAccount(nextIndex), KEY_DERIVATION_TIMEOUT_MS);
+    const newKeys = derived === TIMED_OUT ? null : derived;
     if (!newKeys?.pubkey) {
-      log.warn('profile.orchestrator.key_derivation_failed');
+      log.warn('profile.orchestrator.key_derivation_failed', { timedOut: derived === TIMED_OUT });
       await lock.release();
       return false;
     }
@@ -284,7 +293,12 @@ export async function recoverMnemonicSession(mnemonic: string): Promise<boolean>
         )
     )
       return false;
-    await CocoManager.cleanup();
+    // Bounded, and refused on a timeout: the phrase must not be replaced while
+    // the wallet opened under the old one may still be writing.
+    if ((await settleWithin(CocoManager.cleanup(), WALLET_CLOSE_TIMEOUT_MS)) === TIMED_OUT) {
+      log.warn('profile.orchestrator.recovery_cleanup_timeout');
+      return false;
+    }
 
     // Persist before restart without changing the current account scope mid-flight.
     const lifecycle = useWalletLifecycleStore.persist.getOptions();

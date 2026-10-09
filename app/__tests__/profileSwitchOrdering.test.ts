@@ -70,6 +70,7 @@ function setup() {
     switchToExistingProfile: orchestrator.switchToExistingProfile,
     createAndSwitchProfile: orchestrator.createAndSwitchProfile,
     deleteAllProfiles: orchestrator.deleteAllProfiles,
+    recoverMnemonicSession: orchestrator.recoverMnemonicSession,
     useProfileStore,
     mockRestart: jest.mocked(restartApp),
     AsyncStorage,
@@ -331,5 +332,51 @@ describe('deleteAllProfiles — a wipe that does not finish', () => {
 
     expect(alert).toHaveBeenCalledWith('Restart Required', expect.any(String), expect.any(Array));
     expect(await switchToExistingProfile({ accountIndex: 0 })).toBe(false);
+  });
+});
+
+describe('waits made while the lock is held are bounded', () => {
+  // The lock is one per runtime. A promise that never settles would keep it,
+  // and every other account flow would be refused until the app restarted.
+  beforeEach(() => jest.useFakeTimers());
+  afterEach(() => jest.useRealTimers());
+
+  it('gives up on a key derivation that never settles and frees the lock', async () => {
+    const { createAndSwitchProfile, switchToExistingProfile, useProfileStore, mockRestart } =
+      setup();
+    mockRestart.mockReturnValue(true);
+
+    const pending = createAndSwitchProfile({ getKeysForAccount: () => new Promise(() => {}) });
+    await jest.advanceTimersByTimeAsync(0);
+    await jest.advanceTimersByTimeAsync(31_000);
+
+    await expect(pending).resolves.toBe(false);
+    expect(useProfileStore.getState().profiles).toHaveLength(2);
+    expect(mockRestart).not.toHaveBeenCalled();
+    expect(await switchToExistingProfile({ accountIndex: 1 })).toBe(true);
+  });
+
+  it('refuses a recovery when the wallet does not close, and frees the lock', async () => {
+    const { recoverMnemonicSession, switchToExistingProfile, useProfileStore, mockRestart } =
+      setup();
+    mockRestart.mockReturnValue(true);
+    const { CocoManager } = require('@/shared/lib/cashu/manager') as {
+      CocoManager: Record<string, jest.Mock>;
+    };
+    CocoManager.cleanup.mockReturnValue(new Promise(() => {}));
+    const profiles = useProfileStore.getState().profiles;
+    useProfileStore.setState({ profiles: [] });
+
+    const pending = recoverMnemonicSession('abandon '.repeat(11) + 'about');
+    await jest.advanceTimersByTimeAsync(0);
+    await jest.advanceTimersByTimeAsync(11_000);
+
+    // The phrase is not replaced under a wallet that may still be writing.
+    await expect(pending).resolves.toBe(false);
+    expect(CocoManager.cleanup).toHaveBeenCalled();
+    expect(mockRestart).not.toHaveBeenCalled();
+    useProfileStore.setState({ profiles });
+    CocoManager.cleanup.mockResolvedValue(undefined);
+    expect(await switchToExistingProfile({ accountIndex: 1 })).toBe(true);
   });
 });
