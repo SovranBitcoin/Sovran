@@ -103,20 +103,19 @@ const PersistedProfileEntry = z.looseObject({
 });
 
 /**
- * Profile ceiling, shared by the schema and by `addProfile`.
+ * Profile ceiling, enforced by `addProfile` and nowhere else.
  *
- * One constant used at both ends. The schema declared 64 and `addProfile`
- * appended without a cap, so a 65th profile made the blob unparseable — and
- * `createMergeWithSchema` is all-or-nothing, so the next launch discarded the
- * GLOBAL profile store: every profile the user has, and the active index with
- * them. Refusing the 65th costs one profile; the old behaviour cost all
- * sixty-four.
+ * The schema must not carry it. `createMergeWithSchema` is all-or-nothing, so a
+ * list the schema rejects costs the GLOBAL profile store: every profile the
+ * user has, and the active index with them. Early releases appended without a
+ * cap, so a stored list may already be longer than this; it has to load.
+ * Refusing one more profile costs one profile.
  */
 export const MAX_PROFILES = 64;
 
 const PersistedProfileStore = z.object({
   activeAccountIndex: z.number().int().default(0),
-  profiles: z.array(PersistedProfileEntry).max(MAX_PROFILES).default([]),
+  profiles: z.array(PersistedProfileEntry).default([]),
 });
 
 /**
