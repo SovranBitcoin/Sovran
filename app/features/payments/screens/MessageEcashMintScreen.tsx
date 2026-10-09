@@ -166,7 +166,7 @@ export function MessageEcashMintScreen() {
           accessibilityLabel="No unclaimed ecash at this mint"
         />
       ) : null}
-      <View className="gap-2 px-4">
+      <View className="gap-2">
         {unclaimed.length === 0 ? (
           <Text size={14} color={paint.text.secondary} className="py-8 text-center">
             Nothing to receive from this mint.
