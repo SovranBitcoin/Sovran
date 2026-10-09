@@ -19,6 +19,7 @@ const ROUTE_FEATURE: Readonly<Record<string, Feature>> = {
   onchainReceive: 'onchain',
   sendToken: 'ecash',
   receiveToken: 'ecash',
+  messageEcash: 'ecashMessages',
   paymentRequest: 'paymentRequests',
   nearPay: 'nutDrop',
   nearPayPeers: 'nutDrop',

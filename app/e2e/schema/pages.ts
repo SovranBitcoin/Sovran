@@ -88,6 +88,7 @@ export const CANONICAL_PAGES = [
   'onchain-send',
   'payment-request',
   'profile-share',
+  'receive-message-ecash',
   'receive-rails',
   'settings-delete',
   'settings-design-system',

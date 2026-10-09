@@ -21,28 +21,31 @@ jest.mock('@/shared/providers/NostrKeysProvider', () => ({
 jest.mock('@/features/nearPay/lib/nutDropAutoRedeem', () => ({
   drainNutDropRedeemQueue: jest.fn(async () => undefined),
 }));
-jest.mock('@/shared/lib/cashu/utils', () => ({
-  buildReceiveHistoryEntry: (token: string, unit: string) => ({ token, unit }),
-}));
 jest.mock('@/features/payments/lib/dmEcashRecovery', () => ({
   ...jest.requireActual('@/features/payments/lib/dmEcashRecovery'),
   reconcileParkedMessageEcash: (owner: string, stillCurrent: () => boolean) =>
     mockReconcile(owner, stillCurrent),
 }));
-jest.mock('@/shared/ui/composed/AmountFormatter', () => ({ AmountFormatter: 'AmountFormatter' }));
 
-// The row and its frame have their own suites; here they are plain host
-// views so the test reads what this section decides: which rows, what words,
-// where a tap goes.
-jest.mock('@/shared/ui/composed/ListRow', () => {
+// The row has its own look; here it is a plain host view so the test reads
+// what this section decides: which rows, what words, where a tap goes.
+jest.mock('@/features/payments/components/MessageEcashRow', () => {
   const { createElement } = jest.requireActual<typeof import('react')>('react');
   return {
-    ListRow: (props: { testID: string; title: string; subtitle: string; onPress: () => void }) =>
+    MessageEcashRow: (props: {
+      testID: string;
+      title: string;
+      detail: string;
+      amount: number;
+      showPicture: boolean;
+      onPress: () => void;
+    }) =>
       createElement(
         'View',
-        { testID: props.testID, onPress: props.onPress },
+        { testID: props.testID, onPress: props.onPress, showPicture: props.showPicture },
         createElement('Text', null, props.title),
-        createElement('Text', null, props.subtitle)
+        createElement('Text', null, props.detail),
+        createElement('Text', null, `+${props.amount}`)
       ),
   };
 });
@@ -54,23 +57,29 @@ jest.mock('@/shared/ui/composed/Surface', () => {
     useSurfaceInset: () => 0,
   };
 });
-jest.mock('@/shared/ui/primitives/Text', () => ({ Text: 'Text' }));
-jest.mock('@/shared/hooks/useThemeColor', () => ({
-  useThemeColor: (tokens: string | readonly string[]) =>
-    Array.isArray(tokens) ? tokens.map(() => 'rgb(128,128,128)') : 'rgb(128,128,128)',
-}));
+jest.mock('@/shared/ui/composed/SectionHeading', () => {
+  const { createElement } = jest.requireActual<typeof import('react')>('react');
+  return {
+    SectionHeading: (props: { label: string }) => createElement('Text', null, props.label),
+  };
+});
 
 const store = () => useNutDropRedeemQueueStore.getState();
 
-function park(status: 'untrusted-mint' | 'failed') {
-  store().enqueue('abcdef0123', {
-    token: 'cashuBtoken',
-    mintUrl: 'https://mint.example',
-    amount: 21,
+function park(
+  tokenHash: string,
+  status: 'untrusted-mint' | 'failed',
+  mintUrl = 'https://mint.example',
+  amount = 21
+) {
+  store().enqueue(tokenHash, {
+    token: `cashuB${tokenHash}`,
+    mintUrl,
+    amount,
     unit: 'sat',
     source: 'nostr',
   });
-  store().markStatus('abcdef0123', status, 'parked');
+  store().markStatus(tokenHash, status, 'parked');
 }
 
 beforeEach(() => {
@@ -79,29 +88,41 @@ beforeEach(() => {
   mockReconcile.mockClear();
 });
 
-describe('message ecash that needs review', () => {
-  it('renders nothing, and checks nothing, when no token is parked', () => {
+describe('message ecash waiting to be received', () => {
+  it('renders nothing, and checks nothing, when no token is held', () => {
     render(<MessageEcashToReview />);
     expect(screen.queryByTestId('message-ecash-to-review')).toBeNull();
     expect(mockReconcile).not.toHaveBeenCalled();
   });
 
-  it('names the untrusted mint and opens the token in the receive screen', () => {
-    park('untrusted-mint');
+  it('shows one row per mint with the total held there', () => {
+    park('aaaa000001', 'untrusted-mint', 'https://mint.example', 21);
+    park('aaaa000002', 'untrusted-mint', 'https://mint.example', 100);
+    park('bbbb000001', 'failed', 'https://other.example', 5);
     render(<MessageEcashToReview />);
-    expect(screen.getByText('Needs your review')).toBeTruthy();
-    expect(screen.getByText(/Unknown mint · mint\.example/)).toBeTruthy();
-    fireEvent.press(screen.getByTestId('message-ecash-review-abcdef01'));
+    expect(screen.getByText('To receive')).toBeTruthy();
+    expect(screen.getAllByText('Receive all')).toHaveLength(2);
+    expect(screen.getByText('Unknown mint · mint.example · 2 payments')).toBeTruthy();
+    expect(screen.getByText('+121')).toBeTruthy();
+    expect(screen.getByText('other.example · 1 payment')).toBeTruthy();
+    expect(screen.getByText('+5')).toBeTruthy();
+  });
+
+  it("opens the mint's page, and keeps an unknown mint's picture unfetched", () => {
+    park('aaaa000001', 'untrusted-mint');
+    render(<MessageEcashToReview />);
+    const row = screen.getByTestId('message-ecash-mint-https-mint-example-sat');
+    expect(row.props.showPicture).toBe(false);
+    fireEvent.press(row);
     expect(mockNavigate).toHaveBeenCalledWith({
-      pathname: '/(receive-flow)/receiveToken',
-      params: { receiveHistoryEntry: JSON.stringify({ token: 'cashuBtoken', unit: 'sat' }) },
+      pathname: '/(receive-flow)/messageEcash',
+      params: { mintUrl: 'https://mint.example', unit: 'sat' },
     });
   });
 
-  it('re-checks parked tokens whenever the home regains focus', () => {
-    park('failed');
+  it('re-checks held tokens whenever the home regains focus', () => {
+    park('aaaa000001', 'failed');
     render(<MessageEcashToReview />);
-    expect(screen.getByText(/Not added · mint\.example/)).toBeTruthy();
     expect(mockReconcile).toHaveBeenCalledTimes(1);
   });
 });

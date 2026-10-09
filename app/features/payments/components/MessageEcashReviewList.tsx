@@ -1,73 +1,49 @@
 import { getMintDisplayName } from '@/shared/lib/url';
-import { useStylePaint } from '@/shared/styles/appStyle';
-import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
-import { ListRow } from '@/shared/ui/composed/ListRow';
 import { SectionHeading } from '@/shared/ui/composed/SectionHeading';
-import { Surface, useSurfaceInset } from '@/shared/ui/composed/Surface';
+import { Surface } from '@/shared/ui/composed/Surface';
 
-import type { ParkedMessageEcash } from '../lib/parkedMessageEcash';
+import type { ParkedMintGroup } from '../lib/parkedMessageEcash';
 
-/**
- * Reason first, mint second: the row truncates from the end, and the reason
- * is what tells the person why this needs them.
- */
-function subtitleFor(entry: ParkedMessageEcash): string {
-  const mint = getMintDisplayName(entry.mintUrl);
-  return entry.reason === 'untrusted-mint' ? `Unknown mint · ${mint}` : `Not added · ${mint}`;
+import { MessageEcashRow } from './MessageEcashRow';
+
+/** Mint first, then how much is behind the row. An unknown mint says so. */
+function detailFor(group: ParkedMintGroup): string {
+  const mint = getMintDisplayName(group.mintUrl);
+  const count = group.count === 1 ? '1 payment' : `${group.count} payments`;
+  return group.unknownMint ? `Unknown mint · ${mint} · ${count}` : `${mint} · ${count}`;
 }
 
-/** The section itself, given its tokens. Renders nothing for an empty list. */
+/**
+ * Message ecash waiting on the person, as a card of payments beside Pending
+ * and Confirmed: one row per mint, each standing for everything held there.
+ * Renders nothing for an empty list.
+ */
 export function MessageEcashReviewList({
-  entries,
+  groups,
   onOpen,
 }: {
-  entries: readonly ParkedMessageEcash[];
-  onOpen: (entry: ParkedMessageEcash) => void;
+  groups: readonly ParkedMintGroup[];
+  onOpen: (group: ParkedMintGroup) => void;
 }) {
-  if (entries.length === 0) return null;
+  if (groups.length === 0) return null;
 
   return (
     <Surface testID="message-ecash-to-review">
-      <SectionHeading label="Needs your review" />
-      {entries.map((entry) => (
-        <ReviewRow key={entry.tokenHash} entry={entry} onOpen={onOpen} />
+      <SectionHeading tone="status" label="To receive" detail="Ecash from messages" />
+      {groups.map((group) => (
+        <MessageEcashRow
+          key={group.key}
+          testID={`message-ecash-mint-${group.key.replace(/[^a-z0-9]+/gi, '-')}`}
+          mintUrl={group.mintUrl}
+          showPicture={!group.unknownMint}
+          amount={group.total}
+          unit={group.unit}
+          title="Receive all"
+          detail={detailFor(group)}
+          accessibilityLabel={`Receive all. ${detailFor(group)}`}
+          onPress={() => onOpen(group)}
+        />
       ))}
     </Surface>
-  );
-}
-
-function ReviewRow({
-  entry,
-  onOpen,
-}: {
-  entry: ParkedMessageEcash;
-  onOpen: (entry: ParkedMessageEcash) => void;
-}) {
-  const paint = useStylePaint();
-  // Inside the surface, so the row shares the heading's left edge.
-  const inset = useSurfaceInset();
-  return (
-    <ListRow
-      paddingHorizontal={inset}
-      testID={`message-ecash-review-${entry.tokenHash.slice(0, 8)}`}
-      iconCircle={{
-        icon: 'mdi:alert-circle-outline',
-        color: paint.text.primary,
-        backgroundColor: paint.chipFill,
-      }}
-      title="Ecash from a message"
-      subtitle={subtitleFor(entry)}
-      trailing={
-        <AmountFormatter
-          amount={entry.amount}
-          unit={entry.unit}
-          size={16}
-          weight="medium"
-          color={paint.text.primary}
-        />
-      }
-      onPress={() => onOpen(entry)}
-      accessibilityLabel={`Ecash from a message. ${subtitleFor(entry)}. Review`}
-    />
   );
 }

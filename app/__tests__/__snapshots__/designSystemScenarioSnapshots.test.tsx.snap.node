@@ -35450,15 +35450,30 @@ exports[`Design System exact structural snapshots renders wallet-controls/messag
           "children": [
             {
               "children": [
-                "Needs your review",
+                "To receive",
               ],
               "props": {
-                "className": "css-text-146c3p1",
+                "className": "css-text-146c3p1 r-maxWidth-dnmrzs r-overflow-1udh08x r-textOverflow-1udbk01 r-whiteSpace-3s2u2q r-wordWrap-1iln25a",
                 "dir": "auto",
                 "style": {
                   "color": "rgba(16,16,16,1.00)",
                   "fontFamily": "OxygenBold",
                   "fontSize": "16px",
+                },
+              },
+              "type": "div",
+            },
+            {
+              "children": [
+                "Ecash from messages",
+              ],
+              "props": {
+                "className": "css-text-146c3p1 r-maxWidth-dnmrzs r-overflow-1udh08x r-textOverflow-1udbk01 r-whiteSpace-3s2u2q r-wordWrap-1iln25a",
+                "dir": "auto",
+                "style": {
+                  "color": "rgba(16,16,16,0.66)",
+                  "fontFamily": "OxygenRegular",
+                  "fontSize": "12px",
                 },
               },
               "type": "div",
@@ -35488,10 +35503,10 @@ exports[`Design System exact structural snapshots renders wallet-controls/messag
                             {
                               "children": null,
                               "props": {
-                                "color": "rgb(16, 16, 16)",
+                                "color": "rgb(8, 8, 8)",
                                 "height": 20,
                                 "width": 20,
-                                "xml": "<svg viewBox="0 0 24 24" width="1em" height="1em" ><path fill="currentColor" d="M11 15h2v2h-2zm0-8h2v6h-2zm1-5C6.47 2 2 6.5 2 12a10 10 0 0 0 10 10a10 10 0 0 0 10-10A10 10 0 0 0 12 2m0 18a8 8 0 0 1-8-8a8 8 0 0 1 8-8a8 8 0 0 1 8 8a8 8 0 0 1-8 8"/></svg>",
+                                "xml": "<svg viewBox="0 0 24 24" width="1em" height="1em" ><path fill="currentColor" fill-rule="evenodd" d="M11.33 2.217a1.5 1.5 0 0 1 1.34 0l8.5 4.75A1.5 1.5 0 0 1 22 8.31v1.44c0 .69-.56 1.25-1.25 1.25H3.25C2.56 11 2 10.44 2 9.75V8.31a1.5 1.5 0 0 1 .83-1.343zM13 7a1 1 0 1 1-2 0a1 1 0 0 1 2 0" clip-rule="evenodd"/><path fill="currentColor" d="M7 11H4v8H3a1 1 0 1 0 0 2h18a1 1 0 1 0 0-2h-1v-8h-3v8h-2v-5a1 1 0 1 0-2 0v5h-2v-5a1 1 0 1 0-2 0v5H7z"/></svg>",
                               },
                               "type": "SvgXml",
                             },
@@ -35504,49 +35519,74 @@ exports[`Design System exact structural snapshots renders wallet-controls/messag
                         },
                       ],
                       "props": {
-                        "className": "css-view-g5y9jx r-alignItems-1awozwy r-justifyContent-1777fci",
+                        "aria-label": "mint.minibits.cash icon",
+                        "className": "css-view-g5y9jx r-alignItems-1awozwy r-justifyContent-1777fci r-overflow-1udh08x",
                         "dir": null,
+                        "role": "img",
                         "style": {
-                          "backgroundColor": "rgba(213,213,213,1.00)",
-                          "borderBottomLeftRadius": "22px",
-                          "borderBottomRightRadius": "22px",
-                          "borderTopLeftRadius": "22px",
-                          "borderTopRightRadius": "22px",
-                          "height": "44px",
-                          "width": "44px",
+                          "backgroundColor": "rgba(96,96,96,1.00)",
+                          "borderBottomLeftRadius": "14px",
+                          "borderBottomRightRadius": "14px",
+                          "borderTopLeftRadius": "14px",
+                          "borderTopRightRadius": "14px",
+                          "height": "28px",
+                          "width": "28px",
                         },
                       },
                       "type": "div",
                     },
+                  ],
+                  "props": {
+                    "className": "css-view-g5y9jx",
+                    "dir": null,
+                  },
+                  "type": "div",
+                },
+                {
+                  "children": [
                     {
                       "children": [
                         {
                           "children": [
-                            "Ecash from a message",
+                            "Receive all",
                           ],
                           "props": {
-                            "className": "css-text-146c3p1 r-maxWidth-dnmrzs r-overflow-1udh08x r-textOverflow-1udbk01 r-whiteSpace-3s2u2q r-wordWrap-1iln25a",
+                            "className": "css-text-146c3p1",
                             "dir": "auto",
                             "style": {
                               "color": "rgba(16,16,16,1.00)",
                               "fontFamily": "OxygenBold",
-                              "fontSize": "16px",
+                              "fontSize": "14px",
                             },
                           },
                           "type": "div",
                         },
                         {
                           "children": [
-                            "Unknown mint · mint.minibits.cash",
+                            {
+                              "children": [
+                                "+ ₿ 2,100",
+                              ],
+                              "props": {
+                                "className": "css-text-146c3p1",
+                                "dir": "auto",
+                                "style": {
+                                  "color": "rgba(32,128,72,1.00)",
+                                  "fontFamily": "MonaSans-Black",
+                                  "fontSize": "16px",
+                                  "marginBottom": "0px",
+                                  "marginLeft": "0px",
+                                  "marginRight": "0px",
+                                  "marginTop": "0px",
+                                  "textAlign": "left",
+                                },
+                              },
+                              "type": "div",
+                            },
                           ],
                           "props": {
-                            "className": "css-text-146c3p1 r-maxWidth-dnmrzs r-overflow-1udh08x r-textOverflow-1udbk01 r-whiteSpace-3s2u2q r-wordWrap-1iln25a",
-                            "dir": "auto",
-                            "style": {
-                              "color": "rgba(16,16,16,0.66)",
-                              "fontFamily": "OxygenRegular",
-                              "fontSize": "14px",
-                            },
+                            "className": "css-view-g5y9jx",
+                            "dir": null,
                           },
                           "type": "div",
                         },
@@ -35554,11 +35594,6 @@ exports[`Design System exact structural snapshots renders wallet-controls/messag
                       "props": {
                         "className": "css-view-g5y9jx",
                         "dir": null,
-                        "style": {
-                          "flex": 1,
-                          "flexDirection": "column",
-                          "gap": "2px",
-                        },
                       },
                       "type": "div",
                     },
@@ -35566,20 +35601,30 @@ exports[`Design System exact structural snapshots renders wallet-controls/messag
                       "children": [
                         {
                           "children": [
-                            "₿ 2,100",
+                            "Unknown mint · mint.minibits.cash · 3 payments",
+                          ],
+                          "props": {
+                            "className": "css-text-146c3p1 r-maxWidth-dnmrzs r-overflow-1udh08x r-textOverflow-1udbk01 r-whiteSpace-3s2u2q r-wordWrap-1iln25a",
+                            "dir": "auto",
+                            "style": {
+                              "color": "rgba(16,16,16,0.80)",
+                              "fontFamily": "OxygenRegular",
+                              "fontSize": "10px",
+                            },
+                          },
+                          "type": "div",
+                        },
+                        {
+                          "children": [
+                            "$1.34",
                           ],
                           "props": {
                             "className": "css-text-146c3p1",
                             "dir": "auto",
                             "style": {
-                              "color": "rgba(16,16,16,1.00)",
-                              "fontFamily": "MonaSans-Medium",
-                              "fontSize": "16px",
-                              "marginBottom": "0px",
-                              "marginLeft": "0px",
-                              "marginRight": "0px",
-                              "marginTop": "0px",
-                              "textAlign": "left",
+                              "color": "rgba(16,16,16,0.80)",
+                              "fontFamily": "OverpassBold",
+                              "fontSize": "10px",
                             },
                           },
                           "type": "div",
@@ -35595,45 +35640,30 @@ exports[`Design System exact structural snapshots renders wallet-controls/messag
                   "props": {
                     "className": "css-view-g5y9jx",
                     "dir": null,
-                    "style": {
-                      "alignItems": "center",
-                      "flexDirection": "row",
-                      "gap": "12px",
-                      "paddingBottom": "12px",
-                      "paddingLeft": "16px",
-                      "paddingRight": "16px",
-                      "paddingTop": "12px",
-                    },
                   },
                   "type": "div",
                 },
               ],
               "props": {
-                "testID": "pressable-feedback-scale",
+                "className": "css-view-g5y9jx",
+                "dir": null,
               },
-              "type": "View",
-            },
-            {
-              "children": null,
-              "props": {
-                "testID": "pressable-feedback-ripple",
-              },
-              "type": "View",
+              "type": "div",
             },
           ],
           "props": {
-            "accessibilityLabel": "Ecash from a message. Unknown mint · mint.minibits.cash. Review",
-            "accessibilityRole": "button",
-            "accessibilityState": {
-              "disabled": false,
+            "aria-label": "Receive all. Unknown mint · mint.minibits.cash · 3 payments",
+            "className": "css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73",
+            "data-testid": "message-ecash-mint-untrusted-designsystem",
+            "dir": null,
+            "role": "button",
+            "style": {
+              "opacity": 1,
             },
-            "isDisabled": false,
-            "style": [
-              false,
-            ],
-            "testID": "message-ecash-review-untruste",
+            "tabIndex": 0,
+            "type": "button",
           },
-          "type": "View",
+          "type": "button",
         },
         {
           "children": [
@@ -35648,10 +35678,10 @@ exports[`Design System exact structural snapshots renders wallet-controls/messag
                             {
                               "children": null,
                               "props": {
-                                "color": "rgb(16, 16, 16)",
+                                "color": "rgb(8, 8, 8)",
                                 "height": 20,
                                 "width": 20,
-                                "xml": "<svg viewBox="0 0 24 24" width="1em" height="1em" ><path fill="currentColor" d="M11 15h2v2h-2zm0-8h2v6h-2zm1-5C6.47 2 2 6.5 2 12a10 10 0 0 0 10 10a10 10 0 0 0 10-10A10 10 0 0 0 12 2m0 18a8 8 0 0 1-8-8a8 8 0 0 1 8-8a8 8 0 0 1 8 8a8 8 0 0 1-8 8"/></svg>",
+                                "xml": "<svg viewBox="0 0 24 24" width="1em" height="1em" ><path fill="currentColor" fill-rule="evenodd" d="M11.33 2.217a1.5 1.5 0 0 1 1.34 0l8.5 4.75A1.5 1.5 0 0 1 22 8.31v1.44c0 .69-.56 1.25-1.25 1.25H3.25C2.56 11 2 10.44 2 9.75V8.31a1.5 1.5 0 0 1 .83-1.343zM13 7a1 1 0 1 1-2 0a1 1 0 0 1 2 0" clip-rule="evenodd"/><path fill="currentColor" d="M7 11H4v8H3a1 1 0 1 0 0 2h18a1 1 0 1 0 0-2h-1v-8h-3v8h-2v-5a1 1 0 1 0-2 0v5h-2v-5a1 1 0 1 0-2 0v5H7z"/></svg>",
                               },
                               "type": "SvgXml",
                             },
@@ -35664,49 +35694,74 @@ exports[`Design System exact structural snapshots renders wallet-controls/messag
                         },
                       ],
                       "props": {
-                        "className": "css-view-g5y9jx r-alignItems-1awozwy r-justifyContent-1777fci",
+                        "aria-label": "mint.sovran.example icon",
+                        "className": "css-view-g5y9jx r-alignItems-1awozwy r-justifyContent-1777fci r-overflow-1udh08x",
                         "dir": null,
+                        "role": "img",
                         "style": {
-                          "backgroundColor": "rgba(213,213,213,1.00)",
-                          "borderBottomLeftRadius": "22px",
-                          "borderBottomRightRadius": "22px",
-                          "borderTopLeftRadius": "22px",
-                          "borderTopRightRadius": "22px",
-                          "height": "44px",
-                          "width": "44px",
+                          "backgroundColor": "rgba(96,96,96,1.00)",
+                          "borderBottomLeftRadius": "14px",
+                          "borderBottomRightRadius": "14px",
+                          "borderTopLeftRadius": "14px",
+                          "borderTopRightRadius": "14px",
+                          "height": "28px",
+                          "width": "28px",
                         },
                       },
                       "type": "div",
                     },
+                  ],
+                  "props": {
+                    "className": "css-view-g5y9jx",
+                    "dir": null,
+                  },
+                  "type": "div",
+                },
+                {
+                  "children": [
                     {
                       "children": [
                         {
                           "children": [
-                            "Ecash from a message",
+                            "Receive all",
                           ],
                           "props": {
-                            "className": "css-text-146c3p1 r-maxWidth-dnmrzs r-overflow-1udh08x r-textOverflow-1udbk01 r-whiteSpace-3s2u2q r-wordWrap-1iln25a",
+                            "className": "css-text-146c3p1",
                             "dir": "auto",
                             "style": {
                               "color": "rgba(16,16,16,1.00)",
                               "fontFamily": "OxygenBold",
-                              "fontSize": "16px",
+                              "fontSize": "14px",
                             },
                           },
                           "type": "div",
                         },
                         {
                           "children": [
-                            "Not added · mint.sovran.example",
+                            {
+                              "children": [
+                                "+ ₿ 21",
+                              ],
+                              "props": {
+                                "className": "css-text-146c3p1",
+                                "dir": "auto",
+                                "style": {
+                                  "color": "rgba(32,128,72,1.00)",
+                                  "fontFamily": "MonaSans-Black",
+                                  "fontSize": "16px",
+                                  "marginBottom": "0px",
+                                  "marginLeft": "0px",
+                                  "marginRight": "0px",
+                                  "marginTop": "0px",
+                                  "textAlign": "left",
+                                },
+                              },
+                              "type": "div",
+                            },
                           ],
                           "props": {
-                            "className": "css-text-146c3p1 r-maxWidth-dnmrzs r-overflow-1udh08x r-textOverflow-1udbk01 r-whiteSpace-3s2u2q r-wordWrap-1iln25a",
-                            "dir": "auto",
-                            "style": {
-                              "color": "rgba(16,16,16,0.66)",
-                              "fontFamily": "OxygenRegular",
-                              "fontSize": "14px",
-                            },
+                            "className": "css-view-g5y9jx",
+                            "dir": null,
                           },
                           "type": "div",
                         },
@@ -35714,11 +35769,6 @@ exports[`Design System exact structural snapshots renders wallet-controls/messag
                       "props": {
                         "className": "css-view-g5y9jx",
                         "dir": null,
-                        "style": {
-                          "flex": 1,
-                          "flexDirection": "column",
-                          "gap": "2px",
-                        },
                       },
                       "type": "div",
                     },
@@ -35726,20 +35776,30 @@ exports[`Design System exact structural snapshots renders wallet-controls/messag
                       "children": [
                         {
                           "children": [
-                            "₿ 21",
+                            "mint.sovran.example · 1 payment",
+                          ],
+                          "props": {
+                            "className": "css-text-146c3p1 r-maxWidth-dnmrzs r-overflow-1udh08x r-textOverflow-1udbk01 r-whiteSpace-3s2u2q r-wordWrap-1iln25a",
+                            "dir": "auto",
+                            "style": {
+                              "color": "rgba(16,16,16,0.80)",
+                              "fontFamily": "OxygenRegular",
+                              "fontSize": "10px",
+                            },
+                          },
+                          "type": "div",
+                        },
+                        {
+                          "children": [
+                            "$0.01",
                           ],
                           "props": {
                             "className": "css-text-146c3p1",
                             "dir": "auto",
                             "style": {
-                              "color": "rgba(16,16,16,1.00)",
-                              "fontFamily": "MonaSans-Medium",
-                              "fontSize": "16px",
-                              "marginBottom": "0px",
-                              "marginLeft": "0px",
-                              "marginRight": "0px",
-                              "marginTop": "0px",
-                              "textAlign": "left",
+                              "color": "rgba(16,16,16,0.80)",
+                              "fontFamily": "OverpassBold",
+                              "fontSize": "10px",
                             },
                           },
                           "type": "div",
@@ -35755,45 +35815,30 @@ exports[`Design System exact structural snapshots renders wallet-controls/messag
                   "props": {
                     "className": "css-view-g5y9jx",
                     "dir": null,
-                    "style": {
-                      "alignItems": "center",
-                      "flexDirection": "row",
-                      "gap": "12px",
-                      "paddingBottom": "12px",
-                      "paddingLeft": "16px",
-                      "paddingRight": "16px",
-                      "paddingTop": "12px",
-                    },
                   },
                   "type": "div",
                 },
               ],
               "props": {
-                "testID": "pressable-feedback-scale",
+                "className": "css-view-g5y9jx",
+                "dir": null,
               },
-              "type": "View",
-            },
-            {
-              "children": null,
-              "props": {
-                "testID": "pressable-feedback-ripple",
-              },
-              "type": "View",
+              "type": "div",
             },
           ],
           "props": {
-            "accessibilityLabel": "Ecash from a message. Not added · mint.sovran.example. Review",
-            "accessibilityRole": "button",
-            "accessibilityState": {
-              "disabled": false,
+            "aria-label": "Receive all. mint.sovran.example · 1 payment",
+            "className": "css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73",
+            "data-testid": "message-ecash-mint-failed-designsystem",
+            "dir": null,
+            "role": "button",
+            "style": {
+              "opacity": 1,
             },
-            "isDisabled": false,
-            "style": [
-              false,
-            ],
-            "testID": "message-ecash-review-failed-d",
+            "tabIndex": 0,
+            "type": "button",
           },
-          "type": "View",
+          "type": "button",
         },
       ],
       "props": {

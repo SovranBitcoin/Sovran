@@ -256,21 +256,25 @@ export function WalletScreen() {
               styles.content,
               { gap: style.space.group, paddingHorizontal: style.space.gutter },
             ]}>
-            {hasFeature('ecashMessages') ? <MessageEcashToReview /> : null}
-            <LayoutShiftProbe tag="transactions">
-              <Transactions
-                account={ALL_UNITS_ACCOUNT}
-                showMore={true}
-                history={history}
-                hideExpired={true}
-                onVisiblePendingEcashChange={
-                  __DEV__
-                    ? (entries) =>
-                        walletLog.info('wallet.layout.pending_visible', { count: entries.length })
-                    : undefined
-                }
-              />
-            </LayoutShiftProbe>
+            {/* Ecash waiting to be received is one more card of payments, so it
+                sits at the list's own step from Pending, not a section away. */}
+            <View style={styles.payments}>
+              {hasFeature('ecashMessages') ? <MessageEcashToReview /> : null}
+              <LayoutShiftProbe tag="transactions">
+                <Transactions
+                  account={ALL_UNITS_ACCOUNT}
+                  showMore={true}
+                  history={history}
+                  hideExpired={true}
+                  onVisiblePendingEcashChange={
+                    __DEV__
+                      ? (entries) =>
+                          walletLog.info('wallet.layout.pending_visible', { count: entries.length })
+                      : undefined
+                  }
+                />
+              </LayoutShiftProbe>
+            </View>
             {/* A month of nothing is two empty charts. They appear with the
                 first payment. */}
             {history.length > 0 ? (
@@ -294,6 +298,8 @@ export function WalletScreen() {
 }
 
 const styles = StyleSheet.create({
+  // The step `Transactions` keeps between its own cards.
+  payments: { gap: 8 },
   scrollContent: {
     flexGrow: 1,
     padding: 0,

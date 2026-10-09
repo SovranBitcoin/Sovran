@@ -14,6 +14,23 @@ export interface ParkedMessageEcash {
   amount: number;
   unit: string;
   reason: 'untrusted-mint' | 'failed';
+  receivedAt: number;
+}
+
+/** Message ecash that is not in the wallet yet: held, or on its way in. */
+export interface UnclaimedMessageEcash extends Omit<ParkedMessageEcash, 'reason'> {
+  state: ParkedMessageEcash['reason'] | 'receiving';
+}
+
+/** One mint's held tokens in one unit: what a single "Receive all" covers. */
+export interface ParkedMintGroup {
+  key: string;
+  mintUrl: string;
+  unit: string;
+  total: number;
+  count: number;
+  /** True when the wallet does not trust this mint yet. */
+  unknownMint: boolean;
 }
 
 type QueueEntries = ReturnType<typeof useNutDropRedeemQueueStore.getState>['byTokenHash'];
@@ -31,9 +48,63 @@ export function parkedMessageEcash(entries: QueueEntries): ParkedMessageEcash[] 
       amount: entry.amount,
       unit: entry.unit,
       reason: entry.status,
+      receivedAt: entry.receivedAt,
     });
   }
   return parked;
+}
+
+/**
+ * Held tokens gathered by mint and unit, in the order each mint first appears.
+ * A total is only meaningful within one unit, so a mint holding two units is
+ * two groups.
+ */
+export function parkedMintGroups(parked: readonly ParkedMessageEcash[]): ParkedMintGroup[] {
+  const groups = new Map<string, ParkedMintGroup>();
+  for (const entry of parked) {
+    const key = `${entry.mintUrl}|${entry.unit}`;
+    const group = groups.get(key) ?? {
+      key,
+      mintUrl: entry.mintUrl,
+      unit: entry.unit,
+      total: 0,
+      count: 0,
+      unknownMint: false,
+    };
+    group.total += entry.amount;
+    group.count += 1;
+    if (entry.reason === 'untrusted-mint') group.unknownMint = true;
+    groups.set(key, group);
+  }
+  return [...groups.values()];
+}
+
+/**
+ * Every message token of one mint and unit that has not reached the wallet,
+ * newest first. Tokens being received stay listed, so a batch does not empty
+ * the page while it runs.
+ */
+export function unclaimedMessageEcash(
+  entries: QueueEntries,
+  mintUrl: string,
+  unit: string
+): UnclaimedMessageEcash[] {
+  const unclaimed: UnclaimedMessageEcash[] = [];
+  for (const [tokenHash, entry] of Object.entries(entries)) {
+    if (entry.source !== 'nostr' || entry.mintUrl !== mintUrl || entry.unit !== unit) continue;
+    if (entry.status === 'redeemed' || entry.status === 'spent') continue;
+    unclaimed.push({
+      tokenHash,
+      token: entry.token,
+      mintUrl: entry.mintUrl,
+      amount: entry.amount,
+      unit: entry.unit,
+      receivedAt: entry.receivedAt,
+      state:
+        entry.status === 'untrusted-mint' || entry.status === 'failed' ? entry.status : 'receiving',
+    });
+  }
+  return unclaimed.sort((a, b) => b.receivedAt - a.receivedAt);
 }
 
 /** Nostr-delivered entries the orchestrator still has work to do on. */

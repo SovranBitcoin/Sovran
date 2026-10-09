@@ -61,29 +61,29 @@ const DETAIL_ITEMS = [
   { title: 'State', value: 'PAID' },
 ];
 
-const PARKED_MESSAGE_ECASH = [
+const PARKED_MINT_GROUPS = [
   {
-    tokenHash: 'untrusted-designsystem',
-    token: '',
+    key: 'untrusted-designsystem',
     mintUrl: 'https://mint.minibits.cash/Bitcoin',
-    amount: 2_100,
     unit: 'sat',
-    reason: 'untrusted-mint',
+    total: 2_100,
+    count: 3,
+    unknownMint: true,
   },
   {
-    tokenHash: 'failed-designsystem',
-    token: '',
+    key: 'failed-designsystem',
     mintUrl: 'https://mint.sovran.example',
-    amount: 21,
     unit: 'sat',
-    reason: 'failed',
+    total: 21,
+    count: 1,
+    unknownMint: false,
   },
 ] as const;
 
 function MessageEcashReviewPreview() {
   const { MessageEcashReviewList } =
     require('@/features/payments/components/MessageEcashReviewList') as typeof import('@/features/payments/components/MessageEcashReviewList');
-  return <MessageEcashReviewList entries={PARKED_MESSAGE_ECASH} onOpen={noop} />;
+  return <MessageEcashReviewList groups={PARKED_MINT_GROUPS} onOpen={noop} />;
 }
 
 function AmountSatModesPreview() {

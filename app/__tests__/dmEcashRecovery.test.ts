@@ -1,17 +1,26 @@
 /** @jest-environment node */
 import {
   markMessageEcashReviewed,
+  receiveAllMessageEcash,
   reconcileParkedMessageEcash,
 } from '@/features/payments/lib/dmEcashRecovery';
 import {
   hasDrainableMessageEcash,
   parkedMessageEcash,
+  parkedMintGroups,
+  unclaimedMessageEcash,
 } from '@/features/payments/lib/parkedMessageEcash';
 import { useNutDropRedeemQueueStore } from '@/shared/stores/profile/nutDropRedeemQueueStore';
 
 const mockIsTokenSpent = jest.fn();
 const mockIsTrustedMint = jest.fn();
-const mockManager = { mint: { isTrustedMint: (url: string) => mockIsTrustedMint(url) } };
+const mockAddMint = jest.fn();
+const mockManager = {
+  mint: {
+    isTrustedMint: (url: string) => mockIsTrustedMint(url),
+    addMint: (url: string, options: { trusted: true }) => mockAddMint(url, options),
+  },
+};
 
 jest.mock('@/shared/lib/routstr/spentProbe', () => ({
   isTokenSpent: (...args: unknown[]) => mockIsTokenSpent(...args),
@@ -40,6 +49,7 @@ beforeEach(() => {
   useNutDropRedeemQueueStore.setState({ byTokenHash: {} });
   mockIsTokenSpent.mockReset().mockResolvedValue(false);
   mockIsTrustedMint.mockReset().mockResolvedValue(false);
+  mockAddMint.mockReset().mockResolvedValue({});
 });
 
 describe('message ecash the queue has parked', () => {
@@ -159,5 +169,90 @@ describe('requeue', () => {
     store().markStatus('a', 'spent');
     store().requeue('a');
     expect(store().byTokenHash.a?.status).toBe('spent');
+  });
+});
+
+describe("taking one mint's held message ecash together", () => {
+  const OTHER = 'https://other.example';
+  const statusOf = (hash: string) => store().byTokenHash[hash]?.status;
+
+  function parkAt(hash: string, mintUrl: string, status: 'untrusted-mint' | 'failed' = 'failed') {
+    store().enqueue(hash, {
+      token: `token-${hash}`,
+      mintUrl,
+      amount: 10,
+      unit: 'sat',
+      source: 'nostr',
+    });
+    store().markStatus(hash, status, 'parked');
+  }
+
+  it('groups held tokens by mint, with a total and whether the mint is unknown', () => {
+    park('a', 'untrusted-mint', 'nostr');
+    park('b', 'untrusted-mint', 'nostr');
+    parkAt('c', OTHER);
+    expect(parkedMintGroups(parkedMessageEcash(store().byTokenHash))).toEqual([
+      expect.objectContaining({
+        mintUrl: 'https://mint.example',
+        total: 42,
+        count: 2,
+        unknownMint: true,
+      }),
+      expect.objectContaining({ mintUrl: OTHER, total: 10, count: 1, unknownMint: false }),
+    ]);
+  });
+
+  it("trusts the mint, then puts only that mint's tokens back in line", async () => {
+    park('a', 'untrusted-mint', 'nostr');
+    park('b', 'failed', 'nostr');
+    parkAt('c', OTHER, 'untrusted-mint');
+    await expect(
+      receiveAllMessageEcash(ME, 'https://mint.example', 'sat', () => true)
+    ).resolves.toBe(2);
+    expect(mockAddMint).toHaveBeenCalledTimes(1);
+    expect(mockAddMint).toHaveBeenCalledWith('https://mint.example', { trusted: true });
+    expect(statusOf('a')).toBe('pending');
+    expect(statusOf('b')).toBe('pending');
+    expect(statusOf('c')).toBe('untrusted-mint');
+  });
+
+  it('does not add a mint the wallet already trusts', async () => {
+    mockIsTrustedMint.mockResolvedValue(true);
+    park('a', 'failed', 'nostr');
+    await receiveAllMessageEcash(ME, 'https://mint.example', 'sat', () => true);
+    expect(mockAddMint).not.toHaveBeenCalled();
+    expect(statusOf('a')).toBe('pending');
+  });
+
+  it('requeues nothing when the mint cannot be added', async () => {
+    mockAddMint.mockRejectedValue(new Error('unreachable'));
+    park('a', 'untrusted-mint', 'nostr');
+    await expect(
+      receiveAllMessageEcash(ME, 'https://mint.example', 'sat', () => true)
+    ).rejects.toThrow('unreachable');
+    expect(statusOf('a')).toBe('untrusted-mint');
+  });
+
+  it('writes nothing once the page it was asked from has gone', async () => {
+    park('a', 'untrusted-mint', 'nostr');
+    await expect(
+      receiveAllMessageEcash(ME, 'https://mint.example', 'sat', () => false)
+    ).resolves.toBe(0);
+    expect(statusOf('a')).toBe('untrusted-mint');
+  });
+
+  it("keeps a token being received on the mint's page until it lands", () => {
+    park('a', 'untrusted-mint', 'nostr');
+    park('b', 'failed', 'nostr');
+    store().requeue('b');
+    park('gone', 'failed', 'nostr');
+    store().requeue('gone');
+    store().markStatus('gone', 'redeemed');
+    parkAt('elsewhere', OTHER);
+    const listed = unclaimedMessageEcash(store().byTokenHash, 'https://mint.example', 'sat');
+    expect(listed.map((entry) => [entry.tokenHash, entry.state]).sort()).toEqual([
+      ['a', 'untrusted-mint'],
+      ['b', 'receiving'],
+    ]);
   });
 });

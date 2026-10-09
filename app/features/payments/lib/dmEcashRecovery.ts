@@ -7,6 +7,8 @@
  *
  *  - `parkedMessageEcash` is what the wallet home lists, so the person can open
  *    the token in the ordinary receive screen, add the mint, and redeem.
+ *  - `receiveAllMessageEcash` is the person's decision to take one mint's
+ *    held tokens: it trusts that mint and puts each token back in line.
  *  - `reconcileParkedMessageEcash` puts an entry back in line when its mint
  *    has since been trusted, and clears one whose token was redeemed by hand.
  */
@@ -27,6 +29,36 @@ const reviewKey = (ownerPubkey: string, tokenHash: string) => `${ownerPubkey}:${
 
 export function markMessageEcashReviewed(ownerPubkey: string, tokenHash: string): void {
   reviewed.add(reviewKey(ownerPubkey, tokenHash));
+}
+
+/**
+ * Take every held token of one mint and unit. Trusting the mint is the
+ * person's choice, made on a page that names it; the redeem queue then
+ * receives the tokens as it does any other, one at a time. Returns how many
+ * went back in line. Throws when the mint cannot be added, with nothing
+ * requeued.
+ */
+export async function receiveAllMessageEcash(
+  ownerPubkey: string,
+  mintUrl: string,
+  unit: string,
+  stillCurrent: () => boolean
+): Promise<number> {
+  if (!CocoManager.isInitialized()) throw new Error('Wallet is not ready');
+  const manager = CocoManager.getInstance();
+  const held = parkedMessageEcash(useNutDropRedeemQueueStore.getState().byTokenHash).filter(
+    (entry) => entry.mintUrl === mintUrl && entry.unit === unit
+  );
+  if (held.length === 0) return 0;
+  if (!(await manager.mint.isTrustedMint(mintUrl))) {
+    await manager.mint.addMint(mintUrl, { trusted: true });
+  }
+  if (!stillCurrent() || CocoManager.getInstance() !== manager) return 0;
+  for (const entry of held) {
+    markMessageEcashReviewed(ownerPubkey, entry.tokenHash);
+    useNutDropRedeemQueueStore.getState().requeue(entry.tokenHash);
+  }
+  return held.length;
 }
 
 /**

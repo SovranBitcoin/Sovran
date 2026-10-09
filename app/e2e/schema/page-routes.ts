@@ -64,6 +64,7 @@ export const PAGE_ROUTES: Partial<Record<(typeof CANONICAL_PAGES)[number], reado
     'paymentRequest.tsx',
   ],
   'receive-qr': ['(receive-flow)/qrDisplay.tsx'],
+  'receive-message-ecash': ['(receive-flow)/messageEcash.tsx'],
   'receive-rails': ['(receive-flow)/railList.tsx'],
   receive: ['(receive-flow)/receive.tsx'],
   'receive-token': [
