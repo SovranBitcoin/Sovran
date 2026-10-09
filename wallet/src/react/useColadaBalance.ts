@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useSyncExternalStore } from "react";
 import { Amount, type Manager } from "@cashu/coco-core";
 
 import { logger } from "../logger";
@@ -9,6 +9,7 @@ import {
   type WalletBalanceBreakdown,
 } from "../balance/breakdown";
 import { useColadaManager } from "./ColadaProvider";
+import { createSharedReadStore, type SharedReadStore } from "./sharedReadStore";
 
 // Pending sends are recent; the first history page is enough to total them
 // (matches how the app previously filtered usePaginatedHistory()).
@@ -93,25 +94,48 @@ export function useColadaBalance(
 ): WalletBalanceBreakdown {
   const manager = useColadaManager();
 
-  const [snapshot, setSnapshot] = useState(() => ({
-    manager,
-    unit,
-    includeMint,
-    balance: emptyBalanceBreakdown(),
-  }));
-  const balance = useMemo(
-    () =>
-      snapshot.manager === manager &&
-      snapshot.unit === unit &&
-      snapshot.includeMint === includeMint
-        ? snapshot.balance
-        : emptyBalanceBreakdown(),
-    [snapshot, manager, unit, includeMint],
-  );
+  const store = balanceStore(manager, unit, includeMint);
+  return useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
+}
 
-  useEffect(() => {
-    // Scope the queue to this manager and unit. Cleanup invalidates both the
-    // current read and any trailing refresh before a new scope starts reading.
+// Predicate keys are weak too: a retired caller's predicate must not stay
+// alive for the manager's lifetime. Inactive stores retain only an empty value.
+const balances = new WeakMap<Manager, Map<string, {
+  all: SharedReadStore<WalletBalanceBreakdown>;
+  filtered: WeakMap<(mintUrl: string) => boolean, SharedReadStore<WalletBalanceBreakdown>>;
+}>>();
+
+function balanceStore(
+  manager: Manager,
+  unit: string,
+  includeMint?: (mintUrl: string) => boolean,
+): SharedReadStore<WalletBalanceBreakdown> {
+  let units = balances.get(manager);
+  if (!units) {
+    units = new Map();
+    balances.set(manager, units);
+  }
+  let scope = units.get(unit);
+  if (!scope) {
+    scope = { all: createBalanceStore(manager, unit), filtered: new WeakMap() };
+    units.set(unit, scope);
+  }
+  if (!includeMint) return scope.all;
+  let store = scope.filtered.get(includeMint);
+  if (!store) {
+    store = createBalanceStore(manager, unit, includeMint);
+    scope.filtered.set(includeMint, store);
+  }
+  return store;
+}
+
+function createBalanceStore(
+  manager: Manager,
+  unit: string,
+  includeMint?: (mintUrl: string) => boolean,
+): SharedReadStore<WalletBalanceBreakdown> {
+  return createSharedReadStore(emptyBalanceBreakdown, (publish) => {
+    // A subscription lifetime owns both the read and its trailing refresh.
     let cancelled = false;
     let running = false;
     let requested = false;
@@ -125,7 +149,7 @@ export function useColadaBalance(
         // Events received during a read invalidate it. Collapse their work
         // into one trailing read, and never paint the outdated snapshot.
         if (next && !requested && !cancelled) {
-          setSnapshot({ manager, unit, includeMint, balance: next });
+          publish(next);
           logger.debug("balance.breakdown.reload", {
             unit,
             mintCount: Object.keys(next.byMint).length,
@@ -152,7 +176,5 @@ export function useColadaBalance(
       cancelled = true;
       for (const event of events) manager.off(event, onChange);
     };
-  }, [manager, unit, includeMint]);
-
-  return balance;
+  });
 }
