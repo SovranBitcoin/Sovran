@@ -141,11 +141,22 @@ Nothing below can be done from a development machine alone.
 | Deploy nagg with `since` | A push and deploy of `feat/dm-envelopes-since` |
 | Background polling pause, checked for real | A physical iPhone and Android phone: pay an invoice from another app with this one backgrounded |
 | The in-process switch on iOS, with a funded wallet, an imported key, and Whitenoise groups | Hands on a device; funded and destructive scenarios are never run against a real wallet from automation |
-| Single-profile removal, run once | Hands on a device with a spare empty profile |
+| Single-profile removal and an imported-key switch, run once | Hands on a device; the emulator already has a spare empty derived profile (index 1) to remove |
+| Whether the profile sheet stalls outside this emulator | A person opening it on a phone and on the emulator at the commit before this work |
 | Rows for the pages a deep link cannot reach (those needing parameters, onboarding, backup and recovery, sheets) | The JSON e2e harness on a disposable simulator, since its lanes start from a fresh install |
 | Anything interactive on iOS | A way to tap the simulator (it has no scripted touch here) or a person |
 
 ### Caveats on what is done
+
+- **`coco.call` and `store.set` are opt-in.** Start Metro with `EXPO_PUBLIC_PERF_PROBES=1` to get
+  them, and with `EXPO_PUBLIC_FRAME_DROP_MONITOR=1` and `EXPO_PUBLIC_JS_THREAD_MONITOR=1` for the
+  two monitors. The scorecards above were captured with all of them on.
+- **Imported-key switching and single-profile removal were attempted on the Android emulator and
+  could not be driven.** The profile sheet logged `actionMenuHost.open_stalled` and dismissed itself
+  after about five seconds on every open, so scripted taps did not land; five timed attempts never
+  reached the confirmation. Whether the stall predates this work is not established: the
+  `heroui-native` patch the sheet relies on is applied and the menu host was not touched, but a
+  before-and-after run was not possible. A person tapping at normal speed may not hit it.
 
 - **The opt-in switch has completed on the Android emulator only**, between two derived profiles in
   mock mode: no reload, and the app was initialised again in about four seconds. The first attempt
