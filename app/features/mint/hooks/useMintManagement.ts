@@ -1,4 +1,4 @@
-import { registerAccountScoped } from '@/shared/lib/persist/accountScoped';
+import { registerAccountScoped } from '@/shared/lib/account/accountRegistry';
 import { useCallback, useEffect, useState } from 'react';
 
 import type { Mint } from '@cashu/coco-core';

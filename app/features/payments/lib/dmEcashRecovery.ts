@@ -1,4 +1,4 @@
-import { registerAccountScoped } from '@/shared/lib/persist/accountScoped';
+import { registerAccountScoped } from '@/shared/lib/account/accountRegistry';
 /**
  * @fileoverview Recovery for message ecash the redeem queue has parked.
  *

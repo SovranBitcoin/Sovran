@@ -1,4 +1,4 @@
-import { registerAccountScoped } from '@/shared/lib/persist/accountScoped';
+import { registerAccountScoped } from '@/shared/lib/account/accountRegistry';
 import * as nip19 from 'nostr-tools/nip19';
 import { bytesToHex } from '@noble/hashes/utils.js';
 import { HDKey } from '@scure/bip32';

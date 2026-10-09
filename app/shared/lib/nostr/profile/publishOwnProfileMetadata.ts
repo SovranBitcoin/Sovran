@@ -1,4 +1,4 @@
-import { registerAccountScoped } from '@/shared/lib/persist/accountScoped';
+import { registerAccountScoped } from '@/shared/lib/account/accountRegistry';
 import { verifyNip05 } from 'wallet';
 import NDK, { NDKEvent, NDKSubscriptionCacheUsage } from '@nostr-dev-kit/ndk-mobile';
 import { Result, ResultAsync, err, ok, type Result as ResultType } from 'neverthrow';

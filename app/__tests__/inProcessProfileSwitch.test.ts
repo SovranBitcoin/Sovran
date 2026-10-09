@@ -3,6 +3,7 @@ import { readdirSync, readFileSync } from 'fs';
 import { join } from 'path';
 import type { WhitenoiseContextValue } from '@/features/whitenoise/WhitenoiseContext';
 import type { persistRegistry as Registry } from '@/shared/lib/persist/persistConfig';
+import type * as AccountRegistry from '@/shared/lib/account/accountRegistry';
 
 jest.mock('@internet-privacy/marmot-ts', () => ({
   KeyPackageStore: class {},
@@ -97,11 +98,13 @@ async function setup() {
   const scoped = require('@/shared/lib/cashu/profileScopedStorage');
   const protocol = {
     ...require('@/shared/lib/profile/inProcessProfileSwitch'),
-    ...require('@/shared/lib/profile/profileSwitchSession'),
+    ...require('@/shared/lib/account/accountRegistry'),
   };
   const { persistRegistry } = require('@/shared/lib/persist/persistConfig') as {
     persistRegistry: typeof Registry;
   };
+  const { liveStores, declaredStores, accountHolders } =
+    require('@/shared/lib/account/accountRegistry') as typeof AccountRegistry;
   const { switchToExistingProfile } = require('@/shared/lib/profile/profileSessionOrchestrator');
   const { restartApp } = require('@/shared/lib/profile/appRestart');
   const { CocoManager } = require('@/shared/lib/cashu/manager');
@@ -127,6 +130,9 @@ async function setup() {
     scoped,
     protocol,
     persistRegistry,
+    liveStores,
+    declaredStores,
+    accountHolders,
     switchToExistingProfile,
     restartApp,
     CocoManager,
@@ -157,7 +163,7 @@ it.each(['disposer', 'coco', 'rehydrate'] as const)(
     jest.useFakeTimers();
     const env = await setup();
     if (failure === 'disposer')
-      env.persistRegistry.accountScoped.push({
+      env.accountHolders.push({
         name: 'failing',
         dispose: () => {
           throw new Error('fail');
@@ -196,9 +202,7 @@ it('drains admitted writes to A and suppresses writes while switching', async ()
 it('canary resets every registered profile/session store and invokes every reachable holder', async () => {
   const env = await setup();
   for (const file of new Set(
-    env.persistRegistry.definitions
-      .filter((entry) => entry.scope !== 'global')
-      .map((entry) => entry.file)
+    env.declaredStores.filter((entry) => entry.scope !== 'global').map((entry) => entry.file)
   )) {
     require(`../${file.replace(/\.tsx?$/, '')}`);
   }
@@ -219,7 +223,7 @@ it('canary resets every registered profile/session store and invokes every reach
   // Import registrations without creating a manager or opening any native database.
   jest.requireActual('@/shared/lib/cashu/manager');
   // Owner-bound budget instances are tested separately without mutating the schema canary.
-  const entries = env.persistRegistry.stores.filter((entry) => entry.scope !== 'global');
+  const entries = env.liveStores.filter((entry) => entry.scope !== 'global');
   const sentinel = 'ACCOUNT_A_CANARY_5d71';
   const attachments = require('@/features/ai/lib/attachments');
   const image = { localUri: sentinel, mimeType: 'image/jpeg', width: 1, height: 1 };
@@ -290,7 +294,7 @@ it('canary resets every registered profile/session store and invokes every reach
     'wallet.melt-target': 'Wallet closure; manager and wallet edits are excluded.',
     'wallet.cashu-seed': 'Manager-private seed; manager edits are excluded.',
   };
-  const holders = [...env.persistRegistry.accountScoped];
+  const holders = [...env.accountHolders];
   for (const holder of holders) {
     expect(Boolean(holder.inspect) || Boolean(uninspectable[holder.name])).toBe(true);
   }
@@ -300,7 +304,7 @@ it('canary resets every registered profile/session store and invokes every reach
       .map((holder) => holder.name)
       .sort()
   ).toEqual(Object.keys(uninspectable).sort());
-  const holderCanaries = new Set(env.persistRegistry.accountScoped);
+  const holderCanaries = new Set(env.accountHolders);
   for (const holder of holderCanaries) {
     const dispose = holder.dispose;
     holder.dispose = async () => {
@@ -329,7 +333,7 @@ it('canary resets every registered profile/session store and invokes every reach
   process.stdout.write(
     JSON.stringify({
       stores: entries.length,
-      holders: env.persistRegistry.accountScoped.length,
+      holders: env.accountHolders.length,
       seededHolders: 7,
       inspectedHolders: holders.filter((holder) => holder.inspect).length,
       inspectedNames: holders.filter((holder) => holder.inspect).map((holder) => holder.name),
@@ -537,9 +541,7 @@ it('flushes and unregisters Vertex instances without allowing retained handles t
   expect(await env.switchToExistingProfile({ accountIndex: 1 })).toBe(true);
   expect(env.restartApp).not.toHaveBeenCalled();
   expect(env.scoped.hasCapturedProfileStorage()).toBe(false);
-  expect(env.persistRegistry.stores.some((entry) => entry.name === 'vertex-budget-store')).toBe(
-    false
-  );
+  expect(env.liveStores.some((entry) => entry.name === 'vertex-budget-store')).toBe(false);
   expect(
     JSON.parse(await env.storage.getItem(`vertex-budget-store:profile:${'a'.repeat(64)}`)).state
       .used
@@ -603,7 +605,7 @@ it('replaces the old NDK/cache through public init before exposing B', async () 
       tree = renderer.create(React.createElement(NostrNDKProvider, { accountIndex: 0 }, null));
     });
     await env.protocol.profileSwitchServices().get('nostr.ndk')();
-    const holder = env.persistRegistry.accountScoped.find((entry) => entry.name === 'nostr.ndk:0');
+    const holder = env.accountHolders.find((entry) => entry.name === 'nostr.ndk:0');
     await renderer.act(async () => {
       tree.unmount();
     });
@@ -630,11 +632,9 @@ it('completes the fast path with an active idle Routstr SDK client and scheduled
   expect(await env.switchToExistingProfile({ accountIndex: 1 })).toBe(true);
   expect(env.restartApp).not.toHaveBeenCalled();
   expect(() => bound.client.getCashuSpender()).toThrow();
-  expect(
-    env.persistRegistry.accountScoped
-      .find((holder) => holder.name === 'routstr.client')
-      ?.inspect?.()
-  ).toBe(true);
+  expect(env.accountHolders.find((holder) => holder.name === 'routstr.client')?.inspect?.()).toBe(
+    true
+  );
 });
 
 it('completes the fast path with an active Whitenoise client and zeroes its signer', async () => {
@@ -664,7 +664,7 @@ it('completes the fast path with an active Whitenoise client and zeroes its sign
   });
   const signer = handle.client.signer;
   env.protocol.registerProfileSwitchService('whitenoise', handle.shutdown);
-  env.persistRegistry.accountScoped.push({ name: 'whitenoise.client', dispose: handle.release });
+  env.accountHolders.push({ name: 'whitenoise.client', dispose: handle.release });
   expect(await env.switchToExistingProfile({ accountIndex: 1 })).toBe(true);
   expect(env.restartApp).not.toHaveBeenCalled();
   expect(stop).toHaveBeenCalledTimes(1);
@@ -754,9 +754,7 @@ it('registers the live Whitenoise provider for awaited switch disposal', async (
     });
     expect(client).toBeDefined();
     expect(client).not.toBeNull();
-    const holder = env.persistRegistry.accountScoped.find(
-      (entry) => entry.name === 'whitenoise.client'
-    );
+    const holder = env.accountHolders.find((entry) => entry.name === 'whitenoise.client');
     expect(holder?.inspect?.()).toBe(false);
     expect(await env.switchToExistingProfile({ accountIndex: 1 })).toBe(true);
     expect(env.restartApp).not.toHaveBeenCalled();

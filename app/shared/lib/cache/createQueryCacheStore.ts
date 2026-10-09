@@ -26,12 +26,12 @@ import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
 import { monotonicNow, storeLog } from '@/shared/lib/logger';
 import { defineStore } from '@/shared/lib/persist/defineStore';
-import { registerAccountScoped } from '@/shared/lib/persist/accountScoped';
 import {
-  persistRegistry,
-  persistConfig,
+  registerAccountScoped,
+  liveStores,
   type StoreScope,
-} from '@/shared/lib/persist/persistConfig';
+} from '@/shared/lib/account/accountRegistry';
+import { persistConfig } from '@/shared/lib/persist/persistConfig';
 import { currentCacheEpoch } from './cacheSession';
 import { evictLruOverCap } from './evictLruOverCap';
 import type { QueryCacheEntry } from './queryCacheTypes';
@@ -138,7 +138,7 @@ export interface QueryCacheStore<TData> {
 
 /** Clear every query cache and reject every in-flight completion. */
 export function clearAllQueryCaches(): void {
-  for (const entry of persistRegistry.stores) entry.queryCache?.clear();
+  for (const entry of liveStores) entry.queryCache?.clear();
 }
 
 const PersistedEntry = z.looseObject({
@@ -391,7 +391,7 @@ export function createQueryCacheStore<TData>(opts: QueryCacheStoreOptions): Quer
     generation,
     staleTtlMs: opts.staleTtlMs,
   };
-  const entry = persistRegistry.stores.find((entry) => entry.store === use);
+  const entry = liveStores.find((entry) => entry.store === use);
   if (entry)
     entry.queryCache = {
       clear: store.clear,

@@ -1,4 +1,4 @@
-import { registerAccountScoped } from '@/shared/lib/persist/accountScoped';
+import { registerAccountScoped } from '@/shared/lib/account/accountRegistry';
 /**
  * @fileoverview NIP-61 nutzap-info discovery (`kind:10019` lookup).
  *

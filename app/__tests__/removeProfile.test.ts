@@ -1,9 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
-import { persistRegistry, persistedStoreKeys } from '@/shared/lib/persist/persistConfig';
+
 import { createSecureVault } from '@/shared/lib/persist/secureVault';
 import { removeProfileData } from '@/shared/lib/profile/removeProfile';
 import { profileRemovalPorts } from '@/shared/lib/profile/profileRemovalStorage';
+import { declaredStores, persistedStoreKeys } from '@/shared/lib/account/accountRegistry';
 
 const mockSecure = new Map<string, string>();
 let mockProofStates: string[] = [];
@@ -109,7 +110,7 @@ const remove = (confirmed = false) => removeProfileData(1, confirmed, profileRem
 test('registry-driven removal preserves every other profile blob byte for byte and the shared root', async () => {
   const names = [
     ...new Set(
-      persistRegistry.definitions
+      declaredStores
         .filter(
           (entry) =>
             (entry.scope === 'profile' && entry.persisted) ||

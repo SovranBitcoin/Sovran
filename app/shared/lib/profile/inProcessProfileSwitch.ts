@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { persistRegistry } from '@/shared/lib/persist/persistConfig';
+
 import {
   blockProfilePersistWrites,
   unblockProfilePersistWrites,
@@ -10,7 +10,9 @@ import {
   profileSwitchBoundary,
   profileSwitchServices,
   setProfileSwitchQuiescing,
-} from './profileSwitchSession';
+  liveStores,
+  accountHolders,
+} from '@/shared/lib/account/accountRegistry';
 
 const STEP_TIMEOUT_MS = 5_000;
 
@@ -59,10 +61,10 @@ export async function runInProcessProfileSwitch(options: {
   await switchStep(boundary.suspend);
   await switchStep(options.cleanupCoco);
   // Owner-bound holders flush and detach while the old identity still owns writes.
-  for (const holder of [...persistRegistry.accountScoped]) await switchStep(holder.dispose);
+  for (const holder of [...accountHolders]) await switchStep(holder.dispose);
   if (hasCapturedProfileStorage()) throw new Error('Undisposed captured profile storage');
   await switchStep(blockProfilePersistWrites);
-  const stores = persistRegistry.stores.filter((entry) => entry.scope !== 'global');
+  const stores = liveStores.filter((entry) => entry.scope !== 'global');
   for (const entry of stores) {
     // State types are erased in the registry. Only this handle's recorded initial state is valid.
     entry.store.setState(entry.initialState as never, true);
@@ -100,7 +102,7 @@ function containsPubkey(value: unknown, pubkey: string, seen = new Set<unknown>(
 /** Inspect locally; report identifiers only. A's retained durable blobs are expected. */
 export async function checkProfileSwitchLeaks(previousPubkey: string): Promise<void> {
   if (!__DEV__) return;
-  for (const entry of persistRegistry.stores) {
+  for (const entry of liveStores) {
     if (entry.name !== 'profile-store' && containsPubkey(entry.store.getState(), previousPubkey)) {
       log.warn('profile.switch.leak', { store: entry.name });
     }

@@ -1,7 +1,8 @@
 import { create, type StateCreator, type StoreApi, type StoreMutatorIdentifier } from 'zustand';
 import { createStore } from 'zustand/vanilla';
 import { storeLog } from '@/shared/lib/logger';
-import { persistRegistry, type StoreScope } from './persistConfig';
+import { persistRegistry } from './persistConfig';
+import { liveStores, type StoreScope } from '@/shared/lib/account/accountRegistry';
 
 interface StoreDefinition {
   name: string;
@@ -15,7 +16,7 @@ function record<T>(definition: StoreDefinition, store: StoreApi<T>): void {
     store,
     initialState: store.getInitialState(),
   };
-  persistRegistry.stores.push(registration);
+  liveStores.push(registration);
   for (const entry of persistRegistry) {
     if (entry.name === definition.name) Object.assign(entry, registration);
   }

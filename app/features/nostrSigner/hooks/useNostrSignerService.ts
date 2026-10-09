@@ -1,4 +1,4 @@
-import { registerProfileSwitchService } from '@/shared/lib/profile/profileSwitchSession';
+import { registerProfileSwitchService } from '@/shared/lib/account/accountRegistry';
 /**
  * @fileoverview NIP-46 signer service lifecycle glue
  *

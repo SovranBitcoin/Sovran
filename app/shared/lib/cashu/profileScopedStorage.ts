@@ -22,6 +22,7 @@ import { persistRegistry } from '@/shared/lib/persist/persistConfig';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StateStorage } from 'zustand/middleware';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
+import { declaredStores } from '@/shared/lib/account/accountRegistry';
 
 /** The same barrier covers direct profile adapters and full persisted operations. */
 export {
@@ -130,7 +131,7 @@ export function createProfileScopedStorage(
 /** All profile-scoped store persistence keys. */
 export const PROFILE_SCOPED_STORE_KEYS = [
   ...new Set(
-    persistRegistry.definitions
+    declaredStores
       .filter((entry) => entry.profileStorage && (entry.persisted || entry.queryCache))
       .map((entry) => entry.name)
   ),

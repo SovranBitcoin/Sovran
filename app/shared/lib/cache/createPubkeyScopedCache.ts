@@ -1,4 +1,4 @@
-import { registerAccountScoped } from '@/shared/lib/persist/accountScoped';
+import { registerAccountScoped } from '@/shared/lib/account/accountRegistry';
 /**
  * Two-tier cache (in-memory + AsyncStorage) keyed by an external "scope"
  * identifier — typically a Nostr recipient pubkey, but the factory is

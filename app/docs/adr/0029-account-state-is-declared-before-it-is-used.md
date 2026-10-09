@@ -9,12 +9,15 @@ never mounted. Store declarations go through `defineStore` (or
 `global` belongs to the installation, `profile` belongs to an account, and
 `session` is memory-only state belonging to the active account.
 
-The existing `persistRegistry` owns store instances and non-store disposal
-callbacks. Its array iteration remains the persisted-schema view used by the
-compatibility tests. Registering a store records its original handle and Zustand
-initial state; registering a holder records its disposal function. Neither
-registration changes state or invokes disposal. Multiple instances with the same
-name remain discoverable.
+One module, `app/shared/lib/account/accountRegistry.ts`, holds everything an
+account owns outside React: the stores created so far, the stores declared in
+source, the module-level holders with their disposal callbacks, the running
+services, and the provider boundary. Its header is the map of who registers
+what and what a switch does to each. `persistRegistry` in `persistConfig.ts` is
+only the list of persisted schemas the compatibility tests iterate. Registering
+a store records its original handle and Zustand initial state; registering a
+holder records its disposal function. Neither registration changes state or
+invokes disposal. Multiple instances with the same name remain discoverable.
 
 Pre-hydration migrations must enumerate storage names without initializing every
 lazy feature or native dependency. The registry therefore includes generated

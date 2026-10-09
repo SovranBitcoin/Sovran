@@ -2,7 +2,7 @@ import { defineVanillaStore as createStore } from '@/shared/lib/persist/defineSt
 import { persist } from 'zustand/middleware';
 import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
-import { registerAccountScoped } from '@/shared/lib/persist/accountScoped';
+import { registerAccountScoped, liveStores } from '@/shared/lib/account/accountRegistry';
 import { withSkippedPersistWrites } from '@/shared/lib/persist/profileWriteBarrier';
 import { persistRegistry, persistConfig } from '@/shared/lib/persist/persistConfig';
 
@@ -74,7 +74,7 @@ export function createVertexBudgetStore(ownerPubkey: string) {
       })
     )
   );
-  const registration = persistRegistry.stores.find((entry) => entry.store === store);
+  const registration = liveStores.find((entry) => entry.store === store);
   const unregister = registerAccountScoped(
     'vertex.budget-instance',
     async () => {
@@ -87,8 +87,8 @@ export function createVertexBudgetStore(ownerPubkey: string) {
       withSkippedPersistWrites(() => store.setState(store.getInitialState(), true));
       store.persist.setOptions({ storage: undefined });
       if (registration) {
-        const index = persistRegistry.stores.indexOf(registration);
-        if (index !== -1) persistRegistry.stores.splice(index, 1);
+        const index = liveStores.indexOf(registration);
+        if (index !== -1) liveStores.splice(index, 1);
       }
       for (let index = persistRegistry.length - 1; index >= 0; index--) {
         const entry = persistRegistry[index];

@@ -1,4 +1,4 @@
-import { registerAccountScoped } from '@/shared/lib/persist/accountScoped';
+import { registerAccountScoped } from '@/shared/lib/account/accountRegistry';
 import { AppState, type AppStateStatus } from 'react-native';
 import { Manager, type WebSocketFactory, type WebSocketLike } from '@cashu/coco-core';
 import type { Plugin } from '@cashu/coco-core/plugin';

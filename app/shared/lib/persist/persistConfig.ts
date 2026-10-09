@@ -3,10 +3,9 @@ import { type ZodType } from 'zod';
 import { createJSONStorage, type PersistOptions, type StateStorage } from 'zustand/middleware';
 
 import { redactError, storeLog } from '@/shared/lib/logger';
+import type { LiveStore } from '@/shared/lib/account/accountRegistry';
 import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
-
-import { accountScopedHolders } from './accountScoped';
-import { storeRegistryManifest } from './storeRegistryManifest';
+import { declaredStores } from '@/shared/lib/account/accountRegistry';
 
 const DEFAULT_VERSION = 1;
 
@@ -61,7 +60,7 @@ function deriveLogKey(name: string): string {
  * the one thing standing between a routine schema change and silent data loss
  * on the durable stores (createMergeWithSchema drops a whole blob it can't parse).
  */
-interface PersistRegistryEntry extends Partial<RegisteredStore> {
+interface PersistRegistryEntry extends Partial<LiveStore> {
   name: string;
   version: number;
   schema: ZodType<unknown>;
@@ -75,40 +74,7 @@ interface PersistRegistryEntry extends Partial<RegisteredStore> {
   partialize: (state: never) => unknown;
   capturedOwner?: string;
 }
-export type StoreScope = 'global' | 'profile' | 'session';
-
-interface RegisteredStore {
-  name: string;
-  scope: StoreScope;
-  persisted: boolean;
-  store: {
-    getState: () => unknown;
-    getInitialState: () => unknown;
-    // The registry erases each store's state type; only its own recorded state is restored.
-    setState: (state: never, replace: true) => void;
-    persist?: { rehydrate: () => Promise<void> | void; hasHydrated: () => boolean };
-  };
-  initialState: unknown;
-  queryCache?: { clear: () => void; removeViewer: (pubkey: string) => void };
-}
-
-// Array iteration retains the persisted-schema contract used by the existing
-// compatibility guards. All runtime holders live on this same registry.
-export const persistRegistry = Object.assign([] as PersistRegistryEntry[], {
-  definitions: storeRegistryManifest,
-  stores: [] as RegisteredStore[],
-  accountScoped: accountScopedHolders,
-});
-
-export function persistedStoreKeys(scope: StoreScope): string[] {
-  return [
-    ...new Set(
-      persistRegistry.definitions
-        .filter((entry) => entry.persisted && entry.scope === scope)
-        .map((entry) => entry.name)
-    ),
-  ];
-}
+export const persistRegistry: PersistRegistryEntry[] = [];
 
 /**
  * Standard Zustand `persist` options for a Sovran store.
@@ -143,7 +109,7 @@ export function persistConfig<TFull, TPartial>(
     });
   }
 
-  const profileScoped = persistRegistry.definitions.some(
+  const profileScoped = declaredStores.some(
     (entry) => entry.name === opts.name && entry.scope === 'profile'
   );
   const storage: StateStorage = profileScoped

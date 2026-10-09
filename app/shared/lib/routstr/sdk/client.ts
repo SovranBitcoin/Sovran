@@ -1,6 +1,6 @@
 import { profileSwitchResource } from '@/shared/lib/profile/profileSwitchResource';
-import { registerProfileSwitchService } from '@/shared/lib/profile/profileSwitchSession';
-import { registerAccountScoped } from '@/shared/lib/persist/accountScoped';
+import { registerProfileSwitchService } from '@/shared/lib/account/accountRegistry';
+import { registerAccountScoped } from '@/shared/lib/account/accountRegistry';
 // `@routstr/sdk/browser`, not `/client` or `/storage`: those entries reach for
 // `os` and `better-sqlite3` to persist Tinfoil's cache secret and its model
 // database on a filesystem. React Native has neither. The browser build carries

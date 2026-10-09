@@ -1,9 +1,9 @@
 import {
   profileSwitchQuiescing,
   registerProfileSwitchService,
-} from '@/shared/lib/profile/profileSwitchSession';
+} from '@/shared/lib/account/accountRegistry';
 import { clearForYouCache } from 'nostr';
-import { registerAccountScoped } from '@/shared/lib/persist/accountScoped';
+import { registerAccountScoped } from '@/shared/lib/account/accountRegistry';
 import { createContext, useContext, useEffect, useMemo, useRef, useState, ReactNode } from 'react';
 import { NDKCacheAdapterSqlite, NDKPrivateKeySigner, useNDK } from '@nostr-dev-kit/ndk-mobile';
 import { relays } from '@/shared/ndk';

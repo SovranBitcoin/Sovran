@@ -1,4 +1,4 @@
-import { registerAccountScoped } from '@/shared/lib/persist/accountScoped';
+import { registerAccountScoped } from '@/shared/lib/account/accountRegistry';
 import type NDK from '@nostr-dev-kit/ndk-mobile';
 import {
   createNaggClient,

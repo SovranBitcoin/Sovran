@@ -1,7 +1,7 @@
-import { registerAccountScoped } from '@/shared/lib/persist/accountScoped';
+import { registerAccountScoped } from '@/shared/lib/account/accountRegistry';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { profileSwitchResource } from '@/shared/lib/profile/profileSwitchResource';
-import { registerProfileSwitchService } from '@/shared/lib/profile/profileSwitchSession';
+import { registerProfileSwitchService } from '@/shared/lib/account/accountRegistry';
 import React, { useEffect, useMemo } from 'react';
 import { useNDK } from '@nostr-dev-kit/ndk-mobile';
 import { InviteReader } from '@internet-privacy/marmot-ts';

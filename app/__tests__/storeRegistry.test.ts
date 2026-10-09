@@ -3,15 +3,19 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { resolve } from 'path';
 import { defineStore, defineVanillaStore } from '@/shared/lib/persist/defineStore';
-import { registerAccountScoped } from '@/shared/lib/persist/accountScoped';
-import { persistRegistry } from '@/shared/lib/persist/persistConfig';
+import {
+  registerAccountScoped,
+  liveStores,
+  declaredStores,
+  accountHolders,
+} from '@/shared/lib/account/accountRegistry';
 
 const { collectStoreDefinitions } = require('../scripts/storeRegistryManifest.cjs') as {
   collectStoreDefinitions: (appRoot?: string) => unknown;
 };
 
 it('enumerates every app store declaration, including lazy stores and query caches', () => {
-  expect(collectStoreDefinitions()).toEqual(persistRegistry.definitions);
+  expect(collectStoreDefinitions()).toEqual(declaredStores);
 });
 
 it('records handles and unmodified initial state for bound and vanilla stores', () => {
@@ -24,7 +28,7 @@ it('records handles and unmodified initial state for bound and vanilla stores', 
     scope: 'global',
   })(initializer);
   for (const store of [bound, vanilla]) {
-    const entry = persistRegistry.stores.find((candidate) => candidate.store === store);
+    const entry = liveStores.find((candidate) => candidate.store === store);
     expect(entry?.initialState).toBe(store.getInitialState());
     expect(entry?.persisted).toBe(false);
     store.setState({ count: 7 });
@@ -36,9 +40,7 @@ it('records disposal without invoking it', async () => {
   const dispose = jest.fn();
   registerAccountScoped('registry-test-holder', dispose);
   expect(dispose).not.toHaveBeenCalled();
-  await persistRegistry.accountScoped
-    .find((holder) => holder.name === 'registry-test-holder')
-    ?.dispose();
+  await accountHolders.find((holder) => holder.name === 'registry-test-holder')?.dispose();
   expect(dispose).toHaveBeenCalledTimes(1);
 });
 
@@ -49,9 +51,7 @@ it('keeps every instance when holders share a name', async () => {
   registerAccountScoped('registry-test-instances', second);
   expect(first).not.toHaveBeenCalled();
   expect(second).not.toHaveBeenCalled();
-  for (const holder of persistRegistry.accountScoped.filter(
-    (entry) => entry.name === 'registry-test-instances'
-  )) {
+  for (const holder of accountHolders.filter((entry) => entry.name === 'registry-test-instances')) {
     await holder.dispose();
   }
   expect(first).toHaveBeenCalledTimes(1);

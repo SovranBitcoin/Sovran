@@ -1,5 +1,5 @@
 import { resetProfileNavigation } from '@/shared/lib/profile/resetProfileNavigation';
-import { registerProfileSwitchBoundary } from '@/shared/lib/profile/profileSwitchSession';
+import { registerProfileSwitchBoundary } from '@/shared/lib/account/accountRegistry';
 import {
   Stack,
   DarkTheme,

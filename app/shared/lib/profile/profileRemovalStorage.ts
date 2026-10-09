@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as SQLite from 'expo-sqlite';
 import { z } from 'zod';
-import { persistRegistry, persistedStoreKeys } from '@/shared/lib/persist/persistConfig';
+import { persistRegistry } from '@/shared/lib/persist/persistConfig';
 import { withSkippedPersistWrites } from '@/shared/lib/persist/profileWriteBarrier';
 import { sdkRecoveryVaultNames } from '@/shared/lib/routstr/sdk/driver';
 import { NEARBY_PAYMENT_JOURNAL_KEY } from '@/features/nearPay/lib/nearbyPaymentStorage';
@@ -19,6 +19,11 @@ import {
   type ProfileEntry,
 } from '@/shared/stores/global/profileStore';
 import type { RemovalPorts } from './removeProfile';
+import {
+  liveStores,
+  declaredStores,
+  persistedStoreKeys,
+} from '@/shared/lib/account/accountRegistry';
 
 const States = z.array(z.object({ state: z.string().max(32) })).max(64);
 const CanonicalQuotes = z.array(
@@ -193,7 +198,7 @@ export const profileRemovalPorts: RemovalPorts = {
     );
     const scoped = persistedStoreKeys('profile').map((name) => `${name}:profile:${profile.pubkey}`);
     // Include retired query-cache blobs using registry metadata, even if never mounted.
-    for (const entry of persistRegistry.definitions) {
+    for (const entry of declaredStores) {
       if (entry.profileStorage && entry.queryCache)
         scoped.push(`${entry.name}:profile:${profile.pubkey}`);
     }
@@ -213,8 +218,7 @@ export const profileRemovalPorts: RemovalPorts = {
         name: 'query and plaintext caches',
         run: async () => {
           withSkippedPersistWrites(() => {
-            for (const entry of persistRegistry.stores)
-              entry.queryCache?.removeViewer(profile.pubkey);
+            for (const entry of liveStores) entry.queryCache?.removeViewer(profile.pubkey);
           });
           await removePlaintextCaches(profile.pubkey);
         },

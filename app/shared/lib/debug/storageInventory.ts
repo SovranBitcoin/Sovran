@@ -2,11 +2,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as SecureStore from 'expo-secure-store';
 
-import { persistedStoreKeys } from '@/shared/lib/persist/persistConfig';
-
 import type { ProfileEntry } from '@/shared/stores/global/profileStore';
 import { redactError, redactKnownSecretSubstrings, storeLog } from '@/shared/lib/logger';
 import { sensitiveFieldKind } from '@/shared/lib/sensitiveFieldNames';
+import { persistedStoreKeys } from '@/shared/lib/account/accountRegistry';
 
 const SECURE_STORE_KEY_PREFIXES = {
   migrations: 'migrations_complete_',

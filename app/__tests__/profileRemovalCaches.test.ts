@@ -4,9 +4,10 @@ import {
   createPubkeyScopedCache,
   removePlaintextCaches,
 } from '@/shared/lib/cache/createPubkeyScopedCache';
-import { persistRegistry } from '@/shared/lib/persist/persistConfig';
+
 import { withSkippedPersistWrites } from '@/shared/lib/persist/profileWriteBarrier';
 import { log } from '@/shared/lib/logger';
+import { liveStores } from '@/shared/lib/account/accountRegistry';
 
 jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock')
@@ -32,7 +33,7 @@ test('query removal drops only the removed viewer and invalidates its late compl
   const late = cache
     .run('new-target-key', () => promise, 'target')
     .catch((error: unknown) => error);
-  const registered = persistRegistry.stores.find((entry) => entry.name === 'removal-query-fixture');
+  const registered = liveStores.find((entry) => entry.name === 'removal-query-fixture');
   withSkippedPersistWrites(() => registered?.queryCache?.removeViewer('target'));
   resolve?.({ data: 'late plaintext' });
   expect(isSupersededError(await late)).toBe(true);

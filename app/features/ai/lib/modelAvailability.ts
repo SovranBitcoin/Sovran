@@ -1,4 +1,4 @@
-import { registerAccountScoped } from '@/shared/lib/persist/accountScoped';
+import { registerAccountScoped } from '@/shared/lib/account/accountRegistry';
 import type { LineupEntry } from '@/shared/lib/routstr/lineup';
 import { aiLog } from '@/shared/lib/logger';
 
