@@ -50,6 +50,18 @@ piece of state from quietly escaping.
 
 Registering does nothing. Only the switch and profile removal act on the registry.
 
+### Adding state for an account
+
+In order of preference:
+
+1. **Inside the account providers.** State built in a provider under `AccountProviders.tsx`
+   (React state, or a store made with `createStore` and handed down through context) is discarded
+   when the providers remount. It needs no registration and cannot outlive its account.
+2. **A `defineStore` store** with `scope: 'profile'` or `'session'`, when the state must be read
+   outside React or kept on disk.
+3. **A registered holder**, for a module-level cache or singleton that cannot be either of the
+   above. This is the kind that leaks when forgotten, so it is the last resort.
+
 ## What changes the active account
 
 The flows are in `app/shared/lib/profile/profileSessionOrchestrator.ts`. Every flow starts the same
