@@ -265,6 +265,10 @@ export async function switchToExistingProfile(opts: {
         } catch {
           log.warn('profile.switch.restart_target_failed');
         }
+        // Holding the boundary unmounts the wallet provider, which starts a
+        // cleanup nobody awaits. Wait for the wallet database to close, as the
+        // restart path below does, before the runtime is torn down.
+        await cleanupCocoWithTimeout();
         // If restart is unavailable, keep the held boundary and write barrier.
         // Resuming after failed teardown would expose a half-switched wallet.
         return await teardownAndRestart();

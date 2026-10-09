@@ -149,7 +149,9 @@ it.each(['disposer', 'coco', 'rehydrate'] as const)(
       jest.spyOn(useThemeStore.persist, 'rehydrate').mockRejectedValue(new Error('fail'));
     }
     const pending = env.switchToExistingProfile({ accountIndex: 1 });
-    await jest.advanceTimersByTimeAsync(6_000);
+    // One step timeout, then the bounded wait for the wallet database to close
+    // that precedes every restart. A cleanup that never resolves spends both.
+    await jest.advanceTimersByTimeAsync(11_000);
     expect(await pending).toBe(true);
     expect(env.restartApp).toHaveBeenCalledTimes(1);
     expect(env.useProfileStore.getState().activeAccountIndex).toBe(0);

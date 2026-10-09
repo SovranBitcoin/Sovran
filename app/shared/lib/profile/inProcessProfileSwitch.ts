@@ -102,7 +102,10 @@ export async function checkProfileSwitchLeaks(previousPubkey: string): Promise<v
     if (key.includes(previousPubkey) || value?.includes(previousPubkey)) {
       // Global profile inventory intentionally retains all account identities.
       if (key === 'profile-store') continue;
-      const name = key.replace(previousPubkey, '[previous-account]');
+      // Name the store, not the accounts: the suffix would be another account's pubkey.
+      const name = key
+        .replace(previousPubkey, '[previous-account]')
+        .replace(/:profile:[0-9a-f]{64}$/, ':profile:[account]');
       log.warn('profile.switch.leak', { key: name });
     }
   }
