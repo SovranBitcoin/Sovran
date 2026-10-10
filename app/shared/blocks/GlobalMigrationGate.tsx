@@ -4,7 +4,7 @@ import { signalMigrationsComplete } from '@/shared/lib/cashu/profileScopedStorag
 import { runGlobalMigrations } from '@/shared/lib/migrations/globalMigrations';
 import { initLog } from '@/shared/lib/logger';
 import { InitializationGate } from '@/shared/blocks/InitializationGate';
-import { StorageUpdateFailedScreen } from '@/shared/blocks/StorageUpdateFailedScreen';
+import { StartupFailedScreen } from '@/shared/blocks/StartupFailedScreen';
 
 initLog('Module', 'GlobalMigrationGate loaded');
 
@@ -35,7 +35,7 @@ export default function GlobalMigrationGate({ children }: GlobalMigrationGatePro
       logEvent="gate.global_migration"
       run={runGlobalMigrations}
       onSuccess={signalMigrationsComplete}
-      renderFailure={(retry) => <StorageUpdateFailedScreen onRetry={retry} />}>
+      renderFailure={(retry) => <StartupFailedScreen step="storage" onRetry={retry} />}>
       {children}
     </InitializationGate>
   );

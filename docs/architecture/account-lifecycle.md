@@ -70,15 +70,15 @@ Top to bottom, as nested in `app/app/_layout.tsx` and `AccountProviders.tsx`. Th
 order, not one awaited sequence: the migration gate, the key provider and the wallet provider each
 hold back what is below them; the others do not.
 
-| Step                                      | What it does                                                                                       | If it fails                                                                                      |
-| ----------------------------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| Transition guard cleanup                  | clears the on-disk guard a previous run left; not waited for                                       | nothing; a stale guard is ignored                                                                |
-| Splash gate                               | covers the app until the wallet screen is ready, or a blocking stage fails                         | fades after a timeout                                                                            |
-| Global migrations (`GlobalMigrationGate`) | one-time storage moves, then opens per-profile storage                                             | storage stays closed; a retry screen is shown                                                    |
-| Account boundary                          | lets an in-process switch unmount everything below                                                 | —                                                                                                |
-| Key provider                              | finds the keys and wallet phrase (`loadAccountKeys`), hands them to the wallet manager             | key recovery screen                                                                              |
-| Nostr providers, then wallet provider     | mount in that order, but the wallet database opens first; the Nostr cache opens after it, deferred | the wallet stage fails and nothing below it renders; there is no retry screen for this yet (F85) |
-| App gate (`AppGate`)                      | settings loaded, terms accepted, reinstall check, onboarding, restore                              | its own screens                                                                                  |
+| Step                                      | What it does                                                                                       | If it fails                                      |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| Transition guard cleanup                  | clears the on-disk guard a previous run left; not waited for                                       | nothing; a stale guard is ignored                |
+| Splash gate                               | covers the app until the wallet screen is ready, or a blocking stage fails                         | fades after a timeout                            |
+| Global migrations (`GlobalMigrationGate`) | one-time storage moves, then opens per-profile storage                                             | storage stays closed; a retry screen is shown    |
+| Account boundary                          | lets an in-process switch unmount everything below                                                 | —                                                |
+| Key provider                              | finds the keys and wallet phrase (`loadAccountKeys`), hands them to the wallet manager             | key recovery screen                              |
+| Nostr providers, then wallet provider     | mount in that order, but the wallet database opens first; the Nostr cache opens after it, deferred | a wallet that will not open shows a retry screen |
+| App gate (`AppGate`)                      | settings loaded, terms accepted, reinstall check, onboarding, restore                              | its own screens                                  |
 
 Three separate kinds of readiness, easy to confuse:
 
@@ -302,4 +302,4 @@ Rules:
 | When the splash comes down                                              | `app/shared/blocks/NativeSplashLayoutGate.tsx`                               |
 | What an account owns outside React                                      | `app/shared/lib/account/accountRegistry.ts`                                  |
 | Decisions                                                               | ADR 0029 (registry and switch), ADR 0030 (removal)                           |
-| Known gaps                                                              | `docs/architecture/follow-ups.md` (F72, F76, F77, F79 to F83, F85)           |
+| Known gaps                                                              | `docs/architecture/follow-ups.md` (F72, F76, F77, F79 to F83)                |

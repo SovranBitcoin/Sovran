@@ -1,3 +1,4 @@
+import { StartupFailedScreen } from '@/shared/blocks/StartupFailedScreen';
 import { useEffect, useState, ReactNode, useRef } from 'react';
 import { CocoCashuProvider } from '@cashu/coco-react';
 import { Manager } from '@cashu/coco-core';
@@ -37,6 +38,8 @@ type CocoPhase1Args = {
   privateKey: Uint8Array | undefined;
   onManager: (manager: Manager) => void;
   onReady: () => void;
+  /** The wallet could not be opened; the provider shows a retry. */
+  onFailure: () => void;
   /** False once the effect that started this phase has been cleaned up. */
   isCurrent: () => boolean;
 };
@@ -55,6 +58,7 @@ async function runCocoPhase1({
   privateKey,
   onManager,
   onReady,
+  onFailure,
   isCurrent,
 }: CocoPhase1Args): Promise<void> {
   try {
@@ -95,6 +99,7 @@ async function runCocoPhase1({
       error: caught instanceof Error ? caught.message : String(caught),
     });
     stage.error(failure.message);
+    onFailure();
   }
 }
 
@@ -221,6 +226,9 @@ export function CocoProvider({ children }: CocoProviderProps) {
   const privateKeyRef = useLatestRef(keys?.privateKey);
   const [manager, setManager] = useState<Manager | null>(null);
   const [isReady, setIsReady] = useState(false);
+  // A failed open is shown with a retry; each retry is a new attempt.
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   const hasStarted = useRef(false);
   const bgStarted = useRef(false);
 
@@ -237,6 +245,7 @@ export function CocoProvider({ children }: CocoProviderProps) {
       privateKey: privateKeyRef.current,
       onManager: setManager,
       onReady: () => setIsReady(true),
+      onFailure: () => setFailed(true),
       isCurrent: () => run.current,
     });
 
@@ -255,7 +264,7 @@ export function CocoProvider({ children }: CocoProviderProps) {
       });
     };
     // (`stage` is memoised — it moves only when `canStart` flips.)
-  }, [stage, keys?.pubkey, privateKeyRef]);
+  }, [stage, keys?.pubkey, privateKeyRef, attempt]);
 
   // Phase 2: Non-blocking — Default mints + recovery (runs after app is visible)
   useEffect(() => {
@@ -352,6 +361,17 @@ export function CocoProvider({ children }: CocoProviderProps) {
     return attachMintTestnutToManager(manager);
   }, [manager]);
 
+  if (failed) {
+    return (
+      <StartupFailedScreen
+        step="wallet"
+        onRetry={() => {
+          setFailed(false);
+          setAttempt((current) => current + 1);
+        }}
+      />
+    );
+  }
   if (!isReady || !manager) return null;
 
   return <CocoCashuProvider manager={manager}>{children}</CocoCashuProvider>;

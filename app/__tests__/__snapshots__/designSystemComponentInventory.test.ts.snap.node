@@ -190,7 +190,7 @@ exports[`Design System component inventory tracks the complete reusable componen
     "shared/blocks/PaymentInfo.tsx",
     "shared/blocks/PullToAiRefreshControl.tsx",
     "shared/blocks/SovranTabBar.tsx",
-    "shared/blocks/StorageUpdateFailedScreen.tsx",
+    "shared/blocks/StartupFailedScreen.tsx",
     "shared/blocks/claim/ClaimUsernameCardFrame.tsx",
     "shared/blocks/popup/ActionMenuHost.tsx",
     "shared/blocks/popup/MenuScrim.tsx",

@@ -723,3 +723,6 @@ time, with the wallet open after every start and no errors.
 After the wallet's staged credentials were moved into one owner, the iOS simulator switched from its
 first profile to its second and back, restarting each time with the wallet open and no errors.
 Android was not rechecked: the emulator would not start for lack of disk.
+
+With the wallet's first open forced to fail on the iOS simulator (temporary edit, reverted), the
+new retry screen appeared within seconds instead of a blank screen, and retrying opened the wallet.
