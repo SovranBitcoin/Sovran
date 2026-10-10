@@ -775,3 +775,7 @@ To run it:
 What the checks already run say about the likely outcome: the code that reads and writes user data
 natively is the same version in both builds, v0.1.3's own code produced the data for the upgrades
 run on the Android emulator and iOS simulator, and nothing it stored was lost or set aside.
+
+Decision, 2026-10-10: the tests together with the emulator and simulator upgrades from v0.1.3's
+code were accepted as sufficient evidence that upgrading users are not broken. The store-signed
+upgrade above remains a recommended check before release, not a blocker for this branch.
