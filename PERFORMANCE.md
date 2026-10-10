@@ -662,3 +662,7 @@ completed, a second profile was created, the app switched back to the first, and
 profile was removed. Its wallet database, Nostr cache and every stored key were gone afterwards and
 the first profile was untouched. This is the first time removal has run on a device; it needed the
 change in F80 (a standing payment request no longer blocks removal).
+
+The map cache was then moved out of AsyncStorage into a file (F81). On the iOS simulator the file
+was written (5.3 MB) with no errors. One iOS run before that stalled during wallet startup after a
+dev-client reload and did not recur on the next run; it is unexplained.

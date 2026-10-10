@@ -8,6 +8,22 @@ import { THEMES } from '@/themes';
 jest.mock('@react-native-async-storage/async-storage', () =>
   jest.requireActual('@react-native-async-storage/async-storage/jest/async-storage-mock')
 );
+// The map cache lives in a file; a row in AsyncStorage is what an earlier
+// release left, which the store takes over on its first read.
+const mockFiles = new Map<string, string>();
+jest.mock('expo-file-system/legacy', () => ({
+  cacheDirectory: 'cache/',
+  getInfoAsync: jest.fn(async (path: string) => ({ exists: mockFiles.has(path) })),
+  readAsStringAsync: jest.fn(async (path: string) => mockFiles.get(path) ?? ''),
+  writeAsStringAsync: jest.fn(
+    async (path: string, value: string) => void mockFiles.set(path, value)
+  ),
+  deleteAsync: jest.fn(async (path: string) => void mockFiles.delete(path)),
+  moveAsync: jest.fn(async ({ from, to }: { from: string; to: string }) => {
+    mockFiles.set(to, mockFiles.get(from) ?? '');
+    mockFiles.delete(from);
+  }),
+}));
 jest.mock('@/shared/config/backend', () => ({
   backendConfig: {
     scoreApiBaseUrl: 'https://catalog.example.test',
@@ -175,7 +191,12 @@ it.each(failures)(
         state: { placesCache: { data: [place], timestamp: 1 }, placeDetailsCache: {} },
       })
     );
+    mockFiles.clear();
     await useBTCMapStore.persist.rehydrate();
+    // The released row was taken over into the file and no longer uses the
+    // space every other store shares.
+    await expect(AsyncStorage.getItem('btcmap-store')).resolves.toBeNull();
+    expect([...mockFiles.keys()]).toEqual(['cache/store-btcmap-store.json']);
     expect(useBTCMapStore.getState().getCachedPlaces()).toBeNull();
     failRequest(failure);
     expect(await useBTCMapStore.getState().fetchPlaces()).toEqual([place]);
