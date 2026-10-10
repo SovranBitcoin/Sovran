@@ -715,3 +715,7 @@ gap, the native side of the v0.1.3 tag was compared with the current code:
 
 So the part of the upgrade a JavaScript-only test cannot see is small and does not touch storage.
 A run from the released binary on a real phone is still the only complete proof.
+
+After the switch and add-profile flows were given one shared ending (`cfd07bb43`), the iOS simulator
+switched from its first profile to its second and back through a temporary hook, restarting each
+time, with the wallet open after every start and no errors.
