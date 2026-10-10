@@ -1,3 +1,4 @@
+import { createCredentialStaging } from '@/shared/lib/cashu/credentialStaging';
 import { registerAccountScoped } from '@/shared/lib/account/accountRegistry';
 import { AppState, type AppStateStatus } from 'react-native';
 import { Manager, type WebSocketFactory, type WebSocketLike } from '@cashu/coco-core';
@@ -364,8 +365,6 @@ export class CocoManager {
   /** Tracks an in-flight cleanup() call so initialize() can await it before proceeding. */
   private static pendingCleanup: Promise<void> | null = null;
   private static cleanupFailed = false;
-  private static cashuMnemonic: string | null = null;
-  private static signerKey: Uint8Array | null = null;
   private static npcPlugin: NPCPlugin | null = null;
   private static npcAccount: NPCAccountApi | null = null;
   private static npcPluginRegistered = false;
@@ -380,18 +379,15 @@ export class CocoManager {
   static disposeSeed(): void {
     if (this.seedGetter) disposeCashuSeedGetter(this.seedGetter);
   }
-  /** Current account index — controls which DB file and NPC signer to use */
-  private static accountIndex = 0;
-  /** True when the active profile is an imported nsec (affects signer/seed fallback paths) */
-  private static isImportedProfile = false;
-
   /**
-   * Bumped whenever a credential is staged for the next initialise. A cleanup
-   * notes the values at its start and, when it finishes, clears only the
-   * credentials nobody has replaced since: a provider that remounts while the
-   * old wallet is still closing stages its own first, and they must survive.
+   * The account, wallet phrase and signer key the next wallet opens with, and
+   * the rule for clearing them when a wallet closes. See `credentialStaging.ts`.
    */
-  private static staged = { signerKey: 0, cashuMnemonic: 0, account: 0 };
+  private static credentials = createCredentialStaging();
+  /** Which database file, and which derivation index, the staged account uses. */
+  private static get accountIndex(): number {
+    return this.credentials.accountIndex;
+  }
 
   /**
    * Bumped by `completeReset`. An initialise notes it at its start and, if a
@@ -402,13 +398,14 @@ export class CocoManager {
   private static resetGeneration = 0;
 
   /**
-   * Clear sensitive in-memory state that should not survive profile switches.
-   * With `since`, a credential staged after that snapshot is left in place.
+   * Forget what belonged to the wallet that just closed: its plugins, its seed
+   * getter, and its staged credentials. With `since`, a credential staged
+   * again after that snapshot is left for the wallet that will open next.
    */
-  private static clearSensitiveRuntimeState(since?: typeof CocoManager.staged): void {
-    if (!since || since.signerKey === this.staged.signerKey) this.signerKey = null;
-    if (!since || since.cashuMnemonic === this.staged.cashuMnemonic) this.cashuMnemonic = null;
-    if (!since || since.account === this.staged.account) this.isImportedProfile = false;
+  private static clearSensitiveRuntimeState(
+    since?: ReturnType<typeof CocoManager.credentials.revisions>
+  ): void {
+    this.credentials.clearUnchangedSince(since);
     this.npcPlugin = null;
     this.npcAccount = null;
     this.npcPluginRegistered = false;
@@ -421,9 +418,7 @@ export class CocoManager {
    * Account 0 uses 'coco.db' (backward compatible), N>0 uses 'coco-N.db'.
    */
   static setAccountIndex(index: number, imported = false): void {
-    this.accountIndex = index;
-    this.isImportedProfile = imported;
-    this.staged.account += 1;
+    this.credentials.stageAccount(index, imported);
     cashuLog.info('cashu.manager.account_index_set', {
       accountIndex: index,
       imported,
@@ -625,8 +620,7 @@ export class CocoManager {
    * This should be called before initialize()
    */
   static setCashuMnemonic(mnemonic: string): void {
-    this.cashuMnemonic = mnemonic;
-    this.staged.cashuMnemonic += 1;
+    this.credentials.stageWalletPhrase(mnemonic);
     cashuLog.debug('cashu.manager.cashu_mnemonic_set', {
       hasMnemonic: mnemonic.length > 0,
     });
@@ -637,8 +631,7 @@ export class CocoManager {
    * Called from CocoProvider with the key already derived by NostrKeysProvider.
    */
   static setSignerKey(sk: Uint8Array): void {
-    this.signerKey = new Uint8Array(sk);
-    this.staged.signerKey += 1;
+    this.credentials.stageSigner(sk);
     cashuLog.debug('cashu.manager.signer_key_set', {
       byteLength: sk.length,
     });
@@ -690,10 +683,12 @@ export class CocoManager {
         // name is fixed on the next line; reading the phrase or the imported
         // flag after the awaits below would let a credential staged for the
         // next account be paired with this account's database.
-        const p2pkImportSecretKey = this.signerKey ? new Uint8Array(this.signerKey) : null;
-        const accountIndex = this.accountIndex;
-        const isImported = this.isImportedProfile;
-        const cashuMnemonic = this.cashuMnemonic;
+        const {
+          signerKey: p2pkImportSecretKey,
+          accountIndex,
+          isImported,
+          cashuMnemonic,
+        } = this.credentials.capture();
         const resetGeneration = this.resetGeneration;
 
         // 1. SQLite database (async to avoid blocking JS thread during profile switch)
@@ -701,8 +696,8 @@ export class CocoManager {
         cashuLog.info('cashu.manager.initialize.start', {
           accountIndex: this.accountIndex,
           dbName,
-          importedProfile: this.isImportedProfile,
-          hasCashuMnemonic: !!this.cashuMnemonic,
+          importedProfile: isImported,
+          hasCashuMnemonic: !!cashuMnemonic,
           hasSignerKey: !!p2pkImportSecretKey,
           hasGiveawayP2PK: !!GIVEAWAY_P2PK_SECRET,
         });
@@ -1272,7 +1267,7 @@ export class CocoManager {
 
     this.cleanupFailed = false;
     const doCleanup = async () => {
-      const stagedAtStart = { ...this.staged };
+      const stagedAtStart = this.credentials.revisions();
       // An initialise still in flight sets `instance` when it finishes. Returning
       // now would report a closed wallet while one is still being opened, for
       // the account that was current when it started, and would clear the keys
@@ -1495,12 +1490,13 @@ export class CocoManager {
    */
   private static async getCurrentProfileSigner(): Promise<NsecSigner | null> {
     try {
-      if (this.signerKey) {
+      const signerKey = this.credentials.signerKey;
+      if (signerKey) {
         initLog('CocoManager', 'using pre-set signerKey (fast path)');
-        return new NsecSigner(this.signerKey);
+        return new NsecSigner(signerKey);
       }
 
-      if (this.isImportedProfile) {
+      if (this.credentials.isImported) {
         initLog('CocoManager', 'signerKey not set — loading imported nsec (slow path)');
         const { useProfileStore } = await import('@/shared/stores/global/profileStore');
         const activeProfile = useProfileStore.getState().getActiveProfile();

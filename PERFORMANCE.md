@@ -719,3 +719,7 @@ A run from the released binary on a real phone is still the only complete proof.
 After the switch and add-profile flows were given one shared ending (`cfd07bb43`), the iOS simulator
 switched from its first profile to its second and back through a temporary hook, restarting each
 time, with the wallet open after every start and no errors.
+
+After the wallet's staged credentials were moved into one owner, the iOS simulator switched from its
+first profile to its second and back, restarting each time with the wallet open and no errors.
+Android was not rechecked: the emulator would not start for lack of disk.

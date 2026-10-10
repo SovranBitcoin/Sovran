@@ -54,10 +54,10 @@ jest.mock('@/shared/lib/cashu/npc', () => ({
 type Staged = {
   signerKey: Uint8Array | null;
   cashuMnemonic: string | null;
-  isImportedProfile: boolean;
+  isImported: boolean;
 };
 /** The credentials staged for the next initialise; private, read here only. */
-const staged = () => CocoManager as unknown as Staged;
+const staged = () => (CocoManager as unknown as { credentials: Staged }).credentials;
 
 let failOpen!: (error: Error) => void;
 const tick = () => new Promise((resolve) => setImmediate(resolve));
@@ -131,7 +131,7 @@ it('keeps the credentials a remounted provider staged while the old wallet was c
   // an imported account as a derived one.
   expect(staged().cashuMnemonic).toBe('phrase of account b');
   expect(staged().signerKey).toEqual(new Uint8Array(32).fill(2));
-  expect(staged().isImportedProfile).toBe(true);
+  expect(staged().isImported).toBe(true);
 });
 
 it('does not hand the old signer key to a provider that staged none', async () => {
