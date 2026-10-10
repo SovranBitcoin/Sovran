@@ -28,6 +28,10 @@ The last two rows are the hazard. Disk is keyed, so two accounts never collide t
   storage key on every write but loads its contents once. Flip the account underneath it and it
   writes the old account's contents under the new account's key.
 
+The storage adapter is the last line against exactly this: it remembers which profile each store
+loaded under and drops a save made while another profile is active
+(`app/shared/lib/cashu/profileScopedStorage.ts`).
+
 That is why a profile switch restarts the app, and why anything that changes accounts has to deal
 with what lives outside React.
 

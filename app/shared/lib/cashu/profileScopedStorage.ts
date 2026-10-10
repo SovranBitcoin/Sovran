@@ -20,6 +20,7 @@ import {
 import { persistRegistry } from '@/shared/lib/persist/persistConfig';
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { log } from '@/shared/lib/logger';
 import { StateStorage } from 'zustand/middleware';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { declaredStores } from '@/shared/lib/account/accountRegistry';
@@ -82,6 +83,16 @@ export async function captureProfileStorageOwner(): Promise<string> {
 }
 
 /**
+ * Which profile each store last loaded under, for stores that follow the
+ * active profile. A store holds one profile's contents in memory; writing them
+ * under another profile's key is the leak the whole account design exists to
+ * prevent. The write barrier and the reset-then-reload order already stop it.
+ * This is the second line: a write is dropped when the active profile is no
+ * longer the one the store's contents came from.
+ */
+const loadedUnder = new Map<string, string>();
+
+/**
  * Create a StateStorage adapter scoped to the active profile, or a captured
  * owner for async services that must survive active-profile changes.
  * Use this with `createJSONStorage(() => createProfileScopedStorage())` in Zustand persist.
@@ -97,12 +108,24 @@ export function createProfileScopedStorage(
       await ensureProfileStoreHydrated();
       const pubkey = ownerPubkey ?? getActiveProfilePubkey();
       const key = pubkey ? `${name}:profile:${pubkey}` : name;
-      return AsyncStorage.getItem(key);
+      const value = await AsyncStorage.getItem(key);
+      // Recorded only once the read has succeeded, and only for a store that
+      // follows the active profile; a captured owner cannot drift.
+      if (!ownerPubkey && pubkey) loadedUnder.set(name, pubkey);
+      return value;
     },
     setItem: (name: string, value: string) => {
       if (profilePersistWritesBlocked() && !admittedWrite) return Promise.resolve();
       // Capture ownership before yielding; a queued A write must never resolve B's key.
       const pubkey = ownerPubkey ?? getActiveProfilePubkey();
+      const loaded = ownerPubkey ? undefined : loadedUnder.get(name);
+      if (loaded && pubkey && loaded !== pubkey) {
+        // Not a first write after onboarding (nothing was loaded under a
+        // profile then): the store was loaded for one profile and is being
+        // saved while another is active.
+        log.warn('profile.storage.cross_profile_write_refused', { store: name });
+        return Promise.resolve();
+      }
       const write = (async () => {
         await _migrationGate;
         await ensureProfileStoreHydrated();
@@ -115,6 +138,11 @@ export function createProfileScopedStorage(
     removeItem: (name: string) => {
       if (profilePersistWritesBlocked() && !admittedWrite) return Promise.resolve();
       const pubkey = ownerPubkey ?? getActiveProfilePubkey();
+      const loaded = ownerPubkey ? undefined : loadedUnder.get(name);
+      if (loaded && pubkey && loaded !== pubkey) {
+        log.warn('profile.storage.cross_profile_write_refused', { store: name });
+        return Promise.resolve();
+      }
       return trackProfilePersistWrite(
         (async () => {
           await _migrationGate;
