@@ -120,6 +120,52 @@ describe('switchToExistingProfile — persist-before-restart (BTC-13)', () => {
     expect(await switchToExistingProfile({ accountIndex: 0 })).toBe(false);
   });
 
+  it('holds the app when the target cannot be recorded after the wallet was closed', async () => {
+    // The wallet is already closed, so carrying on as the old account is not
+    // an option: releasing here used to leave it running with no wallet.
+    const { switchToExistingProfile, useProfileStore, mockRestart, AsyncStorage } = setup();
+    mockRestart.mockReturnValue(true);
+    (AsyncStorage.setItem as jest.Mock).mockImplementation(async (key: string) => {
+      if (key === 'profile-store') throw new Error('disk full');
+    });
+    const { Alert } = require('react-native');
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+
+    expect(await switchToExistingProfile({ accountIndex: 1 })).toBe(false);
+
+    expect(mockRestart).not.toHaveBeenCalled();
+    expect(useProfileStore.getState().activeAccountIndex).toBe(0);
+    expect(alert).toHaveBeenCalledWith(
+      'Restart Required',
+      expect.stringContaining('Could not switch'),
+      expect.any(Array)
+    );
+    (AsyncStorage.setItem as jest.Mock).mockImplementation(async () => undefined);
+    expect(await switchToExistingProfile({ accountIndex: 1 })).toBe(false);
+  });
+
+  it('holds the app when the restart call throws', async () => {
+    const { switchToExistingProfile, useProfileStore, mockRestart, AsyncStorage } = setup();
+    mockRestart.mockImplementation(() => {
+      throw new Error('reload unavailable');
+    });
+    const { Alert } = require('react-native');
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+
+    // The target was recorded, so reopening finishes the switch.
+    expect(await switchToExistingProfile({ accountIndex: 1 })).toBe(true);
+
+    expect(persistedActiveIndex(AsyncStorage)).toBe(1);
+    expect(useProfileStore.getState().activeAccountIndex).toBe(0);
+    expect(alert).toHaveBeenCalledWith(
+      'Restart Required',
+      expect.stringContaining('finish switching'),
+      expect.any(Array)
+    );
+    mockRestart.mockReturnValue(true);
+    expect(await switchToExistingProfile({ accountIndex: 0 })).toBe(false);
+  });
+
   it('refuses an unknown target without touching anything', async () => {
     const { switchToExistingProfile, useProfileStore, mockRestart, AsyncStorage } = setup();
     mockRestart.mockReturnValue(true);
@@ -250,6 +296,37 @@ describe('createAndSwitchProfile — capacity', () => {
     ).toBe(false);
 
     expect(await switchToExistingProfile({ accountIndex: 1 })).toBe(true);
+  });
+
+  it('holds the app when the new profile cannot be made active on disk', async () => {
+    const { createAndSwitchProfile, switchToExistingProfile, useProfileStore, mockRestart } =
+      setup();
+    mockRestart.mockReturnValue(true);
+    const { profilePersistWritesBlocked } =
+      require('@/shared/lib/persist/profileWriteBarrier') as typeof import('@/shared/lib/persist/profileWriteBarrier');
+    const AsyncStorage =
+      require('@react-native-async-storage/async-storage') as typeof AsyncStorageMock;
+    const { Alert } = require('react-native');
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    // The row is added and saved; the write that makes it the active account fails.
+    (AsyncStorage.setItem as jest.Mock).mockImplementation(async (key: string, value: string) => {
+      if (key === 'profile-store' && JSON.parse(value).state.activeAccountIndex === 2)
+        throw new Error('disk full');
+    });
+
+    const created = await createAndSwitchProfile({
+      getKeysForAccount: async () => ({ pubkey: 'f'.repeat(64), privateKey: new Uint8Array() }),
+    });
+
+    expect(created).toBe(false);
+    expect(mockRestart).not.toHaveBeenCalled();
+    expect(alert).toHaveBeenCalled();
+    // Held: the old account stays the one in memory, per-profile saves are
+    // blocked, and nothing else can start.
+    expect(useProfileStore.getState().activeAccountIndex).toBe(0);
+    expect(profilePersistWritesBlocked()).toBe(true);
+    (AsyncStorage.setItem as jest.Mock).mockImplementation(async () => undefined);
+    expect(await switchToExistingProfile({ accountIndex: 1 })).toBe(false);
   });
 
   it('creates and switches normally when there is room', async () => {

@@ -133,17 +133,19 @@ credentials are cleared, whatever the index says.
 Between steps 4 and 6 memory says A and disk says B. Nothing may flip memory to B in that window:
 that would remount the providers over stores still holding A.
 
-Ways out other than step 6:
+Step 3 is the point of no return. Before it a failure gives up; from it on the only endings are
+a restart or a hold (`restartInto`). Ways out other than step 6:
 
-- **Something throws before the restart call** (including a failed write in step 4): the lock and
-  splash are released and the active account stays A, but step 3 is not undone. A's wallet may be
-  closed with nothing reopening it until the app is restarted (follow-up F84).
+- **Something fails before step 3** (the target does not exist, the keys for a new profile
+  cannot be derived): the lock and splash are released and the app carries on as A.
+- **Step 4 fails**, or the restart call throws: the app is **held** on A with an alert. A's wallet
+  is already closed, so carrying on is not an option. Reopening starts as A.
 - **The restart call reports failure** (step 5): the app is **held**. Account providers are
   unmounted, saves are blocked, the lock is kept, and an alert asks to close and reopen. Reopening
   starts as B. Checked on a device.
 - **The restart call returns but nothing reloads**: not detected. `true` from `restartApp` means
   the request was made, not that a reload was seen. In a development build the reload call can
-  throw instead, which takes the first exit above.
+  throw instead, which holds the app.
 
 Adding a profile differs before step 3: the new keys are derived (the flow gives up waiting after
 thirty seconds; the derivation itself is not cancelled) and the profile row is added, in memory
@@ -299,4 +301,4 @@ Rules:
 | When the splash comes down                                        | `app/shared/blocks/NativeSplashLayoutGate.tsx`                               |
 | What an account owns outside React                                | `app/shared/lib/account/accountRegistry.ts`                                  |
 | Decisions                                                         | ADR 0029 (registry and switch), ADR 0030 (removal)                           |
-| Known gaps                                                        | `docs/architecture/follow-ups.md` (F72, F76, F77, F79 to F85)                |
+| Known gaps                                                        | `docs/architecture/follow-ups.md` (F72, F76, F77, F79 to F83, F85)           |

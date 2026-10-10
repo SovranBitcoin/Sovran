@@ -105,7 +105,7 @@ export async function switchToExistingProfile(opts: {
     const release = () => lock.release();
     return useSettingsStore.getState().inProcessProfileSwitch
       ? await switchWithoutRestart(opts.accountIndex, release)
-      : await switchByRestart(opts.accountIndex);
+      : await restartInto(opts.accountIndex);
   } catch (error) {
     log.error('profile.orchestrator.switch_failed', { error: redactError(error) });
     await lock.release();
@@ -165,38 +165,58 @@ async function switchWithoutRestart(
   }
 }
 
-/** The default switch: close the wallet, record the target on disk, restart into it. */
-async function switchByRestart(accountIndex: number): Promise<boolean> {
+/**
+ * The shared ending of the default switch and of add-profile: ask the wallet
+ * to close, record the target on disk, restart into it. (The in-process switch
+ * has its own fallback.)
+ *
+ * Asking the wallet to close is the point of no return. Before it, a flow that
+ * fails gives up and releases the lock, and the app carries on as it was. From
+ * it on, the old account can no longer be relied on (its wallet is closed or
+ * closing), so there are only two endings and neither releases the lock:
+ *
+ * - the restart happens, and the new runtime starts as whichever account is
+ *   on disk;
+ * - anything else, and the app is held until it is reopened.
+ *
+ * The active account is never flipped in memory here. That flip remounts the
+ * provider tree over stores still holding the old account's state.
+ *
+ * Resolves true when the write of the target was acknowledged, false when it
+ * was not; the app is then held, and reopening starts as whatever is on disk.
+ */
+async function restartInto(accountIndex: number): Promise<boolean> {
   await cleanupCocoWithTimeout();
-
-  // The Routstr client holds a hydrated, profile-scoped store and a wallet
-  // adapter bound to the Coco manager just torn down. A restart discards it
-  // anyway; this covers the case where the restart does not happen.
+  // The Routstr client holds a store and a wallet adapter bound to the wallet
+  // just closed. A restart discards it; this covers a restart that does not happen.
   resetRoutstrClient();
 
-  // Persist the switch target and restart into it WITHOUT the in-memory
-  // store flip — the flip remounts the whole provider tree and would boot
-  // the new profile in-process, racing the native restart (BTC-13).
-  const persisted = await persistSwitchTargetToDisk(accountIndex);
-  if (persisted.isErr()) {
-    throw persisted.error;
+  let recorded = false;
+  try {
+    const persisted = await persistSwitchTargetToDisk(accountIndex);
+    if (persisted.isErr()) throw persisted.error;
+    recorded = true;
+    if (await teardownAndRestart()) return true;
+  } catch (error) {
+    log.error('profile.orchestrator.restart_into_failed', {
+      recorded,
+      error: redactError(error),
+    });
   }
-  if (!(await teardownAndRestart())) await holdUntilReopened();
-  // Either way the lock stays held: the runtime is about to reload, or the app
-  // is held down until it is reopened.
-  return true;
+  await holdUntilReopened(
+    recorded
+      ? 'Please close and reopen the app to finish switching profiles.'
+      : 'Could not switch profiles. Please close and reopen the app.'
+  );
+  return recorded;
 }
 
 /**
- * The restart did not happen. The target account is already on disk, so the
- * next start boots into it. Until then nothing may run as either account:
- * flipping the account in memory here would remount the providers over stores
- * that still hold the old account's state. Hold the providers down, keep the
- * splash and the lock, and ask for a reopen.
+ * Hold the app until it is reopened: account providers unmounted, per-profile
+ * saves blocked, the splash and the lock kept, and an alert saying so. Nothing
+ * may run as either account once the wallet has been closed for a switch.
  */
-async function holdUntilReopened(
-  message = 'Please close and reopen the app to finish switching profiles.'
-): Promise<void> {
+async function holdUntilReopened(message: string): Promise<void> {
   await holdProfileSwitchForRestart().catch(() => {
     log.warn('profile.switch.boundary_hold_failed');
   });
@@ -248,15 +268,7 @@ export async function createAndSwitchProfile(opts?: {
       return false;
     }
 
-    await cleanupCocoWithTimeout();
-    // Persist-then-restart without the in-memory flip (BTC-13 — see
-    // switchToExistingProfile). If the restart fails the app is held, not flipped.
-    const persisted = await persistSwitchTargetToDisk(nextIndex);
-    if (persisted.isErr()) {
-      throw persisted.error;
-    }
-    if (!(await teardownAndRestart())) await holdUntilReopened();
-    return true;
+    return await restartInto(nextIndex);
   } catch (error) {
     log.error('profile.orchestrator.create_failed', { error: redactError(error) });
     await lock.release();
