@@ -779,3 +779,7 @@ run on the Android emulator and iOS simulator, and nothing it stored was lost or
 Decision, 2026-10-10: the tests together with the emulator and simulator upgrades from v0.1.3's
 code were accepted as sufficient evidence that upgrading users are not broken. The store-signed
 upgrade above remains a recommended check before release, not a blocker for this branch.
+
+The sheet left on screen by a hold (F82) was then fixed and checked on the iOS simulator: with the
+Receive sheet open and the restart forced to fail, the hold showed only the splash and the alert.
+An earlier variant that kept the root route was also tried there and did not close the sheet.

@@ -12,6 +12,7 @@
  * it register the layout's hooks with the account flows.
  */
 import { resetProfileNavigation } from '@/shared/lib/profile/resetProfileNavigation';
+import { hasPresentedRoutes, joinOrStart } from '@/shared/lib/profile/suspendHelpers';
 import { reportAsyncStorageUsage } from '@/shared/lib/persist/storageUsage';
 import { registerProfileSwitchBoundary } from '@/shared/lib/account/accountRegistry';
 import { useNavigationContainerRef } from 'expo-router';
@@ -83,33 +84,67 @@ export function AccountScopedProviders({
   return <InnerProviders>{children}</InnerProviders>;
 }
 
-/** Hold the old tree unmounted until all new-account stores have hydrated. */
 const STORAGE_USAGE_REPORT_DELAY_MS = 60_000;
+/** Long enough for a sheet the system presented to finish going away. */
+const SHEET_DISMISS_MS = 450;
 
+/**
+ * Sheets presented natively (a route modal such as Receive or the backup
+ * prompt) stay on screen after the navigator that opened them is unmounted,
+ * above everything, with controls that no longer do anything. Before
+ * unmounting, send navigation back to its root, which closes them, and give
+ * the dismissal time to finish.
+ *
+ * Only when something is presented: resetting remounts the drawer, which lets
+ * the outgoing account's first screen run again for the moment before the
+ * tree is unmounted. Keeping the root route's key avoids that remount but does
+ * not close a sheet held by a nested navigator (tried on a device). Best
+ * effort: unmounting matters more than a tidy dismissal.
+ */
+async function closePresentedSheets(
+  navigation: ReturnType<typeof useNavigationContainerRef>
+): Promise<void> {
+  try {
+    if (!navigation.isReady() || !hasPresentedRoutes(navigation.getRootState())) return;
+    resetProfileNavigation(navigation);
+    await new Promise((resolve) => setTimeout(resolve, SHEET_DISMISS_MS));
+  } catch {
+    // Nothing to do: the tree is unmounted next either way.
+  }
+}
+
+/** Hold the old tree unmounted until all new-account stores have hydrated. */
 export function AccountSwitchBoundary({ children }: { children: React.ReactNode }) {
   const navigation = useNavigationContainerRef();
   const [suspended, setSuspended] = useState(false);
   const suspendedRef = useRef(false);
+  const suspending = useRef<Promise<void> | null>(null);
   const acknowledgement = useRef<{ resolve: () => void; reject: (error: unknown) => void } | null>(
     null
   );
   useEffect(
     () =>
       registerProfileSwitchBoundary({
-        suspend: () =>
-          suspendedRef.current
-            ? Promise.resolve()
-            : new Promise<void>((resolve, reject) => {
-                acknowledgement.current = { resolve, reject };
-                setSuspended(true);
-              }),
+        suspend: () => {
+          if (suspendedRef.current) return Promise.resolve();
+          // One suspension at a time. A second caller (the fallback hold,
+          // while a timed-out switch is still pending) joins the first; two
+          // would overwrite each other's acknowledgement and one would hang.
+          return joinOrStart(suspending, async () => {
+            await closePresentedSheets(navigation);
+            await new Promise<void>((resolve, reject) => {
+              acknowledgement.current = { resolve, reject };
+              setSuspended(true);
+            });
+          });
+        },
         resume: () =>
           new Promise<void>((resolve, reject) => {
             acknowledgement.current = { resolve, reject };
             setSuspended(false);
           }),
       }),
-    []
+    [navigation]
   );
   useEffect(() => {
     suspendedRef.current = suspended;
