@@ -740,3 +740,18 @@ available:
 
 Both went through the same functions the app's screens call; the screens themselves (the recovery
 form and the drawer's import sheet) were not tapped through. The simulator was deleted afterwards.
+
+### The profile screens, tapped through on a device, 2026-10-10
+
+On the iOS simulator, using the app's own screens (drawer, profile sheet, import sheet, removal
+prompts) rather than hooks:
+
+- Imported a newly generated key through the import sheet. The app restarted into the imported
+  profile, listed under "Imported".
+- Switched back to the first profile from the profile sheet.
+- Removed the imported profile through both removal prompts. The first shows the new warning about
+  payments not yet received, in full; the second asks about deleting the imported key.
+- Removed the spare derived profile left by an earlier check.
+
+The simulator ended with its one original profile. No store refused a write and nothing was set
+aside as unreadable during the run; the only error events were network fetches.
