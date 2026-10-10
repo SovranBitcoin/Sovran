@@ -113,6 +113,23 @@ describe('legacy theme migration', () => {
     expect(store['settings-store']).toBeUndefined();
     expect(store[`theme-store:profile:${activePubkey}`]).toBeUndefined();
   });
+  it.each([
+    ['a string', '{"state":"bad","version":4}'],
+    ['null', '{"state":null}'],
+    ['a number', '{"state":7,"version":4}'],
+    ['an array', '{"state":["theme"],"version":4}'],
+  ])('finishes and leaves settings untouched when state is %s', async (_shape, settingsBlob) => {
+    // Valid JSON, wrong shape. Throwing here would fail the migration on every
+    // launch and hold the user on the retry screen.
+    const store: StorageMap = { 'settings-store': settingsBlob, 'profile-store': profileStoreBlob };
+
+    await expect(runMigration(store)).resolves.toBeUndefined();
+
+    expect(store['settings-store']).toBe(settingsBlob);
+    expect(store[`theme-store:profile:${activePubkey}`]).toBeUndefined();
+    expect(JSON.parse(store[COMPLETED_KEY])).toContain('legacy-global-theme-to-profile-v1');
+  });
+
   it('keeps the source and retries when persisting the migrated theme fails', async () => {
     const store: StorageMap = {
       'settings-store': JSON.stringify({ state: { theme: 'flowers-1' }, version: 0 }),

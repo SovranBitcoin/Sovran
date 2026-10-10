@@ -14,6 +14,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { z } from 'zod';
 
+import { deriveNostrKeys } from '@/shared/lib/nostr/keyDerivation';
+import { retrieveMnemonic } from '@/shared/lib/nostr/secureStorage';
 import { PROFILE_PRIMARY_UNIT_ID, isBuiltinColorTheme } from '@/shared/lib/theme/builtinAlbums';
 import { log } from '../logger';
 
@@ -69,9 +71,16 @@ const INDEX_TO_PUBKEY_STORE_KEYS = [
  */
 const NOW_GLOBAL_STORE_KEYS: ReadonlySet<string> = new Set(['own-profile-stats-cache']);
 
+/**
+ * A migration that returns this is not recorded as done and runs again on the
+ * next launch. It is for work that can only finish once a later launch has
+ * state this one does not; a failure still throws.
+ */
+const RUN_AGAIN = 'run-again';
+
 interface Migration {
   id: string;
-  run: () => Promise<void>;
+  run: () => Promise<void | typeof RUN_AGAIN>;
 }
 
 const PersistedProfileRow = z.object({
@@ -122,6 +131,68 @@ function readPersistedProfiles(raw: string): PersistedProfiles | null {
 }
 
 /**
+ * Carry over an install from before profiles existed (0.0.45 to 0.0.56). It has
+ * no `profile-store`; its one account's stores sit under bare keys and its root
+ * phrase is in SecureStore. The keys provider is about to create account 0 from
+ * that phrase, so the pubkey is derived here the same way and each bare value is
+ * copied to that account's key.
+ *
+ * The bare keys are left for this launch. Until account 0 has a row, a store
+ * that loads reads its bare key, and one that found it gone would later save
+ * defaults over the copy. `RUN_AGAIN` brings the migration back next launch,
+ * when the row exists and the loop in `migrateIndexKeysToPubkeyKeys` removes
+ * them.
+ *
+ * Without a readable, valid phrase nothing is copied and nothing is removed,
+ * and the migration comes back next launch.
+ */
+async function copyPreProfileStoresToAccountZero(): Promise<void | typeof RUN_AGAIN> {
+  const bareStores: [base: string, data: string][] = [];
+  for (const base of INDEX_TO_PUBKEY_STORE_KEYS) {
+    if (NOW_GLOBAL_STORE_KEYS.has(base)) continue;
+    const data = await AsyncStorage.getItem(base);
+    if (data) bareStores.push([base, data]);
+  }
+  // A fresh install ends here, before the keychain is read.
+  if (bareStores.length === 0) return;
+
+  let pubkey: string;
+  try {
+    // Null covers absent, unreadable and invalid; the read logs which.
+    const phrase = await retrieveMnemonic();
+    if (!phrase) {
+      log.warn('migrations.global.pre_profile.phrase_unavailable', {
+        storeCount: bareStores.length,
+      });
+      // The keychain may only be unreadable for now. Recording the migration
+      // here would leave these stores behind for good once it reads again.
+      return RUN_AGAIN;
+    }
+    pubkey = deriveNostrKeys(phrase, 0).pubkey;
+  } catch {
+    // The error is not logged: it may quote the phrase.
+    log.warn('migrations.global.pre_profile.derivation_failed', { storeCount: bareStores.length });
+    return RUN_AGAIN;
+  }
+
+  let copiedCount = 0;
+  for (const [base, data] of bareStores) {
+    const newKey = `${base}:profile:${pubkey}`;
+    // An earlier launch may have copied this already, and saved over it since.
+    if ((await AsyncStorage.getItem(newKey)) !== null) continue;
+    await AsyncStorage.setItem(newKey, data);
+    copiedCount++;
+  }
+
+  log.info('migrations.global.pre_profile.copied', {
+    copiedCount,
+    storeCount: bareStores.length,
+    pubkeyPrefix: pubkey.slice(0, 8),
+  });
+  return RUN_AGAIN;
+}
+
+/**
  * Migrate all profile-scoped Zustand stores from the old index-based
  * AsyncStorage key format to the current pubkey-based format.
  *
@@ -134,9 +205,13 @@ function readPersistedProfiles(raw: string): PersistedProfiles | null {
  *
  * Reads profile-store directly from AsyncStorage (no Zustand dependency)
  * so it can run before any store hydrates.
+ *
+ * An install with no profile-store at all predates profiles and is handled by
+ * `copyPreProfileStoresToAccountZero`.
  */
-async function migrateIndexKeysToPubkeyKeys(): Promise<void> {
+async function migrateIndexKeysToPubkeyKeys(): Promise<void | typeof RUN_AGAIN> {
   const raw = await AsyncStorage.getItem('profile-store');
+  if (raw === null) return copyPreProfileStoresToAccountZero();
   if (!raw) return;
 
   const persisted = readPersistedProfiles(raw);
@@ -193,19 +268,26 @@ async function migrateLegacyGlobalThemeToProfile(): Promise<void> {
   const settingsRaw = await AsyncStorage.getItem('settings-store');
   if (!settingsRaw) return;
 
-  let settingsParsed: { state?: { theme?: unknown }; version?: number };
+  let settingsParsed: { state?: unknown; version?: number } | null;
   try {
     settingsParsed = JSON.parse(settingsRaw);
   } catch {
     return;
   }
 
-  const legacyTheme = settingsParsed?.state?.theme;
+  // Valid JSON can still hold a string, number, null or array where the state
+  // object belongs. There is no theme to move, and `in` throws on a primitive,
+  // which would fail this migration on every launch. The blob is left as it is.
+  const rawState = settingsParsed?.state;
+  if (typeof rawState !== 'object' || rawState === null || Array.isArray(rawState)) return;
+  const settingsState: { theme?: unknown } = rawState;
+
+  const legacyTheme = settingsState.theme;
   if (typeof legacyTheme !== 'string' || !legacyTheme) {
     // Nothing to migrate — still strip the field if it somehow exists as a
     // non-string (paranoia) and exit.
-    if (settingsParsed?.state && 'theme' in settingsParsed.state) {
-      delete settingsParsed.state.theme;
+    if ('theme' in settingsState) {
+      delete settingsState.theme;
       await AsyncStorage.setItem('settings-store', JSON.stringify(settingsParsed));
     }
     return;
@@ -264,10 +346,8 @@ async function migrateLegacyGlobalThemeToProfile(): Promise<void> {
 
   // Strip only after the destination write succeeds. A failed write must
   // preserve the source and leave this migration pending for the next launch.
-  if (settingsParsed?.state) {
-    delete settingsParsed.state.theme;
-    await AsyncStorage.setItem('settings-store', JSON.stringify(settingsParsed));
-  }
+  delete settingsState.theme;
+  await AsyncStorage.setItem('settings-store', JSON.stringify(settingsParsed));
 }
 
 /**
@@ -382,7 +462,10 @@ export async function runGlobalMigrations(): Promise<void> {
     if (completedIds.has(migration.id)) continue;
 
     try {
-      await migration.run();
+      if ((await migration.run()) === RUN_AGAIN) {
+        log.info('migrations.global.run_again', { migrationId: migration.id });
+        continue;
+      }
       completedIds.add(migration.id);
       await writeCompletedMigrationIds(completedIds);
       log.info('migrations.global.completed', { migrationId: migration.id });
