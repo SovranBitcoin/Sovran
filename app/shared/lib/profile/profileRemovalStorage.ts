@@ -20,6 +20,7 @@ import {
   type ProfileEntry,
 } from '@/shared/stores/global/profileStore';
 import type { RemovalPorts } from './removeProfile';
+import { forgetWalletDatabases } from '@/shared/lib/cashu/walletDatabaseRecord';
 import {
   liveStores,
   declaredStores,
@@ -281,6 +282,9 @@ export const profileRemovalPorts: RemovalPorts = {
       {
         name: 'wallet database',
         run: async () => {
+          // Forgotten first: a removal that stops before the row is dropped
+          // must not leave an account that asks for a restore when opened.
+          forgetWalletDatabases([profile.accountIndex]);
           await deleteFiles(walletName(profile.accountIndex));
           deletedWallets.add(profile.pubkey);
         },

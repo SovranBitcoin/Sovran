@@ -90,6 +90,14 @@ Three separate kinds of readiness, easy to confuse:
   then keeps its own overlay up until the wallet screen publishes its position, a blocking stage
   fails, or a timeout passes. The splash coming down does not prove the wallet is usable.
 
+Each row in the profile list records whether this install has opened that account's wallet
+database (`walletDatabaseCreated`, `app/shared/lib/cashu/walletDatabaseRecord.ts`). If a recorded
+account's database opens with no tables, the file was lost and SQLite made a new one: the restore
+is marked pending before the migrations run, and the app gate shows the restore screen. A row with
+no record (written by v0.1.3 or earlier, or new) never asks; it is recorded once its database has
+opened. Accounts are not recorded in the background, because a late save of the profile list
+could undo a switch that had just changed the active account on disk. Removal and delete-all clear the record before they delete the file.
+
 After the wallet opens, read-only watchers and default mints start at once; sync, processors and
 recovery of pending operations wait for any restore to finish.
 

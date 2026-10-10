@@ -215,6 +215,33 @@ test.each(['file', 'secure', 'list'] as const)(
   }
 );
 
+test('removal forgets the wallet database record, so the index can be used again', async () => {
+  useProfileStore.getState().setWalletDatabaseCreated([0, 1], true);
+  expect((await remove()).kind).toBe('removed');
+  useProfileStore.getState().addProfile(1, target);
+  const rows = useProfileStore.getState().profiles;
+  expect(rows.map((p) => p.walletDatabaseCreated)).toEqual([true, undefined]);
+});
+
+test('a removal that stops after deleting the wallet leaves no record of it', async () => {
+  useProfileStore.getState().setWalletDatabaseCreated([0, 1], true);
+  // The last step, saving the shortened list, fails: the row stays.
+  const setItem = jest.mocked(AsyncStorage.setItem);
+  const save = setItem.getMockImplementation()!;
+  setItem.mockImplementation(async (key, value) => {
+    if (key === 'profile-store' && JSON.parse(value).state.profiles.length === 1)
+      throw new Error('disk full');
+    return save(key, value);
+  });
+  const result = await remove();
+  setItem.mockImplementation(save);
+  expect(result).toMatchObject({ kind: 'failed', failed: 'profile list' });
+  expect(mockDeleted.has('fixture/SQLite/coco-1.db')).toBe(true);
+  // Opening this account now finds an empty database; that is not a loss.
+  const rows = useProfileStore.getState().profiles;
+  expect(rows.map((p) => p.walletDatabaseCreated)).toEqual([true, false]);
+});
+
 test('profile registry includes persisted profile stores used by deletion', () => {
   expect(persistedStoreKeys('profile')).toContain('routstr-store');
 });

@@ -27,6 +27,7 @@ import { Alert } from 'react-native';
 
 import { log, nostrLog, redactError } from '../logger';
 import { CocoManager } from '@/shared/lib/cashu/manager';
+import { forgetWalletDatabases } from '@/shared/lib/cashu/walletDatabaseRecord';
 import { deriveNostrKeys } from '@/shared/lib/nostr/keyDerivation';
 import { useSecureStoreState } from '@/shared/stores/runtime/secureStoreState';
 import { useWalletLifecycleStore } from '@/shared/stores/global/walletLifecycleStore';
@@ -489,6 +490,9 @@ export async function deleteAllProfiles(opts?: {
 
     // 1. Close SQLite and destroy all Coco databases
     erasing = true;
+    // If the wipe stops after the databases are gone, reopening must not take
+    // their absence for a loss and ask for a restore.
+    forgetWalletDatabases(accountIndexes);
     await CocoManager.completeReset(accountIndexes);
 
     // 2. Clear ALL secure storage (mnemonic, derived keys, cashu mnemonics, imported nsecs)

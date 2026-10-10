@@ -182,7 +182,21 @@ it('lets a derived account recover its matching phrase after a setup failure', a
 });
 
 it('clears secure data and preferences before restarting fresh', async () => {
+  useProfileStore.setState({
+    profiles: [
+      { accountIndex: 0, pubkey: 'a'.repeat(64), addedAt: 1, walletDatabaseCreated: true },
+      { accountIndex: 3, pubkey: 'b'.repeat(64), addedAt: 2, walletDatabaseCreated: true },
+    ],
+  });
+  // A wipe that stops once the databases are gone leaves the list behind.
+  // Reopening must not then take the missing databases for a loss.
+  let recordedAtReset: unknown;
+  jest.mocked(CocoManager.completeReset).mockImplementationOnce(async () => {
+    recordedAtReset = useProfileStore.getState().profiles.map((p) => p.walletDatabaseCreated);
+  });
   await expect(deleteAllProfiles()).resolves.toBe(true);
+  expect(CocoManager.completeReset).toHaveBeenCalledWith([0, 3]);
+  expect(recordedAtReset).toEqual([false, false]);
   expect(clearAllSecureData).toHaveBeenCalled();
   expect(AsyncStorage.clear).toHaveBeenCalled();
   expect(restartApp).toHaveBeenCalledTimes(1);

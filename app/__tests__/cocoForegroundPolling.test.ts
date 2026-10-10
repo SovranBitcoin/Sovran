@@ -19,6 +19,7 @@ jest.mock('@/shared/lib/nostr/secureStorage', () => ({}));
 jest.mock('@/shared/lib/nostr/keyDerivation', () => ({}));
 jest.mock('@/shared/lib/cashu/cocoRepositories', () => ({}));
 jest.mock('@/shared/lib/cashu/managerInternals', () => ({}));
+jest.mock('@/shared/lib/cashu/walletDatabaseRecord', () => ({}));
 jest.mock('@/shared/lib/cashu/paymentRequestNostrTransport', () => ({}));
 
 /**

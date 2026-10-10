@@ -17,6 +17,10 @@ import {
   type ExpoSqliteRepositoriesOptions,
 } from '@cashu/coco-expo-sqlite';
 import { createSovranCocoRepositories } from './cocoRepositories';
+import {
+  askForRestoreIfWalletDatabaseLost,
+  recordWalletDatabaseCreated,
+} from './walletDatabaseRecord';
 import * as SQLite from 'expo-sqlite';
 import {
   retrieveMnemonic,
@@ -431,6 +435,14 @@ export class CocoManager {
     return this.accountIndex === 0 ? 'coco.db' : `coco-${this.accountIndex}.db`;
   }
 
+  /**
+   * The same name, for an account that is not the staged one. `getDbName`
+   * stays spelled out: `releasedPersistedSurface.test.ts` pins its text.
+   */
+  private static dbNameFor(accountIndex: number): string {
+    return accountIndex === 0 ? 'coco.db' : `coco-${accountIndex}.db`;
+  }
+
   /** File-system paths for a coco database and its pre-v2 backup set. */
   private static getDbPaths(dbName: string) {
     const dbPath = `${FileSystem.documentDirectory}SQLite/${dbName}`;
@@ -483,13 +495,19 @@ export class CocoManager {
    * so the migration outcome is verifiable from log.txt.
    *
    * Never throws — a failed backup logs and lets init proceed. Returns the
-   * live DB handle (reopened when the backup had to close it) and the
-   * pre-init migration count (-1 when unknown).
+   * live DB handle (reopened when the backup had to close it), the pre-init
+   * migration count (-1 when unknown), and whether the database held no
+   * tables: the file was missing and SQLite has just created it.
    */
   private static async runPreInitSafetyRails(
     db: SQLite.SQLiteDatabase,
     dbName: string
-  ): Promise<{ db: SQLite.SQLiteDatabase; migrationCount: number; migrationExpected: boolean }> {
+  ): Promise<{
+    db: SQLite.SQLiteDatabase;
+    migrationCount: number;
+    migrationExpected: boolean;
+    wasEmpty: boolean;
+  }> {
     try {
       const { tables, migrationCount } = await this.dumpSchemaState(db);
       const isPreV2 = tables.length > 0 && !tables.includes('coco_cashu_canonical_mint_quotes');
@@ -503,7 +521,7 @@ export class CocoManager {
         isPreV2,
       });
       if (!isPreV2) {
-        return { db, migrationCount, migrationExpected };
+        return { db, migrationCount, migrationExpected, wasEmpty: tables.length === 0 };
       }
 
       const balances = await this.snapshotReadyProofBalances(db, tables).catch(() => null);
@@ -514,7 +532,7 @@ export class CocoManager {
       const existing = await FileSystem.getInfoAsync(backupPath);
       if (existing.exists) {
         cashuLog.info('cashu.manager.db_backup.skipped', { dbName, reason: 'backup_exists' });
-        return { db, migrationCount, migrationExpected: true };
+        return { db, migrationCount, migrationExpected: true, wasEmpty: false };
       }
 
       cashuLog.info('cashu.manager.db_backup.start', { dbName });
@@ -534,18 +552,19 @@ export class CocoManager {
         dbName,
         bytes: backupInfo.exists && 'size' in backupInfo ? backupInfo.size : 0,
       });
-      return { db: reopened, migrationCount, migrationExpected: true };
+      return { db: reopened, migrationCount, migrationExpected: true, wasEmpty: false };
     } catch (error) {
       cashuLog.error('cashu.manager.db_backup.failed', { dbName, error });
       // The handle may have been closed mid-backup; make sure init still gets a live one.
       try {
         await db.getFirstAsync('SELECT 1');
-        return { db, migrationCount: -1, migrationExpected: true };
+        return { db, migrationCount: -1, migrationExpected: true, wasEmpty: false };
       } catch {
         return {
           db: await SQLite.openDatabaseAsync(dbName),
           migrationCount: -1,
           migrationExpected: true,
+          wasEmpty: false,
         };
       }
     }
@@ -710,6 +729,7 @@ export class CocoManager {
           db: openedDb,
           migrationCount: preInitMigrationCount,
           migrationExpected,
+          wasEmpty,
         } = await initPhase('CocoManager.preInitSafetyRails', () =>
           this.runPreInitSafetyRails(opened, dbName)
         );
@@ -738,6 +758,9 @@ export class CocoManager {
           new ExpoSqliteRepositories({ database }),
           { ephemeralKeyringPubkeys }
         );
+        // Decided here, while the database is still empty: once the migrations
+        // below have run, a wallet that was lost looks like any other.
+        askForRestoreIfWalletDatabaseLost(accountIndex, wasEmpty);
         await initPhase('CocoManager.reposInit', () => repositories.init());
         cashuLog.debug('cashu.manager.repositories.ready', { dbName });
         // Post-init dump is diagnostic for migration boots only — skip the
@@ -865,6 +888,9 @@ export class CocoManager {
           await this.discardAfterReset(db, dbName);
           throw new Error('Wallet was reset while it was opening');
         }
+        // After the reset check: delete-all has just forgotten these accounts.
+        // The other accounts are checked off the startup path, not waited for.
+        recordWalletDatabaseCreated(accountIndex);
         // Opt-in with EXPO_PUBLIC_PERF_PROBES=1. An entry per coco call is
         // thousands a minute, which slows a dev build enough to matter.
         this.instance =
@@ -1675,7 +1701,7 @@ export class CocoManager {
 
       const dbNames = new Set<string>();
       for (const i of accountIndexes) {
-        dbNames.add(i === 0 ? 'coco.db' : `coco-${i}.db`);
+        dbNames.add(this.dbNameFor(i));
       }
       for (const dbName of dbNames) {
         await this.deleteDatabase(dbName);

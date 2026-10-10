@@ -42,6 +42,12 @@ export interface ProfileEntry {
   cachedDisplayName?: string;
   /** Cached Nostr kind-0 profile picture URL */
   cachedPicture?: string;
+  /**
+   * True once this install has opened this account's wallet database. Absent
+   * on a row written by a release that did not record it, and on a new row.
+   * See `walletDatabaseRecord.ts`.
+   */
+  walletDatabaseCreated?: boolean;
 }
 
 interface ProfileState {
@@ -75,6 +81,8 @@ interface ProfileActions {
   updateProfileBalance: (accountIndex: number, balanceSats: number) => void;
   /** Update cached Nostr kind-0 metadata for a profile */
   updateProfileMetadata: (accountIndex: number, displayName?: string, picture?: string) => void;
+  /** Record, or forget, that these accounts' wallet databases exist on this install. */
+  setWalletDatabaseCreated: (accountIndexes: readonly number[], created: boolean) => void;
   /** Check if a pubkey is already used by any profile */
   hasPubkey: (pubkey: string) => boolean;
   /** Get the active profile entry */
@@ -100,6 +108,9 @@ const PersistedProfileEntry = z.looseObject({
   externalChain: z.number().int().nonnegative().optional(),
   cachedDisplayName: z.string().max(512).optional(),
   cachedPicture: z.string().max(2048).optional(),
+  // Absent means not recorded, which never asks for a restore. An unreadable
+  // value is read the same way; rejecting it would discard the whole store.
+  walletDatabaseCreated: z.boolean().optional().catch(undefined),
 });
 
 /**
@@ -274,6 +285,19 @@ export const useProfileStore = create<ProfileStore>({ name: 'profile-store', sco
             p.accountIndex === accountIndex
               ? { ...p, cachedDisplayName: displayName, cachedPicture: picture }
               : p
+          ),
+        }));
+      },
+
+      setWalletDatabaseCreated: (accountIndexes, created) => {
+        const changes = (p: ProfileEntry) =>
+          accountIndexes.includes(p.accountIndex) && (p.walletDatabaseCreated === true) !== created;
+        // Nothing to change is the usual case at startup, and every `set` is
+        // a save of the whole list.
+        if (!get().profiles.some(changes)) return;
+        set((state) => ({
+          profiles: state.profiles.map((p) =>
+            changes(p) ? { ...p, walletDatabaseCreated: created } : p
           ),
         }));
       },

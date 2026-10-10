@@ -3813,6 +3813,9 @@ exports[`persisted schema drift profile-store schema matches the golden snapshot
                 ],
                 "type": "string",
               },
+              "walletDatabaseCreated": {
+                "type": "boolean",
+              },
             },
             "required": [
               "accountIndex",
@@ -3880,6 +3883,9 @@ exports[`persisted schema drift profile-store schema matches the golden snapshot
                   "imported",
                 ],
                 "type": "string",
+              },
+              "walletDatabaseCreated": {
+                "type": "boolean",
               },
             },
             "required": [
