@@ -675,3 +675,13 @@ active account unchanged in memory, tore the account providers down and refused 
 Reopening the app booted into the new profile with its wallet open. The same held switching back.
 The simulator was left on its original profile, with one extra empty derived profile added.
 A native sheet that was open stayed visible above the splash (F82).
+
+### A wipe that stops partway, on a device, 2026-10-10
+
+On a fresh throwaway iOS simulator, with the secure-storage step of delete-all forced to fail by a
+temporary edit (reverted) and the wipe triggered from a temporary hook: the wallet database was
+deleted, the recovery phrase and the profile row were kept, the wallet was closed, delete-all
+returned false and a second attempt was refused while the app was held. After reopening, the app
+started normally with the same profile and phrase and a new, empty wallet database, with no error
+events, so the wipe can be run again. Funds that were in the deleted database are not restored
+automatically; the phrase is still there to restore them from.
