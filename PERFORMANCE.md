@@ -685,3 +685,14 @@ returned false and a second attempt was refused while the app was held. After re
 started normally with the same profile and phrase and a new, empty wallet database, with no error
 events, so the wipe can be run again. Funds that were in the deleted database are not restored
 automatically; the phrase is still there to restore them from.
+
+### Upgrade from v0.1.3 on iOS, 2026-10-10
+
+On a fresh throwaway iOS simulator, the v0.1.3 code (the tag, loaded into the dev build) was taken
+through onboarding and given a second profile by a temporary hook, since no tap tool was available.
+Its storage was copied off, then the current code was loaded over the same data: the migration gate
+completed, the wallet opened on the active (second) profile, and there were no error events. All 31
+stored keys were still present, both profiles, the active account, terms acceptance, onboarding and
+the migration marker were unchanged, the database files were the same, and no `:unreadable` copy
+was made. The simulator was deleted afterwards. As on Android, this was v0.1.3's JavaScript in the
+current native build, not the released binary.
