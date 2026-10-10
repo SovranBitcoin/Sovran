@@ -755,3 +755,23 @@ prompts) rather than hooks:
 
 The simulator ended with its one original profile. No store refused a write and nothing was set
 aside as unreadable during the run; the only error events were network fetches.
+
+### The one upgrade check that cannot be run from a development machine
+
+An upgrade over the released v0.1.3 binary needs a build signed with the same key. For Android that
+key is held by Google Play (`release/README.md`, "Android cross-channel signing"), so the only route
+is Play's internal testing track; for iOS it is TestFlight. Neither can be done from here.
+
+To run it:
+
+1. On a phone, install v0.1.3 from the store (or the Play-signed `sovran-0.1.3.apk` on the GitHub
+   release) and use it as a real install: a funded wallet, two profiles, one imported key, a theme.
+2. Publish this branch to the internal testing track or TestFlight and update over the top.
+3. Check: the app opens without the "update couldn't finish" or "wallet couldn't be opened"
+   screens; both profiles and the active one are as they were; balances and history match; the
+   imported profile still signs; settings and theme are unchanged.
+4. Then switch profile, add one, and remove the spare one.
+
+What the checks already run say about the likely outcome: the code that reads and writes user data
+natively is the same version in both builds, v0.1.3's own code produced the data for the upgrades
+run on the Android emulator and iOS simulator, and nothing it stored was lost or set aside.
