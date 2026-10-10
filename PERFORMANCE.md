@@ -726,3 +726,17 @@ Android was not rechecked: the emulator would not start for lack of disk.
 
 With the wallet's first open forced to fail on the iOS simulator (temporary edit, reverted), the
 new retry screen appeared within seconds instead of a blank screen, and retrying opened the wallet.
+
+### Recovery and key import on a device, 2026-10-10
+
+On a fresh throwaway iOS simulator, driven by a temporary hook (reverted) because no tap tool was
+available:
+
+- **Recovery during onboarding.** Recovering a known test phrase replaced the generated one, the
+  throwaway profile was replaced by the one that phrase derives, a restore was recorded as owed,
+  and the app restarted with the wallet open.
+- **Importing a key.** Importing a newly generated key stored it, added the profile as imported and
+  restarted into it with the wallet open.
+
+Both went through the same functions the app's screens call; the screens themselves (the recovery
+form and the drawer's import sheet) were not tapped through. The simulator was deleted afterwards.
