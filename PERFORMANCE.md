@@ -783,3 +783,19 @@ upgrade above remains a recommended check before release, not a blocker for this
 The sheet left on screen by a hold (F82) was then fixed and checked on the iOS simulator: with the
 Receive sheet open and the restart forced to fail, the hold showed only the splash and the alert.
 An earlier variant that kept the root route was also tried there and did not close the sheet.
+
+### Android rechecked on the current code, 2026-10-10
+
+On the existing Android emulator install (data written by earlier builds), with everything up to
+`6e9e57fbc`:
+
+- Cold start: migration gate complete, wallet open, no store refusing or failing a save.
+- The map cache: on the first start the old 5.3 MB row, which Android could not read, was dropped
+  and freed; the cache was fetched and written as a file; on the second start it loaded with no
+  failure. Before this it failed to load on every start.
+- Storage use, measured by the app: 39 rows and about 150,000 characters, with no unreadable rows,
+  against a 6 MB cap. The one row that had been unreadable is gone.
+- A profile switch to the second profile and back, each a restart, with the wallet open after each.
+
+The switch was driven by a temporary hook, since reverted; this emulator's profile sheet stalls
+under taps.
