@@ -12,8 +12,7 @@
 - Upgrades from **0.0.45 to 0.0.63** had three defects that lose data or a paid credential.
   All three are fixed and tested in this run. No real upgrade from those builds was run.
 - Upgrades from **0.0.1 to 0.0.40** (redux era, iOS only) no longer hand the user a new
-  wallet, but their ecash is **not imported**. That is a FAIL for those builds if any of them
-  is still installed, which only App Store Connect can say.
+  wallet. Their ecash is not imported; that gap was **accepted** on 2026-10-10 (ADR 31).
 - **99 builds from 2024** predate this repository. What they wrote is unknown.
 
 Third artifact of the [persistence release safety](../../../.agents/skills/persistence-release-safety/SKILL.md)
@@ -27,8 +26,8 @@ here was run on 2026-10-10 as part of the full suite.
 | Epoch | Durable thing | State that fails | Status | Evidence | Verdict |
 | --- | --- | --- | --- | --- | --- |
 | 0.0.1 … 0.0.40 (exact for most, 151 builds unreadable) | `persist:SOVRAN` phrase | No `user_mnemonic`, no `profile-store`: the candidate generated a **new** phrase over the old wallet | **Fixed.** The phrase in the row is adopted as the root; a row that cannot be read locks instead of generating. The row is never written | `secureStorageLifecycle.test.ts` (redux-era cases); `shared/lib/nostr/reduxEraRoot.ts` | PASS for the phrase |
-| 0.0.1 … 0.0.40 | `persist:SOVRAN` proofs, counters, paid mint quotes | Nothing imports them. After adoption the user is offered a restore from mints, which finds proofs made by 0.0.12 build 10 and later | **Open, F86.** The importer existed from 0.0.45 to 0.1.1 and was removed in 0.1.2 | `coco-and-cashu.md` findings 1, 2 | FAIL |
-| 0.0.1 … 0.0.12 build 3 | Cashu seed | The seed was the raw 32-byte child key; the candidate uses the BIP39 seed of that key's entropy. The same phrase restores a different wallet | **Open, F86** | `helper/cashu/wallet.ts:37@957eed9ea`; `app/shared/lib/nostr/keyDerivation.ts:78@HEAD` | FAIL |
+| 0.0.1 … 0.0.40 | `persist:SOVRAN` proofs, counters, paid mint quotes | Nothing imports them. After adoption the user is offered a restore from mints, which finds proofs made by 0.0.12 build 10 and later | **Accepted on 2026-10-10** ([ADR 31](../../../app/docs/adr/0031-ecash-from-before-coco-is-not-imported.md)). The importer existed from 0.0.45 to 0.1.1 and was removed in 0.1.2; the row is kept so it can return | `coco-and-cashu.md` findings 1, 2 | FAIL against "nothing lost"; accepted |
+| 0.0.1 … 0.0.12 build 3 | Cashu seed | The seed was the raw 32-byte child key; the candidate uses the BIP39 seed of that key's entropy. The same phrase restores a different wallet | **Accepted**, same decision | `helper/cashu/wallet.ts:37@957eed9ea`; `app/shared/lib/nostr/keyDerivation.ts:78@HEAD` | FAIL |
 | 0.0.45 … 0.0.56 (exact) | Every per-account store under a bare key (`routstr-store` with a paid key, `mint-store`, `scan-history-store`, …) | No `profile-store` existed, so the key migration did nothing and recorded itself; the stores were orphaned | **Fixed.** Account 0's key is derived from the stored phrase and the stores are copied to it; the originals stay until the next launch; an unreadable keychain retries next launch | `preProfileUpgrade.test.ts` (14 cases) | PASS in tests; real upgrade NOT RUN: no build of that age to install |
 | 0.0.45 … 0.0.56 that already upgraded through 0.0.62 … 0.1.3 | The same bare stores | Those releases had the same gap, recorded the migration, and left the bare keys behind | **Open, F87** | `preProfileUpgrade` agent report | INCONCLUSIVE |
 | 0.0.51 … 0.1.0 (bounded) | `routstr-store` with more than 1,024 sessions or 10,000 messages | The key was moved to the secure vault, the blob was then rejected, and on the same launch defaults were saved over the vault: **the paid key was erased**. Reproduced before the fix | **Fixed.** Old blobs are trimmed, newest kept; and the store saves nothing until a load has been accepted | `routstrOversizedUpgrade.test.ts` (7 cases) | PASS in tests |
