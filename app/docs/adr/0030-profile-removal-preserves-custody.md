@@ -24,7 +24,16 @@ runs migrations or calls a mint. It opens an existing account SQLite file throug
 an independent connection, enables query-only mode, begins a read transaction,
 checks integrity, and reads proof states and operation/quote states. Any unspent
 proof refuses, including inflight proofs and every unit. Nonterminal quotes or
-operations refuse. Reusable quotes refuse even after an issued observation,
+operations refuse, with one exception decided on 2026-10-10: the standing
+payment request every profile is given (`active`, not single-use) does not
+refuse on its own. It holds request details only, and without the exception no
+opened profile could ever be removed. A payment taken in on it is an attempt,
+and an unfinished attempt refuses; a one-off request that is still open refuses.
+Residual risk: a payment delivered over Nostr but not yet taken in by the wallet
+has no attempt row and is not seen by the inspection. It stays on relays for as
+long as they keep it and can be fetched with the same key, but not matched
+automatically, because the request id is deleted with the profile.
+Reusable quotes refuse even after an issued observation,
 because more payments can arrive; canonical paid/issued accounting must agree.
 Unpaid expired quotes also refuse rather than guessing their remote state; unknown tables, schemas, null states, absent files, read or
 close failures refuse. The installed Coco adapter's terminal states are the

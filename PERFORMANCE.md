@@ -656,3 +656,9 @@ emulators show the map cache failing to load on Android (F81), which v0.1.3 does
 Limits: this was v0.1.3's JavaScript in the current native build, not the released binary, so
 native-side changes between releases were not covered. iOS was not put through the same upgrade.
 A failed restart and a wipe that stops partway are still covered by tests only.
+
+Later the same day, on a fresh emulator running the current code from a clean install: onboarding
+completed, a second profile was created, the app switched back to the first, and the second
+profile was removed. Its wallet database, Nostr cache and every stored key were gone afterwards and
+the first profile was untouched. This is the first time removal has run on a device; it needed the
+change in F80 (a standing payment request no longer blocks removal).

@@ -12,6 +12,8 @@ let mockPending = false;
 let mockQuoteState: string | null | undefined;
 let mockCloseFailure = false;
 let mockReusableQuote = false;
+let mockPaymentRequests: { state: string; singleUse: number }[] | undefined;
+let mockAttemptStates: string[] = [];
 let mockUnreadable = false;
 let mockMissingWallet = false;
 let mockFileFailure = false;
@@ -60,7 +62,19 @@ jest.mock('expo-sqlite', () => ({
       }),
       getFirstAsync: jest.fn(async () => ({ quick_check: 'ok' })),
       getAllAsync: jest.fn(async (sql: string) => {
-        if (sql.includes('sqlite_master')) return mockTables.map((name) => ({ name }));
+        if (sql.includes('sqlite_master'))
+          return [
+            ...mockTables,
+            ...(mockPaymentRequests
+              ? [
+                  'coco_cashu_payment_request_receive_operations',
+                  'coco_cashu_payment_request_receive_attempts',
+                ]
+              : []),
+          ].map((name) => ({ name }));
+        if (sql.includes('payment_request_receive_operations')) return mockPaymentRequests ?? [];
+        if (sql.includes('payment_request_receive_attempts'))
+          return mockAttemptStates.map((state) => ({ state }));
         if (sql.includes('SELECT state, reusable'))
           return mockReusableQuote
             ? [{ state: 'ISSUED', reusable: 1, amountPaid: '1', amountIssued: '1' }]
@@ -88,6 +102,8 @@ beforeEach(async () => {
   mockDeleted.clear();
   mockReusableQuote = false;
   mockQuoteState = undefined;
+  mockPaymentRequests = undefined;
+  mockAttemptStates = [];
   mockCloseFailure = false;
   mockProofStates = [];
   mockPending = false;
@@ -216,6 +232,34 @@ test.each(['UNPAID', 'PAID'])('refuses non-issued %s mint quotes', async (state)
   mockQuoteState = state;
   expect(await remove()).toEqual({ kind: 'refused', reason: 'pending' });
   expect(mockDeleted.size).toBe(0);
+});
+
+test('a standing payment request with no payment in progress does not block removal', async () => {
+  // Every profile that has been opened has one. Treating it as pending made
+  // removal impossible in practice.
+  mockPaymentRequests = [{ state: 'active', singleUse: 0 }];
+  expect((await remove()).kind).toBe('removed');
+});
+
+test('a payment arriving on the standing request still refuses', async () => {
+  mockPaymentRequests = [{ state: 'active', singleUse: 0 }];
+  mockAttemptStates = ['finalized', 'received'];
+  expect(await remove()).toEqual({ kind: 'refused', reason: 'pending' });
+  expect(mockDeleted.size).toBe(0);
+});
+
+test('a one-off payment request that is still open refuses', async () => {
+  mockPaymentRequests = [
+    { state: 'completed', singleUse: 1 },
+    { state: 'active', singleUse: 1 },
+  ];
+  expect(await remove()).toEqual({ kind: 'refused', reason: 'pending' });
+  expect(mockDeleted.size).toBe(0);
+});
+
+test('a payment request in a state the app does not know refuses', async () => {
+  mockPaymentRequests = [{ state: 'settling', singleUse: 0 }];
+  expect(await remove()).toEqual({ kind: 'refused', reason: 'pending' });
 });
 
 test('a failed close refuses before deleting data', async () => {

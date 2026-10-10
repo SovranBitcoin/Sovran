@@ -36,6 +36,15 @@ const CanonicalQuotes = z.array(
   })
 );
 const TableNames = z.array(z.object({ name: z.string().max(128) })).max(128);
+const PAYMENT_REQUESTS = 'coco_cashu_payment_request_receive_operations';
+const PaymentRequests = z
+  .array(
+    z.object({
+      state: z.string().max(32),
+      singleUse: z.union([z.literal(0), z.literal(1)]),
+    })
+  )
+  .max(64);
 // The installed Coco v2 SQLite adapter's terminal states. Unknown tables/states refuse.
 const terminalStates: Record<string, readonly string[]> = {
   coco_cashu_mint_quotes: ['ISSUED'],
@@ -137,6 +146,30 @@ async function inspectWallet(
       for (const { name } of tables) {
         const terminal = terminalStates[name];
         if (!terminal) continue;
+        if (name === PAYMENT_REQUESTS) {
+          // Every profile has a standing request it can be paid through. It is
+          // an address: the row holds request details, never proofs or a
+          // payment. A payment the wallet has taken in is an attempt, and the
+          // attempts table below still refuses on one that is not finished.
+          // Counting the standing request itself as pending made removal
+          // impossible for any profile that had ever been opened. A one-off
+          // request is still waiting for a specific payment and still refuses.
+          //
+          // Not covered: a payment delivered over Nostr that the wallet has not
+          // taken in yet has no attempt row. It can be fetched again with the
+          // same key while relays keep it (ADR 0030).
+          const requests = PaymentRequests.parse(
+            await db.getAllAsync(`SELECT DISTINCT state, singleUse FROM ${PAYMENT_REQUESTS}`)
+          );
+          if (
+            requests.some(
+              ({ state, singleUse }) =>
+                !terminal.includes(state) && !(state === 'active' && singleUse === 0)
+            )
+          )
+            return 'pending';
+          continue;
+        }
         const states = States.parse(await db.getAllAsync(`SELECT DISTINCT state FROM ${name}`));
         if (states.some(({ state }) => !terminal.includes(state))) return 'pending';
       }
