@@ -118,6 +118,7 @@ To repeat it: download the release APK, `apksigner sign` it and a local `assembl
 | --- | --- | --- |
 | A Coco database written by 0.6.0, rc.11, rc.30, rc.34, rc.47, 1.0.0 opened by 2.0.0 (1.0.1 is shown above) | No database files from those builds exist to test with | Building one old revision per Coco version in a simulator and keeping its `coco.db` as a fixture |
 | SecureStore on a real iPhone keychain, and across native versions older than 0.1.1 | Shown on Android (0.1.1, 0.1.3) and the iOS simulator (0.1.3) | One TestFlight upgrade on a phone |
+| Android 0.1.0 upgraded as a binary | The release rebuild ran out of disk on 2026-10-10 (29 GB of swap in use); 0.1.1, one day newer and with the same stores, was upgraded instead | A reboot, then the same steps as the 0.1.1 run at tag `v0.1.0` |
 | The 99 builds from 2024 | Source is not in this repository | The earlier repository |
 | Which builds are still installed | EAS does not record it | App Store Connect and Play Console (questions in the provenance record) |
 | Android signing certificate named in the old release guide differs from 0.1.3's | Probably upload key against Play's signing key; not confirmed | Play Console → App integrity |
