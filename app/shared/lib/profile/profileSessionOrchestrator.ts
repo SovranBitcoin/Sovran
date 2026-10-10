@@ -17,7 +17,11 @@
  */
 import * as bip39 from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english.js';
-import { storeMnemonic, prepareSecureDataReset } from '@/shared/lib/nostr/secureStorage';
+import {
+  storeImportedNsec,
+  storeMnemonic,
+  prepareSecureDataReset,
+} from '@/shared/lib/nostr/secureStorage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Alert } from 'react-native';
 
@@ -276,6 +280,65 @@ export async function createAndSwitchProfile(opts?: {
   }
 }
 
+type ImportProfileResult =
+  /** The key is stored, the profile added, and the app is restarting into it (or held). */
+  | 'switching'
+  /** A profile with this identity already exists. Nothing was changed. */
+  | 'exists'
+  /** Another account flow is running, or the wallet is not idle. Nothing was changed. */
+  | 'busy'
+  /** Secure storage refused the key. Nothing was changed. */
+  | 'key-not-stored'
+  /** The profile list is full. The key was stored, and nothing else changed. */
+  | 'limit';
+
+/**
+ * Add a profile from an imported key and switch to it.
+ *
+ * Storing the key and adding the profile row happen under the same lock as the
+ * switch that follows, so no other account flow can run between them.
+ */
+export async function importAndSwitchProfile(opts: {
+  accountIndex: number;
+  pubkeyHex: string;
+  nsec: string;
+}): Promise<ImportProfileResult> {
+  if (useProfileStore.getState().hasPubkey(opts.pubkeyHex)) return 'exists';
+  if (isTransitionInFlight() || !CocoManager.isReadyForCleanup()) {
+    log.warn('profile.orchestrator.import_blocked', { ...CocoManager.getCleanupReadiness() });
+    return 'busy';
+  }
+  const lock = acquireTransition();
+  if (!lock) return 'busy';
+  if (!(await lock.takeDiskGuard())) {
+    await lock.release();
+    return 'busy';
+  }
+  try {
+    const inProcess = useSettingsStore.getState().inProcessProfileSwitch;
+    lock.holdSplash(splashControls(), { keepStagesThatOutliveAccount: inProcess });
+    usePopupStore.getState().close();
+
+    if (!(await storeImportedNsec(opts.pubkeyHex, opts.nsec))) {
+      await lock.release();
+      return 'key-not-stored';
+    }
+    if (!useProfileStore.getState().addProfile(opts.accountIndex, opts.pubkeyHex, 'imported')) {
+      log.warn('profile.orchestrator.at_capacity', { nextIndex: opts.accountIndex });
+      await lock.release();
+      return 'limit';
+    }
+    // From here on the endings are the switch's own: a restart or a hold.
+    if (inProcess) await switchWithoutRestart(opts.accountIndex, () => lock.release());
+    else await restartInto(opts.accountIndex);
+    return 'switching';
+  } catch (error) {
+    log.error('profile.orchestrator.import_failed', { error: redactError(error) });
+    await lock.release();
+    return 'busy';
+  }
+}
+
 /** Replace an inaccessible root, or the unused onboarding root, then boot new caches. */
 export async function recoverMnemonicSession(mnemonic: string): Promise<boolean> {
   if (!bip39.validateMnemonic(mnemonic, wordlist) || mnemonic.split(' ').length !== 12)
@@ -284,6 +347,7 @@ export async function recoverMnemonicSession(mnemonic: string): Promise<boolean>
   // and no earlier runtime's transition to wait out: the in-memory lock only.
   const lock = acquireTransition();
   if (!lock) return false;
+  let held = false;
   try {
     const locked = useSecureStoreState.getState().secureStoreState === 'locked';
     const onboarding = !locked && !useSettingsStore.getState().hasSeenOnboarding;
@@ -311,41 +375,87 @@ export async function recoverMnemonicSession(mnemonic: string): Promise<boolean>
       return false;
     }
 
-    // Persist before restart without changing the current account scope mid-flight.
+    // Two steps, with the phrase as the point of no return between them.
+    //
+    // 1. Prepare: record that a restore is owed and, during onboarding, drop
+    //    the throwaway profile. Written before the phrase so a restart can
+    //    never find the new phrase without the restore decision. If the phrase
+    //    then cannot be stored, both are put back as they were.
     const lifecycle = useWalletLifecycleStore.persist.getOptions();
-    await lifecycle.storage!.setItem(lifecycle.name!, {
-      version: lifecycle.version,
-      state: {
-        seedCreatedAt: null,
-        recoveryPhraseVerifiedAt: null,
-        recoveryPhraseVerifiedRevision: null,
-        restoreStatus: 'pending',
-        lastRestoreAt: null,
-        lastRestoreError: null,
-      },
-    });
-    if (onboarding) {
-      // The carousel's auto-generated account is disposable. Its row must not
-      // point at the new mnemonic on restart; no wallet operation is available here.
-      const profiles = useProfileStore.persist.getOptions();
-      await profiles.storage!.setItem(profiles.name!, {
-        version: profiles.version,
-        state: { activeAccountIndex: 0, profiles: [] },
+    const profiles = useProfileStore.persist.getOptions();
+    // A record that cannot be read (damaged JSON) must not stop a recovery:
+    // it is simply not something that can be put back.
+    type Saved = { readable: true; value: unknown } | { readable: false };
+    const read = async (options: typeof lifecycle | typeof profiles): Promise<Saved> => {
+      try {
+        return { readable: true, value: await options.storage!.getItem(options.name!) };
+      } catch {
+        return { readable: false };
+      }
+    };
+    const restore = async (options: typeof lifecycle | typeof profiles, previous: Saved) => {
+      if (!previous.readable) return;
+      if (previous.value) await options.storage!.setItem(options.name!, previous.value as never);
+      else await options.storage!.removeItem(options.name!);
+    };
+    const before = {
+      lifecycle: await read(lifecycle),
+      profiles: onboarding ? await read(profiles) : ({ readable: false } as Saved),
+    };
+    const putBack = async () => {
+      await restore(lifecycle, before.lifecycle);
+      await restore(profiles, before.profiles);
+    };
+    let phraseStored = false;
+    try {
+      await lifecycle.storage!.setItem(lifecycle.name!, {
+        version: lifecycle.version,
+        state: {
+          seedCreatedAt: null,
+          recoveryPhraseVerifiedAt: null,
+          recoveryPhraseVerifiedRevision: null,
+          restoreStatus: 'pending',
+          lastRestoreAt: null,
+          lastRestoreError: null,
+        },
       });
+      if (onboarding) {
+        // The carousel's auto-generated account is disposable. Its row must not
+        // point at the new mnemonic on restart; no wallet operation is available here.
+        await profiles.storage!.setItem(profiles.name!, {
+          version: profiles.version,
+          state: { activeAccountIndex: 0, profiles: [] },
+        });
+      }
+      phraseStored = await storeMnemonic(mnemonic);
+    } finally {
+      if (!phraseStored) {
+        await putBack().catch(() => nostrLog.warn('secure.mnemonic.recovery_rollback_failed'));
+      }
     }
-    if (!(await storeMnemonic(mnemonic))) return false;
-    const settings = useSettingsStore.persist.getOptions();
-    await settings.storage!.setItem(settings.name!, {
-      version: settings.version,
-      state: { ...settings.partialize!(useSettingsStore.getState()), hasSeenOnboarding: true },
-    });
-    nostrLog.info('secure.mnemonic.recovered');
-    return restartApp();
+    if (!phraseStored) return false;
+
+    // 2. The phrase is replaced. This runtime still holds keys from the old
+    //    one, so the only endings are a restart or a hold.
+    try {
+      const settings = useSettingsStore.persist.getOptions();
+      await settings.storage!.setItem(settings.name!, {
+        version: settings.version,
+        state: { ...settings.partialize!(useSettingsStore.getState()), hasSeenOnboarding: true },
+      });
+      nostrLog.info('secure.mnemonic.recovered');
+      if (restartApp()) return true;
+    } catch (error) {
+      log.error('profile.orchestrator.recovery_finish_failed', { error: redactError(error) });
+    }
+    held = true;
+    await holdUntilReopened('Your recovery phrase is saved. Please close and reopen the app.');
+    return true;
   } catch {
     nostrLog.warn('secure.mnemonic.recovery_failed');
     return false;
   } finally {
-    await lock.release();
+    if (!held) await lock.release();
   }
 }
 

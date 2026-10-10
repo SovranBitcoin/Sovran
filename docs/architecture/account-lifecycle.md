@@ -95,24 +95,26 @@ recovery of pending operations wait for any restore to finish.
 
 ## Changing the active account
 
-All five flows live in `app/shared/lib/profile/profileSessionOrchestrator.ts`.
+All six flows live in `app/shared/lib/profile/profileSessionOrchestrator.ts`.
 
-| Flow                  | Function                  | Takes                    | When it works        | When it fails                                                             |
-| --------------------- | ------------------------- | ------------------------ | -------------------- | ------------------------------------------------------------------------- |
-| Switch profile        | `switchToExistingProfile` | lock, disk guard, splash | restart, lock kept   | before the restart call: gives up and releases; restart call fails: holds |
-| Add a derived profile | `createAndSwitchProfile`  | lock, disk guard, splash | restart, lock kept   | same as switch                                                            |
-| Recover from a phrase | `recoverMnemonicSession`  | lock only                | restart              | releases; never holds                                                     |
-| Remove one profile    | `removeInactiveProfile`   | lock, disk guard         | no restart, releases | stops at the failed step, reports what is left, releases                  |
-| Delete everything     | `deleteAllProfiles`       | lock, disk guard, splash | restart, lock kept   | before the wipe starts: releases; after: holds                            |
+| Flow                  | Function                  | Takes                    | When it works        | When it fails                                                                         |
+| --------------------- | ------------------------- | ------------------------ | -------------------- | ------------------------------------------------------------------------------------- |
+| Switch profile        | `switchToExistingProfile` | lock, disk guard, splash | restart, lock kept   | before the restart call: gives up and releases; restart call fails: holds             |
+| Add a derived profile | `createAndSwitchProfile`  | lock, disk guard, splash | restart, lock kept   | same as switch                                                                        |
+| Import a key          | `importAndSwitchProfile`  | lock, disk guard, splash | restart, lock kept   | before the key is stored: refuses, nothing changed; after the wallet is closed: holds |
+| Recover from a phrase | `recoverMnemonicSession`  | lock only                | restart              | before the phrase is stored: puts back what it wrote and releases; after: holds       |
+| Remove one profile    | `removeInactiveProfile`   | lock, disk guard         | no restart, releases | stops at the failed step, reports what is left, releases                              |
+| Delete everything     | `deleteAllProfiles`       | lock, disk guard, splash | restart, lock kept   | before the wipe starts: releases; after: holds                                        |
 
 "Lock kept" means the flow does not release: the reload discards the in-memory lock and the next
 start clears the one on disk. The differences between the rows are deliberate (confirmed
 2026-10-09).
 
-Two things are not transactions. Recovery writes several things in turn (the restore decision, the
-profile list, the phrase, settings) and can stop partway. Removal deletes in steps and stops at the
-first that fails, keeping the profile row until the last. Importing a key stores the key and adds
-the profile row before any of these flows takes the lock (`DrawerProfileChrome.tsx`).
+Recovery has its own point of no return: storing the phrase. Before it, the restore record and
+(during onboarding) the emptied profile list are written, and put back if the phrase cannot be
+stored. After it, this runtime still holds keys from the old phrase, so the endings are a restart
+or a hold. Removal is the one flow that is not all-or-nothing: it deletes in steps, stops at the
+first that fails, reports what is left and keeps the profile row until the last.
 
 ### A switch, step by step (the default)
 

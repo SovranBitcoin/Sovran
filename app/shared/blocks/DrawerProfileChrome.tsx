@@ -36,10 +36,10 @@ import { useNostrSocialStore } from '@/shared/stores/profile/nostrSocialStore';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { profileSwitcherPopup, type ProfileSwitcherAction, staticPopup } from '@/shared/lib/popup';
-import { storeImportedNsec } from '@/shared/lib/nostr/secureStorage';
 import { truncateMiddle } from '@/shared/lib/strings';
 import {
   createAndSwitchProfile,
+  importAndSwitchProfile,
   removeInactiveProfile,
   switchToExistingProfile,
 } from '@/shared/lib/profile/profileSessionOrchestrator';
@@ -47,6 +47,12 @@ import { useProfileStore, type ProfileEntry } from '@/shared/stores/global/profi
 import { alpha, hitSlop, iconSize, radius, spacing } from '@/shared/styles/tokens';
 
 const DRAWER_CLOSE_SETTLE_MS = 300;
+
+const IMPORT_REFUSALS = {
+  exists: 'This identity already exists as a profile.',
+  'key-not-stored': 'Failed to store nsec securely.',
+  limit: 'Profile limit reached.',
+} as const;
 
 function waitForDrawerClose(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, DRAWER_CLOSE_SETTLE_MS));
@@ -113,41 +119,18 @@ function useProfileSwitcher(closeDrawer: () => void) {
         break;
       }
       case 'import': {
-        // Every bail here releases `switchingRef`. It is the re-entry guard
-        // for this whole handler, so one that returns while holding it makes
-        // every later profile action a silent no-op for as long as the drawer
-        // stays mounted.
-        if (useProfileStore.getState().hasPubkey(action.pubkeyHex)) {
-          staticPopup('key-import-failed', {
-            text: 'This identity already exists as a profile.',
-          });
-          switchingRef.current = false;
-          return;
-        }
-
-        const stored = await storeImportedNsec(action.pubkeyHex, action.nsec);
-        if (!stored) {
-          staticPopup('key-import-failed', { text: 'Failed to store nsec securely.' });
-          switchingRef.current = false;
-          return;
-        }
-
-        if (
-          !useProfileStore.getState().hasPubkey(action.pubkeyHex) &&
-          !useProfileStore.getState().addProfile(action.accountIndex, action.pubkeyHex, 'imported')
-        ) {
-          // The nsec is already in SecureStore; without a profile row there is
-          // nothing to switch to, so say so rather than switch into nothing.
-          staticPopup('key-import-failed', { text: 'Profile limit reached.' });
-          switchingRef.current = false;
-          return;
-        }
-
-        const imported = await switchToExistingProfile({ accountIndex: action.accountIndex });
-        if (!imported) {
-          switchingRef.current = false;
-          staticPopup('wallet-still-loading');
-        }
+        const result = await importAndSwitchProfile({
+          accountIndex: action.accountIndex,
+          pubkeyHex: action.pubkeyHex,
+          nsec: action.nsec,
+        });
+        if (result === 'switching') break;
+        // Every other outcome releases `switchingRef`: it is the re-entry
+        // guard for this whole handler, and holding it after a refusal makes
+        // every later profile action a silent no-op.
+        switchingRef.current = false;
+        if (result === 'busy') staticPopup('wallet-still-loading');
+        else staticPopup('key-import-failed', { text: IMPORT_REFUSALS[result] });
         break;
       }
     }

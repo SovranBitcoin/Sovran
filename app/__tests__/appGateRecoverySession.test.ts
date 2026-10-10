@@ -97,6 +97,45 @@ it('does not restart if storing the phrase fails', async () => {
   expect(restartApp).not.toHaveBeenCalled();
 });
 
+it('puts the restore decision back when the phrase cannot be stored', async () => {
+  // Left as written, the next start would find a restore owed for a phrase
+  // that was never replaced.
+  const previous = JSON.stringify({
+    state: { seedCreatedAt: 5, restoreStatus: 'not-needed', lastRestoreAt: null },
+    version: 0,
+  });
+  jest
+    .mocked(AsyncStorage.getItem)
+    .mockImplementation(async (key) => (key === 'wallet-lifecycle' ? previous : null));
+  jest.mocked(storeMnemonic).mockResolvedValue(false);
+
+  await expect(recoverMnemonicSession(phrase)).resolves.toBe(false);
+
+  const writes = jest
+    .mocked(AsyncStorage.setItem)
+    .mock.calls.filter(([key]) => key === 'wallet-lifecycle');
+  expect(JSON.parse(writes[0][1]).state.restoreStatus).toBe('pending');
+  expect(JSON.parse(writes.at(-1)![1]).state).toMatchObject({
+    seedCreatedAt: 5,
+    restoreStatus: 'not-needed',
+  });
+  expect(restartApp).not.toHaveBeenCalled();
+  jest.mocked(AsyncStorage.getItem).mockImplementation(async () => null);
+});
+
+it('still recovers when the saved restore record is damaged', async () => {
+  // Reading it back for a rollback must not be what stops a recovery.
+  jest
+    .mocked(AsyncStorage.getItem)
+    .mockImplementation(async (key) => (key === 'wallet-lifecycle' ? '{"state":{"se' : null));
+
+  await expect(recoverMnemonicSession(phrase)).resolves.toBe(true);
+
+  expect(storeMnemonic).toHaveBeenCalledWith(phrase);
+  expect(restartApp).toHaveBeenCalledTimes(1);
+  jest.mocked(AsyncStorage.getItem).mockImplementation(async () => null);
+});
+
 it('rejects a recovery phrase that changes a known derived identity', async () => {
   useProfileStore.setState({
     profiles: [{ accountIndex: 0, pubkey: 'b'.repeat(64), source: 'derived', addedAt: 1 }],

@@ -26,6 +26,7 @@ jest.mock('@/shared/lib/cashu/manager', () => ({
     completeReset: jest.fn().mockResolvedValue(undefined),
     isReadyForCleanup: jest.fn(() => true),
     isInitialized: jest.fn(() => true),
+    getCleanupReadiness: jest.fn(() => ({ ready: true })),
   },
 }));
 
@@ -71,6 +72,7 @@ function setup() {
     createAndSwitchProfile: orchestrator.createAndSwitchProfile,
     deleteAllProfiles: orchestrator.deleteAllProfiles,
     recoverMnemonicSession: orchestrator.recoverMnemonicSession,
+    importAndSwitchProfile: orchestrator.importAndSwitchProfile,
     useProfileStore,
     mockRestart: jest.mocked(restartApp),
     AsyncStorage,
@@ -455,5 +457,125 @@ describe('waits made while the lock is held are bounded', () => {
     useProfileStore.setState({ profiles });
     CocoManager.cleanup.mockResolvedValue(undefined);
     expect(await switchToExistingProfile({ accountIndex: 1 })).toBe(true);
+  });
+});
+
+describe('importAndSwitchProfile', () => {
+  const imported = { accountIndex: 77, pubkeyHex: 'c'.repeat(64), nsec: 'nsec1example' };
+  const storeImportedNsec = jest.fn();
+
+  beforeEach(() => {
+    storeImportedNsec.mockReset().mockResolvedValue(true);
+    jest.doMock('@/shared/lib/nostr/secureStorage', () => ({
+      ...jest.requireActual('@/shared/lib/nostr/secureStorage'),
+      storeImportedNsec,
+    }));
+  });
+  afterEach(() => jest.dontMock('@/shared/lib/nostr/secureStorage'));
+
+  it('stores the key, adds the profile and restarts into it, all under the lock', async () => {
+    const {
+      importAndSwitchProfile,
+      switchToExistingProfile,
+      useProfileStore,
+      mockRestart,
+      AsyncStorage,
+    } = setup();
+    mockRestart.mockReturnValue(true);
+
+    expect(await importAndSwitchProfile(imported)).toBe('switching');
+
+    expect(storeImportedNsec).toHaveBeenCalledWith(imported.pubkeyHex, imported.nsec);
+    const added = useProfileStore.getState().profiles.find((p) => p.accountIndex === 77);
+    expect(added).toMatchObject({ pubkey: imported.pubkeyHex, source: 'imported' });
+    expect(persistedActiveIndex(AsyncStorage)).toBe(77);
+    // Not flipped in memory, and the lock is kept for the restart.
+    expect(useProfileStore.getState().activeAccountIndex).toBe(0);
+    expect(await switchToExistingProfile({ accountIndex: 1 })).toBe(false);
+  });
+
+  it('refuses an identity that is already a profile, without storing anything', async () => {
+    const { importAndSwitchProfile, switchToExistingProfile, mockRestart } = setup();
+    mockRestart.mockReturnValue(true);
+
+    expect(await importAndSwitchProfile({ ...imported, pubkeyHex: 'b'.repeat(64) })).toBe('exists');
+
+    expect(storeImportedNsec).not.toHaveBeenCalled();
+    expect(await switchToExistingProfile({ accountIndex: 1 })).toBe(true);
+  });
+
+  it('does not store the key while another account flow is running', async () => {
+    // It used to store the key and add the row first, and only then find out.
+    const { importAndSwitchProfile, switchToExistingProfile, useProfileStore, mockRestart } =
+      setup();
+    mockRestart.mockReturnValue(true);
+    expect(await switchToExistingProfile({ accountIndex: 1 })).toBe(true);
+
+    expect(await importAndSwitchProfile(imported)).toBe('busy');
+
+    expect(storeImportedNsec).not.toHaveBeenCalled();
+    expect(useProfileStore.getState().profiles).toHaveLength(2);
+  });
+
+  it('gives the app back when secure storage refuses the key', async () => {
+    storeImportedNsec.mockResolvedValue(false);
+    const { importAndSwitchProfile, switchToExistingProfile, useProfileStore, mockRestart } =
+      setup();
+    mockRestart.mockReturnValue(true);
+
+    expect(await importAndSwitchProfile(imported)).toBe('key-not-stored');
+
+    expect(useProfileStore.getState().profiles).toHaveLength(2);
+    expect(mockRestart).not.toHaveBeenCalled();
+    expect(await switchToExistingProfile({ accountIndex: 1 })).toBe(true);
+  });
+
+  it('gives the app back when the profile list is full', async () => {
+    const { importAndSwitchProfile, switchToExistingProfile, useProfileStore, mockRestart } =
+      setup();
+    mockRestart.mockReturnValue(true);
+    useProfileStore.setState({
+      profiles: Array.from({ length: MAX_PROFILES }, (_, i) => ({
+        accountIndex: i,
+        pubkey: `${i}`.padStart(64, '0'),
+        addedAt: i + 1,
+      })),
+    });
+
+    expect(await importAndSwitchProfile(imported)).toBe('limit');
+
+    expect(mockRestart).not.toHaveBeenCalled();
+    expect(await switchToExistingProfile({ accountIndex: 1 })).toBe(true);
+  });
+});
+
+describe('recoverMnemonicSession once the phrase is replaced', () => {
+  beforeEach(() => {
+    jest.doMock('@/shared/lib/nostr/secureStorage', () => ({
+      ...jest.requireActual('@/shared/lib/nostr/secureStorage'),
+      storeMnemonic: jest.fn(async () => true),
+    }));
+  });
+  afterEach(() => jest.dontMock('@/shared/lib/nostr/secureStorage'));
+
+  it('holds the app when the restart does not happen', async () => {
+    // This runtime still holds keys from the old phrase. Giving the app back
+    // would run the old identity over the new phrase.
+    const { recoverMnemonicSession, switchToExistingProfile, useProfileStore, mockRestart } =
+      setup();
+    mockRestart.mockReturnValue(false);
+    useProfileStore.setState({ profiles: [] });
+    const { Alert } = require('react-native');
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+
+    expect(await recoverMnemonicSession('abandon '.repeat(11) + 'about')).toBe(true);
+
+    expect(alert).toHaveBeenCalledWith(
+      'Restart Required',
+      expect.stringContaining('recovery phrase is saved'),
+      expect.any(Array)
+    );
+    mockRestart.mockReturnValue(true);
+    expect(await switchToExistingProfile({ accountIndex: 1 })).toBe(false);
   });
 });
