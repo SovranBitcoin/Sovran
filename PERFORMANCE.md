@@ -824,3 +824,9 @@ Release builds of the 0.1.3 source and of the candidate were installed one over 
 an iPhone simulator. The 63 test sats, the mint and the history were there afterwards, and
 the app's wallet database held the same six proofs. Record:
 [evidence ledger](docs/architecture/persistence/evidence-ledger.md#real-upgrades).
+
+## A funded 0.1.0 release build upgraded to the candidate with the audit's fixes (Android, 2026-10-10)
+
+A release build of tag `v0.1.0` holding 63 test sats was upgraded in place to a release build
+of `feaead880`. The balance, the mint and the history carried over. Record:
+[evidence ledger](docs/architecture/persistence/evidence-ledger.md#real-upgrades).

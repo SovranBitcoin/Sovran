@@ -6,7 +6,8 @@
   release build of the candidate on an emulator, with nothing lost (below).
 - Upgrades from **0.1.1 on Android: PASS**, with money. A release build of the 0.1.1 source
   holding 63 test sats was upgraded in place to the candidate; the balance and the history
-  carried over (below). 0.1.0 and 0.1.1 are the only Android releases below 0.1.3.
+  carried over (below). The same was then done from **0.1.0**, onto the candidate with every
+  fix of this audit in it. 0.1.0 and 0.1.1 are the only Android releases below 0.1.3.
 - Upgrades from **0.1.3 on iOS: PASS on the simulator**, with money. A release build of the
   0.1.3 source holding 63 test sats was upgraded in place to a release build of the
   candidate; the balance, the mint and the history carried over (below). A store build on a
@@ -104,6 +105,17 @@ released shape and the candidate reader for every row are in the persistence map
 | What this adds | The iOS keychain items and the wallet database written by 0.1.3's native code are read by the candidate's, on iOS |
 | Not covered | A store-signed build on a phone; several accounts; spending the proofs |
 
+**0.1.0 release build, funded, to the candidate with this audit's fixes, Android, 2026-10-10.**
+
+| | |
+| --- | --- |
+| Old | `assembleRelease` of tag `v0.1.0` (`d23d07230`), `versionCode` 19; a rebuild, with Coco 1.0.0 |
+| New | `assembleRelease` of `feaead880` (0.1.4, `versionCode` 25): the candidate including the migration, key, Routstr, scan-history, counter and lost-database changes made during this audit. Same local key |
+| State made on 0.1.0 | Terms accepted, wallet created, a 64 sat test-mint token redeemed (balance 63), test mint trusted |
+| After, on the candidate | Asked to accept the updated documents, then the wallet: the receive in the history, the backup offer "because you have money here now", the test mint listed with **₿ 63**. No failed load, refused write, failed migration or lost-database line from the app in the device log |
+| What this adds | Coco 1.0.0's database migrated by 2.0.0; and the first binary upgrade onto a build that contains this audit's fixes, so none of them disturbs a healthy 0.1.0 install |
+| Not covered | Spending the proofs; several accounts; Routstr |
+
 Earlier, weaker runs (in `PERFORMANCE.md`): 0.1.3's JavaScript, then the candidate's, inside
 the candidate's native build, on a fresh Android emulator and a fresh iOS simulator, with
 nothing lost.
@@ -116,9 +128,8 @@ To repeat it: download the release APK, `apksigner sign` it and a local `assembl
 
 | Gap | Why | Unblocked by |
 | --- | --- | --- |
-| A Coco database written by 0.6.0, rc.11, rc.30, rc.34, rc.47, 1.0.0 opened by 2.0.0 (1.0.1 is shown above) | No database files from those builds exist to test with | Building one old revision per Coco version in a simulator and keeping its `coco.db` as a fixture |
+| A Coco database written by 0.6.0, rc.11, rc.30, rc.34, rc.47, opened by 2.0.0 (1.0.0 and 1.0.1 are shown above) | No database files from those builds exist to test with | Building one old revision per Coco version in a simulator and keeping its `coco.db` as a fixture |
 | SecureStore on a real iPhone keychain, and across native versions older than 0.1.1 | Shown on Android (0.1.1, 0.1.3) and the iOS simulator (0.1.3) | One TestFlight upgrade on a phone |
-| Android 0.1.0 upgraded as a binary | The release rebuild ran out of disk on 2026-10-10 (29 GB of swap in use); 0.1.1, one day newer and with the same stores, was upgraded instead | A reboot, then the same steps as the 0.1.1 run at tag `v0.1.0` |
 | The 99 builds from 2024 | Source is not in this repository | The earlier repository |
 | Which builds are still installed | EAS does not record it | App Store Connect and Play Console (questions in the provenance record) |
 | Android signing certificate named in the old release guide differs from 0.1.3's | Probably upload key against Play's signing key; not confirmed | Play Console → App integrity |
