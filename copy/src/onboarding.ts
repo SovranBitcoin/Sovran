@@ -37,8 +37,8 @@ export const backupIntroCopy = {
 
 export const profileRemovalCopy = {
   title: "Remove profile from this device?",
-  derived: "This profile can be added again from your recovery phrase. Its local wallet records, messages and settings will be deleted.",
-  imported: "This profile's local wallet records, messages and settings will be deleted. Continue to review what happens to its imported key.",
+  derived: "This profile can be added again from your recovery phrase. Its local wallet records, messages and settings will be deleted. If someone may have paid it recently, open it first: a payment this device has not received yet may be lost.",
+  imported: "This profile's local wallet records, messages and settings will be deleted. If someone may have paid it recently, open it first: a payment this device has not received yet may be lost. Continue to review what happens to its imported key.",
   importedTitle: "Delete the imported key?",
   importedConsequence: "The key is deleted from this device and cannot be recovered from the recovery phrase. Keep a separate backup of the imported key before removing this profile.",
   remove: "Remove profile",
