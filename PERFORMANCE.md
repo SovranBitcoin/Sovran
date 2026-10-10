@@ -817,3 +817,10 @@ upgraded in place to the same candidate build. The balance, the mint and the his
 there afterwards, so a wallet database written by Coco 1.0.1 is migrated by Coco 2.0.0 with
 its proofs intact. The only prompt was to accept the documents that changed after 0.1.1.
 Record: [evidence ledger](docs/architecture/persistence/evidence-ledger.md#real-upgrades).
+
+## A funded 0.1.3 release build upgraded to the candidate (iOS simulator, 2026-10-10)
+
+Release builds of the 0.1.3 source and of the candidate were installed one over the other on
+an iPhone simulator. The 63 test sats, the mint and the history were there afterwards, and
+the app's wallet database held the same six proofs. Record:
+[evidence ledger](docs/architecture/persistence/evidence-ledger.md#real-upgrades).

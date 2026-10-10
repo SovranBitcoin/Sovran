@@ -141,7 +141,14 @@ APK (GitHub release, checksum in `origin/release-state`), build the candidate wi
 `assembleRelease` and a higher `versionCode`, sign both with the same local keystore
 (`apksigner sign`), install the old one, make state, then `adb install -r` the new one.
 Data and Keystore entries follow the package, not the certificate. Use an emulator that has
-no store-signed copy installed. iOS has no equivalent; it needs TestFlight.
+no store-signed copy installed.
+
+On iOS a store build cannot run in the simulator, so build both revisions for it:
+`xcodebuild -configuration Release -sdk iphonesimulator` after `expo prebuild`, leaving
+code signing on (an unsigned build has no keychain and shows a black screen). Install the
+old `.app`, make state, terminate, `simctl install` the new one over it. The app's
+`coco.db` can be read straight from `simctl get_app_container <device> <bundle id> data`.
+A store-signed upgrade on a phone still needs TestFlight.
 
 When the old binary is no longer downloadable (EAS artifacts expire), rebuild it: a detached
 `git worktree` at the release commit, `bun install --frozen-lockfile`, `git submodule update

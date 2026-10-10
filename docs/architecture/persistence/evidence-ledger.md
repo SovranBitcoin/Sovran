@@ -7,8 +7,10 @@
 - Upgrades from **0.1.1 on Android: PASS**, with money. A release build of the 0.1.1 source
   holding 63 test sats was upgraded in place to the candidate; the balance and the history
   carried over (below). 0.1.0 and 0.1.1 are the only Android releases below 0.1.3.
-- Upgrades on **iOS** have no open finding and pass every test below, but no released iOS
-  binary was upgraded. That needs TestFlight; the simulator cannot run a store build.
+- Upgrades from **0.1.3 on iOS: PASS on the simulator**, with money. A release build of the
+  0.1.3 source holding 63 test sats was upgraded in place to a release build of the
+  candidate; the balance, the mint and the history carried over (below). A store build on a
+  phone (TestFlight) is still worth one run before release, for the device keychain.
 - Upgrades from **0.0.45 to 0.0.63** had three defects that lose data or a paid credential.
   All three are fixed and tested in this run. No real upgrade from those builds was run.
 - Upgrades from **0.0.1 to 0.0.40** (redux era, iOS only) no longer hand the user a new
@@ -89,6 +91,19 @@ released shape and the candidate reader for every row are in the persistence map
 | What this adds | A wallet database written by Coco 1.0.1 is opened and migrated by Coco 2.0.0 with its proofs intact, and the 0.1.1 stores (settings v3, profile v1) are read |
 | Not covered | Spending the migrated proofs; several accounts; Routstr; iOS |
 
+**0.1.3 release build, funded, to a candidate release build, iOS simulator, 2026-10-10.**
+
+| | |
+| --- | --- |
+| Old | `xcodebuild -configuration Release -sdk iphonesimulator` of tag `v0.1.3` (`d9ad12c4b`), with Xcode's normal simulator signing so the keychain works. A rebuild for the simulator: a store build cannot run there |
+| New | The same build of the candidate (`3965e66bb`, version 0.1.4), same bundle id |
+| Device | iPhone 17 Pro Max simulator |
+| State made on 0.1.3 | Terms and privacy accepted, wallet created, a 64 sat token from the public test mint pasted and redeemed (balance 63 after the fee), test mint trusted |
+| Upgrade | App terminated, `simctl install` of the candidate over it |
+| After, on the candidate | Opened with no terms, onboarding or restore prompt, straight to the backup offer "because you have money here now". The receive is in the history; the test mint is listed with **₿ 63** under test bitcoin. Read directly from the app's `coco.db` after the upgrade and again after a cold start: 6 proofs, all `ready`, summing 63. No failed load, refused write or failed migration in the device log |
+| What this adds | The iOS keychain items and the wallet database written by 0.1.3's native code are read by the candidate's, on iOS |
+| Not covered | A store-signed build on a phone; several accounts; spending the proofs |
+
 Earlier, weaker runs (in `PERFORMANCE.md`): 0.1.3's JavaScript, then the candidate's, inside
 the candidate's native build, on a fresh Android emulator and a fresh iOS simulator, with
 nothing lost.
@@ -102,7 +117,7 @@ To repeat it: download the release APK, `apksigner sign` it and a local `assembl
 | Gap | Why | Unblocked by |
 | --- | --- | --- |
 | A Coco database written by 0.6.0, rc.11, rc.30, rc.34, rc.47, 1.0.0 opened by 2.0.0 (1.0.1 is shown above) | No database files from those builds exist to test with | Building one old revision per Coco version in a simulator and keeping its `coco.db` as a fixture |
-| SecureStore keeping the same items across native versions older than 0.1.3, and on iOS | Shown for 0.1.3 → candidate on Android only | A TestFlight upgrade; an old Android build to upgrade from |
+| SecureStore on a real iPhone keychain, and across native versions older than 0.1.1 | Shown on Android (0.1.1, 0.1.3) and the iOS simulator (0.1.3) | One TestFlight upgrade on a phone |
 | The 99 builds from 2024 | Source is not in this repository | The earlier repository |
 | Which builds are still installed | EAS does not record it | App Store Connect and Play Console (questions in the provenance record) |
 | Android signing certificate named in the old release guide differs from 0.1.3's | Probably upload key against Play's signing key; not confirmed | Play Console → App integrity |
