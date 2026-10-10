@@ -435,6 +435,42 @@ describe('waits made while the lock is held are bounded', () => {
     expect(await switchToExistingProfile({ accountIndex: 1 })).toBe(true);
   });
 
+  it('holds the app when the write of the target never answers', async () => {
+    const { switchToExistingProfile, useProfileStore, mockRestart, AsyncStorage } = setup();
+    mockRestart.mockReturnValue(true);
+    (AsyncStorage.setItem as jest.Mock).mockImplementation((key: string) =>
+      key === 'profile-store' ? new Promise(() => {}) : Promise.resolve()
+    );
+    const { Alert } = require('react-native');
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+
+    const pending = switchToExistingProfile({ accountIndex: 1 });
+    await jest.advanceTimersByTimeAsync(0);
+    await jest.advanceTimersByTimeAsync(11_000);
+
+    // It ends, instead of waiting for good with the lock held and no message.
+    await expect(pending).resolves.toBe(false);
+    expect(mockRestart).not.toHaveBeenCalled();
+    expect(useProfileStore.getState().activeAccountIndex).toBe(0);
+    expect(alert).toHaveBeenCalled();
+  });
+
+  it('still lets a flow start when the disk guard never answers', async () => {
+    const { switchToExistingProfile, mockRestart, AsyncStorage } = setup();
+    mockRestart.mockReturnValue(true);
+    (AsyncStorage.getItem as jest.Mock).mockImplementation((key: string) =>
+      key === 'profile-transition-in-progress' ? new Promise(() => {}) : Promise.resolve(null)
+    );
+
+    const pending = switchToExistingProfile({ accountIndex: 1 });
+    await jest.advanceTimersByTimeAsync(0);
+    await jest.advanceTimersByTimeAsync(6_000);
+    await jest.advanceTimersByTimeAsync(6_000);
+
+    await expect(pending).resolves.toBe(true);
+    expect(mockRestart).toHaveBeenCalled();
+  });
+
   it('refuses a recovery when the wallet does not close, and frees the lock', async () => {
     const { recoverMnemonicSession, switchToExistingProfile, useProfileStore, mockRestart } =
       setup();

@@ -33,7 +33,23 @@ const TRANSITION_EXPIRY_MS = 10_000;
 
 type TransitionGuard = { startedAt: number };
 
+/** How long a flow waits on storage for the guard, or for the target write. */
+const GUARD_STORAGE_TIMEOUT_MS = 5_000;
+const TARGET_WRITE_TIMEOUT_MS = 10_000;
+
+/**
+ * Storage that errors, or does not answer in time, lets the flow in: the
+ * in-memory lock already stops two flows in one runtime, and a guard that
+ * cannot be read must not make account changes impossible.
+ */
 async function beginTransition(): Promise<boolean> {
+  const taken = await settleWithin(takeGuard(), GUARD_STORAGE_TIMEOUT_MS);
+  if (taken !== TIMED_OUT) return taken;
+  log.warn('profile.orchestrator.guard_timeout');
+  return true;
+}
+
+async function takeGuard(): Promise<boolean> {
   try {
     const raw = await AsyncStorage.getItem(TRANSITION_KEY);
     if (raw) {
@@ -50,12 +66,12 @@ async function beginTransition(): Promise<boolean> {
   }
 }
 
+/** Best effort and bounded: an unanswered removal must not keep the lock. */
 async function endTransition(): Promise<void> {
-  try {
-    await AsyncStorage.removeItem(TRANSITION_KEY);
-  } catch {
-    // best-effort
-  }
+  await settleWithin(
+    AsyncStorage.removeItem(TRANSITION_KEY).catch(() => undefined),
+    GUARD_STORAGE_TIMEOUT_MS
+  );
 }
 
 /** Call on app startup to clear any stale transition guard left by a previous run. */
@@ -103,14 +119,20 @@ export function keyDerivation(): KeyDerivationFn | null {
  */
 export function persistSwitchTargetToDisk(accountIndex: number): ResultAsync<void, Error> {
   const { profiles } = useProfileStore.getState();
+  const write = AsyncStorage.setItem(
+    'profile-store',
+    JSON.stringify({
+      state: { activeAccountIndex: accountIndex, profiles },
+      version: PROFILE_STORE_PERSIST_VERSION,
+    })
+  );
+  // Bounded: a write that never answers would keep the flow, and the lock,
+  // waiting for good. It may still land later; the caller treats a timeout as
+  // not recorded and holds the app, so reopening starts from whatever is on disk.
   return ResultAsync.fromPromise(
-    AsyncStorage.setItem(
-      'profile-store',
-      JSON.stringify({
-        state: { activeAccountIndex: accountIndex, profiles },
-        version: PROFILE_STORE_PERSIST_VERSION,
-      })
-    ),
+    settleWithin(write, TARGET_WRITE_TIMEOUT_MS).then((result) => {
+      if (result === TIMED_OUT) throw new Error('Timed out recording the active profile');
+    }),
     (error) => (error instanceof Error ? error : new Error(String(error)))
   );
 }

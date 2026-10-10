@@ -386,6 +386,7 @@ export async function recoverMnemonicSession(mnemonic: string): Promise<boolean>
     // A record that cannot be read (damaged JSON) must not stop a recovery:
     // it is simply not something that can be put back.
     type Saved = { readable: true; value: unknown } | { readable: false };
+    const NOT_SAVED: Saved = { readable: false };
     const read = async (options: typeof lifecycle | typeof profiles): Promise<Saved> => {
       try {
         return { readable: true, value: await options.storage!.getItem(options.name!) };
@@ -400,7 +401,7 @@ export async function recoverMnemonicSession(mnemonic: string): Promise<boolean>
     };
     const before = {
       lifecycle: await read(lifecycle),
-      profiles: onboarding ? await read(profiles) : ({ readable: false } as Saved),
+      profiles: onboarding ? await read(profiles) : NOT_SAVED,
     };
     const putBack = async () => {
       await restore(lifecycle, before.lifecycle);
