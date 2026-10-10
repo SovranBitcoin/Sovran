@@ -799,3 +799,13 @@ On the existing Android emulator install (data written by earlier builds), with 
 
 The switch was driven by a temporary hook, since reverted; this emulator's profile sheet stalls
 under taps.
+
+## Released 0.1.3 binary upgraded to a candidate release build (Android, 2026-10-10)
+
+The check that had been left for a phone was run on the emulator after all, by signing the
+released 0.1.3 APK and a release build of the candidate (`3965e66bb`) with the same local
+key. Two accounts made on 0.1.3 were both there after the upgrade, with the same keys, the
+same one active and the mint still selected; no prompt, no retry screen, and nothing from the
+app in the device log. The full record is in
+[the evidence ledger](docs/architecture/persistence/evidence-ledger.md#real-upgrades). Still
+not run: the same on iOS (TestFlight only), and with funds in the wallet.

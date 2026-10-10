@@ -2,10 +2,11 @@
 
 **Verdict, 2026-10-10, candidate 0.1.4 (`feat/offline-send-just-works`): INCONCLUSIVE.**
 
-- Upgrades from **0.1.0 to 0.1.3** have no open finding and pass every test below. They are
-  not PASS because the one real upgrade that counts, the candidate installed over the
-  store-signed 0.1.3 on a phone, has not been run (it needs the store signing key; steps are
-  at the end of `PERFORMANCE.md`).
+- Upgrades from **0.1.3 on Android: PASS.** The released 0.1.3 APK was upgraded in place to a
+  release build of the candidate on an emulator, with nothing lost (below).
+- Upgrades from **0.1.0 to 0.1.2**, and from **0.1.3 on iOS**, have no open finding and pass
+  every test below, but no released binary of those was upgraded. An iOS binary upgrade needs
+  TestFlight; the simulator cannot run a store build.
 - Upgrades from **0.0.45 to 0.0.63** had three defects that lose data or a paid credential.
   All three are fixed and tested in this run. No real upgrade from those builds was run.
 - Upgrades from **0.0.1 to 0.0.40** (redux era, iOS only) no longer hand the user a new
@@ -50,7 +51,7 @@ released shape and the candidate reader for every row are in the persistence map
 | Durable thing | Fixture / test | Fault cases | Real upgrade |
 | --- | --- | --- | --- |
 | Store names, scopes and versions of 0.1.3 | `releasedPersistedSurface.test.ts` | n/a | JS-level, below |
-| Whole 0.1.0 / 0.1.3 install through the migration runner | `releaseUpgrade.test.ts`, `globalMigrationsRunner.test.ts` | interrupted copy, corrupt marker, marker read failure, run twice | JS-level, below |
+| Whole 0.1.0 / 0.1.3 install through the migration runner | `releaseUpgrade.test.ts`, `globalMigrationsRunner.test.ts` | interrupted copy, corrupt marker, marker read failure, run twice | 0.1.3 binary on Android, below |
 | `settings-store` v0 … v4 | `settingsStorePersistResilience.test.ts`, `persistedEnumTolerance.test.ts` | wrong-shaped state | JS-level |
 | `profile-store` v0 … v2, capacity | `profileStorePersistResilience.test.ts`, `profileStoreCapacity.test.ts` | unknown source, bad active index | JS-level |
 | `wallet-lifecycle` | `lifecycleStampMigration.test.ts` | pending / failed restore kept | JS-level |
@@ -61,17 +62,35 @@ released shape and the candidate reader for every row are in the persistence map
 | Any store rejected by its schema | `persistUnreadableGuard.test.ts` | read throws, copy fails, second failure | n/a |
 | Every schema against its golden shape | `persistSchemaDrift.test.ts` | n/a | n/a |
 
-**Real upgrades run so far** (recorded in `PERFORMANCE.md`): 0.1.3's JavaScript, then the
-candidate's, inside the candidate's native build, on a fresh Android emulator and a fresh iOS
-simulator, with nothing lost. The storage native modules resolve to the same versions in
-0.1.3 and the candidate. This is weaker than a store-signed upgrade and is labelled as such.
+## Real upgrades
+
+**Released 0.1.3 binary to a candidate release build, Android, 2026-10-10.**
+
+| | |
+| --- | --- |
+| Old | `sovran-0.1.3.apk` from the GitHub release, SHA-256 `2fca9101…58a941`, the same file the pipeline recorded for Play and Zapstore (`versionCode` 24) |
+| New | `assembleRelease` of commit `3965e66bb`, arm64, `versionCode` 25, version 0.1.4 |
+| Signing | Both re-signed with one local debug key (certificate `204df835…b14588`), because Play holds the real key. Nothing inside either APK was changed. Android ties an app's data and its Keystore entries to the package and its user id, not to the certificate, so this exercises the same storage path as a store update |
+| Device | Android 16 emulator (API 36.1, arm64) |
+| State made on 0.1.3 | Terms accepted, wallet created (`driven-lion`, `npub124a…vsukles6`), a second account generated (`vivid-cheetah`, `npub1ksm…dq5vhlp9`) and left active, Minibits mint selected |
+| Upgrade | `adb install -r` over the stopped app; `firstInstallTime` kept, so the data was not cleared |
+| After, on the candidate | Opened straight to the wallet: no terms, no onboarding, no restore prompt, no retry screen. Same account active with the same npub; both accounts listed; mint still selected. Switched to the first account: same name and npub. Stopped and started again: still there. No error, refusal or recovery line from the app in the device log |
+| Not covered | Funds (both wallets were empty), Routstr, an install older than 0.1.3, iOS |
+
+Earlier, weaker runs (in `PERFORMANCE.md`): 0.1.3's JavaScript, then the candidate's, inside
+the candidate's native build, on a fresh Android emulator and a fresh iOS simulator, with
+nothing lost.
+
+To repeat it: download the release APK, `apksigner sign` it and a local `assembleRelease`
+(with a higher `versionCode`) with the same keystore, install the first, make state, then
+`adb install -r` the second.
 
 ## Not covered at all
 
 | Gap | Why | Unblocked by |
 | --- | --- | --- |
 | A Coco database written by 0.6.0, rc.11, rc.30, rc.34, rc.47, 1.0.x opened by 2.0.0 | No database files from those builds exist to test with | Building one old revision per Coco version in a simulator and keeping its `coco.db` as a fixture |
-| SecureStore 14 → 15 → 55 → 56 keeping the same keychain items | Native behaviour; cannot be shown in Jest | A store-signed upgrade on a phone |
+| SecureStore keeping the same items across native versions older than 0.1.3, and on iOS | Shown for 0.1.3 → candidate on Android only | A TestFlight upgrade; an old Android build to upgrade from |
 | The 99 builds from 2024 | Source is not in this repository | The earlier repository |
 | Which builds are still installed | EAS does not record it | App Store Connect and Play Console (questions in the provenance record) |
 | Android signing certificate named in the old release guide differs from 0.1.3's | Probably upload key against Play's signing key; not confirmed | Play Console → App integrity |

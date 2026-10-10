@@ -136,6 +136,13 @@ candidate over it. Record exactly what was installed and how it was signed. An u
 old JavaScript inside the new native build is weaker evidence than a store-signed upgrade;
 label it as what it is.
 
+On Android the released binary can be upgraded without the store key: download the release
+APK (GitHub release, checksum in `origin/release-state`), build the candidate with
+`assembleRelease` and a higher `versionCode`, sign both with the same local keystore
+(`apksigner sign`), install the old one, make state, then `adb install -r` the new one.
+Data and Keystore entries follow the package, not the certificate. Use an emulator that has
+no store-signed copy installed. iOS has no equivalent; it needs TestFlight.
+
 ### 5. Independent roles
 
 Run these as separate agents (Codex with `codex exec --sandbox read-only`, detached, one
