@@ -25,6 +25,7 @@ jest.mock('@/shared/lib/logger', () => ({
 
 const COMPLETED_KEY = 'global-migrations-completed';
 const ALL_MIGRATIONS = [
+  'adopt-leftover-bare-stores-v1',
   'index-to-pubkey-keys-v2',
   'legacy-global-theme-to-profile-v1',
   'wallet-lifecycle-stamp-existing-users-v1',
@@ -130,7 +131,10 @@ it('keeps a finished migration marked when a later one fails', async () => {
 
   await expect(runGlobalMigrations()).rejects.toThrow('disk full');
 
-  expect(JSON.parse(mockStorage[COMPLETED_KEY])).toEqual(['index-to-pubkey-keys-v2']);
+  expect(JSON.parse(mockStorage[COMPLETED_KEY])).toEqual([
+    'adopt-leftover-bare-stores-v1',
+    'index-to-pubkey-keys-v2',
+  ]);
   // The legacy theme is still in settings for the retry to move.
   expect(JSON.parse(mockStorage['settings-store']).state.theme).toBe('aurora');
 });
@@ -194,6 +198,11 @@ describe('upgrading from a released build', () => {
     'wallet-lifecycle-stamp-existing-users-v1',
   ]);
 
+  // Added after 0.1.3. On a released install it finds nothing to adopt and is
+  // only recorded.
+  const ADDED_SINCE = ['adopt-leftover-bare-stores-v1'];
+  const CURRENT_MARKER = [...JSON.parse(RELEASED_MARKER), ...ADDED_SINCE].sort();
+
   it('opens storage without touching anything a released build wrote', async () => {
     mockStorage = { ...currentInstall(), [COMPLETED_KEY]: RELEASED_MARKER };
     const before = { ...mockStorage };
@@ -203,14 +212,18 @@ describe('upgrading from a released build', () => {
     // Resolving is what lets the gate open: no retry screen on upgrade.
     await expect(runGlobalMigrations()).resolves.toBeUndefined();
 
-    expect(AsyncStorage.setItem).not.toHaveBeenCalled();
+    // The one write is the marker gaining the migration added since.
+    expect(jest.mocked(AsyncStorage.setItem).mock.calls).toEqual([
+      [COMPLETED_KEY, JSON.stringify(CURRENT_MARKER)],
+    ]);
     expect(AsyncStorage.removeItem).not.toHaveBeenCalled();
-    expect(mockStorage).toEqual(before);
+    expect(mockStorage).toEqual({ ...before, [COMPLETED_KEY]: JSON.stringify(CURRENT_MARKER) });
   });
 
   it('still runs every migration the released builds recorded, under the same ids', () => {
     // Renaming an id would replay that migration on every upgraded install.
-    expect(ALL_MIGRATIONS.slice().sort()).toEqual(JSON.parse(RELEASED_MARKER));
+    expect(ALL_MIGRATIONS.slice().sort()).toEqual(CURRENT_MARKER);
+    expect(ALL_MIGRATIONS).toEqual(expect.arrayContaining(JSON.parse(RELEASED_MARKER)));
   });
 
   it('finishes a released build whose first launch was cut short', async () => {
@@ -223,7 +236,7 @@ describe('upgrading from a released build', () => {
 
     await expect(runGlobalMigrations()).resolves.toBeUndefined();
 
-    expect(JSON.parse(mockStorage[COMPLETED_KEY])).toEqual(JSON.parse(RELEASED_MARKER));
+    expect(JSON.parse(mockStorage[COMPLETED_KEY])).toEqual(CURRENT_MARKER);
     const { [COMPLETED_KEY]: _marker, ...after } = mockStorage;
     const { [COMPLETED_KEY]: _oldMarker, ...expected } = before;
     expect(after).toEqual(expected);

@@ -193,6 +193,73 @@ async function copyPreProfileStoresToAccountZero(): Promise<void | typeof RUN_AG
 }
 
 /**
+ * Releases 0.0.62 to 0.1.3 recorded the key migration on an install that had
+ * no profile list yet (one that began before 0.0.57), without moving anything.
+ * Account 0's stores from that time are still under their bare keys, a paid
+ * Routstr key possibly among them, and nothing reads them.
+ *
+ * A leftover is adopted only where account 0 has nothing under its own key:
+ * what the account saved since is never replaced, and in that case the
+ * leftover stays where it is. A copy is read back before its source goes.
+ */
+async function adoptLeftoverBareStores(): Promise<void | typeof RUN_AGAIN> {
+  const leftovers: [base: string, data: string][] = [];
+  for (const base of INDEX_TO_PUBKEY_STORE_KEYS) {
+    if (NOW_GLOBAL_STORE_KEYS.has(base)) continue;
+    const data = await AsyncStorage.getItem(base);
+    if (data) leftovers.push([base, data]);
+  }
+  if (leftovers.length === 0) return;
+
+  const raw = await AsyncStorage.getItem('profile-store');
+  const accountZero = raw
+    ? readPersistedProfiles(raw)?.profiles.find((profile) => profile.accountIndex === 0)
+    : undefined;
+  // No account 0 yet: the pre-profile copy above is still in progress, or the
+  // list cannot be read. Either way, look again next launch.
+  if (!accountZero) return RUN_AGAIN;
+
+  // The leftovers were written by the first account of the stored phrase. An
+  // imported identity at index 0, or one from another phrase, is not their
+  // owner: they stay where they are.
+  let owner: string;
+  try {
+    const phrase = await retrieveMnemonic();
+    if (!phrase) return RUN_AGAIN;
+    owner = deriveNostrKeys(phrase, 0).pubkey;
+  } catch {
+    // The error is not logged: it may quote the phrase.
+    return RUN_AGAIN;
+  }
+  if (owner !== accountZero.pubkey) {
+    log.warn('migrations.global.leftover_bare_stores.not_owner', {
+      leftoverCount: leftovers.length,
+    });
+    return;
+  }
+
+  let adoptedCount = 0;
+  let unconfirmed = false;
+  for (const [base, data] of leftovers) {
+    const ownKey = `${base}:profile:${owner}`;
+    if ((await AsyncStorage.getItem(ownKey)) !== null) continue;
+    await AsyncStorage.setItem(ownKey, data);
+    if ((await AsyncStorage.getItem(ownKey)) !== data) {
+      // A save can be dropped without an error. Try again next launch.
+      unconfirmed = true;
+      continue;
+    }
+    await AsyncStorage.removeItem(base);
+    adoptedCount++;
+  }
+  log.info('migrations.global.leftover_bare_stores', {
+    adoptedCount,
+    leftoverCount: leftovers.length,
+  });
+  if (unconfirmed) return RUN_AGAIN;
+}
+
+/**
  * Migrate all profile-scoped Zustand stores from the old index-based
  * AsyncStorage key format to the current pubkey-based format.
  *
@@ -415,6 +482,7 @@ async function stampSeedCreatedForExistingUsers(): Promise<void> {
  */
 const MIGRATIONS: Migration[] = [
   { id: 'index-to-pubkey-keys-v2', run: migrateIndexKeysToPubkeyKeys },
+  { id: 'adopt-leftover-bare-stores-v1', run: adoptLeftoverBareStores },
   { id: 'legacy-global-theme-to-profile-v1', run: migrateLegacyGlobalThemeToProfile },
   { id: 'wallet-lifecycle-stamp-existing-users-v1', run: stampSeedCreatedForExistingUsers },
 ];

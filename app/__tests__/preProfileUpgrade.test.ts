@@ -301,3 +301,99 @@ describe('when the phrase cannot be used', () => {
     expect(scoped).toHaveLength(Object.keys(MOVED).length);
   });
 });
+
+describe('an install that passed through 0.0.62 to 0.1.3 with its stores left behind', () => {
+  const ADOPT_MIGRATION = 'adopt-leftover-bare-stores-v1';
+  const ownKey = (base: string) => `${base}:profile:${ACCOUNT_0}`;
+
+  /** Those releases recorded the key migration and created account 0; the bare keys stayed. */
+  function strandedInstall(): StorageMap {
+    mockSecureBacking.set('user_mnemonic', PHRASE);
+    mockStorage = { ...preProfileInstall(), [COMPLETED_KEY]: JSON.stringify([INDEX_MIGRATION]) };
+    addAccountZeroRow();
+    return mockStorage;
+  }
+
+  it('adopts each leftover store the account has nothing of its own for', async () => {
+    strandedInstall();
+    await runGlobalMigrations();
+
+    for (const [base, data] of Object.entries(MOVED)) {
+      expect(mockStorage[ownKey(base)]).toBe(data);
+      expect(mockStorage[base]).toBeUndefined();
+    }
+    expect(mockStorage['own-profile-stats-cache']).toBeDefined();
+    expect(completed()).toContain(ADOPT_MIGRATION);
+  });
+
+  it('never replaces what the account saved since, and leaves that leftover in place', async () => {
+    strandedInstall();
+    const savedSince = blob({ apiKey: null, sessions: [{ id: 'made-after-the-upgrade' }] });
+    mockStorage[ownKey('routstr-store')] = savedSince;
+
+    await runGlobalMigrations();
+
+    expect(mockStorage[ownKey('routstr-store')]).toBe(savedSince);
+    expect(mockStorage['routstr-store']).toBe(MOVED['routstr-store']);
+    expect(mockStorage[ownKey('mint-store')]).toBe(MOVED['mint-store']);
+  });
+
+  it('keeps the leftover when the copy does not read back', async () => {
+    strandedInstall();
+    const realSet = jest.mocked(AsyncStorage.setItem).getMockImplementation()!;
+    jest.mocked(AsyncStorage.setItem).mockImplementation(async (key, value) => {
+      if (key === ownKey('routstr-store')) return;
+      await realSet(key, value);
+    });
+
+    await runGlobalMigrations();
+
+    expect(mockStorage['routstr-store']).toBe(MOVED['routstr-store']);
+    expect(mockStorage[ownKey('routstr-store')]).toBeUndefined();
+    // Not recorded, so the next launch tries the copy again.
+    expect(completed()).not.toContain(ADOPT_MIGRATION);
+
+    jest.mocked(AsyncStorage.setItem).mockImplementation(realSet);
+    await runGlobalMigrations();
+    expect(mockStorage[ownKey('routstr-store')]).toBe(MOVED['routstr-store']);
+    expect(completed()).toContain(ADOPT_MIGRATION);
+  });
+
+  it('does not hand the leftovers to an account 0 that is not the phrase\u2019s first account', async () => {
+    strandedInstall();
+    const imported = 'b'.repeat(64);
+    mockStorage['profile-store'] = JSON.stringify({
+      state: {
+        activeAccountIndex: 0,
+        profiles: [{ accountIndex: 0, pubkey: imported, addedAt: 1 }],
+      },
+      version: 2,
+    });
+
+    await runGlobalMigrations();
+
+    expect(mockStorage['routstr-store']).toBe(MOVED['routstr-store']);
+    expect(mockStorage[`routstr-store:profile:${imported}`]).toBeUndefined();
+  });
+
+  it('waits when the keychain cannot say whose they are', async () => {
+    strandedInstall();
+    mockSecureBacking.clear();
+    await runGlobalMigrations();
+    expect(mockStorage['routstr-store']).toBe(MOVED['routstr-store']);
+    expect(completed()).not.toContain(ADOPT_MIGRATION);
+  });
+
+  it('waits for another launch while there is no account 0 to give them to', async () => {
+    mockStorage = { ...preProfileInstall(), [COMPLETED_KEY]: JSON.stringify([INDEX_MIGRATION]) };
+    await runGlobalMigrations();
+    expect(mockStorage['routstr-store']).toBe(MOVED['routstr-store']);
+    expect(completed()).not.toContain(ADOPT_MIGRATION);
+  });
+
+  it('is recorded at once on an install with nothing left over', async () => {
+    addAccountZeroRow();
+    await runGlobalMigrations();
+    expect(completed()).toContain(ADOPT_MIGRATION);
+  });
+});
