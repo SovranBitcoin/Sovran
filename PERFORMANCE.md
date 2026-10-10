@@ -696,3 +696,22 @@ stored keys were still present, both profiles, the active account, terms accepta
 the migration marker were unchanged, the database files were the same, and no `:unreadable` copy
 was made. The simulator was deleted afterwards. As on Android, this was v0.1.3's JavaScript in the
 current native build, not the released binary.
+
+### What the upgrade tests did not cover: the native side, 2026-10-10
+
+The device upgrades ran v0.1.3's JavaScript inside the current development build, because a
+released build cannot be installed over from here (it needs the release signing key). To size that
+gap, the native side of the v0.1.3 tag was compared with the current code:
+
+- React Native, Expo, AsyncStorage, expo-sqlite, expo-secure-store, expo-file-system, the wallet
+  core and its SQLite adapter, and the Nostr cache library resolve to the same versions in
+  `bun.lock` at both points. The code that reads and writes a user's data natively is the same.
+- Native changes since v0.1.3: `@cashudevkit/react-native` was removed (a crypto helper, not
+  storage), a local `network-timeouts` module was added, and `app.json` gained
+  `android.allowBackup: false` and reordered the NFC identifiers. The bundle identifiers, URL
+  schemes and keychain configuration are unchanged.
+- No `ios/` or `android/` directories are committed, so there is no hand-edited native code to
+  differ.
+
+So the part of the upgrade a JavaScript-only test cannot see is small and does not touch storage.
+A run from the released binary on a real phone is still the only complete proof.
