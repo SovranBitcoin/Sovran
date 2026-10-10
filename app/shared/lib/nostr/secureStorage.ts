@@ -12,6 +12,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { nostrLog, redactError } from '../logger';
 import { useSecureStoreState } from '@/shared/stores/runtime/secureStoreState';
 import { maybeExportSeedForE2E } from './e2eSeedExport';
+import { REDUX_ERA_ROW, readReduxEraRoot, type ReduxEraRoot } from './reduxEraRoot';
 import {
   SecureVaultManifest,
   secureVaultChunkKey,
@@ -452,6 +453,33 @@ async function ensureMnemonicExistsInner(): Promise<string | null> {
       return null;
     }
 
+    // A phone coming straight from a release before 0.0.45 has its phrase in
+    // the old redux row and nowhere else. Take that phrase as the root rather
+    // than hand the user a new wallet over the old one. If the row had a
+    // wallet whose phrase cannot be read, ask for the phrase instead.
+    let reduxEra: ReduxEraRoot;
+    try {
+      reduxEra = readReduxEraRoot(await AsyncStorage.getItem(REDUX_ERA_ROW));
+    } catch (error) {
+      lockMnemonic(error);
+      return null;
+    }
+    if (reduxEra.kind === 'unreadable') {
+      lockMnemonic(new Error('Earlier wallet requires its recovery phrase'));
+      return null;
+    }
+    if (reduxEra.kind === 'phrase') {
+      // seedCreatedAt stays unset: this install did not create the phrase, so
+      // startup offers a restore from the mints. The old proofs are not
+      // imported and stay in the row, which is left untouched.
+      if (!(await storeMnemonic(reduxEra.mnemonic))) {
+        nostrLog.error('nostr.secure.store_redux_era_mnemonic_failed');
+        return null;
+      }
+      nostrLog.info('nostr.secure.mnemonic_stored', { source: 'redux_era' });
+      return reduxEra.mnemonic;
+    }
+
     // Generate new mnemonic
     nostrLog.info('nostr.secure.generating_mnemonic');
     const generated = await generateMnemonic();
@@ -625,11 +653,36 @@ export function storeDerivedKeys(accountIndex: number, keys: CachedDerivedKeys):
   return secureSet(derivedKeysKey(accountIndex), JSON.stringify(keys), 'store_keys');
 }
 
+// Both caches can be made again from the root phrase, so a blob of the wrong
+// shape is deleted and counts as absent. Served as it is, a matching hash
+// would select it and the account would fail to load on every launch.
+const HEX_64 = /^[0-9a-fA-F]{64}$/;
+const DerivedKeysCache = z.object({
+  npub: z.string().startsWith('npub1'),
+  nsec: z.string().startsWith('nsec1'),
+  pubkey: z.string().regex(HEX_64),
+  privateKeyHex: z.string().regex(HEX_64),
+  mnemonicHash: z.string(),
+});
+const CashuMnemonicCache = z.object({
+  value: z.string().refine((phrase) => bip39.validateMnemonic(phrase, wordlist)),
+  mnemonicHash: z.string(),
+});
+
+/** Throws a plain error: a zod error could carry the secret fields into the log. */
+function parseCache<T>(schema: z.ZodType<T>, raw: string, name: string): T {
+  const parsed = schema.safeParse(JSON.parse(raw));
+  if (!parsed.success) throw new Error(`${name} cache has the wrong shape`);
+  return parsed.data;
+}
+
 export async function retrieveDerivedKeys(accountIndex: number): Promise<CachedDerivedKeys | null> {
   const key = derivedKeysKey(accountIndex);
   const raw = await secureGet(key, 'retrieve_keys');
   if (!raw) return null;
-  return parseOrSelfHeal(raw, key, 'retrieve_keys', (s) => JSON.parse(s) as CachedDerivedKeys);
+  return parseOrSelfHeal(raw, key, 'retrieve_keys', (s) =>
+    parseCache(DerivedKeysCache, s, 'derived keys')
+  );
 }
 
 export function storeCashuMnemonic(
@@ -647,11 +700,8 @@ export async function retrieveCashuMnemonic(
   const key = cashuMnemonicKey(accountIndex);
   const raw = await secureGet(key, 'retrieve_cashu_mnemonic');
   if (!raw) return null;
-  return parseOrSelfHeal(
-    raw,
-    key,
-    'retrieve_cashu_mnemonic',
-    (s) => JSON.parse(s) as { value: string; mnemonicHash: string }
+  return parseOrSelfHeal(raw, key, 'retrieve_cashu_mnemonic', (s) =>
+    parseCache(CashuMnemonicCache, s, 'cashu mnemonic')
   );
 }
 
