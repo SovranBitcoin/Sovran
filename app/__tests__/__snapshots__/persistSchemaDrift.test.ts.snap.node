@@ -5510,7 +5510,6 @@ exports[`persisted schema drift scan-history-store schema matches the golden sna
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
         "entries": {
-          "default": [],
           "items": {
             "additionalProperties": {},
             "properties": {
@@ -5535,7 +5534,6 @@ exports[`persisted schema drift scan-history-store schema matches the golden sna
                 "type": "array",
               },
               "raw": {
-                "maxLength": 16384,
                 "type": "string",
               },
               "scannedAt": {
@@ -5577,7 +5575,6 @@ exports[`persisted schema drift scan-history-store schema matches the golden sna
             ],
             "type": "object",
           },
-          "maxItems": 500,
           "type": "array",
         },
       },
@@ -5589,76 +5586,6 @@ exports[`persisted schema drift scan-history-store schema matches the golden sna
       "properties": {
         "entries": {
           "default": [],
-          "items": {
-            "additionalProperties": {},
-            "properties": {
-              "container": {
-                "maxLength": 64,
-                "type": "string",
-              },
-              "id": {
-                "maxLength": 128,
-                "type": "string",
-              },
-              "inputType": {
-                "maxLength": 64,
-                "type": "string",
-              },
-              "optionKinds": {
-                "items": {
-                  "maxLength": 128,
-                  "type": "string",
-                },
-                "maxItems": 64,
-                "type": "array",
-              },
-              "raw": {
-                "maxLength": 16384,
-                "type": "string",
-              },
-              "scannedAt": {
-                "maximum": 9007199254740991,
-                "minimum": 0,
-                "type": "integer",
-              },
-              "source": {
-                "default": "qr",
-                "enum": [
-                  "qr",
-                  "nfc",
-                  "paste",
-                  "deeplink",
-                ],
-                "type": "string",
-              },
-              "transactionId": {
-                "maxLength": 256,
-                "type": "string",
-              },
-              "type": {
-                "default": "unknown",
-                "enum": [
-                  "npub",
-                  "ecash",
-                  "lightning",
-                  "mint",
-                  "paymentRequest",
-                  "unknown",
-                ],
-                "type": "string",
-              },
-            },
-            "required": [
-              "id",
-              "raw",
-              "type",
-              "source",
-              "scannedAt",
-            ],
-            "type": "object",
-          },
-          "maxItems": 500,
-          "type": "array",
         },
       },
       "required": [
