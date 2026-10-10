@@ -3,7 +3,7 @@
  */
 
 /**
- * The wallet core ships as its maintainers published it.
+ * The wallet core ships as its maintainers published it, with one exception.
  *
  * It used to carry a patch that let a P2PK send be reclaimed with a refund
  * key. Upstream says such a send cannot be reclaimed, the patch had never run
@@ -11,7 +11,12 @@
  * something to carry on our own word. The app now withholds what the core
  * cannot do (`wallet/src/p2pk/reclaimGate.ts`) instead of changing the core.
  *
- * This fails if a patch comes back, under any file name.
+ * The exception is ADR 0019: `ops.send.prepare({ offline: true })`, which
+ * prepares an exact-match send from stored mint data without contacting the
+ * mint. The patch is the compiled output of the coco commit kept in
+ * `app/patches/sources/`; see `app/patches/README.coco-offline-send.md`.
+ *
+ * This fails if any other patch arrives, or if that one reaches further.
  */
 
 import { existsSync, readFileSync, readdirSync } from 'fs';
@@ -26,29 +31,56 @@ const CANDIDATES = [
 const bundlePath = CANDIDATES.find((candidate) => existsSync(candidate));
 const bundle = bundlePath ? readFileSync(bundlePath, 'utf8') : '';
 
-describe('@cashu/coco-core is unmodified', () => {
+const OFFLINE_SEND_PATCH = '@cashu+coco-core+2.0.0.patch';
+const PATCHES_DIR = resolve(__dirname, '..', 'patches');
+
+describe('@cashu/coco-core carries one patch', () => {
   it('found the installed bundle to check', () => {
     expect(bundlePath).toBeTruthy();
   });
 
-  it('has no patch registered against any coco package', () => {
+  it('has only the offline-send patch registered against a coco package', () => {
     const root = JSON.parse(
       readFileSync(resolve(__dirname, '..', '..', 'package.json'), 'utf8')
     ) as { patchedDependencies?: Record<string, string> };
-    const patched = Object.keys(root.patchedDependencies ?? {}).filter((name) =>
+    const patched = Object.entries(root.patchedDependencies ?? {}).filter(([name]) =>
       name.startsWith('@cashu/coco-')
     );
-    expect(patched).toEqual([]);
+    expect(patched).toEqual([['@cashu/coco-core@2.0.0', `app/patches/${OFFLINE_SEND_PATCH}`]]);
   });
 
-  it('has no coco patch file waiting to be registered', () => {
-    const files = readdirSync(resolve(__dirname, '..', 'patches')).filter((name) =>
-      /coco/i.test(name)
+  it('has no other coco patch file waiting to be registered', () => {
+    const files = readdirSync(PATCHES_DIR).filter(
+      (name) => /coco/i.test(name) && /\.patch$/.test(name)
     );
-    expect(files).toEqual([]);
+    expect(files).toEqual([OFFLINE_SEND_PATCH]);
   });
 
-  it('carries none of the reclaim code the patch added', () => {
+  it('changes the bundle and its type declarations, nothing else', () => {
+    const patch = readFileSync(resolve(PATCHES_DIR, OFFLINE_SEND_PATCH), 'utf8');
+    const files = patch
+      .split('\n')
+      .filter((line) => line.startsWith('diff --git '))
+      .map((line) => line.split(' b/')[1]);
+    expect(files).toEqual(['dist/index-CvKNFBXJ.d.ts', 'dist/index.d.ts', 'dist/index.js']);
+  });
+
+  it('carries the offline prepare option and refuses what needs a swap', () => {
+    expect(bundle).toContain(
+      'return this.sendOperationService.prepare(initOp, { offline: input.offline });'
+    );
+    expect(bundle).toContain('async getOfflineWallet(mintUrl, unit) {');
+    expect(bundle).toContain('Offline send needs proofs that add up to exactly');
+    expect(bundle).toContain('requires the mint and cannot be prepared offline');
+  });
+
+  it('keeps the online path refreshing stale mint data', () => {
+    expect(bundle).toContain(
+      'const { mint, keysets } = await this.mintService.ensureUpdatedMint(normalizedMintUrl);'
+    );
+  });
+
+  it('carries none of the reclaim code the earlier patch added', () => {
     expect(bundle).not.toContain('collectSigningKeys');
     expect(bundle).not.toContain('assertReclaimable');
     expect(bundle).not.toContain('getP2PKExpectedWitnessPubkeys');

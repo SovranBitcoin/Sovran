@@ -208,7 +208,7 @@ export function UserMessagesScreen({
   const lud16 = rawLud16 && LightningAddress.safeParse(rawLud16).success ? rawLud16 : undefined;
   // No (valid) lud16 → fall back to the counterparty's npub.cash address so
   // Send money always works (UserProfileScreen precedent; the send flow's
-  // Select-option menu labels the variant "to npub.cash" for npc targets).
+  // Select-option menu labels the variant "as Lightning (npub.cash)" for npc targets).
   const sendMoneyTarget = useMemo(() => {
     if (lud16) return lud16;
     try {

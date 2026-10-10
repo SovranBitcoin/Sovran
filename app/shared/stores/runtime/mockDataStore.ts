@@ -8,7 +8,7 @@ import { isLegacyMockProfile } from './legacyMockProfiles';
  * Legacy cleanup below removes only identifiable fixtures from older builds.
  */
 
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { storeLog } from '@/shared/lib/logger';
 import { useScanHistoryStore, type ScanSource } from '@/shared/stores/profile/scanHistoryStore';
 import {
@@ -516,7 +516,10 @@ export function purgeLegacyMockData() {
   });
 }
 
-export const useMockDataStore = create<MockDataState>()((set) => ({
+export const useMockDataStore = create<MockDataState>({
+  name: 'useMockDataStore',
+  scope: 'global',
+})((set) => ({
   walletUnit: 'sat',
   setWalletUnit: (walletUnit) => set({ walletUnit }),
   mockHistory: MOCK.history,

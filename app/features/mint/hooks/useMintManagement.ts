@@ -1,3 +1,4 @@
+import { registerAccountScoped } from '@/shared/lib/account/accountRegistry';
 import { useCallback, useEffect, useState } from 'react';
 
 import type { Mint } from '@cashu/coco-core';
@@ -160,3 +161,16 @@ export function useMintManagement() {
     getMintInfo,
   };
 }
+
+registerAccountScoped(
+  'mint.management-cache',
+  async () => {
+    try {
+      await inflightLoad;
+    } finally {
+      inflightLoad = null;
+      lastLoad = null;
+    }
+  },
+  () => inflightLoad === null && lastLoad === null
+);

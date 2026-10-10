@@ -1,3 +1,4 @@
+import { registerAccountScoped } from '@/shared/lib/account/accountRegistry';
 import * as nip19 from 'nostr-tools/nip19';
 import { bytesToHex } from '@noble/hashes/utils.js';
 import { HDKey } from '@scure/bip32';
@@ -157,3 +158,13 @@ export function deriveCashuWalletSeedForImported(mnemonic: string, npubNumber: n
   });
   return seed;
 }
+
+registerAccountScoped(
+  'nostr.root-key-cache',
+  () => {
+    _cachedRootSeed?.fill(0);
+    _cachedRootSeed = null;
+    _cachedMnemonic = null;
+  },
+  () => _cachedRootSeed === null && _cachedMnemonic === null
+);

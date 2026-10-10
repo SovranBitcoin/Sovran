@@ -1,5 +1,5 @@
 import { CTA_DEFINITIONS } from '@/shared/lib/cta/definitions';
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { persist } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { z } from 'zod';
@@ -20,7 +20,7 @@ interface CtaState {
   previewSeq: number;
   preview: (id: CtaId | null) => void;
 }
-export const useCtaStore = create<CtaState>()(
+export const useCtaStore = create<CtaState>({ name: 'cta-store', scope: 'global' })(
   persist(
     (set) => ({
       dismissed: {},

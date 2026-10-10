@@ -1,8 +1,10 @@
-import { createStore } from 'zustand/vanilla';
+import { defineVanillaStore as createStore } from '@/shared/lib/persist/defineStore';
 import { persist } from 'zustand/middleware';
 import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
-import { persistConfig } from '@/shared/lib/persist/persistConfig';
+import { registerAccountScoped, liveStores } from '@/shared/lib/account/accountRegistry';
+import { withSkippedPersistWrites } from '@/shared/lib/persist/profileWriteBarrier';
+import { persistRegistry, persistConfig } from '@/shared/lib/persist/persistConfig';
 
 export const VERTEX_DAILY_CAP = 20;
 const dayAt = (now: number) => new Date(now).toISOString().slice(0, 10);
@@ -20,12 +22,16 @@ type Store = Budget & {
 
 /** Each instance captures its storage owner before any async work or hydration. */
 export function createVertexBudgetStore(ownerPubkey: string) {
-  return createStore<Store>()(
+  let disposed = false;
+  const storage = createProfileScopedStorage(ownerPubkey);
+  const writes = new Set<Promise<unknown>>();
+  const store = createStore<Store>({ name: 'vertex-budget-store', scope: 'profile' })(
     persist(
       (set, get) => ({
         day: '',
         used: 0,
         reserve: (now = Date.now()) => {
+          if (disposed) return false;
           const today = dayAt(now);
           const state = get();
           if (state.blockedUntilDay && today < state.blockedUntilDay) return false;
@@ -37,6 +43,7 @@ export function createVertexBudgetStore(ownerPubkey: string) {
           return true;
         },
         block: (now = Date.now()) => {
+          if (disposed) return false;
           const tomorrow = dayAt(now + 86_400_000);
           const blockedUntilDay = get().blockedUntilDay;
           if (blockedUntilDay && blockedUntilDay >= tomorrow) return false;
@@ -46,7 +53,18 @@ export function createVertexBudgetStore(ownerPubkey: string) {
       }),
       persistConfig({
         name: 'vertex-budget-store',
-        storage: createProfileScopedStorage(ownerPubkey),
+        storage: {
+          ...storage,
+          setItem: (name, value) => {
+            const write = Promise.resolve(storage.setItem(name, value));
+            writes.add(write);
+            void write.then(
+              () => writes.delete(write),
+              () => writes.delete(write)
+            );
+            return write;
+          },
+        },
         schema,
         partialize: (state) => ({
           day: state.day,
@@ -56,6 +74,31 @@ export function createVertexBudgetStore(ownerPubkey: string) {
       })
     )
   );
+  const registration = liveStores.find((entry) => entry.store === store);
+  const unregister = registerAccountScoped(
+    'vertex.budget-instance',
+    async () => {
+      disposed = true;
+      // Persist's adapter captures ownerPubkey; flush before detaching, never rehydrate as B.
+      await Promise.all([...writes]);
+      // Cancel any earlier hydration generation before clearing retained handles.
+      await store.persist.rehydrate();
+      if (!store.persist.hasHydrated()) throw new Error('Vertex budget hydration did not drain');
+      withSkippedPersistWrites(() => store.setState(store.getInitialState(), true));
+      store.persist.setOptions({ storage: undefined });
+      if (registration) {
+        const index = liveStores.indexOf(registration);
+        if (index !== -1) liveStores.splice(index, 1);
+      }
+      for (let index = persistRegistry.length - 1; index >= 0; index--) {
+        const entry = persistRegistry[index];
+        if (entry?.store === store) persistRegistry.splice(index, 1);
+      }
+      unregister();
+    },
+    () => disposed && store.getState().used === 0
+  );
+  return store;
 }
 
 const stores = new Map<string, ReturnType<typeof createVertexBudgetStore>>();
@@ -67,3 +110,11 @@ export function getVertexBudgetStore(ownerPubkey: string) {
   }
   return store;
 }
+
+registerAccountScoped(
+  'vertex.owner-stores',
+  () => {
+    stores.clear();
+  },
+  () => stores.size === 0
+);

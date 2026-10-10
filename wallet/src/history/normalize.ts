@@ -32,6 +32,13 @@ export function normalizeHistoryEntryState(entry: HistoryEntry): HistoryEntry {
 
   const next = normalizeContractState(entry.type, state);
   if (next === state) return entry;
+  // The list contract has no word for a failed mint and reads it as UNPAID.
+  // The timeline must still be able to say it failed, so the operation's own
+  // verdict rides along beside the contract state instead of being erased.
+  if (entry.type === "mint" && state === "failed") {
+    const failed = { ...entry, state: next } as HistoryEntry;
+    return Object.assign(failed, { operationState: state });
+  }
   return { ...entry, state: next } as HistoryEntry;
 }
 

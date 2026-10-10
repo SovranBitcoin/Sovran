@@ -24,7 +24,7 @@
 
 import React, { useCallback, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
-import { Button as HerouiButton } from 'heroui-native';
+import { Button } from '@/shared/ui/primitives/Button';
 import Animated, { FadeOut, LinearTransition } from 'react-native-reanimated';
 
 import {
@@ -289,25 +289,25 @@ export function SignerRequestsScreen(): React.ReactElement {
               <View style={{ paddingHorizontal: 20, paddingBottom: 4 }}>
                 <HStack gap={8}>
                   <View style={{ flex: 1 }}>
-                    <HerouiButton
+                    <Button
                       testID={`signer-requests-allow-all-${group.clientPubkey}`}
                       variant="secondary"
-                      size="sm"
-                      isDisabled={!allowAllEnabled}
+                      size="compact"
+                      text={allowAllLabel(count)}
+                      disabled={!allowAllEnabled}
                       onPress={() => confirmAllowAll(group.clientPubkey, appName, count)}
-                      accessibilityLabel={allowAllLabel(count)}>
-                      <HerouiButton.Label>{allowAllLabel(count)}</HerouiButton.Label>
-                    </HerouiButton>
+                      accessibilityLabel={allowAllLabel(count)}
+                    />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <HerouiButton
+                    <Button
                       testID={`signer-requests-deny-all-${group.clientPubkey}`}
                       variant="secondary"
-                      size="sm"
+                      size="compact"
+                      text={DENY_ALL_LABEL}
                       onPress={() => void resolveBatch(group.clientPubkey, 'deny_once')}
-                      accessibilityLabel={DENY_ALL_LABEL}>
-                      <HerouiButton.Label>{DENY_ALL_LABEL}</HerouiButton.Label>
-                    </HerouiButton>
+                      accessibilityLabel={DENY_ALL_LABEL}
+                    />
                   </View>
                 </HStack>
                 {!allowAllEnabled ? (

@@ -6,7 +6,7 @@
  * Scope is deliberate: only trusted mints. When none of them changed there is
  * no ecosystem-wide fallback — a quiet empty state is the honest answer.
  */
-import { RefreshControl, StyleSheet, type ViewToken } from 'react-native';
+import { StyleSheet, type ViewToken } from 'react-native';
 import { withAlpha } from '@/shared/lib/color';
 
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
@@ -93,10 +93,6 @@ export function MintChangesList() {
     </VisualLayoutProbe>
   );
 
-  const refreshControl = (
-    <RefreshControl refreshing={isRefreshing} onRefresh={refresh} tintColor={foreground} />
-  );
-
   const listEmpty = isLoading ? (
     <Spinner size={22} color={withAlpha(foreground, alpha.strong)} style={styles.loader} />
   ) : errorMessage ? (
@@ -134,7 +130,6 @@ export function MintChangesList() {
       keyExtractor={(update) => update.id}
       contentContainerStyle={contentContainerStyle}
       contentInsetAdjustmentBehavior="never"
-      refreshControl={refreshControl}
       ItemSeparatorComponent={renderSeparator}
       ListEmptyComponent={listEmpty}
       viewabilityConfig={VISUAL_LIST_VIEWABILITY_CONFIG}

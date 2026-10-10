@@ -5,27 +5,7 @@ import * as SecureStore from 'expo-secure-store';
 import type { ProfileEntry } from '@/shared/stores/global/profileStore';
 import { redactError, redactKnownSecretSubstrings, storeLog } from '@/shared/lib/logger';
 import { sensitiveFieldKind } from '@/shared/lib/sensitiveFieldNames';
-
-const GLOBAL_ZUSTAND_STORE_KEYS = [
-  'settings-store',
-  'profile-store',
-  'pricelist-store',
-  'btcmap-store',
-  'kym-mint-store',
-  'audit-mint-store',
-];
-
-const PROFILE_ZUSTAND_STORE_KEYS = [
-  'mint-store',
-  'mint-distribution-store',
-  'npc-mint-store',
-  'routstr-store',
-  'scan-history-store',
-  'search-history-store',
-  'swap-transactions-store',
-  'transaction-location-store',
-  'nostr-social-store',
-];
+import { persistedStoreKeys } from '@/shared/lib/account/accountRegistry';
 
 const SECURE_STORE_KEY_PREFIXES = {
   migrations: 'migrations_complete_',
@@ -88,6 +68,8 @@ function buildSecureStoreProbeKeys(profiles: ProfileEntry[]): string[] {
 }
 
 async function getZustandInventory(): Promise<ZustandInventory> {
+  const GLOBAL_ZUSTAND_STORE_KEYS = persistedStoreKeys('global');
+  const PROFILE_ZUSTAND_STORE_KEYS = persistedStoreKeys('profile');
   const keys = await AsyncStorage.getAllKeys();
   const keySet = new Set(keys);
 

@@ -331,3 +331,52 @@ console.log(`[patch-bitchat-imports] patched ${patched} file(s)`);
   );
   console.log(`[patch-bitchat-imports] vendor version: ${commit}`);
 })();
+
+// Wallet discovery uses an instance-local service UUID. Never mutate a shared
+// UUID: callbacks from a stopped public mesh must retain their original domain.
+{
+  const file = path.join(ROOT, 'bitchat/Services/BLE/BLEService.swift');
+  let source = fs.readFileSync(file, 'utf8');
+  if (!source.includes('private let discoveryServiceUUID: CBUUID')) {
+    source = source.replace(
+      '    init(\n        keychain:',
+      '    private let discoveryServiceUUID: CBUUID\n\n    init(\n        keychain:'
+    );
+    source = source.replace(
+      '        initializeBluetoothManagers: Bool = true',
+      '        discoveryServiceUUID: CBUUID = BLEService.serviceUUID,\n        initializeBluetoothManagers: Bool = true'
+    );
+    source = source.replace(
+      '        self.keychain = keychain',
+      '        self.discoveryServiceUUID = discoveryServiceUUID\n        self.keychain = keychain'
+    );
+    // Keep the default argument public; all operations use the captured UUID.
+    source = source
+      .replaceAll('BLEService.serviceUUID', 'self.discoveryServiceUUID')
+      .replace(
+        'discoveryServiceUUID: CBUUID = self.discoveryServiceUUID',
+        'discoveryServiceUUID: CBUUID = BLEService.serviceUUID'
+      );
+    if (
+      !source.includes('private let discoveryServiceUUID: CBUUID') ||
+      source.includes('[BLEService.serviceUUID]')
+    )
+      throw new Error('wallet service UUID patch failed');
+    fs.writeFileSync(file, source);
+  }
+}
+
+// Restoration identifiers are discovery-domain scoped as well as radio UUIDs.
+{
+  const file = path.join(ROOT, 'bitchat/Services/BLE/BLEService.swift');
+  let source = fs.readFileSync(file, 'utf8');
+  source = source.replace(
+    /(CBCentralManagerOptionRestoreIdentifierKey: BLEService.centralRestorationID)(?! \+)/g,
+    '$1 + "." + discoveryServiceUUID.uuidString'
+  );
+  source = source.replace(
+    /(CBPeripheralManagerOptionRestoreIdentifierKey: BLEService.peripheralRestorationID)(?! \+)/g,
+    '$1 + "." + discoveryServiceUUID.uuidString'
+  );
+  fs.writeFileSync(file, source);
+}

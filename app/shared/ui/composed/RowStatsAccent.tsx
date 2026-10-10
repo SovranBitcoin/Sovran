@@ -22,6 +22,7 @@
  */
 
 import React from 'react';
+import { Nip05Identity } from '@/shared/ui/composed/Nip05Identity';
 import { View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { withAlpha } from '@/shared/lib/color';
@@ -48,12 +49,7 @@ export const STAT_ICONS = {
   audit: 'lucide:activity',
   /** Works-offline indicator. Tint: theme `success`. */
   offline: 'mdi:airplane',
-  /** NIP-05 verification badge. Rendered next to a handle in the trailing
-   *  pill of the accent row; always tinted `STAT_COLOR_SOCIAL` (blue) to
-   *  match the rest of the nostr-sourced stats. Server-side `nip05Valid`
-   *  is too noisy (cache misses, transient `/.well-known/nostr.json`
-   *  fetch failures) to gate color on, and conflicts are already
-   *  filtered out of search results upstream. */
+  /** NIP-05 domain-to-key verification badge. */
   nip05: 'mdi:check-decagram',
 } as const;
 
@@ -88,12 +84,8 @@ interface RowStatsAccentProps {
   animate?: boolean;
   /** Trailing note appended below the stats (e.g. a disabled reason). */
   note?: string;
-  /** Optional NIP-05 pill rendered as the last entry on the stats line:
-   *  `[stats] • <check> handle@relay.example.com` (truncated with ellipsis
-   *  to fit remaining width). Always tinted `STAT_COLOR_SOCIAL` (blue) —
-   *  see `STAT_ICONS.nip05` for why we don't gate on a validity flag.
-   *  Absent `handle` → pill is omitted. */
-  nip05?: { handle: string };
+  /** Domain assertion is verified against this exact key before showing a check. */
+  nip05?: { handle: string; pubkey: string };
 }
 
 /**
@@ -155,19 +147,7 @@ export function RowStatsAccent({ stats, note, nip05, animate }: RowStatsAccentPr
                   {'•'}
                 </Text>
               )}
-              <View
-                style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 3 }}
-                accessibilityLabel={`Verified ${nip05!.handle}`}>
-                <Icon name={STAT_ICONS.nip05} size={12} color={STAT_COLOR_SOCIAL} />
-                <Text
-                  size={12}
-                  numberOfLines={1}
-                  ellipsizeMode="tail"
-                  color={STAT_COLOR_SOCIAL}
-                  style={{ flexShrink: 1 }}>
-                  {nip05!.handle}
-                </Text>
-              </View>
+              <Nip05Identity address={nip05!.handle} pubkey={nip05!.pubkey} />
             </>
           ) : null}
         </HStack>

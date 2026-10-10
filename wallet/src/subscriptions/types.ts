@@ -17,6 +17,7 @@ export type ScreenActionsChangedReason =
   | 'scanHistory'
   | 'transactionDistribution'
   | 'settings'
+  | 'offline'
   | 'unknown';
 
 interface BaseSubscriptionEvent {

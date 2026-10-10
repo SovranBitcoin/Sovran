@@ -83,27 +83,27 @@ function receiveEntry(overrides: Record<string, unknown> = {}): HistoryEntry {
 
 const NOW = 2_000_000_000_000;
 
+const stepTypes = (t: ReturnType<typeof buildTimeline>) => t.map((s) => s.stepType);
+const labels = (t: ReturnType<typeof buildTimeline>) => t.map((s) => s.displayLabel);
+
 describe('buildTimeline (audit 61.json F-006)', () => {
   describe('mint', () => {
-    it('UNPAID renders three steps with the first as next-pending', () => {
+    it('UNPAID is the invoice plus the one open slot: waiting for payment', () => {
       const t = buildTimeline({
         historyEntry: mintEntry({ state: MintQuoteState.UNPAID }),
         currentTime: NOW,
       });
-      expect(t).toHaveLength(3);
-      expect(t[0]).toMatchObject({ stepType: 'next-pending', state: MintQuoteState.UNPAID });
-      expect(t[1].stepType).toBe('future-small');
-      expect(t[2].stepType).toBe('future-small');
+      expect(stepTypes(t)).toEqual(['complete', 'next-pending']);
+      expect(labels(t)).toEqual(['Invoice created', 'Waiting for payment']);
     });
 
-    it('PAID marks first step complete and second next-pending', () => {
+    it('PAID finishes the payment row and opens the minting slot', () => {
       const t = buildTimeline({
         historyEntry: mintEntry({ state: MintQuoteState.PAID }),
         currentTime: NOW,
       });
-      expect(t[0].stepType).toBe('complete');
-      expect(t[1].stepType).toBe('next-pending');
-      expect(t[2].stepType).toBe('future-small');
+      expect(stepTypes(t)).toEqual(['complete', 'complete', 'current']);
+      expect(labels(t)).toEqual(['Invoice created', 'Payment received', 'Adding to wallet']);
     });
 
     it('ISSUED marks every step complete with success on the last', () => {
@@ -111,23 +111,20 @@ describe('buildTimeline (audit 61.json F-006)', () => {
         historyEntry: mintEntry({ state: MintQuoteState.ISSUED, amount: 250 }),
         currentTime: NOW,
       });
-      expect(t.map((s) => s.stepType)).toEqual(['complete', 'complete', 'success']);
+      expect(stepTypes(t)).toEqual(['complete', 'complete', 'success']);
       expect(t[2].info).toContain('250');
     });
 
-    it('operation-backed pending onchain mint waits for address payment', () => {
+    it('operation-backed pending onchain mint waits for the deposit', () => {
       const t = buildTimeline({
         historyEntry: operationMintEntry({ state: 'pending' }),
         currentTime: NOW,
       });
-      expect(t).toHaveLength(3);
-      expect(t[0]).toMatchObject({
-        state: MintQuoteState.UNPAID,
-        stepType: 'next-pending',
+      expect(stepTypes(t)).toEqual(['complete', 'next-pending']);
+      expect(t[1]).toMatchObject({
+        displayLabel: 'Waiting for deposit',
         info: 'Pay the address to receive funds',
       });
-      expect(t[1].stepType).toBe('future-small');
-      expect(t[2].stepType).toBe('future-small');
     });
 
     it('operation-backed pending onchain mint shows compact confirmation progress', () => {
@@ -144,22 +141,21 @@ describe('buildTimeline (audit 61.json F-006)', () => {
         },
       });
 
-      expect(t.map((s) => s.stepType)).toEqual(['complete', 'current', 'future-small']);
+      expect(stepTypes(t)).toEqual(['complete', 'complete', 'current']);
       // Mint quote is still UNPAID (coco op pending) — do NOT claim the payment
       // was received; the mint hasn't credited the quote yet.
-      expect(t[1]).toMatchObject({
-        state: MintQuoteState.PAID,
+      expect(t[2]).toMatchObject({
         displayLabel: 'Confirming on-chain',
         info: '1/6 confirmations',
+        confirmationRing: true,
       });
-      expect(t[1].displayLabel).not.toBe('Payment received');
+      expect(labels(t)).not.toContain('Payment received');
     });
 
     it('onchain mint confirmed on-chain but not yet credited waits on the mint', () => {
       // Regression: chain confirmations satisfied (2/2) while the mint quote is
-      // still UNPAID must not read as "Payment received". The terminal received
-      // milestone is gated on the mint marking the quote PAID (state executing/
-      // PAID/ISSUED), not on our own explorer's confirmation count.
+      // still UNPAID must not read as received or as minting. The chain rows
+      // follow our explorer; the last slot is waiting on the mint, and says so.
       const t = buildTimeline({
         historyEntry: operationMintEntry({ state: 'pending' }),
         currentTime: NOW,
@@ -173,17 +169,17 @@ describe('buildTimeline (audit 61.json F-006)', () => {
         },
       });
 
-      expect(t.map((s) => s.stepType)).toEqual(['complete', 'current', 'future-small']);
-      expect(t[1]).toMatchObject({
-        state: MintQuoteState.PAID,
-        displayLabel: 'Confirmed on-chain',
-        info: 'Waiting for mint to credit',
+      expect(stepTypes(t)).toEqual(['complete', 'complete', 'complete', 'next-pending']);
+      expect(t[2].displayLabel).toBe('Confirmed on-chain');
+      expect(t[3]).toMatchObject({
+        displayLabel: 'Waiting for mint to credit',
+        info: 'Deep enough by our count. The mint credits it once its own node agrees.',
       });
-      expect(t[1].displayLabel).not.toBe('Payment received');
-      expect(getStatusHeader(t)).toBe('CONFIRMED ON-CHAIN');
+      expect(labels(t)).not.toContain('Payment received');
+      expect(getStatusHeader(t)).toBe('WAITING FOR MINT TO CREDIT');
     });
 
-    it('operation-backed executing mint maps to payment received', () => {
+    it('operation-backed executing mint is minting, with the chain steps behind it', () => {
       const t = buildTimeline({
         historyEntry: operationMintEntry({ state: 'executing' }),
         currentTime: NOW,
@@ -196,9 +192,8 @@ describe('buildTimeline (audit 61.json F-006)', () => {
           isSatisfied: true,
         },
       });
-      expect(t.map((s) => s.stepType)).toEqual(['complete', 'current', 'future-small']);
-      expect(t[1].state).toBe(MintQuoteState.PAID);
-      expect(t[1].info).toBe('6/6 confirmations');
+      expect(stepTypes(t)).toEqual(['complete', 'complete', 'complete', 'current']);
+      expect(t[3].displayLabel).toBe('Adding to wallet');
     });
 
     it('operation-backed finalized mint maps to issued success', () => {
@@ -206,8 +201,8 @@ describe('buildTimeline (audit 61.json F-006)', () => {
         historyEntry: operationMintEntry({ state: 'finalized', amount: 321 }),
         currentTime: NOW,
       });
-      expect(t.map((s) => s.stepType)).toEqual(['complete', 'complete', 'success']);
-      expect(t[2].info).toContain('321');
+      expect(stepTypes(t)).toEqual(['complete', 'complete', 'complete', 'success']);
+      expect(t[3].info).toContain('321');
     });
 
     it('operation-backed failed mint shows a terminal failure', () => {
@@ -226,20 +221,21 @@ describe('buildTimeline (audit 61.json F-006)', () => {
   });
 
   describe('melt', () => {
-    it('UNPAID is a waiting state', () => {
+    it('UNPAID is waiting on the tap', () => {
       const t = buildTimeline({
         historyEntry: meltEntry({ state: MeltQuoteState.UNPAID }),
         currentTime: NOW,
       });
-      expect(t[0].stepType).toBe('next-pending');
+      expect(stepTypes(t)).toEqual(['complete', 'next-pending']);
     });
 
     it('PENDING is the active processing state', () => {
       const t = buildTimeline({
         historyEntry: meltEntry({ state: MeltQuoteState.PENDING }),
-        currentTime: NOW,
+        // Just after it was handed over: in flight, not yet slow.
+        currentTime: baseFields.createdAt + 5_000,
       });
-      expect(t[1].stepType).toBe('current');
+      expect(stepTypes(t)).toEqual(['complete', 'complete', 'current']);
     });
 
     it('PAID is a fully successful timeline', () => {
@@ -247,7 +243,7 @@ describe('buildTimeline (audit 61.json F-006)', () => {
         historyEntry: meltEntry({ state: MeltQuoteState.PAID }),
         currentTime: NOW,
       });
-      expect(t.map((s) => s.stepType)).toEqual(['complete', 'complete', 'success']);
+      expect(stepTypes(t)).toEqual(['complete', 'complete', 'success']);
     });
 
     it('expired melt quote yields a single complete + expired step', () => {
@@ -274,25 +270,23 @@ describe('buildTimeline (audit 61.json F-006)', () => {
   });
 
   describe('send', () => {
-    it('standard send prepared shows current step + waiting next', () => {
+    it('standard send prepared is one open slot: the token being made', () => {
       const t = buildTimeline({
         historyEntry: sendEntry({ state: 'prepared' }),
         currentTime: NOW,
       });
-      expect(t[0].stepType).toBe('current');
-      expect(t[1].stepType).toBe('next-pending');
+      expect(stepTypes(t)).toEqual(['current']);
     });
 
-    it('rolledBack standard send produces 2 steps without nostrSent', () => {
+    it('rolledBack standard send with no token is the cancellation alone', () => {
       const t = buildTimeline({
         historyEntry: sendEntry({ state: 'rolledBack' }),
         currentTime: NOW,
       });
-      expect(t).toHaveLength(2);
-      expect(t[1].stepType).toBe('rolled-back');
+      expect(stepTypes(t)).toEqual(['rolled-back']);
     });
 
-    it('rolledBack payment request with nostrSent inserts a Delivered step', () => {
+    it('rolledBack payment request with nostrSent keeps the Delivered step', () => {
       const t = buildTimeline({
         historyEntry: sendEntry({ state: 'rolledBack' }),
         currentTime: NOW,
@@ -316,20 +310,20 @@ describe('buildTimeline (audit 61.json F-006)', () => {
         currentTime: NOW,
         tokenCreated: false,
       });
-      expect(creating[0].stepType).toBe('next-pending');
+      expect(creating[0].stepType).toBe('current');
     });
 
-    it('payment-request-mode pending without nostrSent shows Delivered as next-pending', () => {
+    it('payment-request-mode pending without nostrSent is still delivering', () => {
       const t = buildTimeline({
         historyEntry: sendEntry({ state: 'pending' }),
         currentTime: NOW,
         tokenCreated: true,
       });
-      expect(t[1].state).toBe('nostrSent');
-      expect(t[1].stepType).toBe('next-pending');
+      expect(t[1]).toMatchObject({ state: 'nostrSent', stepType: 'current' });
+      expect(t).toHaveLength(2);
     });
 
-    it('payment-request-mode pending with nostrSent shows Claimed as next-pending', () => {
+    it('payment-request-mode pending with nostrSent waits on the recipient', () => {
       const t = buildTimeline({
         historyEntry: sendEntry({ state: 'pending' }),
         currentTime: NOW,
@@ -347,18 +341,17 @@ describe('buildTimeline (audit 61.json F-006)', () => {
         tokenCreated: true,
         nostrSent: true,
       });
-      expect(t.map((s) => s.stepType)).toEqual(['complete', 'complete', 'success']);
+      expect(stepTypes(t)).toEqual(['complete', 'complete', 'success']);
     });
   });
 
   describe('receive', () => {
-    it('prepared shows pending as next-pending and redeemed as future', () => {
+    it('prepared is the token plus the one open slot: redeem', () => {
       const t = buildTimeline({
         historyEntry: receiveEntry({ state: 'prepared' }),
         currentTime: NOW,
       });
-      expect(t[0].stepType).toBe('next-pending');
-      expect(t[1].stepType).toBe('future-small');
+      expect(stepTypes(t)).toEqual(['complete', 'next-pending']);
     });
 
     it('finalized is fully successful', () => {
@@ -366,7 +359,7 @@ describe('buildTimeline (audit 61.json F-006)', () => {
         historyEntry: receiveEntry({ state: 'finalized', amount: 750 }),
         currentTime: NOW,
       });
-      expect(t.map((s) => s.stepType)).toEqual(['complete', 'success']);
+      expect(stepTypes(t)).toEqual(['complete', 'success']);
       expect(t[1].info).toContain('750');
     });
 
@@ -412,6 +405,9 @@ describe('getCardLabel (audit 61.json F-009)', () => {
     ).toBe('Receive • Awaiting Payment');
     expect(
       getCardLabel(operationMintEntry({ state: 'pending' }), [
+        // The request, then a deposit our explorer has seen: the mint has not
+        // credited the quote, but something is under way.
+        { state: MintQuoteState.UNPAID, displayLabel: '', stepType: 'complete' },
         { state: MintQuoteState.UNPAID, displayLabel: '', stepType: 'complete' },
         { state: MintQuoteState.PAID, displayLabel: '', stepType: 'next-pending' },
       ])

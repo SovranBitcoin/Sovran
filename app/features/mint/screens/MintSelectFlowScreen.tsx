@@ -202,7 +202,6 @@ export function MintSelectFlowScreen({ flow, mintSelectorEntry }: MintSelectFlow
         items={rows}
         loading={allCold}
         showDetailsButton={!isNpcScope && actions.getInfo.available}
-        closeButtonLabel="Cancel"
         onMintSelect={(item) => actions.select.execute({ mintUrl: item.mintUrl })}
         onInspectMint={
           !isNpcScope && actions.getInfo.available
@@ -213,7 +212,6 @@ export function MintSelectFlowScreen({ flow, mintSelectorEntry }: MintSelectFlow
                 })
             : undefined
         }
-        onClose={() => actions.cancel.execute()}
       />
     </>
   );

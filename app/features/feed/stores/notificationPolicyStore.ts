@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { persist } from 'zustand/middleware';
 import { z } from 'zod';
 
@@ -41,7 +41,10 @@ const PersistedNotificationPolicyStore = z.object({
     .catch(DEFAULT_NOTIFICATION_REPLY_SCOPE),
 });
 
-export const useNotificationPolicyStore = create<NotificationPolicyStore>()(
+export const useNotificationPolicyStore = create<NotificationPolicyStore>({
+  name: 'notification-policy-store',
+  scope: 'profile',
+})(
   persist(
     (set) => ({
       policy: DEFAULT_NOTIFICATION_POLICY,

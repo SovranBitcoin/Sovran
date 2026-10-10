@@ -85,7 +85,11 @@ export function useDominantColor(
 
     getColors(imageUrl, { fallback, cache: true, key: imageUrl })
       .then((res: any) => {
-        if (!mounted || !res) return;
+        if (!mounted) return;
+        if (!res) {
+          setHasLoaded(true);
+          return;
+        }
 
         const candidates = extractCandidates(res);
         const picked = candidates.find((c): c is string => Boolean(c) && !isCornerColor(c));

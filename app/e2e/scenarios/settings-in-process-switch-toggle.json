@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "id": "settings.in-process-switch-toggle",
+  "name": "Developer profile switch opt-in defaults off",
+  "description": "Enter developer settings, enable and disable the in-process profile switch, then exit. No wallet operation is performed.",
+  "lane": "simulator",
+  "tags": ["flow:isolation"],
+  "requires": ["fresh-install"],
+  "setup": [
+    {"use":"flow.onboard"},
+    {"use":"capture.developer"}
+  ],
+  "steps": [
+    {"action":"swipe","dir":"up"},
+    {"action":"waitFor","selector":{"id":"settings-in-process-profile-switch-toggle"},"value":"0","timeoutMs":15000},
+    {"action":"tap","selector":{"id":"settings-in-process-profile-switch-toggle"}},
+    {"action":"waitFor","selector":{"id":"settings-in-process-profile-switch-toggle"},"value":"1","timeoutMs":15000},
+    {"action":"tap","selector":{"id":"settings-in-process-profile-switch-toggle"}},
+    {"action":"waitFor","selector":{"id":"settings-in-process-profile-switch-toggle"},"value":"0","timeoutMs":15000},
+    {"action":"goHome"}
+  ],
+  "verify": [
+    {"action":"assert","that":"visible","selector":{"id":"wallet-send"}}
+  ],
+  "endState": "wallet"
+}

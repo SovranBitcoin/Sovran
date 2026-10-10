@@ -398,9 +398,8 @@ describe('ecash send — insufficient balance', () => {
 // ---------------------------------------------------------------------------
 
 /**
- * When exact local proofs exist, the machine creates the token locally first.
- * Non-exact online sends still attempt executeSend and can fall back to
- * chooseProofs when the mint is unreachable.
+ * Exact bearer sends use local proofs. Non-exact sends contact the mint and
+ * offer local proof amounts when it is unreachable.
  */
 describe('ecash send — online executeSend fallback', () => {
   function mintFetchError(): Error {
@@ -417,22 +416,35 @@ describe('ecash send — online executeSend fallback', () => {
     tm.assertStep('sendComplete');
   });
 
-  it('online + exact proofs → local-first offline send without executeSend', async () => {
+  it('online + exact proofs → local token without contacting the mint', async () => {
     const tm = createTestMachine();
     await tm.machine.startSendEcash();
     await tm.machine.enterAmount({ value: 100, unit: 'sat' }, MINT1);
 
     tm.assertStep('sendComplete');
-    expect(tm.operationCalls.map((call) => call.name)).toContain('executeOfflineSend');
     expect(tm.operationCalls.map((call) => call.name)).not.toContain('executeSend');
-    expect(tm.handlerCalls[tm.handlerCalls.length - 1]).toMatchObject({
-      step: 'sendComplete',
-      data: {
-        createdOffline: true,
+    expect(tm.operationCalls.map((call) => call.name)).toContain('executeOfflineSend');
+    expect(tm.handlerCalls[tm.handlerCalls.length - 1].data).toMatchObject({
+      createdOffline: true,
+    });
+  });
+
+  it('online + exact proofs + mint unreachable → local token without probing the mint', async () => {
+    const tm = createTestMachine({
+      operations: {
+        executeSend: async () => { throw mintFetchError(); },
       },
     });
-    expect(tm.handlerCalls[tm.handlerCalls.length - 1].data).not.toMatchObject({
-      mintWasOffline: true,
+    await tm.machine.startSendEcash();
+    await tm.machine.enterAmount({ value: 100, unit: 'sat' }, MINT1);
+
+    tm.assertStep('sendComplete');
+    const names = tm.operationCalls.map((call) => call.name);
+    expect(names.filter((name) => name === 'executeSend')).toHaveLength(0);
+    expect(names.filter((name) => name === 'executeOfflineSend')).toHaveLength(1);
+    expect(tm.handlerCalls[tm.handlerCalls.length - 1]).toMatchObject({
+      step: 'sendComplete',
+      data: { createdOffline: true },
     });
   });
 

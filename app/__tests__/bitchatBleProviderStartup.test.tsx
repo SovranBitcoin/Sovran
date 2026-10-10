@@ -1,3 +1,4 @@
+import { useNearbyDiscovery } from '@/features/nearPay/hooks/useNearbyDiscovery';
 import TestRenderer, { act } from 'react-test-renderer';
 import {
   startBLE,
@@ -6,6 +7,10 @@ import {
 } from 'bitchat-module';
 
 import { BitchatBLEProvider } from '@/shared/providers/BitchatBLEProvider';
+jest.mock('@/features/nearPay/hooks/useNearbyDiscovery', () => ({ useNearbyDiscovery: jest.fn() }));
+jest.mock('@/features/nearPay/lib/nearbyPayments', () => ({
+  NEARBY_PAYMENT_PREFIX: 'sovran:payment:1:',
+}));
 
 jest.mock('bitchat-module', () => ({
   startBLE: jest.fn(),
@@ -42,7 +47,7 @@ jest.mock('@/shared/lib/logger', () => ({
 }));
 
 describe('BitchatBLEProvider startup', () => {
-  it('mounts DM listeners without starting BLE discovery', async () => {
+  it('mounts the account discovery owner and DM listeners', async () => {
     let renderer: TestRenderer.ReactTestRenderer | undefined;
 
     await act(async () => {
@@ -53,6 +58,7 @@ describe('BitchatBLEProvider startup', () => {
       );
     });
 
+    expect(useNearbyDiscovery).toHaveBeenCalledTimes(1);
     expect(startBLE).not.toHaveBeenCalled();
     expect(addBLEPrivateMessageListener).toHaveBeenCalledTimes(1);
     expect(addBLEDeliveryStatusListener).toHaveBeenCalledTimes(1);

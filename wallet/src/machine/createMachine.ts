@@ -6,6 +6,7 @@ import { defaultDetectors } from "../detectors";
 import type { P2pkLockSpec } from "../p2pk";
 import { createMintRowRules } from "../mint-list-rows";
 import { isMeltUserCancelledError, isMintOfflineError } from "../errors";
+import { isLockedSend } from "../p2pk";
 import { t } from "../formatting/locales";
 import { compareMintDisplayOrder } from "../mint-capabilities";
 import { errField, logger, mintUrlFields } from "../logger";
@@ -36,6 +37,7 @@ import type {
   ExecutionState,
   FlowContext,
   FlowStep,
+  SendFallbackId,
   MeltQuoteMethod,
   MintQuoteMethod,
   MintSelectorScope,
@@ -80,6 +82,7 @@ function deriveExecutionState(
       };
 
     case "chooseFallbackOption":
+    case "chooseSendFallback":
       return {
         status: "needsInput",
         code: "FALLBACK_OPTION_REQUIRED",
@@ -183,6 +186,7 @@ const INPUT_STEPS = new Set<FlowStep>([
   "selectMint",
   "chooseOption",
   "chooseFallbackOption",
+  "chooseSendFallback",
   "chooseProofs",
   "enterSendMemo",
 ]);
@@ -502,6 +506,90 @@ export function createPaymentMachine(
     }
   }
 
+  /**
+   * The retry behind a `chooseSendFallback` step, kept off the step data so
+   * the app renders only what the user chooses between.
+   */
+  let sendFallback: {
+    amount: number;
+    unit: string;
+    mintUrl: string;
+    npcTarget?: string;
+    error: StepDataMap["error"];
+  } | null = null;
+
+  /** Plain ecash for a lock the user added themselves; never for a required one. */
+  function lockFallbackFor(
+    data: { mintUrl: string; amount: number; unit: string },
+    error: StepDataMap["error"],
+  ): StepDataMap["chooseSendFallback"] | null {
+    if (
+      flowCtx.destination !== "sendEcash" ||
+      !isLockedSend(flowCtx) ||
+      !flowCtx.lockIsOptional
+    ) {
+      return null;
+    }
+    sendFallback = { ...data, error };
+    return {
+      amount: data.amount,
+      unit: data.unit,
+      failed: { label: "as Locked Ecash", message: error.message },
+      alternatives: [
+        {
+          id: "ecash",
+          label: "as Ecash",
+          description:
+            "Send it unlocked. Anyone holding the token can claim it, so share it only with them.",
+        },
+      ],
+    };
+  }
+
+  /**
+   * Their npub.cash address when their own Lightning address failed. Not when
+   * the mint was the problem: npub.cash needs the same mint to pay.
+   */
+  function npcFallbackFor(
+    err: unknown,
+    data: { mintUrl: string; amount: number; unit: string; meltTarget?: string },
+  ): StepDataMap["chooseSendFallback"] | null {
+    const target = data.meltTarget ?? flowCtx.meltTarget ?? "";
+    if (
+      isMintOfflineError(err) ||
+      !flowCtx.recipientPubkey ||
+      !target.includes("@") ||
+      /@npubx?\.cash$/i.test(target.trim()) ||
+      meltMethodForTarget(target) === "onchain"
+    ) {
+      return null;
+    }
+    const npcTarget = operations?.npcAddressForPubkey?.(flowCtx.recipientPubkey);
+    if (!npcTarget) return null;
+    const message = err instanceof Error ? err.message : "Lightning payment failed";
+    sendFallback = {
+      amount: data.amount,
+      unit: data.unit,
+      mintUrl: data.mintUrl,
+      npcTarget,
+      error: { code: "MELT_FAILED", message },
+    };
+    return {
+      amount: data.amount,
+      unit: data.unit,
+      failed: { label: `as Lightning (${target.trim()})`, message },
+      alternatives: [
+        {
+          id: "lightning-npc",
+          label: "as Lightning (npub.cash)",
+          description:
+            "They haven't published this address. npub.cash accepts payments for any Nostr key, but only they can claim it, so check they use it.",
+          isCaution: true,
+        },
+      ],
+    };
+  }
+
   // Helper: route an operation failure to BIP321 fallback or error.
   /**
    * Route an operation failure. For BIP321 multi-option flows, marks the
@@ -579,6 +667,15 @@ export function createPaymentMachine(
         message: "All payment options have failed",
       });
       return;
+    }
+
+    if (variant === "melt") {
+      const fallback = npcFallbackFor(err, { ...data, meltTarget: failedValue });
+      if (fallback) {
+        logger.info("machine.sendFallback.offered", { failed: "lightning", id: "lightning-npc" });
+        setStep("chooseSendFallback", fallback);
+        return;
+      }
     }
 
     // Single-option: stay on the current step so the user can retry.
@@ -777,6 +874,46 @@ export function createPaymentMachine(
     ) {
       const originalStep = step;
       const data = stepData as StepDataMap["navigateToMeltPreview"];
+      if (
+        data.meltQuote?.expiresAt != null &&
+        data.meltQuote.expiresAt <= Date.now() / 1000 &&
+        operations.quoteMelt
+      ) {
+        // The previous approval expired. Show the new quote and require a
+        // second tap, even when the fee happens to be unchanged.
+        handlerExecuting = true;
+        notify();
+        try {
+          const refreshed = await runMeltQuotePreviewEffect({
+            data,
+            operation: operations.quoteMelt,
+            isStale: (op) => isStaleGeneration(sendGeneration, op),
+          });
+          if (refreshed.isOk()) {
+            if (refreshed.value.kind === "stale") return;
+            flowCtx = { ...flowCtx, meltQuotePreview: refreshed.value.quote };
+            setStep("navigateToMeltPreview", {
+              ...data,
+              meltQuote: refreshed.value.quote,
+            });
+          } else {
+            routeOperationFailure(
+              refreshed.error.cause,
+              "melt",
+              data.meltTarget,
+              data,
+            );
+          }
+          await dispatchHandler(step, stepData);
+        } finally {
+          if (!isStaleGeneration(sendGeneration, "confirmMelt.refreshQuote")) {
+            handlerExecuting = false;
+            sendLocked = false;
+            notify();
+          }
+        }
+        return;
+      }
       logger.info("machine.confirmMelt.start", {
         ...mintUrlFields(data.mintUrl),
         amount: data.amount,
@@ -1585,7 +1722,16 @@ export function createPaymentMachine(
                 error: errField(effect.error.fallbackFailure),
               });
             }
-            setStep("error", effect.error.data);
+            const lockFallback = lockFallbackFor(
+              { ...data, unit: flowCtx.unit },
+              effect.error.data,
+            );
+            if (lockFallback) {
+              logger.info("machine.sendFallback.offered", { failed: "locked-ecash", id: "ecash" });
+              setStep("chooseSendFallback", lockFallback);
+            } else {
+              setStep("error", effect.error.data);
+            }
           }
           handlerExecuting = false;
           notify();
@@ -1995,6 +2141,37 @@ export function createPaymentMachine(
   const chooseProofs = (amount: number) =>
     send({ type: "PROOFS_CHOSEN", amount });
 
+  const chooseSendFallback = async (id: SendFallbackId | null) => {
+    const retry = sendFallback;
+    sendFallback = null;
+    logger.info("machine.sendFallback.chosen", { id, hasRetry: !!retry });
+    if (!retry || step !== "chooseSendFallback") return;
+    if (id === null) {
+      setStep("error", retry.error);
+      notify();
+      return;
+    }
+    const recipient = {
+      ...(flowCtx.recipientPubkey ? { recipientPubkey: flowCtx.recipientPubkey } : {}),
+      ...(flowCtx.recipientProfile ? { recipientProfile: flowCtx.recipientProfile } : {}),
+    };
+    const amount = { value: retry.amount, unit: retry.unit };
+    if (id === "ecash") {
+      await enterAmount(amount, retry.mintUrl, {
+        destination: "sendEcash",
+        p2pkLock: null,
+        ...recipient,
+      });
+    } else if (retry.npcTarget) {
+      await enterAmount(amount, retry.mintUrl, {
+        destination: "meltQuote",
+        meltQuoteMethod: "bolt11",
+        meltTarget: retry.npcTarget,
+        ...recipient,
+      });
+    }
+  };
+
   const submitSendMemo = (memo?: string) =>
     send({ type: "SEND_MEMO_SUBMITTED", memo });
 
@@ -2077,6 +2254,7 @@ export function createPaymentMachine(
     enterAmount,
     chooseOption,
     chooseProofs,
+    chooseSendFallback,
     submitSendMemo,
     changeMint,
     requestMintSelector,

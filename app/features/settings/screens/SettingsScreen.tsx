@@ -24,13 +24,15 @@ import { actionMenuPopup, paramPopup } from '@/shared/lib/popup';
 import { useCtaStore } from '@/shared/stores/global/ctaStore';
 import { CTA_DEFINITIONS } from '@/shared/lib/cta/definitions';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
-import { ListGroup, PressableFeedback, Separator, Switch as HeroSwitch } from 'heroui-native';
+import { ListGroup, PressableFeedback, Separator } from 'heroui-native';
+import { Switch as HeroSwitch } from '@/shared/ui/primitives/Switch';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { log, useLifecycleLogger } from '@/shared/lib/logger';
 import { useNotificationPolicyStore } from '@/features/feed/stores/notificationPolicyStore';
 import { notificationPolicyLabel } from '@/features/feed/lib/notificationCopy';
 import { useMediaServerStore } from '@/shared/lib/nostr/media/mediaServerStore';
 import { useNip46RequestsStore } from '@/features/nostrSigner';
+import { hasFeature } from '@/shared/config/features';
 
 const name = Application.applicationName;
 const version = Application.nativeApplicationVersion;
@@ -214,6 +216,12 @@ export const SettingsScreen = () => {
   const setMockFailPaymentRequest = useSettingsStore((state) => state.setMockFailPaymentRequest);
   const whitenoiseEnabled = useSettingsStore((state) => state.whitenoiseEnabled);
   const setWhitenoiseEnabled = useSettingsStore((state) => state.setWhitenoiseEnabled);
+  const layoutGuides = useSettingsStore((state) => state.layoutGuides);
+  const setLayoutGuides = useSettingsStore((state) => state.setLayoutGuides);
+  const showTouches = useSettingsStore((state) => state.showTouches);
+  const setShowTouches = useSettingsStore((state) => state.setShowTouches);
+  const inProcessProfileSwitch = useSettingsStore((state) => state.inProcessProfileSwitch);
+  const setInProcessProfileSwitch = useSettingsStore((state) => state.setInProcessProfileSwitch);
   const mockNoGlass = useSettingsStore((state) => state.mockNoGlass);
   const setMockNoGlass = useSettingsStore((state) => state.setMockNoGlass);
   const notificationPolicy = useNotificationPolicyStore((state) => state.policy);
@@ -277,21 +285,29 @@ export const SettingsScreen = () => {
                 title="Swap routing"
                 testID="settings-routing-row"
               />
-              <Separator className="mx-4" />
-              <SettingsListLinkItem
-                href="/(settings-flow)/notification-policy"
-                title="Notifications"
-                testID="settings-notifications-row"
-                description={notificationPolicyLabel(notificationPolicy)}
-                descriptionNumberOfLines={1}
-              />
-              <Separator className="mx-4" />
-              <SettingsListLinkItem
-                href="/(settings-flow)/network"
-                title="Network"
-                testID="settings-network-row"
-                description="Aggregators, caching, and relays"
-              />
+              {hasFeature('feed') && (
+                <>
+                  <Separator className="mx-4" />
+                  <SettingsListLinkItem
+                    href="/(settings-flow)/notification-policy"
+                    title="Notifications"
+                    testID="settings-notifications-row"
+                    description={notificationPolicyLabel(notificationPolicy)}
+                    descriptionNumberOfLines={1}
+                  />
+                </>
+              )}
+              {hasFeature('nostr') && (
+                <>
+                  <Separator className="mx-4" />
+                  <SettingsListLinkItem
+                    href="/(settings-flow)/network"
+                    title="Network"
+                    testID="settings-network-row"
+                    description="Aggregators, caching, and relays"
+                  />
+                </>
+              )}
             </ListGroup>
           </Section>
         </LayoutShiftProbe>
@@ -319,14 +335,18 @@ export const SettingsScreen = () => {
         <LayoutShiftProbe tag="settings.security">
           <Section title="Security">
             <ListGroup variant="secondary">
-              <SettingsListLinkItem
-                href="/(signer-flow)"
-                title="Remote Login"
-                testID="settings-remote-login-row"
-                description={signerRowDescription(signerPendingCount)}
-                descriptionNumberOfLines={1}
-              />
-              <Separator className="mx-4" />
+              {hasFeature('nostr') && (
+                <>
+                  <SettingsListLinkItem
+                    href="/(signer-flow)"
+                    title="Remote Login"
+                    testID="settings-remote-login-row"
+                    description={signerRowDescription(signerPendingCount)}
+                    descriptionNumberOfLines={1}
+                  />
+                  <Separator className="mx-4" />
+                </>
+              )}
               <SettingsListLinkItem
                 href="/(settings-flow)/keyring"
                 title="P2PK Keys"
@@ -353,20 +373,28 @@ export const SettingsScreen = () => {
                 isSelected={sendLocationEnabled ?? false}
                 onSelectedChange={setSendLocationEnabled}
               />
-              <Separator className="mx-4" />
-              <SettingsListLinkItem
-                href="/(settings-flow)/moderation"
-                testID="settings-moderation-row"
-                title="Moderation"
-                description="Blocked people and private-message word filter"
-              />
-              <Separator className="mx-4" />
-              <SettingsListLinkItem
-                href="/(settings-flow)/media"
-                title="My media"
-                testID="settings-media-row"
-                description={`Images you've posted · uploads via ${mediaHost}`}
-              />
+              {hasFeature('nostr') && (
+                <>
+                  <Separator className="mx-4" />
+                  <SettingsListLinkItem
+                    href="/(settings-flow)/moderation"
+                    testID="settings-moderation-row"
+                    title="Moderation"
+                    description="Blocked people and private-message word filter"
+                  />
+                </>
+              )}
+              {hasFeature('feed') && (
+                <>
+                  <Separator className="mx-4" />
+                  <SettingsListLinkItem
+                    href="/(settings-flow)/media"
+                    title="My media"
+                    testID="settings-media-row"
+                    description={`Images you've posted · uploads via ${mediaHost}`}
+                  />
+                </>
+              )}
             </ListGroup>
           </Section>
         </LayoutShiftProbe>
@@ -430,6 +458,20 @@ export const SettingsScreen = () => {
                 />
                 <Separator className="mx-4" />
                 <SettingsToggleItem
+                  title="Layout guides"
+                  testID="settings-layout-guides-toggle"
+                  isSelected={layoutGuides}
+                  onSelectedChange={setLayoutGuides}
+                />
+                <Separator className="mx-4" />
+                <SettingsToggleItem
+                  title="Show taps"
+                  testID="settings-show-taps-toggle"
+                  isSelected={showTouches}
+                  onSelectedChange={setShowTouches}
+                />
+                <Separator className="mx-4" />
+                <SettingsToggleItem
                   title="Mock Mode"
                   testID="settings-mock-mode-toggle"
                   isSelected={mockMode}
@@ -463,12 +505,23 @@ export const SettingsScreen = () => {
                   isSelected={mockFailPaymentRequest}
                   onSelectedChange={setMockFailPaymentRequest}
                 />
+                {hasFeature('directMessages') && (
+                  <>
+                    <Separator className="mx-4" />
+                    <SettingsToggleItem
+                      title="White Noise"
+                      testID="settings-white-noise-toggle"
+                      isSelected={whitenoiseEnabled}
+                      onSelectedChange={setWhitenoiseEnabled}
+                    />
+                  </>
+                )}
                 <Separator className="mx-4" />
                 <SettingsToggleItem
-                  title="White Noise"
-                  testID="settings-white-noise-toggle"
-                  isSelected={whitenoiseEnabled}
-                  onSelectedChange={setWhitenoiseEnabled}
+                  title="Switch profiles without restart"
+                  testID="settings-in-process-profile-switch-toggle"
+                  isSelected={inProcessProfileSwitch}
+                  onSelectedChange={setInProcessProfileSwitch}
                 />
                 <Separator className="mx-4" />
                 <SettingsToggleItem

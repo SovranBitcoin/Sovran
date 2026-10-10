@@ -2,14 +2,13 @@
 // TimelineRow — one timeline row: dot + connector rail + label block
 // ---------------------------------------------------------------------------
 //
-// Rows are keyed by the engine's `step.rowKey` (semantic slot identity —
-// terminal steps inherit the displaced slot's rowKey), so a timeline that
-// changes shape (rollback, expiry, off-chain settle) morphs each slot in
-// place: the dot animates to its new status with the full draw-in
-// choreography and the label crossfades — instead of remounting the whole
-// timeline. The inner label block is keyed by `step.id`: meaning changes
-// (id swap, e.g. 'pending' → 'rolled-back') crossfade the text block, while
-// info-only updates (confirmation counts) mutate in place.
+// Rows are keyed by the engine's `step.rowKey` (semantic slot identity — an
+// outcome inherits the rowKey of the slot it lands in), so a change of state
+// morphs the open slot in place: the dot animates to its new status with the
+// full draw-in choreography and the label crossfades. The inner label block
+// is keyed by the step's id AND its label, so a row crossfades whenever its
+// wording turns (a new meaning, or the same event moving into the past
+// tense), while sub-line updates (confirmation counts) mutate in place.
 
 import React, { useEffect, useRef } from 'react';
 import { StyleSheet } from 'react-native';
@@ -234,14 +233,28 @@ export function TimelineRow({
   const { dotDelayMs, lineDelayMs } = rowDelays(index);
   const { entering, exiting } = rowTransitions(hasMounted, index);
 
-  const getStateTextColor = (stepType: TimelineStepType, isFuture: boolean) => {
-    if (isFuture) return foreground50;
-    if (stepType === 'expired') return dangerColor;
-    if (stepType === 'waiting') return warningColor;
-    if (stepType === 'already-spent') return warningColor;
-    if (stepType === 'rolled-back') return warningColor;
-    return foreground;
-  };
+  // The label takes the colour of its dot, so the two never disagree: green
+  // beside a tick, the outcome's colour beside an ending, plain while the
+  // step is still open.
+  const labelTone =
+    step.stepType === 'complete' || step.stepType === 'success'
+      ? 'success'
+      : step.stepType === 'expired'
+        ? 'danger'
+        : step.stepType === 'waiting' ||
+            step.stepType === 'already-spent' ||
+            step.stepType === 'rolled-back'
+          ? 'warning'
+          : isFutureState
+            ? 'muted'
+            : 'plain';
+  const labelColor = {
+    success: successColor,
+    danger: dangerColor,
+    warning: warningColor,
+    muted: foreground50,
+    plain: foreground,
+  }[labelTone];
 
   return (
     <Animated.View entering={entering} exiting={exiting}>
@@ -302,16 +315,22 @@ export function TimelineRow({
             paddingBottom: isLast ? 0 : 16,
             marginTop: CONTENT_MARGIN_TOP,
           }}>
-          {/* Keyed by the step's semantic id so a slot that changes meaning in
-              place ("Sent" → "Cancelled") crossfades its text block, while
-              info-only updates (confirmation counts) mutate without
-              remounting. */}
-          <Animated.View key={step.id} entering={entering} exiting={exiting}>
+          {/* Keyed by what the row SAYS and the colour it says it in, not only
+              what it is: a slot that changes meaning ("Waiting for recipient"
+              → "Cancelled"), a row that changes tense as its event happens
+              ("Creating token" → "Created"), and a row that only changes
+              colour (a payment that turns slow) all crossfade, so the colour
+              never snaps. Sub-line updates (confirmation counts) mutate
+              without remounting. */}
+          <Animated.View
+            key={`${step.id}:${step.displayLabel}:${labelTone}`}
+            entering={entering}
+            exiting={exiting}>
             <Text
               size={15}
               bold
               style={{
-                color: getStateTextColor(step.stepType, isFutureState),
+                color: labelColor,
                 marginBottom: 2,
               }}>
               {step.displayLabel}

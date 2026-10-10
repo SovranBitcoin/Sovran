@@ -33,8 +33,10 @@ interface BitChatNativeModule {
     noisePrivateKeyHex: string,
     signingPrivateKeyHex: string,
     p2pkPubkeyHex: string,
-    creq: string | null
+    creq: string | null,
+    walletDiscovery: boolean
   ): Promise<void>;
+  stopBLE(): Promise<void>;
   sendBLEMessage(content: string): Promise<void>;
   startBLEPrivateChat(peerID: string): Promise<void>;
   resetBLEPrivateChat(peerID: string): Promise<void>;
@@ -115,7 +117,7 @@ function validateBLEIdentityMaterial(
   }
 }
 
-export function startBLE(
+function startNativeBLE(
   nickname: string,
   profileScope: string,
   identityMaterial: BitchatBLEIdentityMaterial,
@@ -132,17 +134,46 @@ export function startBLE(
         profileScope,
         identityMaterial.noisePrivateKeyHex,
         identityMaterial.signingPrivateKeyHex,
-        // Our identity / P2PK lock target: "02" + the profile's x-only Nostr
-        // pubkey (NUT-11 / Minibits convention — BIP340 signing ignores Y
-        // parity). The native bridge derives our bech32 npub from this and
-        // sends it (plus `creq`) via bitchat's native `[FAVORITED]:<npub>:<creq>`
-        // favorite notification — there is no custom announce TLV.
+        // Native favorite identity supports explicit chat interaction only.
+        // Payment eligibility is proved by signed capabilities in JS.
         `02${identityMaterial.nostrPubkey}`,
         // Our standing NUT-18 payment request (accepted mints + P2PK lock key),
         // built in JS from the user's trusted mints. null until mints load.
-        creq ?? null
+        creq ?? null,
+        publicMeshLeases.size === 0
       )
     : unavailable();
+}
+
+// Serialize ownership changes. A profile teardown cannot stop a newer start.
+let lifecycle: Promise<void> = Promise.resolve();
+let currentStart: Parameters<typeof startNativeBLE> | null = null;
+const publicMeshLeases = new Set<symbol>();
+function enqueueLifecycle(action: () => Promise<void>): Promise<void> {
+  const next = lifecycle.catch(() => undefined).then(action);
+  lifecycle = next;
+  return next;
+}
+export function startBLE(...args: Parameters<typeof startNativeBLE>): Promise<void> {
+  currentStart = args;
+  return enqueueLifecycle(() => startNativeBLE(...args));
+}
+export function stopBLE(): Promise<void> {
+  currentStart = null;
+  return enqueueLifecycle(() => NativeModule?.stopBLE() ?? Promise.resolve());
+}
+export function isPublicBLEMesh(): boolean {
+  return publicMeshLeases.size > 0;
+}
+/** Public chat is an explicit lease; ordinary wallet discovery never joins it. */
+export function acquirePublicBLEMesh(): () => void {
+  const lease = Symbol('public mesh');
+  publicMeshLeases.add(lease);
+  if (currentStart) void startBLE(...currentStart).catch(() => undefined);
+  return () => {
+    publicMeshLeases.delete(lease);
+    if (currentStart) void startBLE(...currentStart).catch(() => undefined);
+  };
 }
 
 export function sendBLEMessage(content: string): Promise<void> {
@@ -192,14 +223,15 @@ export function addBLEPrivateMessageListener(
   listener: (event: BLEPrivateMessageEvent) => void
 ): EventSubscription {
   if (!NativeModule) return NOOP_SUBSCRIPTION;
-  return NativeModule.addListener('onBLEPrivateMessage', listener);
+  return NativeModule.addListener('onBLEPrivateMessage', (event) => {
+    if (event.profileScope && event.profileScope === currentStart?.[1]) listener(event);
+  });
 }
 
 /**
  * Hand a peer our Nostr identity via bitchat's native favorite notification
- * (`[FAVORITED]:<npub>:<creq>`). NearPay calls this eagerly for each discovered
- * peer; Sovran peers reciprocate and we learn theirs (surfaced as
- * `BLEPeer.nostrPubkeyHex` + `BLEPeer.creq` / `onBLEPeerIdentity`). If no Noise
+ * (`[FAVORITED]:<npub>:<creq>`). This is an explicit chat action, never
+ * wallet discovery or evidence that a peer controls the advertised key. If no Noise
  * session exists yet the native side defers the send until the handshake
  * completes.
  */
@@ -363,7 +395,10 @@ export function sendGeohashMessage(content: string, nickname: string): Promise<v
  * observed on their public geohash messages (`senderPubkey` from
  * `onNostrMessage` events).
  */
-export function sendGeohashPrivateMessage(recipientNostrPubkeyHex: string, content: string): Promise<void> {
+export function sendGeohashPrivateMessage(
+  recipientNostrPubkeyHex: string,
+  content: string
+): Promise<void> {
   return NativeModule
     ? NativeModule.sendGeohashPrivateMessage(recipientNostrPubkeyHex, content)
     : unavailable();

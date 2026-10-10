@@ -1,12 +1,12 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
 import { Platform, StyleSheet, View as RNView } from 'react-native';
 import { AppleMaps, GoogleMaps } from 'expo-maps';
 import * as Location from 'expo-location';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { Text } from '@/shared/ui/primitives/Text';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
-import { BlurCardFrame } from '@/shared/ui/composed/BlurCardFrame';
-import { SquircleView } from '@/shared/ui/primitives/SquircleView';
+import { Surface } from '@/shared/ui/composed/Surface';
 import Icon from 'assets/icons';
 import { withAlpha } from '@/shared/lib/color';
 import { MapVignette } from '@/shared/ui/composed/MapVignette';
@@ -166,12 +166,13 @@ async function resolveNearbyCoords(ctx: {
 }) {
   const { isCancelled, setPermStatus, setCoords } = ctx;
   try {
-    // Request (not just check) permission, matching every other location
-    // consumer in the app (MapScreen, useTransactionLocation,
-    // useLocationTiers). The old check-only call left permission
-    // undetermined, so this card never had a fix and stayed on the London
-    // default.
-    const { status } = await Location.requestForegroundPermissionsAsync();
+    // Check, never request. This card mounts with the wallet home, so a
+    // request here put the system location dialog in front of a new user
+    // before they had touched anything, and again on later launches. The map
+    // screen asks when the user opens it, where the reason is on screen; once
+    // granted there, this card picks the fix up on its next mount.
+    const { status, canAskAgain } = await Location.getForegroundPermissionsAsync();
+    if (status !== 'granted' && canAskAgain) return;
     if (!isCancelled()) setPermStatus(status === 'granted' ? 'granted' : 'denied');
     if (status !== 'granted') return;
 
@@ -197,7 +198,7 @@ async function resolveNearbyCoords(ctx: {
 // stays until a pass audits the consumer (removal only shifts re-render cost).
 // ast-grep-ignore: no-manual-memo-tsx
 export const BitcoinNearYou = React.memo(function BitcoinNearYou() {
-  const [muted, foreground] = useThemeColor(['muted', 'foreground'] as const);
+  const foreground = useThemeColor('foreground');
   const mockMode = useSettingsStore((s) => s.mockMode);
 
   const { placesCache, fetchPlaces } = useBTCMapStore(
@@ -236,24 +237,36 @@ export const BitcoinNearYou = React.memo(function BitcoinNearYou() {
     'undetermined'
   );
 
-  useEffect(() => {
-    if (mockMode) {
-      setCoords({ latitude: MOCK_LAT, longitude: MOCK_LON });
-      return;
-    }
+  // Runs on every return to the wallet, not once per mount: this card only
+  // CHECKS permission, and the map screen is where it gets granted. The wallet
+  // stays mounted underneath the map, so a mount-only effect would keep the
+  // default city on screen after the user had just allowed location.
+  useFocusEffect(
+    useCallback(() => {
+      if (mockMode) {
+        setCoords({ latitude: MOCK_LAT, longitude: MOCK_LON });
+        return;
+      }
 
-    let cancelled = false;
+      let cancelled = false;
 
-    void resolveNearbyCoords({
-      isCancelled: () => cancelled,
-      setPermStatus,
-      setCoords,
-    });
+      void resolveNearbyCoords({
+        isCancelled: () => cancelled,
+        setPermStatus,
+        // The same place is the same object: the markers are filtered around
+        // these coords and the native map compares its marker list by
+        // reference, so a fresh object on every return reset the map.
+        setCoords: (next) =>
+          setCoords((prev) =>
+            prev.latitude === next.latitude && prev.longitude === next.longitude ? prev : next
+          ),
+      });
 
-    return () => {
-      cancelled = true;
-    };
-  }, [mockMode]);
+      return () => {
+        cancelled = true;
+      };
+    }, [mockMode])
+  );
 
   // Feeds expo-maps `markers` (reference-compared at the native boundary) and
   // does real per-place compute. Kept manual; see cameraPosition above.
@@ -303,45 +316,36 @@ export const BitcoinNearYou = React.memo(function BitcoinNearYou() {
         accessibilityRole="link"
         activeOpacity={0.85}
         testID={`wallet-location:${permStatus}`}>
-        <SquircleView
-          style={{
-            overflow: 'hidden',
-            borderRadius: 20,
-            borderWidth: 1,
-            borderCurve: 'continuous',
-            borderColor: withAlpha(muted, 0.3),
-          }}>
-          <BlurCardFrame accentColor={muted}>
-            <RNView className="z-[1]">
-              <MapPreview
-                latitude={coords.latitude}
-                longitude={coords.longitude}
-                markers={nearbyMarkers}
-              />
+        <Surface media>
+          <RNView className="z-[1]">
+            <MapPreview
+              latitude={coords.latitude}
+              longitude={coords.longitude}
+              markers={nearbyMarkers}
+            />
 
-              <RNView className="absolute left-0 right-0 top-0 z-[2] flex-row items-center justify-between px-4 pt-3.5">
-                <Text size={14} semibold color={titleColor}>
-                  Bitcoin near you
+            <RNView className="absolute left-0 right-0 top-0 z-[2] flex-row items-center justify-between px-4 pt-3.5">
+              <Text size={14} semibold color={titleColor}>
+                Bitcoin near you
+              </Text>
+              <Icon name="mdi:chevron-right" size={18} color={titleColor} />
+            </RNView>
+
+            <RNView className="absolute bottom-2.5 left-3 z-[2]">
+              <RNView
+                className="flex-row items-center gap-1 rounded-full px-2 py-1"
+                style={{
+                  borderCurve: 'continuous',
+                  backgroundColor: withAlpha(foreground, 0.1),
+                }}>
+                <Icon name="mdi:map-marker" size={12} color={titleColor} />
+                <Text size={11} semibold color={titleColor}>
+                  {countLabel}
                 </Text>
-                <Icon name="mdi:chevron-right" size={18} color={titleColor} />
-              </RNView>
-
-              <RNView className="absolute bottom-2.5 left-3 z-[2]">
-                <RNView
-                  className="flex-row items-center gap-1 rounded-full px-2 py-1"
-                  style={{
-                    borderCurve: 'continuous',
-                    backgroundColor: withAlpha(foreground, 0.1),
-                  }}>
-                  <Icon name="mdi:map-marker" size={12} color={titleColor} />
-                  <Text size={11} semibold color={titleColor}>
-                    {countLabel}
-                  </Text>
-                </RNView>
               </RNView>
             </RNView>
-          </BlurCardFrame>
-        </SquircleView>
+          </RNView>
+        </Surface>
       </Pressable>
     </Log>
   );

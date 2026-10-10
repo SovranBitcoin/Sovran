@@ -1,3 +1,5 @@
+import { useNavigationContainerRef } from 'expo-router';
+import { captureNearbyDelivery } from '@/features/nearPay/lib/nearbyPayments';
 /**
  * @fileoverview Sovran ColadaProvider — wires colada to the app
  *
@@ -7,6 +9,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { npcAddressForPubkey } from '@/shared/lib/cashu/npc';
 import { Share } from 'react-native';
 
 import * as Clipboard from 'expo-clipboard';
@@ -61,7 +64,6 @@ import {
   createSovranScanSources,
   createSovranScreenActionHandlers,
 } from '@/features/send/lib/sovranPaymentConfig';
-import { deriveBitchatBLEIdentityMaterial } from '@/features/bitchat/lib/bleIdentity';
 import {
   createSovranScreenActionsBridge,
   getSovranMintEnrichment,
@@ -81,6 +83,7 @@ import { usePricelistStore } from '@/shared/stores/global/pricelistStore';
 import { useSettingsStore, type DisplayCurrency } from '@/shared/stores/global/settingsStore';
 import { clearPaymentContext } from '@/shared/stores/runtime/clearPaymentContext';
 import { useDmEchoStore } from '@/shared/stores/runtime/dmEchoStore';
+import { buildDetectors } from '@/shared/config/featureDetectors';
 import { isPaymentRequestFailureMockEnabled } from '@/features/send/lib/paymentRequestFailureMock';
 
 // Per-mint NUT-06 deadline used by `fetchMintInfo` below. Only matters on a
@@ -176,7 +179,6 @@ type ColadaIdentity = {
   getNpub: () => string | undefined;
   getPubkey: () => string | undefined;
   getPrivateKey: () => Uint8Array | undefined;
-  getBitchatIdentityMaterial: () => ReturnType<typeof deriveBitchatBLEIdentityMaterial> | null;
   /** Register a receive surface for p2pk-keypair regeneration. Returns an unsubscribe. */
   subscribeP2pkKeyRefreshed: (listener: (newKey: string | null) => void) => () => void;
   notifyP2pkKeyRefreshed: (newKey: string | null) => void;
@@ -213,12 +215,6 @@ function useColadaIdentity(
       getNpub: () => npubRef.current,
       getPubkey: () => pubkeyRef.current,
       getPrivateKey: () => privateKeyRef.current,
-      getBitchatIdentityMaterial: () => {
-        const privateKey = privateKeyRef.current;
-        const pubkey = pubkeyRef.current;
-        if (!privateKey || !pubkey) return null;
-        return deriveBitchatBLEIdentityMaterial({ privateKey, pubkey });
-      },
       subscribeP2pkKeyRefreshed: (listener: (newKey: string | null) => void) => {
         subscribersRef.current.add(listener);
         return () => {
@@ -235,12 +231,32 @@ function useColadaIdentity(
 
 export function SovranColadaProvider({ children }: { children: React.ReactNode }) {
   const manager = useManager();
+  // The payment handlers navigate, and one of them has to know what is under
+  // the screen it is leaving (features/send/lib/amountReturn.ts).
+  const navigationRef = useNavigationContainerRef();
   const { keys } = useNostrKeysContext();
   const { ndk } = useNDK();
   const { isOffline: contextOffline } = useOfflineStatus();
   const mockOffline = useSettingsStore((state) => state.mockOffline);
   const isOffline = mockOffline || contextOffline;
   const getOffline = useLatestGetter(isOffline);
+
+  // Coco serves stored mint data without a request while offline, and sends
+  // default to exact-only, so nothing waits on a mint that cannot answer.
+  const [offlineListeners] = useState(() => new Set<() => void>());
+  const subscribeOfflineChanged = useCallback(
+    (listener: () => void) => {
+      offlineListeners.add(listener);
+      return () => {
+        offlineListeners.delete(listener);
+      };
+    },
+    [offlineListeners]
+  );
+  useEffect(() => {
+    manager?.setOffline(isOffline);
+    for (const listener of offlineListeners) listener();
+  }, [manager, isOffline, offlineListeners]);
 
   // Camera permission lives here rather than behind a (receive-flow)-scoped
   // context provider so it's reachable from this provider's navigation /
@@ -284,7 +300,7 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
   // `() => manager` inline, so every render handed the engine, the operations
   // override and the notifications factory a fresh function identity.
   const getManager = useCallback(() => manager, [manager]);
-  const { getNpub, getBitchatIdentityMaterial } = identity;
+  const { getNpub } = identity;
 
   const getBtcPrice = useCallback(() => {
     const currency = useSettingsStore.getState().displayCurrency;
@@ -310,6 +326,7 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
     () =>
       createColada({
         manager,
+        captureSendDelivery: captureNearbyDelivery,
         sendNostrDM: async (nprofile, message) => {
           paymentLog.info('colada.adapter.send_nostr_dm.start', {
             hasPrivateKey: !!identity.getPrivateKey(),
@@ -521,6 +538,7 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
     () =>
       ({
         ...instance.operations,
+        npcAddressForPubkey,
         // The machine asks for a REAL unit; stay on the active account's side
         // of the testnut split.
         switchUnit: (unit: string) => {
@@ -607,8 +625,9 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
         manager,
         requestCameraPermission,
         subscribeP2pkKeyRefreshed: identity.subscribeP2pkKeyRefreshed,
+        subscribeOfflineChanged,
       }),
-    [manager, requestCameraPermission, identity]
+    [manager, requestCameraPermission, identity, subscribeOfflineChanged]
   );
 
   // Deliver a bearer ecash token to a remote Nostr contact over an encrypted
@@ -655,10 +674,11 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
         onOptionDismiss: () => refs.getOptionDismiss()?.(),
         getManager,
         getNpub,
-        getBitchatIdentityMaterial,
         deliverContactEcashDm,
+        getRootNavigationState: () =>
+          navigationRef.isReady() ? navigationRef.getRootState() : undefined,
       }),
-    [getManager, getNpub, getBitchatIdentityMaterial, deliverContactEcashDm]
+    [getManager, getNpub, deliverContactEcashDm, navigationRef]
   );
 
   // Built once per manager, not per render: it lands in Colada's context, so a
@@ -677,6 +697,7 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
   return (
     <ColadaProviderBase
       handlers={handlers}
+      detectors={buildDetectors}
       instance={instance}
       getManager={getManager}
       annotationStore={transactionAnnotationAdapter}

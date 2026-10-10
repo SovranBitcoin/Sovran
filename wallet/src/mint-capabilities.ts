@@ -539,13 +539,25 @@ export function getMintMethodCapability(
   return support;
 }
 
+let enabledMethods: ReadonlySet<MintPaymentMethod> = new Set(METHODS);
+
+/**
+ * Restrict the payment methods this build offers (ADR 0021). The app calls
+ * it once at startup from its feature set; a disabled method reads as
+ * unavailable everywhere availability is computed.
+ */
+export function configureEnabledPaymentMethods(
+  methods: readonly MintPaymentMethod[],
+): void {
+  enabledMethods = new Set(methods);
+}
+
 export function isMethodImplemented(
-  _requirement: MintMethodRequirement,
+  requirement: MintMethodRequirement,
 ): boolean {
-  // coco v2: bolt11 mint+melt, onchain mint+melt, bolt12 mint (reusable
-  // offers) + melt (paying an offer, wired via the bolt12 melt path in
-  // defaultOperations.executeMelt). All method/operation pairs are implemented.
-  return true;
+  // coco v2 implements every method/operation pair (bolt11, onchain and
+  // bolt12 mint + melt), so only the build's feature set can rule one out.
+  return enabledMethods.has(requirement.method);
 }
 
 function methodLabel(method: MintPaymentMethod): string {

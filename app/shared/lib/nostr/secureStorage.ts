@@ -12,7 +12,12 @@ import { useCallback, useEffect, useState } from 'react';
 import { nostrLog, redactError } from '../logger';
 import { useSecureStoreState } from '@/shared/stores/runtime/secureStoreState';
 import { maybeExportSeedForE2E } from './e2eSeedExport';
-import { SecureVaultManifest, secureVaultChunkKey } from '../routstr/secureVaultManifest';
+import { REDUX_ERA_ROW, readReduxEraRoot, type ReduxEraRoot } from './reduxEraRoot';
+import {
+  SecureVaultManifest,
+  secureVaultChunkKey,
+  secureVaultManifestKey,
+} from '../persist/secureVaultManifest';
 
 // Keys for secure storage
 const STORAGE_KEYS = {
@@ -448,6 +453,33 @@ async function ensureMnemonicExistsInner(): Promise<string | null> {
       return null;
     }
 
+    // A phone coming straight from a release before 0.0.45 has its phrase in
+    // the old redux row and nowhere else. Take that phrase as the root rather
+    // than hand the user a new wallet over the old one. If the row had a
+    // wallet whose phrase cannot be read, ask for the phrase instead.
+    let reduxEra: ReduxEraRoot;
+    try {
+      reduxEra = readReduxEraRoot(await AsyncStorage.getItem(REDUX_ERA_ROW));
+    } catch (error) {
+      lockMnemonic(error);
+      return null;
+    }
+    if (reduxEra.kind === 'unreadable') {
+      lockMnemonic(new Error('Earlier wallet requires its recovery phrase'));
+      return null;
+    }
+    if (reduxEra.kind === 'phrase') {
+      // seedCreatedAt stays unset: this install did not create the phrase, so
+      // startup offers a restore from the mints. The old proofs are not
+      // imported and stay in the row, which is left untouched.
+      if (!(await storeMnemonic(reduxEra.mnemonic))) {
+        nostrLog.error('nostr.secure.store_redux_era_mnemonic_failed');
+        return null;
+      }
+      nostrLog.info('nostr.secure.mnemonic_stored', { source: 'redux_era' });
+      return reduxEra.mnemonic;
+    }
+
     // Generate new mnemonic
     nostrLog.info('nostr.secure.generating_mnemonic');
     const generated = await generateMnemonic();
@@ -514,6 +546,16 @@ export async function clearAllSecureData(
   accountIndexes: number[],
   importedPubkeys: string[] = []
 ): Promise<boolean> {
+  const clear = await prepareSecureDataReset(accountIndexes, importedPubkeys);
+  return clear();
+}
+
+/** Read every deletion manifest before the caller destroys any wallet database. */
+export async function prepareSecureDataReset(
+  accountIndexes: number[],
+  importedPubkeys: string[] = []
+): Promise<() => Promise<boolean>> {
+  await keyIndexQueue;
   const callerKeys: string[] = [
     STORAGE_KEYS.USER_MNEMONIC,
     STORAGE_KEYS.MIGRATIONS_COMPLETE_LEGACY,
@@ -539,42 +581,32 @@ export async function clearAllSecureData(
   const indexed = await readKeyIndex(true);
   const allKeys = Array.from(new Set([...callerKeys, ...indexed]));
 
-  const results = await Promise.all(
-    allKeys.map(async (key) => {
-      if (key.startsWith('routstr_v1_') && key.endsWith('_manifest')) {
-        try {
-          const raw = await readSensitiveValue(key);
-          if (raw !== null) {
-            const manifest = SecureVaultManifest.parse(JSON.parse(raw));
-            for (let slot = 0; slot < manifest.slots.length; slot++) {
-              for (let index = 0; index < manifest.slots[slot]; index++) {
-                if (
-                  !(await secureDelete(
-                    secureVaultChunkKey(key, slot, index),
-                    'clear_recovery_chunk'
-                  ))
-                )
-                  return false;
-              }
-            }
-          }
-        } catch {
-          return false;
-        }
+  const chunkKeys: string[] = [];
+  for (const key of allKeys) {
+    if (!key.startsWith('routstr_v1_') || !key.endsWith('_manifest')) continue;
+    const raw = await readSensitiveValue(key);
+    if (raw === null) continue;
+    const manifest = SecureVaultManifest.parse(JSON.parse(raw));
+    for (let slot = 0; slot < manifest.slots.length; slot++) {
+      for (let index = 0; index < manifest.slots[slot]; index++) {
+        chunkKeys.push(secureVaultChunkKey(key, slot, index));
       }
-      return secureDelete(key, 'clear_key');
-    })
-  );
-  // Drop the index itself last so a partial wipe followed by a retry still
-  // sees the un-wiped keys on the second pass.
-  const keysCleared = results.every(Boolean);
-  const allOk = keysCleared && (await secureDelete(STORAGE_KEYS.KEY_INDEX, 'clear_index'));
-  if (allOk) {
-    nostrLog.info('nostr.secure.all_data_cleared', { count: allKeys.length });
-  } else {
-    nostrLog.warn('nostr.secure.all_data_cleared_with_errors', { count: allKeys.length });
+    }
   }
-  return allOk;
+
+  return async () => {
+    // Keep manifests until all their chunks are gone, so a failed wipe is retryable.
+    const chunks = await Promise.all(
+      chunkKeys.map((key) => secureDelete(key, 'clear_recovery_chunk'))
+    );
+    if (!chunks.every(Boolean)) return false;
+    const results = await Promise.all(allKeys.map((key) => secureDelete(key, 'clear_key')));
+    const allOk =
+      results.every(Boolean) && (await secureDelete(STORAGE_KEYS.KEY_INDEX, 'clear_index'));
+    if (allOk) nostrLog.info('nostr.secure.all_data_cleared', { count: allKeys.length });
+    else nostrLog.warn('nostr.secure.all_data_cleared_with_errors', { count: allKeys.length });
+    return allOk;
+  };
 }
 
 /** A source repair must discard both mnemonic and PBKDF2 caches from the old chain. */
@@ -621,11 +653,36 @@ export function storeDerivedKeys(accountIndex: number, keys: CachedDerivedKeys):
   return secureSet(derivedKeysKey(accountIndex), JSON.stringify(keys), 'store_keys');
 }
 
+// Both caches can be made again from the root phrase, so a blob of the wrong
+// shape is deleted and counts as absent. Served as it is, a matching hash
+// would select it and the account would fail to load on every launch.
+const HEX_64 = /^[0-9a-fA-F]{64}$/;
+const DerivedKeysCache = z.object({
+  npub: z.string().startsWith('npub1'),
+  nsec: z.string().startsWith('nsec1'),
+  pubkey: z.string().regex(HEX_64),
+  privateKeyHex: z.string().regex(HEX_64),
+  mnemonicHash: z.string(),
+});
+const CashuMnemonicCache = z.object({
+  value: z.string().refine((phrase) => bip39.validateMnemonic(phrase, wordlist)),
+  mnemonicHash: z.string(),
+});
+
+/** Throws a plain error: a zod error could carry the secret fields into the log. */
+function parseCache<T>(schema: z.ZodType<T>, raw: string, name: string): T {
+  const parsed = schema.safeParse(JSON.parse(raw));
+  if (!parsed.success) throw new Error(`${name} cache has the wrong shape`);
+  return parsed.data;
+}
+
 export async function retrieveDerivedKeys(accountIndex: number): Promise<CachedDerivedKeys | null> {
   const key = derivedKeysKey(accountIndex);
   const raw = await secureGet(key, 'retrieve_keys');
   if (!raw) return null;
-  return parseOrSelfHeal(raw, key, 'retrieve_keys', (s) => JSON.parse(s) as CachedDerivedKeys);
+  return parseOrSelfHeal(raw, key, 'retrieve_keys', (s) =>
+    parseCache(DerivedKeysCache, s, 'derived keys')
+  );
 }
 
 export function storeCashuMnemonic(
@@ -643,11 +700,8 @@ export async function retrieveCashuMnemonic(
   const key = cashuMnemonicKey(accountIndex);
   const raw = await secureGet(key, 'retrieve_cashu_mnemonic');
   if (!raw) return null;
-  return parseOrSelfHeal(
-    raw,
-    key,
-    'retrieve_cashu_mnemonic',
-    (s) => JSON.parse(s) as { value: string; mnemonicHash: string }
+  return parseOrSelfHeal(raw, key, 'retrieve_cashu_mnemonic', (s) =>
+    parseCache(CashuMnemonicCache, s, 'cashu mnemonic')
   );
 }
 
@@ -762,4 +816,69 @@ export function useMnemonic(autoLoad: boolean = true): UseMnemonicReturn {
   }, [autoLoad, refresh]);
 
   return { value, loading, error, refresh };
+}
+
+/** Read and validate the account's manifests before any destructive step. */
+export async function prepareProfileSecureRemoval(
+  accountIndex: number,
+  pubkey: string,
+  vaultNames: readonly string[]
+): Promise<() => Promise<void>> {
+  assertAccountIndex(accountIndex);
+  assertPubkeyHex(pubkey);
+  await keyIndexQueue;
+  const indexed = await readKeyIndex(true);
+  const keys = new Set([
+    derivedKeysKey(accountIndex),
+    cashuMnemonicKey(accountIndex),
+    cashuSeedKey(accountIndex),
+    migrationsCompleteKey(accountIndex),
+    importedNsecKey(pubkey),
+  ]);
+  const chunks: string[] = [];
+  const manifests = new Set([
+    ...vaultNames.map((name) => secureVaultManifestKey(pubkey, name)),
+    ...indexed.filter((key) => key.startsWith(`routstr_v1_${pubkey}_`)),
+  ]);
+  for (const key of manifests) {
+    // Every indexed vault must have a readable manifest; unclassified records refuse.
+    if (!key.endsWith('_manifest')) throw new Error('Unclassified account recovery record');
+    const raw = await readSensitiveValue(key);
+    if (raw === null) continue;
+    const manifest = SecureVaultManifest.parse(JSON.parse(raw));
+    function empty(record: unknown): boolean {
+      if (record === null) return true;
+      if (Array.isArray(record)) return record.length === 0;
+      if (typeof record === 'object') return Object.values(record).every(empty);
+      return false;
+    }
+    if (manifest.generation === null) throw new Error('Uncommitted account recovery record');
+    for (let slot = 0; slot < manifest.slots.length; slot++) {
+      let value = '';
+      for (let index = 0; index < manifest.slots[slot]; index++) {
+        const chunk = secureVaultChunkKey(key, slot, index);
+        chunks.push(chunk);
+        const part = await readSensitiveValue(chunk);
+        if (part === null) throw new Error('Incomplete account recovery record');
+        value += part;
+      }
+      if (
+        slot === manifest.generation % 2 &&
+        bytesToHex(sha256(utf8ToBytes(value))) !== manifest.digest
+      )
+        throw new Error('Corrupt account recovery record');
+      // Retained alternate generations may also contain bearer proofs. Never guess spentness.
+      if (value !== '' && !empty(JSON.parse(value)))
+        throw new Error('Account recovery requires review');
+    }
+    keys.add(key);
+  }
+  return async () => {
+    // Delete chunks before manifests; retaining the manifest makes retry enumeration safe.
+    for (const key of [...chunks, ...keys]) {
+      if (!(await secureDelete(key, 'remove_profile')))
+        throw new Error('Account key deletion failed');
+    }
+    // Keep the shared index and mnemonic: missing entries are harmless deletion hints.
+  };
 }

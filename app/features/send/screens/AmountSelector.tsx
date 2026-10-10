@@ -10,6 +10,8 @@ import type { ActionVariant, P2pkLockSpec, RecipientProfile, ScreenActionName } 
 import type { BoundAction, QuickSendSuggestion } from 'wallet/react';
 
 import { MintSelector } from '@/features/wallet';
+import { useAppStyle } from '@/shared/styles/appStyle';
+import { FOOTER_GAP } from '@/shared/ui/composed/footerInset';
 import { UnitSwitcherPill } from '@/features/wallet/components/UnitSwitcherPill';
 import { formatAmount } from '@/shared/lib/currency';
 import type { ActionMenuVariant } from '@/shared/ui/composed/ActionMenuButton';
@@ -18,13 +20,21 @@ import {
   type AmountEntryTransactionType,
 } from '@/shared/ui/composed/AmountEntryView';
 import { Log, useLifecycleLogger, walletLog } from '@/shared/lib/logger';
+import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useRoutstrTopUpStore } from '@/shared/stores/runtime/routstrTopUpStore';
 import { hasP2PKLock } from '@/features/send/lib/p2pkLock';
+import type { SendDelivery } from '@/features/send/lib/sendDelivery';
 import { E2EToastProbe } from '@/shared/lib/popup/E2EToastProbe';
 
 import type { ButtonHandlerProps } from '@/shared/ui/composed/ButtonHandler';
 
 type AmountEntryActions = Record<ScreenActionName['amountEntry'], BoundAction>;
+
+/**
+ * Room for the recipient's name and domain, which hang under the navigation
+ * bar when the payment has a recipient: the amount is centred below them.
+ */
+const RECIPIENT_BAND_CLEARANCE = 44;
 
 const EMPTY_QUICK_SEND_SUGGESTIONS: QuickSendSuggestion[] = [];
 
@@ -78,26 +88,27 @@ function buildNextVariants(
   nextAction: AmountEntryActions['next'],
   nextExecuteParams: NextExecuteParams,
   suppress: boolean,
-  lockOption?: { reason?: string; choose: () => Promise<P2pkLockSpec | null> },
-  confirmLock?: () => Promise<P2pkLockSpec | null>
+  confirmLock?: () => Promise<P2pkLockSpec | null>,
+  askLock?: () => Promise<P2pkLockSpec | null | undefined>
 ): ActionMenuVariant[] | undefined {
   if (suppress) return undefined;
   const raw = nextAction.variants as ActionVariant[] | undefined;
   if (!raw || raw.length === 0) return undefined;
   return (
     raw
-      // "Lock Ecash" needs terms, and the sender is always the one who
-      // answers for them: `lockOption` when locking is theirs to turn on,
-      // `confirmLock` when the flow arrived locked and only its length is.
-      .filter((v) => v.id !== 'locked-ecash' || lockOption || confirmLock)
+      // Locking is a question "as Ecash" asks, not an option of its own. The
+      // row survives only for a lock the flow arrived with, where it is the
+      // one thing that can happen and only its length is the sender's.
+      .filter((v) => v.id !== 'locked-ecash' || !!confirmLock)
       .map((v) => ({
         id: v.id,
         label: v.label,
         description: v.description,
         icon: v.icon,
-        isDisabled: !v.available || (v.id === 'locked-ecash' && !!lockOption?.reason),
-        reason: v.id === 'locked-ecash' ? (lockOption?.reason ?? v.reason) : v.reason,
+        isDisabled: !v.available,
+        reason: v.reason,
         isDestructive: v.isDestructive,
+        isCaution: v.isCaution,
         onPress: async () => {
           walletLog.info('amount.next.variant', {
             variantId: v.id,
@@ -106,16 +117,22 @@ function buildNextVariants(
             recipientDisplayName: nextExecuteParams.recipientProfile?.displayName ?? null,
           });
           if (v.id === 'locked-ecash') {
-            const lock = await (lockOption?.choose ?? confirmLock)?.();
+            const lock = await confirmLock?.();
             if (!lock) return;
             await nextAction.execute({ ...nextExecuteParams, variantId: v.id, p2pkLock: lock });
-          } else {
+            return;
+          }
+          if (v.id === 'ecash' && askLock) {
+            const lock = await askLock();
+            if (lock === undefined) return;
             await nextAction.execute({
               ...nextExecuteParams,
-              variantId: v.id,
-              ...(lockOption ? { p2pkLock: null } : {}),
+              variantId: lock ? 'locked-ecash' : 'ecash',
+              p2pkLock: lock,
             });
+            return;
           }
+          await nextAction.execute({ ...nextExecuteParams, variantId: v.id });
         },
       }))
   );
@@ -194,13 +211,18 @@ interface AmountSelectorProps {
   lockChoice?: null;
   /** Short line under the amount when the lock is worth a caveat. */
   lockWarning?: string | null;
-  lockOption?: { reason?: string; choose: () => Promise<P2pkLockSpec | null> };
+  /** See `useSendLock().askLock`: "as Ecash" asks "Lock to <name>" first. */
+  askLock?: () => Promise<P2pkLockSpec | null | undefined>;
   /**
    * Set whenever the send will be locked. Called as the send leaves, it
    * returns the terms to send on, asking the sender first if they have not
    * answered yet. Null means they backed out, and nothing is sent.
    */
   confirmLock?: () => Promise<P2pkLockSpec | null>;
+  /** Delivery status: the display's offline mark and the sentence behind it. */
+  delivery?: SendDelivery | null;
+  /** Opens the note picker. Set only when there are notes to pick from. */
+  onPickNotes?: () => void;
   /** Hide variant menu when the caller owns delivery after ecash creation. */
   suppressNextVariants?: boolean;
 }
@@ -218,9 +240,11 @@ export function AmountSelector({
   recipientProfile,
   lockChoice,
   lockWarning = null,
-  lockOption,
   confirmLock,
+  askLock,
   suppressNextVariants = false,
+  delivery = null,
+  onPickNotes,
 }: AmountSelectorProps) {
   useLifecycleLogger('AmountSelector', walletLog);
 
@@ -283,6 +307,15 @@ export function AmountSelector({
       recipientDisplayName: nextExecuteParams.recipientProfile?.displayName ?? null,
       locked: !!nextExecuteParams.p2pkLock || !!confirmLock,
     });
+    if (askLock) {
+      const asked = await askLock();
+      if (asked === undefined) {
+        walletLog.info('amount.next.lock_declined');
+        return;
+      }
+      await actions.next.execute({ ...nextExecuteParams, p2pkLock: asked });
+      return;
+    }
     if (!confirmLock) {
       await actions.next.execute(nextExecuteParams);
       return;
@@ -309,8 +342,8 @@ export function AmountSelector({
     actions.next,
     nextExecuteParams,
     suppressNextVariants || isCreateEcashEntry,
-    lockOption,
-    confirmLock
+    confirmLock,
+    askLock
   );
 
   // The AI-credit top-up flow lands on this screen via a hand-rolled
@@ -364,33 +397,35 @@ export function AmountSelector({
   // bottom-bar pill — same component the header uses, so balance, icon,
   // and liquid/blur/flat chrome stay consistent across the swap.
   //
-  // Sizing mirrors Button's `SIZES.default` so the pill and Next render
-  // with identical outer footprints:
-  //   • BottomButtons spans full window width (no horizontal padding),
-  //     so each 50% slot is `windowWidth / 2`.
-  //   • Button bakes `margin: 4` on all four sides + `marginBottom: 8`,
-  //     consuming 8 px of horizontal space inside its slot. The pill
-  //     gets the same margins on its wrapper, and `width = slot - 8`,
-  //     so visible button widths match to the pixel.
-  //   • Height 48 matches Button's `minHeight`; contentHeight 32 leaves
-  //     visible padding inside the SwiftUI liquid-glass button instead
-  //     of crowding the avatar + label + chevron row at 48 px.
+  // The pill and Next are the two halves of one row: the bar is inset by the
+  // gutter, the row keeps FOOTER_GAP between its halves, and each half takes
+  // what is left. Height is the style's primary-action height, the same value
+  // Button takes as its `minHeight`; the content sits 16px shorter so the
+  // avatar + label + chevron row keeps visible padding.
   const { width: windowWidth } = useWindowDimensions();
-  const mintBottomSlotWidth = PixelRatio.roundToNearestPixel(windowWidth / 2);
-  const mintBottomPillWidth = Math.max(0, mintBottomSlotWidth - 8);
+  const appStyle = useAppStyle();
+  const footerControlHeight = appStyle.size.cta;
+  const mintBottomSlotWidth = PixelRatio.roundToNearestPixel(
+    (windowWidth - 2 * appStyle.space.gutter - FOOTER_GAP) / 2
+  );
+  const mintBottomPillWidth = Math.max(0, mintBottomSlotWidth);
   const leadingBottomButton =
     showMintBottomButton && onRequestMintList ? (
-      <View style={[styles.mintBottomPillWrapper, { width: mintBottomPillWidth, height: 48 }]}>
+      <View style={{ width: mintBottomPillWidth, height: footerControlHeight }}>
         <MintSelector
           testID="amount-mint-selector"
           selectedMintUrl={mintUrl}
           onRequestMintList={onRequestMintList}
           width={mintBottomPillWidth}
-          height={48}
-          contentHeight={32}
+          height={footerControlHeight}
+          contentHeight={footerControlHeight - 16}
         />
       </View>
     ) : undefined;
+
+  // The swap key names the currency it switches to.
+  const displayCurrency = useSettingsStore((state) => state.displayCurrency);
+  const swapLabel = inputMode === 'fiat' ? 'sats' : displayCurrency.toUpperCase();
 
   return (
     <Log name="AmountSelector" style={styles.amountSelectorRoot}>
@@ -429,6 +464,10 @@ export function AmountSelector({
         nextVariants={nextVariants}
         leadingBottomButton={leadingBottomButton}
         transactionType={transactionTypeForView}
+        delivery={delivery}
+        swapLabel={swapLabel}
+        onPickNotes={onPickNotes}
+        topClearance={recipientProfile ? RECIPIENT_BAND_CLEARANCE : 0}
       />
     </Log>
   );
@@ -437,9 +476,5 @@ export function AmountSelector({
 const styles = StyleSheet.create({
   amountSelectorRoot: {
     flex: 1,
-  },
-  mintBottomPillWrapper: {
-    margin: 4,
-    marginBottom: 8,
   },
 });

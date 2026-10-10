@@ -111,6 +111,31 @@ export function NotificationFollowersScreen() {
       }),
     });
 
+  const pressedBackground = withAlpha(surfaceTertiary, 0.45);
+  // Stable for FlashList: a new renderItem re-renders every mounted cell.
+  const renderFollower = useCallback(
+    ({ item, index }: { item: FeedNotification; index: number }) => (
+      <VisualLayoutProbe
+        scope={NOTIFICATION_FOLLOWERS_VISUAL_SCOPE}
+        surface="notifications"
+        component="NotificationFollowerRow"
+        itemKey={`follower:${item.event.id}`}
+        itemType={item.reason}
+        index={index}
+        extra={{ phase: visualPhase }}>
+        <FollowerRow
+          notification={item}
+          result={result}
+          foreground={foreground}
+          muted={muted}
+          pressedBackground={pressedBackground}
+          onPress={() => openProfile(item)}
+        />
+      </VisualLayoutProbe>
+    ),
+    [visualPhase, result, foreground, muted, pressedBackground, openProfile]
+  );
+
   return (
     <Screen name="NotificationFollowersScreen" scroll="custom" safeArea="scroll" bgColor={surface}>
       {__DEV__ &&
@@ -203,25 +228,7 @@ export function NotificationFollowersScreen() {
           scrollEventThrottle={250}
           viewabilityConfig={VISUAL_LIST_VIEWABILITY_CONFIG}
           onViewableItemsChanged={onListViewableItemsChanged}
-          renderItem={({ item, index }) => (
-            <VisualLayoutProbe
-              scope={NOTIFICATION_FOLLOWERS_VISUAL_SCOPE}
-              surface="notifications"
-              component="NotificationFollowerRow"
-              itemKey={`follower:${item.event.id}`}
-              itemType={item.reason}
-              index={index}
-              extra={{ phase: visualPhase }}>
-              <FollowerRow
-                notification={item}
-                result={result}
-                foreground={foreground}
-                muted={muted}
-                pressedBackground={withAlpha(surfaceTertiary, 0.45)}
-                onPress={() => openProfile(item)}
-              />
-            </VisualLayoutProbe>
-          )}
+          renderItem={renderFollower}
         />
       </Log>
     </Screen>

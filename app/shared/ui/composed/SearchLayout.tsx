@@ -1,5 +1,11 @@
 import { createContext, useContext, type ReactNode } from 'react';
-import { useWindowDimensions, View as RNView } from 'react-native';
+import { StyleSheet, useWindowDimensions, View as RNView } from 'react-native';
+import Animated, {
+  Extrapolation,
+  interpolate,
+  useAnimatedStyle,
+  type SharedValue,
+} from 'react-native-reanimated';
 import { Stack, useNavigation } from 'expo-router';
 import { DrawerActions } from 'expo-router/react-navigation';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -9,6 +15,7 @@ import { buildExpoRouterHeaderOptions, HeaderIconButton } from '@/navigation/nat
 import { GlassSearchBar } from '@/shared/ui/composed/GlassSearchBar';
 import { getHeaderTitleWidthFromWidth, HEADER_LAYOUT } from '@/features/wallet/lib/walletHeader';
 import { HeaderProfileButton } from '@/shared/blocks/HeaderProfileButton';
+import { HeaderGradient } from '@/shared/ui/composed/HeaderGradient';
 
 // --- Context ---
 
@@ -108,6 +115,13 @@ type SearchLayoutProps = {
    */
   transparent?: boolean;
   /**
+   * With `transparent`: the page's scroll offset. The header fades a scrim of
+   * the canvas colour in over `scrimDistance` px of scroll, so the wallpaper
+   * shows through at rest and content never runs under the controls.
+   */
+  scrimScrollY?: SharedValue<number>;
+  scrimDistance?: number;
+  /**
    * Per-tab e2e id prefix: `<prefix>-search-toggle` on the header button and
    * `<prefix>-search-input` on the search bar (the Wallet passes "wallet").
    */
@@ -119,11 +133,33 @@ type SearchLayoutProps = {
  * Feed and Contacts tabs' `_layout.tsx` files render it as their default
  * export, so its `<Stack>` is the file-based stack for that tab.
  */
+/** A canvas-coloured header fade whose opacity follows the page's scroll. */
+function HeaderScrim({
+  scrollY,
+  distance,
+  color,
+}: {
+  scrollY: SharedValue<number>;
+  distance: number;
+  color: string;
+}) {
+  const style = useAnimatedStyle(() => ({
+    opacity: interpolate(scrollY.value, [0, distance], [0, 1], Extrapolation.CLAMP),
+  }));
+  return (
+    <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, style]}>
+      <HeaderGradient backgroundColor={color} anchor={0.82} />
+    </Animated.View>
+  );
+}
+
 export function SearchLayout({
   title,
   placeholder,
   renderIdleTitle,
   transparent = false,
+  scrimScrollY,
+  scrimDistance = 24,
   searchTestIDPrefix,
 }: SearchLayoutProps) {
   const [iconColor, surface] = useThemeColor(['foreground', 'surface'] as const);
@@ -163,7 +199,9 @@ export function SearchLayout({
       headerShadowVisible: false,
       headerBlurEffect: 'none',
       headerStyle: { backgroundColor: 'transparent' },
-      headerBackground: () => null,
+      headerBackground: scrimScrollY
+        ? () => <HeaderScrim scrollY={scrimScrollY} distance={scrimDistance} color={surface} />
+        : () => null,
       // GlassSearchBar wins while searching; otherwise an optional custom
       // idle title (Wallet's MintSelector), else the native `title`.
       ...(search.isSearching

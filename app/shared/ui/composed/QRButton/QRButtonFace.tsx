@@ -18,10 +18,16 @@ import { withAlpha } from '@/shared/lib/color';
 export function QRButtonFace({
   foreground,
   background,
+  glass,
 }: {
   foreground: string;
   background: string;
+  /** Draw the glossy gradient tile. Otherwise the face is one solid fill. */
+  glass: boolean;
 }): React.ReactElement {
+  if (!glass) {
+    return <View style={[StyleSheet.absoluteFill, { backgroundColor: foreground }]} />;
+  }
   return (
     <>
       <View style={[StyleSheet.absoluteFill, { backgroundColor: background }]} />
@@ -53,12 +59,18 @@ export function QRButtonFace({
  * face container (not inside it) so the icon isn't affected by the container's
  * squircle clipping.
  */
-export function QRButtonGlyph({ background }: { background: string }): React.ReactElement {
+export function QRButtonGlyph({
+  background,
+  size = 38,
+}: {
+  background: string;
+  size?: number;
+}): React.ReactElement {
   return (
     <View
       style={[StyleSheet.absoluteFill, { justifyContent: 'center', alignItems: 'center' }]}
       pointerEvents="none">
-      <Icon name="stash:qr-code" size={38} color={background} />
+      <Icon name="stash:qr-code" size={size} color={background} />
     </View>
   );
 }

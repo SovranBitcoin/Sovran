@@ -15,7 +15,7 @@ import type { Bip321RailSelection } from '@/features/receive/lib/bip321RailSelec
 import { E2EAccessibilityProbe } from '@/shared/lib/e2e/E2EAccessibilityProbe';
 import type { Bip321RailId } from '@/shared/stores/profile/mintStore';
 import { CopyRequestRow } from '@/shared/ui/composed/CopyRequestCard';
-import { GradientCard } from '@/shared/ui/composed/GradientCard';
+import { Surface } from '@/shared/ui/composed/Surface';
 import { Section } from '@/shared/ui/composed/Section';
 import { View } from '@/shared/ui/primitives/View/View';
 
@@ -52,7 +52,7 @@ export function UnifiedRailsCard({
   return (
     <View className="mx-4">
       <Section title="Receive via">
-        <GradientCard>
+        <Surface>
           <ListGroup variant="transparent">
             <CopyRequestRow
               icon="stash:qr-code"
@@ -96,7 +96,7 @@ export function UnifiedRailsCard({
               );
             })}
           </ListGroup>
-        </GradientCard>
+        </Surface>
       </Section>
       <E2EAccessibilityProbe
         testID="receive-unified-rails-state"

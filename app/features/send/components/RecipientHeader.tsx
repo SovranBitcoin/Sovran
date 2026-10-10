@@ -1,4 +1,5 @@
 import { IdentityBarTitle, IdentityNameBand } from '@/shared/ui/composed/IdentityHeader';
+import { Nip05Identity } from '@/shared/ui/composed/Nip05Identity';
 
 interface RecipientHeaderProps {
   pubkey?: string;
@@ -32,7 +33,22 @@ export function RecipientHeader(props: RecipientHeaderProps) {
   );
 }
 
-/** Mount inside the amount screen; it positions itself under the bar. */
-export function RecipientHeaderBand({ displayName }: Pick<RecipientHeaderProps, 'displayName'>) {
-  return <IdentityNameBand name={payLabel(displayName)} />;
+/**
+ * Mount inside the amount screen; it positions itself under the bar. One
+ * column with the picture above it: who is being paid, then the domain they
+ * claim. The claim's icon and colour say whether it checked out, so it needs
+ * no sentence, and the key itself is on the payment's Details page.
+ */
+export function RecipientHeaderBand({
+  displayName,
+  pubkey,
+  nip05,
+}: Pick<RecipientHeaderProps, 'displayName' | 'pubkey'> & { nip05?: string | null }) {
+  return (
+    <IdentityNameBand name={payLabel(displayName)}>
+      {pubkey && nip05 ? (
+        <Nip05Identity address={nip05} pubkey={pubkey} testID="payment-identity-nip05" />
+      ) : null}
+    </IdentityNameBand>
+  );
 }

@@ -1,3 +1,4 @@
+import { Nip05Status } from '@/shared/ui/composed/Nip05Identity';
 import React from 'react';
 
 import { DetailsList } from '@/shared/ui/composed/DetailsList';
@@ -32,6 +33,7 @@ const SOURCES = {
   hstack: 'shared/ui/primitives/View/HStack.tsx',
   pillTabs: 'shared/ui/composed/PillTabs.tsx',
   rowStats: 'shared/ui/composed/RowStatsAccent.tsx',
+  nip05: 'shared/ui/composed/Nip05Identity.tsx',
   selectableCheckCircle: 'shared/ui/primitives/SelectableCheck/SelectableCheck.circle.tsx',
   sheetGrabber: 'shared/ui/composed/SheetGrabber.tsx',
   skeleton: 'shared/ui/primitives/Skeleton.tsx',
@@ -49,7 +51,7 @@ const DETAIL_ITEMS = [
   { title: 'Unit', value: 'sat' },
   { title: 'Balance', value: '2,100 sats' },
 ];
-const DESIGN_SYSTEM_NIP05 = { handle: 'sovran@example.com' };
+const DESIGN_SYSTEM_NIP05 = { handle: 'sovran@example.com', pubkey: '' };
 
 function RowStatsScenario() {
   const [warning, success] = useThemeColor(['warning', 'success'] as const);
@@ -63,7 +65,25 @@ function RowStatsScenario() {
   );
 
   return (
-    <RowStatsAccent stats={stats} nip05={DESIGN_SYSTEM_NIP05} note="Verified public profile" />
+    <VStack className="gap-2.5">
+      <RowStatsAccent stats={stats} nip05={DESIGN_SYSTEM_NIP05} note="Domain identity" />
+      <Nip05Status
+        address="alice@example.com"
+        state={{ status: 'verified', identifier: 'alice@example.com' }}
+        detail
+      />
+      <Nip05Status
+        address="alice@example.com"
+        state={{ status: 'mismatch', identifier: 'alice@example.com' }}
+        detail
+      />
+      <Nip05Status
+        address="alice@example.com"
+        state={{ status: 'error', reason: 'network' }}
+        detail
+      />
+      <Nip05Status address="alice@example.com" state={{ status: 'pending' }} detail />
+    </VStack>
   );
 }
 
@@ -121,7 +141,7 @@ export const FOUNDATION_SCENARIOS = [
     title: 'Button variants',
     covers: [SOURCES.button],
     render: () => (
-      <VStack>
+      <VStack gap={8}>
         <Button text="Primary action" variant="primary" onPress={noop} />
         <Button text="Secondary action" variant="secondary" onPress={noop} />
         <Button text="Dangerous action" variant="dangerous" onPress={noop} />
@@ -261,7 +281,7 @@ export const FOUNDATION_SCENARIOS = [
   {
     id: 'row-stats',
     title: 'Row stats and NIP-05 identity',
-    covers: [SOURCES.rowStats],
+    covers: [SOURCES.rowStats, SOURCES.nip05],
     render: () => <RowStatsScenario />,
   },
   {

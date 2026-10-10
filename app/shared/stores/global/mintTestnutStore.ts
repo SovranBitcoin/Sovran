@@ -23,7 +23,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useMemo } from 'react';
 import { z } from 'zod';
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { persist } from 'zustand/middleware';
 
 import type { DiscoverMint, MintInfoRow } from '@/shared/lib/apiClient';
@@ -66,7 +66,10 @@ function evictIfOverCap(byMintUrl: Record<string, MintTestnutEntry>): void {
   if (trimmed) storeLog.debug('store.mint_testnut.evicted', trimmed);
 }
 
-export const useMintTestnutStore = create<MintTestnutState>()(
+export const useMintTestnutStore = create<MintTestnutState>({
+  name: 'mint-testnut-store',
+  scope: 'global',
+})(
   persist(
     (set) => ({
       byMintUrl: {},

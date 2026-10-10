@@ -1,12 +1,13 @@
 import { ScreenScrollView } from '@/shared/ui/composed/ScreenScrollView';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { Button, Card } from 'heroui-native';
+import { Button as HerouiButton, Card } from 'heroui-native';
 
 import { getDesignSystemFamily } from '@/features/settings/design-system/catalog';
 import { DesignSystemProfileRow } from '@/features/settings/design-system/skeletonCrossfade';
 import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
 import { Section } from '@/shared/ui/composed/Section';
+import { Button } from '@/shared/ui/primitives/Button';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -134,12 +135,12 @@ export function SettingsDesignSystemSkeletonCrossfadeScreen() {
             </Text>
             <Button
               variant="secondary"
-              size="sm"
+              size="compact"
+              text={loading ? 'Show content' : 'Show skeleton'}
               testID="design-system-skeleton-crossfade-toggle"
-              onPress={toggle}>
-              <Button.Label>{loading ? 'Show content' : 'Show skeleton'}</Button.Label>
-            </Button>
-            <Button
+              onPress={toggle}
+            />
+            <HerouiButton
               variant={auto ? 'primary' : 'secondary'}
               size="sm"
               testID="design-system-skeleton-crossfade-auto"
@@ -147,8 +148,10 @@ export function SettingsDesignSystemSkeletonCrossfadeScreen() {
               accessibilityLabel="Auto-cycle"
               accessibilityState={{ checked: auto }}
               onPress={() => setAuto((v) => !v)}>
-              <Button.Label>{auto ? 'Stop auto-cycle' : 'Start auto-cycle'}</Button.Label>
-            </Button>
+              <HerouiButton.Label>
+                {auto ? 'Stop auto-cycle' : 'Start auto-cycle'}
+              </HerouiButton.Label>
+            </HerouiButton>
           </Card.Body>
         </Card>
 

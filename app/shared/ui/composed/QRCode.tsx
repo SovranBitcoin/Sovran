@@ -9,7 +9,7 @@ import Animated, {
 import { useAnimatedQrFrames } from '@/shared/hooks/useAnimatedQrFrames';
 import { PressableFeedback } from 'heroui-native';
 import { log, Log } from '@/shared/lib/logger';
-import { GradientCard } from '@/shared/ui/composed/GradientCard';
+import { Surface } from '@/shared/ui/composed/Surface';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -135,7 +135,7 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
   const QR_LIGHT = INVARIANT_WHITE;
   const { qrSize } = qrCodeGeometry(screenWidth, padding, size);
   // On light themes a pure-white card disappears into the page surface, so
-  // swap the flat gradient for `GradientCard` — the same blur + corner-glow
+  // swap the flat gradient for `Surface` — the same blur + corner-glow
   // frame the Receive Address row uses on this screen, so the QR sits in
   // matching chrome instead of floating on a flat white block. The inner
   // `EQRCode` still paints an opaque white square at `qrSize` (the strict
@@ -204,7 +204,7 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
       <Icon name="ri:error-warning-line" size={48} color={withAlpha(QR_DARK, 0.5)} />
     </View>
   ) : canRenderQR ? (
-    // `transparent` on light mode lets the `GradientCard`'s frosted
+    // `transparent` on light mode lets the `Surface`'s frosted
     // material show through the QR's "white" cells, so the pattern reads
     // as on-card instead of floating on a hard white block. Dark mode
     // keeps a pure-white fill since the surrounding `LinearGradient` IS
@@ -359,7 +359,7 @@ export const QRSpeedControls = memo(function QRSpeedControls({
   const foreground = useThemeColor('foreground');
 
   return (
-    <GradientCard style={{ marginHorizontal: 16 }}>
+    <Surface style={{ marginHorizontal: 16 }}>
       <HStack style={{ minHeight: 44 }}>
         <PressableFeedback
           testID="qr-speed-control"
@@ -401,6 +401,6 @@ export const QRSpeedControls = memo(function QRSpeedControls({
           <PressableFeedback.Ripple />
         </PressableFeedback>
       </HStack>
-    </GradientCard>
+    </Surface>
   );
 });

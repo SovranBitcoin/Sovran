@@ -7,7 +7,7 @@
  * Reads the same cached changelog response as the list, so opening a row costs
  * no fetch.
  */
-import { RefreshControl, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
 import { z } from 'zod';
 
 import { MintChangeGlyph } from '@/features/mint/components/mintChanges/MintChangeRow';
@@ -119,8 +119,7 @@ export function MintChangesScreen() {
   useLifecycleLogger('MintChangesScreen');
   const params = useRouteParams(ParamsSchema, { where: 'mint-changes' });
   const mintUrl = params?.mintUrl;
-  const { revisions, isLoading, isRefreshing, errorMessage, refresh } =
-    useMintChangeRevisions(mintUrl);
+  const { revisions, isLoading, errorMessage, refresh } = useMintChangeRevisions(mintUrl);
   const metadata = useCachedMintMetadata(mintUrl);
   const [foreground, muted, surface, separator] = useThemeColor([
     'foreground',
@@ -170,9 +169,6 @@ export function MintChangesScreen() {
           keyExtractor={(revision) => revision.entry.hash}
           ListHeaderComponent={revisions.length > 0 ? listHeader : null}
           ItemSeparatorComponent={renderSeparator}
-          refreshControl={
-            <RefreshControl refreshing={isRefreshing} onRefresh={refresh} tintColor={foreground} />
-          }
           ListEmptyComponent={
             isLoading ? (
               <Spinner size={22} color={foreground} />

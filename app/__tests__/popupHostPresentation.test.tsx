@@ -134,6 +134,7 @@ jest.mock('@gorhom/bottom-sheet', () => {
       ReactActual.createElement('BottomSheetFooter', props, children),
   };
 });
+jest.mock('@/shared/ui/primitives/Button', () => ({ Button: 'Button' }));
 jest.mock('heroui-native', () => {
   const ReactActual = jest.requireActual<typeof import('react')>('react');
   const BottomSheet = ({ children, ...props }: { children?: React.ReactNode }) => {

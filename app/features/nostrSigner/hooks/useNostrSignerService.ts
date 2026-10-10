@@ -1,3 +1,4 @@
+import { registerProfileSwitchService } from '@/shared/lib/account/accountRegistry';
 /**
  * @fileoverview NIP-46 signer service lifecycle glue
  *
@@ -69,6 +70,14 @@ function hasActiveApp(apps: Record<string, Nip46Connection>): boolean {
 }
 
 export function useNostrSignerService(): void {
+  useEffect(
+    () =>
+      registerProfileSwitchService('nostr.nip46', () => {
+        const stopped = nip46Engine.stop();
+        if (stopped.isErr()) throw new Error('NIP-46 teardown failed');
+      }),
+    []
+  );
   const { isInitialized: ndkInitialized } = useNostrNDKContext();
   const { keys } = useNostrKeysContext();
   const connectionsHydrated = useNip46ConnectionsHydrated();

@@ -11,6 +11,7 @@
 import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 
+import { useNotePickerStore } from '@/shared/stores/runtime/notePickerStore';
 import { AmountFlowContent } from '@/features/send/screens/AmountFlowScreen';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -18,10 +19,19 @@ import { AmountFlowContent } from '@/features/send/screens/AmountFlowScreen';
 const capturedOptions: Record<string, unknown>[] = [];
 let mockEntry: Record<string, unknown> = { destination: 'mintQuote' };
 let mockMintUrl: string | null = null;
+let mockMetadata: { nip05: string } | null = null;
+let mockAmountProps: {
+  recipientProfile?: { nip05: string | null };
+  onPickNotes?: () => void;
+} = {};
+let mockProofAmounts: Record<string, number[]> = {};
 
 beforeEach(() => {
   mockEntry = { destination: 'mintQuote' };
   mockMintUrl = null;
+  mockMetadata = null;
+  mockAmountProps = {};
+  mockProofAmounts = {};
 });
 
 jest.mock('expo-router', () => ({
@@ -32,20 +42,31 @@ jest.mock('expo-router', () => ({
     },
   },
 }));
-jest.mock('@/features/send/screens/AmountSelector', () => ({ AmountSelector: () => null }));
+jest.mock('@/features/send/screens/AmountSelector', () => ({
+  AmountSelector: (props: typeof mockAmountProps) => {
+    mockAmountProps = props;
+    return null;
+  },
+}));
 jest.mock('@/features/send/components/AmountSelectedMintProbe', () => ({
   AmountSelectedMintProbe: () => null,
 }));
 jest.mock('@/shared/lib/popup/E2EActionMenuProbe', () => ({ E2EActionMenuProbe: () => null }));
 jest.mock('@/shared/ui/composed/ScreenStates', () => ({ ScreenErrorState: () => null }));
 jest.mock('@/shared/ui/composed/ScreenHeaderAction', () => ({ ScreenHeaderAction: () => null }));
-jest.mock('@/shared/hooks/useThemeColor', () => ({ useThemeColor: () => 'white' }));
+jest.mock('@/shared/hooks/useThemeColor', () => ({
+  useThemeColor: () =>
+    jest.requireActual<typeof import('@/shared/lib/themeEngine')>('@/shared/lib/themeEngine')
+      .staticColor['shade-0'],
+}));
 jest.mock('@/shared/hooks/useNostrProfileMetadata', () => ({
-  useNostrProfileMetadata: () => ({ metadata: null }),
+  useNostrProfileMetadata: () => ({ metadata: mockMetadata }),
 }));
 jest.mock('@/shared/lib/identity', () => ({ resolveIdentityName: () => null }));
+jest.mock('@/shared/ui/composed/Nip05Identity', () => ({ Nip05Identity: () => null }));
+jest.mock('@/shared/hooks/useGuardedRouter', () => ({ guardedRouter: { push: jest.fn() } }));
 jest.mock('@/shared/providers/WalletContextProvider', () => ({
-  useWalletContextWithOverride: () => ({}),
+  useWalletContextWithOverride: () => ({ proofAmounts: mockProofAmounts }),
 }));
 jest.mock('@/shared/stores/runtime/nearPayStore', () => ({
   useNearPaySessionStore: (selector: (s: unknown) => unknown) => selector({ active: null }),
@@ -76,6 +97,13 @@ jest.mock('@/features/send/hooks/useSendLockTarget', () => ({
   }),
 }));
 jest.mock('@cashu/coco-react', () => ({ useMints: () => ({ trustedMints: [] }) }));
+jest.mock('@/shared/providers/OfflineProvider', () => ({
+  useOfflineStatus: () => ({ isOffline: false }),
+}));
+jest.mock('@/shared/stores/global/settingsStore', () => ({
+  useSettingsStore: (select: (state: { mockOffline: boolean }) => unknown) =>
+    select({ mockOffline: false }),
+}));
 jest.mock('@/shared/stores/runtime/sendLockStore', () => ({
   useSendLockStore: (selector: (s: unknown) => unknown) =>
     selector({ draft: null, set: jest.fn(), clear: jest.fn() }),
@@ -128,34 +156,15 @@ test('that title reads "Select amount" when no recipient replaces it', () => {
   expect(title.props.children).toBe('Select amount');
 });
 
-// ── The lock and sendability status ────────────────────────────────────────
-// Both live in the bar of every ecash amount screen. The route draws its own
-// bar; inside the Nut Drop radar the bar is the radar's, so the status is
-// handed up to it.
-
-type StatusElement = React.ReactElement<{
-  lock?: { locked: boolean; label: string };
-  canSendOffline: boolean | null;
-}>;
+// ── The lock and network status ────────────────────────────────────────────
+// The amount screen's own display shows them, so the bar carries neither and
+// the content is told what to show.
 
 const PEER_KEY = `02${'cd'.repeat(32)}`;
 
-test('an ecash amount screen shows the lock in its header', () => {
+test('an ecash amount screen leaves the status out of its header', () => {
   mockEntry = { destination: 'sendEcash', p2pkLockPubkey: PEER_KEY, canSendOffline: true };
   mockMintUrl = 'https://mint.example';
-  capturedOptions.length = 0;
-  void act(() => {
-    TestRenderer.create(<AmountFlowContent headerMode="native" />);
-  });
-
-  const render = capturedOptions.at(-1)?.headerRight as (() => StatusElement) | undefined;
-  expect(typeof render).toBe('function');
-  const status = render!();
-  expect(status.props.lock).toMatchObject({ locked: true });
-  expect(status.props.canSendOffline).toBe(true);
-});
-
-test('a receive amount screen has no status in its header', () => {
   capturedOptions.length = 0;
   void act(() => {
     TestRenderer.create(<AmountFlowContent headerMode="native" />);
@@ -164,23 +173,66 @@ test('a receive amount screen has no status in its header', () => {
   expect(capturedOptions.at(-1)?.headerRight).toBeUndefined();
 });
 
-test('inline, the status is handed to the host that owns the bar, then taken back', () => {
-  mockEntry = { destination: 'sendEcash', p2pkLockPubkey: PEER_KEY };
+test.each([
+  ['selected@example.com', 'selected@example.com'],
+  [null, 'changed@example.com'],
+])('retains a known claim or enriches a missing claim %s for the same key', (nip05, expected) => {
+  mockEntry = {
+    destination: 'sendEcash',
+    recipientPubkey: 'ab'.repeat(32),
+    recipientProfile: { displayName: 'Alice', avatarUrl: null, nip05 },
+  };
+  mockMetadata = { nip05: 'changed@example.com' };
+  let renderer!: TestRenderer.ReactTestRenderer;
+  act(() => {
+    renderer = TestRenderer.create(<AmountFlowContent headerMode="native" />);
+  });
+  expect(mockAmountProps.recipientProfile?.nip05).toBe(expected);
+  act(() => renderer.unmount());
+});
+
+// ── The note picker ─────────────────────────────────────────────────────────
+
+const openPickerWith = (entry: Record<string, unknown>) => {
+  mockEntry = { destination: 'sendEcash', unit: 'sat', ...entry };
   mockMintUrl = 'https://mint.example';
-  const onHeaderStatus = jest.fn();
-  let renderer: TestRenderer.ReactTestRenderer;
+  mockProofAmounts = { 'https://mint.example': [64, 8, 2] };
   void act(() => {
-    renderer = TestRenderer.create(
-      <AmountFlowContent headerMode="none" onHeaderStatus={onHeaderStatus} />
-    );
+    TestRenderer.create(<AmountFlowContent headerMode="native" />);
+  });
+  void act(() => mockAmountProps.onPickNotes?.());
+  return useNotePickerStore.getState().request;
+};
+
+test('the picker opens on an amount that can already leave offline', () => {
+  const request = openPickerWith({
+    canSendOffline: true,
+    // Typed as dollars: the figure on the keypad is not the sat amount.
+    inputMode: 'fiat',
+    numericValue: 0.06,
+    effectiveAmount: { value: 74, unit: 'sat' },
   });
 
-  const render = onHeaderStatus.mock.calls.at(-1)?.[0] as (() => StatusElement) | null;
-  expect(typeof render).toBe('function');
-  expect(render!().props.lock).toMatchObject({ locked: true });
+  expect(request).toMatchObject({ notes: [64, 8, 2], unit: 'sat', amount: 74 });
+});
 
-  void act(() => {
-    renderer!.unmount();
+test('the picker opens empty on an amount the mint would have to make', () => {
+  const request = openPickerWith({
+    canSendOffline: false,
+    numericValue: 20,
+    effectiveAmount: { value: 20, unit: 'sat' },
   });
-  expect(onHeaderStatus).toHaveBeenLastCalledWith(null);
+
+  expect(request?.amount).toBe(0);
+});
+
+test('a payment that is not an ecash send offers no picker', () => {
+  mockEntry = { destination: 'mintQuote' };
+  mockMintUrl = 'https://mint.example';
+  mockProofAmounts = { 'https://mint.example': [64] };
+  void act(() => {
+    TestRenderer.create(<AmountFlowContent headerMode="native" />);
+  });
+
+  expect(mockAmountProps.onPickNotes).toBeUndefined();
 });

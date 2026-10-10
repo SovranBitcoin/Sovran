@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { StyleSheet, useWindowDimensions } from 'react-native';
 
 import type { GetInfoResponse } from '@cashu/cashu-ts';
@@ -20,6 +20,7 @@ import {
   amountDetailItem,
   stateDetailItem,
   mintDetailItem,
+  entryDetailItems,
 } from '@/features/transactions';
 import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
 import { useMempoolAddressSummary } from '@/shared/hooks/useMempoolAddressSummary';
@@ -30,6 +31,7 @@ import {
   getOnchainMintRequestedAmount,
   getOnchainMintAddress,
   getOnchainMintQuoteRequiredConfirmations,
+  isOnchainMintRequirementFromMint,
 } from '@/shared/lib/cashu/onchainMint';
 import { asHistoryEntry } from '@/shared/lib/cashu/syntheticHistory';
 import { paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
@@ -75,12 +77,18 @@ export function OnchainReceiveScreen({
   const onchainAddress = getOnchainMintAddress(historyEntry);
   const mempool = useMempoolAddressSummary(onchainAddress);
   const bip321 = useBip321Info(entry.id);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const isPaid = isMintQuotePaymentObserved(entry);
   // Opened from the transactions (history) list, not the live receive flow —
   // the mint is fixed, so show the non-clickable "Receiving with" row.
   const isHistoryView = useIsTransactionHistoryView();
   const quoteCardWidth = Math.max(0, windowWidth - QUOTE_CARD_HORIZONTAL_MARGIN * 2);
   const requiredConfirmations = getOnchainMintQuoteRequiredConfirmations(
+    historyEntry,
+    mintInfo,
+    entry.unit ?? 'sat'
+  );
+  const requirementFromMint = isOnchainMintRequirementFromMint(
     historyEntry,
     mintInfo,
     entry.unit ?? 'sat'
@@ -99,11 +107,13 @@ export function OnchainReceiveScreen({
   // ast-grep-ignore: no-manual-memo-tsx
   const onchainConfirmationProgress = useMemo(
     () =>
-      observedConfirmationProgress ??
+      (observedConfirmationProgress
+        ? { ...observedConfirmationProgress, requirementFromMint }
+        : null) ??
       (isPaid
         ? buildSatisfiedOnchainConfirmationProgress(requiredConfirmations)
         : buildOnchainRequiredConfirmationProgress(requiredConfirmations)),
-    [isPaid, observedConfirmationProgress, requiredConfirmations]
+    [isPaid, observedConfirmationProgress, requiredConfirmations, requirementFromMint]
   );
   const paymentInfoValue = getMintQuotePaymentValue(historyEntry) ?? entry.paymentRequest;
   // Once the deposit is visible on our own explorer, offer a deep link to the
@@ -158,19 +168,16 @@ export function OnchainReceiveScreen({
         <ButtonHandler
           buttons={[
             {
-              text: isPaid ? 'Close' : 'Cancel',
-              testID: isPaid ? 'receive-onchain-close' : 'receive-onchain-cancel',
-              icon: 'ri:close-circle-line',
+              // The header already closes this screen. This slot opens what
+              // the page leaves out: every id and value, each one copyable.
+              text: 'Details',
+              testID: 'receive-onchain-details',
+              icon: 'mdi:receipt-text-outline',
               variant: 'secondary',
-              onPress: () => {
-                paymentLog.info('receive.onchain.action.press', {
-                  action: 'back',
-                  state: entry.state,
-                  isPaid,
-                });
-                return actions.back.execute();
-              },
-              condition: actions.back.available,
+              onPress: () => setDetailsOpen(true),
+              // Copy and Share are what this screen is for; Details waits
+              // behind the dots when both are showing.
+              prefersOverflow: true,
             },
             {
               text: 'Copy',
@@ -271,6 +278,9 @@ export function OnchainReceiveScreen({
         </>
       }>
       <DetailsSection
+        trigger="none"
+        open={detailsOpen}
+        onOpenChange={setDetailsOpen}
         items={[
           entry.id && { title: 'ID', value: entry.id },
           ...transactionLeadDetailItems({
@@ -294,6 +304,7 @@ export function OnchainReceiveScreen({
             title: 'Address',
             value: <MiddleEllipsisValue value={onchainAddress} />,
           },
+          ...entryDetailItems(entry),
         ]}
       />
     </TransactionDetailShell>

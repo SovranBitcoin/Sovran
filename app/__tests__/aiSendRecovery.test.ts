@@ -274,6 +274,11 @@ describe('AI send lineup recovery', () => {
 
     expect(sendMock).toHaveBeenCalledTimes(2);
     expect(sendMock.mock.calls[1][1].model).toBe('old-auto');
+    expect(useRoutstrStore.getState().selectedTier).toBe('auto');
+    expect(useRoutstrStore.getState().conversationHistory[1].modelSwitch).toEqual({
+      from: 'old-pro',
+      to: 'old-auto',
+    });
   });
 
   it('stops declining after the attempt cap rather than fanning out the lineup', async () => {
@@ -323,6 +328,49 @@ describe('AI send lineup recovery', () => {
     // Still the same exchange: the conversation section looks the message up
     // by these, not by the group.
     expect(second?.messageId).toBe(first?.messageId);
+  });
+
+  it('selects the successful fallback vendor in the picker', async () => {
+    sendMock
+      .mockRejectedValueOnce(upstreamRefusal(404))
+      .mockRejectedValueOnce(upstreamRefusal(404))
+      .mockResolvedValueOnce(success());
+    await send();
+    expect(useRoutstrStore.getState().selectedProvider).toBe('claude');
+    expect(useRoutstrStore.getState().selectedTier).toBe('auto');
+    expect(useRoutstrStore.getState().conversationHistory[1].modelSwitch).toEqual({
+      from: 'old-pro',
+      to: 'other-auto',
+    });
+  });
+
+  it('keeps the selected slot and omits the notice when its model answers', async () => {
+    sendMock.mockResolvedValueOnce(success());
+    await send();
+    expect(useRoutstrStore.getState().selectedProvider).toBe('openai');
+    expect(useRoutstrStore.getState().selectedTier).toBe('pro');
+    expect(useRoutstrStore.getState().conversationHistory[1].modelSwitch).toBeUndefined();
+  });
+
+  it('preserves a newer picker choice while still naming the model that answered', async () => {
+    sendMock.mockRejectedValueOnce(upstreamRefusal(404)).mockImplementationOnce(async () => {
+      useRoutstrStore.getState().setSelectedSlot({ provider: 'claude', tier: 'auto' });
+      return success();
+    });
+    await send();
+    expect(useRoutstrStore.getState().selectedProvider).toBe('claude');
+    expect(useRoutstrStore.getState().conversationHistory[1].modelSwitch).toEqual({
+      from: 'old-pro',
+      to: 'old-auto',
+    });
+  });
+
+  it('leaves the picker alone when every model refuses', async () => {
+    sendMock.mockRejectedValue(upstreamRefusal(404));
+    await send();
+    expect(useRoutstrStore.getState().selectedProvider).toBe('openai');
+    expect(useRoutstrStore.getState().selectedTier).toBe('pro');
+    expect(useRoutstrStore.getState().conversationHistory[1].modelSwitch).toBeUndefined();
   });
 
   it('keeps siblings behind the same upstream when the refusal is about the model', async () => {

@@ -1,9 +1,11 @@
+import { profileAvatarStateFor } from '@/shared/lib/imageLoadState';
+import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata';
 /**
  * @fileoverview Zapped-post card on the transaction detail screen.
  *
  * The zap message rides as a pill (animated emoji + our message) absolutely
  * positioned across the post card's top edge, so it reads as stuck onto the
- * post. The pill lives OUTSIDE the GradientCard — the card clips its content
+ * post. The pill lives OUTSIDE the Surface — the card clips its content
  * (`overflow: hidden`), so a pill nested inside could never overhang it.
  *
  * The card itself is plain typography (author + preview), no box inside a
@@ -31,14 +33,11 @@ import { withAlpha } from '@/shared/lib/color';
 import { getZap } from 'wallet';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { prefetchThread } from '@/features/feed/lib/prefetchThread';
-import {
-  seedLowConfidenceProfiles,
-  useCachedNostrProfile,
-} from '@/shared/lib/nostr/useEntityCache';
+import { seedLowConfidenceProfiles } from '@/shared/lib/nostr/useEntityCache';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { Log } from '@/shared/lib/logger';
 import { zIndex } from '@/shared/styles/tokens';
-import { GradientCard } from '@/shared/ui/composed/GradientCard';
+import { Surface } from '@/shared/ui/composed/Surface';
 import { AnimatedEmoji } from '@/shared/ui/primitives/AnimatedEmoji';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
@@ -53,8 +52,8 @@ interface ZappedPostSectionProps {
 export function ZappedPostSection({ entry }: ZappedPostSectionProps) {
   const [foreground, surfaceTertiary] = useThemeColor(['foreground', 'surface-tertiary'] as const);
   const zap = entry ? getZap(entry) : null;
-  // Fetch-free warm-cache read so a bare annotation still shows a live avatar.
-  const { metadata: cachedProfile } = useCachedNostrProfile(zap?.authorPubkey ?? '');
+  // Resolve bare annotations before choosing the generated fallback.
+  const { metadata: cachedProfile, isResolving } = useNostrProfileMetadata(zap?.authorPubkey);
 
   const eventId = zap?.eventId;
   const authorPubkey = zap?.authorPubkey;
@@ -107,11 +106,11 @@ export function ZappedPostSection({ entry }: ZappedPostSectionProps) {
         accessibilityLabel={`Zapped post by ${authorName}. Opens the post.`}
         testID="zapped-post-section"
         style={styles.wrap}>
-        <GradientCard contentStyle={styles.cardContent}>
+        <Surface contentStyle={styles.cardContent}>
           <View style={styles.inner}>
             <HStack align="center" gap={8} style={styles.authorRow}>
               <Avatar
-                state={avatarPicture ? 'image' : 'fallback'}
+                state={profileAvatarStateFor(avatarPicture, isResolving ? 'loading' : 'cached')}
                 picture={avatarPicture}
                 seed={zap.authorPubkey}
                 name={authorName}
@@ -131,7 +130,7 @@ export function ZappedPostSection({ entry }: ZappedPostSectionProps) {
               </Text>
             ) : null}
           </View>
-        </GradientCard>
+        </Surface>
         {/* Declared after the card so it paints on top of it. */}
         <HStack gap={8} align="center" style={[styles.pill, { backgroundColor: surfaceTertiary }]}>
           <AnimatedEmoji emoji={emoji} size={18} />

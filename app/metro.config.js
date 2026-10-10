@@ -57,6 +57,7 @@ const appCocoPackages = {
 const walletPath = path.join(workspaceRoot, 'wallet');
 const nostrPath = path.join(workspaceRoot, 'nostr');
 const localPackageEntryPaths = {
+  'bitchat-module': path.resolve(__dirname, 'modules/bitchat-module/index.ts'),
   wallet: path.join(walletPath, 'src', 'index.ts'),
   'wallet/react': path.join(walletPath, 'src', 'react', 'index.ts'),
   'wallet/units': path.join(walletPath, 'src', 'units', 'index.ts'),

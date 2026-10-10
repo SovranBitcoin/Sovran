@@ -1,3 +1,9 @@
+import { createRoutstrPersistence } from '@/shared/lib/routstr/securePersistence';
+import { createSdkStorageDriver } from '@/shared/lib/routstr/sdk/driver';
+import { createSecureVault } from '@/shared/lib/persist/secureVault';
+import { clearAllSecureData } from '@/shared/lib/nostr/secureStorage';
+import * as SecureStore from 'expo-secure-store';
+
 const mockPlain = new Map<string, string>();
 const mockSecure = new Map<string, string>();
 let mockOwner = 'a'.repeat(64);
@@ -32,12 +38,6 @@ jest.mock('@/shared/lib/logger', () => ({
   nostrLog: { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() },
   redactError: (error: unknown) => error,
 }));
-
-import { createRoutstrPersistence } from '@/shared/lib/routstr/securePersistence';
-import { createSdkStorageDriver } from '@/shared/lib/routstr/sdk/driver';
-import { createSecureVault } from '@/shared/lib/routstr/secureVault';
-import { clearAllSecureData } from '@/shared/lib/nostr/secureStorage';
-import * as SecureStore from 'expo-secure-store';
 
 const legacy = JSON.stringify({
   version: 1,
@@ -151,6 +151,23 @@ describe('Routstr secure migration', () => {
     mockFailWrite = true;
     void driver.setItem('xcashu_tokens', { node: [{ token: 'cashuB-fixture' }] });
     await expect(driver.flush()).rejects.toThrow('Payment recovery could not be saved');
+  });
+
+  it('surfaces an unreadable key index through the paid-request flush barrier', async () => {
+    mockSecure.set('secure_key_index', '{corrupt');
+    const driver = createSdkStorageDriver(mockOwner);
+    void driver.setItem('xcashu_tokens', { node: [{ token: 'cashuB-fixture' }] });
+    await expect(driver.flush()).rejects.toThrow('Payment recovery could not be saved');
+    expect(SecureStore.setItemAsync).not.toHaveBeenCalled();
+    expect(mockSecure.get('secure_key_index')).toBe('{corrupt');
+  });
+
+  it('reads all vault manifests before deleting any keys', async () => {
+    await createSecureVault(mockOwner, 'keep').write('cashuB-fixture');
+    const keys = JSON.parse(mockSecure.get('secure_key_index')!);
+    mockSecure.set(keys[0], '{corrupt');
+    await expect(clearAllSecureData([0])).rejects.toThrow();
+    expect(SecureStore.deleteItemAsync).not.toHaveBeenCalled();
   });
 
   it('indexes only the manifest and Delete All removes every large-token chunk', async () => {

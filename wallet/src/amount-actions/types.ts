@@ -106,6 +106,13 @@ export interface QuickSendSuggestion {
  * where these values genuinely don't change for the manager's lifetime.
  */
 export interface CreateAmountActionManagerConfig {
+  /**
+   * Live reachability for the Next menu: `offline` when the device has no
+   * network, `mintUnreachable` when a send already found the selected mint
+   * down. Either one disables the options that need the mint (Lightning,
+   * locked ecash, onchain) while plain ecash stays on its offline path.
+   */
+  getNetwork?: () => { offline: boolean; mintUnreachable: boolean };
   /** Returns the currently selected mint URL. */
   getMintUrl: () => string | undefined;
   /** Returns proof amounts for the selected mint, in the active unit's minor units. */

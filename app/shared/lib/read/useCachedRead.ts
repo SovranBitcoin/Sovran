@@ -275,8 +275,7 @@ export function useCachedRead<TData>(
               cached: cachedForViewer?.data,
               mode,
               partial: (data, cursor) => {
-                ctx.partial(data, cursor);
-                if (controller.signal.aborted) return;
+                if (!ctx.partial(data, cursor) || controller.signal.aborted) return false;
                 setFlight((f) => (f && f.readId === readId ? { ...f, partial: true } : f));
                 readEvents.partial({
                   readId,
@@ -287,6 +286,7 @@ export function useCachedRead<TData>(
                   count: countOf(data),
                   gate: 'partial',
                 });
+                return true;
               },
             }),
           viewerKey,

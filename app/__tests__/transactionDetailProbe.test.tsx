@@ -8,21 +8,26 @@ import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
 import { QRCodeFrame } from '@/shared/ui/composed/QRCodeFrame';
 import TestRenderer, { act } from 'react-test-renderer';
 
+import { PaymentIdentity } from '@/shared/ui/composed/Nip05Identity';
 import { TransactionDetailShell } from '@/features/transactions/components/detail/TransactionDetailShell';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-let mockCounterparty: { pubkey: string } | null = null;
+let mockCounterparty: { pubkey: string; nip05?: string } | null = null;
+let mockProfile: { nip05: string } | null = null;
 const mockScrollTo = jest.fn();
 const mockInnerContent = {};
 let mockReducedMotion = false;
 const mockAfterInteractions: (() => void)[] = [];
 const mockNavigateToProfile = jest.fn();
+jest.mock('@/shared/hooks/useNip05Verification', () => ({
+  useNip05Verification: () => ({ state: { status: 'none' }, retry: jest.fn() }),
+}));
 jest.mock('@/shared/hooks/useGuardedRouter', () => ({
   guardedRouter: { push: (...args: unknown[]) => mockNavigateToProfile(...args) },
 }));
 jest.mock('@/shared/hooks/useNostrProfileMetadata', () => ({
-  useNostrProfileMetadata: () => ({ metadata: null, isResolving: false }),
+  useNostrProfileMetadata: () => ({ metadata: mockProfile, isResolving: false }),
 }));
 jest.mock('@/shared/ui/composed/ContactRow', () => ({
   nostrIdentity: (pubkey: string) => ({ pubkey }),
@@ -69,6 +74,7 @@ jest.mock('react-native-reanimated', () => {
   };
 });
 jest.mock('wallet', () => ({
+  parseNip05Identifier: jest.requireActual('wallet').parseNip05Identifier,
   getCounterparty: () => mockCounterparty,
   // The title resolver is covered by wallet's own unit tests; this probe only
   // needs the shell to get A title so the header renders.
@@ -119,7 +125,11 @@ jest.mock('@/shared/ui/composed/ModalLayoutWrapper', () => ({
     );
   },
 }));
-jest.mock('@/shared/hooks/useThemeColor', () => ({ useThemeColor: () => 'white' }));
+jest.mock('@/shared/hooks/useThemeColor', () => ({
+  useThemeColor: () =>
+    jest.requireActual<typeof import('@/shared/lib/themeEngine')>('@/shared/lib/themeEngine')
+      .staticColor['shade-0'],
+}));
 jest.mock('@/shared/hooks/useColorScheme', () => ({ useColorScheme: () => 'dark' }));
 jest.mock('@/shared/lib/logger', () => ({
   Log: ({ children }: React.PropsWithChildren) => <>{children}</>,
@@ -131,8 +141,8 @@ jest.mock('@/shared/ui/primitives/Haptics', () => ({ EnhancedHaptics: { copyHapt
 jest.mock('@/shared/ui/primitives/Pressable', () => ({
   Pressable: ({ children }: React.PropsWithChildren) => <>{children}</>,
 }));
-jest.mock('@/shared/ui/composed/GradientCard', () => ({
-  GradientCard: ({ children }: React.PropsWithChildren) => <>{children}</>,
+jest.mock('@/shared/ui/composed/Surface', () => ({
+  Surface: ({ children }: React.PropsWithChildren) => <>{children}</>,
 }));
 jest.mock('expo-linear-gradient', () => ({
   LinearGradient: ({ children }: React.PropsWithChildren) => <>{children}</>,
@@ -187,6 +197,7 @@ describe('TransactionDetailShell device probe', () => {
   beforeEach(() => {
     jest.spyOn(Keyboard, 'dismiss').mockImplementation(() => {});
     mockCounterparty = null;
+    mockProfile = null;
     mockAfterInteractions.length = 0;
     Dimensions.set({
       window: { width: 393, height: 852, scale: 3, fontScale: 1 },
@@ -198,6 +209,27 @@ describe('TransactionDetailShell device probe', () => {
     });
   });
   afterEach(() => jest.restoreAllMocks());
+
+  it('keeps the captured domain claim on confirmation when a profile update arrives', () => {
+    mockCounterparty = { pubkey: 'a'.repeat(64), nip05: 'selected@example.com' };
+    mockProfile = { nip05: 'changed@example.com' };
+    let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      renderer = TestRenderer.create(
+        <TransactionDetailShell
+          screenName="SendTokenScreen"
+          testID="identity-handoff"
+          footer={null}>
+          <view />
+        </TransactionDetailShell>
+      );
+    });
+    expect(renderer.root.findByType(PaymentIdentity).props).toMatchObject({
+      pubkey: 'a'.repeat(64),
+      address: 'selected@example.com',
+    });
+    act(() => renderer.unmount());
+  });
 
   it.each([false, true])(
     'focuses cancellation then keeps the timeline anchored after QR removal (reduced motion: %s)',

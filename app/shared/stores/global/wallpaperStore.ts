@@ -6,7 +6,7 @@
 // and sets _hasHydrated = true so ThemeProvider can safely render.
 // ---------------------------------------------------------------------------
 
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { persist } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { z } from 'zod';
@@ -124,7 +124,10 @@ const PersistedWallpaperStore = z.object({
 // Store
 // ---------------------------------------------------------------------------
 
-export const useWallpaperStore = create<WallpaperState>()(
+export const useWallpaperStore = create<WallpaperState>({
+  name: 'wallpaper-store',
+  scope: 'global',
+})(
   persist(
     (set, get) => ({
       _hasHydrated: false,

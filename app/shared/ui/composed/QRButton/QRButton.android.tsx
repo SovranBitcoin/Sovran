@@ -19,6 +19,7 @@ export function QRButton(props: QRButtonProps): React.ReactElement {
   const {
     foreground,
     background,
+    glass,
     borderRadius,
     containerStyle,
     pressableStyle,
@@ -46,7 +47,7 @@ export function QRButton(props: QRButtonProps): React.ReactElement {
             testID={testID}
             accessibilityLabel="Scan QR code"
             accessibilityRole="button"
-            style={[styles.touchable, pressableStyle]}
+            style={[glass ? styles.glow : styles.plain, pressableStyle]}
             className="items-center justify-center"
             activeOpacity={1}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -54,9 +55,9 @@ export function QRButton(props: QRButtonProps): React.ReactElement {
             onPressIn={pressFeedback.onPressIn}
             onPressOut={pressFeedback.onPressOut}>
             <SquircleView style={[styles.container, containerStyle]} pointerEvents="none">
-              <QRButtonFace foreground={foreground} background={background} />
+              <QRButtonFace foreground={foreground} background={background} glass={glass} />
             </SquircleView>
-            <QRButtonGlyph background={background} />
+            <QRButtonGlyph background={background} size={Math.round(size * 0.56)} />
           </Pressable>
         </Animated.View>
       </Animated.View>
@@ -65,7 +66,11 @@ export function QRButton(props: QRButtonProps): React.ReactElement {
 }
 
 const styles = StyleSheet.create({
-  touchable: {
+  plain: {
+    borderCurve: 'continuous',
+    overflow: 'hidden',
+  },
+  glow: {
     borderCurve: 'continuous',
     overflow: 'hidden',
     shadowOffset: { width: 0, height: 0 },

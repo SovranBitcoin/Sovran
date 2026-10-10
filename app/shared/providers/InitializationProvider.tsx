@@ -54,6 +54,13 @@ interface StageConfig {
    * is already visible (e.g. relay connections, recovery operations).
    */
   blocking?: boolean;
+  /**
+   * Set by a stage whose owner sits above the account providers, so it stays
+   * mounted across an in-process profile switch and never registers again.
+   * Such a stage keeps its status through a reset that asks to keep them;
+   * dropping it would leave every stage that depends on it waiting forever.
+   */
+  outlivesAccount?: boolean;
 }
 
 interface Stage {
@@ -62,10 +69,21 @@ interface Stage {
   dependsOn?: string[];
   /** When true (the default), this stage must complete before the app renders. */
   blocking: boolean;
+  outlivesAccount: boolean;
+}
+
+interface ResetStagesOptions {
+  /**
+   * Keep stages registered above the account providers. An in-process profile
+   * switch passes this; a switch that restarts the runtime does not need it.
+   */
+  keepStagesThatOutliveAccount?: boolean;
 }
 
 interface InitializationContextValue {
   isInitializing: boolean;
+  /** A blocking stage has failed; whatever it rendered in place of the app is on screen. */
+  hasFailedStage: boolean;
   registerStage: (id: string, config: StageConfig) => void;
   updateStage: (
     id: string,
@@ -73,7 +91,7 @@ interface InitializationContextValue {
   ) => void;
   canStageStart: (id: string) => boolean;
   /** Clear all stages, forcing the splash to show again until inner providers re-register. */
-  resetStages: (options?: { holdUntilCancel?: boolean }) => void;
+  resetStages: (options?: ResetStagesOptions) => void;
   /** Cancel a held reset when a profile switch/add flow aborts before stages re-register. */
   cancelResetStages: () => void;
 }
@@ -82,6 +100,7 @@ const noop = () => {};
 
 const InitializationContext = createContext<InitializationContextValue>({
   isInitializing: false,
+  hasFailedStage: false,
   registerStage: noop,
   updateStage: noop,
   canStageStart: () => true,
@@ -94,8 +113,8 @@ const useInitializationContext = () => {
 };
 
 export function useInitializationState() {
-  const { isInitializing } = useInitializationContext();
-  return { isInitializing };
+  const { isInitializing, hasFailedStage } = useInitializationContext();
+  return { isInitializing, hasFailedStage };
 }
 
 interface InitializationProviderProps {
@@ -104,22 +123,19 @@ interface InitializationProviderProps {
 
 export function InitializationProvider({ children }: InitializationProviderProps) {
   const [stages, setStages] = useState<Map<string, Stage>>(new Map());
-  // When true, forces isInitializing=true until real stages register (profile switch).
-  const [forceReinitialize, setForceReinitialize] = useState(false);
-  // When true, keeps the splash pinned even after stages re-register until explicitly released.
-  const [holdSplashVisible, setHoldSplashVisible] = useState(false);
+  // Set by a reset and cleared as soon as any stage is registered again, or by
+  // a cancel. It covers the gap after a reset in which no stage exists yet and
+  // the app would otherwise look initialised. It is not a lasting hold: the
+  // stages that register next keep the splash up through their own status.
+  const [awaitingStages, setAwaitingStages] = useState(false);
   useInitMount('InitializationProvider');
 
-  // Synchronous map of stage id → blocking flag. Updated immediately in
-  // registerStage so updateStage can check it before the next React render.
-  const blockingFlagsRef = useRef<Map<string, boolean>>(new Map());
   // Track when each stage first transitioned to 'loading' so we can log a
   // duration when it reaches 'complete'.
   const stageStartTimes = useRef<Map<string, number>>(new Map());
 
   const registerStage = useCallback((id: string, config: StageConfig) => {
     const isBlocking = config.blocking !== false;
-    blockingFlagsRef.current.set(id, isBlocking);
 
     initLog(
       'registerStage',
@@ -136,6 +152,7 @@ export function InitializationProvider({ children }: InitializationProviderProps
         status: 'pending',
         dependsOn: config.dependsOn,
         blocking: isBlocking,
+        outlivesAccount: config.outlivesAccount === true,
       });
       return newStages;
     });
@@ -203,11 +220,14 @@ export function InitializationProvider({ children }: InitializationProviderProps
   );
 
   const isInitializing =
-    forceReinitialize ||
-    holdSplashVisible ||
+    awaitingStages ||
     Array.from(stages.values()).some(
       (stage) => stage.blocking && (stage.status === 'loading' || stage.status === 'pending')
     );
+
+  const hasFailedStage = Array.from(stages.values()).some(
+    (stage) => stage.blocking && stage.status === 'error'
+  );
 
   // Log isInitializing transitions. Written in an effect, not during render:
   // a render-phase ref write logs renders React went on to discard, and it is
@@ -226,29 +246,33 @@ export function InitializationProvider({ children }: InitializationProviderProps
     prevInitializing.current = isInitializing;
   }, [isInitializing, stages]);
 
-  // Clear forceReinitialize / holdSplashVisible once real stages have registered
-  // (they'll keep isInitializing true via their own blocking status).
-  // This ensures the splash is released after a profile switch even if
-  // cancelResetStages() was never called (e.g. DevSettings.reload() in dev).
+  // The wait ends once stages exist again. This also covers a reset that kept
+  // its long-lived stages, and a development reload that never calls cancel.
   useEffect(() => {
-    if ((forceReinitialize || holdSplashVisible) && stages.size > 0) {
-      setForceReinitialize(false);
-      setHoldSplashVisible(false);
-    }
-  }, [forceReinitialize, holdSplashVisible, stages.size]);
+    if (awaitingStages && stages.size > 0) setAwaitingStages(false);
+  }, [awaitingStages, stages.size]);
 
-  const resetStages = useCallback((options?: { holdUntilCancel?: boolean }) => {
-    log.info('init.provider.reset_stages');
-    setForceReinitialize(true);
-    setHoldSplashVisible(options?.holdUntilCancel === true);
-    setStages(new Map());
-    blockingFlagsRef.current.clear();
+  const resetStages = useCallback((options?: ResetStagesOptions) => {
+    const keep = options?.keepStagesThatOutliveAccount === true;
+    log.info('init.provider.reset_stages', { keepStagesThatOutliveAccount: keep });
+    setAwaitingStages(true);
+    setStages((prev) => {
+      const kept = new Map<string, Stage>();
+      // Iterated with forEach, not spread: the React Native Babel preset
+      // compiles array spread loosely, and spreading a Map there does not
+      // yield its entries.
+      if (keep) {
+        prev.forEach((stage, id) => {
+          if (stage.outlivesAccount) kept.set(id, stage);
+        });
+      }
+      return kept;
+    });
     stageStartTimes.current.clear();
   }, []);
 
   const cancelResetStages = useCallback(() => {
-    setForceReinitialize(false);
-    setHoldSplashVisible(false);
+    setAwaitingStages(false);
   }, []);
 
   useEffect(() => {
@@ -266,13 +290,22 @@ export function InitializationProvider({ children }: InitializationProviderProps
   const contextValue = useMemo<InitializationContextValue>(
     () => ({
       isInitializing,
+      hasFailedStage,
       registerStage,
       updateStage,
       canStageStart,
       resetStages,
       cancelResetStages,
     }),
-    [isInitializing, registerStage, updateStage, canStageStart, resetStages, cancelResetStages]
+    [
+      isInitializing,
+      hasFailedStage,
+      registerStage,
+      updateStage,
+      canStageStart,
+      resetStages,
+      cancelResetStages,
+    ]
   );
 
   return (
@@ -301,7 +334,7 @@ export function useInitializationStage(stageId: string, config: StageConfig = {}
   // The join/split round-trip is lossless because stage IDs are the closed,
   // comma-free set in the table at the top of this file. A stage ID containing
   // a comma would split into two phantom dependencies that never complete.
-  const { message, dependsOn, blocking } = config;
+  const { message, dependsOn, blocking, outlivesAccount } = config;
   const dependsOnKey = dependsOn?.join(',') ?? '';
 
   useEffect(() => {
@@ -310,9 +343,10 @@ export function useInitializationStage(stageId: string, config: StageConfig = {}
     registerStage(stageId, {
       message,
       blocking,
+      outlivesAccount,
       dependsOn: dependsOnKey ? dependsOnKey.split(',') : undefined,
     });
-  }, [stageId, registerStage, message, blocking, dependsOnKey]);
+  }, [stageId, registerStage, message, blocking, outlivesAccount, dependsOnKey]);
 
   const log = useCallback(
     (message: string) => {

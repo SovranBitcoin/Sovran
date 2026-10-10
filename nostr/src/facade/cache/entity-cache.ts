@@ -1,14 +1,18 @@
-import type { NostrTier, NoteStats, NoteStatsMap } from '@sovranbitcoin/schemas';
-import type { NaggFeedEvent, NaggProfileInfo } from '../../map/feed';
-import type { ProfileMetadata } from '../profiles';
-import type { ProfileStats } from '../profile-stats';
+import type {
+  NostrTier,
+  NoteStats,
+  NoteStatsMap,
+} from "@sovranbitcoin/schemas";
+import type { NaggFeedEvent, NaggProfileInfo } from "../../map/feed";
+import type { ProfileMetadata } from "../profiles";
+import type { ProfileStats } from "../profile-stats";
 import {
   createNormalizingStore,
   fieldLevelMerge,
   type Merge,
   type NormalizingStore,
-} from './store';
-import { createPendingSet, type PendingSet } from './pending';
+} from "./store";
+import { createPendingSet, type PendingSet } from "./pending";
 
 // ---------------------------------------------------------------------------
 // Source ranking — when the SAME datum arrives from more than one transport,
@@ -22,11 +26,16 @@ import { createPendingSet, type PendingSet } from './pending';
 /** Which transport a cached datum came from. */
 export type CacheSource = NostrTier;
 
-const TIER_RANK: Record<string, number> = { nagg: 3, primal: 2, relay: 1, cache: 0 };
+const TIER_RANK: Record<string, number> = {
+  nagg: 3,
+  primal: 2,
+  relay: 1,
+  cache: 0,
+};
 
 /** Rank of a source; an unknown/absent source ranks lowest (0). */
 export function sourceRank(source: CacheSource | undefined): number {
-  return source ? TIER_RANK[source] ?? 0 : 0;
+  return source ? (TIER_RANK[source] ?? 0) : 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -48,14 +57,16 @@ export function sourceRank(source: CacheSource | undefined): number {
 
 /**
  * A profile accumulated across sources. A cheap feed seed carries name+picture at
- * `seenAt: 0`; a full kind-0 fetch carries the rest at its event `created_at`.
+ * `seenAt: 0`; a full kind-0 fetch carries the rest at a higher merge order.
  * `seenAt` gates the merge so a stale/low-confidence write never overwrites a
  * fresher field — it only fills gaps.
  */
 export type CachedProfile = ProfileMetadata & {
   pubkey: string;
-  /** kind-0 `created_at`, or 0 for a low-confidence (feed/notification) seed. */
+  /** Merge order: 0 for a seed, 1 for a direct answer, or the caller's event order. */
   seenAt: number;
+  /** Epoch milliseconds of the latest settled metadata answer; seeds omit it. */
+  fetchedAt?: number;
   /** Source rank of the dominant fields (nagg>primal>relay); breaks freshness ties. */
   srcRank: number;
 };
@@ -106,9 +117,11 @@ const mergeProfile: Merge<CachedProfile> = (existing, patch) => {
     ...existing,
     seenAt: Math.max(existing.seenAt, incomingAt),
     srcRank: incomingWins ? incomingRank : existing.srcRank,
+    fetchedAt:
+      Math.max(existing.fetchedAt ?? 0, patch.fetchedAt ?? 0) || undefined,
   };
   for (const key in patch) {
-    if (key === 'seenAt' || key === 'srcRank') continue;
+    if (key === "seenAt" || key === "srcRank" || key === "fetchedAt") continue;
     const value = patch[key as keyof CachedProfile];
     if (value === undefined) continue;
     if (incomingWins || base[key as keyof CachedProfile] === undefined) {
@@ -159,12 +172,17 @@ export interface NostrEntityCache {
   readonly profileStats: NormalizingStore<CachedProfileStats>;
   /** Which profile pubkeys have a fetch in flight (loading vs absent, for bindings). */
   readonly pendingProfiles: PendingSet;
+  /** First metadata fetch settlement, including misses (memory-only). */
+  readonly settledProfiles: NormalizingStore<{ settledAt: number }>;
   /** Which note ids have a stats fetch in flight (placeholder vs unknown, for bindings). */
   readonly pendingNoteStats: PendingSet;
 
   /** Seed minimal name+picture (feed/notification profiles) at low confidence, tagged by source. */
-  ingestProfileInfos(infos: Record<string, NaggProfileInfo>, source: CacheSource): void;
-  /** Ingest full kind-0 metadata at a given freshness (the event `created_at`), tagged by source. */
+  ingestProfileInfos(
+    infos: Record<string, NaggProfileInfo>,
+    source: CacheSource,
+  ): void;
+  /** Ingest full kind-0 metadata at a given merge order, tagged by source. */
   ingestProfileMetadata(
     metadata: Record<string, ProfileMetadata>,
     seenAt: number,
@@ -188,24 +206,45 @@ export interface NostrEntityCache {
   clear(): void;
 }
 
-export function createNostrEntityCache(limits: EntityCacheLimits = {}): NostrEntityCache {
+export function createNostrEntityCache(
+  limits: EntityCacheLimits = {},
+): NostrEntityCache {
   const profiles = createNormalizingStore<CachedProfile>({
+    name: 'profiles',
     maxEntries: limits.profiles ?? DEFAULT_LIMITS.profiles,
     merge: mergeProfile,
   });
   const notes = createNormalizingStore<CachedNote>({
+    name: 'notes',
     maxEntries: limits.notes ?? DEFAULT_LIMITS.notes,
     merge: mergeNote,
   });
   const noteStats = createNormalizingStore<CachedNoteStats>({
+    name: 'noteStats',
     maxEntries: limits.noteStats ?? DEFAULT_LIMITS.noteStats,
     merge: mergeNoteStats,
   });
   const profileStats = createNormalizingStore<CachedProfileStats>({
+    name: 'profileStats',
     maxEntries: limits.profileStats ?? DEFAULT_LIMITS.profileStats,
   });
 
-  const pendingProfiles = createPendingSet();
+  const settledProfiles = createNormalizingStore<{ settledAt: number }>({
+    name: 'settledProfiles',
+    maxEntries: limits.profiles ?? DEFAULT_LIMITS.profiles,
+  });
+  const pending = createPendingSet();
+  const pendingProfiles: PendingSet = {
+    ...pending,
+    end(keys) {
+      for (const key of keys) {
+        if (pending.has(key) && !settledProfiles.has(key)) {
+          settledProfiles.set(key, { settledAt: Date.now() });
+        }
+      }
+      pending.end(keys);
+    },
+  };
   const pendingNoteStats = createPendingSet();
 
   return {
@@ -214,6 +253,7 @@ export function createNostrEntityCache(limits: EntityCacheLimits = {}): NostrEnt
     noteStats,
     profileStats,
     pendingProfiles,
+    settledProfiles,
     pendingNoteStats,
 
     ingestProfileInfos(infos, source) {
@@ -221,14 +261,30 @@ export function createNostrEntityCache(limits: EntityCacheLimits = {}): NostrEnt
       profiles.setMany(
         Object.entries(infos).map(([pubkey, info]) => [
           pubkey,
-          { pubkey, name: info.name, picture: info.picture, seenAt: 0, srcRank },
+          {
+            pubkey,
+            name: info.name,
+            picture: info.picture,
+            seenAt: 0,
+            srcRank,
+          },
         ]),
       );
     },
     ingestProfileMetadata(metadata, seenAt, source) {
       const srcRank = sourceRank(source);
+      const fetchedAt = seenAt > 0 ? Date.now() : undefined;
       profiles.setMany(
-        Object.entries(metadata).map(([pubkey, m]) => [pubkey, { ...m, pubkey, seenAt, srcRank }]),
+        Object.entries(metadata).map(([pubkey, m]) => [
+          pubkey,
+          {
+            ...m,
+            pubkey,
+            seenAt,
+            srcRank,
+            ...(fetchedAt !== undefined ? { fetchedAt } : {}),
+          },
+        ]),
       );
     },
     ingestNotes(events) {
@@ -269,6 +325,7 @@ export function createNostrEntityCache(limits: EntityCacheLimits = {}): NostrEnt
 
     clear() {
       profiles.clear();
+      settledProfiles.clear();
       notes.clear();
       noteStats.clear();
       profileStats.clear();

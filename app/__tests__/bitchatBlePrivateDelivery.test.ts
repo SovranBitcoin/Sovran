@@ -10,11 +10,7 @@ jest.mock('@/shared/lib/id', () => ({
   mintLocalId: jest.fn((prefix: string) => `${prefix}-id`),
 }));
 
-import {
-  chunkUtf8,
-  sendBLEPrivateMessageChunks,
-  sendBLEPrivateMessageWhole,
-} from '@/features/bitchat/lib/blePrivateDelivery';
+import { chunkUtf8, sendBLEPrivateMessageChunks } from '@/features/bitchat/lib/blePrivateDelivery';
 import type { BitchatBLEIdentityMaterial } from 'bitchat-module';
 
 function byteLength(text: string): number {
@@ -29,6 +25,9 @@ const IDENTITY_MATERIAL: BitchatBLEIdentityMaterial = {
 };
 
 describe('BitChat BLE private delivery', () => {
+  it('keeps default chat chunks below the extended-length sentinel', () => {
+    expect(chunkUtf8('a'.repeat(255))).toEqual(['a'.repeat(254), 'a']);
+  });
   it('chunks UTF-8 payloads at the byte limit', () => {
     const payload = 'a'.repeat(612);
     const chunks = chunkUtf8(payload, 255);
@@ -138,137 +137,6 @@ describe('BitChat BLE private delivery', () => {
         deps: { startBLE },
       })
     ).rejects.toThrow('BitChat identity material unavailable');
-
-    expect(startBLE).not.toHaveBeenCalled();
-  });
-});
-
-describe('BitChat BLE whole private-DM delivery', () => {
-  it('sends the whole token as a single private DM after the handshake', async () => {
-    const startBLE = jest
-      .fn<Promise<void>, [string, string, BitchatBLEIdentityMaterial]>()
-      .mockResolvedValue(undefined);
-    const startBLEPrivateChat = jest.fn<Promise<void>, [string]>().mockResolvedValue(undefined);
-    const sendBLEPrivateMessage = jest
-      .fn<Promise<string>, [string, string, string, string]>()
-      .mockResolvedValue('message-1');
-    const sleep = jest.fn<Promise<void>, [number]>().mockResolvedValue(undefined);
-    // A multi-KB token — fits ONE message thanks to the extended PM length.
-    const token = `cashuB${'A'.repeat(4000)}`;
-
-    const result = await sendBLEPrivateMessageWhole({
-      peerID: 'peer-a',
-      content: token,
-      nickname: 'sender',
-      profileScope: 'profile-a',
-      identityMaterial: IDENTITY_MATERIAL,
-      deps: {
-        startBLE,
-        startBLEPrivateChat,
-        sendBLEPrivateMessage,
-        sleep,
-        createMessageId: () => 'nutdrop-id',
-        now: () => 0,
-      },
-    });
-
-    expect(startBLE).toHaveBeenCalledWith('sender', 'profile-a', IDENTITY_MATERIAL);
-    expect(startBLEPrivateChat).toHaveBeenCalledWith('peer-a');
-    expect(sendBLEPrivateMessage).toHaveBeenCalledTimes(1);
-    expect(sendBLEPrivateMessage).toHaveBeenCalledWith('peer-a', token, 'sender', 'nutdrop-id');
-    expect(result).toEqual({
-      messageId: 'nutdrop-id',
-      startupMs: 0,
-      handshakeMs: 0,
-      sendMs: 0,
-    });
-  });
-
-  it('reports a handshake error without throwing, then still sends', async () => {
-    const startBLE = jest
-      .fn<Promise<void>, [string, string, BitchatBLEIdentityMaterial]>()
-      .mockResolvedValue(undefined);
-    const startBLEPrivateChat = jest
-      .fn<Promise<void>, [string]>()
-      .mockRejectedValue(new Error('handshake timed out'));
-    const sendBLEPrivateMessage = jest
-      .fn<Promise<string>, [string, string, string, string]>()
-      .mockResolvedValue('message-1');
-    const sleep = jest.fn<Promise<void>, [number]>().mockResolvedValue(undefined);
-
-    const result = await sendBLEPrivateMessageWhole({
-      peerID: 'peer-a',
-      content: 'cashuB...',
-      nickname: 'sender',
-      profileScope: 'profile-a',
-      identityMaterial: IDENTITY_MATERIAL,
-      deps: {
-        startBLE,
-        startBLEPrivateChat,
-        sendBLEPrivateMessage,
-        sleep,
-        createMessageId: () => 'nutdrop-id',
-        now: () => 0,
-      },
-    });
-
-    expect(result.handshakeError).toBe('handshake timed out');
-    expect(sendBLEPrivateMessage).toHaveBeenCalledTimes(1);
-  });
-
-  it('fails safely before native calls when profile scope is missing', async () => {
-    const startBLE = jest
-      .fn<Promise<void>, [string, string, BitchatBLEIdentityMaterial]>()
-      .mockResolvedValue(undefined);
-
-    await expect(
-      sendBLEPrivateMessageWhole({
-        peerID: 'peer-a',
-        content: 'cashuA...',
-        nickname: 'sender',
-        profileScope: '',
-        identityMaterial: IDENTITY_MATERIAL,
-        deps: { startBLE },
-      })
-    ).rejects.toThrow('BitChat profile scope unavailable');
-
-    expect(startBLE).not.toHaveBeenCalled();
-  });
-
-  it('fails safely before native calls when identity material is missing', async () => {
-    const startBLE = jest
-      .fn<Promise<void>, [string, string, BitchatBLEIdentityMaterial]>()
-      .mockResolvedValue(undefined);
-
-    await expect(
-      sendBLEPrivateMessageWhole({
-        peerID: 'peer-a',
-        content: 'cashuA...',
-        nickname: 'sender',
-        profileScope: 'profile-a',
-        identityMaterial: null,
-        deps: { startBLE },
-      })
-    ).rejects.toThrow('BitChat identity material unavailable');
-
-    expect(startBLE).not.toHaveBeenCalled();
-  });
-
-  it('fails safely before native calls when the peer is missing', async () => {
-    const startBLE = jest
-      .fn<Promise<void>, [string, string, BitchatBLEIdentityMaterial]>()
-      .mockResolvedValue(undefined);
-
-    await expect(
-      sendBLEPrivateMessageWhole({
-        peerID: '',
-        content: 'cashuA...',
-        nickname: 'sender',
-        profileScope: 'profile-a',
-        identityMaterial: IDENTITY_MATERIAL,
-        deps: { startBLE },
-      })
-    ).rejects.toThrow('BitChat peer unavailable');
 
     expect(startBLE).not.toHaveBeenCalled();
   });

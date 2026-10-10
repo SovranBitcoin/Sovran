@@ -131,6 +131,27 @@ export function luminance(hex: string): number {
 }
 
 /**
+ * WCAG 2 contrast ratio between two hex colours, from 1 (identical) to 21
+ * (black on white). Text needs 4.5 at body sizes and 3 at large sizes.
+ *
+ * Uses WCAG relative luminance (linearised sRGB), not `luminance()` above: the
+ * BT.601 figure is a brightness estimate and misjudges saturated mid-tones, so
+ * it cannot decide whether black or white text reads on a colour.
+ */
+export function contrastRatio(a: string, b: string): number {
+  const relative = (hex: string) => {
+    const { r, g, b: blue } = hexToRgb(hex);
+    const linear = (channel: number) => {
+      const c = channel / 255;
+      return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+    };
+    return 0.2126 * linear(r) + 0.7152 * linear(g) + 0.0722 * linear(blue);
+  };
+  const [lighter, darker] = [relative(a), relative(b)].sort((x, y) => y - x) as [number, number];
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
+/**
  * Apply an alpha channel to a hex colour, returning `#RRGGBBAA`.
  *
  * Behaviour is inherited from the package this replaced: an existing alpha pair

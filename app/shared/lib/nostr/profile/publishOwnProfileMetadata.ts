@@ -1,3 +1,5 @@
+import { registerAccountScoped } from '@/shared/lib/account/accountRegistry';
+import { verifyNip05 } from 'wallet';
 import NDK, { NDKEvent, NDKSubscriptionCacheUsage } from '@nostr-dev-kit/ndk-mobile';
 import { Result, ResultAsync, err, ok, type Result as ResultType } from 'neverthrow';
 import { parseProfileMetadata } from 'nostr';
@@ -161,7 +163,10 @@ export async function loadOwnProfileMetadata(
 
 type OwnProfilePublishError =
   | (PublishError & { cause?: unknown })
-  | { type: 'profile-changed' | 'base-unavailable' | 'unexpected'; cause?: unknown };
+  | {
+      type: 'profile-changed' | 'base-unavailable' | 'unexpected' | 'nip05-unverified';
+      cause?: unknown;
+    };
 const inFlight = new Map<string, ResultAsync<PublishResult, OwnProfilePublishError>>();
 
 export function publishOwnProfileMetadata({
@@ -229,6 +234,14 @@ export function publishOwnProfileMetadata({
         deltaSeconds: base.createdAt - nowSeconds,
       });
     const content = applyProfilePatch(base?.content ?? {}, patch);
+    // UI/cache status cannot authorize a changed identity. Verify the exact
+    // claim and signing key afresh before creating any signed/public event.
+    if (patch.nip05) {
+      const verification = await verifyNip05(patch.nip05, pubkey);
+      if (!isOwner() || ndk.signer !== signer) return err({ type: 'profile-changed' });
+      if (verification.status !== 'verified') return err({ type: 'nip05-unverified' });
+      content.nip05 = verification.identifier;
+    }
     event.content = JSON.stringify(content);
     event.tags = [];
     const signed = await ResultAsync.fromPromise(
@@ -281,3 +294,11 @@ export function publishOwnProfileMetadata({
   });
   return result;
 }
+
+registerAccountScoped(
+  'nostr.profile-publish-flights',
+  () => {
+    inFlight.clear();
+  },
+  () => inFlight.size === 0
+);

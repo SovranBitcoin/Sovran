@@ -4,7 +4,7 @@ import { ScreenScrollView } from '@/shared/ui/composed/ScreenScrollView';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, useWindowDimensions } from 'react-native';
 
-import { Button, Card } from 'heroui-native';
+import { Card } from 'heroui-native';
 
 import { getDesignSystemFamily } from '@/features/settings/design-system/catalog';
 import {
@@ -15,6 +15,7 @@ import {
 } from '@/features/settings/design-system/fadeRevealStress';
 import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
 import { Section } from '@/shared/ui/composed/Section';
+import { Button } from '@/shared/ui/primitives/Button';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
@@ -119,12 +120,18 @@ export function SettingsDesignSystemFadeStressScreen() {
                 </Text>
               </VStack>
               <VStack gap={6}>
-                <Button size="sm" variant="secondary" onPress={() => setAuto((a) => !a)}>
-                  <Button.Label>{auto ? 'Pause' : 'Run'}</Button.Label>
-                </Button>
-                <Button size="sm" variant="secondary" onPress={() => setJank((j) => !j)}>
-                  <Button.Label>{jank ? 'Jank: on' : 'Jank: off'}</Button.Label>
-                </Button>
+                <Button
+                  size="compact"
+                  variant="secondary"
+                  text={auto ? 'Pause' : 'Run'}
+                  onPress={() => setAuto((a) => !a)}
+                />
+                <Button
+                  size="compact"
+                  variant="secondary"
+                  text={jank ? 'Jank: on' : 'Jank: off'}
+                  onPress={() => setJank((j) => !j)}
+                />
               </VStack>
             </HStack>
           </Card>

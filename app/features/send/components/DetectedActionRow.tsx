@@ -59,25 +59,6 @@ function decodeNpubHex(value: string): string | undefined {
   }
 }
 
-/** The lightning-address NIP-05 lookup, verbatim from the resolve effect. */
-async function resolveLnaddrPubkey(ctx: {
-  value: string;
-  signal: AbortSignal;
-  isCancelled: () => boolean;
-  setLnaddrHex: (hex: string | null) => void;
-  setNip05Resolving: (resolving: boolean) => void;
-}): Promise<void> {
-  const { value, signal, isCancelled, setLnaddrHex, setNip05Resolving } = ctx;
-  try {
-    const pk = await fetchNip05Pubkey(value, { signal });
-    if (!isCancelled()) setLnaddrHex(pk ?? null);
-  } catch (e) {
-    if (!isCancelled()) paymentLog.debug('send.detected.nip05.failed', { error: redactError(e) });
-  } finally {
-    if (!isCancelled()) setNip05Resolving(false);
-  }
-}
-
 interface ContactSendTarget {
   pubkey: string;
   displayName: string | null;
@@ -108,31 +89,28 @@ export function DetectedActionRow({
   const npubHex = ref?.type === 'npub' ? decodeNpubHex(ref.value) : undefined;
 
   // lightning address → hex via NIP-05 (async, cancellable; mirrors AmountFlowScreen).
-  const [lnaddrHex, setLnaddrHex] = useState<string | null>(null);
-  const [nip05Resolving, setNip05Resolving] = useState(false);
+  const [resolvedAddress, setResolvedAddress] = useState<{
+    address: string;
+    pubkey: string | null;
+  } | null>(null);
+  const lightningAddress = ref?.type === 'lightningAddress' ? ref.value : undefined;
   useEffect(() => {
-    if (ref?.type !== 'lightningAddress') {
-      setLnaddrHex(null);
-      setNip05Resolving(false);
-      return;
-    }
+    setResolvedAddress(null);
+    if (!lightningAddress) return;
     const controller = new AbortController();
-    let cancelled = false;
-    setLnaddrHex(null);
-    setNip05Resolving(true);
-    void resolveLnaddrPubkey({
-      value: ref.value,
-      signal: controller.signal,
-      isCancelled: () => cancelled,
-      setLnaddrHex,
-      setNip05Resolving,
-    });
-    return () => {
-      cancelled = true;
-      controller.abort();
-    };
-  }, [ref?.type, ref?.value]);
+    void fetchNip05Pubkey(lightningAddress, { signal: controller.signal })
+      .then((pubkey) => {
+        if (!controller.signal.aborted) setResolvedAddress({ address: lightningAddress, pubkey });
+      })
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted)
+          paymentLog.debug('send.detected.nip05.failed', { error: redactError(error) });
+      });
+    return () => controller.abort();
+  }, [lightningAddress]);
 
+  const lnaddrHex =
+    resolvedAddress?.address === lightningAddress ? resolvedAddress?.pubkey : undefined;
   const personPubkey = npubHex ?? lnaddrHex ?? undefined;
   // Warm the kind:10019 lookup the amount screen's lock option depends on, the
   // moment the identity is known — not when the user reaches the menu and has
@@ -142,14 +120,13 @@ export function DetectedActionRow({
   }, [personPubkey]);
   // Always called (tolerates undefined → no-op for non-person kinds) so hooks
   // stay unconditional.
-  const { metadata, isLoading } = useNostrProfileMetadata(personPubkey);
+  const { metadata } = useNostrProfileMetadata(personPubkey);
 
   const resolvedName = metadata
     ? resolveIdentityName({ pubkey: personPubkey ?? '', nostrProfile: metadata })
     : null;
 
   if (isPerson) {
-    const personLoading = !metadata && (nip05Resolving || isLoading);
     const fallback = ref ? truncateMiddle(ref.value) : '';
     const title = `${descriptor.label} ${resolvedName ?? fallback}`.trim();
     // Once the name resolves, surface the pasted identity on the secondary line
@@ -165,7 +142,6 @@ export function DetectedActionRow({
         }}
         title={title}
         subtitle={subtitle}
-        loading={personLoading}
         accessibilityLabel={title}
         testID={`send-detected-${descriptor.kind}`}
         onPress={() => {

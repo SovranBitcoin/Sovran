@@ -27,6 +27,7 @@ let storeSeq = 0;
 function makeStore() {
   storeSeq += 1;
   return createQueryCacheStore<string>({
+    scope: 'session',
     name: `gen-test-${storeSeq}`,
     staleTtlMs: 60_000,
     persist: false,

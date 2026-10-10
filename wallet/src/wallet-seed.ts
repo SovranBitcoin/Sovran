@@ -138,6 +138,13 @@ export function tryDeriveStandardCashuSeed(
   }
 }
 
+const seedDisposers = new WeakMap<() => Promise<Uint8Array>, () => void>();
+
+/** Zero and drop a getter's memoized seed. Callers only ever hold copies. */
+export function disposeCashuSeedGetter(getter: () => Promise<Uint8Array>): void {
+  seedDisposers.get(getter)?.();
+}
+
 export function createCashuSeedGetter({
   getMnemonic,
   deriveSeed = deriveStandardCashuSeed,
@@ -150,7 +157,7 @@ export function createCashuSeedGetter({
     hasCacheStore: !!cache?.store,
   });
 
-  return async () => {
+  const getter = async () => {
     logger.debug('walletSeed.getter.start', {
       hasMemoizedSeed: !!memoizedSeed,
       hasCacheLoad: !!cache?.load,
@@ -236,6 +243,11 @@ export function createCashuSeedGetter({
     }
     return copySeed(memoizedSeed);
   };
+  seedDisposers.set(getter, () => {
+    memoizedSeed?.fill(0);
+    memoizedSeed = null;
+  });
+  return getter;
 }
 
 function validateCashuSeed(

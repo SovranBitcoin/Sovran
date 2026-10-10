@@ -89,7 +89,11 @@ export const ReceivePaymentRequestQuoteScreen = memo(function ReceivePaymentRequ
   // 'requested' (waiting for payment on nostr) → 'paid' (payer paid, coco's
   // auto-claim is running) → 'finalized' (added to wallet). Drives the timeline;
   // redeem is automatic (coco) so there is no confirm step.
-  const [prState, setPrState] = useState<'requested' | 'paid' | 'finalized'>('requested');
+  const [prState, setPrState] = useState<'requested' | 'paid' | 'finalized' | 'rejected'>(
+    'requested'
+  );
+  // Why the mint turned the payment away, when it did.
+  const [rejection, setRejection] = useState<string | undefined>(undefined);
   // Stable timestamp for the synthetic entry's "Requested" step so the
   // position-keyed timeline rows animate in place rather than remounting.
   // Frozen at first render via a lazy state initializer, the repo's idiom for
@@ -111,6 +115,18 @@ export const ReceivePaymentRequestQuoteScreen = memo(function ReceivePaymentRequ
       });
       setPrState((s) => (s === 'finalized' ? s : 'paid'));
     });
+    // The payment arrived and the mint would not swap it (already spent, a
+    // dead keyset). Without this the timeline sat on "Adding to wallet" for
+    // good.
+    const offRolledBack = manager.on('receive-op:rolled-back', ({ operation }) => {
+      if (!matches(operation)) return;
+      const reason = (operation as { error?: unknown }).error;
+      paymentLog.warn('receive.creq.fixed_amount.rejected', {
+        operationId: entry.operationId,
+      });
+      setRejection(typeof reason === 'string' ? reason : undefined);
+      setPrState((s) => (s === 'finalized' ? s : 'rejected'));
+    });
     const offFinalized = manager.on('receive-op:finalized', ({ operation }) => {
       if (!matches(operation)) return;
       paymentLog.info('receive.creq.fixed_amount.claimed', {
@@ -123,6 +139,7 @@ export const ReceivePaymentRequestQuoteScreen = memo(function ReceivePaymentRequ
     return () => {
       offPrepared();
       offFinalized();
+      offRolledBack();
     };
   }, [manager, entry]);
 
@@ -132,8 +149,14 @@ export const ReceivePaymentRequestQuoteScreen = memo(function ReceivePaymentRequ
   // timeline builder's receive-PR branch renders payment-seen → added.
   const syntheticEntry = useMemo<HistoryEntry | null>(() => {
     if (!entry) return null;
-    const state =
-      prState === 'requested' ? 'executing' : prState === 'paid' ? 'prepared' : 'finalized';
+    const state = (
+      {
+        requested: 'executing',
+        paid: 'prepared',
+        finalized: 'finalized',
+        rejected: 'rolled_back',
+      } as const
+    )[prState];
     return asHistoryEntry({
       id: `pr-${entry.operationId}`,
       type: 'receive',
@@ -145,13 +168,14 @@ export const ReceivePaymentRequestQuoteScreen = memo(function ReceivePaymentRequ
       unit: entry.unit,
       amount: entry.amount,
       state,
+      ...(prState === 'rejected' && rejection ? { error: rejection } : {}),
       metadata: {
         operationId: entry.operationId,
         source: 'payment-request',
         ...(prState === 'requested' ? { paymentRequestPending: '1' } : {}),
       },
     });
-  }, [entry, prState, createdAt]);
+  }, [entry, prState, rejection, createdAt]);
 
   // Resolve the keyring P2PK pubkey (the only key coco's claim path can sign
   // for). Absent → the lock toggle is disabled, exactly like the hub tab.

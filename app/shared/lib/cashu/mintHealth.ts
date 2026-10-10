@@ -23,7 +23,7 @@ import type { RequestControls } from 'wallet/safeFetch';
 
 export type MintStatus = 'online' | 'offline' | 'unknown';
 
-export interface MintProbe {
+interface MintProbe {
   /** The normalized mint key (`normalizeMintUrlKey`), which is how rows look it up. */
   key: string;
   status: MintStatus;

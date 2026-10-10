@@ -10,14 +10,15 @@ import {
 } from '@/features/send/lib/sovranPaymentConfig';
 import { paramPopup, sendMemoPopup } from '@/shared/lib/popup';
 import { getEncodedToken } from '@cashu/cashu-ts';
-import { sendBLEPrivateMessageWhole } from '@/features/bitchat/lib/blePrivateDelivery';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { paymentLog } from '@/shared/lib/logger';
 import { useContactSendStore } from '@/shared/stores/runtime/contactSendStore';
 
 const mockNavigate = jest.fn();
 const mockBack = jest.fn();
+const mockReplace = jest.fn();
 const mockDismissAll = jest.fn();
+const mockDismissTo = jest.fn();
 const mockNearPayComplete = jest.fn();
 const mockNearPaySetAmountEntry = jest.fn();
 const mockNearPaySetMintPickerOpen = jest.fn();
@@ -44,26 +45,37 @@ jest.mock('expo-router', () => ({
   router: {
     navigate: (...args: unknown[]) => mockNavigate(...args),
     back: (...args: unknown[]) => mockBack(...args),
-    replace: jest.fn(),
+    replace: (...args: unknown[]) => mockReplace(...args),
     dismiss: jest.fn(),
     dismissAll: (...args: unknown[]) => mockDismissAll(...args),
+    dismissTo: (...args: unknown[]) => mockDismissTo(...args),
   },
   useSegments: jest.fn(() => []),
 }));
 
+// The build's modules (ADR 0021). Every module is on unless a case narrows it.
+const mockHasFeature = jest.fn((_feature: string) => true);
+jest.mock('@/shared/config/features', () => ({
+  hasFeature: (feature: string) => mockHasFeature(feature),
+}));
 jest.mock('expo-camera', () => ({ scanFromURLAsync: jest.fn() }));
 jest.mock('expo-image-picker', () => ({ launchImageLibraryAsync: jest.fn() }));
 jest.mock('expo-clipboard', () => ({ setStringAsync: jest.fn() }));
 jest.mock('react-native', () => ({ Share: { share: jest.fn() } }));
+// Whether the mint picker is a sheet is the platform's call; a case sets it.
+const mockMintPickerIsSheet = jest.fn(() => true);
+jest.mock('@/features/send/lib/amountReturn', () => ({
+  ...jest.requireActual('@/features/send/lib/amountReturn'),
+  mintPickerIsSheet: () => mockMintPickerIsSheet(),
+}));
 jest.mock('@/shared/lib/interactions', () => ({
   // The DM-thread navigate is deferred behind the interaction settle; run it
   // synchronously here — the pinned contract is dismissAll-before-navigate.
   runAfterInteractions: (callback: () => void) => callback(),
+  // The picker's dismissal is followed a frame later; here, at once.
+  afterNextFrame: (callback: () => void) => callback(),
 }));
 jest.mock('@cashu/cashu-ts', () => ({ getDecodedToken: jest.fn(), getEncodedToken: jest.fn() }));
-jest.mock('@/features/bitchat/lib/blePrivateDelivery', () => ({
-  sendBLEPrivateMessageWhole: jest.fn(),
-}));
 jest.mock('@/features/bitchat/hooks/useBitchatNickname', () => ({
   getBitchatNickname: jest.fn(() => 'Self Sender'),
 }));
@@ -73,6 +85,7 @@ jest.mock('@/features/bitchat/lib/profileScope', () => ({
 jest.mock('@/shared/lib/logger', () => ({
   paymentLog: { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() },
   storeLog: { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() },
+  cashuLog: { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() },
 }));
 jest.mock('@/shared/lib/id', () => ({ mintLocalId: jest.fn((prefix: string) => `${prefix}-id`) }));
 jest.mock('@/shared/lib/cashu/utils', () => ({ buildReceiveHistoryEntry: jest.fn() }));
@@ -150,6 +163,7 @@ jest.mock('@/shared/stores/profile/transactionDistributionStore', () => ({
 
 describe('createSovranHandlers profile routing', () => {
   beforeEach(() => {
+    mockHasFeature.mockImplementation(() => true);
     mockNavigate.mockReset();
     mockDismissAll.mockReset();
     mockBack.mockReset();
@@ -158,7 +172,6 @@ describe('createSovranHandlers profile routing', () => {
     mockNearPaySetMintPickerOpen.mockReset();
     mockNearPayActive = null;
     (getEncodedToken as jest.Mock).mockReset();
-    (sendBLEPrivateMessageWhole as jest.Mock).mockReset();
     (sendMemoPopup as jest.Mock).mockReset();
     (paymentLog.debug as jest.Mock).mockClear();
     (paymentLog.info as jest.Mock).mockClear();
@@ -189,6 +202,7 @@ describe('createSovranHandlers profile routing', () => {
       id: 'near-pay-1',
       startedAt: 1,
       phase: 'picking',
+      presentation: 'radar',
       amountEntry: null,
       recipient: {
         peerID: 'peer-123',
@@ -234,6 +248,7 @@ describe('createSovranHandlers profile routing', () => {
       id: 'near-pay-1',
       startedAt: 1,
       phase: 'picking',
+      presentation: 'radar',
       amountEntry: null,
       mintPickerOpen: true,
       recipient: { peerID: 'peer-123', nickname: 'Nearby Alice', hasDirectLink: true, lastSeen: 2 },
@@ -258,6 +273,7 @@ describe('createSovranHandlers profile routing', () => {
       id: 'near-pay-1',
       startedAt: 1,
       phase: 'picking',
+      presentation: 'radar',
       amountEntry: null,
       mintPickerOpen: false,
       recipient: { peerID: 'peer-123', nickname: 'Nearby Alice', hasDirectLink: true, lastSeen: 2 },
@@ -318,6 +334,138 @@ describe('createSovranHandlers profile routing', () => {
       },
     });
   });
+
+  it.each([
+    ['sendEcash', '(send-flow)', '/(send-flow)/amount'],
+    ['mintQuote', '(receive-flow)', '/(receive-flow)/amount'],
+  ] as const)(
+    'a mint chosen in the picker the %s amount screen opened comes back to that screen',
+    async (destination, flowGroup, pathname) => {
+      // @ts-expect-error enterAmount only reads no machine methods.
+      const machine: PaymentMachine = { getContext: jest.fn(() => ({})) };
+      const stack = (names: string[]) => ({
+        index: 0,
+        routes: [
+          {
+            name: flowGroup,
+            state: { index: names.length - 1, routes: names.map((name) => ({ name })) },
+          },
+        ],
+      });
+      let routes = ['amount', 'mintSelect'];
+      const handlers = createSovranHandlers({
+        machine,
+        getManager: () => null,
+        getRootNavigationState: () => stack(routes),
+      });
+      const step = {
+        unit: 'sat',
+        preselectedMintUrl: 'https://other-mint.example',
+        constraints: { destination },
+      };
+
+      mockNavigate.mockClear();
+      mockDismissTo.mockClear();
+      await handlers.enterAmount?.(step);
+      // Popped to, not pushed: a push here is the second amount screen.
+      expect(mockNavigate).not.toHaveBeenCalled();
+      expect(mockDismissTo).toHaveBeenCalledWith({
+        pathname,
+        params: { amountEntry: expect.stringContaining('https://other-mint.example') },
+      });
+
+      // The picker as the FIRST screen of the flow still goes forward.
+      routes = ['mintSelect'];
+      mockNavigate.mockClear();
+      mockDismissTo.mockClear();
+      await handlers.enterAmount?.(step);
+      expect(mockDismissTo).not.toHaveBeenCalled();
+      expect(mockNavigate).toHaveBeenCalledWith(expect.objectContaining({ pathname }));
+    }
+  );
+
+  it('an invoice made from the mint picker replaces the amount screen, not the picker', async () => {
+    // With the amount already entered, choosing a mint goes straight to the
+    // invoice. Replacing the picker left the amount screen underneath and, on
+    // iPhone, drew the invoice inside the frame of the sheet it replaced.
+    // @ts-expect-error mintQuoteCreated reads no machine methods.
+    const machine: PaymentMachine = { getContext: jest.fn(() => ({})) };
+    let routes = ['amount', 'mintSelect'];
+    const handlers = createSovranHandlers({
+      machine,
+      getManager: () => null,
+      getRootNavigationState: () => ({
+        index: 0,
+        routes: [
+          {
+            name: '(receive-flow)',
+            state: { index: routes.length - 1, routes: routes.map((name) => ({ name })) },
+          },
+        ],
+      }),
+    });
+    const step = { historyEntry: JSON.stringify({ type: 'mint', id: 'mint:1' }), unit: 'sat' };
+    const calls: string[] = [];
+    mockBack.mockReset().mockImplementation(() => calls.push('back'));
+    mockReplace.mockReset().mockImplementation(() => calls.push('replace'));
+
+    await handlers.mintQuoteCreated?.(step);
+    expect(calls).toEqual(['back', 'replace']);
+    expect(mockReplace).toHaveBeenCalledWith({
+      pathname: '/(receive-flow)/lightningReceive',
+      params: { mintHistoryEntry: step.historyEntry, unit: 'sat' },
+    });
+
+    // Straight from the amount screen there is no picker to dismiss. (A second
+    // invoice: the guarded router drops a repeat of the same navigation.)
+    routes = ['amount'];
+    calls.length = 0;
+    await handlers.mintQuoteCreated?.({
+      historyEntry: JSON.stringify({ type: 'mint', id: 'mint:2' }),
+      unit: 'sat',
+    });
+    expect(calls).toEqual(['replace']);
+  });
+
+  it.each([
+    [true, ['back', 'navigate']],
+    [false, ['navigate']],
+  ] as const)(
+    'a mint chosen in a picker over the send hub leaves the picker only where it is a sheet (sheet: %s)',
+    async (sheet, expected) => {
+      // On iPhone the stack presents every screen after a sheet as a modal
+      // over it. On Android the picker is a page and stays in the history.
+      mockMintPickerIsSheet.mockReturnValue(sheet);
+      // @ts-expect-error enterAmount only reads no machine methods.
+      const machine: PaymentMachine = { getContext: jest.fn(() => ({})) };
+      const handlers = createSovranHandlers({
+        machine,
+        getManager: () => null,
+        getRootNavigationState: () => ({
+          index: 0,
+          routes: [
+            {
+              name: '(send-flow)',
+              state: { index: 1, routes: [{ name: 'send' }, { name: 'mintSelect' }] },
+            },
+          ],
+        }),
+      });
+      const calls: string[] = [];
+      mockBack.mockReset().mockImplementation(() => calls.push('back'));
+      mockNavigate.mockReset().mockImplementation(() => calls.push('navigate'));
+      mockDismissTo.mockClear();
+
+      await handlers.enterAmount?.({
+        unit: 'sat',
+        preselectedMintUrl: `https://sheet-${sheet}-mint.example`,
+        constraints: { destination: 'sendEcash' },
+      });
+      expect(mockDismissTo).not.toHaveBeenCalled();
+      expect(calls).toEqual(expected);
+      mockMintPickerIsSheet.mockReturnValue(true);
+    }
+  );
 
   it('serializes the Create Ecash entry source into the amount route', async () => {
     // @ts-expect-error enterAmount only reads no machine methods.
@@ -446,6 +594,43 @@ describe('createSovranHandlers profile routing', () => {
     expect(JSON.stringify(paymentLogCalls())).not.toContain(bearerToken);
   });
 
+  it('delivers to the contact but ends on the wallet when the build has no DM pages', async () => {
+    mockHasFeature.mockImplementation((feature) => feature !== 'directMessages');
+    const recipientPubkey = 'cd'.repeat(32);
+    const bearerToken = 'cashuA-contact-token-no-dm-pages';
+    useContactSendStore
+      .getState()
+      .start({ pubkey: recipientPubkey, displayName: 'Bob', delivery: 'nip17' });
+    const deliverContactEcashDm = jest.fn(() => Promise.resolve());
+    // @ts-expect-error sendComplete only reads getContext.
+    const machine: PaymentMachine = { getContext: jest.fn(() => ({})) };
+    const handlers = createSovranHandlers({
+      machine,
+      getManager: () => null,
+      deliverContactEcashDm,
+    });
+
+    await handlers.sendComplete?.({
+      historyEntry: JSON.stringify({
+        id: 'send-contact-no-dm-pages',
+        type: 'send',
+        mintUrl: 'https://mint.example',
+        tokenString: bearerToken,
+      }),
+      createdOffline: false,
+      mintWasOffline: false,
+    });
+
+    // The rail is unchanged: the token still travels over the DM transport.
+    expect(deliverContactEcashDm).toHaveBeenCalledWith({ recipientPubkey, token: bearerToken });
+    expect(useContactSendStore.getState().active).toBeNull();
+    // Only the ending differs: the flow closes onto the wallet and nothing is
+    // pushed on top. `dismissAll` would stop at the send chooser.
+    expect(mockDismissTo).toHaveBeenCalledWith('/');
+    expect(mockDismissAll).not.toHaveBeenCalled();
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
   it('still DMs a LOCKED token to the contact it was locked to', async () => {
     // Regression: sendComplete read "has a P2PK lock" as "this was a Nut Drop",
     // so a locked contact send skipped the DM and dropped the user on the
@@ -559,136 +744,51 @@ describe('createSovranHandlers profile routing', () => {
     expect(submitSendMemo).not.toHaveBeenCalled();
   });
 
-  it('does not DM a token when the recipient has no creq capability proof', async () => {
+  it('routes a nearby Send selection to a visible amount screen', async () => {
     mockNearPayActive = {
-      id: 'near-pay-no-creq',
-      startedAt: 1,
-      recipient: {
-        peerID: 'peer-no-creq',
-        nickname: 'Unconfirmed Carol',
-        hasDirectLink: true,
-        lastSeen: 2,
-        delivery: { locked: false },
-      },
+      id: 'nearby-route',
+      presentation: 'route',
+      recipient: { peerID: 'peer' },
     };
-    (getEncodedToken as jest.Mock).mockReturnValue('cashuA-token-that-must-not-send');
+    // @ts-expect-error enterAmount only reads no machine methods.
+    const machine: PaymentMachine = { getContext: jest.fn(() => ({})) };
+    const handlers = createSovranHandlers({ machine, getManager: () => null });
+    await handlers.enterAmount?.({
+      unit: 'sat',
+      constraints: { destination: 'sendEcash', p2pkLockPubkey: `02${'ab'.repeat(32)}` },
+    });
+    expect(mockNearPaySetAmountEntry).not.toHaveBeenCalled();
+    expect(mockNavigate).toHaveBeenCalledWith({
+      pathname: '/(send-flow)/amount',
+      params: { amountEntry: expect.any(String) },
+    });
+    expect(JSON.parse(mockNavigate.mock.calls[0][0].params.amountEntry).p2pkLockPubkey).toBe(
+      `02${'ab'.repeat(32)}`
+    );
+  });
+
+  it('keeps the created token recoverable without completing an unrelated nearby session', async () => {
+    mockNearPayActive = {
+      id: 'different-selection',
+      presentation: 'route',
+      recipient: { peerID: 'other-peer' },
+    };
+    (getEncodedToken as jest.Mock).mockReturnValue('cashuA-created-token');
     // @ts-expect-error sendComplete only reads no machine methods.
     const machine: PaymentMachine = { getContext: jest.fn(() => ({})) };
-    const handlers = createSovranHandlers({
-      machine,
-      getManager: () => null,
-    });
-    const historyEntry = JSON.stringify({
-      id: 'send-no-creq',
-      type: 'send',
-      mintUrl: 'https://mint.example',
-      token: { mint: 'https://mint.example', proofs: [] },
-    });
-
+    const handlers = createSovranHandlers({ machine, getManager: () => null });
     await handlers.sendComplete?.({
-      historyEntry,
+      historyEntry: JSON.stringify({
+        id: 'send-1',
+        type: 'send',
+        mintUrl: 'https://mint.example',
+        token: { mint: 'https://mint.example', proofs: [] },
+      }),
       createdOffline: false,
       mintWasOffline: false,
     });
-
-    expect(sendBLEPrivateMessageWhole).not.toHaveBeenCalled();
-    expect(mockNearPayComplete).toHaveBeenCalledTimes(1);
-  });
-
-  it('DMs an offline bearer token to a creq-confirmed peer', async () => {
-    mockNearPayActive = {
-      id: 'near-pay-3',
-      startedAt: 1,
-      recipient: {
-        peerID: 'peer-789',
-        nickname: 'Sovran Carol',
-        hasDirectLink: true,
-        lastSeen: 2,
-        creq: 'creqA-confirmed',
-        delivery: { locked: false },
-      },
-    };
-    (getEncodedToken as jest.Mock).mockReturnValue('cashuA-bearer-token');
-    (sendBLEPrivateMessageWhole as jest.Mock).mockResolvedValue({
-      messageId: 'm',
-      startupMs: 1,
-      handshakeMs: 2,
-      sendMs: 3,
-    });
-    // @ts-expect-error sendComplete only reads no machine methods.
-    const machine: PaymentMachine = { getContext: jest.fn(() => ({})) };
-    const handlers = createSovranHandlers({
-      machine,
-      getManager: () => null,
-    });
-    const historyEntry = JSON.stringify({
-      id: 'send-3',
-      type: 'send',
-      mintUrl: 'https://mint.example',
-      token: { mint: 'https://mint.example', proofs: [] },
-    });
-
-    // Bearer drops take the local-proof shortcut when offline, but only after a
-    // valid creq confirmed the recipient can decode extended private DMs.
-    await handlers.sendComplete?.({
-      historyEntry,
-      createdOffline: true,
-      mintWasOffline: true,
-    });
-
-    expect(sendBLEPrivateMessageWhole).toHaveBeenCalledWith(
-      expect.objectContaining({ content: 'cashuA-bearer-token', peerID: 'peer-789' })
-    );
-    expect(mockNearPayComplete).toHaveBeenCalledTimes(1);
-  });
-
-  it('DMs a locked token privately to the recipient peer', async () => {
-    mockNearPayActive = {
-      id: 'near-pay-4',
-      startedAt: 1,
-      recipient: {
-        peerID: 'peer-999',
-        nickname: 'Sovran Dave',
-        hasDirectLink: true,
-        lastSeen: 2,
-        creq: 'creqA-confirmed',
-        delivery: { locked: true },
-      },
-    };
-    (getEncodedToken as jest.Mock).mockReturnValue('cashuA-locked-token');
-    (sendBLEPrivateMessageWhole as jest.Mock).mockResolvedValue({
-      messageId: 'm',
-      startupMs: 1,
-      handshakeMs: 2,
-      sendMs: 3,
-    });
-    // @ts-expect-error sendComplete only reads no machine methods.
-    const machine: PaymentMachine = { getContext: jest.fn(() => ({})) };
-    const handlers = createSovranHandlers({
-      machine,
-      getManager: () => null,
-    });
-    const historyEntry = JSON.stringify({
-      id: 'send-4',
-      type: 'send',
-      mintUrl: 'https://mint.example',
-      token: { mint: 'https://mint.example', proofs: [] },
-    });
-
-    // A locked token is delivered as a private Noise DM addressed to the
-    // recipient peer — encrypted to them, so the payment stays private and
-    // only they can redeem the P2PK-locked proofs.
-    await handlers.sendComplete?.({
-      historyEntry,
-      createdOffline: false,
-      mintWasOffline: false,
-      p2pkLockPubkey: `02${'ef'.repeat(32)}`,
-    });
-
-    expect(sendBLEPrivateMessageWhole).toHaveBeenCalledWith(
-      expect.objectContaining({ content: 'cashuA-locked-token', peerID: 'peer-999' })
-    );
-    expect(mockNearPayComplete).toHaveBeenCalledTimes(1);
+    expect(mockNearPayComplete).not.toHaveBeenCalled();
+    expect(mockNavigate).toHaveBeenCalled();
   });
 
   it('skips P2PK key regeneration when the current-profile P2PK plugin is active', async () => {

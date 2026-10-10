@@ -10,6 +10,7 @@ import type { MintReviewsResponse } from '@/shared/lib/apiClient';
 import { normalizeMintUrlKey } from '@/shared/lib/url';
 
 export const mintReviewsCache = createQueryCacheStore<MintReviewsResponse>({
+  scope: 'session',
   name: 'mint-reviews-cache',
   logKey: 'mint_reviews_cache',
   staleTtlMs: 60 * 60 * 1000,

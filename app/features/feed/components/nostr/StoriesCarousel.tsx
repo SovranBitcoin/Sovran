@@ -5,7 +5,7 @@
  * Each "user" is a followed nostr account with video posts as their "stories".
  */
 
-import { avatarStateFor } from '@/shared/lib/imageLoadState';
+import { profileAvatarStateFor } from '@/shared/lib/imageLoadState';
 import React, { useCallback, useEffect, useRef, useState, type FC } from 'react';
 // Tolerated seam exception: horizontal story rail driven by Animated.FlatList
 // (reanimated scroll handler); the List seam wraps plain FlashList only.
@@ -274,6 +274,25 @@ export const StoriesCarousel: FC<CarouselProps> = ({
     reportCarouselMetrics('state');
   }, [listCurrentIndex, reportCarouselMetrics, storyUsers.length, width]);
 
+  const totalUsers = storyUsers.length;
+  // Stable for FlatList: a new renderItem re-renders every mounted page.
+  const renderStoryUser = useCallback(
+    ({ item, index }: { item: StoryUser; index: number }) => (
+      <UserStoriesItem
+        user={item}
+        userIndex={index}
+        totalUsers={totalUsers}
+        listAnimatedIndex={listAnimatedIndex}
+        listCurrentIndex={listCurrentIndex}
+        isDragging={isDragging}
+        scrollRef={scrollRef}
+        onClose={onClose}
+        isClosing={isClosing}
+      />
+    ),
+    [totalUsers, listAnimatedIndex, listCurrentIndex, isDragging, scrollRef, onClose, isClosing]
+  );
+
   return (
     <Log name="StoriesCarousel">
       <VisualLayoutProbe
@@ -294,19 +313,7 @@ export const StoriesCarousel: FC<CarouselProps> = ({
           ref={scrollRef as any}
           data={storyUsers}
           keyExtractor={(item) => item.pubkey}
-          renderItem={({ item, index }) => (
-            <UserStoriesItem
-              user={item}
-              userIndex={index}
-              totalUsers={storyUsers.length}
-              listAnimatedIndex={listAnimatedIndex}
-              listCurrentIndex={listCurrentIndex}
-              isDragging={isDragging}
-              scrollRef={scrollRef}
-              onClose={onClose}
-              isClosing={isClosing}
-            />
-          )}
+          renderItem={renderStoryUser}
           horizontal
           showsHorizontalScrollIndicator={false}
           onLayout={handleCarouselLayout}
@@ -570,6 +577,7 @@ const UserStoriesItem: FC<UserItemProps> = ({
     ? buildStoryCaption(currentVideo.content, currentVideo.videoUrl)
     : null;
   const profileName = user.profile?.name || user.pubkey.slice(0, 12) + '…';
+  // The route carries a fixed profile snapshot; story playback owns no metadata fetch.
   const profilePicture = user.profile?.picture;
   const visualKey = `story:${userIndex}:${user.pubkey.slice(0, 12)}`;
 
@@ -645,9 +653,9 @@ const UserStoriesItem: FC<UserItemProps> = ({
 
         <View style={styles.header} pointerEvents="box-none">
           <View testID="story-progress" style={styles.progressRow} pointerEvents="none">
-            {user.videoPosts.map((_, idx) => (
+            {user.videoPosts.map((post, idx) => (
               <StoryProgressBar
-                key={idx}
+                key={post.eventId}
                 index={idx}
                 currentStoryIndex={currentStoryIndex}
                 storyProgress={storyProgress}
@@ -656,7 +664,7 @@ const UserStoriesItem: FC<UserItemProps> = ({
           </View>
           <View style={styles.profileRow} pointerEvents="box-none">
             <Avatar
-              state={avatarStateFor(profilePicture, user.profile !== undefined)}
+              state={profileAvatarStateFor(profilePicture, 'cached')}
               picture={profilePicture}
               seed={user.pubkey}
               name={profileName}

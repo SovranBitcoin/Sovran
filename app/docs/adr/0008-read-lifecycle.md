@@ -25,10 +25,10 @@ reviews), where a slower tier can complete what a faster one missed.
 Every hook and screen reports `loading | revalidating | ready | empty | error`
 plus `partial` and `source`. Cached data always paints synchronously; a refetch
 is background work that never blanks what is on screen. A key change shows that
-key's cached entry or a skeleton, never `null` plus a spinner. Skeletons are data
-items rendered by the same row component (FlashList surfaces) or a
-`SkeletonContentCrossfade` with the same component in both branches. Unknown
-counts render a placeholder or a dash, never a zero.
+key's cached entry immediately. Payment identities use known names and stable
+key-based avatars while enrichment runs; unresolved search placeholders are not
+rendered. Existing skeleton surfaces remain outside that payment policy. Unknown
+counts render a dash, never a zero.
 
 ### One consumer over the query cache
 
@@ -40,6 +40,15 @@ value from a prior step as `revalidating`; `keepPreviousData` opts a same-surfac
 refinement (a search query) into holding the previous rows; `classify` maps zero
 items to `empty` and an unavailable read to `error`. The DM paging engine keeps
 its own loop (cursor + client-side decrypt) but speaks the same status vocabulary.
+
+### Profile enrichment follows the shared owner
+
+Home warm-up, list rows and payment steps read the same profile entity cache.
+Overlapping automatic revalidation shares work by public key and data-layer
+instance, including aggregate gap filling after the first answer. Switching
+accounts or tier configuration cannot join a prior layer's request. Reads with
+caller-owned cancellation remain independent. A completed miss can be retried;
+sharing in-flight work must not become a permanent negative cache.
 
 ### Empty is not unavailable
 

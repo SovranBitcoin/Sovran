@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { paymentLog } from '@/shared/lib/logger';
 
 type AmountInputMode = 'unit' | 'fiat';
@@ -41,7 +41,10 @@ interface AmountDraftStore {
  * via the same `setInput` action the keypad uses. Cleared at every flow root by
  * `clearPaymentContext` so a brand-new flow never restores a stale amount.
  */
-export const useAmountDraftStore = create<AmountDraftStore>((set, get) => ({
+export const useAmountDraftStore = create<AmountDraftStore>({
+  name: 'useAmountDraftStore',
+  scope: 'session',
+})((set, get) => ({
   pending: null,
   stash: (draft) => {
     paymentLog.info('amount_draft.stash', {

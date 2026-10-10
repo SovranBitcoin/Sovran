@@ -5,27 +5,19 @@ import { StatusBar } from 'expo-status-bar';
 import { setBackgroundColorAsync } from 'expo-system-ui';
 import { HeroUINativeProvider } from 'heroui-native/provider';
 import 'global.css';
-
 import { useFonts } from '@/shared/hooks/useFonts';
-import { cashuLog, initLog, paymentLog, useInitMount } from '@/shared/lib/logger';
+import { initLog, paymentLog, useInitMount } from '@/shared/lib/logger';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { LogBox, Platform } from 'react-native';
-
-import AppGate from '@/shared/blocks/AppGate';
 import { CtaHost } from '@/shared/blocks/CtaHost';
 import GlobalMigrationGate from '@/shared/blocks/GlobalMigrationGate';
 import { NativeSplashLayoutGate } from '@/shared/blocks/NativeSplashLayoutGate';
-import {
-  InitializationProvider,
-  useInitializationReset,
-} from '@/shared/providers/InitializationProvider';
+import { InitializationProvider } from '@/shared/providers/InitializationProvider';
 import { compose } from '@/shared/lib/utils';
-import { NostrKeysProvider } from '@/shared/providers/NostrKeysProvider';
-import { NostrNDKProvider } from '@/shared/providers/NostrNDKProvider';
-import { NostrSignerProvider } from '@/shared/providers/NostrSignerProvider';
-import { PricelistProvider } from '@/shared/providers/PricelistProvider';
 import { ThemeProvider, useTheme } from '@/shared/providers/ThemeProvider';
 import { CapabilityProvider, useCapabilities } from '@/shared/ui/capability';
+import { LayoutGuidesProvider } from '@/shared/providers/LayoutGuidesProvider';
+import { TouchIndicatorProvider } from '@/shared/providers/TouchIndicatorProvider';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import React, { useCallback, useEffect, useMemo } from 'react';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
@@ -33,18 +25,14 @@ import { MODAL_SCREENS, ModalConfig } from '../config/modalScreens';
 import { getBaseModalHeaderOptions } from '../config/flowLayoutOptions';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { loadSettledHeaderHeights } from '@/shared/ui/composed/settledHeaderHeight';
+import { applyFeatureSetToWallet } from '@/shared/config/features';
+import { useFeatureRouteGuard } from '@/shared/lib/nav/featureRoutes';
 import { preloadNfcSupported } from '@/shared/lib/nfc/useNfcSupported';
 import { withGlassHeaderItems } from '@/navigation/headerItems';
-import { CocoProvider } from '@/shared/providers/CocoProvider';
-import { BitchatBLEProvider } from '@/shared/providers/BitchatBLEProvider';
-import { WhitenoiseProvider } from '@/features/whitenoise/WhitenoiseProvider';
-import { WalletContextProvider } from '@/shared/providers/WalletContextProvider';
 import { HeroTransitionProvider } from '@/shared/providers/hero-transition/HeroTransitionProvider';
-import { SovranColadaProvider } from '@/features/send/providers/Colada';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { useProfileBalanceSync } from '@/features/wallet';
 import { usePaymentStatusListener } from '@/shared/hooks/usePaymentStatusListener';
-import { useRegisterKeyDerivation } from '@/shared/hooks/useRegisterKeyDerivation';
 import { useSwapStatusListener } from '@/shared/hooks/useSwapStatusListener';
 import { useOwnEventsSync } from '@/shared/lib/nostr/ownsync/useOwnEventsSync';
 import { useOwnSocialGraphSeed } from '@/shared/lib/nostr/ownsync/useOwnSocialGraphSeed';
@@ -55,9 +43,12 @@ import { E2EStateMirror } from '@/shared/lib/e2e/E2EStateMirror';
 import { AndroidImageOverlayHost } from '@/features/feed/components/nostr/image-overlay/AndroidImageOverlayHost';
 import { OfflineShell, OfflineStatusProvider } from '@/shared/providers/OfflineProvider';
 import {
-  clearTransitionGuardOnStartup,
-  registerTransitionControls,
-} from '@/shared/lib/profile/profileSessionOrchestrator';
+  AccountScopedProviders,
+  AccountSwitchBoundary,
+  TransitionControlRegistrar,
+  KeyDerivationRegistrar,
+  TransitionGuardCleanup,
+} from '@/shared/providers/AccountProviders';
 
 initLog('Module', '_layout loaded');
 
@@ -74,6 +65,7 @@ LogBox.ignoreAllLogs();
 // Before any stack pushes a page, so it starts at the right header height.
 void loadSettledHeaderHeights();
 // Before Send opens, so its method list is sized by the answer, not the guess.
+applyFeatureSetToWallet();
 preloadNfcSupported();
 
 // Outer providers — stable across profile switches, never remount.
@@ -89,79 +81,13 @@ const OuterProviders = compose([
   InitializationProvider,
   ThemeProvider,
   CapabilityProvider,
+  LayoutGuidesProvider,
+  TouchIndicatorProvider,
   HeroUINativeProvider,
   HeroTransitionProvider,
   OfflineStatusProvider,
 ]);
 
-// Inner providers — remounted on profile switch via React key change
-function AccountScopedProviders({
-  accountIndex,
-  children,
-}: {
-  accountIndex: number;
-  children: React.ReactNode;
-}) {
-  useInitMount('AccountScopedProviders');
-  initLog('AccountScoped', `render — accountIndex=${accountIndex}`);
-  useEffect(() => {
-    cashuLog.info('app.account_scoped_providers.mount', { accountIndex });
-    return () => {
-      cashuLog.info('app.account_scoped_providers.unmount', { accountIndex });
-    };
-  }, [accountIndex]);
-  const InnerProviders = useMemo(
-    () =>
-      compose([
-        [NostrKeysProvider, { defaultAccountIndex: accountIndex }],
-        [NostrNDKProvider, { accountIndex }],
-        // NIP-46 signer service — stays cold (no sockets) until the user has
-        // ≥1 connected app or an in-flight pairing. Must sit directly after
-        // NostrNDKProvider: it gates on its isInitialized flag.
-        NostrSignerProvider,
-        [WhitenoiseProvider, { accountIndex }],
-        CocoProvider,
-        WalletContextProvider,
-        SovranColadaProvider,
-        PricelistProvider,
-        // Mounts BitChat DM listeners once per account scope without
-        // starting BLE on app launch. BLE discovery announces to nearby
-        // bitchat clients, so explicit peer-list/chat surfaces own startup.
-        BitchatBLEProvider,
-        AppGate,
-      ]),
-    [accountIndex]
-  );
-
-  return <InnerProviders>{children}</InnerProviders>;
-}
-
-/** Registers resetStages/cancelResetStages with the orchestrator so profile transitions can show a splash. */
-function TransitionControlRegistrar() {
-  const { resetStages, cancelResetStages } = useInitializationReset();
-
-  useEffect(() => {
-    registerTransitionControls({ resetStages, cancelResetStages });
-  }, [resetStages, cancelResetStages]);
-
-  return null;
-}
-
-/** Registers key derivation function with the orchestrator so createAndSwitchProfile can derive keys. */
-function KeyDerivationRegistrar() {
-  useRegisterKeyDerivation();
-  return null;
-}
-
-/** Clears the AsyncStorage transition guard on app startup (if leftover from a previous restart). */
-function TransitionGuardCleanup() {
-  useEffect(() => {
-    void clearTransitionGuardOnStartup();
-  }, []);
-  return null;
-}
-
-/** Subscribes to coco mint-quote events and shows payment status sheet for NPC payments */
 function PaymentStatusListener() {
   useEffect(() => {
     paymentLog.info('app.payment_status_listener.mount');
@@ -213,8 +139,21 @@ const CloseButton = React.memo(function CloseButton() {
   return <ScreenHeaderAction icon="material-symbols:close-rounded" onPress={() => router.back()} />;
 });
 
+// A pushed Android route leaves with Back; same chrome as every header action.
+const BackButton = React.memo(function BackButton() {
+  return (
+    <ScreenHeaderAction
+      icon="material-symbols:arrow-back-rounded"
+      accessibilityLabel="Go back"
+      testID="flow-header-back"
+      onPress={() => router.back()}
+    />
+  );
+});
+
 // Inner component that can access theme context
 function RootLayoutContent() {
+  useFeatureRouteGuard();
   const { currentTheme } = useTheme();
   const [foreground, background] = useThemeColor(['foreground', 'surface'] as const);
 
@@ -266,6 +205,9 @@ function RootLayoutContent() {
           ...(screen.title !== undefined ? { headerTitle: screen.title } : {}),
           // Add close button for modal presentations (only when header is shown)
           ...(isModalPresentation ? { headerLeft: () => <CloseButton /> } : {}),
+          ...(screen.androidPushed
+            ? { headerLeft: () => <BackButton />, headerBackVisible: false }
+            : {}),
         });
       }
 
@@ -384,18 +326,20 @@ export default function RootLayout() {
         <TransitionGuardCleanup />
         <NativeSplashLayoutGate>
           <GlobalMigrationGate>
-            <AccountScopedProviders
-              key={`account-${activeAccountIndex}`}
-              accountIndex={activeAccountIndex}>
-              <RootLayoutContent />
-              <E2EToastProbe />
-              {/* Same-window host for the Android feed media lightbox; must
+            <AccountSwitchBoundary>
+              <AccountScopedProviders
+                key={`account-${activeAccountIndex}`}
+                accountIndex={activeAccountIndex}>
+                <RootLayoutContent />
+                <E2EToastProbe />
+                {/* Same-window host for the Android feed media lightbox; must
                     sit BEFORE PopupHost so popups triggered from inside the
                     lightbox stack above it. No-op on iOS / when empty. */}
-              <AndroidImageOverlayHost />
-              <PopupHost />
-              <ActionMenuHost />
-            </AccountScopedProviders>
+                <AndroidImageOverlayHost />
+                <PopupHost />
+                <ActionMenuHost />
+              </AccountScopedProviders>
+            </AccountSwitchBoundary>
           </GlobalMigrationGate>
         </NativeSplashLayoutGate>
       </OuterProviders>

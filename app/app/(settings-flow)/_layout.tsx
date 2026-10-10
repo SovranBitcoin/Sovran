@@ -30,6 +30,8 @@ const DESIGN_SYSTEM_EMPTY_STATES_OPTIONS = { title: 'Empty states' };
 const DESIGN_SYSTEM_SKELETON_CROSSFADE_OPTIONS = { title: 'Skeleton crossfade' };
 const DESIGN_SYSTEM_FADE_STRESS_OPTIONS = { title: 'Fade-reveal stress' };
 const DESIGN_SYSTEM_POSTS_OPTIONS = { title: 'Fake posts' };
+const DESIGN_SYSTEM_SCREENS_OPTIONS = { title: 'Screens' };
+const DESIGN_SYSTEM_VARIATIONS_OPTIONS = { title: 'Variations' };
 const RECOVERY_OPTIONS = { title: 'Recover wallet' };
 const DELETE_OPTIONS = { title: 'Delete account' };
 
@@ -73,6 +75,8 @@ export default function SettingsFlowLayout() {
       />
       <Stack.Screen name="design-system-fade-stress" options={DESIGN_SYSTEM_FADE_STRESS_OPTIONS} />
       <Stack.Screen name="design-system-posts" options={DESIGN_SYSTEM_POSTS_OPTIONS} />
+      <Stack.Screen name="design-system-screens" options={DESIGN_SYSTEM_SCREENS_OPTIONS} />
+      <Stack.Screen name="design-system-variations" options={DESIGN_SYSTEM_VARIATIONS_OPTIONS} />
       <Stack.Screen name="recovery" options={RECOVERY_OPTIONS} />
       <Stack.Screen name="delete" options={DELETE_OPTIONS} />
     </Stack>

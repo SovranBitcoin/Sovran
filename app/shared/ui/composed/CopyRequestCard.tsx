@@ -12,7 +12,7 @@ import Icon from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { withAlpha } from '@/shared/lib/color';
 import { formatVerifiableValue, type VerifiableKind } from '@/shared/lib/format/verifiableValue';
-import { GradientCard } from '@/shared/ui/composed/GradientCard';
+import { Surface } from '@/shared/ui/composed/Surface';
 import { Section } from '@/shared/ui/composed/Section';
 import { Skeleton } from '@/shared/ui/primitives/Skeleton';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -122,11 +122,11 @@ export function CopyRequestCard({ title, ...row }: CopyRequestRowProps & { title
   return (
     <View className="mx-4">
       <Section title={title}>
-        <GradientCard>
+        <Surface>
           <ListGroup variant="transparent">
             <CopyRequestRow {...row} />
           </ListGroup>
-        </GradientCard>
+        </Surface>
       </Section>
     </View>
   );

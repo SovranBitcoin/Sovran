@@ -11,7 +11,7 @@
  * entry; the pay action handles LNURL resolution + prepareMeltBolt11 + executeMelt.
  */
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useWindowDimensions } from 'react-native';
 
 import type { MeltHistoryEntry } from '@cashu/coco-core';
@@ -30,6 +30,7 @@ import {
   stateDetailItem,
   quoteIdDetailItem,
   mintDetailItem,
+  entryDetailItems,
 } from '@/features/transactions';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
@@ -63,6 +64,8 @@ export function LightningSendScreen({
   onRequestMintList,
 }: LightningSendScreenProps) {
   useLifecycleLogger('LightningSendScreen');
+  // Details is opened from the footer, not from a row in the page.
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const { width: windowWidth } = useWindowDimensions();
   const { entry, error, actions, source, mintUrl } = useScreenActions(
     'meltQuote',
@@ -218,21 +221,23 @@ export function LightningSendScreen({
         <ButtonHandler
           buttons={[
             {
+              // Every id and value behind this payment, each one copyable. It
+              // gives way to the screen's own actions: behind the dots when two
+              // of them are showing, in the free slot when they are not.
+              testID: 'melt-details',
+              text: 'Details',
+              icon: 'mdi:receipt-text-outline',
+              variant: 'secondary',
+              onPress: () => setDetailsOpen(true),
+              prefersOverflow: true,
+            },
+            {
               testID: 'melt-close',
               text: 'Close',
               icon: 'ri:close-circle-line',
               variant: 'secondary',
               onPress: async () => onCancel(),
               condition: isPaid,
-            },
-            {
-              testID: 'melt-pay',
-              text: actions.pay.loading ? 'Sending...' : 'Pay',
-              icon: actions.pay.loading ? 'ri:loader-line' : 'ri:send-plane-2-fill',
-              variant: 'primary',
-              onPress: () => actions.pay.execute(),
-              condition: actions.pay.available,
-              disabled: anyLoading,
             },
             {
               testID: 'melt-cancel',
@@ -250,6 +255,15 @@ export function LightningSendScreen({
               // reads as a broken button. Synthetic previews remain directly
               // dismissible even though the rollback action is unavailable.
               condition: (isPreview || actions.cancel.available) && !actions.pay.loading,
+              disabled: anyLoading,
+            },
+            {
+              testID: 'melt-pay',
+              text: actions.pay.loading ? 'Sending...' : 'Pay',
+              icon: actions.pay.loading ? 'ri:loader-line' : 'ri:send-plane-2-fill',
+              variant: 'primary',
+              onPress: () => actions.pay.execute(),
+              condition: actions.pay.available,
               disabled: anyLoading,
             },
           ]}
@@ -300,6 +314,9 @@ export function LightningSendScreen({
         ) : null
       }>
       <DetailsSection
+        trigger="none"
+        open={detailsOpen}
+        onOpenChange={setDetailsOpen}
         items={[
           ...transactionLeadDetailItems({
             source,
@@ -330,6 +347,7 @@ export function LightningSendScreen({
             value: <MiddleEllipsisValue value={entry.metadata.meltTarget} />,
           },
           mintDetailItem(mintUrl),
+          ...entryDetailItems(entry),
         ]}
       />
     </TransactionDetailShell>

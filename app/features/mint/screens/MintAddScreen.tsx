@@ -1,5 +1,5 @@
 import { accountUnitLabel } from 'wallet';
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import type { ViewToken } from 'react-native';
 import { Platform, TextInput, useWindowDimensions } from 'react-native';
 import { usePreventRemove } from 'expo-router/react-navigation';
@@ -504,16 +504,17 @@ export function MintAddScreen() {
   // and the presence hook re-sweeps as the window moves; probed rows answer
   // from the cache when they scroll back in.
   const [visibleMintUrls, setVisibleMintUrls] = useState<string[]>([]);
-  const handleViewableItemsChanged = useRef(
-    ({ viewableItems }: { viewableItems: ViewToken<SearchableMint>[] }) => {
-      const urls = viewableItems
-        .map((token) => token.item?.url)
-        .filter((url): url is string => typeof url === 'string' && url.startsWith('https://'));
-      setVisibleMintUrls((prev) =>
-        prev.length === urls.length && prev.every((url, i) => url === urls[i]) ? prev : urls
-      );
-    }
-  ).current;
+  const [handleViewableItemsChanged] = useState(
+    () =>
+      ({ viewableItems }: { viewableItems: ViewToken<SearchableMint>[] }) => {
+        const urls = viewableItems
+          .map((token) => token.item?.url)
+          .filter((url): url is string => typeof url === 'string' && url.startsWith('https://'));
+        setVisibleMintUrls((prev) =>
+          prev.length === urls.length && prev.every((url, i) => url === urls[i]) ? prev : urls
+        );
+      }
+  );
   const presence = useMintPresence(visibleMintUrls);
 
   const renderItem = ({ item }: { item: SearchableMint }) =>

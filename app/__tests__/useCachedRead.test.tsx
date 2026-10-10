@@ -46,7 +46,12 @@ function deferred<T>() {
 let seq = 0;
 function makeStore(staleTtlMs = 60_000) {
   seq += 1;
-  return createQueryCacheStore<Page>({ name: `read-test-${seq}`, staleTtlMs, persist: false });
+  return createQueryCacheStore<Page>({
+    scope: 'session',
+    name: `read-test-${seq}`,
+    staleTtlMs,
+    persist: false,
+  });
 }
 
 const flush = () => act(async () => {});

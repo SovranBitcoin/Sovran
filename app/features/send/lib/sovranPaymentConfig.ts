@@ -11,15 +11,21 @@
  * via createColada in the library.
  */
 
+import {
+  mintPickerIsSheet,
+  mintPickerUnderlay,
+  type AmountFlowGroup,
+} from '@/features/send/lib/amountReturn';
 import { Share } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { scanFromURLAsync } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
+import { hasFeature } from '@/shared/config/features';
 import { paymentLog, mintUrlLogFields } from '@/shared/lib/logger';
 import { parseHistoryEntryOnce, type ParsedHistoryEntry } from 'wallet/operations';
 import { z } from 'zod';
-import { runAfterInteractions } from '@/shared/lib/interactions';
+import { afterNextFrame, runAfterInteractions } from '@/shared/lib/interactions';
 import { mintLocalId } from '@/shared/lib/id';
 
 import { getEncodedToken, getTokenMetadata, type Token } from '@cashu/cashu-ts';
@@ -79,6 +85,7 @@ import {
   paymentOptionsPopup,
   paymentStatusPopup,
   proofSelectorPopup,
+  sendFallbackPopup,
   sendMemoPopup,
   staticPopup,
   paramPopup,
@@ -86,10 +93,6 @@ import {
 import { RECEIVE_PENDING_TOAST_COPY } from '@/shared/lib/popup/paymentStatusCopy';
 import { captureAndStoreLocation } from '@/shared/hooks/useTransactionLocation';
 import { executeRoutstrTopUp, formatRoutstrBalance } from '@/shared/lib/routstr/topUp';
-import { sendBLEPrivateMessageWhole } from '@/features/bitchat/lib/blePrivateDelivery';
-import { getBitchatNickname } from '@/features/bitchat/hooks/useBitchatNickname';
-import { getBitchatProfileScope } from '@/features/bitchat/lib/profileScope';
-import type { BitchatBLEIdentityMaterial } from 'bitchat-module';
 import { useRoutstrTopUpStore } from '@/shared/stores/runtime/routstrTopUpStore';
 import { useNearPaySessionStore } from '@/shared/stores/runtime/nearPayStore';
 import { useContactSendStore } from '@/shared/stores/runtime/contactSendStore';
@@ -1321,9 +1324,10 @@ export function createSovranScanSources(nfcAdapter?: NfcIOAdapter): ScanSources 
 interface CreateSovranHandlersConfig {
   machine: PaymentMachine;
   onOptionDismiss?: () => void;
+  /** The root navigator's current state, for telling where a screen sits. */
+  getRootNavigationState?: () => Parameters<typeof mintPickerUnderlay>[0];
   getManager: () => Manager | null;
   getNpub?: () => string | undefined;
-  getBitchatIdentityMaterial?: () => BitchatBLEIdentityMaterial | null;
   /**
    * Deliver a bearer ecash token to a remote Nostr contact over an encrypted
    * NIP-17 gift-wrapped DM. Provided by the Colada provider (which holds the
@@ -1367,70 +1371,6 @@ function getEncodedEcashTokenFromSendHistoryEntry(historyEntry: string): string 
     });
   }
   return null;
-}
-
-async function deliverNearPayIfActive(
-  historyEntry: string,
-  getBitchatIdentityMaterial?: () => BitchatBLEIdentityMaterial | null
-): Promise<void> {
-  const active = useNearPaySessionStore.getState().active;
-  if (!active) return;
-
-  // Every Nut Drop send is delivered as a SINGLE private Noise DM to a
-  // creq-confirmed Sovran peer — encrypted to them, so a locked OR offline
-  // bearer token stays private (no public-mesh broadcast of payment metadata).
-  // The whole multi-KB token fits one message thanks to the extended
-  // PrivateMessagePacket length. Stock clients can't decode extended DMs, so
-  // active sessions must carry a creq capability proof before we transmit.
-
-  try {
-    const encodedToken = getEncodedEcashTokenFromSendHistoryEntry(historyEntry);
-    if (!encodedToken) throw new Error('Created send entry did not contain an ecash token');
-    if (!active.recipient.creq) {
-      throw new Error('Nut Drop recipient has not advertised a creq capability');
-    }
-
-    const profileScope = getBitchatProfileScope();
-    const identityMaterial = getBitchatIdentityMaterial?.() ?? null;
-    const nickname = getBitchatNickname() || 'sovran';
-    const result = await sendBLEPrivateMessageWhole({
-      peerID: active.recipient.peerID,
-      content: encodedToken,
-      nickname,
-      profileScope,
-      identityMaterial,
-    });
-
-    paymentLog.info('near_pay.delivery.sent', {
-      peerID: active.recipient.peerID,
-      tokenBytes: encodedToken.length,
-      hasDirectLink: active.recipient.hasDirectLink,
-      startupMs: Math.round(result.startupMs * 100) / 100,
-      handshakeMs: Math.round(result.handshakeMs * 100) / 100,
-      sendMs: Math.round(result.sendMs * 100) / 100,
-      ...(result.handshakeError ? { handshakeError: result.handshakeError } : {}),
-    });
-
-    // Delivered over the BLE/bitchat mesh — stamp a bluetooth source badge on
-    // the resulting send transaction.
-    const entry = parseHistoryEntryOnce(historyEntry);
-    if (entry?.id) {
-      try {
-        setTransactionAnnotation(`id:${entry.id}`, { scan: { method: 'ble' } });
-      } catch (e) {
-        paymentLog.warn('near_pay.delivery.ble_source_annotation_failed', {
-          error: e instanceof Error ? e.message : String(e),
-        });
-      }
-    }
-  } catch (err) {
-    paymentLog.error('near_pay.delivery.failed', {
-      peerID: active.recipient.peerID,
-      error: err instanceof Error ? err.message : String(err),
-    });
-  } finally {
-    useNearPaySessionStore.getState().complete();
-  }
 }
 
 /**
@@ -1482,10 +1422,40 @@ export function createSovranHandlers({
   onOptionDismiss,
   getManager,
   getNpub,
-  getBitchatIdentityMaterial,
   deliverContactEcashDm,
+  getRootNavigationState,
 }: CreateSovranHandlersConfig): StepHandlerMap {
   paymentLog.debug('payment.handlers.created');
+
+  /**
+   * Move on from the mint picker when it is still the current screen. With
+   * the amount already known, choosing a mint goes straight to the next
+   * screen, and the picker has to go first.
+   *
+   * Over the amount screen it was a detour from that screen, on both
+   * platforms: the next screen takes its place over (or in place of) the
+   * amount screen, exactly as it does when no picker was shown. Replacing the
+   * picker itself left the amount screen underneath.
+   *
+   * Over anything else it is a page in the flow's history on Android and
+   * stays there. On iPhone it is a system sheet, and the stack presents every
+   * screen that follows a sheet as a modal over it, so it goes there too.
+   *
+   * The step then waits for the dismissal to reach the screen: a page pushed
+   * in the same update lands beneath a sheet that is still presented.
+   */
+  const leaveMintPicker = (flowGroup: AmountFlowGroup, go: () => void) => {
+    const beneath = mintPickerUnderlay(getRootNavigationState?.(), flowGroup);
+    if (beneath === null || (beneath === 'other' && !mintPickerIsSheet())) {
+      go();
+      return;
+    }
+    paymentLog.info('navigate.leave_mint_picker', { flowGroup, beneath });
+    // Unguarded: the guard would drop this as a repeat of a back just made
+    // (closing mint details, say), and the step would land over the picker.
+    router.raw.back();
+    afterNextFrame(go);
+  };
 
   return {
     selectDestination: ({ unit }) => {
@@ -1623,18 +1593,14 @@ export function createSovranHandlers({
         }
       }
 
-      await deliverNearPayIfActive(enrichedHistoryEntry, getBitchatIdentityMaterial);
-
       // Remote-contact ecash: deliver the token over an encrypted Nostr DM and
       // drop the user into that chat thread (the self-copy wrap surfaces the
       // sent token bubble), instead of the bearer hand-off screen. The token
       // may be P2PK-locked to them; the DM is the envelope, the lock is what
       // is inside it.
       //
-      // This used to read "no P2PK lock" as "not a Nut Drop", which made a
-      // locked contact send impossible. Nut Drop is identified by its own
-      // session store, handled by `deliverNearPayIfActive` immediately above,
-      // and never populates this one.
+      // Nearby delivery is bound to its operation before execution and never
+      // populates the contact-send session.
       const contactTarget = useContactSendStore.getState().active;
       if (contactTarget) {
         const recipientPubkey = contactTarget.pubkey;
@@ -1643,13 +1609,21 @@ export function createSovranHandlers({
           deliverContactEcashDm
         );
         if (delivered) {
-          router.dismissAll();
-          // Let the modal dismissal settle before pushing the DM thread —
-          // navigating mid-dismissal triggers react-native-screens' modal
-          // header-visibility remount loop (blank DM thread).
-          runAfterInteractions(() => {
-            router.navigate({ pathname: '/userMessages', params: { pubkey: recipientPubkey } });
-          });
+          if (hasFeature('directMessages')) {
+            router.dismissAll();
+            // Let the modal dismissal settle before pushing the DM thread —
+            // navigating mid-dismissal triggers react-native-screens' modal
+            // header-visibility remount loop (blank DM thread).
+            runAfterInteractions(() => {
+              router.navigate({ pathname: '/userMessages', params: { pubkey: recipientPubkey } });
+            });
+          } else {
+            // Without DM pages the send ends on the wallet: the token is
+            // already with the contact, so there is no hand-off to show.
+            // `dismissAll` alone only pops this flow's stack to its first
+            // screen, the send chooser.
+            router.dismissTo('/');
+          }
           return;
         }
         // Delivery failed — fall through to the bearer hand-off screen so the
@@ -1657,14 +1631,16 @@ export function createSovranHandlers({
         paymentLog.warn('contact_send.delivery.fallback_to_hand_off');
       }
 
-      router.navigate({
-        pathname: '/(send-flow)/sendToken',
-        params: {
-          sendHistoryEntry: enrichedHistoryEntry,
-          ...(createdOffline ? { createdOffline: 'true' } : {}),
-          ...(mintWasOffline ? { mintWasOffline: 'true' } : {}),
-        },
-      });
+      leaveMintPicker('(send-flow)', () =>
+        router.navigate({
+          pathname: '/(send-flow)/sendToken',
+          params: {
+            sendHistoryEntry: enrichedHistoryEntry,
+            ...(createdOffline ? { createdOffline: 'true' } : {}),
+            ...(mintWasOffline ? { mintWasOffline: 'true' } : {}),
+          },
+        })
+      );
     },
 
     navigateToPaymentRequest: ({ mintUrl, paymentRequest, amount, unit, recipientPubkey }) => {
@@ -1691,10 +1667,12 @@ export function createSovranHandlers({
       };
       const isFallback = (machine.getContext().failedOptionValues?.length ?? 0) > 0;
       const nav = isFallback ? router.replace : router.navigate;
-      nav({
-        pathname: '/(send-flow)/paymentRequest',
-        params: { paymentRequestEntry: JSON.stringify(entry) },
-      });
+      leaveMintPicker('(send-flow)', () =>
+        nav({
+          pathname: '/(send-flow)/paymentRequest',
+          params: { paymentRequestEntry: JSON.stringify(entry) },
+        })
+      );
     },
 
     navigateToMeltPreview: ({
@@ -1767,10 +1745,12 @@ export function createSovranHandlers({
       };
       const isFallback = (machine.getContext().failedOptionValues?.length ?? 0) > 0;
       const nav = isFallback ? router.replace : router.navigate;
-      nav({
-        pathname: isOnchain ? '/(send-flow)/onchainSend' : '/(send-flow)/lightningSend',
-        params: { meltHistoryEntry: JSON.stringify(entry) },
-      });
+      leaveMintPicker('(send-flow)', () =>
+        nav({
+          pathname: isOnchain ? '/(send-flow)/onchainSend' : '/(send-flow)/lightningSend',
+          params: { meltHistoryEntry: JSON.stringify(entry) },
+        })
+      );
     },
 
     mintQuoteCreated: ({ historyEntry, unit }) => {
@@ -1779,10 +1759,12 @@ export function createSovranHandlers({
       const pathname = getOnchainMintAddress(entry)
         ? '/(receive-flow)/onchainReceive'
         : '/(receive-flow)/lightningReceive';
-      router.replace({
-        pathname,
-        params: { mintHistoryEntry: historyEntry, unit },
-      });
+      leaveMintPicker('(receive-flow)', () =>
+        router.replace({
+          pathname,
+          params: { mintHistoryEntry: historyEntry, unit },
+        })
+      );
     },
 
     // Receive "as Ecash": the machine created the single-use NUT-18 request and
@@ -1790,10 +1772,12 @@ export function createSovranHandlers({
     // same router.replace lane as mintQuoteCreated (a step-handler navigation,
     // not a side-channel callback).
     paymentRequestReceived: ({ entry }) => {
-      router.replace({
-        pathname: '/(receive-flow)/paymentRequest',
-        params: { paymentRequestEntry: entry },
-      });
+      leaveMintPicker('(receive-flow)', () =>
+        router.replace({
+          pathname: '/(receive-flow)/paymentRequest',
+          params: { paymentRequestEntry: entry },
+        })
+      );
     },
 
     reviewMint: ({ mintUrl, token, mintInfo }) => {
@@ -1908,11 +1892,9 @@ export function createSovranHandlers({
       };
       const params = { amountEntry: JSON.stringify(entry) };
       const nearPaySessionStore = useNearPaySessionStore.getState();
-      // Radar-launched sends stay inline on the radar: the vanilla ladder
-      // arrives as destination 'sendEcash', mesh sends as 'paymentRequest'
-      // (the solicited creq rides the payment-request machinery).
+      // Only radar-origin sessions render their amount step inline.
       if (
-        nearPaySessionStore.active &&
+        nearPaySessionStore.active?.presentation === 'radar' &&
         (constraints.destination === 'sendEcash' || constraints.destination === 'paymentRequest')
       ) {
         // The amount step is inline, so no route is pushed over the mint
@@ -1931,12 +1913,24 @@ export function createSovranHandlers({
         });
         return;
       }
-      router.navigate(
+      // A mint chosen in the picker that the amount screen opened comes BACK
+      // to that amount screen, carrying the new mint. Navigating forward
+      // instead stacked a second amount screen over the picker — plain to see
+      // on iPhone, where the picker is a sheet and the first amount screen is
+      // still showing behind it. `dismissTo` pops to the route already there
+      // and gives it the new params; `navigate` is for arriving fresh.
+      const flowGroup = constraints.destination === 'mintQuote' ? '(receive-flow)' : '(send-flow)';
+      const returning = mintPickerUnderlay(getRootNavigationState?.(), flowGroup) === 'amount';
+      const href =
         constraints.destination === 'mintQuote'
-          ? { pathname: '/(receive-flow)/amount', params }
-          : { pathname: '/(send-flow)/amount', params }
-      );
-      paymentLog.info('navigate.enterAmount.done', { duration_ms: performance.now() - t0 });
+          ? ({ pathname: '/(receive-flow)/amount', params } as const)
+          : ({ pathname: '/(send-flow)/amount', params } as const);
+      if (returning) router.dismissTo(href);
+      else leaveMintPicker(flowGroup, () => router.navigate(href));
+      paymentLog.info('navigate.enterAmount.done', {
+        duration_ms: performance.now() - t0,
+        returning,
+      });
     },
 
     selectMint: ({
@@ -1984,6 +1978,10 @@ export function createSovranHandlers({
 
     chooseFallbackOption: (stepData) => {
       paymentFallbackPopup({ ...stepData, machine, onDismiss: onOptionDismiss });
+    },
+
+    chooseSendFallback: (stepData) => {
+      sendFallbackPopup({ ...stepData, machine });
     },
 
     chooseProofs: (stepData) => {

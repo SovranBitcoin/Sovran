@@ -13,7 +13,8 @@
 import React from 'react';
 import { useLocalSearchParams } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
-import { ListGroup, PressableFeedback, Switch as HeroSwitch } from 'heroui-native';
+import { ListGroup, PressableFeedback } from 'heroui-native';
+import { Switch as HeroSwitch } from '@/shared/ui/primitives/Switch';
 import { z } from 'zod';
 
 import Icon from 'assets/icons';

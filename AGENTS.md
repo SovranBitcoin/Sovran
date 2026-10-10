@@ -95,8 +95,9 @@ license and refresh command beside it.
 Skills are standard, upstream skills committed under `.agents/skills/`, the
 cross-agent location; `.claude/skills/` links to the same folders. Sovran-specific
 semantic checks belong in `hunch.config.ts`; broader conventions belong in
-`docs/review/contributor-conventions.md`, not in custom skills. Load only the skill a
-task needs:
+`docs/review/contributor-conventions.md`, not in custom skills. The one exception is
+`persistence-release-safety`, a local procedure with a verdict rather than a
+convention. Load only the skill a task needs:
 
 | Skill | Use for |
 | --- | --- |
@@ -114,6 +115,7 @@ task needs:
 | principle-type-system-discipline | Illegal states, derived types, exhaustive matching |
 | principle-model-the-domain | Replacing scattered branching with one structure |
 | react-native-testing | React Native Testing Library 13 queries and async tests |
+| persistence-release-safety | Certifying that a release upgrades every released durable state; run before a release and after any change to persisted stores, secrets, databases or migrations |
 
 `python3 .agents/skills/manage.py check` verifies the installation and
 `python3 .agents/skills/manage.py link` repairs missing links. Keep upstream

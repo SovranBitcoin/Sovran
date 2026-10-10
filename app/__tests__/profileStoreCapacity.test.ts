@@ -2,8 +2,6 @@
  * @jest-environment node
  */
 
-import { z } from 'zod';
-
 import { persistRegistry } from '@/shared/lib/persist/persistConfig';
 import { MAX_PROFILES, useProfileStore } from '@/shared/stores/global/profileStore';
 
@@ -22,10 +20,11 @@ jest.mock('@/shared/lib/logger', () => ({
 }));
 
 /**
- * `PersistedProfileStore` caps `profiles` at `MAX_PROFILES` and `addProfile`
- * appended without one, so a 65th profile made the blob unparseable — and
- * `createMergeWithSchema` is all-or-nothing, so the next launch discarded the
- * GLOBAL profile store: every profile the user has, and the active index.
+ * `addProfile` once appended without a ceiling while the schema declared one,
+ * so a 65th profile made the blob unparseable — and `createMergeWithSchema` is
+ * all-or-nothing, so the next launch discarded the GLOBAL profile store: every
+ * profile the user has, and the active index. The ceiling now lives on the
+ * writer only; the schema has to load whatever an earlier release stored.
  *
  * The refusal has to be reported, not silent: `profileSessionOrchestrator`
  * switches into the index it just asked for, and doing that for a profile the
@@ -44,18 +43,6 @@ function projection(): unknown {
   return JSON.parse(JSON.stringify(partialize(useProfileStore.getState() as never)));
 }
 
-/** The ceiling the schema declares, read back out of it rather than retyped. */
-function schemaCap(): number {
-  const shape: unknown = z.toJSONSchema(registered().schema, {
-    unrepresentable: 'any',
-    io: 'input',
-  });
-  const max = (shape as { properties?: { profiles?: { maxItems?: number } } }).properties?.profiles
-    ?.maxItems;
-  if (max === undefined) throw new Error('profile schema no longer declares a maximum');
-  return max;
-}
-
 const pubkey = (i: number) => `${i}`.padStart(64, '0');
 
 /** The store's own post-rehydration hook, as `persist` would call it. */
@@ -71,8 +58,33 @@ function afterHydrate(): (state: ReturnType<typeof useProfileStore.getState>) =>
 beforeEach(() => useProfileStore.setState({ profiles: [], activeAccountIndex: 0 }));
 
 describe('profile store capacity', () => {
-  it('declares the same ceiling the writer enforces', () => {
-    expect(schemaCap()).toBe(MAX_PROFILES);
+  it('loads a stored list longer than the ceiling', () => {
+    // v0.1.0 had no ceiling. Rejecting the list here would replace it with an
+    // empty one and persist that.
+    const profiles = Array.from({ length: MAX_PROFILES + 3 }, (_, i) => ({
+      accountIndex: i,
+      pubkey: pubkey(i),
+      addedAt: i + 1,
+    }));
+
+    const parsed = registered().schema.safeParse({ activeAccountIndex: 2, profiles });
+
+    expect(parsed.success).toBe(true);
+    expect((parsed.data as { profiles: unknown[] }).profiles).toHaveLength(MAX_PROFILES + 3);
+  });
+
+  it('still refuses to add to a list already past the ceiling', () => {
+    useProfileStore.setState({
+      activeAccountIndex: 0,
+      profiles: Array.from({ length: MAX_PROFILES + 3 }, (_, i) => ({
+        accountIndex: i,
+        pubkey: pubkey(i),
+        addedAt: i + 1,
+      })),
+    });
+
+    expect(useProfileStore.getState().addProfile(900, pubkey(900))).toBe(false);
+    expect(useProfileStore.getState().profiles).toHaveLength(MAX_PROFILES + 3);
   });
 
   it('refuses the profile past the ceiling instead of losing all of them', () => {

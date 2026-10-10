@@ -25,10 +25,11 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Platform, StyleSheet, TextInput } from 'react-native';
+import { StyleSheet, TextInput } from 'react-native';
 import { ScreenScrollView } from '@/shared/ui/composed/ScreenScrollView';
 import { usePaymentFlowMachine } from 'wallet/react';
-import { describeDestination, defaultDetectors, parsePaymentInput } from 'wallet';
+import { describeDestination, parsePaymentInput } from 'wallet';
+import { buildDetectors } from '@/shared/config/featureDetectors';
 import type { BLEPeer } from 'bitchat-module';
 import Animated, {
   Easing,
@@ -42,11 +43,9 @@ import { withAlpha } from '@/shared/lib/color';
 
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { useHandleCameraPermission } from '@/features/camera';
-import { useBLEPeers } from '@/features/bitchat/hooks/useBLEPeers';
-import {
-  BLE_PEER_FRESHNESS_TICK_MS,
-  filterFreshBLEPeers,
-} from '@/features/bitchat/lib/blePeerSnapshots';
+import { useFreshNearbyPeers } from '@/features/nearPay/hooks/useFreshNearbyPeers';
+import { useStartNearbySend } from '@/features/nearPay/hooks/useStartNearbySend';
+
 import { NearbyPeerRow } from '@/features/nearPay/components/NearbyPeerRow';
 import { peerNostrPubkey } from '@/features/nearPay/lib/peerProfile';
 import { useRememberPeers } from '@/features/nearPay/hooks/useRememberPeers';
@@ -62,8 +61,7 @@ import type { NostrPubkeyHex } from '@/shared/lib/protocolIds';
 import { normalizeRecentPersonPubkey } from '@/shared/stores/profile/recentPeopleStore';
 import type { NostrSearchResult } from '@/shared/lib/apiClient';
 import { useNfcSupported } from '@/shared/lib/nfc';
-import { useNfcTapStore } from '@/shared/stores/runtime/nfcTapStore';
-import { showActionSheet } from '@/shared/lib/popup';
+import { runTapToPayScan } from '@/features/send/lib/runTapToPayScan';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { paymentLog } from '@/shared/lib/logger';
@@ -76,6 +74,7 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import Icon from 'assets/icons';
+import { hasFeature, type Feature } from '@/shared/config/features';
 
 // Leading icon size — matched to the liquid-glass CircleActionButton (52).
 const ROW_ICON = 52;
@@ -85,6 +84,19 @@ const LISTROW_H = ROW_ICON + 24;
 const COLLAPSED_H = 92;
 // Duration of the expanded-rows ⇄ collapsed-row cross-fade, both directions.
 const METHODS_FADE_MS = 300;
+
+/** Module each send method belongs to; `qr` ships in every edition. */
+const SEND_METHOD_FEATURE: Record<SendMethod['id'], Feature | null> = {
+  qr: null,
+  createEcash: 'ecash',
+  nfc: 'nfc',
+  nutDrop: 'nutDrop',
+};
+
+function shipsSendMethod(id: SendMethod['id']): boolean {
+  const feature = SEND_METHOD_FEATURE[id];
+  return feature === null || hasFeature(feature);
+}
 
 interface SendMethod {
   id: 'qr' | 'createEcash' | 'nfc' | 'nutDrop';
@@ -121,22 +133,9 @@ export function SendScreen({ unit }: { unit: string }) {
   const [focused, setFocused] = useState(false);
 
   // ── Nearby Nut Drop peers (passive BLE discovery) ────────────────────────
-  const { peers } = useBLEPeers();
-  // Persist identified peers (with their nickname) so they survive into the
-  // quick-pay tier after they leave range.
-  useRememberPeers(peers);
-  // Re-tick so stale peers drop out of the fresh window without a peer event.
-  // The tick IS the dependency — `filterFreshBLEPeers` reads the wall clock, so
-  // nothing else marks the result stale.
-  const [freshnessTick, setFreshnessTick] = useState(0);
-  useEffect(() => {
-    const id = setInterval(() => setFreshnessTick((tick) => tick + 1), BLE_PEER_FRESHNESS_TICK_MS);
-    return () => clearInterval(id);
-  }, []);
-  const freshPeers = useMemo(
-    () => filterFreshBLEPeers(peers, Date.now()).filter((p) => peerNostrPubkey(p) != null),
-    [peers, freshnessTick]
-  );
+  const freshPeers = useFreshNearbyPeers();
+  useRememberPeers(freshPeers);
+  const startNearbySend = useStartNearbySend();
 
   // Live peers already show in the "Nearby" tier, so exclude them from the
   // People results (search hits + recents) below.
@@ -153,7 +152,9 @@ export function SendScreen({ unit }: { unit: string }) {
   // Send inherits identical results and per-result metrics, but WITHOUT
   // `useAllSearchResults`' unconditional `useLocationTiers()` — no location
   // permission prompt on a payment screen.
-  const { contactRows, loading: searchLoading } = useOverlaidContactSearch(query);
+  const { contactRows, loading: searchLoading } = useOverlaidContactSearch(
+    hasFeature('nostrSearch') ? query : ''
+  );
   const trimmed = query.trim();
   const isTyping = trimmed.length >= CONTACT_SEARCH_MIN_LENGTH;
 
@@ -174,8 +175,8 @@ export function SendScreen({ unit }: { unit: string }) {
   const destinationDescriptor = useMemo(() => {
     if (!trimmed || /\s/.test(trimmed)) return null;
     const d = describeDestination(
-      parsePaymentInput(trimmed, defaultDetectors),
-      defaultDetectors,
+      parsePaymentInput(trimmed, buildDetectors),
+      buildDetectors,
       walletContext
     );
     return d.kind === 'unsupported' ? null : d;
@@ -276,16 +277,11 @@ export function SendScreen({ unit }: { unit: string }) {
   }, [machine]);
 
   const nfcSupported = useNfcSupported();
-  const nfcArmed = useNfcTapStore((s) => s.armed);
   const handleNfc = useCallback(() => {
-    paymentLog.info('send.method.nfc', { armed: nfcArmed });
-    if (Platform.OS === 'android' && nfcArmed) {
-      showActionSheet('nfc-tap', {});
-      return;
-    }
+    paymentLog.info('send.method.nfc');
     clearPaymentContext('send.nfc');
-    void machine.scan?.(undefined, { source: 'nfc' });
-  }, [machine, nfcArmed]);
+    void runTapToPayScan(() => machine.scan?.(undefined, { source: 'nfc' }));
+  }, [machine]);
 
   const handleNutDrop = useCallback(() => {
     paymentLog.info('send.method.nut_drop');
@@ -316,14 +312,18 @@ export function SendScreen({ unit }: { unit: string }) {
       // Lightning option carries that caveat (see `availability.ts`).
       const npcFallback = npcAddressForPubkey(pubkey);
       const lightningTarget = lud16 ?? npcFallback;
-      useContactSendStore.getState().start({
-        pubkey,
-        delivery: 'nip17',
-        ...(displayName ? { displayName } : {}),
-        avatarUrl: picture,
-        nip05,
-        ...(lud16 ? { lud16 } : {}),
-      });
+      // Without ecash messages the contact is paid over Lightning only, so
+      // no DM delivery is armed.
+      if (hasFeature('ecashMessages')) {
+        useContactSendStore.getState().start({
+          pubkey,
+          delivery: 'nip17',
+          ...(displayName ? { displayName } : {}),
+          avatarUrl: picture,
+          nip05,
+          ...(lud16 ? { lud16 } : {}),
+        });
+      }
       void machine.startSendEcash({
         recipientPubkey: pubkey,
         recipientProfile: { displayName: displayName ?? '', avatarUrl: picture, nip05 },
@@ -364,58 +364,54 @@ export function SendScreen({ unit }: { unit: string }) {
     [startContactSend]
   );
 
-  const handleSelectPeer = useCallback((_peer: BLEPeer) => {
-    // v1: hand off to the proven Nut Drop radar rather than reimplement the
-    // peer P2PK consent/decision flow here. The peer is surfaced in the unified
-    // list; selecting it routes through the radar (which owns the lock logic).
-    paymentLog.info('send.peer.select_handoff');
-    clearPaymentContext('send.near_pay');
-    router.push('/(send-flow)/nearPay');
-  }, []);
+  const handleSelectPeer = (peer: BLEPeer) => startNearbySend(peer);
 
   const methods: SendMethod[] = useMemo(
-    () => [
-      {
-        id: 'qr',
-        title: 'Scan QR',
-        subtitle: 'Scan a code to pay',
-        caption: 'Scan',
-        icon: 'mdi:qrcode-scan',
-        systemIcon: 'qrcode.viewfinder',
-        onPress: handleQrScan,
-      },
-      {
-        id: 'createEcash',
-        title: 'Create ecash',
-        subtitle: 'Make a token to send',
-        caption: 'Ecash',
-        icon: 'mdi:cash-multiple',
-        systemIcon: 'banknote',
-        onPress: handleCreateEcash,
-      },
-      ...(nfcSupported
-        ? [
-            {
-              id: 'nfc' as const,
-              title: 'Tap to pay',
-              subtitle: 'Contactless via NFC',
-              caption: 'Tap',
-              icon: 'lucide:nfc',
-              systemIcon: 'wave.3.right',
-              onPress: handleNfc,
-            },
-          ]
-        : []),
-      {
-        id: 'nutDrop',
-        title: 'Nut Drop',
-        subtitle: 'Pay a nearby person',
-        caption: 'Nut Drop',
-        icon: 'mdi:bluetooth',
-        systemIcon: 'dot.radiowaves.left.and.right',
-        onPress: handleNutDrop,
-      },
-    ],
+    () =>
+      (
+        [
+          {
+            id: 'qr',
+            title: 'Scan QR',
+            subtitle: 'Scan a code to pay',
+            caption: 'Scan',
+            icon: 'mdi:qrcode-scan',
+            systemIcon: 'qrcode.viewfinder',
+            onPress: handleQrScan,
+          },
+          {
+            id: 'createEcash',
+            title: 'Create ecash',
+            subtitle: 'Make a token to send',
+            caption: 'Ecash',
+            icon: 'mdi:cash-multiple',
+            systemIcon: 'banknote',
+            onPress: handleCreateEcash,
+          },
+          ...(nfcSupported
+            ? [
+                {
+                  id: 'nfc' as const,
+                  title: 'Tap to pay',
+                  subtitle: 'Contactless via NFC',
+                  caption: 'Tap',
+                  icon: 'lucide:nfc',
+                  systemIcon: 'wave.3.right',
+                  onPress: handleNfc,
+                },
+              ]
+            : []),
+          {
+            id: 'nutDrop',
+            title: 'Nut Drop',
+            subtitle: 'Pay a nearby person',
+            caption: 'Nut Drop',
+            icon: 'mdi:bluetooth',
+            systemIcon: 'dot.radiowaves.left.and.right',
+            onPress: handleNutDrop,
+          },
+        ] satisfies SendMethod[]
+      ).filter((method) => shipsSendMethod(method.id)),
     [nfcSupported, handleQrScan, handleCreateEcash, handleNfc, handleNutDrop]
   );
 
@@ -424,10 +420,12 @@ export function SendScreen({ unit }: { unit: string }) {
   // Set<string> (not the brand): membership is checked against unbranded
   // wire-row pubkeys; branded values assign into it fine.
   const pinnedPubkeys = useMemo(() => new Set<string>(livePeerPubkeys), [livePeerPubkeys]);
-  // Live search rows: keep placeholder rows (they paint the loading skeletons)
-  // but drop real rows already pinned in Nearby.
+  // Render actual results immediately; unresolved search placeholders carry no identity.
   const renderedPeople = useMemo(
-    () => contactRows.filter((r) => !(r.profile && pinnedPubkeys.has(r.pubkey))),
+    () =>
+      contactRows.flatMap((row) =>
+        row.profile && !pinnedPubkeys.has(row.pubkey) ? [{ ...row, profile: row.profile }] : []
+      ),
     [contactRows, pinnedPubkeys]
   );
 
@@ -594,13 +592,8 @@ export function SendScreen({ unit }: { unit: string }) {
             {renderedPeople.map((row) => (
               <ContactRow
                 key={row.pubkey}
-                identity={nostrIdentity(row.pubkey, row.profile, {
-                  isLoadingProfile: row.isLoadingProfile,
-                })}
-                // Placeholder rows (no profile) paint skeletons and aren't tappable.
-                onPress={
-                  row.profile ? () => handleSelectContact(row.pubkey, row.profile!) : undefined
-                }
+                identity={nostrIdentity(row.pubkey, row.profile)}
+                onPress={() => handleSelectContact(row.pubkey, row.profile)}
                 testID={`send-contact:${row.pubkey}`}
               />
             ))}
@@ -616,16 +609,12 @@ export function SendScreen({ unit }: { unit: string }) {
             {quickPayPeople.map((person) => (
               <ContactRow
                 key={person.pubkey}
-                identity={nostrIdentity(
-                  person.pubkey,
-                  {
-                    displayName: person.displayName,
-                    picture: person.picture ?? undefined,
-                    nip05: person.nip05 ?? undefined,
-                    lud16: person.lud16 ?? undefined,
-                  },
-                  { isLoadingProfile: person.isLoading }
-                )}
+                identity={nostrIdentity(person.pubkey, {
+                  displayName: person.displayName,
+                  picture: person.picture ?? undefined,
+                  nip05: person.nip05 ?? undefined,
+                  lud16: person.lud16 ?? undefined,
+                })}
                 onPress={() => handleSelectQuickPay(person)}
                 testID={`send-contact:${person.pubkey}`}
               />

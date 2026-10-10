@@ -1,3 +1,5 @@
+import { profileAvatarStateFor } from '@/shared/lib/imageLoadState';
+import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata';
 import React, { useEffect, useMemo } from 'react';
 import { isSendTokenCancelled, getCounterparty } from 'wallet';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -6,7 +8,6 @@ import Icon from 'assets/icons';
 import { Spinner } from '@/shared/ui/primitives/Spinner';
 import { HistoryEntry } from '@cashu/coco-core';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { useCachedNostrProfile } from '@/shared/lib/nostr/useEntityCache';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { Log, paymentLog } from '@/shared/lib/logger';
 
@@ -41,9 +42,8 @@ export default function TransactionIcon({
   // replaces the center arrow, so the direction moves to the corner badge.
   const counterparty = getCounterparty(historyEntry);
   const counterpartyPubkey = counterparty?.pubkey;
-  // Reactive but fetch-free read of the warm kind-0 cache, so the avatar fills
-  // in if the profile is already cached and updates without per-row fetches.
-  const { metadata: cachedProfile } = useCachedNostrProfile(counterpartyPubkey ?? '');
+  // Hold grey until kind-0 resolution settles when the snapshot lacks a picture.
+  const { metadata: cachedProfile, isResolving } = useNostrProfileMetadata(counterpartyPubkey);
   const showAvatar = !isLoading && !!counterpartyPubkey;
   const avatarPicture = counterparty?.avatarUrl ?? cachedProfile?.picture;
   const avatarName =
@@ -95,7 +95,7 @@ export default function TransactionIcon({
           <Spinner size={22} color={foreground} />
         ) : showAvatar ? (
           <Avatar
-            state={avatarPicture ? 'image' : 'fallback'}
+            state={profileAvatarStateFor(avatarPicture, isResolving ? 'loading' : 'cached')}
             picture={avatarPicture}
             seed={counterpartyPubkey}
             name={avatarName}

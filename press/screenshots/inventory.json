@@ -2250,6 +2250,31 @@
       }
     },
     {
+      "platform": "android",
+      "page": "mint-history",
+      "state": "default",
+      "baseline": true,
+      "scenario": null,
+      "occurrence": null,
+      "stepId": null,
+      "evidenceClass": "unavailable",
+      "privacy": "blocked",
+      "publicationEligibility": "blocked",
+      "status": "blocked",
+      "blocker": "Review (mint-flow)/history.tsx and add an effect-reviewed recipe with page-specific readiness; no recipe is approved for this canonical page.",
+      "platformProfile": {
+        "driver": "android",
+        "orientation": "portrait",
+        "identity": "disposable",
+        "effects": "navigation-only"
+      },
+      "readiness": [],
+      "readinessStepIds": [],
+      "routes": [
+        "(mint-flow)/history.tsx"
+      ]
+    },
+    {
       "scenario": "profile.own.view",
       "page": "profile",
       "occurrence": 1,
@@ -5517,11 +5542,11 @@
         "(drawer)/(tabs)/index/index.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-25T15:26:53.140Z",
+        "at": "2026-09-28T04:40:47.643Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-25T15-27-08-329Z-971c09a2"
+          "run-2026-09-28T04-40-54-232Z-d1e4941a"
         ]
       }
     },
@@ -6179,11 +6204,11 @@
         "(receive-flow)/receive.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-25T15:26:53.140Z",
+        "at": "2026-09-28T04:40:47.643Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-25T15-27-08-329Z-971c09a2"
+          "run-2026-09-28T04-40-54-232Z-d1e4941a"
         ]
       }
     },
@@ -6274,7 +6299,7 @@
       "platform": "ios",
       "baseline": true,
       "stepId": "T15",
-      "status": "captured",
+      "status": "running",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -6290,12 +6315,10 @@
         "(receive-flow)/qrDisplay.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-25T22:41:45.561Z",
-        "status": "captured",
+        "at": "2026-09-28T04:49:58.762Z",
+        "status": "running",
         "attempts": 1,
-        "runs": [
-          "run-2026-09-25T22-41-50-980Z-50222993"
-        ]
+        "runs": []
       }
     },
     {
@@ -6477,11 +6500,11 @@
         "lightningReceive.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-25T15:26:53.140Z",
+        "at": "2026-09-28T04:40:47.643Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-25T15-27-08-329Z-971c09a2"
+          "run-2026-09-28T04-40-54-232Z-d1e4941a"
         ]
       }
     },
@@ -6537,7 +6560,7 @@
       "platform": "ios",
       "baseline": true,
       "stepId": "T19",
-      "status": "captured",
+      "status": "running",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -6553,12 +6576,10 @@
         "(send-flow)/send.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-25T22:41:45.561Z",
-        "status": "captured",
+        "at": "2026-09-28T04:49:58.762Z",
+        "status": "running",
         "attempts": 1,
-        "runs": [
-          "run-2026-09-25T22-41-50-980Z-50222993"
-        ]
+        "runs": []
       }
     },
     {
@@ -6862,7 +6883,7 @@
       "platform": "ios",
       "baseline": true,
       "stepId": "T03",
-      "status": "captured",
+      "status": "running",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -6879,12 +6900,10 @@
         "(send-flow)/mintSelect.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-25T22:41:45.561Z",
-        "status": "captured",
+        "at": "2026-09-28T04:49:58.762Z",
+        "status": "running",
         "attempts": 1,
-        "runs": [
-          "run-2026-09-25T22-41-50-980Z-50222993"
-        ]
+        "runs": []
       }
     },
     {
@@ -7011,7 +7030,7 @@
       "platform": "ios",
       "baseline": true,
       "stepId": "T06",
-      "status": "captured",
+      "status": "running",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -7027,12 +7046,10 @@
         "(mint-flow)/info.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-25T22:41:45.561Z",
-        "status": "captured",
+        "at": "2026-09-28T04:49:58.762Z",
+        "status": "running",
         "attempts": 1,
-        "runs": [
-          "run-2026-09-25T22-41-50-980Z-50222993"
-        ]
+        "runs": []
       }
     },
     {
@@ -7345,6 +7362,31 @@
       }
     },
     {
+      "platform": "ios",
+      "page": "mint-history",
+      "state": "default",
+      "baseline": true,
+      "scenario": null,
+      "occurrence": null,
+      "stepId": null,
+      "evidenceClass": "unavailable",
+      "privacy": "blocked",
+      "publicationEligibility": "blocked",
+      "status": "blocked",
+      "blocker": "Review (mint-flow)/history.tsx and add an effect-reviewed recipe with page-specific readiness; no recipe is approved for this canonical page.",
+      "platformProfile": {
+        "driver": "sim",
+        "orientation": "portrait",
+        "identity": "disposable",
+        "effects": "navigation-only"
+      },
+      "readiness": [],
+      "readinessStepIds": [],
+      "routes": [
+        "(mint-flow)/history.tsx"
+      ]
+    },
+    {
       "scenario": "profile.own.view",
       "page": "profile",
       "occurrence": 1,
@@ -7395,7 +7437,7 @@
       "platform": "ios",
       "baseline": true,
       "stepId": "T27",
-      "status": "captured",
+      "status": "running",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -7414,12 +7456,10 @@
         "userMessages.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-25T22:41:45.561Z",
-        "status": "captured",
+        "at": "2026-09-28T04:49:58.762Z",
+        "status": "running",
         "attempts": 1,
-        "runs": [
-          "run-2026-09-25T22-41-50-980Z-50222993"
-        ]
+        "runs": []
       }
     },
     {
@@ -7509,7 +7549,7 @@
       "platform": "ios",
       "baseline": true,
       "stepId": "T50",
-      "status": "captured",
+      "status": "running",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -7525,12 +7565,10 @@
         "(settings-flow)/index.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-25T22:41:45.561Z",
-        "status": "captured",
+        "at": "2026-09-28T04:49:58.762Z",
+        "status": "running",
         "attempts": 1,
-        "runs": [
-          "run-2026-09-25T22-41-50-980Z-50222993"
-        ]
+        "runs": []
       }
     },
     {
@@ -7546,7 +7584,7 @@
       "platform": "ios",
       "baseline": true,
       "stepId": "T32",
-      "status": "captured",
+      "status": "running",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -7562,12 +7600,10 @@
         "(drawer)/(tabs)/feed/index.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-25T22:41:45.561Z",
-        "status": "captured",
+        "at": "2026-09-28T04:49:58.762Z",
+        "status": "running",
         "attempts": 1,
-        "runs": [
-          "run-2026-09-25T22-41-50-980Z-50222993"
-        ]
+        "runs": []
       }
     },
     {
@@ -7673,11 +7709,11 @@
         "(drawer)/(tabs)/contacts/index.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-25T15:26:53.140Z",
+        "at": "2026-09-28T04:40:47.643Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-25T15-27-08-329Z-971c09a2"
+          "run-2026-09-28T04-40-54-232Z-d1e4941a"
         ]
       }
     },
@@ -7694,7 +7730,7 @@
       "platform": "ios",
       "baseline": true,
       "stepId": "T37",
-      "status": "captured",
+      "status": "running",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -7710,12 +7746,10 @@
         "(drawer)/(tabs)/notifications/index.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-25T22:41:45.561Z",
-        "status": "captured",
+        "at": "2026-09-28T04:49:58.762Z",
+        "status": "running",
         "attempts": 1,
-        "runs": [
-          "run-2026-09-25T22-41-50-980Z-50222993"
-        ]
+        "runs": []
       }
     },
     {
@@ -7784,11 +7818,11 @@
         "(drawer)/(tabs)/ai/index.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-25T15:26:53.140Z",
+        "at": "2026-09-28T04:40:47.643Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-25T15-27-08-329Z-971c09a2"
+          "run-2026-09-28T04-40-54-232Z-d1e4941a"
         ]
       }
     },
@@ -7805,7 +7839,7 @@
       "platform": "ios",
       "baseline": false,
       "stepId": "T44",
-      "status": "captured",
+      "status": "running",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -7821,12 +7855,10 @@
         "(drawer)/(tabs)/ai/index.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-25T22:41:45.561Z",
-        "status": "captured",
+        "at": "2026-09-28T04:49:58.762Z",
+        "status": "running",
         "attempts": 1,
-        "runs": [
-          "run-2026-09-25T22-41-50-980Z-50222993"
-        ]
+        "runs": []
       }
     },
     {
@@ -7969,11 +8001,11 @@
         "(transactions-flow)/transactions.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-25T15:26:53.140Z",
+        "at": "2026-09-28T04:40:47.643Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-25T15-27-08-329Z-971c09a2"
+          "run-2026-09-28T04-40-54-232Z-d1e4941a"
         ]
       }
     },
@@ -8006,11 +8038,11 @@
         "(mint-flow)/distribution.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-25T15:26:53.140Z",
+        "at": "2026-09-28T04:40:47.643Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-25T15-27-08-329Z-971c09a2"
+          "run-2026-09-28T04-40-54-232Z-d1e4941a"
         ]
       }
     },
@@ -10252,7 +10284,7 @@
     }
   ],
   "campaign": {
-    "startedAt": "2026-09-25T22:41:37.208Z",
+    "startedAt": "2026-09-28T04:49:53.996Z",
     "interrupted": false
   }
 }

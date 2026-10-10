@@ -11,14 +11,18 @@ import { log, useLifecycleLogger } from '@/shared/lib/logger';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
+import { Button } from '@/shared/ui/primitives/Button';
 import Icon from 'assets/icons';
-import { Button, Card } from 'heroui-native';
+import { Surface } from '@/shared/ui/composed/Surface';
+import { useStylePaint } from '@/shared/styles/appStyle';
 import { withAlpha } from '@/shared/lib/color';
 
 export function DeleteScreen() {
   useLifecycleLogger('DeleteScreen');
   const foreground = useThemeColor('foreground');
   const [danger, red400] = useThemeColor(['danger', 'red-400'] as const);
+  const paint = useStylePaint();
+  const cardContent = { padding: paint.style.space.pad, gap: paint.style.space.related };
 
   const handleDelete = useCallback(async () => {
     log.warn('settings.delete.confirmed', { reason: 'user_initiated_slide_to_delete' });
@@ -51,38 +55,44 @@ export function DeleteScreen() {
               </Text>
             </VStack>
 
-            <Card variant="secondary" className="w-full">
-              <Card.Body className="gap-2">
-                <Card.Title>Save your NIP06</Card.Title>
-                <Card.Description>
+            <View className="w-full">
+              <Surface contentStyle={cardContent}>
+                <Text semibold size={16} color={paint.text.primary}>
+                  Save your NIP06
+                </Text>
+                <Text size={13} color={paint.text.secondary}>
                   Your NIP06 is the recovery phrase for your full Sovran account. Every Cashu
                   profile in this app is derived from it, so restoring with a different NIP06 will
                   create different Cashu wallets and will not recover the same ecash. If you were a
                   TestFlight user, recovery may still not restore all historical funds.
-                </Card.Description>
-              </Card.Body>
-            </Card>
+                </Text>
+              </Surface>
+            </View>
 
-            <Card variant="secondary" className="w-full">
-              <Card.Body className="gap-2">
-                <Card.Title>Imported Nostr accounts</Card.Title>
-                <Card.Description>
+            <View className="w-full">
+              <Surface contentStyle={cardContent}>
+                <Text semibold size={16} color={paint.text.primary}>
+                  Imported Nostr accounts
+                </Text>
+                <Text size={13} color={paint.text.secondary}>
                   Even imported Nostr accounts depend on your current NIP06 for their Cashu profile.
                   Re-importing the same Nostr key under a different NIP06 will produce a different
                   Cashu profile, so that ecash will not be recoverable.
-                </Card.Description>
-              </Card.Body>
-            </Card>
+                </Text>
+              </Surface>
+            </View>
 
-            <Card variant="secondary" className="w-full">
-              <Card.Body className="gap-2">
-                <Card.Title>Before deleting, make sure you have:</Card.Title>
-                <Card.Description>
+            <View className="w-full">
+              <Surface contentStyle={cardContent}>
+                <Text semibold size={16} color={paint.text.primary}>
+                  Before deleting, make sure you have:
+                </Text>
+                <Text size={13} color={paint.text.secondary}>
                   - Backed up your NIP06{'\n'}- Transferred any ecash you do not want to risk
                   {'\n'}- Exported any important data
-                </Card.Description>
-              </Card.Body>
-            </Card>
+                </Text>
+              </Surface>
+            </View>
           </VStack>
 
           <VStack gap={12} className="w-full items-center pb-6">
@@ -96,13 +106,14 @@ export function DeleteScreen() {
               iconColor={danger}
               testID="settings-delete-slider"
             />
-            <Button
-              variant="secondary"
-              className="w-full"
-              testID="settings-delete-cancel"
-              onPress={() => router.back()}>
-              <Button.Label>Cancel</Button.Label>
-            </Button>
+            <View className="w-full">
+              <Button
+                variant="secondary"
+                text="Cancel"
+                testID="settings-delete-cancel"
+                onPress={() => router.back()}
+              />
+            </View>
           </VStack>
         </VStack>
       </ScreenScrollView>

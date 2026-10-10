@@ -157,6 +157,10 @@ function buildPaymentCopyGroups(text: PaymentCopyText) {
         label: text("timeline.receive.alreadySpent.label"),
         info: text("timeline.receive.alreadySpent.info"),
       },
+      rejected: {
+        label: text("timeline.receive.rejected.label"),
+        info: text("timeline.receive.rejected.info"),
+      },
       paymentRequest: {
         requested: {
           label: text("timeline.receiveRequest.requested.label"),

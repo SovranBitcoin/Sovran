@@ -40,6 +40,7 @@ jest.mock('wallet/react', () => ({
 }));
 
 jest.mock('@/features/transactions', () => ({
+  entryDetailItems: () => [],
   TransactionDetailShell: ({
     children,
     footer,

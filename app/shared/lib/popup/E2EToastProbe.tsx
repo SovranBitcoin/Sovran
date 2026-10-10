@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -24,7 +24,10 @@ type E2EToastProbeState = {
   clearPayment: (sequence: number) => void;
 };
 
-const useE2EToastProbeStore = create<E2EToastProbeState>((set, get) => ({
+const useE2EToastProbeStore = create<E2EToastProbeState>({
+  name: 'useE2EToastProbeStore',
+  scope: 'global',
+})((set, get) => ({
   key: null,
   sequence: 0,
   payment: null,

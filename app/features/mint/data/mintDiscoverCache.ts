@@ -15,6 +15,7 @@ import type { DiscoverMintsResponse } from '@/shared/lib/apiClient';
 export const MINT_DISCOVER_CACHE_KEY = 'all';
 
 export const mintDiscoverCache = createQueryCacheStore<DiscoverMintsResponse>({
+  scope: 'global',
   name: 'mint-discover-cache',
   logKey: 'mint_discover_cache',
   staleTtlMs: 20 * 60 * 1000,

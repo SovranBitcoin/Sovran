@@ -41,7 +41,7 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { VisualLayoutProbe } from '@/shared/ui/composed/VisualLayoutProbe';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useUploadAbortMap } from '@/shared/hooks/useUploadAbortMap';
-import { useProfileStore } from '@/shared/stores/global/profileStore';
+import { selectActiveProfile, useProfileStore } from '@/shared/stores/global/profileStore';
 import { uploadMediaBlocks } from '@/shared/lib/nostr/media/uploadMediaBlocks';
 import { useOwnedMediaStore } from '@/shared/stores/profile/ownedMediaStore';
 import type { ComposerBlock } from '@/features/composer/config/types';
@@ -138,7 +138,7 @@ export function ThreadReplyBar({
     'muted',
     'accent',
   ] as const);
-  const ownProfile = useProfileStore((s) => s.getActiveProfile());
+  const ownProfile = useProfileStore(selectActiveProfile);
   const { pictureResolved: ownPictureResolved } = useProfileDisplay(ownProfile?.pubkey ?? '');
   const inputRef = useRef<TextInput>(null);
   const handledFocusRequestRef = useRef(0);

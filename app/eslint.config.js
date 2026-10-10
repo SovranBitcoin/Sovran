@@ -17,6 +17,37 @@ const REACT_COMPILER_BAILING_TSX = (() => {
   }
 })();
 
+// Store creation must go through the scope-requiring registry factory.
+const storeRegistryPlugin = {
+  rules: {
+    'require-factory': {
+      meta: {
+        type: 'problem',
+        schema: [],
+        messages: {
+          factory: 'Use defineStore/defineVanillaStore with an explicit scope.',
+        },
+      },
+      create(context) {
+        return {
+          ImportDeclaration(node) {
+            if (!['zustand', 'zustand/vanilla'].includes(node.source.value)) return;
+            for (const specifier of node.specifiers) {
+              if (
+                specifier.type === 'ImportNamespaceSpecifier' ||
+                specifier.type === 'ImportDefaultSpecifier' ||
+                ['create', 'createStore'].includes(specifier.imported?.name)
+              ) {
+                context.report({ node: specifier, messageId: 'factory' });
+              }
+            }
+          },
+        };
+      },
+    },
+  },
+};
+
 module.exports = defineConfig([
   // Global ignores — apply to every config below. Listed first because a
   // flat-config block with only `ignores` (no `files`) is treated as a
@@ -465,5 +496,11 @@ module.exports = defineConfig([
     rules: {
       'no-restricted-syntax': 'off',
     },
+  },
+  {
+    files: ['**/*.ts', '**/*.tsx'],
+    ignores: ['shared/lib/persist/defineStore.ts', '**/__tests__/**'],
+    plugins: { 'store-registry': storeRegistryPlugin },
+    rules: { 'store-registry/require-factory': 'error' },
   },
 ]);

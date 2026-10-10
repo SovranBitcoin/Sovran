@@ -254,7 +254,7 @@ _Reference — every capability Sovran ships today, organized by concern. Each i
 
 ### Wallet & balance
 
-<!-- code: features/wallet/screens/WalletScreen.tsx; features/wallet/components/Account.tsx; features/wallet/components/PrimaryBalance.tsx; features/wallet/components/CurrencySwapperPill.tsx; features/wallet/hooks/useAppBalance.ts; features/send/screens/AmountSelector.tsx; features/transactions/screens/TransactionsScreen.tsx; features/transactions/components/Transactions.tsx; features/transactions/components/Transaction.tsx; features/transactions/components/TransactionIcon.tsx; features/transactions/components/TransactionLocationSection.tsx; shared/stores/profile/transactionDistributionStore.ts; shared/stores/profile/transactionLocationStore.ts; shared/stores/runtime/rollbackStore.ts -->
+<!-- code: features/wallet/screens/WalletScreen.tsx; features/wallet/components/Account.tsx; features/wallet/components/PrimaryBalance.tsx; features/wallet/hooks/useAppBalance.ts; features/send/screens/AmountSelector.tsx; features/transactions/screens/TransactionsScreen.tsx; features/transactions/components/Transactions.tsx; features/transactions/components/Transaction.tsx; features/transactions/components/TransactionIcon.tsx; features/transactions/components/TransactionLocationSection.tsx; shared/stores/profile/transactionDistributionStore.ts; shared/stores/profile/transactionLocationStore.ts; shared/stores/runtime/rollbackStore.ts -->
 
 - [x] **Live BTC price** — real-time price feeds drive fiat equivalents app-wide
 - [x] **Fiat-first amount entry** — type fiat, Sovran picks a composable sat amount from your proofs

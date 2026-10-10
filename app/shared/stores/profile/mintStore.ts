@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { persist } from 'zustand/middleware';
 import { z } from 'zod';
 import { ACCOUNT_UNITS, type AccountUnit } from 'wallet/units';
@@ -106,7 +106,7 @@ function migrateMintStore(state: unknown, version: number): V2Persisted {
   return s as V2Persisted;
 }
 
-export const useMintStore = create<MintStore>()(
+export const useMintStore = create<MintStore>({ name: 'mint-store', scope: 'profile' })(
   persist(
     (set) => ({
       selectedMint: undefined,

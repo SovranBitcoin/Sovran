@@ -13,32 +13,27 @@
  * `shared/lib/migrations/globalMigrations.ts`.
  */
 
+import {
+  profilePersistWritesBlocked,
+  trackProfilePersistWrite,
+} from '@/shared/lib/persist/profileWriteBarrier';
+import { persistRegistry } from '@/shared/lib/persist/persistConfig';
+
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { log } from '@/shared/lib/logger';
 import { StateStorage } from 'zustand/middleware';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
+import { declaredStores } from '@/shared/lib/account/accountRegistry';
 
-/**
- * Module-level flag that keeps the persist middleware from writing while a
- * store is mutated. Raised by `withSkippedPersistWrites` so runtime-only
- * mutations (e.g. mock-mode demo data injection) stay out of the persisted
- * blob rather than overwriting the profile's stored data.
- */
-let _skipPersistWrite = false;
+/** The same barrier covers direct profile adapters and full persisted operations. */
+export {
+  blockProfilePersistWrites,
+  unblockProfilePersistWrites,
+  withSkippedPersistWrites,
+} from '@/shared/lib/persist/profileWriteBarrier';
 
-/**
- * Run `fn` with the persist-write gate raised. Synchronous: mutations queued
- * inside `fn` (`useStore.setState(...)`) bypass AsyncStorage; afterwards the
- * gate drops and normal persistence resumes. Use for runtime-only injections
- * into persisted profile-scoped stores.
- */
-export function withSkippedPersistWrites<T>(fn: () => T): T {
-  const prev = _skipPersistWrite;
-  _skipPersistWrite = true;
-  try {
-    return fn();
-  } finally {
-    _skipPersistWrite = prev;
-  }
+export function hasCapturedProfileStorage(): boolean {
+  return persistRegistry.some((entry) => entry.capturedOwner !== undefined);
 }
 
 /**
@@ -72,7 +67,8 @@ async function ensureProfileStoreHydrated(): Promise<void> {
   });
 }
 
-function getActiveProfilePubkey(): string | undefined {
+/** The profile whose key the scoped stores are reading and writing under now. */
+export function getActiveProfilePubkey(): string | undefined {
   const state = useProfileStore.getState();
   return state.profiles.find((p) => p.accountIndex === state.activeAccountIndex)?.pubkey;
 }
@@ -87,72 +83,83 @@ export async function captureProfileStorageOwner(): Promise<string> {
 }
 
 /**
+ * Which profile each store last loaded under, for stores that follow the
+ * active profile. A store holds one profile's contents in memory; writing them
+ * under another profile's key is the leak the whole account design exists to
+ * prevent. The write barrier and the reset-then-reload order already stop it.
+ * This is the second line: a write is dropped when the active profile is no
+ * longer the one the store's contents came from.
+ */
+const loadedUnder = new Map<string, string>();
+
+/**
  * Create a StateStorage adapter scoped to the active profile, or a captured
  * owner for async services that must survive active-profile changes.
  * Use this with `createJSONStorage(() => createProfileScopedStorage())` in Zustand persist.
  */
-export function createProfileScopedStorage(ownerPubkey?: string): StateStorage {
+export function createProfileScopedStorage(
+  ownerPubkey?: string,
+  admittedWrite = false
+): StateStorage & { profileStorageOwner?: string } {
+  const keyFor = (name: string, pubkey: string | undefined) =>
+    pubkey ? `${name}:profile:${pubkey}` : name;
+
+  /**
+   * The one path every save and removal takes. In order:
+   *
+   * 1. Dropped if the write barrier is up (an account switch is under way).
+   * 2. The owner is decided NOW, before anything is awaited: a write queued
+   *    for one profile must never resolve another profile's key later.
+   * 3. Dropped if the store was loaded for a different profile than the one
+   *    active now. A load before any profile existed recorded nothing, so the
+   *    first save after onboarding still lands.
+   * 4. Waits for migrations and for the profile list, then runs, counted by
+   *    the barrier so a switch can wait for it to land.
+   *
+   * A dropped write resolves like a completed one; callers cannot tell.
+   */
+  const mutateOwnedKey = (name: string, mutate: (key: string) => Promise<void>): Promise<void> => {
+    if (profilePersistWritesBlocked() && !admittedWrite) return Promise.resolve();
+    const pubkey = ownerPubkey ?? getActiveProfilePubkey();
+    const loaded = ownerPubkey ? undefined : loadedUnder.get(name);
+    if (loaded && pubkey && loaded !== pubkey) {
+      log.warn('profile.storage.cross_profile_write_refused', { store: name });
+      return Promise.resolve();
+    }
+    return trackProfilePersistWrite(
+      (async () => {
+        await _migrationGate;
+        await ensureProfileStoreHydrated();
+        // No profile existed when this was called (first launch): use whichever
+        // exists now, or the bare key if there is still none.
+        await mutate(keyFor(name, pubkey ?? getActiveProfilePubkey()));
+      })()
+    );
+  };
+
   return {
+    profileStorageOwner: ownerPubkey,
     getItem: async (name: string) => {
       await _migrationGate;
       await ensureProfileStoreHydrated();
       const pubkey = ownerPubkey ?? getActiveProfilePubkey();
-      const key = pubkey ? `${name}:profile:${pubkey}` : name;
-      return AsyncStorage.getItem(key);
+      const value = await AsyncStorage.getItem(keyFor(name, pubkey));
+      // Recorded only once the read has succeeded, and only for a store that
+      // follows the active profile; a captured owner cannot drift.
+      if (!ownerPubkey && pubkey) loadedUnder.set(name, pubkey);
+      return value;
     },
-    setItem: async (name: string, value: string) => {
-      if (_skipPersistWrite) return;
-      await _migrationGate;
-      await ensureProfileStoreHydrated();
-      const pubkey = ownerPubkey ?? getActiveProfilePubkey();
-      const key = pubkey ? `${name}:profile:${pubkey}` : name;
-      await AsyncStorage.setItem(key, value);
-    },
-    removeItem: async (name: string) => {
-      await _migrationGate;
-      await ensureProfileStoreHydrated();
-      const pubkey = ownerPubkey ?? getActiveProfilePubkey();
-      const key = pubkey ? `${name}:profile:${pubkey}` : name;
-      await AsyncStorage.removeItem(key);
-    },
+    setItem: (name: string, value: string) =>
+      mutateOwnedKey(name, (key) => AsyncStorage.setItem(key, value)),
+    removeItem: (name: string) => mutateOwnedKey(name, (key) => AsyncStorage.removeItem(key)),
   };
 }
 
 /** All profile-scoped store persistence keys. */
 export const PROFILE_SCOPED_STORE_KEYS = [
-  'mint-store',
-  'mint-distribution-store',
-  'npc-mint-store',
-  'routstr-store',
-  'ai-provider-directory-store',
-  'scan-history-store',
-  'search-history-store',
-  'recent-people-store',
-  'dm-last-message-store',
-  'swap-transactions-store',
-  'transaction-location-store',
-  'transaction-distribution-store',
-  'nostr-social-store',
-  'own-content-store',
-  'own-profile-metadata-store',
-  'vertex-budget-store',
-  'nostr-relay-list-store',
-  'nostr-media-server-store',
-  'nostr-metadata-cache',
-  'theme-store',
-  'bitchat-dm-messages-store',
-  'feed-ignore-store',
-  'notification-policy-store',
-  'nip46-connections-store',
-  'nip46-activity-store',
-  'transaction-annotation-store',
-  'owned-media-store',
-  'data-migration-store',
-  // Generic query caches (createQueryCacheStore). Profile-scoped because their
-  // entries are keyed by the viewer pubkey.
-  'feed-cache',
-  'notifications-cache',
-  'dm-conversations-cache',
-  'dm-messages-cache',
-  'own-profile-stats-cache',
+  ...new Set(
+    declaredStores
+      .filter((entry) => entry.profileStorage && (entry.persisted || entry.queryCache))
+      .map((entry) => entry.name)
+  ),
 ];

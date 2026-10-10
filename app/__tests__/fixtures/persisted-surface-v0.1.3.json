@@ -1,0 +1,169 @@
+{
+  "release": "v0.1.3",
+  "commit": "d9ad12c4b",
+  "stores": {
+    "btcmap-store": {
+      "version": 1,
+      "profileScoped": false
+    },
+    "data-migration-store": {
+      "version": 1,
+      "profileScoped": true
+    },
+    "feed-ignore-store": {
+      "version": 1,
+      "profileScoped": true
+    },
+    "mempool-address-cache": {
+      "version": 1,
+      "profileScoped": false
+    },
+    "mint-distribution-store": {
+      "version": 1,
+      "profileScoped": true
+    },
+    "mint-metadata-store": {
+      "version": 1,
+      "profileScoped": false
+    },
+    "mint-store": {
+      "version": 2,
+      "profileScoped": true
+    },
+    "nip46-activity-store": {
+      "version": 1,
+      "profileScoped": true
+    },
+    "nip46-connections-store": {
+      "version": 1,
+      "profileScoped": true
+    },
+    "nostr-media-server-store": {
+      "version": 1,
+      "profileScoped": true
+    },
+    "nostr-metadata-cache": {
+      "version": 1,
+      "profileScoped": true
+    },
+    "nostr-relay-list-store": {
+      "version": 1,
+      "profileScoped": true
+    },
+    "nostr-social-store": {
+      "version": 2,
+      "profileScoped": true
+    },
+    "notification-policy-store": {
+      "version": 1,
+      "profileScoped": true
+    },
+    "npc-mint-store": {
+      "version": 2,
+      "profileScoped": true
+    },
+    "nut-drop-redeem-queue": {
+      "version": 1,
+      "profileScoped": true
+    },
+    "own-content-store": {
+      "version": 1,
+      "profileScoped": true
+    },
+    "owned-media-store": {
+      "version": 1,
+      "profileScoped": true
+    },
+    "pricelist-store": {
+      "version": 1,
+      "profileScoped": false
+    },
+    "profile-store": {
+      "version": 2,
+      "profileScoped": false
+    },
+    "recent-people-store": {
+      "version": 1,
+      "profileScoped": true
+    },
+    "relay-metadata-store": {
+      "version": 1,
+      "profileScoped": false
+    },
+    "routstr-store": {
+      "version": 1,
+      "profileScoped": true
+    },
+    "scan-history-store": {
+      "version": 1,
+      "profileScoped": true
+    },
+    "search-history-store": {
+      "version": 1,
+      "profileScoped": true
+    },
+    "send-reachability-store": {
+      "version": 1,
+      "profileScoped": true
+    },
+    "settings-store": {
+      "version": 4,
+      "profileScoped": false
+    },
+    "swap-transactions-store": {
+      "version": 1,
+      "profileScoped": true
+    },
+    "theme-store": {
+      "version": 2,
+      "profileScoped": true
+    },
+    "transaction-annotation-store": {
+      "version": 1,
+      "profileScoped": true
+    },
+    "transaction-distribution-store": {
+      "version": 1,
+      "profileScoped": true
+    },
+    "transaction-location-store": {
+      "version": 1,
+      "profileScoped": true
+    },
+    "wallet-lifecycle": {
+      "version": 1,
+      "profileScoped": false
+    },
+    "wallpaper-store": {
+      "version": 1,
+      "profileScoped": false
+    }
+  },
+  "secureStoreKeys": [
+    "user_mnemonic",
+    "migrations_complete_",
+    "migrations_complete",
+    "derived_keys_",
+    "cashu_mnemonic_",
+    "cashu_seed_",
+    "imported_nsec_",
+    "secure_key_index"
+  ],
+  "sourcePins": [
+    {
+      "what": "wallet database name per account",
+      "file": "shared/lib/cashu/manager.ts",
+      "text": "this.accountIndex === 0 ? 'coco.db' : `coco-${this.accountIndex}.db`"
+    },
+    {
+      "what": "Nostr cache database name per account",
+      "file": "shared/providers/NostrNDKProvider.tsx",
+      "text": "activeAccountIndex === 0 ? 'nostr' : `nostr-${activeAccountIndex}`"
+    },
+    {
+      "what": "per-profile storage key format",
+      "file": "shared/lib/cashu/profileScopedStorage.ts",
+      "text": "`${name}:profile:${"
+    }
+  ]
+}

@@ -2935,6 +2935,17 @@ exports[`persisted schema drift nut-drop-redeem-queue schema matches the golden 
                 "maxLength": 128,
                 "type": "string",
               },
+              "senderPubkey": {
+                "pattern": "^[a-f0-9]{64}$",
+                "type": "string",
+              },
+              "source": {
+                "enum": [
+                  "ble",
+                  "nostr",
+                ],
+                "type": "string",
+              },
               "status": {
                 "default": "pending",
                 "enum": [
@@ -3021,6 +3032,17 @@ exports[`persisted schema drift nut-drop-redeem-queue schema matches the golden 
               },
               "senderPeerID": {
                 "maxLength": 128,
+                "type": "string",
+              },
+              "senderPubkey": {
+                "pattern": "^[a-f0-9]{64}$",
+                "type": "string",
+              },
+              "source": {
+                "enum": [
+                  "ble",
+                  "nostr",
+                ],
                 "type": "string",
               },
               "status": {
@@ -3799,7 +3821,6 @@ exports[`persisted schema drift profile-store schema matches the golden snapshot
             ],
             "type": "object",
           },
-          "maxItems": 64,
           "type": "array",
         },
       },
@@ -3868,7 +3889,6 @@ exports[`persisted schema drift profile-store schema matches the golden snapshot
             ],
             "type": "object",
           },
-          "maxItems": 64,
           "type": "array",
         },
       },
@@ -5122,6 +5142,21 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
                       "maxLength": 128,
                       "type": "string",
                     },
+                    "modelSwitch": {
+                      "properties": {
+                        "from": {
+                          "type": "string",
+                        },
+                        "to": {
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "from",
+                        "to",
+                      ],
+                      "type": "object",
+                    },
                     "parentId": {
                       "anyOf": [
                         {
@@ -5475,7 +5510,6 @@ exports[`persisted schema drift scan-history-store schema matches the golden sna
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
         "entries": {
-          "default": [],
           "items": {
             "additionalProperties": {},
             "properties": {
@@ -5500,7 +5534,6 @@ exports[`persisted schema drift scan-history-store schema matches the golden sna
                 "type": "array",
               },
               "raw": {
-                "maxLength": 16384,
                 "type": "string",
               },
               "scannedAt": {
@@ -5542,7 +5575,6 @@ exports[`persisted schema drift scan-history-store schema matches the golden sna
             ],
             "type": "object",
           },
-          "maxItems": 500,
           "type": "array",
         },
       },
@@ -5554,76 +5586,6 @@ exports[`persisted schema drift scan-history-store schema matches the golden sna
       "properties": {
         "entries": {
           "default": [],
-          "items": {
-            "additionalProperties": {},
-            "properties": {
-              "container": {
-                "maxLength": 64,
-                "type": "string",
-              },
-              "id": {
-                "maxLength": 128,
-                "type": "string",
-              },
-              "inputType": {
-                "maxLength": 64,
-                "type": "string",
-              },
-              "optionKinds": {
-                "items": {
-                  "maxLength": 128,
-                  "type": "string",
-                },
-                "maxItems": 64,
-                "type": "array",
-              },
-              "raw": {
-                "maxLength": 16384,
-                "type": "string",
-              },
-              "scannedAt": {
-                "maximum": 9007199254740991,
-                "minimum": 0,
-                "type": "integer",
-              },
-              "source": {
-                "default": "qr",
-                "enum": [
-                  "qr",
-                  "nfc",
-                  "paste",
-                  "deeplink",
-                ],
-                "type": "string",
-              },
-              "transactionId": {
-                "maxLength": 256,
-                "type": "string",
-              },
-              "type": {
-                "default": "unknown",
-                "enum": [
-                  "npub",
-                  "ecash",
-                  "lightning",
-                  "mint",
-                  "paymentRequest",
-                  "unknown",
-                ],
-                "type": "string",
-              },
-            },
-            "required": [
-              "id",
-              "raw",
-              "type",
-              "source",
-              "scannedAt",
-            ],
-            "type": "object",
-          },
-          "maxItems": 500,
-          "type": "array",
         },
       },
       "required": [
@@ -5838,6 +5800,10 @@ exports[`persisted schema drift settings-store schema matches the golden snapsho
           "default": false,
           "type": "boolean",
         },
+        "inProcessProfileSwitch": {
+          "default": false,
+          "type": "boolean",
+        },
         "language": {
           "default": "en",
           "maxLength": 16,
@@ -5876,6 +5842,10 @@ exports[`persisted schema drift settings-store schema matches the golden snapsho
             },
           ],
           "default": null,
+        },
+        "layoutGuides": {
+          "default": false,
+          "type": "boolean",
         },
         "legalAcceptance": {
           "anyOf": [
@@ -6014,6 +5984,10 @@ exports[`persisted schema drift settings-store schema matches the golden snapsho
           "default": false,
           "type": "boolean",
         },
+        "showTouches": {
+          "default": false,
+          "type": "boolean",
+        },
         "termsAccepted": {
           "anyOf": [
             {
@@ -6080,6 +6054,10 @@ exports[`persisted schema drift settings-store schema matches the golden snapsho
           "default": false,
           "type": "boolean",
         },
+        "inProcessProfileSwitch": {
+          "default": false,
+          "type": "boolean",
+        },
         "language": {
           "default": "en",
           "maxLength": 16,
@@ -6119,6 +6097,10 @@ exports[`persisted schema drift settings-store schema matches the golden snapsho
             },
           ],
           "default": null,
+        },
+        "layoutGuides": {
+          "default": false,
+          "type": "boolean",
         },
         "legalAcceptance": {
           "anyOf": [
@@ -6259,6 +6241,10 @@ exports[`persisted schema drift settings-store schema matches the golden snapsho
           "default": false,
           "type": "boolean",
         },
+        "showTouches": {
+          "default": false,
+          "type": "boolean",
+        },
         "termsAccepted": {
           "anyOf": [
             {
@@ -6305,7 +6291,10 @@ exports[`persisted schema drift settings-store schema matches the golden snapsho
         "mockFailMelt",
         "mockFailPaymentRequest",
         "whitenoiseEnabled",
+        "inProcessProfileSwitch",
         "mockNoGlass",
+        "layoutGuides",
+        "showTouches",
         "termsAccepted",
         "legalAcceptance",
         "hasSeenOnboarding",

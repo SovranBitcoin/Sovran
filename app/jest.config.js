@@ -14,6 +14,7 @@ module.exports = {
     '<rootDir>/jest.staticAssets.js',
   ],
   moduleNameMapper: {
+    '^bitchat-module$': '<rootDir>/modules/bitchat-module/index.ts',
     '^nostr$': '<rootDir>/../nostr/src/index.ts',
     '^nostr/map$': '<rootDir>/../nostr/src/map/index.ts',
     '^nostr/recipes$': '<rootDir>/../nostr/src/recipes/index.ts',

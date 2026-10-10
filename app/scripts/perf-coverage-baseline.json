@@ -1,0 +1,23 @@
+{
+  "$comment": "Canonical pages with no per-page performance instrumentation. `uncovered`: the listed route files (relative to app/app) never reach Screen or a page-level <Log>. `unrouted`: the page has no route alias in e2e/schema/page-routes.ts, so it cannot be checked. Ratcheted by scripts/check-perf-coverage.mjs — both lists may only shrink. Regenerate with `bun run check:perf-coverage:update`.",
+  "uncovered": {
+    "ai": ["(drawer)/(tabs)/ai/index.tsx"],
+    "not-found": ["+not-found.tsx"]
+  },
+  "unrouted": [
+    "drawer",
+    "image-viewer",
+    "onboarding-carousel",
+    "privacy",
+    "profile-keys-error",
+    "profile-removal",
+    "profile-switcher",
+    "recovery-complete",
+    "restore-gate",
+    "search",
+    "secure-locked",
+    "splash",
+    "terms",
+    "welcome"
+  ]
+}

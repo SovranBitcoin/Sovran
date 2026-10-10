@@ -21,9 +21,6 @@ jest.mock('expo-camera', () => ({ scanFromURLAsync: jest.fn() }));
 jest.mock('expo-image-picker', () => ({ launchImageLibraryAsync: jest.fn() }));
 jest.mock('expo-clipboard', () => ({ setStringAsync: jest.fn() }));
 jest.mock('react-native', () => ({ Share: { share: jest.fn() } }));
-jest.mock('@/features/bitchat/lib/blePrivateDelivery', () => ({
-  sendBLEPrivateMessageWhole: jest.fn(),
-}));
 jest.mock('@/features/bitchat/hooks/useBitchatNickname', () => ({
   getBitchatNickname: jest.fn(() => 'Self Sender'),
 }));

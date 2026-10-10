@@ -111,3 +111,31 @@ describe('logger redaction — private key material is never shown', () => {
     expect(brand).toEqual({ _kind: 'nsec', len: nsec.length });
   });
 });
+
+describe('logger redaction — screen and component names stay readable', () => {
+  const name = 'SettingsDesignSystemHeadersScreen'; // 33 letters: base58-shaped
+  const path =
+    'GlobalMigrationGate/AppGate/WalletScreen/BalancePill/BalanceDisplay/Transactions/Row'; // base64-shaped
+
+  it('shows a long PascalCase name and a nested path under screen / component', () => {
+    expect(logField('screen', name).brand).toBe(name);
+    expect(logField('screen', path).brand).toBe(path);
+    expect(logField('component', `Screen(${name})`).brand).toBe(`Screen(${name})`);
+  });
+
+  it('still hides the same shapes under any other field', () => {
+    expect(logValue(name).brand).toEqual({ _kind: 'base58', len: name.length });
+    expect(logValue(path).brand).toEqual({ _kind: 'base64', len: path.length });
+  });
+
+  it('still hides key material placed under screen', () => {
+    const wif = 'K' + 'x'.repeat(51); // letters only, so it is also an identifier
+    const hex = 'a'.repeat(64);
+    const base64 = 'QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVowMTIzNDU2Nzg5QUJDREVGR0hJSktMTU5PUA==';
+    for (const secret of [wif, hex, base64]) {
+      const { brand, json } = logField('screen', secret);
+      expect(typeof brand).toBe('object');
+      expect(json).not.toContain(secret);
+    }
+  });
+});

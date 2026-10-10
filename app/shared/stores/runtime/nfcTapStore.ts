@@ -11,7 +11,7 @@
  * Not persisted — listening is per-session and per-screen-focus.
  */
 
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { paymentLog } from '@/shared/lib/logger';
 
 export type NfcTapPhase = 'armed' | 'reading' | 'selecting' | 'creating' | 'writing';
@@ -23,15 +23,17 @@ interface NfcTapStore {
   setPhase: (phase: NfcTapPhase) => void;
 }
 
-export const useNfcTapStore = create<NfcTapStore>((set) => ({
-  armed: false,
-  phase: 'armed',
-  setArmed: (armed) => {
-    paymentLog.info('nfc.tap_store.set_armed', { armed });
-    set({ armed });
-  },
-  setPhase: (phase) => {
-    paymentLog.info('nfc.tap_store.set_phase', { phase });
-    set({ phase });
-  },
-}));
+export const useNfcTapStore = create<NfcTapStore>({ name: 'useNfcTapStore', scope: 'session' })(
+  (set) => ({
+    armed: false,
+    phase: 'armed',
+    setArmed: (armed) => {
+      paymentLog.info('nfc.tap_store.set_armed', { armed });
+      set({ armed });
+    },
+    setPhase: (phase) => {
+      paymentLog.info('nfc.tap_store.set_phase', { phase });
+      set({ phase });
+    },
+  })
+);

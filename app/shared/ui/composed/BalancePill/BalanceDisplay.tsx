@@ -90,7 +90,9 @@ const BalanceDisplay: React.FC<BalanceDisplayProps> = ({
         align="center"
         justify="space-between"
         style={[{ height: innerHeight, width: innerWidth }, style]}>
-        <HStack align="center">
+        {/* The label column takes what the icon and chevron leave and no more,
+            so a long mint name ends in an ellipsis inside the pill. */}
+        <HStack align="center" className="min-w-0 flex-1">
           <View style={{ marginRight: iconRightSpacing }}>
             {iconNode ? (
               // Square box around the glyph — defaults to 32 to keep
@@ -122,16 +124,24 @@ const BalanceDisplay: React.FC<BalanceDisplayProps> = ({
             // centered inside the same pill so the header doesn't reflow
             // when the user tops up and the layout swaps back to the
             // standard two-line balance row.
-            <Text size={14} bold style={{ color: foreground }}>
+            <Text
+              size={14}
+              bold
+              numberOfLines={1}
+              ellipsizeMode="tail"
+              className="min-w-0 shrink"
+              style={{ color: foreground }}>
               {ctaLabel}
             </Text>
           ) : (
-            <VStack align="flex-start">
+            <VStack align="flex-start" className="min-w-0 shrink">
               <Text
                 loading={isLoading}
                 placeholder={loadingTitlePlaceholder}
                 style={{ color: foreground }}
                 size={12}
+                numberOfLines={1}
+                ellipsizeMode="tail"
                 bold>
                 {isLoading ? undefined : title || undefined}
               </Text>
@@ -152,7 +162,7 @@ const BalanceDisplay: React.FC<BalanceDisplayProps> = ({
           )}
         </HStack>
 
-        <View className="mr-2">
+        <View className="ml-1 mr-2">
           <Icon name="fluent:chevron-down-12-filled" size={12} color={foreground} />
         </View>
       </HStack>

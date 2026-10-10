@@ -6,6 +6,7 @@ import { GRADIENT_HEADER_OPTIONS } from '@/navigation/headerOptions';
  * (receive-flow, send-flow, mint-flow, transactions-flow) to ensure consistency.
  */
 
+import { androidFlowPresentation } from './androidFlowPresentation';
 import { memo, useMemo, type ReactNode } from 'react';
 import { Platform } from 'react-native';
 import type { NativeStackHeaderProps, NativeStackNavigationOptions } from 'expo-router';
@@ -31,18 +32,34 @@ interface FlowColors {
 // re-render) doesn't re-parse the SVG icon unless isFirstScreen/foreground change.
 const FlowHeaderButton = memo(function FlowHeaderButton({
   isFirstScreen,
+  pushed,
+  sheet = false,
 }: {
   isFirstScreen: boolean;
+  /**
+   * This one screen rose as a system sheet over the screen before it (iPhone
+   * mint selector). It is dismissed, not gone back from, so it shows the X.
+   * The selector stays `flow-header-back`: the route is the same.
+   */
+  sheet?: boolean;
+  /**
+   * The flow is a pushed screen (Android), not a sheet. Leaving a pushed
+   * screen is going back, so its first screen shows the arrow too; an X says
+   * "dismiss this sheet". Selectors and labels are unchanged either way.
+   */
+  pushed: boolean;
 }) {
   return (
     <ScreenHeaderAction
       icon={
-        isFirstScreen ? 'material-symbols:close-rounded' : 'material-symbols:arrow-back-rounded'
+        sheet || (isFirstScreen && !pushed)
+          ? 'material-symbols:close-rounded'
+          : 'material-symbols:arrow-back-rounded'
       }
       // ScreenHeaderAction is AX-visible only with an accessibilityLabel; the
       // labels deliberately avoid "Close"/"Back", which in-flow content buttons
       // already use as visible text.
-      accessibilityLabel={isFirstScreen ? 'Close screen' : 'Go back'}
+      accessibilityLabel={isFirstScreen || sheet ? 'Close screen' : 'Go back'}
       testID={isFirstScreen ? 'flow-header-close' : 'flow-header-back'}
       onPress={() => router.back()}
     />
@@ -104,12 +121,45 @@ const renderSheetPageLayer = ({ children }: { children: ReactNode }) => (
  * per-screen options. The card-presented stacks ((settings-flow),
  * (user-flow)) must NOT set this — their native headers work.
  */
+/**
+ * The mint selector, when a flow pushes it over another screen.
+ *
+ * On iPhone it is a system sheet: it rises over the amount screen at a little
+ * over half height, shows a grabber, grows to full height when pulled or
+ * scrolled, and is dismissed by pulling down. Choosing a mint is a short
+ * detour from the screen underneath, and a sheet keeps that screen in view.
+ * As the first screen of a flow there is nothing to rise over, and the stack
+ * shows it as an ordinary page.
+ *
+ * Android keeps the pushed page (ADR 0025).
+ */
+/** Route names that use the options below, for the header's close button. */
+const IOS_SHEET_SCREENS: ReadonlySet<string> = new Set(['mintSelect']);
+
+export const MINT_SELECT_SCREEN_OPTIONS: NativeStackNavigationOptions =
+  Platform.OS === 'ios'
+    ? {
+        title: 'Select mint',
+        presentation: 'formSheet',
+        sheetAllowedDetents: [0.62, 1],
+        sheetGrabberVisible: true,
+        sheetCornerRadius: 28,
+        sheetExpandsWhenScrolledToEdge: true,
+      }
+    : { title: 'Select mint' };
+
 export const createFlowLayoutScreenOptions = (
   colors: FlowColors,
   config?: { androidSheet?: boolean }
 ) => {
   const sheetHeader = config?.androidSheet === true && Platform.OS === 'android';
-  return ({ navigation }: { navigation: NavigationProp<ParamListBase> }) => {
+  return ({
+    navigation,
+    route,
+  }: {
+    navigation: NavigationProp<ParamListBase>;
+    route: { name: string };
+  }) => {
     // Get the current stack index - 0 means first screen
     const state = navigation.getState();
     const isFirstScreen = state.index === 0;
@@ -125,7 +175,13 @@ export const createFlowLayoutScreenOptions = (
       // null` remains the sanctioned scrim opt-out (renders nothing).
       ...(sheetHeader ? { header: renderFlowSheetHeader, headerBackground: undefined } : {}),
       // Dynamic back/close button based on stack depth
-      headerLeft: () => <FlowHeaderButton isFirstScreen={isFirstScreen} />,
+      headerLeft: () => (
+        <FlowHeaderButton
+          isFirstScreen={isFirstScreen}
+          pushed={Platform.OS === 'android' && !sheetHeader}
+          sheet={Platform.OS === 'ios' && !isFirstScreen && IOS_SHEET_SCREENS.has(route.name)}
+        />
+      ),
     });
   };
 };
@@ -135,12 +191,26 @@ export const createFlowLayoutScreenOptions = (
  * Route modules supply only their Stack.Screen declarations; theme, header,
  * sheet geometry, and stack policy stay local to this module.
  */
-export function AndroidSheetFlowStack({ children }: { children: ReactNode }) {
+export function AndroidSheetFlowStack({
+  flow,
+  children,
+}: {
+  /** The route group this stack belongs to, e.g. `(send-flow)`. */
+  flow: string;
+  children: ReactNode;
+}) {
   const [foreground, background] = useThemeColor(['foreground', 'surface'] as const);
+  // Android only: a sheet flow draws the JS sheet header inside a fixed-height
+  // sheet frame; a pushed flow is an ordinary stack with the native header.
+  const androidSheet = Platform.OS === 'android' && androidFlowPresentation(flow) === 'sheet';
   const screenOptions = useMemo(
-    () => createFlowLayoutScreenOptions({ foreground, background }, { androidSheet: true }),
-    [foreground, background]
+    () => createFlowLayoutScreenOptions({ foreground, background }, { androidSheet }),
+    [foreground, background, androidSheet]
   );
+
+  if (Platform.OS === 'android' && !androidSheet) {
+    return <Stack screenOptions={screenOptions}>{children}</Stack>;
+  }
 
   return (
     <AndroidSheetRoot headerHeight={FLOW_SHEET_HEADER_HEIGHT}>

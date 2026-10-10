@@ -1,8 +1,13 @@
+import { profilePersistWrite } from './profileWriteBarrier';
 import { type ZodType } from 'zod';
 import { createJSONStorage, type PersistOptions, type StateStorage } from 'zustand/middleware';
 
 import { redactError, storeLog } from '@/shared/lib/logger';
+import type { LiveStore } from '@/shared/lib/account/accountRegistry';
 import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
+import { declaredStores } from '@/shared/lib/account/accountRegistry';
+import { guardUnreadable } from '@/shared/lib/persist/preserveUnreadable';
+import { markHydrationFailed, markHydrationStarted } from '@/shared/lib/persist/hydrationOutcome';
 
 const DEFAULT_VERSION = 1;
 
@@ -43,6 +48,45 @@ interface PersistConfigOptions<TFull, TPartial> {
    * or marking `_hasHydrated`.
    */
   afterHydrate?: (state: TFull | undefined, error: unknown) => void;
+  /**
+   * False in two cases. A store whose storage adapter keeps secrets out of the
+   * blob it writes (`routstr-store`): what such an adapter hands back is rebuilt
+   * with the secrets in it, and copying that to plain storage would expose
+   * them, so the adapter has to protect unreadable data itself. And a cache
+   * that can be fetched again, where replacing a bad blob is the right outcome.
+   */
+  preserveUnreadable?: boolean;
+}
+
+/**
+ * Log a save that the storage rejected, then pass the rejection on. Once per
+ * store and message: a full database fails every save the same way.
+ *
+ * The rejection must survive. Zustand ignores it for ordinary saves, but it
+ * awaits the save after a migration, and recovery awaits these writes and
+ * decides what to undo from whether they threw.
+ */
+function reportFailedSaves(logKey: string, storage: StateStorage): StateStorage {
+  let lastMessage: string | null = null;
+  return {
+    getItem: (name) => storage.getItem(name),
+    removeItem: (name) => storage.removeItem(name),
+    setItem: async (name, value) => {
+      try {
+        await storage.setItem(name, value);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (message !== lastMessage) {
+          lastMessage = message;
+          storeLog.error(`store.${logKey}.save_failed`, {
+            chars: value.length,
+            error: redactError(error),
+          });
+        }
+        throw error;
+      }
+    },
+  };
 }
 
 /** Derive a snake_case log slug from the kebab-case `<name>-store` storage key. */
@@ -57,7 +101,7 @@ function deriveLogKey(name: string): string {
  * the one thing standing between a routine schema change and silent data loss
  * on the durable stores (createMergeWithSchema drops a whole blob it can't parse).
  */
-interface PersistRegistryEntry {
+interface PersistRegistryEntry extends Partial<LiveStore> {
   name: string;
   version: number;
   schema: ZodType<unknown>;
@@ -69,6 +113,7 @@ interface PersistRegistryEntry {
    * snapshot compares schemas to themselves, not to the data).
    */
   partialize: (state: never) => unknown;
+  capturedOwner?: string;
 }
 export const persistRegistry: PersistRegistryEntry[] = [];
 
@@ -96,22 +141,54 @@ export function persistConfig<TFull, TPartial>(
       name: opts.name,
       version,
       schema: opts.schema,
+      capturedOwner:
+        'profileStorageOwner' in opts.storage &&
+        typeof opts.storage.profileStorageOwner === 'string'
+          ? opts.storage.profileStorageOwner
+          : undefined,
       partialize: opts.partialize as (state: never) => unknown,
     });
   }
 
+  const profileScoped = declaredStores.some(
+    (entry) => entry.name === opts.name && entry.scope === 'profile'
+  );
+  const storage: StateStorage = profileScoped
+    ? {
+        getItem: (name) => opts.storage.getItem(name),
+        setItem: (name, value) => profilePersistWrite(() => opts.storage.setItem(name, value)),
+        removeItem: (name) => profilePersistWrite(() => opts.storage.removeItem(name)),
+      }
+    : opts.storage;
+  // Zustand does not look at the result of a save. One that fails (on Android,
+  // most often because AsyncStorage is full) would otherwise leave no trace.
+  const reported = reportFailedSaves(logKey, storage);
+  const guard =
+    opts.preserveUnreadable === false ? null : guardUnreadable(opts.name, logKey, reported);
+  const mergeWithSchema = createMergeWithSchema(logKey, opts.schema);
   return {
     name: opts.name,
-    storage: createJSONStorage(() => opts.storage),
+    storage: createJSONStorage(() => guard?.storage ?? reported),
     version,
     partialize: opts.partialize,
     migrate,
-    merge: createMergeWithSchema(logKey, opts.schema),
-    onRehydrateStorage: () => (state, error) => {
-      if (error) {
-        storeLog.warn(`store.${logKey}.rehydrate_failed`, { error: redactError(error) });
-      }
-      opts.afterHydrate?.(state, error);
+    merge: (persisted, current) => {
+      const merged = mergeWithSchema(persisted, current);
+      // The schema merge hands back `current` itself when it turns a blob down.
+      if (persisted && typeof persisted === 'object' && merged === current) guard?.reject();
+      return merged;
+    },
+    onRehydrateStorage: () => {
+      markHydrationStarted(opts.name);
+      return (state, error) => {
+        if (error) {
+          // An unparseable blob or a throwing `migrate` ends up here, not in `merge`.
+          guard?.reject();
+          storeLog.warn(`store.${logKey}.rehydrate_failed`, { error: redactError(error) });
+          markHydrationFailed(opts.name);
+        }
+        opts.afterHydrate?.(state, error);
+      };
     },
   };
 }

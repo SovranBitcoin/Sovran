@@ -50,7 +50,10 @@ jest.mock('@/shared/hooks/useThemeColor', () => ({
   useThemeColor: (token: string | readonly string[]) =>
     typeof token === 'string' ? 'c' : token.map(() => 'c'),
 }));
-jest.mock('@/shared/lib/color', () => ({ withAlpha: (c: string) => c }));
+jest.mock('@/shared/lib/color', () => ({
+  ...jest.requireActual('@/shared/lib/color'),
+  withAlpha: (c: string) => c,
+}));
 jest.mock('@/shared/lib/date', () => ({ formatDate: () => 'today' }));
 jest.mock('@/shared/lib/currency', () => ({
   formatAmount: ({ amount }: { amount: number }) => `$${amount}`,

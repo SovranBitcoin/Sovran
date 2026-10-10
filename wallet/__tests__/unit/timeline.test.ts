@@ -6,71 +6,222 @@ import { describe, expect, it, vi } from 'vitest';
 // what ships.
 vi.mock('../../src/p2pk/reclaimGate', () => ({ P2PK_RECLAIM_ENABLED: true }));
 
+import { mergeEntryUpdate } from '../../src/screen-actions/createManager';
 import {
+  bucketTransaction,
   buildTimeline,
+  buildTimelineModel,
   getCardLabel,
   getStatusColorType,
   getStatusHeader,
+  normalizeHistoryEntry,
 } from '../../src/history';
 
-describe('history timeline', () => {
-  it('renders receive recovery as waiting to redeem', () => {
-    const entry = {
-      id: 'receive-op-1',
-      type: 'receive',
-      state: 'executing',
-      mintUrl: 'https://mint.example.com',
-      amount: 21,
-      unit: 'sat',
-      createdAt: 1_700_000_000_000,
-      updatedAt: 1_700_000_000_000,
-      operationId: 'op-1',
-    } as never;
+const CREATED_AT = 1_700_000_000_000;
+const base = {
+  mintUrl: 'https://mint.example.com',
+  unit: 'sat',
+  createdAt: CREATED_AT,
+  updatedAt: CREATED_AT,
+  operationId: 'op-1',
+};
 
-    const timeline = buildTimeline({
-      historyEntry: entry,
-      currentTime: 1_700_000_000_000,
-    });
+type Input = Parameters<typeof buildTimeline>[0];
+const build = (historyEntry: unknown, extra: Partial<Input> = {}) =>
+  buildTimeline({ historyEntry: historyEntry as never, currentTime: CREATED_AT, ...extra });
 
-    expect(timeline).toEqual([
-      expect.objectContaining({
-        state: 'accepted',
-        displayLabel: 'Token accepted',
-        stepType: 'complete',
-      }),
-      expect.objectContaining({
-        state: 'executing',
-        displayLabel: 'Waiting to redeem',
-        stepType: 'waiting',
-        info: "We'll add this ecash to your wallet when you're back online.",
-      }),
-      expect.objectContaining({
-        state: 'redeemed',
-        displayLabel: 'Added to wallet',
-        stepType: 'future-small',
-      }),
+/** One line per row: what kind of row it is, what it says, and its subline. */
+const rows = (timeline: ReturnType<typeof buildTimeline>) =>
+  timeline.map((row) => `${row.stepType} | ${row.displayLabel}${row.info ? ` | ${row.info}` : ''}`);
+
+const ONCHAIN = { method: 'onchain', onchainAddress: 'bc1qexample' };
+
+describe('history timeline — token receive', () => {
+  const receive = (state: string, error?: string) => ({
+    ...base,
+    id: 'receive-op-1',
+    type: 'receive',
+    state,
+    amount: 21,
+    ...(error ? { error } : {}),
+  });
+
+  it('a token waiting on a tap opens the "added" slot', () => {
+    expect(rows(build(receive('prepared')))).toEqual([
+      'complete | Token accepted',
+      'next-pending | Ready to redeem | Tap Redeem to add to wallet',
     ]);
-    expect(getCardLabel(entry, timeline)).toBe('Receive • Waiting');
+  });
+
+  it('a receive stuck executing is the SAME slot, stalled — not a different timeline', () => {
+    const entry = receive('executing');
+    const timeline = build(entry);
+    expect(rows(timeline)).toEqual([
+      'complete | Token accepted',
+      "waiting | Waiting to redeem | We'll add this ecash to your wallet when you're back online.",
+    ]);
+    expect(getCardLabel(entry as never, timeline)).toBe('Receive • Waiting');
+    expect(getStatusColorType(timeline)).toBe('warning');
+  });
+
+  it('finalized closes the slot as the success row', () => {
+    expect(rows(build(receive('finalized')))).toEqual([
+      'complete | Token accepted',
+      'success | Added to wallet | +21 sats added to wallet',
+    ]);
+  });
+
+  it('says "already spent" only when the mint said so', () => {
+    expect(rows(build(receive('rolled_back', 'Token already spent')))[1]).toBe(
+      'already-spent | Already spent | The mint reports this token as spent'
+    );
+    expect(rows(build(receive('rolledBack', 'Keyset is inactive (12002)')))[1]).toMatch(
+      /^already-spent \| Not added/
+    );
+    expect(rows(build(receive('rolled_back')))[1]).toMatch(/^already-spent \| Not added/);
+  });
+});
+
+describe('history timeline — lightning SEND (melt)', () => {
+  const melt = (state: string, extra: Record<string, unknown> = {}) => ({
+    ...base,
+    id: 'melt-op-1',
+    type: 'melt',
+    state,
+    amount: 5_000,
+    quoteId: 'mq-1',
+    ...extra,
+  });
+
+  it('walks prepared → handed to the mint → paid, one row at a time', () => {
+    expect(rows(build(melt('UNPAID')))).toEqual([
+      'complete | Payment prepared',
+      'next-pending | Ready to send | Tap Send to complete payment',
+    ]);
+    expect(rows(build(melt('PENDING')))).toEqual([
+      'complete | Payment prepared',
+      'complete | Ecash sent to mint',
+      'current | Paying | The mint is sending the payment',
+    ]);
+    expect(rows(build(melt('PAID')))).toEqual([
+      'complete | Payment prepared',
+      'complete | Ecash sent to mint',
+      'success | Paid | Payment complete',
+    ]);
+  });
+
+  it('a quote that runs out before the tap expires in the open slot', () => {
+    const quote = { expiry: Math.floor(CREATED_AT / 1000) - 60 } as never;
+    const timeline = build(melt('UNPAID'), { meltQuote: quote });
+    expect(rows(timeline)).toEqual([
+      'complete | Payment prepared',
+      'expired | Quote expired | It ran out before the payment was sent',
+    ]);
+    expect(getStatusColorType(timeline)).toBe('error');
+  });
+
+  it('rolling_back is the reversal in flight, not its result', () => {
+    expect(rows(build(melt('rolling_back')))).toEqual([
+      'complete | Payment prepared',
+      'current | Cancelling | Returning ecash to your balance',
+    ]);
+  });
+
+  it.each(['rolled_back', 'rolledBack', 'failed'])(
+    '%s without a recorded reason reads as the user backing out',
+    (state) => {
+      expect(rows(build(melt(state)))).toEqual([
+        'complete | Payment prepared',
+        'rolled-back | Cancelled | Funds returned to your balance',
+      ]);
+    }
+  );
+
+  it.each(['Rollback requested by handler', 'Recovered: Swap happened but melt failed', 'anything a newer coco says'])(
+    'any reason other than the user backing out is a failed payment (%s)',
+    (error) => {
+      const failed = melt('rolled_back', { error });
+      const timeline = build(failed);
+      expect(rows(timeline)[1]).toBe('rolled-back | Payment failed | Funds returned to your balance');
+    }
+  );
+
+  it('the user backing out leaves a reason too, and is still a cancellation', () => {
+    expect(rows(build(melt('rolled_back', { error: 'User cancelled' })))[1]).toBe(
+      'rolled-back | Cancelled | Funds returned to your balance'
+    );
+  });
+
+  it('a payment in flight for minutes says it is slow, and that the ecash is held', () => {
+    const paying = melt('PENDING', { updatedAt: CREATED_AT + 1_000 });
+    const early = buildTimelineModel({ historyEntry: paying as never, currentTime: CREATED_AT + 5_000 });
+    expect(early.steps[2].stepType).toBe('current');
+    // The model says when to look again, so the card needs no polling.
+    expect(early.recheckAt).toBe(CREATED_AT + 1_000 + 120_000);
+    const late = buildTimelineModel({ historyEntry: paying as never, currentTime: early.recheckAt! });
+    expect(late.steps[2]).toMatchObject({ stepType: 'waiting', displayLabel: 'Paying' });
+    expect(late.steps[2].info).toContain('stays held');
+    expect(late.recheckAt).toBeUndefined();
+  });
+
+  it('a reversal that never finishes stops implying it is about to', () => {
+    const stuck = melt('rolling_back', { updatedAt: CREATED_AT + 1_000 });
+    const late = build(stuck, { currentTime: CREATED_AT + 10 * 60_000 });
+    expect(rows(late)[1]).toBe(
+      'waiting | Cancelling | This has not finished. Your ecash is still held and may need recovering.'
+    );
+  });
+
+  it('with no record of when the payment was sent, it is never called slow', () => {
+    // An entry built from a live operation event may carry only createdAt,
+    // which is when the QUOTE was made — possibly long before the tap.
+    const { updatedAt: _dropped, ...noUpdatedAt } = melt('PENDING');
+    const model = buildTimelineModel({
+      historyEntry: noUpdatedAt as never,
+      currentTime: CREATED_AT + 3_600_000,
+    });
+    expect(model.steps[2].stepType).toBe('current');
+    expect(model.recheckAt).toBeUndefined();
+  });
+
+  it('a failed payment and a cancellation get different headers', () => {
+    const failed = melt('rolled_back', { error: 'Recovered: payment failed' });
+    expect(getCardLabel(failed as never, buildTimelineModel({ historyEntry: failed as never, currentTime: CREATED_AT }).steps)).toBe(
+      'Send • Failed'
+    );
+    const cancelled = melt('rolled_back', { error: 'User cancelled' });
+    expect(getCardLabel(cancelled as never, buildTimelineModel({ historyEntry: cancelled as never, currentTime: CREATED_AT }).steps)).toBe(
+      'Send • Cancelled'
+    );
+  });
+
+  it('the header follows the rows, not the raw state', () => {
+    const reversing = build(melt('rolling_back'));
+    expect(getCardLabel(melt('rolling_back') as never, reversing)).toBe('Send • In Progress');
+    const paid = build(melt('finalized'));
+    expect(getCardLabel(melt('finalized') as never, paid)).toBe('Send • Complete');
+    const ready = build(melt('prepared'));
+    expect(getCardLabel(melt('prepared') as never, ready)).toBe('Send • Ready');
+  });
+
+  it('a reversal coco recorded a reason for reads as a failed payment', () => {
+    expect(rows(build(melt('rolled_back', { error: 'Recovered: payment failed' })))[1]).toBe(
+      'rolled-back | Payment failed | Funds returned to your balance'
+    );
   });
 });
 
 describe('history timeline — onchain SEND (melt)', () => {
-  const meltEntry = (state: string) =>
-    ({
-      id: 'melt-op-1',
-      type: 'melt',
-      state,
-      mintUrl: 'https://mint.example.com',
-      amount: 5_000,
-      unit: 'sat',
-      createdAt: 1_700_000_000_000,
-      updatedAt: 1_700_000_000_000,
-      operationId: 'op-1',
-      quoteId: 'mq-1',
-      metadata: { method: 'onchain', onchainAddress: 'bc1qexample' },
-    }) as never;
-
-  const progress = (over: Record<string, unknown>) => ({
+  const melt = (state: string) => ({
+    ...base,
+    id: 'melt-op-1',
+    type: 'melt',
+    state,
+    amount: 5_000,
+    quoteId: 'mq-1',
+    metadata: ONCHAIN,
+  });
+  const progress = (over: Record<string, unknown> = {}) => ({
     hasPayment: false,
     hasUnconfirmedPayment: false,
     receivedSats: 0,
@@ -80,393 +231,497 @@ describe('history timeline — onchain SEND (melt)', () => {
     ...over,
   });
 
-  // Before the mint accepts (still UNPAID / submitting), the first row spins
-  // as "Sending" — nothing may pre-claim completion.
-  it('UNPAID (submitting) → "Sending" active, nothing pre-completed', () => {
-    const timeline = buildTimeline({
-      historyEntry: meltEntry('UNPAID'),
-      currentTime: 1_700_000_000_000,
-      onchainConfirmationProgress: progress({ hasPayment: false }),
-    });
-    expect(timeline).toEqual([
-      expect.objectContaining({
-        displayLabel: 'Sending',
-        stepType: 'current',
-        info: 'Submitting payment…',
-      }),
-      expect.objectContaining({
-        displayLabel: 'Broadcasting…',
-        stepType: 'future-small',
-      }),
-      expect.objectContaining({
-        displayLabel: 'Confirmed',
-        stepType: 'future-small',
-      }),
+  // Before the mint accepts, nothing may pre-claim completion.
+  it('UNPAID (submitting) → the hand-over spins, nothing else is drawn', () => {
+    expect(rows(build(melt('UNPAID'), { onchainConfirmationProgress: progress() }))).toEqual([
+      'complete | Payment prepared',
+      'current | Sending to mint | Submitting payment…',
     ]);
-    expect(timeline[0].timestamp).toBeUndefined();
   });
 
-  it('PENDING, not yet broadcast → Sent / Broadcasting… / Confirmed', () => {
-    const timeline = buildTimeline({
-      historyEntry: meltEntry('pending'),
-      currentTime: 1_700_000_000_000,
-      onchainConfirmationProgress: progress({ hasPayment: false }),
-    });
-    expect(timeline).toEqual([
-      expect.objectContaining({ displayLabel: 'Sent', stepType: 'complete' }),
-      expect.objectContaining({
-        displayLabel: 'Broadcasting…',
-        stepType: 'current',
-        info: 'Sending the transaction to the network',
-      }),
-      expect.objectContaining({
-        displayLabel: 'Confirmed',
-        stepType: 'future-small',
-      }),
+  it('PENDING, not yet broadcast → handed over, broadcasting', () => {
+    expect(rows(build(melt('pending'), { onchainConfirmationProgress: progress() }))).toEqual([
+      'complete | Payment prepared',
+      'complete | Ecash sent to mint',
+      'current | Broadcasting | Sending the transaction to the network',
     ]);
-    // The broadcasting row shows no confirmation ring yet (no tx to count).
-    expect(timeline[1].confirmationRing).toBeUndefined();
   });
 
-  it('broadcast + confirming → "In mempool · N/6 blocks" with the ring', () => {
-    const timeline = buildTimeline({
-      historyEntry: meltEntry('PAID'),
-      currentTime: 1_700_000_000_000,
-      onchainConfirmationProgress: progress({
-        hasPayment: true,
-        currentConfirmations: 3,
-      }),
+  it('in the mempool, then counting blocks, with the ring on the open row', () => {
+    const mempool = build(melt('pending'), {
+      onchainConfirmationProgress: progress({ hasPayment: true, hasUnconfirmedPayment: true }),
     });
-    expect(timeline[1]).toMatchObject({
-      displayLabel: 'In mempool',
-      stepType: 'current',
-      info: '3/6 blocks',
-      confirmationRing: true,
+    expect(rows(mempool)).toEqual([
+      'complete | Payment prepared',
+      'complete | Ecash sent to mint',
+      'complete | Broadcast',
+      'current | In mempool | 0/6 blocks',
+    ]);
+    expect(mempool.map((row) => !!row.confirmationRing)).toEqual([false, false, false, true]);
+
+    const counting = build(melt('pending'), {
+      onchainConfirmationProgress: progress({ hasPayment: true, currentConfirmations: 2 }),
     });
-    expect(timeline[2]).toMatchObject({
-      displayLabel: 'Confirmed',
-      stepType: 'future-small',
-    });
+    expect(rows(counting)[3]).toBe('current | Confirming | 2/6 blocks');
   });
 
-  it('fully confirmed → "Confirmed" success, mempool row complete', () => {
-    const timeline = buildTimeline({
-      historyEntry: meltEntry('PAID'),
-      currentTime: 1_700_000_000_000,
+  it('fully confirmed → "Confirmed" success, and the ring stays on its row', () => {
+    const timeline = build(melt('PAID'), {
       onchainConfirmationProgress: progress({
         hasPayment: true,
         currentConfirmations: 6,
         isSatisfied: true,
       }),
     });
-    expect(timeline[1]).toMatchObject({
-      displayLabel: 'In mempool',
-      stepType: 'complete',
-    });
-    expect(timeline[2]).toMatchObject({
-      displayLabel: 'Confirmed',
-      stepType: 'success',
-    });
+    expect(rows(timeline)).toEqual([
+      'complete | Payment prepared',
+      'complete | Ecash sent to mint',
+      'complete | Broadcast',
+      'success | Confirmed',
+    ]);
+    expect(timeline[3].confirmationRing).toBe(true);
   });
 
-  // The mint can settle an onchain melt OFF-CHAIN (no outpoint / no broadcast).
-  // The network phase collapses to one row and no step label claims on-chain.
-  it('PAID + off-chain settlement → "Sent" / "Settled off-chain"', () => {
-    const timeline = buildTimeline({
-      historyEntry: meltEntry('PAID'),
-      currentTime: 1_700_000_000_000,
-      onchainConfirmationProgress: progress({
-        hasPayment: false,
-        isSatisfied: true,
-      }),
+  // The mint and our explorer are separate observers; either may get there
+  // first, and the timeline follows whichever does.
+  it('mint says PAID while our explorer is still counting → confirmed, not "3/6"', () => {
+    const timeline = build(melt('PAID'), {
+      onchainConfirmationProgress: progress({ hasPayment: true, currentConfirmations: 3 }),
+    });
+    expect(rows(timeline)[3]).toBe('success | Confirmed');
+  });
+
+  it('our explorer reaching the depth does not finish the payment: that is the mint\'s to say', () => {
+    const deep = progress({ hasPayment: true, currentConfirmations: 6, isSatisfied: true });
+    const timeline = build(melt('pending'), { onchainConfirmationProgress: deep });
+    expect(rows(timeline)[3]).toBe(
+      'next-pending | Waiting for the mint | Deep enough by our count. The mint confirms it once its own node agrees.'
+    );
+    expect(getCardLabel(melt('pending') as never, timeline)).toBe('Send • In Progress');
+    // The mint can still reverse a melt it has not settled; nothing above
+    // may have said the payment was complete.
+    expect(rows(build(melt('PAID'), { onchainConfirmationProgress: deep }))[3]).toBe(
+      'success | Confirmed'
+    );
+  });
+
+  it('PAID with nothing on the explorer is not called confirmed', () => {
+    const timeline = build(melt('PAID'), { onchainConfirmationProgress: progress() });
+    expect(rows(timeline)[2]).toBe('current | Paid by the mint | Looking for the transaction');
+  });
+
+  it('PAID with no transaction → settles off-chain in the slot that awaited the broadcast', () => {
+    const timeline = build(melt('PAID'), {
+      onchainConfirmationProgress: progress(),
       onchainSettledInternally: true,
     });
-    expect(timeline).toHaveLength(2);
-    expect(timeline[0]).toMatchObject({
-      displayLabel: 'Sent',
-      stepType: 'complete',
-    });
-    expect(timeline[1]).toMatchObject({
-      displayLabel: 'Settled off-chain',
-      stepType: 'success',
-      info: 'No on-chain transaction',
-    });
-    const labelClaimsOnChain = timeline.some((item) => /on-chain|mempool/i.test(item.displayLabel));
-    expect(labelClaimsOnChain).toBe(false);
+    expect(rows(timeline)).toEqual([
+      'complete | Payment prepared',
+      'complete | Ecash sent to mint',
+      'success | Paid by the mint | The mint reported no on-chain transaction',
+    ]);
+    expect(getStatusColorType(timeline)).toBe('success');
   });
 
-  // Device bug: a mint (cdk-ldk-bdk) settled off-chain but reported a state the
-  // melt-state mapping didn't recognise, so meltState fell to UNPAID and the
-  // first row rendered as a grey idle dot (with a grey connector) ABOVE the
-  // green "Settled off-chain". onchainSettledInternally must force the "Sent"
-  // row complete regardless.
-  it('off-chain settle with an unrecognised state → "Sent" still complete', () => {
-    const timeline = buildTimeline({
-      historyEntry: meltEntry('UNPAID'),
-      currentTime: 1_700_000_000_000,
-      onchainConfirmationProgress: progress({
-        hasPayment: false,
-        isSatisfied: false,
-      }),
+  it('off-chain settle with an unrecognised state → the hand-over is still complete', () => {
+    const timeline = build(melt('SETTLED_WEIRDLY'), {
+      onchainConfirmationProgress: progress(),
       onchainSettledInternally: true,
     });
-    expect(timeline[0]).toMatchObject({
-      displayLabel: 'Sent',
-      stepType: 'complete',
-    });
-    expect(timeline[1]).toMatchObject({
-      displayLabel: 'Settled off-chain',
-      stepType: 'success',
-    });
+    expect(rows(timeline).slice(0, 2)).toEqual([
+      'complete | Payment prepared',
+      'complete | Ecash sent to mint',
+    ]);
   });
 
-  // coco v2 spells a reversed melt `rolled_back` (normalized to `rolledBack`);
-  // without dedicated handling it collapsed to the UNPAID default and a
-  // cancelled send rendered as if it were still waiting to be sent.
-  it.each(['rolled_back', 'rolledBack', 'rolling_back', 'failed'])(
-    '%s → Cancelled, funds returned (short-circuits before the onchain branch)',
-    (state) => {
-      const timeline = buildTimeline({
-        historyEntry: meltEntry(state),
-        currentTime: 1_700_000_000_000,
-      });
-      expect(timeline).toEqual([
-        expect.objectContaining({ stepType: 'complete' }),
-        expect.objectContaining({
-          displayLabel: 'Cancelled',
-          stepType: 'rolled-back',
-          info: 'Funds returned to your balance',
-        }),
-      ]);
-    }
-  );
+  it.each(['rolled_back', 'rolledBack', 'failed'])('%s → funds returned', (state) => {
+    const timeline = build(melt(state), { onchainConfirmationProgress: progress() });
+    expect(rows(timeline)).toEqual([
+      'complete | Payment prepared',
+      'rolled-back | Cancelled | Funds returned to your balance',
+    ]);
+    expect(getStatusHeader(timeline)).toBe('CANCELLED');
+  });
+});
+
+describe('history timeline — bearer SEND', () => {
+  const send = (state: string, extra: Record<string, unknown> = {}) => ({
+    ...base,
+    id: 'send-op-1',
+    type: 'send',
+    state,
+    amount: 100,
+    ...extra,
+  });
+
+  it.each(['prepared', 'executing'])('%s → the token is still being made', (state) => {
+    expect(rows(build(send(state)))).toEqual(['current | Creating token | Setting aside ecash']);
+  });
+
+  it('pending → created, waiting on the recipient', () => {
+    expect(rows(build(send('pending')))).toEqual([
+      'complete | Created',
+      'next-pending | Waiting for recipient | Not claimed yet',
+    ]);
+  });
+
+  it('finalized → claimed', () => {
+    expect(rows(build(send('finalized')))).toEqual([
+      'complete | Created',
+      'success | Claimed | The token has been redeemed',
+    ]);
+  });
+
+  it('a cancel tap and coco\'s own rolling_back draw the same in-flight row', () => {
+    const expected = ['complete | Created', 'current | Cancelling | Returning ecash to your balance'];
+    expect(rows(build(send('pending'), { cancelling: true }))).toEqual(expected);
+    expect(rows(build(send('rolling_back', { token: { proofs: [{ secret: 'x' }] } })))).toEqual(expected);
+  });
+
+  it('a rolled-back send keeps "Created" only when a token was actually made', () => {
+    expect(rows(build(send('rolled_back')))).toEqual([
+      'rolled-back | Cancelled | Funds returned to your balance',
+    ]);
+    expect(rows(build(send('rolled_back', { token: { proofs: [{ secret: 'x' }] } })))).toEqual([
+      'complete | Created',
+      'rolled-back | Cancelled | Funds returned to your balance',
+    ]);
+  });
+});
+
+describe('history timeline — outgoing payment request', () => {
+  const send = (state: string) => ({ ...base, id: 'send-pr-1', type: 'send', state, amount: 100 });
+
+  it('walks token → delivery → claim', () => {
+    expect(rows(build(send('prepared'), { tokenCreated: false }))).toEqual([
+      'current | Creating token | Setting aside ecash',
+    ]);
+    expect(rows(build(send('pending'), { tokenCreated: true, nostrSent: false }))).toEqual([
+      'complete | Created',
+      'current | Delivering | Sending to the recipient',
+    ]);
+    expect(rows(build(send('pending'), { tokenCreated: true, nostrSent: true }))).toEqual([
+      'complete | Created',
+      'complete | Delivered | Sent to the recipient',
+      'next-pending | Waiting for recipient | Not claimed yet',
+    ]);
+    const done = build(send('finalized'), { tokenCreated: true, nostrSent: true });
+    expect(rows(done)[2]).toBe('success | Claimed | The token has been redeemed');
+    expect(getCardLabel(send('finalized') as never, done, true, true)).toBe('Payment • Complete');
+  });
+
+  it('a paid request reopened from history is still a request, from its record alone', () => {
+    // No live flags: only what was written down when it was handed over.
+    const reopened = {
+      ...send('pending'),
+      metadata: { paymentRequestRole: 'payer', paymentRequestTransport: 'http' },
+    };
+    const timeline = build(reopened);
+    expect(rows(timeline)).toEqual([
+      'complete | Created',
+      "complete | Delivered | Sent to the recipient's server",
+      'next-pending | Waiting for recipient | Not claimed yet',
+    ]);
+    expect(getCardLabel(reopened as never, timeline)).toBe('Payment • In Progress');
+  });
+
+  it('a preview the user has not confirmed is waiting on them, not working', () => {
+    const preview = { ...send('prepared'), metadata: { phase: 'preview' } };
+    expect(rows(build(preview, { tokenCreated: false }))).toEqual([
+      'next-pending | Ready to pay | Nothing has been sent yet',
+    ]);
+  });
+
+  it('a cancelled request keeps exactly the steps that happened', () => {
+    expect(rows(build(send('rolled_back'), { tokenCreated: true, nostrSent: true }))).toHaveLength(3);
+    expect(rows(build(send('rolled_back'), { tokenCreated: true, nostrSent: false }))).toHaveLength(2);
+  });
 });
 
 describe('history timeline — incoming payment request (receive)', () => {
-  const base = {
+  const receive = (state: string, metadata: Record<string, string>) => ({
+    ...base,
     id: 'pr-op-1',
     type: 'receive',
-    mintUrl: 'https://mint.example.com',
+    state,
     amount: 100,
-    unit: 'sat',
-    createdAt: 1_700_000_000_000,
-    updatedAt: 1_700_000_000_000,
-    operationId: 'op-1',
-  };
-  const build = (entry: unknown) =>
-    buildTimeline({
-      historyEntry: entry as never,
-      currentTime: 1_700_000_000_000,
-    });
-
-  it('pending request (paymentRequestPending) leads with "waiting for payment"', () => {
-    // The list pending row is state:executing but must NOT read "redeeming".
-    const timeline = build({
-      ...base,
-      state: 'executing',
-      metadata: { source: 'payment-request', paymentRequestPending: '1' },
-    });
-    expect(timeline.map((t) => [t.displayLabel, t.stepType])).toEqual([
-      ['Requested', 'next-pending'],
-      ['Payment received', 'future-small'],
-      ['Added to wallet', 'future-small'],
-    ]);
-    expect(timeline[0].info).toBe('Waiting for payment over Nostr…');
+    metadata,
   });
 
-  it('claim in progress (prepared) shows Payment received · Redeeming…', () => {
-    const timeline = build({
-      ...base,
-      state: 'prepared',
-      metadata: { source: 'payment-request' },
-    });
-    expect(timeline.map((t) => [t.displayLabel, t.stepType])).toEqual([
-      ['Requested', 'complete'],
-      ['Payment received', 'current'],
-      ['Added to wallet', 'future-small'],
+  it('pending request (paymentRequestPending) leads with "waiting for payment"', () => {
+    // The list's pending row is `executing`; the flag must win over the state.
+    expect(rows(build(receive('executing', { paymentRequestPending: '1' })))).toEqual([
+      'complete | Requested',
+      'next-pending | Waiting for payment | Waiting for payment over Nostr…',
     ]);
-    expect(timeline[1].info).toBe('Redeeming…');
+  });
+
+  it('claim in progress shows Payment received, then adding', () => {
+    expect(rows(build(receive('prepared', { source: 'payment-request' })))).toEqual([
+      'complete | Requested',
+      'complete | Payment received',
+      'current | Adding to wallet | Redeeming…',
+    ]);
   });
 
   it('finalized shows Added to wallet as success', () => {
-    const timeline = build({
-      ...base,
-      state: 'finalized',
-      metadata: { source: 'payment-request' },
-    });
-    expect(timeline.map((t) => [t.displayLabel, t.stepType])).toEqual([
-      ['Requested', 'complete'],
-      ['Payment received', 'complete'],
-      ['Added to wallet', 'success'],
-    ]);
-    expect(timeline[2].info).toContain('100');
+    const timeline = build(receive('finalized', { source: 'payment-request' }));
+    expect(rows(timeline)[2]).toBe('success | Added to wallet | +100 sats added to wallet');
+    expect(getStatusColorType(timeline)).toBe('success');
   });
 
-  it('a plain token receive is unaffected (no PR metadata)', () => {
-    const timeline = build({ ...base, id: 'receive-x', state: 'finalized' });
-    expect(timeline.map((t) => t.displayLabel)).toEqual(['Pending', 'Added to wallet']);
+  it('a payment that could not be added still shows it arrived', () => {
+    expect(
+      rows(build({ ...receive('rolled_back', { source: 'payment-request' }), error: 'Token already spent' }))
+    ).toEqual([
+      'complete | Requested',
+      'complete | Payment received',
+      'already-spent | Already spent | The mint reports this token as spent',
+    ]);
   });
 });
 
 describe('history timeline — mint (receive) arms', () => {
-  const mintEntry = (state: string, metadata?: Record<string, string>) =>
-    ({
-      id: 'mint-op-1',
-      type: 'mint',
-      state,
-      mintUrl: 'https://mint.example.com',
-      amount: 21_000,
-      unit: 'sat',
-      createdAt: 1_700_000_000_000,
-      updatedAt: 1_700_000_000_000,
-      quoteId: 'q1',
-      paymentRequest: '',
-      ...(metadata ? { metadata } : {}),
-    }) as never;
-
-  const ONCHAIN = { method: 'onchain', onchainAddress: 'bc1qexample' };
-
-  const progress = (
-    currentConfirmations: number | null,
-    hasPayment = true,
-    requiredConfirmations = 6
-  ) => ({
+  const mint = (state: string, extra: Record<string, unknown> = {}) => ({
+    ...base,
+    id: 'mint-op-1',
+    type: 'mint',
+    state,
+    amount: 21_000,
+    quoteId: 'q1',
+    paymentRequest: '',
+    ...extra,
+  });
+  const onchain = (state: string) => mint(state, { metadata: ONCHAIN });
+  const progress = (currentConfirmations: number | null, hasPayment = true) => ({
     hasPayment,
     hasUnconfirmedPayment: currentConfirmations == null && hasPayment,
     receivedSats: hasPayment ? 21_000 : 0,
     currentConfirmations,
-    requiredConfirmations,
-    isSatisfied: currentConfirmations != null && currentConfirmations >= requiredConfirmations,
+    requiredConfirmations: 6,
+    isSatisfied: currentConfirmations != null && currentConfirmations >= 6,
   });
 
-  const build = (entry: never, extra: Record<string, unknown> = {}) =>
-    buildTimeline({
-      historyEntry: entry,
-      currentTime: 1_700_000_000_000,
-      ...extra,
+  it('lightning: invoice → payment → added', () => {
+    const waiting = build(mint('UNPAID'));
+    expect(rows(waiting)).toEqual([
+      'complete | Invoice created',
+      'next-pending | Waiting for payment | Pay the invoice to receive funds',
+    ]);
+    expect(getCardLabel(mint('UNPAID') as never, waiting)).toBe('Receive • Awaiting Payment');
+
+    const paid = build(mint('PAID'));
+    expect(rows(paid)).toEqual([
+      'complete | Invoice created',
+      'complete | Payment received',
+      'current | Adding to wallet | Collecting your ecash from the mint',
+    ]);
+    expect(getCardLabel(mint('PAID') as never, paid)).toBe('Receive • In Progress');
+
+    expect(rows(build(mint('ISSUED')))[2]).toBe(
+      'success | Added to wallet | +21000 sats added to wallet'
+    );
+  });
+
+  it('the mint having issued is not the wallet having the ecash', () => {
+    // coco puts the operation back to pending when issued outputs cannot be
+    // restored: the payment is proven, the credit is not.
+    expect(rows(build(mint('pending', { remoteState: 'ISSUED' })))).toEqual([
+      'complete | Invoice created',
+      'complete | Payment received',
+      'current | Adding to wallet | Collecting your ecash from the mint',
+    ]);
+  });
+
+  it('a mint finished with nothing restored does not say "Added to wallet"', () => {
+    const timeline = build(
+      mint('finalized', { error: 'Recovered issued quote but no proofs could be restored' })
+    );
+    expect(rows(timeline)).toEqual([
+      'complete | Invoice created',
+      'complete | Payment received',
+      'expired | Not added | The mint issued this ecash but it could not be restored',
+    ]);
+  });
+
+  it('an error left over from an attempt that later succeeded is not a failure', () => {
+    // The live entry merge keeps fields an update omits, so a retry that
+    // worked can still be carrying the failed attempt's reason.
+    expect(rows(build(mint('finalized', { error: 'Network request failed' })))[2]).toBe(
+      'success | Added to wallet | +21000 sats added to wallet'
+    );
+  });
+
+  it('a retry that succeeds sheds the failed attempt\'s reason in the live merge', () => {
+    // coco's projection omits `error` once it is cleared, and the merge used
+    // to keep whatever the update left out.
+    const stuck = mint('pending', {
+      error: 'Recovered issued quote q1 but no proofs could be restored',
     });
-
-  const shape = (timeline: ReturnType<typeof buildTimeline>) =>
-    timeline.map((t) => [t.displayLabel, t.stepType, t.info ?? null]);
-
-  it('lightning UNPAID → waiting / future / future', () => {
-    const entry = mintEntry('UNPAID');
-    const timeline = build(entry);
-    expect(shape(timeline)).toEqual([
-      ['Waiting for payment', 'next-pending', 'Pay the invoice to receive funds'],
-      ['Payment received', 'future-small', null],
-      ['Complete', 'future-small', null],
-    ]);
-    expect(getCardLabel(entry, timeline)).toBe('Receive • Awaiting Payment');
-    expect(getStatusHeader(timeline)).toBe('WAITING FOR PAYMENT');
-    expect(getStatusColorType(timeline)).toBe('default');
+    const succeeded = mint('finalized');
+    const merged = mergeEntryUpdate(stuck as never, succeeded as never);
+    expect(merged.error).toBeUndefined();
+    expect(rows(build(merged))[2]).toBe('success | Added to wallet | +21000 sats added to wallet');
   });
 
-  it('lightning PAID → adding to wallet', () => {
-    const timeline = build(mintEntry('PAID'));
-    expect(shape(timeline)).toEqual([
-      ['Waiting for payment', 'complete', null],
-      ['Payment received', 'next-pending', 'Adding to wallet...'],
-      ['Complete', 'future-small', null],
-    ]);
-    expect(getStatusHeader(timeline)).toBe('PAYMENT RECEIVED');
+  it('a failed mint survives the history list, which hands it over as UNPAID', () => {
+    const fromList = normalizeHistoryEntry(mint('failed', { source: 'operation' }) as never);
+    expect((fromList as { state: string }).state).toBe('UNPAID');
+    expect(rows(build(fromList))[1]).toBe('expired | Failed | Receive could not be completed');
+    // And the list no longer files it under Pending.
+    expect(bucketTransaction(fromList)).toBe('expired');
   });
 
-  it('lightning ISSUED → success terminal with credited amount', () => {
-    const entry = mintEntry('ISSUED');
-    const timeline = build(entry);
-    expect(shape(timeline)).toEqual([
-      ['Waiting for payment', 'complete', null],
-      ['Payment received', 'complete', null],
-      ['Complete', 'success', '+21000 sats added to wallet'],
+  it('a mint that fails before payment fails in the payment slot', () => {
+    const timeline = build(mint('failed'));
+    expect(rows(timeline)).toEqual([
+      'complete | Invoice created',
+      'expired | Failed | Receive could not be completed',
     ]);
-    expect(getCardLabel(entry, timeline)).toBe('Receive • Complete');
-    expect(getStatusColorType(timeline)).toBe('success');
+    expect(getCardLabel(mint('failed') as never, timeline)).toBe('Receive • Failed');
   });
 
-  it('failed mint → expired-style terminal', () => {
-    const timeline = build(mintEntry('failed'));
-    expect(shape(timeline)).toEqual([
-      ['Waiting for payment', 'complete', null],
-      ['Failed', 'expired', 'Receive could not be completed'],
+  it('a mint that fails AFTER payment keeps "Payment received" — that money moved', () => {
+    expect(rows(build(mint('failed', { remoteState: 'PAID' })))).toEqual([
+      'complete | Invoice created',
+      'complete | Payment received',
+      'expired | Failed | The payment arrived but the mint did not issue ecash',
     ]);
-    expect(getStatusHeader(timeline)).toBe('FAILED');
-    expect(getStatusColorType(timeline)).toBe('error');
+  });
+
+  it('the mint\'s own reason wins over the stock one', () => {
+    expect(rows(build(mint('failed', { error: 'Quote expired (20007)' })))[1]).toBe(
+      'expired | Failed | Quote expired (20007)'
+    );
   });
 
   it('onchain deposit: no payment observed → still waiting (no over-claim)', () => {
-    const timeline = build(mintEntry('UNPAID', ONCHAIN), {
-      onchainConfirmationProgress: progress(null, false),
-    });
-    expect(shape(timeline)[0]).toEqual([
-      'Waiting for payment',
-      'next-pending',
-      'Pay the address to receive funds',
-    ]);
-    expect(shape(timeline)[1]).toEqual(['Payment received', 'future-small', null]);
-  });
-
-  it('onchain deposit: tx in mempool while quote UNPAID → "Confirming on-chain", never "Payment received"', () => {
-    const timeline = build(mintEntry('UNPAID', ONCHAIN), {
-      onchainConfirmationProgress: progress(null, true),
-    });
-    expect(shape(timeline)[1]).toEqual([
-      'Confirming on-chain',
-      'next-pending',
-      'Waiting for first confirmation',
-    ]);
-
-    const midway = build(mintEntry('UNPAID', ONCHAIN), {
-      onchainConfirmationProgress: progress(3),
-    });
-    expect(shape(midway)[1]).toEqual(['Confirming on-chain', 'current', '3/6 confirmations']);
-  });
-
-  it('onchain deposit: confirmations satisfied but quote still UNPAID → waiting on the mint', () => {
-    const timeline = build(mintEntry('UNPAID', ONCHAIN), {
-      onchainConfirmationProgress: progress(6),
-    });
-    expect(shape(timeline)[1]).toEqual([
-      'Confirmed on-chain',
-      'current',
-      'Waiting for mint to credit',
+    expect(rows(build(onchain('UNPAID'), { onchainConfirmationProgress: progress(null, false) }))).toEqual([
+      'complete | Address created',
+      'next-pending | Waiting for deposit | Pay the address to receive funds',
     ]);
   });
 
-  it('onchain deposit: quote PAID → "Payment received" gated on the MINT, not our watcher', () => {
-    const timeline = build(mintEntry('PAID', ONCHAIN), {
-      onchainConfirmationProgress: progress(6),
+  it('onchain deposit: in the mempool while the quote is UNPAID → detected, never "Payment received"', () => {
+    const timeline = build(onchain('UNPAID'), { onchainConfirmationProgress: progress(null) });
+    expect(rows(timeline)).toEqual([
+      'complete | Address created',
+      'complete | Deposit detected',
+      'next-pending | Confirming on-chain | Waiting for first confirmation',
+    ]);
+    expect(timeline[2].confirmationRing).toBe(true);
+    expect(rows(timeline).join()).not.toContain('Payment received');
+    expect(getCardLabel(onchain('UNPAID') as never, timeline)).toBe('Receive • In Progress');
+  });
+
+  it('onchain deposit: counting blocks spins from the first one', () => {
+    expect(
+      rows(build(onchain('UNPAID'), { onchainConfirmationProgress: progress(2) }))[2]
+    ).toBe('current | Confirming on-chain | 2/6 confirmations');
+  });
+
+  it('onchain deposit: deep enough but the quote is still UNPAID → waiting on the mint', () => {
+    expect(rows(build(onchain('UNPAID'), { onchainConfirmationProgress: progress(6) }))).toEqual([
+      'complete | Address created',
+      'complete | Deposit detected',
+      'complete | Confirmed on-chain',
+      'next-pending | Waiting for mint to credit | Deep enough by our count. The mint credits it once its own node agrees.',
+    ]);
+  });
+
+  // The mint credits from its own node; our explorer is only a hint. Running
+  // a block or two ahead of it is lag. Running well past it is not.
+  it('onchain deposit: our count far past the requirement and still no credit → says so', () => {
+    const overdue = { ...progress(6), observedConfirmations: 9, requirementFromMint: true };
+    const timeline = build(onchain('UNPAID'), { onchainConfirmationProgress: overdue });
+    expect(timeline[3]).toMatchObject({
+      stepType: 'waiting',
+      displayLabel: 'Not credited by the mint',
     });
-    expect(shape(timeline)[1]).toEqual(['Payment received', 'current', '6/6 confirmations']);
+    expect(timeline[3].info).toContain('below their minimum');
+    expect(getStatusColorType(timeline)).toBe('warning');
+
+    // One block past is still just lag.
+    const lagging = { ...progress(6), observedConfirmations: 7, requirementFromMint: true };
+    expect(build(onchain('UNPAID'), { onchainConfirmationProgress: lagging })[3].stepType).toBe(
+      'next-pending'
+    );
+    // Against a depth we only assumed, the mint may simply want more blocks:
+    // that is never reported as the mint failing to credit.
+    const guessed = { ...progress(6), observedConfirmations: 30 };
+    expect(build(onchain('UNPAID'), { onchainConfirmationProgress: guessed })[3].stepType).toBe(
+      'next-pending'
+    );
+    // And the mint crediting ends the warning, whatever our count was.
+    expect(rows(build(onchain('PAID'), { onchainConfirmationProgress: overdue }))[3]).toBe(
+      'current | Adding to wallet | Collecting your ecash from the mint'
+    );
+  });
+
+  it('onchain deposit: "deep enough" is only said while our explorer still says so', () => {
+    // "Confirmed" was drawn against an assumed 6 blocks; the mint's real
+    // requirement (12) then loaded. The row stays, but the slot below it must
+    // not go on claiming our count is deep enough — or warn about the mint.
+    const nineOfTwelve = {
+      ...progress(9),
+      requiredConfirmations: 12,
+      isSatisfied: false,
+      observedConfirmations: 9,
+    };
+    const timeline = build(onchain('UNPAID'), {
+      onchainConfirmationProgress: nineOfTwelve,
+      doneRowKeys: ['created', 'deposit', 'confirmed'],
+    });
+    expect(rows(timeline)[3]).toBe(
+      'next-pending | Waiting for mint to credit | The mint has not credited the deposit yet'
+    );
+    // Same when the explorer has nothing at all to say any more.
+    expect(
+      rows(build(onchain('UNPAID'), { doneRowKeys: ['created', 'deposit', 'confirmed'] }))[3]
+    ).toBe('next-pending | Waiting for mint to credit | The mint has not credited the deposit yet');
+  });
+
+  it('onchain deposit: a credit from the mint proves the chain steps even with no explorer', () => {
+    expect(rows(build(onchain('PAID')))).toEqual([
+      'complete | Address created',
+      'complete | Deposit detected',
+      'complete | Confirmed on-chain',
+      'current | Adding to wallet | Collecting your ecash from the mint',
+    ]);
   });
 
   it('onchain deposit: ISSUED → success terminal', () => {
-    const timeline = build(mintEntry('ISSUED', ONCHAIN), {
-      onchainConfirmationProgress: progress(6),
+    const timeline = build(onchain('ISSUED'), { onchainConfirmationProgress: progress(6) });
+    expect(rows(timeline)[3]).toBe('success | Added to wallet | +21000 sats added to wallet');
+  });
+
+  it('onchain deposit: a transaction that leaves the mempool is said to have left', () => {
+    const timeline = build(onchain('UNPAID'), {
+      onchainConfirmationProgress: progress(null, false),
+      doneRowKeys: ['created', 'deposit'],
     });
-    expect(shape(timeline)[2]).toEqual(['Complete', 'success', '+21000 sats added to wallet']);
-    expect(getStatusColorType(timeline)).toBe('success');
+    expect(rows(timeline)[2]).toBe(
+      'waiting | Confirming on-chain | The transaction is no longer in the mempool'
+    );
   });
 });
 
 describe('history timeline — a send that is locked until a date', () => {
   const THEIR_KEY = `02${'11'.repeat(32)}`;
   const OUR_KEY = `02${'22'.repeat(32)}`;
-  const CREATED_AT = 1_800_000_000_000;
-  const LOCKTIME_SEC = Math.floor(CREATED_AT / 1000) + 3600;
+  const AT = 1_800_000_000_000;
+  const LOCKTIME_SEC = Math.floor(AT / 1000) + 3600;
   const UNLOCK_AT = LOCKTIME_SEC * 1000;
 
-  const lockedSend = (tags: string[][], state = 'pending', updatedAt = CREATED_AT) =>
+  const lockedSend = (tags: string[][], state = 'pending', updatedAt = AT) =>
     ({
+      ...base,
       id: 'send-locked-1',
       type: 'send',
       state,
-      mintUrl: 'https://mint.example.com',
       amount: 21,
-      unit: 'sat',
-      createdAt: CREATED_AT,
+      createdAt: AT,
       updatedAt,
-      operationId: 'op-locked-1',
       token: {
         proofs: [
           {
@@ -480,109 +735,74 @@ describe('history timeline — a send that is locked until a date', () => {
     ['locktime', String(LOCKTIME_SEC)],
     ['refund', OUR_KEY],
   ];
+  const at = (currentTime: number, ourPubkeys = [OUR_KEY]) => ({ currentTime, ourPubkeys });
 
-  it('does not promise a reclaim milestone for a permanent lock', () => {
-    const timeline = buildTimeline({
-      historyEntry: lockedSend([]),
-      currentTime: CREATED_AT,
-      ourPubkeys: [OUR_KEY],
-    });
-    expect(timeline.map((step) => step.displayLabel)).toEqual(['Created', 'Locked']);
-  });
-
-  it('does not say this wallet can reclaim a refund locked to someone else', () => {
-    const timeline = buildTimeline({
-      historyEntry: lockedSend(refundTags),
-      currentTime: UNLOCK_AT + 60_001,
-      ourPubkeys: [THEIR_KEY],
-    });
-    expect(timeline[1].displayLabel).toBe('Unlocked');
-    expect(timeline[1].info).not.toBe('You can take this back');
+  it('does not promise an unlock for a permanent lock', () => {
+    expect(rows(build(lockedSend([]), at(AT)))).toEqual([
+      'complete | Created',
+      'next-pending | Locked | Only the recipient can redeem it',
+    ]);
   });
 
   it('shows when it unlocks, as a date rather than a countdown', () => {
     // The row rebuilds only at the boundary, so a live "in 3 hours" would be
     // wrong for the three hours after it.
-    const timeline = buildTimeline({
-      historyEntry: lockedSend(refundTags),
-      currentTime: CREATED_AT,
-      ourPubkeys: [OUR_KEY],
-    });
-
-    expect(timeline.map((step) => step.displayLabel)).toEqual(['Created', 'Locked', 'Reclaimable']);
-    expect(timeline[2]).toMatchObject({
-      info: 'Unlocks',
-      timestamp: UNLOCK_AT,
-    });
+    const timeline = build(lockedSend(refundTags), at(AT));
+    expect(rows(timeline)).toEqual(['complete | Created', 'next-pending | Locked | Unlocks']);
+    expect(timeline[1].timestamp).toBe(UNLOCK_AT);
   });
 
   it('says who may take it once the lock has opened', () => {
-    const mine = buildTimeline({
-      historyEntry: lockedSend(refundTags),
-      currentTime: UNLOCK_AT + 60_001,
-      ourPubkeys: [OUR_KEY],
-    });
-    expect(mine.map((step) => step.displayLabel)).toEqual(['Created', 'Unlocked']);
-    expect(mine[1]).toMatchObject({ info: 'You can take this back', stepType: 'current' });
+    const mine = build(lockedSend(refundTags), at(UNLOCK_AT + 60_001));
+    expect(rows(mine)).toEqual([
+      'complete | Created',
+      'complete | Unlocked',
+      'next-pending | Reclaimable | You can take this back',
+    ]);
+    expect(mine[1].timestamp).toBe(UNLOCK_AT);
 
     // No refund tag: it opens to whoever holds the token, not to us.
-    const anyones = buildTimeline({
-      historyEntry: lockedSend([['locktime', String(LOCKTIME_SEC)]]),
-      currentTime: UNLOCK_AT + 60_001,
-      ourPubkeys: [OUR_KEY],
-    });
-    expect(anyones[1]).toMatchObject({
-      info: 'Anyone with the token can redeem it',
-      stepType: 'current',
-    });
+    const anyones = build(lockedSend([['locktime', String(LOCKTIME_SEC)]]), at(UNLOCK_AT + 60_001));
+    expect(rows(anyones)[2]).toBe(
+      'next-pending | Waiting for recipient | Anyone with the token can redeem it'
+    );
+  });
+
+  it('does not say this wallet can reclaim a refund locked to someone else', () => {
+    const timeline = build(lockedSend(refundTags), at(UNLOCK_AT + 60_001, [THEIR_KEY]));
+    expect(rows(timeline).join()).not.toContain('You can take this back');
+    expect(timeline[1].displayLabel).toBe('Unlocked');
   });
 
   it.each(['rolledBack', 'rolled_back'])('retains unlocked history after %s', (state) => {
-    const timeline = buildTimeline({
-      historyEntry: lockedSend(refundTags, state, UNLOCK_AT + 60_001),
-      currentTime: UNLOCK_AT + 120_000,
-      ourPubkeys: [OUR_KEY],
-    });
-    expect(timeline.map((step) => step.displayLabel)).toEqual(['Created', 'Unlocked', 'Reclaimed']);
-    expect(timeline[2].stepType).toBe('rolled-back');
+    const timeline = build(lockedSend(refundTags, state, UNLOCK_AT + 60_001), at(UNLOCK_AT + 120_000));
+    expect(rows(timeline)).toEqual([
+      'complete | Created',
+      'complete | Unlocked',
+      'rolled-back | Reclaimed | Funds returned to your balance',
+    ]);
   });
 
   it('does not invent an unlock for an early cancellation viewed later', () => {
-    const timeline = buildTimeline({
-      historyEntry: lockedSend(refundTags, 'rolledBack'),
-      currentTime: UNLOCK_AT + 120_000,
-      ourPubkeys: [OUR_KEY],
-    });
-    expect(timeline.map((step) => step.displayLabel)).toEqual(['Created', 'Cancelled']);
+    const timeline = build(lockedSend(refundTags, 'rolledBack'), at(UNLOCK_AT + 120_000));
+    expect(timeline.map((row) => row.displayLabel)).toEqual(['Created', 'Cancelled']);
   });
 
   it('never draws a checkmark on a moment that did not happen', () => {
-    // Claimed BEFORE the locktime: an unlock row here would be a tick on
-    // "Reclaimable" for a window that never opened.
-    const timeline = buildTimeline({
-      historyEntry: lockedSend(refundTags, 'finalized'),
-      currentTime: CREATED_AT + 60_000,
-      ourPubkeys: [OUR_KEY],
-    });
-    expect(timeline.map((step) => step.displayLabel)).toEqual(['Created', 'Locked', 'Claimed']);
+    // Claimed BEFORE the locktime, viewed long after it: an "Unlocked" tick
+    // here would be for a window that never opened.
+    const timeline = build(lockedSend(refundTags, 'finalized', AT + 60_000), at(UNLOCK_AT + 120_000));
+    expect(rows(timeline)).toEqual([
+      'complete | Created',
+      'success | Claimed | The token has been redeemed',
+    ]);
   });
 
   it('leaves an unlocked send on the ordinary send timeline', () => {
-    const timeline = buildTimeline({
-      historyEntry: {
-        id: 'send-plain-1',
-        type: 'send',
-        state: 'pending',
-        mintUrl: 'https://mint.example.com',
-        amount: 21,
-        unit: 'sat',
-        createdAt: CREATED_AT,
-        updatedAt: CREATED_AT,
-        operationId: 'op-plain-1',
-        token: { proofs: [{ secret: 'a-plain-random-secret' }] },
-      } as never,
-      currentTime: CREATED_AT,
-    });
-    expect(timeline.map((step) => step.displayLabel)).toEqual(['Created', 'Pending', 'Claimed']);
+    const timeline = build(
+      { ...base, id: 'send-plain-1', type: 'send', state: 'pending', amount: 21, token: { proofs: [{ secret: 'a-plain-random-secret' }] } },
+      at(AT)
+    );
+    expect(timeline.map((row) => row.displayLabel)).toEqual(['Created', 'Waiting for recipient']);
   });
 });

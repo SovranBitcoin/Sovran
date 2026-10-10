@@ -1,8 +1,5 @@
-import {
-  KeyPackageStore,
-  MarmotClient,
-  type NostrNetworkInterface,
-} from '@internet-privacy/marmot-ts';
+import { profileSwitchResource } from '@/shared/lib/profile/profileSwitchResource';
+import { KeyPackageStore, MarmotClient } from '@internet-privacy/marmot-ts';
 import type NDK from '@nostr-dev-kit/ndk-mobile';
 import { createWhitenoiseStorage } from '../storage';
 import {
@@ -22,13 +19,15 @@ type WhitenoiseClientOptions = {
 type WhitenoiseClientHandle = {
   client: MarmotClient<WhitenoiseGroupHistory>;
   disposeSigner: () => void;
+  shutdown: () => Promise<void>;
+  release: () => void;
 };
 
 export function createWhitenoiseClient(opts: WhitenoiseClientOptions): WhitenoiseClientHandle {
   const { groupStateBackend, keyPackageStoreBackend } = createWhitenoiseStorage(opts.accountIndex);
   const keyPackageStore = new KeyPackageStore(keyPackageStoreBackend);
   const signer = createWhitenoiseSigner(opts.privateKey);
-  const network: NostrNetworkInterface = createWhitenoiseNetwork(opts.ndk, opts.fallbackRelays);
+  const network = createWhitenoiseNetwork(opts.ndk, opts.fallbackRelays);
   const client = new MarmotClient<WhitenoiseGroupHistory>({
     signer,
     groupStateBackend,
@@ -36,5 +35,29 @@ export function createWhitenoiseClient(opts: WhitenoiseClientOptions): Whitenois
     network,
     historyFactory: createWhitenoiseGroupHistoryFactory(opts.accountIndex),
   });
-  return { client, disposeSigner: signer.dispose };
+  const resource = profileSwitchResource(client, ['keyPackages']);
+  let shutdown: Promise<void> | undefined;
+  return {
+    client: resource.value,
+    disposeSigner: signer.dispose,
+    release: resource.release,
+    shutdown: () =>
+      (shutdown ??= (async () => {
+        try {
+          const draining = resource.stop();
+          await network.shutdown();
+          await draining;
+          // Marmot 0.4 unloadGroup only evicts its Map. It cannot zero a group's
+          // private MLS state held by callers without destroy() deleting durable history.
+          if (client.groups.length)
+            throw new Error('Marmot loaded MLS groups have no non-destructive release API');
+        } finally {
+          try {
+            client.removeAllListeners();
+          } finally {
+            signer.dispose();
+          }
+        }
+      })()),
+  };
 }

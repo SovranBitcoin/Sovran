@@ -1,3 +1,4 @@
+import { registerAccountScoped } from '@/shared/lib/account/accountRegistry';
 /**
  * Module-level record of which assistant turns failed, and why.
  *
@@ -95,3 +96,11 @@ export function useTurnError(messageId: string): TurnError | null {
     () => null
   );
 }
+
+registerAccountScoped(
+  'ai.turn-errors',
+  () => {
+    resetTurnErrors();
+  },
+  () => errorsByMessageId.size === 0
+);

@@ -23,7 +23,7 @@ import type { AiRequestGroup } from 'wallet';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Log } from '@/shared/lib/logger';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
-import { GradientCard } from '@/shared/ui/composed/GradientCard';
+import { Surface } from '@/shared/ui/composed/Surface';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -32,6 +32,7 @@ import Icon from 'assets/icons';
 
 import { aiConversationPreview } from '@/features/transactions/lib/aiConversationPreview';
 import { openAiSession } from '@/features/transactions/lib/openAiSession';
+import { hasFeature } from '@/shared/config/features';
 
 interface AiConversationSectionProps {
   group: Pick<AiRequestGroup, 'sessionId' | 'messageId' | 'model'>;
@@ -51,7 +52,8 @@ export function AiConversationSection({ group }: AiConversationSectionProps) {
     [session, group.messageId]
   );
 
-  if (!session || !preview) return null;
+  // The payment stays in history; its link into the AI tab ships with `ai`.
+  if (!hasFeature('ai') || !session || !preview) return null;
 
   const title = session.title || 'Conversation';
 
@@ -64,7 +66,7 @@ export function AiConversationSection({ group }: AiConversationSectionProps) {
         accessibilityLabel={`Conversation: ${title}. Opens the AI chat on it.`}
         testID="ai-request-conversation"
         className="mx-4 pt-4">
-        <GradientCard>
+        <Surface>
           {/* pt-7 clears the half of the pill that overlaps into the card. */}
           <View className="px-5 pb-4 pt-7">
             {preview.prompt ? (
@@ -78,7 +80,7 @@ export function AiConversationSection({ group }: AiConversationSectionProps) {
               </Text>
             ) : null}
           </View>
-        </GradientCard>
+        </Surface>
         {/* Declared after the card so it paints on top of it. */}
         <HStack className="bg-surface-tertiary absolute top-0 z-10 h-8 max-w-[85%] items-center gap-2 self-center rounded-full px-3">
           <Icon name="mdi:robot-outline" size={16} color={foreground} />

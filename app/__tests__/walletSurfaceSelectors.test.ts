@@ -159,6 +159,17 @@ describe('wallet surface e2e selectors', () => {
     expect(policy).toContain('testID={`notification-policy-${option.toLowerCase()}`}');
   });
 
+  it.each([
+    ['Segmented', 'segmented', 'segmentsAuto'],
+    ['Timeline', 'timeline', 'timelineAuto'],
+  ])('exposes the %s autoplay control as native checked state', (screen, id, state) => {
+    const source = read(`features/settings/screens/SettingsDesignSystem${screen}Screen.tsx`);
+    const control = source.slice(source.indexOf(`testID="design-system-${id}-auto"`));
+    const props = control.slice(0, control.indexOf('onPress='));
+    expect(props).toContain('accessibilityRole="switch"');
+    expect(props).toContain(`accessibilityState={{ checked: ${state} }}`);
+  });
+
   it('drives the Design System through actionable outer-row selectors', () => {
     const settings = read('features/settings/screens/SettingsScreen.tsx');
     expect(settings).toContain('testID="settings-design-system-row"');
@@ -254,8 +265,9 @@ describe('wallet surface e2e selectors', () => {
   });
 
   it('pins the drawer menu row ids', () => {
-    const drawer = read('navigation/DrawerContent.tsx');
-    expect(drawer).toContain('testID={`drawer-menu-${id}`}');
+    expect(read('navigation/DrawerContent.tsx')).toContain('testID={`drawer-menu-${id}`}');
+    // The rows themselves are data, filtered by the build's feature set.
+    const drawer = read('navigation/drawerMenu.ts');
     // Row ids are the e2e selector suffixes (drawer-menu-feed, …); renaming
     // one breaks every scenario that opens that route from the drawer.
     for (const id of [

@@ -11,7 +11,10 @@ jest.mock('@/shared/hooks/useThemeColor', () => ({
   useThemeColor: (tokens: string | readonly string[]) =>
     Array.isArray(tokens) ? tokens.map(() => 'grey') : 'grey',
 }));
-jest.mock('@/shared/lib/color', () => ({ withAlpha: (c: string) => c }));
+jest.mock('@/shared/lib/color', () => ({
+  ...jest.requireActual('@/shared/lib/color'),
+  withAlpha: (c: string) => c,
+}));
 jest.mock('assets/icons', () => ({ __esModule: true, default: () => null }));
 jest.mock('@/shared/ui/primitives/Text', () => ({ Text: 'Text' }));
 jest.mock('@/shared/ui/primitives/Avatar', () => ({ Avatar: 'Avatar' }));
@@ -60,7 +63,7 @@ it('spans the row pressable full width and overlays the trailing control as a si
   expect(pressable.findAllByProps({ testID: 'ripple' }).length).toBeGreaterThan(0);
   // The overlay wrapper (the RN View composite above the control's host node).
   const overlay = dots.parent!.parent!;
-  expect(flatten(overlay.props.style)).toMatchObject({ position: 'absolute', right: 20 });
+  expect(flatten(overlay.props.style)).toMatchObject({ position: 'absolute', right: 16 });
 
   // The body reserves the control's width (44 until measured) plus the row gap.
   const reservedRight = () =>

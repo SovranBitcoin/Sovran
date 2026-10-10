@@ -486,3 +486,324 @@ export function summarizeReads(runs: ReadRun[]): ReadSurfaceSummary[] {
   }
   return [...bySurface.values()].sort((a, b) => b.reads - a.reads);
 }
+
+function numberParam(params: Record<string, unknown>, key: string): number {
+  const value = params[key];
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0;
+}
+
+// ─── Ingest fan-out (`ingest` mode) ──────────────────────────────────────────
+// One `cache.store.write` per entity-cache write batch (nostr/src/facade/cache/
+// store.ts): keys written, keys whose record actually changed, and how many
+// listeners that woke. Rolled up per store.
+
+interface IngestStoreSummary {
+  store: string;
+  /** Write batches seen. */
+  batches: number;
+  /** Batches that changed nothing — every key was an idempotent re-write. */
+  noopBatches: number;
+  written: number;
+  changed: number;
+  /** `written - changed`: keys ingested again with nothing new. */
+  wasted: number;
+  keyListenersNotified: number;
+  globalListenersNotified: number;
+  /** Listeners woken per changed key (key + global), 0 when nothing changed. */
+  fanOut: number;
+}
+
+interface IngestAnalysis {
+  stores: IngestStoreSummary[];
+  /** The same stores, most wasted writes first. */
+  byWasted: IngestStoreSummary[];
+  /** The same stores, highest fan-out first. */
+  byFanOut: IngestStoreSummary[];
+}
+
+export function analyzeIngest(entries: AnalyzableEntry[]): IngestAnalysis {
+  const byStore = new Map<string, IngestStoreSummary>();
+  for (const entry of entries) {
+    if (entry.event !== 'cache.store.write') continue;
+    const params = entry.params ?? {};
+    const store = typeof params.store === 'string' ? params.store : '?';
+    let summary = byStore.get(store);
+    if (!summary) {
+      summary = {
+        store,
+        batches: 0,
+        noopBatches: 0,
+        written: 0,
+        changed: 0,
+        wasted: 0,
+        keyListenersNotified: 0,
+        globalListenersNotified: 0,
+        fanOut: 0,
+      };
+      byStore.set(store, summary);
+    }
+    const written = numberParam(params, 'written');
+    const changed = numberParam(params, 'changed');
+    summary.batches += 1;
+    if (changed === 0) summary.noopBatches += 1;
+    summary.written += written;
+    summary.changed += changed;
+    summary.wasted += Math.max(0, written - changed);
+    summary.keyListenersNotified += numberParam(params, 'keyListenersNotified');
+    summary.globalListenersNotified += numberParam(params, 'globalListenersNotified');
+  }
+  const stores = [...byStore.values()];
+  for (const summary of stores) {
+    const notified = summary.keyListenersNotified + summary.globalListenersNotified;
+    summary.fanOut = summary.changed > 0 ? notified / summary.changed : 0;
+  }
+  // Ties fall back to the store name so the ranking is stable across runs.
+  const byName = (a: IngestStoreSummary, b: IngestStoreSummary) => a.store.localeCompare(b.store);
+  return {
+    stores,
+    byWasted: [...stores].sort((a, b) => b.wasted - a.wasted || byName(a, b)),
+    byFanOut: [...stores].sort((a, b) => b.fanOut - a.fanOut || byName(a, b)),
+  };
+}
+
+// ─── Zustand store writes (`stores` mode) ────────────────────────────────────
+// One `store.set` per write to a store declared through defineStore
+// (app/shared/lib/persist/defineStore.ts): the top-level keys whose value
+// changed and how many subscribers zustand notified. Rolled up per store.
+
+interface StoreWriteSummary {
+  store: string;
+  scope: string;
+  writes: number;
+  /** Writes that changed no top-level key. */
+  noopWrites: number;
+  /** No-op writes that still notified subscribers, because the state object was new. */
+  noopNotifying: number;
+  /** Sum of subscribers notified across all writes. */
+  subscribersNotified: number;
+  /** Most-written top-level keys, most frequent first. */
+  topKeys: { key: string; writes: number }[];
+}
+
+interface StoreWriteAnalysis {
+  stores: StoreWriteSummary[];
+  /** The same stores, most writes first. */
+  byWrites: StoreWriteSummary[];
+  /** Only stores with a no-op write, most no-op writes first. */
+  byNoop: StoreWriteSummary[];
+}
+
+/** The logger truncates long arrays with a trailing `…N more` marker. */
+const TRUNCATION_MARKER = /^…\d+ more$/;
+
+/** `changed` from a `store.set` entry, or null when the entry carries none. */
+function changedKeysParam(params: Record<string, unknown>): string[] | null {
+  if (!Array.isArray(params.changed)) return null;
+  return params.changed.filter(
+    (key): key is string => typeof key === 'string' && !TRUNCATION_MARKER.test(key)
+  );
+}
+
+export function analyzeStoreWrites(entries: AnalyzableEntry[]): StoreWriteAnalysis {
+  const byStore = new Map<string, StoreWriteSummary>();
+  const keyCounts = new Map<string, Map<string, number>>();
+  for (const entry of entries) {
+    if (entry.event !== 'store.set') continue;
+    const params = entry.params ?? {};
+    const store = typeof params.store === 'string' ? params.store : '?';
+    let summary = byStore.get(store);
+    if (!summary) {
+      summary = {
+        store,
+        scope: typeof params.scope === 'string' ? params.scope : '?',
+        writes: 0,
+        noopWrites: 0,
+        noopNotifying: 0,
+        subscribersNotified: 0,
+        topKeys: [],
+      };
+      byStore.set(store, summary);
+      keyCounts.set(store, new Map());
+    }
+    const changed = changedKeysParam(params);
+    const subscribers = numberParam(params, 'subscribers');
+    summary.writes += 1;
+    summary.subscribersNotified += subscribers;
+    if (changed?.length === 0) {
+      summary.noopWrites += 1;
+      if (subscribers > 0) summary.noopNotifying += 1;
+    }
+    const counts = keyCounts.get(store)!;
+    for (const key of changed ?? []) counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  const stores = [...byStore.values()];
+  for (const summary of stores) {
+    summary.topKeys = [...keyCounts.get(summary.store)!]
+      .map(([key, writes]) => ({ key, writes }))
+      .sort((a, b) => b.writes - a.writes || a.key.localeCompare(b.key))
+      .slice(0, 3);
+  }
+  // Ties fall back to the store name so the ranking is stable across runs.
+  const byName = (a: StoreWriteSummary, b: StoreWriteSummary) => a.store.localeCompare(b.store);
+  return {
+    stores,
+    byWrites: [...stores].sort((a, b) => b.writes - a.writes || byName(a, b)),
+    byNoop: stores
+      .filter((summary) => summary.noopWrites > 0)
+      .sort((a, b) => b.noopWrites - a.noopWrites || byName(a, b)),
+  };
+}
+
+// ─── Per-page scorecard (`pages` mode) ───────────────────────────────────────
+// Keyed by the `Screen` name (app/shared/lib/loggerScreen.ts). A page becomes
+// current when its Screen logs `nav.transition` or `screen.mount`, and stays
+// current until another does; frame drops, coco calls and store writes are
+// charged to it.
+// A back or pop mounts nothing, so time on a revealed page is charged to the
+// page that was left — read those two columns as "since this page mounted".
+
+interface PageSummary {
+  screen: string;
+  mounts: number;
+  /** `screen.mount` `content_ms`: first render → deferred content committed. */
+  mountMs: number[];
+  /** `screen.mount` `shell_ms`: first render → first commit. */
+  shellMs: number[];
+  /** `nav.transition` `duration_ms`: route change dispatched → first commit. */
+  navMs: number[];
+  /** `render.why` entries for `Screen(<name>)` or a hook keyed by the bare name. */
+  renderWhy: number;
+  frameDropReports: number;
+  droppedFrames: number;
+  cocoCalls: number;
+  cocoMs: number;
+  /** `store.set` entries logged while this page was current. */
+  storeWrites: number;
+  /** Of those, the writes that changed no top-level key. */
+  storeNoopWrites: number;
+}
+
+const SCREEN_RENDER_KEY = /^Screen\((.+)\)$/;
+
+export function analyzePages(entries: AnalyzableEntry[]): PageSummary[] {
+  const byScreen = new Map<string, PageSummary>();
+  const page = (screen: string): PageSummary => {
+    let summary = byScreen.get(screen);
+    if (!summary) {
+      summary = {
+        screen,
+        mounts: 0,
+        mountMs: [],
+        shellMs: [],
+        navMs: [],
+        renderWhy: 0,
+        frameDropReports: 0,
+        droppedFrames: 0,
+        cocoCalls: 0,
+        cocoMs: 0,
+        storeWrites: 0,
+        storeNoopWrites: 0,
+      };
+      byScreen.set(screen, summary);
+    }
+    return summary;
+  };
+
+  // render.why is keyed by component, so it can arrive before the screen's own
+  // mount event names it; hold those counts until the screen is known.
+  const renderWhyByComponent = new Map<string, number>();
+  let current: string | null = null;
+
+  for (const entry of entries) {
+    const params = entry.params ?? {};
+    const screen = typeof params.screen === 'string' ? params.screen : null;
+    if (entry.event === 'nav.transition' && screen) {
+      current = screen;
+      const summary = page(screen);
+      if (typeof params.duration_ms === 'number') summary.navMs.push(params.duration_ms);
+    } else if (entry.event === 'screen.mount' && screen) {
+      current = screen;
+      const summary = page(screen);
+      summary.mounts += 1;
+      if (typeof params.content_ms === 'number') summary.mountMs.push(params.content_ms);
+      if (typeof params.shell_ms === 'number') summary.shellMs.push(params.shell_ms);
+    } else if (entry.event === 'render.why' && typeof params.component === 'string') {
+      const name = SCREEN_RENDER_KEY.exec(params.component)?.[1] ?? params.component;
+      renderWhyByComponent.set(name, (renderWhyByComponent.get(name) ?? 0) + 1);
+    } else if (entry.event === 'perf.frame_drop' && current) {
+      const summary = page(current);
+      summary.frameDropReports += 1;
+      summary.droppedFrames += numberParam(params, 'dropped');
+    } else if (entry.event === 'coco.call' && current) {
+      const summary = page(current);
+      summary.cocoCalls += 1;
+      summary.cocoMs += numberParam(params, 'duration_ms');
+    } else if (entry.event === 'store.set' && current) {
+      const summary = page(current);
+      summary.storeWrites += 1;
+      if (changedKeysParam(params)?.length === 0) summary.storeNoopWrites += 1;
+    }
+  }
+
+  for (const summary of byScreen.values()) {
+    summary.renderWhy = renderWhyByComponent.get(summary.screen) ?? 0;
+  }
+  return [...byScreen.values()].sort((a, b) => a.screen.localeCompare(b.screen));
+}
+
+// ─── Avatar flicker guard (`avatars` mode) ───────────────────────────────────
+// `visual.avatar.sequence` (app/shared/ui/primitives/Avatar.tsx) logs each
+// branch an avatar instance shows for a seed. loading → fallback → image is the
+// flicker: the placeholder gave way to the seeded gradient, and only then to
+// the picture that was coming all along.
+
+interface AvatarFlicker {
+  seed: string;
+  instance: string;
+  /** `_t` of the entry that completed the sequence, when the log carries one. */
+  t: number | null;
+}
+
+interface AvatarAnalysis {
+  /** Distinct seeds seen. */
+  seeds: number;
+  /** Distinct avatar instance + seed pairs seen. */
+  sequences: number;
+  /** Entries with no readable seed or branch, which cannot be checked. */
+  unreadable: number;
+  flickers: AvatarFlicker[];
+}
+
+const AVATAR_FLICKER = ['loading', 'fallback', 'image'] as const;
+
+export function analyzeAvatarSequences(entries: AnalyzableEntry[]): AvatarAnalysis {
+  // Per instance + seed: the last branches shown, newest last.
+  const recent = new Map<string, string[]>();
+  const seeds = new Set<string>();
+  const flickers: AvatarFlicker[] = [];
+  let unreadable = 0;
+
+  for (const entry of entries) {
+    if (entry.event !== 'visual.avatar.sequence') continue;
+    const params = entry.params ?? {};
+    if (typeof params.subject !== 'string' || typeof params.branch !== 'string') {
+      unreadable += 1;
+      continue;
+    }
+    const seed = params.subject;
+    const instance = typeof params.instance === 'string' ? params.instance : '';
+    seeds.add(seed);
+    // A recycled cell reuses its instance for another seed; that is a new sequence.
+    const slot = `${instance}\u0000${seed}`;
+    const branches = recent.get(slot) ?? [];
+    if (branches[branches.length - 1] === params.branch) continue;
+    branches.push(params.branch);
+    if (branches.length > AVATAR_FLICKER.length) branches.shift();
+    recent.set(slot, branches);
+    if (AVATAR_FLICKER.every((branch, index) => branches[index] === branch)) {
+      flickers.push({ seed, instance, t: typeof entry._t === 'number' ? entry._t : null });
+    }
+  }
+
+  return { seeds: seeds.size, sequences: recent.size, unreadable, flickers };
+}

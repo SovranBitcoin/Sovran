@@ -1,3 +1,4 @@
+import { registerAccountScoped } from '@/shared/lib/account/accountRegistry';
 /**
  * @fileoverview Recipient relay-list resolution + outbox composition.
  *
@@ -63,3 +64,11 @@ export async function resolveOutboxRelays(ndk: NDK, input: OutboxInput): Promise
     hintRelays: input.hintRelays,
   });
 }
+
+registerAccountScoped(
+  'nostr.recipient-relays',
+  () => {
+    cache.clear();
+  },
+  () => cache.size === 0
+);

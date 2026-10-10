@@ -28,6 +28,7 @@
  * `sendDirectMessageToRelays` is the app's `SimplePool` wiring.
  */
 
+import { z } from 'zod';
 import { SimplePool } from 'nostr-tools/pool';
 import * as nip19 from 'nostr-tools/nip19';
 
@@ -40,10 +41,14 @@ import { buildRecipientGiftWrap } from './nip17';
 
 const DEFAULT_PAYMENT_RELAY = 'wss://relay.vertexlab.io';
 
+// Order matters: the first three become our nprofile hints, so they must be
+// relays Sovran reads gift wraps from (nagg ingests damus and nos.lol, and both
+// are in the relay tier). Macadamia ignores hints and publishes only to its own
+// relays, whose defaults also include damus and nos.lol.
 const FALLBACK_PAYMENT_RELAYS = [
   'wss://relay.damus.io',
-  'wss://relay.8333.space/',
   'wss://nos.lol',
+  'wss://relay.8333.space/',
   'wss://relay.nostr.band',
 ];
 
@@ -78,11 +83,43 @@ export class NoDirectMessageRelaysError extends Error {
   }
 }
 
+export const PreparedDirectMessageSchema = z.object({
+  event: z.object({
+    id: z.string().regex(/^[0-9a-f]{64}$/),
+    pubkey: z.string().regex(/^[0-9a-f]{64}$/),
+    sig: z.string().regex(/^[0-9a-f]{128}$/),
+    kind: z.literal(1059),
+    created_at: z.number().int(),
+    tags: z.array(z.array(z.string().max(2048)).max(8)).max(32),
+    content: z.string().max(256_000),
+  }),
+  relays: z.array(z.string().max(2048)).min(1).max(32),
+});
+type PreparedDirectMessage = z.infer<typeof PreparedDirectMessageSchema>;
+
 interface SendDirectMessageParams {
   senderPrivateKey: Uint8Array;
   nprofile: string;
   message: string;
   timeoutMs?: number;
+}
+
+/**
+ * A payment request's nostr target is normally an nprofile, but payers also
+ * meet a bare npub or hex key (NUT-26 can carry the key without relays, and
+ * Macadamia accepts both). Those carry no hints, so `kind:10050` decides.
+ */
+function recipientOf(target: string): { pubkey: string; relays?: string[] } {
+  const trimmed = target.trim();
+  if (/^[0-9a-f]{64}$/i.test(trimmed)) return { pubkey: trimmed.toLowerCase() };
+  const decoded = nip19.decode(trimmed);
+  if (decoded.type === 'nprofile') return decoded.data;
+  if (decoded.type === 'npub') return { pubkey: decoded.data };
+  nostrLog.warn('nostr.sendDirectMessage.invalidNprofile', {
+    decodedType: decoded.type,
+    inputPreview: trimmed.slice(0, 30),
+  });
+  throw new Error('Invalid nprofile format');
 }
 
 /**
@@ -93,18 +130,9 @@ export function createDirectMessageSender(deps: {
   openPool: () => DirectMessageRelayPool;
   /** NIP-17 `kind:10050` lookup, used only when the nprofile carries no hints. */
   resolveDmRelays: (pubkey: string) => Promise<string[]>;
-}): (params: SendDirectMessageParams) => Promise<void> {
-  return async function sendDirectMessage(params) {
-    const decoded = nip19.decode(params.nprofile);
-    if (decoded.type !== 'nprofile') {
-      nostrLog.warn('nostr.sendDirectMessage.invalidNprofile', {
-        decodedType: decoded.type,
-        inputPreview: params.nprofile.slice(0, 30),
-      });
-      throw new Error('Invalid nprofile format');
-    }
-
-    const { pubkey, relays } = decoded.data;
+}) {
+  async function prepare(params: SendDirectMessageParams): Promise<PreparedDirectMessage> {
+    const { pubkey, relays } = recipientOf(params.nprofile);
     const hinted = [...new Set(relays ?? [])];
     // No hints: ask the recipient where they read DMs. Never guess — a wrap on
     // the wrong relay is spent ecash the payee will never see.
@@ -130,18 +158,27 @@ export function createDirectMessageSender(deps: {
       recipientPublicKey: pubkey,
     });
 
+    return PreparedDirectMessageSchema.parse({ event: recipientWrap, relays: uniqueRelays });
+  }
+
+  async function publish(prepared: PreparedDirectMessage, timeoutMs = DEFAULT_PUBLISH_TIMEOUT_MS) {
     const pool = deps.openPool();
     try {
       await withTimeout(
-        Promise.any(pool.publish(uniqueRelays, recipientWrap)),
-        params.timeoutMs ?? DEFAULT_PUBLISH_TIMEOUT_MS,
+        Promise.any(pool.publish(prepared.relays, prepared.event)),
+        timeoutMs,
         'sendDirectMessage publish'
       );
       nostrLog.info('nostr.sendDirectMessage.published');
     } finally {
-      pool.close(uniqueRelays);
+      pool.close(prepared.relays);
     }
-  };
+  }
+  // Callers needing durable retries persist prepare() before the first publish.
+  return Object.assign(
+    async (params: SendDirectMessageParams) => publish(await prepare(params), params.timeoutMs),
+    { prepare, publish }
+  );
 }
 
 /** App wiring: a short-lived nostr-tools `SimplePool` per publish, and a

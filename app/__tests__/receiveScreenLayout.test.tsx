@@ -282,10 +282,10 @@ jest.mock('@/shared/ui/composed/Section', () => ({
   },
 }));
 
-jest.mock('@/shared/ui/composed/GradientCard', () => ({
-  GradientCard: ({ children, ...props }: { children?: React.ReactNode }) => {
+jest.mock('@/shared/ui/composed/Surface', () => ({
+  Surface: ({ children, ...props }: { children?: React.ReactNode }) => {
     const ReactActual = jest.requireActual<typeof import('react')>('react');
-    return ReactActual.createElement('GradientCard', props, children);
+    return ReactActual.createElement('Surface', props, children);
   },
 }));
 

@@ -9,7 +9,7 @@
  * and which one is currently active.
  */
 
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { persist } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { z } from 'zod';
@@ -103,20 +103,19 @@ const PersistedProfileEntry = z.looseObject({
 });
 
 /**
- * Profile ceiling, shared by the schema and by `addProfile`.
+ * Profile ceiling, enforced by `addProfile` and nowhere else.
  *
- * One constant used at both ends. The schema declared 64 and `addProfile`
- * appended without a cap, so a 65th profile made the blob unparseable — and
- * `createMergeWithSchema` is all-or-nothing, so the next launch discarded the
- * GLOBAL profile store: every profile the user has, and the active index with
- * them. Refusing the 65th costs one profile; the old behaviour cost all
- * sixty-four.
+ * The schema must not carry it. `createMergeWithSchema` is all-or-nothing, so a
+ * list the schema rejects costs the GLOBAL profile store: every profile the
+ * user has, and the active index with them. Early releases appended without a
+ * cap, so a stored list may already be longer than this; it has to load.
+ * Refusing one more profile costs one profile.
  */
 export const MAX_PROFILES = 64;
 
 const PersistedProfileStore = z.object({
   activeAccountIndex: z.number().int().default(0),
-  profiles: z.array(PersistedProfileEntry).max(MAX_PROFILES).default([]),
+  profiles: z.array(PersistedProfileEntry).default([]),
 });
 
 /**
@@ -147,7 +146,32 @@ function migrateProfileStore(state: unknown, version: number): V2Persisted {
   return state as V2Persisted;
 }
 
-export const useProfileStore = create<ProfileStore>()(
+// One-slot memo for `selectActiveProfile`, keyed on the two inputs it reads.
+let memoProfiles: ProfileEntry[] | undefined;
+let memoActiveAccountIndex: number | undefined;
+let memoActiveProfile: ProfileEntry | undefined;
+
+/**
+ * The active profile entry, as a selector: `useProfileStore(selectActiveProfile)`.
+ *
+ * A zustand selector runs on every store update, so it must not walk the list
+ * each time. This scans only when the list or the active index is a different
+ * value from the last call, and otherwise hands back the entry it already
+ * found — the same reference, since the store's writers keep an untouched
+ * entry's identity.
+ */
+export function selectActiveProfile(
+  state: Pick<ProfileState, 'profiles' | 'activeAccountIndex'>
+): ProfileEntry | undefined {
+  if (state.profiles !== memoProfiles || state.activeAccountIndex !== memoActiveAccountIndex) {
+    memoProfiles = state.profiles;
+    memoActiveAccountIndex = state.activeAccountIndex;
+    memoActiveProfile = state.profiles.find((p) => p.accountIndex === state.activeAccountIndex);
+  }
+  return memoActiveProfile;
+}
+
+export const useProfileStore = create<ProfileStore>({ name: 'profile-store', scope: 'global' })(
   persist(
     (set, get) => ({
       activeAccountIndex: 0,
@@ -258,10 +282,7 @@ export const useProfileStore = create<ProfileStore>()(
         return get().profiles.some((p) => p.pubkey === pubkey);
       },
 
-      getActiveProfile: () => {
-        const { profiles, activeAccountIndex } = get();
-        return profiles.find((p) => p.accountIndex === activeAccountIndex);
-      },
+      getActiveProfile: () => selectActiveProfile(get()),
     }),
     persistConfig({
       name: 'profile-store',

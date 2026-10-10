@@ -6,6 +6,7 @@ import Icon from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { supportsLiquidGlass } from '@/shared/lib/version';
 import { HeaderGlassCircle } from '@/shared/ui/composed/HeaderGlassCircle';
+import { useControlChrome } from '@/shared/styles/appStyle';
 import { alpha, headerButtonSize, hitSlop } from '@/shared/styles/tokens';
 
 /**
@@ -51,11 +52,8 @@ export function ScreenHeaderAction({
   disabled,
   accessory,
 }: ScreenHeaderActionProps) {
-  const [foreground, surfaceSecondary, muted] = useThemeColor([
-    'foreground',
-    'surface-secondary',
-    'muted',
-  ] as const);
+  const chrome = useControlChrome();
+  const foreground = useThemeColor('foreground');
 
   const content =
     children ??
@@ -64,12 +62,8 @@ export function ScreenHeaderAction({
     ) : null);
 
   const circleStyle = React.useMemo(
-    () => [
-      styles.circle,
-      { backgroundColor: surfaceSecondary, borderColor: withAlpha(muted, 0.3) },
-      { opacity: disabled ? 0.4 : 1 },
-    ],
-    [disabled, muted, surfaceSecondary]
+    () => [styles.circle, chrome, { opacity: disabled ? 0.4 : 1 }],
+    [disabled, chrome]
   );
 
   if (supportsLiquidGlass()) {

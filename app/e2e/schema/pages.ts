@@ -24,6 +24,7 @@ export const CANONICAL_PAGES = [
   'wallet', // wallet home (WalletScreen)
   'drawer', // profile drawer (drawer-profile-name)
   'profile-switcher', // independently tested action-menu sheet
+  'profile-removal', // removal confirmation sheet; cancellation-only scenario
   // receive flow
   'receive', // receive method hub sheet (receive-method-*)
   'receive-qr', // standing receive rails QR display (ReceiveScreen: Unified/Lightning/Onchain/Cashu)
@@ -50,6 +51,8 @@ export const CANONICAL_PAGES = [
   'mint-history', // one mint's NUT-06 update history from its details page (MintChangesScreen)
   'profile', // nostr user profile (UserProfileScreen)
   'dm-chat', // 1:1 DM conversation (UserMessagesScreen, dm-chat-probe)
+  'details', // every fact about one payment, as a table (details-sheet, details-sheet-done)
+  'note-picker', // held ecash by denomination, from the amount screen's notes key (note-picker, note-picker-use)
   'camera', // QR scan camera screen (CameraScreen, incl. its permission-required state)
   'search', // header search overlay with results (SearchOverlay)
   'settings', // settings root screen ((settings-flow), SettingsScreen)
@@ -86,6 +89,7 @@ export const CANONICAL_PAGES = [
   'onchain-send',
   'payment-request',
   'profile-share',
+  'receive-message-ecash',
   'receive-rails',
   'settings-delete',
   'settings-design-system',
@@ -94,6 +98,8 @@ export const CANONICAL_PAGES = [
   'settings-design-system-foundations',
   'settings-design-system-loading',
   'settings-design-system-posts',
+  'settings-design-system-screens',
+  'settings-design-system-variations',
   'settings-design-system-segmented',
   'settings-design-system-skeleton-crossfade',
   'settings-design-system-timeline',

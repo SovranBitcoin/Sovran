@@ -66,6 +66,17 @@ describe('nutDropRedeemQueueStore', () => {
     });
   });
 
+  it('stores an error no longer than the stored queue allows', () => {
+    // A mint or proxy can answer with a whole page. One entry past its limit
+    // fails the persisted queue's schema, and with it every other entry.
+    const page = 'x'.repeat(5_000);
+    useNutDropRedeemQueueStore.getState().enqueue(HASH, ENTRY);
+    useNutDropRedeemQueueStore.getState().scheduleRetry(HASH, page);
+    expect(useNutDropRedeemQueueStore.getState().byTokenHash[HASH]?.lastError).toHaveLength(500);
+    useNutDropRedeemQueueStore.getState().markStatus(HASH, 'failed', page);
+    expect(useNutDropRedeemQueueStore.getState().byTokenHash[HASH]?.lastError).toHaveLength(500);
+  });
+
   it('marks statuses and records errors', () => {
     useNutDropRedeemQueueStore.getState().enqueue(HASH, ENTRY);
     useNutDropRedeemQueueStore.getState().markStatus(HASH, 'spent', 'already spent');
@@ -78,7 +89,7 @@ describe('nutDropRedeemQueueStore', () => {
     expect(Object.keys(useNutDropRedeemQueueStore.getState().byTokenHash)).toHaveLength(1);
   });
 
-  it('prunes terminal entries faster than pending ones', () => {
+  it('prunes settled entries but retains old unredeemed recovery material', () => {
     const dayMs = 24 * 60 * 60 * 1000;
     useNutDropRedeemQueueStore.setState({
       byTokenHash: {
@@ -108,7 +119,10 @@ describe('nutDropRedeemQueueStore', () => {
 
     useNutDropRedeemQueueStore.getState().prune();
     const remaining = Object.keys(useNutDropRedeemQueueStore.getState().byTokenHash);
-    expect(remaining).toEqual(['a'.repeat(64)]);
+    expect(remaining).toEqual(['a'.repeat(64), 'c'.repeat(64)]);
+    expect(useNutDropRedeemQueueStore.getState().byTokenHash['c'.repeat(64)].token).toBe(
+      ENTRY.token
+    );
   });
 
   it('degrades an unknown persisted status without discarding queued ecash', () => {

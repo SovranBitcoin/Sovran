@@ -15,7 +15,7 @@ import Animated, {
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { log } from '@/shared/lib/logger';
 import { Screen } from '@/shared/ui/composed/Screen';
-import { GradientCard } from '@/shared/ui/composed/GradientCard';
+import { Surface } from '@/shared/ui/composed/Surface';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Button } from '@/shared/ui/primitives/Button';
@@ -127,7 +127,7 @@ export function BackupVerifyScreen() {
               <StepProgress total={12} done={progress.position} accepted={accepted} />
             </View>
             <Animated.View style={shakeStyle}>
-              <GradientCard>
+              <Surface>
                 <ListGroup>
                   {question.choices.map((word, index) => (
                     <Fragment key={index}>
@@ -170,7 +170,7 @@ export function BackupVerifyScreen() {
                     </Fragment>
                   ))}
                 </ListGroup>
-              </GradientCard>
+              </Surface>
             </Animated.View>
             {progress.missesAtPosition > 0 && !accepted ? (
               <Text accessibilityRole="alert" size={14} className="text-muted">

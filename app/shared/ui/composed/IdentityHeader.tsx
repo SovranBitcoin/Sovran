@@ -173,8 +173,10 @@ function MorphTitle({
       accessibilityLabel={identity?.name ?? title}>
       {/* The title is an overlay, so this zero-height copy is what gives the box
           the title's width: Android's native header subview clips content to the
-          box, and the identity stack alone is narrower than most titles. */}
-      <Text size={16} bold numberOfLines={1} aria-hidden className="h-0 opacity-0">
+          box, and the identity stack alone is narrower than most titles. The
+          copy is padded: a box exactly as wide as the text loses its last
+          letters to rounding ("Send Lightni…"). */}
+      <Text size={16} bold numberOfLines={1} aria-hidden className="h-0 px-2 opacity-0">
         {title}
       </Text>
       <Animated.View className="absolute max-w-full" style={titleStyle}>
@@ -217,8 +219,11 @@ export function IdentityNameBand({
   name,
   progress,
   nameTestID,
+  children,
 }: {
   name: string;
+  /** A line hung under the name, centred with it (a domain claim). */
+  children?: React.ReactNode;
   /** Fades the band in with a scroll handoff. Omit on a header that always names its person. */
   progress?: SharedValue<number>;
   nameTestID?: string;
@@ -239,11 +244,14 @@ export function IdentityNameBand({
       ref={measureRef}
       onLayout={onMeasureLayout}
       pointerEvents="none"
-      style={[BAND_STYLE, style]}
-      accessibilityElementsHidden
-      importantForAccessibility="no-hide-descendants">
+      style={[BAND_STYLE, style]}>
       <Animated.View style={clearanceStyle}>
+        {/* The name repeats the bar's title, so only it is hidden: what a
+            caller puts under it (a domain claim and its verdict) is said
+            nowhere else. */}
         <Text
+          accessibilityElementsHidden
+          importantForAccessibility="no"
           bold
           size={headerIdentity.bandNameSize}
           numberOfLines={1}
@@ -253,6 +261,7 @@ export function IdentityNameBand({
           testID={nameTestID}>
           {name}
         </Text>
+        {children ? <View className="items-center px-6">{children}</View> : null}
       </Animated.View>
     </Animated.View>
   );

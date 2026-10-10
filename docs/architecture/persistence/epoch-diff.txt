@@ -1,0 +1,179 @@
+# Changes in durable names across 997 revisions
+# 227 store builds name a commit in this repository; 229 do not (99 predate the repository).
+
+2025-02-03 eb83c0b965 [0.0.1 ios build 71] BASE
+  
+2025-04-16 957eed9ea3 [origin/main, inside a window whose builds recorded no commit]
+  + persisted:SOVRAN version:ecash.ts=4 version:index.ts=30 version:usePollingPaymentRequest.ts=4
+  - 
+2025-04-23 e788c76021 [origin/main, inside a window whose builds recorded no commit]
+  + persisted:Sovran version:index.ts=37
+  - version:index.ts=30
+2025-04-26 c6bbf34b7f [origin/main, inside a window whose builds recorded no commit]
+  + version:index.ts=40 version:pay.ts=4
+  - version:ecash.ts=4 version:index.ts=37
+2025-05-17 3bc6663dff [0.0.12 ios build 10]
+  + version:index.ts=72
+  - version:index.ts=40
+2025-05-21 96b7c386ee [origin/main, inside a window whose builds recorded no commit]
+  + version:index.ts=73
+  - version:index.ts=72
+2025-05-22 be0a7952cd [origin/main, inside a window whose builds recorded no commit]
+  + version:index.ts=74
+  - version:index.ts=73
+2025-06-09 963e2045a5 [origin/main, inside a window whose builds recorded no commit]
+  + version:index.ts=91
+  - version:index.ts=74
+2025-06-13 2717475495 [origin/main, inside a window whose builds recorded no commit]
+  + version:index.ts=101
+  - version:index.ts=91
+2025-06-16 c79682ede9 [origin/main, inside a window whose builds recorded no commit]
+  + version:index.ts=120
+  - version:index.ts=101
+2025-07-09 9e626cd8c4 [origin/main, inside a window whose builds recorded no commit]
+  + version:cashuClient.ts=4
+  - version:pay.ts=4
+2025-07-15 2cdad22d1e [origin/main, inside a window whose builds recorded no commit]
+  + 
+  - persisted:Sovran
+2025-07-21 ac32c01529 [0.0.28 ios build 1]
+  + persisted:Sovran
+  - 
+2025-07-21 87c5bca2cc [origin/main, inside a window whose builds recorded no commit]
+  + 
+  - version:usePollingPaymentRequest.ts=4
+2025-08-06 c606669bc9 [origin/main, inside a window whose builds recorded no commit]
+  + version:index.ts=150
+  - version:index.ts=120
+2025-09-27 783230c5c0 [origin/main, inside a window whose builds recorded no commit]
+  + persisted:SOVRAN-1
+  - persisted:SOVRAN
+2025-09-27 d855c646b6 [origin/main, inside a window whose builds recorded no commit]
+  + persisted:SOVRAN
+  - persisted:SOVRAN-1
+2025-10-01 f3ea7f2438 [origin/main, inside a window whose builds recorded no commit]
+  + sqlite:coco.db
+  - 
+2025-10-02 d7352520a6 [origin/main, inside a window whose builds recorded no commit]
+  + 
+  - version:cashuClient.ts=4
+2025-10-10 e688076ed1 [origin/main, inside a window whose builds recorded no commit]
+  + persisted:SOVRANNNN12387162736
+  - persisted:SOVRAN
+2025-10-12 62f2215678 [origin/main, inside a window whose builds recorded no commit]
+  + persisted:SOVRAN
+  - persisted:SOVRANNNN12387162736
+2025-10-12 600f275976 [origin/main, inside a window whose builds recorded no commit]
+  + version:index.ts=151
+  - version:index.ts=150
+2025-10-14 260ae084a3 [origin/main, inside a window whose builds recorded no commit]
+  + asyncstorage:mint-store asyncstorage:persist:root asyncstorage:pricelist-store asyncstorage:settings-store persisted:mint-store persisted:pricelist-store persisted:settings-store version:index.ts=152
+  - version:index.ts=151
+2025-10-14 4ef992d27e [0.0.45 ios build 25]
+  + version:index.ts=251
+  - version:index.ts=152
+2025-11-21 efbd40b23f [origin/main, inside a window whose builds recorded no commit]
+  + asyncstorage:audit-mint-store asyncstorage:kym-mint-store asyncstorage:routstr-store persisted:audit-mint-store persisted:kym-mint-store persisted:routstr-store
+  - 
+2025-11-30 acc27bf23d [origin/main, inside a window whose builds recorded no commit]
+  + asyncstorage:btcmap-store persisted:btcmap-store
+  - 
+2025-12-06 862e8ab8d6 [origin/main, inside a window whose builds recorded no commit]
+  + sqlite:${dbDirectory}coco-export.db
+  - 
+2025-12-08 6837b232d6 [origin/main, inside a window whose builds recorded no commit]
+  + asyncstorage:transaction-location-store persisted:transaction-location-store
+  - 
+2025-12-12 ef0aed6bf4 [origin/main, inside a window whose builds recorded no commit]
+  + persisted:scan-history-store
+  - 
+2026-01-15 2a4172bba5 [origin/main, inside a window whose builds recorded no commit]
+  + asyncstorage:mint-distribution-store persisted:mint-distribution-store
+  - 
+2026-01-17 f7b5daad28 [origin/main, inside a window whose builds recorded no commit]
+  + persisted:AppStore persisted:TodoStore persisted:app-storage persisted:nextjs-storage version:persist-store.ts=1
+  - 
+2026-02-07 5ff6aa4825 [origin/main, inside a window whose builds recorded no commit]
+  + asyncstorage:scan-history-store asyncstorage:search-history-store asyncstorage:swap-transactions-store persisted:AuditMint persisted:BTCMap persisted:KYMMint persisted:Mint persisted:MintDistribution persisted:Pricelist persisted:Routstr persisted:ScanHistory persisted:SearchHistory persisted:Settings persisted:SwapTransactions persisted:TransactionLocation persisted:search-history-store persisted:swap-transactions-store
+  - 
+2026-02-14 2e780f69e5 [0.0.57 ios build 45]
+  + persisted:Profile persisted:profile-store sqlite:coco-${this.accountIndex}.db sqlite:coco-N.db
+  - asyncstorage:mint-distribution-store asyncstorage:mint-store asyncstorage:routstr-store asyncstorage:scan-history-store asyncstorage:search-history-store asyncstorage:swap-transactions-store asyncstorage:transaction-location-store
+2026-02-17 7b1aba2d8e [origin/main, inside a window whose builds recorded no commit]
+  + persisted:npc-mint-store
+  - 
+2026-02-26 09a13c0a9a [0.0.60 ios build 58]
+  + persisted:nostr-social-store
+  - 
+2026-02-28 a838d5bc3d [origin/main, inside a window whose builds recorded no commit]
+  + securestore:true
+  - 
+2026-03-02 1e81f7fe8d [origin/main, inside a window whose builds recorded no commit]
+  + asyncstorage:profile-store sqlite:coco-${activeProfile.accountIndex}.db sqlite:coco-${i}.db
+  - 
+2026-03-04 d170783ed6 [0.0.61 ios build 77]
+  + 
+  - persisted:Profile
+2026-03-06 7d53b31812 [origin/main, inside a window whose builds recorded no commit]
+  + sqlite:coco-${accountIndex}.db version:profileSessionOrchestrator.ts=0 version:store.deprecated.ts=251
+  - persisted:AuditMint persisted:BTCMap persisted:KYMMint persisted:Mint persisted:MintDistribution persisted:Pricelist persisted:Routstr persisted:ScanHistory persisted:SearchHistory persisted:Settings persisted:SwapTransactions persisted:TransactionLocation version:index.ts=251
+2026-03-08 7056ecc965 [origin/main, inside a window whose builds recorded no commit]
+  + version:gen-og-sovran-account.ts=251
+  - 
+2026-04-10 19388f0e37 [origin/main, inside a window whose builds recorded no commit]
+  + asyncstorage:mint-profile-store persisted:mint-profile-store
+  - sqlite:coco-${accountIndex}.db
+2026-04-21 28bf7713ac [origin/main, inside a window whose builds recorded no commit]
+  + asyncstorage:wallet-lifecycle persisted:split-bill-transactions-store persisted:theme-store persisted:transaction-distribution-store persisted:wallet-lifecycle persisted:wallpaper-store version:globalMigrations.ts=0
+  - 
+2026-04-28 e26c8f9a1a [origin/main, inside a window whose builds recorded no commit]
+  + asyncstorage:${opts.storagePrefixNeg}:${scope} asyncstorage:${opts.storagePrefix}:${scope} persisted:${opts.storagePrefix}:${scope} persisted:nostr-metadata-cache persisted:{prefix}:{scope}
+  - 
+2026-05-01 90f1326ac9 [origin/main, inside a window whose builds recorded no commit]
+  + version:group.js=2
+  - 
+2026-05-20 88fad97411 [origin/main, inside a window whose builds recorded no commit]
+  + asyncstorage:deleteAllProfiles persisted:alice persisted:bitchat-dm-messages-store persisted:bob persisted:carol persisted:mint-info-cache persisted:satoshi persisted:send-reachability-store version:mintStore.ts=2 version:npcMintStore.ts=2
+  - asyncstorage:audit-mint-store asyncstorage:btcmap-store asyncstorage:kym-mint-store asyncstorage:mint-profile-store asyncstorage:pricelist-store securestore:true
+2026-06-06 0f37aa3ac7 [origin/main, inside a window whose builds recorded no commit]
+  + persisted:feed-ignore-store persisted:mempool-address-cache persisted:notification-policy-store persisted:recent-people-store
+  - 
+2026-06-06 c5ad77075e [origin/main, inside a window whose builds recorded no commit]
+  + version:settingsStore.ts=2
+  - 
+2026-06-07 6ee832a921 [origin/main, inside a window whose builds recorded no commit]
+  + 
+  - persisted:AppStore persisted:TodoStore persisted:app-storage persisted:nextjs-storage version:persist-store.ts=1
+2026-06-07 b7b780a070 [origin/main, inside a window whose builds recorded no commit]
+  + version:settingsStore.ts=3
+  - version:settingsStore.ts=2
+2026-06-12 b907afe06f [origin/main, inside a window whose builds recorded no commit]
+  + persisted:nut-drop-redeem-queue
+  - 
+2026-06-12 598d500ce0 [origin/main, inside a window whose builds recorded no commit]
+  + persisted:nip46-activity-store persisted:nip46-connections-store version:nip46ActivityStore.ts=1
+  - 
+2026-06-16 fd38ca46b4 [origin/main, inside a window whose builds recorded no commit]
+  + persisted:transaction-annotation-store
+  - persisted:split-bill-transactions-store
+2026-06-19 3f5737cb3f [origin/main, inside a window whose builds recorded no commit]
+  + persisted:nostr-media-server-store persisted:nostr-relay-list-store
+  - 
+2026-06-20 6b2a63d13a [origin/main, inside a window whose builds recorded no commit]
+  + persisted:own-content-store
+  - 
+2026-06-25 3acff97532 [origin/main, inside a window whose builds recorded no commit]
+  + persisted:owned-media-store
+  - 
+2026-06-27 26cf182eee [origin/main, inside a window whose builds recorded no commit]
+  + persisted:data-migration-store version:nostrSocialStore.ts=2
+  - 
+2026-06-28 248c34a59d [origin/main, inside a window whose builds recorded no commit]
+  + persisted:mint-metadata-store
+  - persisted:audit-mint-store persisted:kym-mint-store persisted:mint-info-cache persisted:mint-profile-store
+2026-09-12 148ebd085a [0.1.2 ios build 175]
+  + persisted:relay-metadata-store version:cli.ts=1 version:custody.ts=1 version:e2eProofReconciliationConfig.ts=1 version:e2eReadyProofReconciliation.ts=1 version:e2eReadyProofStatus.ts=1 version:export.ts=3 version:legacy-recovery.ts=1 version:legacy-recovery.ts=2 version:lock.ts=1 version:manifest.ts=1 version:mint-faults.ts=1 version:runtime.ts=1 version:settingsStore.ts=4 version:simulator-session.ts=1 version:simulator.ts=1 version:state.ts=1 version:themeStore.ts=2
+  - asyncstorage:persist:root persisted:SOVRAN persisted:Sovran persisted:alice persisted:bob persisted:carol persisted:satoshi version:gen-og-sovran-account.ts=251 version:profileSessionOrchestrator.ts=0 version:settingsStore.ts=3 version:store.deprecated.ts=251
+2026-10-10 5651d4720d [candidate]
+  + asyncstorage:${opts.storagePrefixNeg}:${pubkey} asyncstorage:${opts.storagePrefix}:${pubkey} asyncstorage:routstr-store:profile:${profile.pubkey} persisted:ai-provider-directory-store persisted:cta-store persisted:dm-conversations-cache persisted:dm-last-message-store persisted:dm-thread-cache persisted:expo-router persisted:feed-page-cache persisted:fetch persisted:global persisted:jamie persisted:legProgress persisted:leo persisted:maya persisted:mint-changes-cache persisted:mint-discover-cache persisted:mint-reviews-cache persisted:mint-testnut-store persisted:notification-followers-page-cache persisted:notifications-page-cache persisted:own-profile-metadata-store persisted:own-profile-stats-cache persisted:profile persisted:profile-search-cache persisted:react-native persisted:search-posts-cache persisted:session persisted:sofia persisted:useAmountDraftStore persisted:useBLEPeerDirectory persisted:useComposerStore persisted:useContactSendStore persisted:useDebugTierStore persisted:useDetailsSheetStore persisted:useDmEchoStore persisted:useE2EActionMenuRenderStore persisted:useE2EActionMenuTargetStore persisted:useE2EHerouiMenuStore persisted:useE2EToastProbeStore persisted:useMockDataStore persisted:useNearPaySessionStore persisted:useNfcTapStore persisted:useNip46RequestsStore persisted:useNotePickerStore persisted:usePaymentStatusStore persisted:usePopupStore persisted:useRollbackStore persisted:useRoutstrTopUpStore persisted:useSecureStoreState persisted:useSendLockStore persisted:useSettingsHydration persisted:useThemeDraft persisted:useWallpaperRenderStore persisted:vertex-budget-store sqlite:coco-${index}.db version:artwork.mjs=1 version:import.ts=1 version:native-build.ts=1 version:nearbyCapability.ts=1 version:nearbyPayments.ts=1 version:plan.ts=1 version:refresh.ts=1 version:routstrStore.ts=3 version:securePersistence.ts=1 version:secureVault.ts=1
+  - 

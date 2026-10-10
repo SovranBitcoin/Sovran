@@ -172,7 +172,9 @@ describe("classifyMeshToken", () => {
   }
 
   it("classifies a token locked to me when its keyset id is a short v2 id", () => {
-    expect(classifyMeshToken(encodeV2(p2pkSecret(MY_PUBKEY), 5), MY_PUBKEY)).toEqual({
+    expect(
+      classifyMeshToken(encodeV2(p2pkSecret(MY_PUBKEY), 5), MY_PUBKEY),
+    ).toEqual({
       classification: "locked-to-me",
       mintUrl: MINT_URL,
       amount: 5,
@@ -243,6 +245,30 @@ function fakeManager(trusted = true) {
 }
 
 describe("createMeshRedeemOrchestrator", () => {
+  it("abandons a profile's drain when the profile changes during trust lookup", async () => {
+    const queue = createQueue({ h1: entry() });
+    const other = fakeManager()();
+    const original = {
+      mint: {
+        isTrustedMint: async () => {
+          current = other;
+          return true;
+        },
+      },
+    } as never;
+    let current = original;
+    const execute = vi.fn(async () => ({ historyEntryId: null }));
+    const orchestrator = createMeshRedeemOrchestrator({
+      getManager: () => current,
+      queue: queue.port,
+      executeAutoRedeem: execute,
+    });
+    await orchestrator.drain();
+    expect(execute).not.toHaveBeenCalled();
+    expect(queue.statuses).toEqual([]);
+    expect(queue.retries).toEqual([]);
+  });
+
   it("redeems due trusted entries through executeAutoRedeem", async () => {
     const queue = createQueue({ h1: entry() });
     const redeemed: string[] = [];

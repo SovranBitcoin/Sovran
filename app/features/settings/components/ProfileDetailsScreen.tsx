@@ -12,7 +12,10 @@ import { pubkeyToAccountNumber } from '@/shared/lib/nostr/keyDerivation';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
-import { Button, Card, Description, Input, Label, TextField } from 'heroui-native';
+import { Button as HerouiButton, Description, Input, Label, TextField } from 'heroui-native';
+import { Surface } from '@/shared/ui/composed/Surface';
+import { useStylePaint } from '@/shared/styles/appStyle';
+import { Button } from '@/shared/ui/primitives/Button';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import type { ProfileEntry } from '@/shared/stores/global/profileStore';
 import { Notice } from '@/shared/ui/composed/Notice';
@@ -59,6 +62,8 @@ export function ProfileDetailsScreen({
 }) {
   const mutedColor = useThemeColor('muted');
   const backgroundColor = useThemeColor('background');
+  const paint = useStylePaint();
+  const { pad, item } = paint.style.space;
   const shift = useShiftLogger('SettingsProfileScreen');
   const [visibleFields, setVisibleFields] = useState({
     mnemonic: false,
@@ -112,8 +117,8 @@ export function ProfileDetailsScreen({
     const name = label.replace(/:$/, '');
 
     return (
-      <Card variant="secondary" className="mb-3">
-        <Card.Body className="gap-2">
+      <View className="mb-3">
+        <Surface contentStyle={{ padding: pad }}>
           <TextField>
             <Label>{label}</Label>
             <Input
@@ -130,7 +135,7 @@ export function ProfileDetailsScreen({
                 height, so it must not appear once the value loads. */}
             <View className="mt-2 w-full flex-row gap-2">
               {showEyeIcon ? (
-                <Button
+                <HerouiButton
                   variant="secondary"
                   size="sm"
                   className="flex-1"
@@ -145,26 +150,29 @@ export function ProfileDetailsScreen({
                     size={15}
                     color={mutedColor}
                   />
-                  <Button.Label className="text-muted">{isVisible ? 'Hide' : 'Show'}</Button.Label>
-                </Button>
+                  <HerouiButton.Label className="text-muted">
+                    {isVisible ? 'Hide' : 'Show'}
+                  </HerouiButton.Label>
+                </HerouiButton>
               ) : null}
-              <Button
-                variant="secondary"
-                size="sm"
-                className={showEyeIcon ? 'flex-1' : 'w-full'}
-                isDisabled={!value || loading || isLoading}
-                testID={`profile-copy-${copyTarget}`}
-                accessibilityLabel={`Copy ${name}`}
-                accessibilityState={{ disabled: !value || loading || isLoading }}
-                onPress={() => handleCopy(value, copyTarget)}>
-                <Icon name="lets-icons:copy" size={15} color={mutedColor} />
-                <Button.Label className="text-muted">Copy</Button.Label>
-              </Button>
+              <View className="flex-1">
+                <Button
+                  variant="secondary"
+                  size="compact"
+                  text="Copy"
+                  icon={<Icon name="lets-icons:copy" size={15} color={mutedColor} />}
+                  contentColor={mutedColor}
+                  disabled={!value || loading || isLoading}
+                  testID={`profile-copy-${copyTarget}`}
+                  accessibilityLabel={`Copy ${name}`}
+                  onPress={() => handleCopy(value, copyTarget)}
+                />
+              </View>
             </View>
             {description ? <Description>{description}</Description> : null}
           </TextField>
-        </Card.Body>
-      </Card>
+        </Surface>
+      </View>
     );
   };
 
@@ -175,9 +183,12 @@ export function ProfileDetailsScreen({
       footer={
         onBack ? (
           <View className="p-4">
-            <Button variant="secondary" testID="settings-profile-back-to-review" onPress={onBack}>
-              <Button.Label>Back to review</Button.Label>
-            </Button>
+            <Button
+              variant="secondary"
+              text="Back to review"
+              testID="settings-profile-back-to-review"
+              onPress={onBack}
+            />
           </View>
         ) : undefined
       }>
@@ -195,8 +206,9 @@ export function ProfileDetailsScreen({
             <Text bold size={13} className="mb-2 ml-2 uppercase tracking-wide">
               Profile info
             </Text>
-            <Card variant="secondary" className="mb-4">
-              <Card.Body className="gap-3 py-3">
+            <View className="mb-4">
+              <Surface
+                contentStyle={{ paddingHorizontal: pad, paddingVertical: pad + item, gap: item }}>
                 <View className="flex-row items-center gap-3">
                   <Avatar
                     state={avatarStateFor(profilePicture, profilePictureResolved ?? true)}
@@ -206,12 +218,19 @@ export function ProfileDetailsScreen({
                     size={56}
                   />
                   <View className="flex-1">
-                    <Card.Title numberOfLines={1}>{username}</Card.Title>
+                    <Text semibold size={16} color={paint.text.primary} numberOfLines={1}>
+                      {username}
+                    </Text>
                     {/* One line, middle-truncated: an npub is always 63 chars,
                         so the row measures the same loading and loaded. */}
-                    <Card.Description className="mt-1" numberOfLines={1} ellipsizeMode="middle">
+                    <Text
+                      size={13}
+                      color={paint.text.secondary}
+                      className="mt-1"
+                      numberOfLines={1}
+                      ellipsizeMode="middle">
                       {loading ? 'Loading public key…' : nostrKeys?.npub || 'N/A'}
-                    </Card.Description>
+                    </Text>
                     {chain >= 1 && (
                       <Text
                         size={12}
@@ -226,14 +245,14 @@ export function ProfileDetailsScreen({
                     Lightning address, Nostr address, about). */}
                 <Button
                   variant="primary"
+                  text="Edit profile"
+                  icon={<Icon name="mdi:pencil" size={16} color={backgroundColor} />}
                   testID="settings-profile-edit"
                   accessibilityLabel="Edit profile"
-                  onPress={() => router.push('/(settings-flow)/edit-profile')}>
-                  <Icon name="mdi:pencil" size={16} color={backgroundColor} />
-                  <Button.Label>Edit profile</Button.Label>
-                </Button>
-              </Card.Body>
-            </Card>
+                  onPress={() => router.push('/(settings-flow)/edit-profile')}
+                />
+              </Surface>
+            </View>
           </>
         )}
         <Text bold size={13} className="mb-2 ml-2 uppercase tracking-wide">
@@ -305,8 +324,8 @@ export function ProfileDetailsScreen({
             <Text bold size={13} className="mb-2 ml-2 uppercase tracking-wide">
               Debug (dev only)
             </Text>
-            <Card variant="secondary" className="mb-3">
-              <Card.Body className="gap-3">
+            <View className="mb-3">
+              <Surface contentStyle={{ padding: pad, gap: item }}>
                 <DebugRow
                   label="Coco DB"
                   value={
@@ -343,8 +362,8 @@ export function ProfileDetailsScreen({
                     value={String(pubkeyToAccountNumber(activeProfile.pubkey))}
                   />
                 )}
-              </Card.Body>
-            </Card>
+              </Surface>
+            </View>
           </View>
         )}
       </View>

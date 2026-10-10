@@ -40,8 +40,7 @@ describe("useColadaTransactionAnnotation read mechanism", () => {
   });
 
   it("closes over the whole entry rather than hand-picked fields", () => {
-    const deps = /\}, \[([^\]]*)\]\);/.exec(SOURCE)?.[1];
-    expect(deps).toBe("store, entry");
+    expect(SOURCE).toContain("createSnapshotReader(store, entry)");
     for (const narrowed of [
       "entry?.id",
       "entry?.quoteId",

@@ -15,7 +15,7 @@
  */
 
 import { err, ok, type Result } from 'neverthrow';
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 
 import {
   isGrantKey,
@@ -173,7 +173,10 @@ interface Nip46RequestsActions {
 
 type Nip46RequestsStore = Nip46RequestsState & Nip46RequestsActions;
 
-export const useNip46RequestsStore = create<Nip46RequestsStore>()((set, get) => ({
+export const useNip46RequestsStore = create<Nip46RequestsStore>({
+  name: 'useNip46RequestsStore',
+  scope: 'session',
+})((set, get) => ({
   pending: [],
   sessionGrants: [],
   sessionAllows: [],

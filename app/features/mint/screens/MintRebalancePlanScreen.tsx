@@ -281,7 +281,8 @@ export function MintRebalancePlanScreen() {
               ...(stepCounts.hasFailedStep
                 ? [
                     {
-                      text: 'Retry failed',
+                      text: 'Retry',
+                      accessibilityLabel: 'Retry failed transfers',
                       variant: 'secondary' as const,
                       testID: 'rebalance-retry-failed',
                       onPress: async () => {
@@ -317,7 +318,7 @@ export function MintRebalancePlanScreen() {
                 },
               },
               {
-                text: 'Start rebalancing',
+                text: 'Rebalance',
                 variant: 'primary' as const,
                 testID: 'rebalance-start',
                 onPress: async () => {

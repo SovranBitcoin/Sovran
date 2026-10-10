@@ -13,6 +13,9 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { Text } from '@/shared/ui/primitives/Text';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { useStylePaint } from '@/shared/styles/appStyle';
+
+const BARE_HIT_SLOP = { top: 12, bottom: 12, left: 24, right: 24 };
 
 interface FiatPillShellProps {
   text: string;
@@ -38,6 +41,26 @@ export function FiatPillShell({
     'surface-secondary',
     'muted',
   ] as const);
+  const paint = useStylePaint();
+  // Outside the glass style the conversion is a line of secondary type under
+  // the balance, not a second pill: the figure above it is the only object
+  // with weight. `hitSlop` keeps the tap target at 48 around the bare text.
+  if (paint.style.surface !== 'glass') {
+    return (
+      <Pressable
+        testID={testID}
+        accessibilityLabel={accessibilityLabel}
+        accessibilityRole="button"
+        disabled={!primaryHandler && !longPressHandler}
+        hitSlop={BARE_HIT_SLOP}
+        onPress={primaryHandler}
+        onLongPress={longPressHandler}>
+        <Text size={16} family={paint.style.type.family} color={paint.text.secondary}>
+          {text}
+        </Text>
+      </Pressable>
+    );
+  }
   return (
     <Pressable
       testID={testID}

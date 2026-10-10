@@ -13,6 +13,18 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   setItem: jest.fn(() => Promise.resolve()),
   removeItem: jest.fn(() => Promise.resolve()),
 }));
+// Focus is mount here: the first focus runs the effect once, and a test
+// refocuses by calling what it was given.
+let mockRefocus: () => void = () => {};
+jest.mock('expo-router', () => ({
+  useFocusEffect: (effect: () => void) => {
+    const { useEffect } = jest.requireActual<typeof import('react')>('react');
+    mockRefocus = effect;
+    useEffect(() => {
+      effect();
+    }, [effect]);
+  },
+}));
 jest.mock('@/shared/lib/getDiscoveredMintMetadata', () => ({
   getDiscoveredMintMetadata: jest.fn(),
 }));
@@ -115,6 +127,17 @@ it('reports error for a failed reviews read only when no aggregate is known', as
   expect(warm.result.current.reviews).toBe('ready');
 });
 
+it('reads a failed group again when the page is returned to, and not before', async () => {
+  stampAudit();
+  jest.mocked(fetchMintReviews).mockResolvedValue(err(new Error('offline')));
+  const { result } = renderHook(() => useMintDetailRead(MINT, { mintUrl: MINT }));
+  await waitFor(() => expect(result.current.reviews).toBe('error'));
+  // The failure alone is not a reason to try again.
+  expect(fetchMintReviews).toHaveBeenCalledTimes(1);
+  act(() => mockRefocus());
+  await waitFor(() => expect(fetchMintReviews).toHaveBeenCalledTimes(2));
+});
+
 it('surfaces a failed identity read and routes retry to the bridge', () => {
   stampAudit();
   const { result } = renderHook(() =>
@@ -136,4 +159,30 @@ it('resolves the operator from discovery when the NUT-06 contact is a placeholde
   expect(jest.mocked(useMintProfiles)).toHaveBeenLastCalledWith([
     { url: MINT, mintInfo: { contact: [{ method: 'nostr', info: 'ab'.repeat(32) }] } },
   ]);
+});
+
+it('accepts late review updates until the detail read is aborted', async () => {
+  stampAudit();
+  let update: Parameters<typeof fetchMintReviews>[0]['onUpdate'];
+  const first = {
+    mintUrl: MINT,
+    score: null,
+    reviewCount: 1,
+    recommendations: [],
+    lastUpdated: null,
+    fromCache: false,
+  };
+  jest.mocked(fetchMintReviews).mockImplementation(async (args) => {
+    update = args.onUpdate;
+    return ok(first);
+  });
+  const hook = renderHook(() => useMintDetailRead(MINT, { mintUrl: MINT }));
+  await waitFor(() => expect(hook.result.current.reviews).toBe('ready'));
+  act(() => update?.({ ...first, tier: 'nagg', score: 4.5, reviewCount: 90 }));
+  expect(store().getCached(MINT)).toMatchObject({ averageScore: 4.5, reviewCount: 90 });
+  expect(mintReviewsCache.getEntry(mintReviewsKey(MINT))?.data.score).toBe(4.5);
+  hook.unmount();
+  act(() => update?.({ ...first, tier: 'nagg', score: 2, reviewCount: 3 }));
+  expect(store().getCached(MINT)).toMatchObject({ averageScore: 4.5, reviewCount: 90 });
+  expect(mintReviewsCache.getEntry(mintReviewsKey(MINT))?.data.score).toBe(4.5);
 });

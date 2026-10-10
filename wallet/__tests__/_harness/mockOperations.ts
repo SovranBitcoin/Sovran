@@ -262,5 +262,7 @@ export function createMockOperations(
     // identity enrichers. No defaults in tests; individual suites opt in.
     resolveRecipientPubkey: wrap('resolveRecipientPubkey', undefined),
     resolveRecipientProfile: wrap('resolveRecipientProfile', undefined),
+    // npcAddressForPubkey: no default, so no npub.cash fallback unless a suite opts in.
+    npcAddressForPubkey: overrides?.npcAddressForPubkey,
   };
 }

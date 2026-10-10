@@ -11,22 +11,34 @@ const drawerSource = readFileSync(
 );
 const tabsSource = readFileSync(resolve(__dirname, '../app/(drawer)/(tabs)/_layout.tsx'), 'utf8');
 
-function capsuleButton(label: string): string {
-  const marker = source.indexOf(`label="${label}"`);
-  if (marker < 0) throw new Error(`missing ${label} CapsuleButton`);
-  const start = source.lastIndexOf('<CapsuleButton', marker);
-  const end = source.indexOf('/>', marker);
-  if (start < 0 || end < 0) throw new Error(`could not isolate ${label} CapsuleButton`);
-  return source.slice(start, end + 2);
+const homeLayoutSource = readFileSync(
+  resolve(__dirname, '../features/wallet/home/HomeLayouts.tsx'),
+  'utf8'
+);
+
+/** The object literal that declares one home action in WalletScreen. */
+function homeAction(id: string): string {
+  const marker = source.indexOf(`id: '${id}',`);
+  if (marker < 0) throw new Error(`missing ${id} home action`);
+  return source.slice(marker, source.indexOf('},', marker));
 }
 
 describe('wallet simulator selectors', () => {
   it.each([
-    ['Receive', 'wallet-receive'],
-    ['Send', 'wallet-send'],
-  ])('puts %s testID on the accessible CapsuleButton', (label, testID) => {
-    expect(capsuleButton(label)).toContain(`testID="${testID}"`);
+    ['receive', 'wallet-receive'],
+    ['send', 'wallet-send'],
+  ])('declares the %s action with its testID, once, for every home layout', (id, testID) => {
+    expect(homeAction(id)).toContain(`testID: '${testID}'`);
+    expect(source.split(`'${testID}'`)).toHaveLength(2);
     expect(source).not.toContain(`<View testID="${testID}"`);
+  });
+
+  it.each(['receive', 'send'])('puts the %s testID on the accessible CapsuleButton', (id) => {
+    const marker = homeLayoutSource.indexOf(`testID={actions.${id}.testID}`);
+    expect(marker).toBeGreaterThan(0);
+    expect(homeLayoutSource.lastIndexOf('<CapsuleButton', marker)).toBeGreaterThan(
+      homeLayoutSource.lastIndexOf('/>', marker)
+    );
   });
 
   it('exposes the active drawer profile name through a stable accessibility selector', () => {

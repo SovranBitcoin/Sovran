@@ -14,7 +14,6 @@ import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
-import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { formatAmount } from '@/shared/lib/currency';
@@ -75,12 +74,12 @@ export function HistoryEntryHeader({
   const avatarRecipientPubkey = showRecipientAvatar ? effectiveRecipientPubkey : undefined;
   const { metadata: recipientMetadata, isResolving: recipientResolving } =
     useNostrProfileMetadata(avatarRecipientPubkey);
-  const [foreground, surface, background, danger, success] = useThemeColor([
+  const [foreground, surface, background, success, danger] = useThemeColor([
     'foreground',
     'surface',
     'background',
-    'danger',
     'success',
+    'danger',
   ] as const);
 
   // Determine values from either historyEntry or pendingData
@@ -209,27 +208,19 @@ export function HistoryEntryHeader({
 
   return (
     <Log name="HistoryEntryHeader">
-      <HStack align="center" justify="space-between" className="p-5 pb-0 pt-0">
+      <HStack align="center" justify="space-between" className="px-4">
         <VStack>
-          <HStack align="center">
-            <Spacer size={8} />
-            <Text
-              overpass
-              size={isSend ? 32 : 24}
-              color={isSend ? danger : success}
-              style={{ opacity: 0.9 }}>
-              {isSend ? '-' : '+'}
-            </Text>
-            <Spacer size={8} />
-            <AmountFormatter
-              amount={amount}
-              unit={unit}
-              size={28}
-              weight="heavy"
-              color={isReceive ? success : danger}
-            />
-          </HStack>
-          <Text overpass size={18} color={withAlpha(foreground, 0.9)} bold>
+          {/* Green for money arriving, red for money leaving: the same two
+              colours the transaction list uses for the same amounts. */}
+          <AmountFormatter
+            amount={amount}
+            unit={unit}
+            size={36}
+            weight="bold"
+            sign={isSend ? '-' : '+'}
+            color={isReceive ? success : danger}
+          />
+          <Text size={16} color={withAlpha(foreground, 0.66)}>
             {formatAmount(
               { amount: Math.abs(numericAmount), unit },
               {

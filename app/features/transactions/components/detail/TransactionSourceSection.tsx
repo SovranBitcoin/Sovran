@@ -102,6 +102,8 @@ export function transactionLeadDetailItems({
       ? {
           title: 'Payment Methods',
           value: <Bip321MethodIcons optionKinds={bip321.optionKinds} usedKind={usedKind} />,
+          // Icons on screen; the names on the clipboard.
+          copyText: `${bip321.optionKinds.join(', ')}${usedKind ? ` (used: ${usedKind})` : ''}`,
         }
       : null,
     { title: 'Date', value: createdAt },

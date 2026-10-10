@@ -218,6 +218,8 @@ recipe('capture.settings', 'native-navigation', [
 ]);
 recipe('capture.design-system', 'native-fixture', [
   ['settings-design-system', 'design-system-family-foundations'],
+  ['settings-design-system-screens', 'ds-screens-unit-sat'],
+  ['settings-design-system-variations', 'ds-subject-transaction-row'],
   ['settings-design-system-foundations', 'TYPE RAMP'],
   ['settings-design-system-loading', 'CURRENT STATE'],
   ['settings-design-system-segmented', 'Pause'],

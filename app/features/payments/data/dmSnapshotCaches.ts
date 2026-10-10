@@ -12,6 +12,7 @@ import type { DmThreadMessage } from '@/features/payments/hooks/useDmThread';
 import type { DmThreadRef } from '@/shared/stores/runtime/dmEchoStore';
 
 export const dmConversationsCache = createQueryCacheStore<DmConversation[]>({
+  scope: 'session',
   name: 'dm-conversations-cache',
   logKey: 'dm_conversations_cache',
   staleTtlMs: 60 * 1000,
@@ -24,6 +25,7 @@ export function dmConversationsKey(viewer: string): string {
 }
 
 export const dmThreadCache = createQueryCacheStore<DmThreadMessage[]>({
+  scope: 'session',
   name: 'dm-thread-cache',
   logKey: 'dm_thread_cache',
   staleTtlMs: 60 * 1000,

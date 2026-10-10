@@ -7,6 +7,7 @@
  *   loggerCore.ts    — types, RingBuffer, createLogger, log, child loggers,
  *                      init helpers, redactError
  *   loggerJsThread   — JS-thread heartbeat monitor (auto-arms on import)
+ *   loggerUiThread   — UI-thread frame-drop sampler (auto-arms on import)
  *   loggerGlobalErrors — uncaught + React-reported error capture (auto-arms)
  *   loggerDefer      — InteractionManager-aware scheduler
  *   loggerHooks      — useRenderLogger / useLifecycleLogger
@@ -22,6 +23,7 @@
 // Side-effect imports: must run on barrel load so the dev heartbeat starts and
 // uncaught errors get a stack in the ring buffer from the first frame.
 import './loggerJsThread';
+import './loggerUiThread';
 import './loggerGlobalErrors';
 
 export type { Logger, RedactedError } from './loggerCore';
@@ -60,7 +62,9 @@ export { applyFileLogging, exportLogFile, clearLogFile, getLogFileInfo } from '.
 export type { LogFileInfo } from './loggerFile';
 
 export { stopJSThreadMonitor } from './loggerJsThread';
+export { stopFrameDropMonitor } from './loggerUiThread';
 export { deferWork } from './loggerDefer';
+export { timedDerive } from './loggerTimedDerive';
 export { useRenderLogger, useLifecycleLogger, useMountLog } from './loggerHooks';
 // `flushRowRenderWindows` stays off the barrel deliberately: it is a teardown
 // hook for tests, which import it from './loggerRender' directly.

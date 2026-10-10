@@ -15,9 +15,11 @@
 
 import { describe, it, expect, vi } from "vitest";
 import {
+  Amount,
   PaymentRequest,
   PaymentRequestTransportType,
   decodePaymentRequest,
+  getEncodedToken,
 } from "@cashu/cashu-ts";
 import type { Manager } from "@cashu/coco-core";
 import { createDefaultOperations } from "../../src/operations/defaultOperations";
@@ -43,7 +45,7 @@ interface MockManagerOverrides {
 
 function createMockManager(overrides: MockManagerOverrides = {}) {
   const mockToken = {
-    proofs: [{ id: "proof-1", amount: 100, C: "abc", secret: "def" }],
+    proofs: [{ id: "proof-1", amount: Amount.from(100), C: "abc", secret: "def" }],
   };
 
   return {
@@ -259,6 +261,44 @@ describe("executePaymentRequest — Nostr transport", () => {
     expect(payload).not.toHaveProperty("id");
   });
 
+  it("sends proof amounts as JSON numbers, not cashu-ts Amount strings", async () => {
+    const sendNostrDM = vi.fn().mockResolvedValue(undefined);
+    const manager = createMockManager();
+    manager._mockToken.proofs = [
+      { id: "proof-1", amount: Amount.from(8), C: "abc", secret: "def" },
+    ] as never;
+    mockGetPRInfo.mockReturnValue({
+      mints: [MINT1],
+      amount: 8,
+      unit: "sat",
+      transports: [{ type: "nostr", target: "nprofile1abc" }],
+    });
+    const ops = createDefaultOperations({
+      getManager: () => manager as unknown as Manager,
+      sendNostrDM,
+    });
+    await ops.executePaymentRequest!(MINT1, "creqNUM", 8, "sat");
+    const payload = JSON.parse(sendNostrDM.mock.calls[0][1]);
+    expect(payload.proofs[0].amount).toBe(8);
+  });
+
+  it("echoes the request's spelling of the paying mint", async () => {
+    const sendNostrDM = vi.fn().mockResolvedValue(undefined);
+    const manager = createMockManager();
+    mockGetPRInfo.mockReturnValue({
+      mints: [`${MINT1.toUpperCase()}/`],
+      amount: 100,
+      unit: "sat",
+      transports: [{ type: "nostr", target: "nprofile1abc" }],
+    });
+    const ops = createDefaultOperations({
+      getManager: () => manager as unknown as Manager,
+      sendNostrDM,
+    });
+    await ops.executePaymentRequest!(MINT1, "creqSpelling", 100, "sat");
+    expect(JSON.parse(sendNostrDM.mock.calls[0][1]).mint).toBe(`${MINT1.toUpperCase()}/`);
+  });
+
   it("rejects unsupported spending conditions before creating or delivering ecash", async () => {
     const sendNostrDM = vi.fn().mockResolvedValue(undefined);
     const manager = createMockManager();
@@ -279,6 +319,34 @@ describe("executePaymentRequest — Nostr transport", () => {
     expect(manager.ops.send.prepare).not.toHaveBeenCalled();
     expect(sendNostrDM).not.toHaveBeenCalled();
   });
+  it.each([false, true])("preserves plain P2PK and refuses extra conditions (tags=%s)", async (tagged) => {
+    const pubkey = `02${"ab".repeat(32)}`;
+    const request = new PaymentRequest(
+      [{ type: PaymentRequestTransportType.NOSTR, target: "nprofile1abc" }],
+      "locked-request", 100, "sat", [MINT1], undefined, undefined,
+      { kind: "P2PK", data: pubkey, tags: tagged ? [["sigflag", "SIG_ALL"]] : [] },
+    ).toEncodedRequest();
+    mockGetPRInfo.mockReturnValue({
+      requestId: "locked-request", mints: [MINT1], amount: 100, unit: "sat",
+      hasSpendingCondition: true, lockP2pkPubkey: pubkey,
+      transports: [{ type: "nostr", target: "nprofile1abc" }],
+    });
+    const manager = createMockManager();
+    const sendNostrDM = vi.fn().mockResolvedValue(undefined);
+    const ops = createDefaultOperations({ getManager: () => manager as unknown as Manager, sendNostrDM });
+    if (tagged) {
+      await expect(ops.executePaymentRequest!(MINT1, request, 100, "sat")).rejects.toThrow("unsupported spending conditions");
+      expect(manager.ops.send.prepare).not.toHaveBeenCalled();
+      expect(sendNostrDM).not.toHaveBeenCalled();
+      return;
+    }
+    await ops.executePaymentRequest!(MINT1, request, 100, "sat");
+    expect(manager.ops.send.prepare).toHaveBeenCalledWith({
+      mintUrl: MINT1, amount: 100, unit: "sat", target: { type: "p2pk", pubkey },
+    });
+    expect(sendNostrDM).toHaveBeenCalledTimes(1);
+  });
+
   it("calls sendNostrDM with the Nostr target and token payload", async () => {
     const sendNostrDM = vi.fn().mockResolvedValue(undefined);
     const mockManager = createMockManager();
@@ -321,7 +389,9 @@ describe("executePaymentRequest — Nostr transport", () => {
       mint: MINT1,
       unit: "sat",
     });
-    expect(payload.proofs).toEqual(mockManager._mockToken.proofs);
+    expect(payload.proofs).toEqual([
+      { id: "proof-1", amount: 100, C: "abc", secret: "def" },
+    ]);
 
     expect(result.historyEntry).toBeDefined();
     expect(typeof result.historyEntry).toBe("string");
@@ -1320,6 +1390,21 @@ describe("executeSend — reservation rescue (BTC-07)", () => {
     expect(mockManager.ops.send.cancel).toHaveBeenCalledWith("prepared-send-1");
   });
 
+  it("does not create a token when durable delivery binding fails", async () => {
+    const mockManager = createMockManager();
+    const ops = createDefaultOperations({
+      getManager: () => mockManager as unknown as Manager,
+      captureSendDelivery: () => async () => {
+        throw new Error("storage unavailable");
+      },
+    });
+    await expect(ops.executeSend!(MINT1, 100)).rejects.toThrow(
+      "storage unavailable",
+    );
+    expect(mockManager.ops.send.execute).not.toHaveBeenCalled();
+    expect(mockManager.ops.send.cancel).toHaveBeenCalledWith("prepared-send-1");
+  });
+
   it("does not cancel when execute succeeds", async () => {
     const mockManager = createMockManager();
 
@@ -1561,5 +1646,51 @@ describe("buildMintListItems testnut split", () => {
     const test = byUrl(await build({ scope: "onchain" }, true));
     expect(test[TESTNUT].status).toBe("available");
     expect(test[MINT1]).toMatchObject(outside);
+  });
+});
+
+describe("legacy nearby receive history ownership", () => {
+  it("returns the canonical child receive id without scanning concurrent history", async () => {
+    const token = getEncodedToken({
+      mint: MINT1,
+      unit: "sat",
+      proofs: [
+        {
+          id: "00".repeat(8),
+          amount: Amount.from(1),
+          C: "02" + "ab".repeat(32),
+          secret: "synthetic",
+        },
+      ],
+    });
+    const manager = createMockManager({
+      ops: {
+        receive: {
+          prepare: vi.fn(async () => ({ id: "receive-a" })),
+          execute: vi.fn(async () => ({ id: "receive-a" })),
+        },
+      },
+      history: {
+        getPaginatedHistory: vi.fn(() => {
+          throw new Error("broad history scan forbidden");
+        }),
+        getHistoryEntryById: vi.fn(async () => ({
+          id: "receive:receive-a",
+          type: "receive",
+          amount: 1,
+        })),
+      },
+    });
+    const operations = createDefaultOperations({
+      getManager: () => manager as unknown as Manager,
+    });
+    const result = await operations.executeAutoRedeem!(token, MINT1);
+    expect(result.historyEntryId).toBe("receive:receive-a");
+    expect(JSON.parse(result.historyEntry!)).toEqual({
+      id: "receive:receive-a",
+      type: "receive",
+      amount: 1,
+    });
+    expect(manager.history.getPaginatedHistory).not.toHaveBeenCalled();
   });
 });

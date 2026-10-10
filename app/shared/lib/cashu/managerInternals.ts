@@ -309,67 +309,16 @@ export function isAlreadyRecoveredError(error: unknown): boolean {
  * hold the UI for over a minute, so per-keyset granularity is the difference
  * between a progress display and a bare spinner.
  *
- * Keep in step with coco's loop if it changes — `restoreKeysetForMint.test.ts`
+ * Keep in step with coco's loop if it changes — `restoreKeysetGuards.test.ts`
  * pins the call shape, and the cast lives in one place so a coco rename trips
  * the type-checker here rather than at runtime.
  */
-export interface ProofStateTally {
-  /** Proofs the mint reported UNSPENT — the only ones coco keeps. */
-  ready: number;
-  /** Proofs unblinded at full cost and then discarded as already spent. */
-  spent: number;
-}
-
 export async function restoreKeysetForMint(
   manager: Manager,
-  { mintUrl, keysetId, unit }: { mintUrl: string; keysetId: string; unit: string },
-  /**
-   * Accumulated into, NOT returned.
-   *
-   * The keysets worth measuring are exactly the ones that throw: a keyset whose
-   * proofs are already in the database reaches `checkProofsStates`, gets its
-   * full verdict, and only then fails in `saveProofs` with "Proof with secret
-   * already exists". A return value is discarded on that path, which is why the
-   * first version of this reported `proofsReady: 0, proofsSpent: 0` on a run
-   * where coco's own logs showed 75 ready and 445 spent. Writing through a
-   * caller-owned object keeps the counts whatever the restore does next.
-   */
-  tally?: ProofStateTally
+  { mintUrl, keysetId, unit }: { mintUrl: string; keysetId: string; unit: string }
 ): Promise<void> {
   const wallet = await internals(manager).walletService.getWallet(mintUrl, unit);
-
-  // Count the NUT-07 verdict on the way past.
-  //
-  // This is the number that reframes recovery cost: a restore unblinds every
-  // signature the mint returns — the single most expensive operation in the
-  // wallet — and only then asks which are still unspent. On a used wallet the
-  // answer is "almost none", so the great majority of that work is discarded.
-  // coco logs the split per keyset but returns void, and without it in the
-  // benchmark the run summary can only say how many proofs were unblinded, not
-  // how many were worth unblinding.
-  //
-  // An own property shadowing the prototype method, deleted in `finally`: the
-  // wallet is cached per (mintUrl, unit) by WalletService, so this instance
-  // outlives the restore and must be handed back unpatched.
-  const patched = wallet as Omit<Wallet, 'checkProofsStates'> & {
-    checkProofsStates?: Wallet['checkProofsStates'];
-  };
-  const original = wallet.checkProofsStates.bind(wallet);
-  patched.checkProofsStates = async (proofs) => {
-    const states = await original(proofs);
-    if (tally) {
-      for (const state of states) {
-        if (state.state === 'SPENT') tally.spent += 1;
-        else tally.ready += 1;
-      }
-    }
-    return states;
-  };
-  try {
-    await internals(manager).walletRestoreService.restoreKeyset(mintUrl, wallet, keysetId, unit);
-  } finally {
-    delete patched.checkProofsStates;
-  }
+  await internals(manager).walletRestoreService.restoreKeyset(mintUrl, wallet, keysetId, unit);
 }
 
 /** Counters scanned by a shallow probe before declaring a mint unused. */

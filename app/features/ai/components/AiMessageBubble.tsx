@@ -434,6 +434,14 @@ function AssistantBubble({
   return (
     <View style={{ alignSelf: 'stretch', marginVertical: 8, paddingHorizontal: 4 }}>
       <VStack gap={6} align="flex-start">
+        {message.modelSwitch ? (
+          <Text
+            testID={`ai-message-model-switch-${message.id}`}
+            size={12}
+            className="text-foreground/60">
+            {`Switched from ${message.modelSwitch.from} to ${message.modelSwitch.to}.`}
+          </Text>
+        ) : null}
         {showHeader ? (
           <ThinkingHeader
             isLive={isLive}

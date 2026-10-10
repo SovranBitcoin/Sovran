@@ -45,18 +45,18 @@ const action = (available = false) => ({
 });
 
 describe('AmountSelector lock', () => {
-  it('sends locked ecash only through its explicit method and leaves Ecash unlocked', async () => {
+  it('"as Ecash" asks about the lock, and there is no separate locked row', async () => {
     const lock = { pubkey: `02${'11'.repeat(32)}` };
-    const choose = jest.fn(async () => lock);
+    const askLock = jest.fn<Promise<typeof lock | null | undefined>, []>(async () => lock);
     const actions: React.ComponentProps<typeof AmountSelector>['actions'] = {
       setInput: action(true),
       toggle: action(true),
       next: {
         ...action(true),
         variants: [
-          { id: 'ecash', label: 'Ecash', available: true },
-          { id: 'lightning', label: 'Lightning', available: true },
-          { id: 'locked-ecash', label: 'Lock Ecash', available: true },
+          { id: 'ecash', label: 'as Ecash', available: true },
+          { id: 'lightning', label: 'as Lightning', available: true },
+          { id: 'locked-ecash', label: 'as Locked Ecash', available: true },
         ],
       },
       paste: action(),
@@ -72,23 +72,34 @@ describe('AmountSelector lock', () => {
           actions={actions}
           transactionType="send"
           lockChoice={null}
-          lockOption={{ choose }}
+          askLock={askLock}
         />
       );
     });
     const variants = renderer!.root.findByType('div').props.nextVariants;
+    expect(variants.map((v: { id: string }) => v.id)).toEqual(['ecash', 'lightning']);
+    const ecash = variants.find((v: { id: string }) => v.id === 'ecash');
+
     await act(async () => {
-      await variants.find((v: { id: string }) => v.id === 'locked-ecash').onPress();
+      await ecash.onPress();
     });
-    expect(choose).toHaveBeenCalledTimes(1);
     expect(actions.next.execute).toHaveBeenLastCalledWith({
       variantId: 'locked-ecash',
       p2pkLock: lock,
     });
+
+    askLock.mockResolvedValueOnce(null);
     await act(async () => {
-      await variants.find((v: { id: string }) => v.id === 'ecash').onPress();
+      await ecash.onPress();
     });
     expect(actions.next.execute).toHaveBeenLastCalledWith({ variantId: 'ecash', p2pkLock: null });
+
+    askLock.mockResolvedValueOnce(undefined);
+    const calls = (actions.next.execute as jest.Mock).mock.calls.length;
+    await act(async () => {
+      await ecash.onPress();
+    });
+    expect((actions.next.execute as jest.Mock).mock.calls.length).toBe(calls);
     await act(async () => {
       renderer!.unmount();
     });
@@ -180,14 +191,14 @@ describe('AmountSelector lock', () => {
     expect(actions.next.execute).not.toHaveBeenCalled();
   });
 
-  it('asks through the Lock Ecash row too when the flow arrived locked', async () => {
+  it('asks through the as Locked Ecash row too when the flow arrived locked', async () => {
     const lock = { pubkey: `02${'11'.repeat(32)}` };
     const confirmLock = jest.fn(async () => lock);
     const actions = {
       ...plainActions(),
       next: {
         ...action(true),
-        variants: [{ id: 'locked-ecash', label: 'Lock Ecash', available: true }],
+        variants: [{ id: 'locked-ecash', label: 'as Locked Ecash', available: true }],
       },
     };
     let renderer: TestRenderer.ReactTestRenderer;

@@ -18,6 +18,11 @@ export interface FeedEmptySignals {
   followCount: number;
 }
 
+/** How many accounts a following map holds. */
+export function countFollowing(followingPubkeys: Readonly<Record<string, true>>): number {
+  return Object.keys(followingPubkeys).length;
+}
+
 /** Picks the empty-state mode from the feed's current signals. */
 export function selectFeedEmptyMode(signals: FeedEmptySignals): FeedEmptyMode {
   if (signals.isLoading) return 'loading';

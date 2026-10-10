@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 
-import { registerKeyDerivation } from '@/shared/lib/profile/profileSessionOrchestrator';
+import { registerKeyDerivation } from '@/shared/lib/profile/profileTransition';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 
 /** Registers key derivation function with the orchestrator so createAndSwitchProfile can derive keys. */

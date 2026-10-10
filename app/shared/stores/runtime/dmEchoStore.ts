@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 
 /**
  * Optimistic sent-DM echoes created OUTSIDE the chat screen. The Send flow's
@@ -46,19 +46,21 @@ const MAX_ECHOES_PER_THREAD = 20;
 const threadKey = ({ protocol, viewer, counterparty }: DmThreadRef) =>
   `${protocol}:${viewer}:${counterparty}`;
 
-export const useDmEchoStore = create<DmEchoStore>((set, get) => ({
-  byThread: {},
-  append: (thread, message) =>
-    set((state) => {
-      const key = threadKey(thread);
-      const existing = state.byThread[key] ?? [];
-      if (existing.some((m) => m.id === message.id)) return state;
-      return {
-        byThread: {
-          ...state.byThread,
-          [key]: [...existing.slice(-(MAX_ECHOES_PER_THREAD - 1)), message],
-        },
-      };
-    }),
-  getForThread: (thread) => get().byThread[threadKey(thread)] ?? [],
-}));
+export const useDmEchoStore = create<DmEchoStore>({ name: 'useDmEchoStore', scope: 'session' })(
+  (set, get) => ({
+    byThread: {},
+    append: (thread, message) =>
+      set((state) => {
+        const key = threadKey(thread);
+        const existing = state.byThread[key] ?? [];
+        if (existing.some((m) => m.id === message.id)) return state;
+        return {
+          byThread: {
+            ...state.byThread,
+            [key]: [...existing.slice(-(MAX_ECHOES_PER_THREAD - 1)), message],
+          },
+        };
+      }),
+    getForThread: (thread) => get().byThread[threadKey(thread)] ?? [],
+  })
+);

@@ -10,6 +10,18 @@ export interface OnchainConfirmationProgress {
   currentConfirmations: number | null;
   requiredConfirmations: number;
   isSatisfied: boolean;
+  /**
+   * How deep our explorer actually sees the transaction, NOT capped at the
+   * required count. Only a hint: the mint credits from its own node, and how
+   * far past the requirement our count has run is how we notice it has not.
+   */
+  observedConfirmations?: number | null;
+  /**
+   * `requiredConfirmations` is the depth the mint itself published, not the
+   * wallet's fallback. Nothing may be concluded about the mint's behaviour
+   * from a depth we guessed.
+   */
+  requirementFromMint?: boolean;
 }
 
 export function getOnchainConfirmationProgress(
@@ -59,6 +71,7 @@ export function getOnchainConfirmationProgress(
     isSatisfied:
       currentConfirmations != null &&
       currentConfirmations >= normalizedRequired,
+    observedConfirmations: currentConfirmations,
   };
   logger.info("chain.onchain.confirmationProgress.result", {
     reason: progress.isSatisfied ? "satisfied" : "waiting",

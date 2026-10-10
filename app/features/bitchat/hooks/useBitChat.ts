@@ -1,6 +1,8 @@
+import { useVisualActivityEffect } from '@/shared/hooks/useVisualActivityEffect';
 import { useState, useEffect, useCallback } from 'react';
 import {
   startBLE,
+  acquirePublicBLEMesh,
   sendBLEMessage,
   startBLEPrivateChat,
   sendBLEPrivateMessage,
@@ -150,6 +152,11 @@ export function useBitChat(
   const [isConnected, setIsConnected] = useState(false);
 
   const dmPeerID = options.dm?.peerID;
+  useVisualActivityEffect(
+    useCallback(() => {
+      if (transport === 'ble' || transport === 'ble-dm') return acquirePublicBLEMesh();
+    }, [transport])
+  );
 
   // Reset the buffer only when the *subscription identity* changes — i.e.
   // we're now watching a different transport / peer / geohash and the old

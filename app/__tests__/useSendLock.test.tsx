@@ -2,8 +2,6 @@
 // switched off (`wallet/src/p2pk/reclaimGate.ts`), so it is switched on here
 // to keep the behaviour specified for the day it returns.
 // `sendLockReclaimGate.test.ts` covers what ships.
-jest.mock('../../wallet/src/p2pk/reclaimGate', () => ({ P2PK_RECLAIM_ENABLED: true }));
-
 import { act, renderHook } from '@testing-library/react-native';
 
 import { useSendLock } from '@/features/send/hooks/useSendLock';
@@ -11,22 +9,17 @@ import type { SendLockGate } from '@/features/send/lib/sendLockGate';
 import type { CashuP2pkPubkey } from '@/shared/lib/protocolIds';
 import { useSendLockStore } from '@/shared/stores/runtime/sendLockStore';
 
+jest.mock('../../wallet/src/p2pk/reclaimGate', () => ({ P2PK_RECLAIM_ENABLED: true }));
+
 type SheetButton = { testID: string; onPress: (close: () => void) => void };
 type SheetPayload = { title: string; buttons: SheetButton[]; onDismiss?: () => void };
 
 const mockSheets: SheetPayload[] = [];
-const mockNotices: { title: string; description: string }[] = [];
 let mockGate: SendLockGate = { kind: 'unavailable', reason: 'Locking needs a Nostr recipient' };
 let mockRefundKey: string | null = null;
 
 jest.mock('@/shared/lib/popup/popups/actionMenuSheet', () => ({
   actionMenuSheet: (payload: SheetPayload) => mockSheets.push(payload),
-}));
-jest.mock('@/shared/lib/popup/popups/acknowledgeSheet', () => ({
-  acknowledgeSheet: (notice: { title: string; description: string }) => {
-    mockNotices.push(notice);
-    return Promise.resolve();
-  },
 }));
 jest.mock('@/features/send/hooks/useSendLockTarget', () => ({
   useSendLockTarget: () => ({ gate: mockGate, refundKey: mockRefundKey, loading: false }),
@@ -54,7 +47,6 @@ function pick(testID: string) {
 
 beforeEach(() => {
   mockSheets.length = 0;
-  mockNotices.length = 0;
   mockGate = { kind: 'ready', lockKey: ALICE_KEY };
   mockRefundKey = OUR_KEY;
   useSendLockStore.setState({ draft: null });
@@ -94,23 +86,6 @@ describe('a flow that arrived locked (Nut Drop)', () => {
     });
   });
 
-  it('does not ask twice once the header sheet has been answered', async () => {
-    const { result } = render();
-    await act(async () => {
-      result.current.open();
-      pick('send-lock-forever');
-    });
-    expect(mockSheets).toHaveLength(1);
-
-    let confirmed: unknown;
-    await act(async () => {
-      confirmed = await result.current.confirmLock!();
-    });
-
-    expect(mockSheets).toHaveLength(1);
-    expect(confirmed).toEqual({ pubkey: PEER_KEY });
-  });
-
   it('sends nothing when the sheet is dismissed', async () => {
     const { result } = render();
     let confirmed: unknown = 'unset';
@@ -125,8 +100,9 @@ describe('a flow that arrived locked (Nut Drop)', () => {
   it('counts a timed lock from the send, not from when it was chosen', async () => {
     const { result } = render();
     await act(async () => {
-      result.current.open();
+      const pending = result.current.confirmLock!();
       pick('send-lock-1h');
+      await pending;
     });
     jest.setSystemTime(Date.UTC(2026, 8, 27, 12, 10));
 
@@ -152,41 +128,58 @@ describe('a send to a person', () => {
     expect(result.current.confirmLock).toBeUndefined();
   });
 
-  it('locks from the header, and the plain Next then sends on those terms', async () => {
+  it('asks "Lock to Alice" as the ecash leaves, and sends on the answer', async () => {
     const { result } = render();
+    let asked: unknown;
     await act(async () => {
-      result.current.open();
+      const pending = result.current.askLock!();
+      expect(mockSheets[0].title).toBe('Lock to Alice');
       expect(mockSheets[0].buttons.map((b) => b.testID)).toContain('send-lock-off');
       pick('send-lock-7d');
+      asked = await pending;
     });
-
-    expect(result.current.locked).toBe(true);
-    let confirmed: unknown;
-    await act(async () => {
-      confirmed = await result.current.confirmLock!();
-    });
-    expect(mockSheets).toHaveLength(1);
-    expect(confirmed).toEqual({
+    expect(asked).toEqual({
       pubkey: ALICE_KEY,
       locktimeSec: Math.floor(Date.now() / 1000) + 7 * 86400,
       refundKeys: [OUR_KEY],
     });
+    expect(result.current.locked).toBe(true);
   });
 
-  it('unlocks again from the header', async () => {
+  it('"Don\'t lock" sends it unlocked, and dismissing sends nothing', async () => {
     const { result } = render();
+    let off: unknown = 'unset';
     await act(async () => {
-      result.current.open();
-      pick('send-lock-forever');
-    });
-    expect(result.current.locked).toBe(true);
-    await act(async () => {
-      result.current.open();
+      const pending = result.current.askLock!();
       pick('send-lock-off');
+      off = await pending;
     });
-    expect(result.current.locked).toBe(false);
-    expect(result.current.lockChoice).toBeNull();
+    expect(off).toBeNull();
+    let dismissed: unknown = 'unset';
+    await act(async () => {
+      const pending = result.current.askLock!();
+      mockSheets.at(-1)!.onDismiss?.();
+      dismissed = await pending;
+    });
+    expect(dismissed).toBeUndefined();
+  });
+
+  it('never asks offline, and sends unlocked', () => {
+    useSendLockStore.setState({
+      draft: {
+        lockKey: ALICE_KEY,
+        durationId: 'forever',
+        recipientPubkey: ALICE,
+        confirmed: false,
+      },
+    });
+    const { result } = renderHook(() =>
+      useSendLock({ entry: toAlice, recipientPubkey: ALICE, recipientName: 'Alice', offline: true })
+    );
+    expect(result.current.askLock).toBeUndefined();
     expect(result.current.confirmLock).toBeUndefined();
+    expect(result.current.lockChoice).toBeNull();
+    expect(result.current.locked).toBe(false);
   });
 
   it('drops a choice made for someone else', async () => {
@@ -206,11 +199,8 @@ describe('where there is no choice to make', () => {
     const { result } = renderHook(() => useSendLock({ entry: toAlice, recipientName: 'this key' }));
     expect(result.current.mode).toBe('unavailable');
     expect(result.current.locked).toBe(false);
-    act(() => result.current.open());
-    expect(mockSheets).toHaveLength(0);
-    expect(mockNotices).toEqual([
-      expect.objectContaining({ description: 'Locking needs a Nostr recipient' }),
-    ]);
+    expect(result.current.askLock).toBeUndefined();
+    expect(result.current.label).toBe('Not locked. Locking needs a Nostr recipient');
   });
 
   it('shows a payment request as locked on the request’s own terms', () => {
@@ -222,9 +212,7 @@ describe('where there is no choice to make', () => {
     );
     expect(result.current.locked).toBe(true);
     expect(result.current.confirmLock).toBeUndefined();
-    act(() => result.current.open());
-    expect(mockSheets).toHaveLength(0);
-    expect(mockNotices).toHaveLength(1);
+    expect(result.current.askLock).toBeUndefined();
   });
 
   it('shows no lock on a payment that is not ecash', () => {

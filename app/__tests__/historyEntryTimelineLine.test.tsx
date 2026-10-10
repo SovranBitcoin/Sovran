@@ -68,12 +68,12 @@ jest.mock('@/shared/lib/logger', () => {
   };
 });
 
-jest.mock('@/shared/ui/composed/GradientCard', () => {
+jest.mock('@/shared/ui/composed/Surface', () => {
   const ReactActual = jest.requireActual<typeof import('react')>('react');
   const { View } = jest.requireActual<typeof import('react-native')>('react-native');
 
   return {
-    GradientCard: ({ children }: { children?: React.ReactNode }) =>
+    Surface: ({ children }: { children?: React.ReactNode }) =>
       ReactActual.createElement(View, null, children),
   };
 });
@@ -256,7 +256,8 @@ describe('HistoryEntryTimeline connector rail', () => {
 
     const lines = collectNodesByTestID(renderer!.toJSON(), 'history-entry-timeline-line');
 
-    expect(lines).toHaveLength(2);
+    // Invoice created → waiting for payment: two rows, one rail between them.
+    expect(lines).toHaveLength(1);
 
     // Every dot's ring/segment strokes match the 3px connector rail width.
     const indicators = collectNodesByTestIDPrefix(renderer!.toJSON(), 'indicator-');
@@ -311,9 +312,9 @@ describe('HistoryEntryTimeline connector rail', () => {
   it('top-aligns label blocks identically for every step type', () => {
     let renderer: TestRenderer.ReactTestRenderer;
 
-    // Unpaid mint: one next-pending row + two future-small rows. All label
-    // blocks must share one marginTop so a step going active (gaining its
-    // sublabel) never nudges the label.
+    // Unpaid mint: a finished row (label + timestamp) and the open slot
+    // (label + sublabel). Both label blocks must share one marginTop so a row
+    // changing tense never nudges its label.
     act(() => {
       renderer = TestRenderer.create(<HistoryEntryTimeline historyEntry={unpaidMintEntry} />);
     });
@@ -335,7 +336,7 @@ describe('HistoryEntryTimeline connector rail', () => {
     };
     walk(renderer!.toJSON());
 
-    expect(negativeMarginTops).toHaveLength(3);
+    expect(negativeMarginTops).toHaveLength(2);
     expect(new Set(negativeMarginTops)).toEqual(new Set([-3]));
 
     act(() => {
@@ -349,11 +350,11 @@ describe('HistoryEntryTimeline connector rail', () => {
     act(() => {
       renderer = TestRenderer.create(<HistoryEntryTimeline historyEntry={sendEntry('pending')} />);
     });
-    expect(collectNodesByTestIDPrefix(renderer!.toJSON(), 'indicator-')).toHaveLength(3);
+    expect(collectNodesByTestIDPrefix(renderer!.toJSON(), 'indicator-')).toHaveLength(2);
 
-    // Rollback: 3 steps collapse to 2. Rows are position-keyed, so the second
-    // row's indicator TRANSITIONS to done/reverted (playing the draw-in) and
-    // the third row unmounts.
+    // Rollback lands in the open slot: no row is added or removed. Rows are
+    // keyed by slot, so the second row's indicator TRANSITIONS to
+    // done/reverted (playing the draw-in) instead of remounting.
     act(() => {
       renderer.update(<HistoryEntryTimeline historyEntry={sendEntry('rolledBack')} />);
     });
@@ -429,7 +430,7 @@ describe('HistoryEntryTimeline connector rail', () => {
     });
   });
 
-  it('passes pending confirmation segments to the onchain payment-received indicator before payment', () => {
+  it('draws no confirmation ring before a deposit has been seen', () => {
     let renderer: TestRenderer.ReactTestRenderer;
 
     act(() => {
@@ -457,21 +458,10 @@ describe('HistoryEntryTimeline connector rail', () => {
         indicator.props.confirmationProgress != null
     );
 
-    expect(progressIndicators).toHaveLength(1);
-    const previewIndicator =
-      progressIndicators[0] &&
-      typeof progressIndicators[0] !== 'string' &&
-      !Array.isArray(progressIndicators[0])
-        ? progressIndicators[0]
-        : null;
-    expect(previewIndicator?.props.confirmationProgress).toEqual({
-      currentConfirmations: null,
-      requiredConfirmations: 3,
-    });
-    // No payment observed yet: the ring is a preview of the required
-    // confirmations, so the next segment must not breathe "in progress"
-    // while the prior "Waiting for payment" step is still pending.
-    expect(previewIndicator?.props.segmentedInProgress).toBe(false);
+    // The open slot is "waiting for deposit". The ring belongs to the
+    // confirming row, which does not exist until there is something to count.
+    expect(indicators).toHaveLength(2);
+    expect(progressIndicators).toHaveLength(0);
 
     act(() => {
       renderer.unmount();

@@ -11,7 +11,8 @@
  *   screen, so opening it afterwards is a cache hit).
  * - social: operator profile via `useMintProfiles` when stale.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
 
 import { mintReviewsCache, mintReviewsKey } from '@/features/mint/data/mintReviewsCache';
 import { useMintProfiles } from '@/features/mint/hooks/useMintProfiles';
@@ -19,8 +20,7 @@ import { projectMintMeta } from '@/features/mint/lib/auditInfo';
 import { retryMintInfoFetch } from '@/features/send/lib/createSovranScreenActionsBridge';
 import { isSupersededError } from '@/shared/lib/cache/createQueryCacheStore';
 import { getDiscoveredMintMetadata } from '@/shared/lib/getDiscoveredMintMetadata';
-import { fetchMintReviews } from '@/shared/lib/nostr/fetchMintReviews';
-import { reviewAggregateOf } from '@/shared/lib/nostr/reviewAggregate';
+import { readMintReviews } from '@/features/mint/data/readMintReviews';
 import { extractMintNostrPubkey } from '@/shared/lib/nostr/extractMintNostrPubkey';
 import { newReadId, readErrorType, readEvents, readKeyHash } from '@/shared/lib/read/readLog';
 import {
@@ -82,26 +82,10 @@ async function runReviewsRead(mintUrl: string, signal: AbortSignal): Promise<boo
     gen: mintReviewsCache.generation(key),
   });
   try {
-    const data = await mintReviewsCache.run(
-      key,
-      async (ctx) => {
-        const result = await fetchMintReviews({ mintUrl, signal: ctx.signal, readId: ctx.readId });
-        if (result.isErr()) throw result.error;
-        if (ctx.signal?.aborted) return { data: result.value };
-        const aggregate = reviewAggregateOf(
-          result.value,
-          useMintMetadataStore.getState().getCached(mintUrl)?.reviewCount
-        );
-        if (aggregate.authoritative) {
-          useMintMetadataStore
-            .getState()
-            .setReviewsAggregate(mintUrl, aggregate.score, aggregate.reviewCount);
-        }
-        return { data: result.value };
-      },
-      '',
-      { signal, readId }
-    );
+    const data = await mintReviewsCache.run(key, (ctx) => readMintReviews(mintUrl, ctx), '', {
+      signal,
+      readId,
+    });
     readEvents.done({
       readId,
       surface: 'mintReviews',
@@ -178,6 +162,19 @@ export function useMintDetailRead(
     }
     return () => controller.abort();
   }, [mintUrl, attempt]);
+
+  // A read that failed is tried again when the page is returned to: it was
+  // the network's answer at one moment, not the mint's. Held in a ref so the
+  // failure itself does not re-run the focus effect and retry in a loop.
+  const failedRef = useRef(false);
+  useEffect(() => {
+    failedRef.current = audit.failed || reviews.failed;
+  }, [audit.failed, reviews.failed]);
+  useFocusEffect(
+    useCallback(() => {
+      if (failedRef.current) setAttempt((n) => n + 1);
+    }, [])
+  );
 
   // Social: operator profile from the NUT-06 contact, through the shared hook
   // (it writes `setSocial`, which re-renders us via the cached entry).

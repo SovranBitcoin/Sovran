@@ -1,5 +1,5 @@
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
+import { persist, type PersistOptions, type StateStorage } from 'zustand/middleware';
 import { z } from 'zod';
 import { createRoutstrPersistence } from '@/shared/lib/routstr/securePersistence';
 import { mintLocalId } from '@/shared/lib/id';
@@ -264,6 +264,8 @@ export interface RoutstrMessage {
    * messages from before the cost-tracking change shipped.
    */
   costSats?: number;
+  /** Model names at send time, retained with an answer that used a fallback. */
+  modelSwitch?: { from: string; to: string };
   /**
    * Optimistic dispatch flag for user messages — `true` between submit and
    * the moment the streaming round-trip resolves (success or error).
@@ -590,6 +592,7 @@ interface RoutstrActions {
       thinkingDurationSec?: number;
       reasoningContent?: string;
       costSats?: number;
+      modelSwitch?: RoutstrMessage['modelSwitch'];
     }
   ) => void;
   removeMessages: (ids: Set<string>) => void;
@@ -715,6 +718,7 @@ const PersistedRoutstrMessage = z.looseObject({
   thinkingDurationSec: z.number().nonnegative().optional(),
   reasoningContent: z.string().max(65_536).optional(),
   costSats: z.number().int().nonnegative().optional(),
+  modelSwitch: z.object({ from: z.string(), to: z.string() }).optional().catch(undefined),
   pending: z.boolean().optional(),
 });
 
@@ -858,6 +862,90 @@ function truncateTranscript(session: RoutstrSession): RoutstrSession {
   return { ...session, messages, activeChildren };
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+/**
+ * The session list of an older blob, cut to the ceilings before the schema
+ * reads it.
+ *
+ * Releases up to 0.1.0 saved every session and every turn with no limit, and
+ * the schema turns down a list that is too long, which empties the whole
+ * store, key included. A ceiling belongs on what is written. What is read has
+ * to accept what any release wrote, so it is trimmed here, by the same rule
+ * `partialize` uses.
+ *
+ * A session or turn that is not an object is left out: the trim reads their
+ * fields, and the schema would have turned the blob down for a session like
+ * that anyway.
+ */
+function releasedSessionsWithinCeilings(sessions: unknown, currentSessionId: unknown): unknown {
+  if (!Array.isArray(sessions)) return sessions;
+  const readable = sessions.flatMap((session: unknown) =>
+    isRecord(session) && Array.isArray(session.messages)
+      ? [{ ...session, messages: session.messages.filter(isRecord) }]
+      : []
+  );
+  return boundedSessions(
+    // Only the fields the trim reads are known here. The schema checks the rest.
+    readable as unknown as RoutstrSession[],
+    typeof currentSessionId === 'string' ? currentSessionId : null
+  );
+}
+
+type Merge<S> = NonNullable<PersistOptions<S>['merge']>;
+
+/**
+ * Lets the store save only after a load has been accepted.
+ *
+ * A load that the schema turns down, or that throws, leaves the store on
+ * defaults, and persist saves whatever the store holds: at once after a
+ * migration, otherwise on the next change. Through this store's adapter a save
+ * of defaults does more than replace the chat blob. It replaces the key and
+ * the recovery tokens in the secure vault with empty values. So after a load
+ * that was not accepted, saves are dropped until one is. What is stored stays
+ * as it was, for a release that can read it.
+ *
+ * The cost is that nothing from that session is kept, a newly paid key
+ * included. That is the same position the adapter already takes when it
+ * cannot read the vault.
+ */
+function saveOnlyAfterAcceptedLoad(storage: StateStorage) {
+  // Nothing has been read yet, so there is nothing a save could replace
+  // unseen. The adapter refuses a save over a blob it never read.
+  let load: 'accepted' | 'pending' | 'rejected' = 'accepted';
+  let refusalLogged = false;
+  const gated: StateStorage = {
+    getItem: (name) => {
+      load = 'pending';
+      refusalLogged = false;
+      return storage.getItem(name);
+    },
+    setItem: (name, value) => {
+      if (load === 'accepted') return storage.setItem(name, value);
+      if (!refusalLogged) {
+        refusalLogged = true;
+        storeLog.warn('store.routstr.write_refused', { reason: `load_${load}` });
+      }
+    },
+    removeItem: (name) => storage.removeItem(name),
+  };
+  return {
+    storage: gated,
+    /** Wraps `merge`, the one place that learns whether the blob was accepted. */
+    watching<S>(merge: Merge<S>): Merge<S> {
+      return (persisted, current) => {
+        const merged = merge(persisted, current);
+        // The schema merge hands back `current` itself when it turns a blob down.
+        const turnedDown = isRecord(persisted) && merged === current;
+        load = turnedDown ? 'rejected' : 'accepted';
+        return merged;
+      };
+    },
+  };
+}
+
 const PersistedRoutstrSession = z.looseObject({
   id: z.string().max(128),
   title: z.string().max(512),
@@ -971,7 +1059,9 @@ const PersistedRoutstrStore = z.object({
     .catch(null),
 });
 
-export const useRoutstrStore = create<RoutstrStore>()(
+const acceptedLoad = saveOnlyAfterAcceptedLoad(createRoutstrPersistence());
+
+export const useRoutstrStore = create<RoutstrStore>({ name: 'routstr-store', scope: 'profile' })(
   persist(
     (set, get) => ({
       apiKey: null,
@@ -1122,6 +1212,7 @@ export const useRoutstrStore = create<RoutstrStore>()(
                   thinkingDurationSec: fields.thinkingDurationSec ?? msg.thinkingDurationSec,
                   reasoningContent: fields.reasoningContent ?? msg.reasoningContent,
                   costSats: fields.costSats ?? msg.costSats,
+                  modelSwitch: fields.modelSwitch ?? msg.modelSwitch,
                 }
               : msg
           )
@@ -1481,7 +1572,9 @@ export const useRoutstrStore = create<RoutstrStore>()(
     }),
     persistConfig({
       name: 'routstr-store',
-      storage: createRoutstrPersistence(),
+      storage: acceptedLoad.storage,
+      // The adapter rebuilds the blob with its secrets; see `preserveUnreadable`.
+      preserveUnreadable: false,
       schema: PersistedRoutstrStore,
       // v2: bring back the spend prompt for everyone who had turned it off.
       //
@@ -1515,6 +1608,9 @@ export const useRoutstrStore = create<RoutstrStore>()(
       version: 3,
       migrate: (state, version) => {
         const blob: Record<string, unknown> = { ...(state as Record<string, unknown> | null) };
+        // Every released blob is older than this version, so every one of them
+        // passes through here on its first load.
+        blob.sessions = releasedSessionsWithinCeilings(blob.sessions, blob.currentSessionId);
         if (version < 2) {
           blob.confirmSpend = true;
           if (typeof blob.apiKey === 'string' && blob.apiKey && blob.nodeBaseUrl == null) {
@@ -1653,3 +1749,12 @@ export const useRoutstrStore = create<RoutstrStore>()(
     })
   )
 );
+
+// Set here, not inside the options above, so that block keeps its shape.
+// Persist reads `merge` when a load finishes, which is after this line has
+// run. If it ever read it sooner, no load would count as accepted and the
+// store would stop saving, which the upgrade tests would catch.
+const schemaMerge = useRoutstrStore.persist.getOptions().merge;
+if (schemaMerge) {
+  useRoutstrStore.persist.setOptions({ merge: acceptedLoad.watching(schemaMerge) });
+}

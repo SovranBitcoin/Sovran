@@ -12,13 +12,14 @@ import type { DestinationDescriptor } from 'wallet';
 // Mutable per-test mock state.
 let mockMetadata: Record<string, unknown> | undefined;
 let mockIsLoading = false;
-let mockNip05Result: string | null = null;
+let mockNip05Result: string | null | Promise<string | null> = null;
+const mockProfileKeys: (string | undefined)[] = [];
 
 jest.mock('@/shared/hooks/useNostrProfileMetadata', () => ({
-  useNostrProfileMetadata: (pubkey?: string) => ({
-    metadata: pubkey ? mockMetadata : undefined,
-    isLoading: mockIsLoading,
-  }),
+  useNostrProfileMetadata: (pubkey?: string) => {
+    mockProfileKeys.push(pubkey);
+    return { metadata: pubkey ? mockMetadata : undefined, isLoading: mockIsLoading };
+  },
 }));
 
 jest.mock('wallet', () => ({
@@ -76,6 +77,7 @@ const baseDescriptor = (
 
 describe('DetectedActionRow', () => {
   beforeEach(() => {
+    mockProfileKeys.length = 0;
     mockMetadata = undefined;
     mockIsLoading = false;
     mockNip05Result = null;
@@ -240,7 +242,7 @@ describe('DetectedActionRow', () => {
     );
   });
 
-  it('shows a loading skeleton + truncated label while a person is unresolved, still contact-sends', async () => {
+  it('shows the known identifier without a skeleton while a person is unresolved', async () => {
     mockMetadata = undefined;
     mockIsLoading = true;
     const onStartContactSend = jest.fn();
@@ -264,7 +266,7 @@ describe('DetectedActionRow', () => {
       );
     });
     const row = findRow(renderer!);
-    expect(row.props.loading).toBe(true);
+    expect(row.props.loading).not.toBe(true);
     expect(row.props.title).toContain('…'); // middle-truncated raw npub
     await act(async () => {
       row.props.onPress();
@@ -302,6 +304,97 @@ describe('DetectedActionRow', () => {
     expect(onExecute).toHaveBeenCalledTimes(1);
     expect(onStartContactSend).not.toHaveBeenCalled();
   });
+  it('never renders a previous address key for a new pasted address', async () => {
+    mockNip05Result = 'alice-key';
+    const descriptor = (value: string) =>
+      baseDescriptor({
+        kind: 'person',
+        label: 'Pay',
+        icon: 'person',
+        action: 'startContactSend',
+        recipient: { ref: { type: 'lightningAddress', value }, pending: true },
+      });
+    const onExecute = jest.fn();
+    const onStartContactSend = jest.fn();
+    let renderer!: TestRenderer.ReactTestRenderer;
+    await act(async () => {
+      renderer = TestRenderer.create(
+        <DetectedActionRow
+          descriptor={descriptor('alice@example.com')}
+          onExecute={onExecute}
+          onStartContactSend={onStartContactSend}
+        />
+      );
+    });
+    expect(mockProfileKeys.at(-1)).toBe('alice-key');
+    mockProfileKeys.length = 0;
+    mockNip05Result = null;
+    await act(async () => {
+      renderer.update(
+        <DetectedActionRow
+          descriptor={descriptor('bob@example.com')}
+          onExecute={onExecute}
+          onStartContactSend={onStartContactSend}
+        />
+      );
+    });
+    expect(mockProfileKeys[0]).toBeUndefined();
+    await act(async () => {
+      findRow(renderer).props.onPress();
+    });
+    expect(onExecute).toHaveBeenCalledTimes(1);
+    expect(onStartContactSend).not.toHaveBeenCalled();
+    act(() => renderer.unmount());
+  });
+
+  it('does not revive a previous key when returning to an address before another lookup finishes', async () => {
+    const row = (value: string) => (
+      <DetectedActionRow
+        descriptor={baseDescriptor({
+          kind: 'person',
+          label: 'Pay',
+          icon: 'person',
+          action: 'startContactSend',
+          recipient: { ref: { type: 'lightningAddress', value }, pending: true },
+        })}
+        onExecute={onExecute}
+        onStartContactSend={onStartContactSend}
+      />
+    );
+    const onExecute = jest.fn();
+    const onStartContactSend = jest.fn();
+    mockNip05Result = 'old-alice-key';
+    let renderer!: TestRenderer.ReactTestRenderer;
+    await act(async () => {
+      renderer = TestRenderer.create(row('alice@example.com'));
+    });
+    let finishBob!: (value: string) => void;
+    mockNip05Result = new Promise((resolve) => {
+      finishBob = resolve;
+    });
+    await act(async () => renderer.update(row('bob@example.com')));
+    let finishAlice!: (value: string) => void;
+    mockNip05Result = new Promise((resolve) => {
+      finishAlice = resolve;
+    });
+    await act(async () => renderer.update(row('alice@example.com')));
+    await act(async () => {
+      findRow(renderer).props.onPress();
+    });
+    expect(onStartContactSend).not.toHaveBeenCalled();
+    expect(onExecute).toHaveBeenCalledTimes(1);
+    await act(async () => finishBob('bob-key'));
+    expect(mockProfileKeys.at(-1)).toBeUndefined();
+    await act(async () => finishAlice('new-alice-key'));
+    await act(async () => {
+      findRow(renderer).props.onPress();
+    });
+    expect(onStartContactSend).toHaveBeenCalledWith(
+      expect.objectContaining({ pubkey: 'new-alice-key' })
+    );
+    act(() => renderer.unmount());
+  });
+
   // A wallet's P2PK receive key affords one thing: locking ecash to it. It
   // must not borrow the person row — no avatar, no name lookup, no NIP-17
   // contact send to an identity nobody claimed.

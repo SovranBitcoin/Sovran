@@ -15,6 +15,7 @@ const SOURCES = {
   copyableValue: 'shared/ui/composed/CopyableValue.tsx',
   customKeyboard: 'shared/ui/composed/CustomKeyboard.tsx',
   detailsSection: 'shared/ui/composed/DetailsSection.tsx',
+  messageEcashReview: 'features/payments/components/MessageEcashReviewList.tsx',
   mintIcon: 'shared/ui/composed/MintIcon.tsx',
   selectableCheck: 'shared/ui/primitives/SelectableCheck/index.tsx',
   selectableCheckSquare: 'shared/ui/primitives/SelectableCheck/SelectableCheck.square.tsx',
@@ -59,6 +60,31 @@ const DETAIL_ITEMS = [
   { title: 'Quote ID', value: 'melt-quote-000021' },
   { title: 'State', value: 'PAID' },
 ];
+
+const PARKED_MINT_GROUPS = [
+  {
+    key: 'untrusted-designsystem',
+    mintUrl: 'https://mint.minibits.cash/Bitcoin',
+    unit: 'sat',
+    total: 2_100,
+    count: 3,
+    unknownMint: true,
+  },
+  {
+    key: 'failed-designsystem',
+    mintUrl: 'https://mint.sovran.example',
+    unit: 'sat',
+    total: 21,
+    count: 1,
+    unknownMint: false,
+  },
+] as const;
+
+function MessageEcashReviewPreview() {
+  const { MessageEcashReviewList } =
+    require('@/features/payments/components/MessageEcashReviewList') as typeof import('@/features/payments/components/MessageEcashReviewList');
+  return <MessageEcashReviewList groups={PARKED_MINT_GROUPS} onOpen={noop} />;
+}
 
 function AmountSatModesPreview() {
   const { CapabilityProvider } =
@@ -223,6 +249,12 @@ function TransferFeedbackPreview() {
 }
 
 export const WALLET_CONTROL_SCENARIOS = [
+  {
+    id: 'message-ecash-review',
+    title: 'Message ecash · needs review',
+    covers: [SOURCES.messageEcashReview],
+    render: () => <MessageEcashReviewPreview />,
+  },
   {
     id: 'amount-sat-modes',
     title: 'Amount · BTC and sat display modes',

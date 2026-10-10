@@ -23,16 +23,38 @@ function summarizeError(err: unknown): Record<string, unknown> {
   };
 }
 
-/**
- * Returns true when the error indicates the mint could not be reached —
- * either a raw network failure, a server error (5xx), or a MintFetchError
- * (coco-core wraps network failures when refreshing mint info/keysets).
- */
-export function isMintOfflineError(err: unknown): boolean {
-  const result =
+/** Coco's wrappers for a mint that could not be read while refreshing it. */
+const MINT_UNREACHABLE_ERROR_NAMES = new Set([
+  "MintFetchError",
+  "KeysetSyncError",
+]);
+/** Enough for coco's wrapper around cashu-ts's around fetch's. */
+const MAX_CAUSE_DEPTH = 4;
+
+function isMintUnreachableCause(err: unknown): boolean {
+  return (
     err instanceof NetworkError ||
     (err instanceof HttpResponseError && err.status >= 500) ||
-    (err instanceof Error && err.name === "MintFetchError");
+    (err instanceof Error && MINT_UNREACHABLE_ERROR_NAMES.has(err.name))
+  );
+}
+
+/**
+ * Returns true when the error indicates the mint could not be reached —
+ * either a raw network failure, a server error (5xx), or coco's
+ * MintFetchError / KeysetSyncError from refreshing mint info or keysets —
+ * directly or as the `cause` of the error that was thrown.
+ */
+export function isMintOfflineError(err: unknown): boolean {
+  let current: unknown = err;
+  let result = false;
+  for (let depth = 0; depth <= MAX_CAUSE_DEPTH && current != null; depth += 1) {
+    if (isMintUnreachableCause(current)) {
+      result = true;
+      break;
+    }
+    current = current instanceof Error ? current.cause : undefined;
+  }
   logger.debug("errors.mintOffline.classify", {
     ...summarizeError(err),
     result,

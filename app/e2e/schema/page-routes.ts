@@ -11,6 +11,7 @@ export const PAGE_ROUTES: Partial<Record<(typeof CANONICAL_PAGES)[number], reado
   'backup-done': ['(prompt-flow)/backup-done.tsx'],
   'secure-locked': [], // boot gate; no route alias
   'profile-keys-error': [], // key-provider gate; no route alias
+  'profile-removal': [], // Imperative confirmation; no route alias.
   'profile-switcher': [], // Imperative sheet entered from the drawer; no route alias.
   ai: ['(drawer)/(tabs)/ai/index.tsx'],
   contacts: ['(drawer)/(tabs)/contacts/index.tsx'],
@@ -44,6 +45,8 @@ export const PAGE_ROUTES: Partial<Record<(typeof CANONICAL_PAGES)[number], reado
   'whitenoise-dm': ['(profile-flow)/whitenoiseDM.tsx', '(user-flow)/whitenoiseDM.tsx'],
   'whitenoise-setup': ['(profile-flow)/whitenoiseSetup.tsx', '(user-flow)/whitenoiseSetup.tsx'],
   'receive-amount': ['(receive-flow)/amount.tsx'],
+  details: ['details.tsx'],
+  'note-picker': ['notes.tsx'],
   camera: ['(receive-flow)/camera.tsx', '(send-flow)/camera.tsx', 'camera.tsx'],
   'lightning-receive': [
     '(receive-flow)/lightningReceive.tsx',
@@ -62,6 +65,7 @@ export const PAGE_ROUTES: Partial<Record<(typeof CANONICAL_PAGES)[number], reado
     'paymentRequest.tsx',
   ],
   'receive-qr': ['(receive-flow)/qrDisplay.tsx'],
+  'receive-message-ecash': ['(receive-flow)/messageEcash.tsx'],
   'receive-rails': ['(receive-flow)/railList.tsx'],
   receive: ['(receive-flow)/receive.tsx'],
   'receive-token': [
@@ -90,6 +94,8 @@ export const PAGE_ROUTES: Partial<Record<(typeof CANONICAL_PAGES)[number], reado
   'settings-design-system-foundations': ['(settings-flow)/design-system-foundations.tsx'],
   'settings-design-system-loading': ['(settings-flow)/design-system-loading.tsx'],
   'settings-design-system-posts': ['(settings-flow)/design-system-posts.tsx'],
+  'settings-design-system-screens': ['(settings-flow)/design-system-screens.tsx'],
+  'settings-design-system-variations': ['(settings-flow)/design-system-variations.tsx'],
   'settings-design-system-segmented': ['(settings-flow)/design-system-segmented.tsx'],
   'settings-design-system-skeleton-crossfade': [
     '(settings-flow)/design-system-skeleton-crossfade.tsx',

@@ -12,15 +12,12 @@ import {
   capsuleAccessibilityState,
   capsuleWidthStyle,
 } from './CapsuleButton.content';
+import { useControlChrome } from '@/shared/styles/appStyle';
 import type { CapsuleButtonProps } from './CapsuleButton.types';
 
 export function CapsuleButtonFlat(props: CapsuleButtonProps): React.ReactElement {
-  const [foreground, surfaceSecondary, muted, background] = useThemeColor([
-    'foreground',
-    'surface-secondary',
-    'muted',
-    'background',
-  ] as const);
+  const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
+  const chrome = useControlChrome();
   const {
     onPress,
     label,
@@ -52,12 +49,12 @@ export function CapsuleButtonFlat(props: CapsuleButtonProps): React.ReactElement
     ? foreground
     : isActive
       ? withAlpha(foreground, 0.14)
-      : surfaceSecondary;
+      : (chrome.backgroundColor as string);
   const borderColor = filled
     ? foreground
     : isActive
       ? withAlpha(foreground, 0.3)
-      : withAlpha(muted, 0.3);
+      : (chrome.borderColor as string);
 
   return (
     <View
@@ -65,7 +62,12 @@ export function CapsuleButtonFlat(props: CapsuleButtonProps): React.ReactElement
         styles.card,
         widthStyle,
         cornerStyle,
-        { minHeight: height, backgroundColor, borderColor },
+        {
+          minHeight: height,
+          backgroundColor,
+          borderColor,
+          borderWidth: filled || isActive ? 1 : chrome.borderWidth,
+        },
         style,
       ]}>
       <PressableFeedback

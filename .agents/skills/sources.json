@@ -365,6 +365,12 @@
         "references/anti-patterns.md": "1ae7fcef36164093ca259a4192556b6356ba70ec2ac000b08307ffebd89da823",
         "references/api-reference-v13.md": "f9a47fcbee4c54871b2fc337e7ba035d9f9753c2f0cadef459e40b11932e77a7"
       }
+    },
+    {
+      "name": "persistence-release-safety",
+      "kind": "local",
+      "reviewed_on": "2026-10-10",
+      "purpose": "Sovran's own procedure for certifying that a release upgrades every released durable state; requested by the maintainer."
     }
   ]
 }

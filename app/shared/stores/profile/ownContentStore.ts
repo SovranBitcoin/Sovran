@@ -26,7 +26,7 @@
  * app-kill mid-publish rehydrates as a recoverable local copy rather than a
  * stuck pending.
  */
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { persist } from 'zustand/middleware';
 import { z } from 'zod';
 
@@ -121,7 +121,10 @@ const PersistedOwnContentStore = z.object({
   byId: z.record(z.string().max(128), PersistedOwnEntry).default({}),
 });
 
-export const useOwnContentStore = create<OwnContentStore>()(
+export const useOwnContentStore = create<OwnContentStore>({
+  name: 'own-content-store',
+  scope: 'profile',
+})(
   persist(
     (set, get) => ({
       byId: {},

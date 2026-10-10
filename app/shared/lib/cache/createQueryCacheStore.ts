@@ -20,11 +20,17 @@
  * `clear()` cannot resurrect a wiped entry.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { create, type StateCreator, type StoreApi, type UseBoundStore } from 'zustand';
+import { type StateCreator, type StoreApi, type UseBoundStore } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
 import { monotonicNow, storeLog } from '@/shared/lib/logger';
+import { defineStore } from '@/shared/lib/persist/defineStore';
+import {
+  registerAccountScoped,
+  liveStores,
+  type StoreScope,
+} from '@/shared/lib/account/accountRegistry';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
 import { currentCacheEpoch } from './cacheSession';
 import { evictLruOverCap } from './evictLruOverCap';
@@ -33,6 +39,7 @@ import type { QueryCacheEntry } from './queryCacheTypes';
 interface QueryCacheStoreOptions {
   /** Kebab-case AsyncStorage key, e.g. `'feed-cache'`. */
   name: string;
+  scope: StoreScope;
   /** Snake_case log slug; defaults to `name` with dashes replaced. */
   logKey?: string;
   /** How long a written entry stays fresh before it's revalidated. */
@@ -66,11 +73,11 @@ export interface QueryCacheRunOptions {
   readId?: string;
 }
 
-/** What a `run` fetcher receives. `partial` writes an early value under the same generation guard. */
+/** What a `run` fetcher receives. `partial` writes under the generation guard and returns whether it was accepted. */
 export interface QueryCacheRunContext<TData> {
   signal: AbortSignal | undefined;
   readId: string;
-  partial: (data: TData, cursor?: string) => void;
+  partial: (data: TData, cursor?: string) => boolean;
 }
 
 type QueryCacheSupersededReason = 'newer-request' | 'clear' | 'abort';
@@ -128,11 +135,10 @@ export interface QueryCacheStore<TData> {
 
 // Every store created this session, so a profile wipe can invalidate all
 // in-flight completions at once (`clearAllQueryCaches`).
-const registry = new Set<{ clear: () => void }>();
 
 /** Clear every query cache and reject every in-flight completion. */
 export function clearAllQueryCaches(): void {
-  for (const store of registry) store.clear();
+  for (const entry of liveStores) entry.queryCache?.clear();
 }
 
 const PersistedEntry = z.looseObject({
@@ -231,8 +237,8 @@ export function createQueryCacheStore<TData>(opts: QueryCacheStoreOptions): Quer
 
   const use =
     opts.persist === false
-      ? create<QueryCacheState<TData>>()(creator)
-      : create<QueryCacheState<TData>>()(
+      ? defineStore<QueryCacheState<TData>>({ name: opts.name, scope: opts.scope })(creator)
+      : defineStore<QueryCacheState<TData>>({ name: opts.name, scope: opts.scope })(
           persist(
             creator,
             persistConfig<QueryCacheState<TData>, Pick<QueryCacheState<TData>, 'byKey'>>({
@@ -241,6 +247,8 @@ export function createQueryCacheStore<TData>(opts: QueryCacheStoreOptions): Quer
               schema: PersistedSchema,
               logKey,
               partialize: (state) => ({ byKey: state.byKey }),
+              // Fetched again on demand: a bad blob is simply replaced.
+              preserveUnreadable: false,
             })
           )
         );
@@ -254,7 +262,7 @@ export function createQueryCacheStore<TData>(opts: QueryCacheStoreOptions): Quer
   const inFlight = new Map<string, { gen: number; promise: Promise<TData> }>();
   // The newest run per key, kept after it settles so a superseded older run can
   // still hand its awaiters the result that actually won (cleared on clear()).
-  const latestRun = new Map<string, { gen: number; promise: Promise<TData> }>();
+  const latestRun = new Map<string, { gen: number; promise: Promise<TData>; viewerKey: string }>();
 
   const getEntry = (key: string): QueryCacheEntry<TData> | undefined => use.getState().byKey[key];
   const isFresh = (entry: QueryCacheEntry<TData> | undefined): boolean =>
@@ -305,10 +313,11 @@ export function createQueryCacheStore<TData>(opts: QueryCacheStoreOptions): Quer
       return 'ok';
     };
 
-    const partial = (data: TData, cursor?: string): void => {
-      if (currency() !== 'ok') return;
+    const partial = (data: TData, cursor?: string): boolean => {
+      if (currency() !== 'ok') return false;
       use.getState().setEntry(key, data, { viewerKey, cursor });
       storeLog.debug('query_cache.run.partial', { ...logCtx, ...keyMeta(key), readId, gen });
+      return currency() === 'ok';
     };
 
     const promise = fetcher({ signal: runOpts.signal, readId, partial }).then(
@@ -356,7 +365,7 @@ export function createQueryCacheStore<TData>(opts: QueryCacheStoreOptions): Quer
       }
     );
     inFlight.set(key, { gen, promise });
-    latestRun.set(key, { gen, promise });
+    latestRun.set(key, { gen, promise, viewerKey });
     const cleanup = () => {
       if (inFlight.get(key)?.promise === promise) {
         inFlight.delete(key);
@@ -384,6 +393,38 @@ export function createQueryCacheStore<TData>(opts: QueryCacheStoreOptions): Quer
     generation,
     staleTtlMs: opts.staleTtlMs,
   };
-  registry.add(store);
+  const entry = liveStores.find((entry) => entry.store === use);
+  if (entry)
+    entry.queryCache = {
+      clear: store.clear,
+      removeViewer: (pubkey) => {
+        const keys = new Set([
+          ...Object.entries(use.getState().byKey)
+            .filter(([, cached]) => cached.viewerKey === pubkey)
+            .map(([key]) => key),
+          ...[...latestRun].filter(([, run]) => run.viewerKey === pubkey).map(([key]) => key),
+        ]);
+        for (const key of keys) {
+          genByKey.set(key, generation(key) + 1);
+          inFlight.delete(key);
+          latestRun.delete(key);
+          touchedEpochByKey.delete(key);
+          store.removeEntry(key);
+        }
+      },
+    };
+  registerAccountScoped(
+    `query-cache:${opts.name}`,
+    () => {
+      store.clear();
+      touchedEpochByKey.clear();
+    },
+    () =>
+      Object.keys(use.getState().byKey).length === 0 &&
+      touchedEpochByKey.size === 0 &&
+      inFlight.size === 0 &&
+      latestRun.size === 0 &&
+      genByKey.size === 0
+  );
   return store;
 }

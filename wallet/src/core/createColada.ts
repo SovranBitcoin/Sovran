@@ -58,6 +58,7 @@ export interface ColadaConfig {
    */
   annotationStore?: AnnotationStoreAdapter;
 
+  captureSendDelivery?: DefaultOperationsConfig["captureSendDelivery"];
   sendNostrDM?: (nprofile: string, message: string) => Promise<void>;
 
   /**
@@ -225,6 +226,7 @@ export function createColada(config: ColadaConfig): ColadaInstance {
     getProofAmounts: () => tracker.getContext().proofAmounts,
     getPreferredMintUrl: config.getPreferredMintUrl,
     sendNostrDM,
+    captureSendDelivery: config.captureSendDelivery,
     enrichMintReviewInfo,
     fetchMintCatalog: config.fetchMintCatalog,
     isTestnutMint: config.isTestnutMint,

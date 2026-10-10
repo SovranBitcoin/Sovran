@@ -34,7 +34,7 @@ import {
   type ReceiveRailItem,
 } from '@/features/receive/lib/receiveRailItems';
 import { EmptyState } from '@/shared/ui/composed/EmptyState';
-import { GradientCard } from '@/shared/ui/composed/GradientCard';
+import { Surface } from '@/shared/ui/composed/Surface';
 import { MintIcon } from '@/shared/ui/composed/MintIcon';
 import { Badge } from '@/shared/ui/primitives/Badge';
 import { Button } from '@/shared/ui/primitives/Button';
@@ -53,6 +53,7 @@ import { formatRelative } from '@/shared/lib/date';
 import { copyPopup, paramPopup } from '@/shared/lib/popup';
 import { navigateToTransactionDetail } from '@/shared/lib/nav/transactionDetailRoutes';
 import { paymentLog } from '@/shared/lib/logger';
+import { Log } from '@/shared/lib/loggerUI';
 import Icon from 'assets/icons';
 import { E2EAccessibilityProbe } from '@/shared/lib/e2e/E2EAccessibilityProbe';
 
@@ -302,7 +303,7 @@ export function ReceiveRailListScreen() {
   const topPad = insets.top + 48;
 
   return (
-    <View style={{ flex: 1, backgroundColor: background }}>
+    <Log name="ReceiveRailListScreen" style={{ flex: 1, backgroundColor: background }}>
       <Stack.Screen options={{ title: RAIL_TITLE[rail] }} />
       {__DEV__ && !state.loading && !state.failed && state.items.length === 0 && (
         <E2EAccessibilityProbe
@@ -352,7 +353,7 @@ export function ReceiveRailListScreen() {
             Nothing here yet.
           </Text>
         ) : (
-          <GradientCard>
+          <Surface>
             <ListGroup variant="transparent">
               {state.items.map((item, index) => (
                 <React.Fragment key={item.key}>
@@ -367,9 +368,9 @@ export function ReceiveRailListScreen() {
                 </React.Fragment>
               ))}
             </ListGroup>
-          </GradientCard>
+          </Surface>
         )}
       </ScreenScrollView>
-    </View>
+    </Log>
   );
 }

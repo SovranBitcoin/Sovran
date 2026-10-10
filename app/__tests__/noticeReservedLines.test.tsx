@@ -17,7 +17,10 @@ jest.mock('assets/icons', () => 'Icon');
 jest.mock('@/shared/hooks/useThemeColor', () => ({
   useThemeColor: () => ['white', 'grey', 'accent', 'amber', 'red', 'green', 'a', 'b', 'c'],
 }));
-jest.mock('@/shared/lib/color', () => ({ withAlpha: (value: string) => value }));
+jest.mock('@/shared/lib/color', () => ({
+  ...jest.requireActual('@/shared/lib/color'),
+  withAlpha: (value: string) => value,
+}));
 
 type Props = Record<string, unknown>;
 

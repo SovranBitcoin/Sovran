@@ -58,6 +58,7 @@ import React, { useMemo, useState } from 'react';
 import { StyleProp, ViewStyle } from 'react-native';
 import { Log, log } from '@/shared/lib/logger';
 import { Button } from '@/shared/ui/primitives/Button';
+import { FOOTER_GAP } from '@/shared/ui/composed/footerInset';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import Icon from '@/assets/icons';
@@ -101,6 +102,13 @@ export interface ButtonHandlerButton {
   onPress?: () => void | Promise<void>;
   /** Whether the button should be visible (default: true) */
   condition?: boolean;
+  /**
+   * A supporting action that gives up its place to the others. With two or
+   * more other buttons showing it is listed behind the three dots, so the
+   * footer's two full-width slots go to what the screen is for. With fewer, it
+   * takes the free slot as usual.
+   */
+  prefersOverflow?: boolean;
 }
 
 type ButtonHandlerActionButton = ButtonHandlerButton;
@@ -204,7 +212,15 @@ export function ButtonHandler({
   const [loadingIdx, setLoadingIdx] = useState<number | null>(null);
 
   // Filter buttons based on condition
-  const visibleButtons = buttons.filter((button) => button.condition !== false);
+  const shown = buttons.filter((button) => button.condition !== false);
+  // Supporting actions go last, whatever order they were written in.
+  const visibleButtons = [
+    ...shown.filter((button) => !button.prefersOverflow),
+    ...shown.filter((button) => button.prefersOverflow),
+  ];
+  // Three buttons normally show the third as an icon of its own. A supporting
+  // action is not worth a third icon in the row: it goes behind the dots.
+  const menuForThird = visibleButtons.length === 3 && !!visibleButtons[2].prefersOverflow;
 
   // Overflow Menu contents — items 3+ only. The first two are already
   // rendered inline so we'd double-list them otherwise. Preserve the
@@ -256,11 +272,12 @@ export function ButtonHandler({
         align="center"
         justify="space-between"
         className={`flex-row ${className || ''}`}
-        style={[style]}>
+        style={[{ gap: FOOTER_GAP }, style]}>
         {visibleButtons.slice(0, 2).map((button, index) => (
-          <View
-            key={button.testID}
-            style={{ flexGrow: 1, flexShrink: 1, flexBasis: 'auto', minWidth: 0 }}>
+          // Equal shares of the row whatever the labels say: a basis of zero,
+          // not `auto`, or the longer label takes more room and two buttons
+          // stop lining up. The dots button beside them keeps its own width.
+          <View key={button.testID} className="min-w-0 flex-1 basis-0">
             <Button
               testID={button.testID}
               accessibilityLabel={button.accessibilityLabel}
@@ -274,7 +291,7 @@ export function ButtonHandler({
         ))}
 
         {/* Exactly 3 buttons: render the third inline as an icon-only button. */}
-        {visibleButtons.length === 3 && (
+        {visibleButtons.length === 3 && !menuForThird && (
           <View>
             <Button
               testID={visibleButtons[2].testID}
@@ -295,7 +312,7 @@ export function ButtonHandler({
         )}
 
         {/* 4+ buttons: "More" opens the app-wide actionMenuSheet listing items 3+. */}
-        {visibleButtons.length > 3 && (
+        {(visibleButtons.length > 3 || menuForThird) && (
           <View>
             <Button
               testID="more-button"

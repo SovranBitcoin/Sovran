@@ -1,3 +1,4 @@
+import { registerAccountScoped } from '@/shared/lib/account/accountRegistry';
 import type { LineupEntry } from '@/shared/lib/routstr/lineup';
 import { aiLog } from '@/shared/lib/logger';
 
@@ -91,3 +92,11 @@ export function orderByAvailability<T extends Pick<LineupEntry, 'modelId'>>(
 export function resetModelAvailability(): void {
   unavailable.clear();
 }
+
+registerAccountScoped(
+  'ai.model-availability',
+  () => {
+    unavailable.clear();
+  },
+  () => unavailable.size === 0
+);

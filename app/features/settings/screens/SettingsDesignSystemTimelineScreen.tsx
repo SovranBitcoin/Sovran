@@ -2,11 +2,12 @@ import { ScreenScrollView } from '@/shared/ui/composed/ScreenScrollView';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet } from 'react-native';
 
-import { Button, Card } from 'heroui-native';
+import { Button as HerouiButton, Card } from 'heroui-native';
 
 import { getDesignSystemFamily } from '@/features/settings/design-system/catalog';
 import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
 import { Section } from '@/shared/ui/composed/Section';
+import { Button } from '@/shared/ui/primitives/Button';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
@@ -43,8 +44,9 @@ export function SettingsDesignSystemTimelineScreen() {
 
   const selectedScenario =
     timelineScenarios.find((s) => s.id === selectedScenarioId) ?? timelineScenarios[0];
-  // Receive-hub chrome: method groups as top-level underline tabs, the
-  // group's scenario variants (Success / Rollback / …) as the pill row.
+  // Receive-hub chrome: payment types as top-level underline tabs, every
+  // path through the selected type (success, each failure, each detour) as
+  // the pill row.
   const groups = useMemo(
     () => [...new Set(timelineScenarios.map((s) => s.group))],
     [timelineScenarios]
@@ -106,6 +108,9 @@ export function SettingsDesignSystemTimelineScreen() {
   };
   const onStepFrame = () => {
     setTimelineAuto(false);
+    // Wrapping starts a new run, as the automatic loop does: the card
+    // remembers the rows a run completed.
+    if (frameIndex >= frameCount - 1) setLoopIteration((value) => value + 1);
     setFrameIndex((index) => (index >= frameCount - 1 ? 0 : index + 1));
   };
   const onResetFrames = () => {
@@ -139,8 +144,9 @@ export function SettingsDesignSystemTimelineScreen() {
           <Text size={12} bold className="text-foreground">
             Timeline
           </Text>{' '}
-          is fully state-driven. Each scenario simulates a real payment flow, stepping the Timeline
-          through its states.
+          only ever adds rows: every finished step stays, in the past tense, above the one step
+          being waited on. Pick a payment type, then a path through it, and watch it step from the
+          first state to the last.
         </Text>
 
         {/* Cancel the ScrollView's px-4 so the Timeline's own 16px margin aligns with the cards. */}
@@ -153,6 +159,7 @@ export function SettingsDesignSystemTimelineScreen() {
             nostrSent={currentFrame.nostrSent}
             onchainConfirmationProgress={currentFrame.onchainConfirmationProgress}
             onchainSettledInternally={currentFrame.onchainSettledInternally}
+            cancelling={currentFrame.cancelling}
           />
         </View>
 
@@ -205,7 +212,7 @@ export function SettingsDesignSystemTimelineScreen() {
 
             <HStack gap={8}>
               <View className="flex-1">
-                <Button
+                <HerouiButton
                   variant={timelineAuto ? 'primary' : 'secondary'}
                   size="sm"
                   testID="design-system-timeline-auto"
@@ -213,26 +220,26 @@ export function SettingsDesignSystemTimelineScreen() {
                   accessibilityLabel="Auto-play"
                   accessibilityState={{ checked: timelineAuto }}
                   onPress={() => setTimelineAuto((value) => !value)}>
-                  <Button.Label>{timelineAuto ? 'Pause' : 'Play'}</Button.Label>
-                </Button>
+                  <HerouiButton.Label>{timelineAuto ? 'Pause' : 'Play'}</HerouiButton.Label>
+                </HerouiButton>
               </View>
               <View className="flex-1">
                 <Button
                   variant="secondary"
-                  size="sm"
+                  size="compact"
+                  text="Step"
                   testID="design-system-timeline-step"
-                  onPress={onStepFrame}>
-                  <Button.Label>Step</Button.Label>
-                </Button>
+                  onPress={onStepFrame}
+                />
               </View>
               <View className="flex-1">
                 <Button
                   variant="secondary"
-                  size="sm"
+                  size="compact"
+                  text="Reset"
                   testID="design-system-timeline-reset"
-                  onPress={onResetFrames}>
-                  <Button.Label>Reset</Button.Label>
-                </Button>
+                  onPress={onResetFrames}
+                />
               </View>
             </HStack>
           </Card.Body>

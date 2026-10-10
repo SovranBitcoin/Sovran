@@ -14,29 +14,31 @@ import {
   type SearchScopeCounts,
 } from '@/shared/ui/composed/search/scopes';
 
+// Scope selection is edition-independent; these cases run with every module on.
+const ALL_ON = () => true;
 const ZERO: SearchScopeCounts = { people: 0, posts: 0, mints: 0, groups: 0 };
 
 describe('unified search scope selection', () => {
   it('shows the full scope row for an empty query', () => {
-    expect(computeVisibleScopes('', ZERO)).toEqual([...ALL_SCOPES]);
+    expect(computeVisibleScopes('', ZERO, ALL_ON)).toEqual([...ALL_SCOPES]);
   });
 
   it('always includes All, and only non-empty scopes, for a query', () => {
-    expect(computeVisibleScopes('lon', ZERO)).toEqual(['All']);
-    expect(computeVisibleScopes('lon', { people: 2, posts: 2, mints: 0, groups: 0 })).toEqual([
-      'All',
-      'People',
-      'Posts',
-    ]);
-    expect(computeVisibleScopes('lon', { people: 0, posts: 0, mints: 1, groups: 3 })).toEqual([
-      'All',
-      'Mints',
-      'Groups',
-    ]);
+    expect(computeVisibleScopes('lon', ZERO, ALL_ON)).toEqual(['All']);
+    expect(
+      computeVisibleScopes('lon', { people: 2, posts: 2, mints: 0, groups: 0 }, ALL_ON)
+    ).toEqual(['All', 'People', 'Posts']);
+    expect(
+      computeVisibleScopes('lon', { people: 0, posts: 0, mints: 1, groups: 3 }, ALL_ON)
+    ).toEqual(['All', 'Mints', 'Groups']);
   });
 
   it('keeps the selection inside the visible set, falling back to All', () => {
-    const visible = computeVisibleScopes('lon', { people: 1, posts: 1, mints: 0, groups: 0 });
+    const visible = computeVisibleScopes(
+      'lon',
+      { people: 1, posts: 1, mints: 0, groups: 0 },
+      ALL_ON
+    );
     expect(resolveSelectedScope(visible, 'People')).toBe('People');
     // Mints tab isn't visible for this query → fall back to All.
     expect(resolveSelectedScope(visible, 'Mints')).toBe('All');
@@ -52,7 +54,7 @@ describe('unified search scope selection', () => {
     ];
     for (const query of ['', 'lon', 'a']) {
       for (const counts of countSets) {
-        const visible = computeVisibleScopes(query, counts);
+        const visible = computeVisibleScopes(query, counts, ALL_ON);
         for (const prior of ALL_SCOPES) {
           const selected = resolveSelectedScope(visible, prior);
           // The resolved selection is always a visible tab...

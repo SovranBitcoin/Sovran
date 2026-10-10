@@ -20,6 +20,7 @@ jest.mock('@/shared/lib/popup/popups/copy', () => ({}));
 jest.mock('@/shared/lib/popup/popups/actionSheets', () => ({}));
 jest.mock('@/shared/lib/popup/popups/paymentOptionsSheet', () => ({}));
 jest.mock('@/shared/lib/popup/popups/proofSelectorSheet', () => ({}));
+jest.mock('@/shared/lib/popup/popups/sendFallbackSheet', () => ({}));
 jest.mock('@/shared/lib/popup/popups/sendMemoSheet', () => ({}));
 jest.mock('@/shared/lib/popup/popups/emojiPicker', () => ({}));
 jest.mock('@/shared/lib/popup/popups/modelPicker', () => ({}));

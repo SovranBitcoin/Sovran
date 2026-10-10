@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { persist } from 'zustand/middleware';
 import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
@@ -147,7 +147,10 @@ type PersistedSlice = Pick<BitchatDmMessagesStore, 'byPeer'>;
  * remains the source of truth for the Contacts-tab Recent/All entries — this
  * store is the message-thread layer.
  */
-export const useBitchatDmMessagesStore = create<BitchatDmMessagesStore>()(
+export const useBitchatDmMessagesStore = create<BitchatDmMessagesStore>({
+  name: 'bitchat-dm-messages-store',
+  scope: 'profile',
+})(
   persist<BitchatDmMessagesStore, [], [], PersistedSlice>(
     (set, get) => ({
       byPeer: {},

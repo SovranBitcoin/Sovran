@@ -410,6 +410,7 @@ export {
   getMintMethodCapability,
   hasCompatibleMintForMethod,
   hasMintSupportingMethod,
+  configureEnabledPaymentMethods,
   isMethodImplemented,
   isMintMethodCompatible,
   methodContextHasCompatibleMint,
@@ -493,6 +494,8 @@ export type {
   NfcIOAdapter,
   RecipientProfile,
   SendEntrySource,
+  SendFallbackAlternative,
+  SendFallbackId,
 } from "./machine/types";
 
 export type { MintAvailability } from "./machine/selectMintContext";
@@ -575,7 +578,7 @@ export {
 } from "./lnurl";
 
 // Recipient identity resolution (Lightning Address → Nostr hex pubkey)
-export { fetchNip05Pubkey } from "./nip05";
+export { fetchNip05Pubkey, parseNip05Identifier, verifyNip05, type Nip05Verification } from "./nip05";
 export { normalizeNostrPubkey, resolveRecipientPubkey } from "./recipient";
 
 // Cancellable-fetch primitives (timeout + AbortSignal). Hermes lacks
@@ -651,3 +654,7 @@ export type {
 // auto-redeem orchestrator. Ecash is locked to the recipient's announced
 // P2PK key and broadcast on the public mesh — no in-band handshake.
 export * from "./transport";
+
+export { disposeReusableQuoteFlights } from "./quotes/reusable";
+export { resetMeltTarget } from "./melt-target";
+export { disposeCashuSeedGetter } from "./wallet-seed";

@@ -32,6 +32,16 @@ import { useOwnContentStore } from '@/shared/stores/profile/ownContentStore';
 import { ingestOwnMediaBlobs } from '@/shared/stores/profile/ownedMediaStore';
 
 import { OWN_EVENT_KINDS, partitionOwnEvents, type OwnSyncEvent } from './partitionOwnEvents';
+import { Contacts, Metadata } from 'nostr-tools/kinds';
+import { hasFeature } from '@/shared/config/features';
+
+/**
+ * Without the feed (ADR 0021) only the profile and follow list are consumed,
+ * so notes, reactions, reposts and deletions are not requested at all.
+ */
+const SYNC_KINDS = hasFeature('feed')
+  ? OWN_EVENT_KINDS
+  : OWN_EVENT_KINDS.filter((kind) => kind === Metadata || kind === Contacts);
 
 /** Backfill window for our own events. Replaceable kinds (0/3) ignore it. */
 const BACKFILL_SEC = 365 * 24 * 60 * 60; // 1 year
@@ -77,7 +87,7 @@ export function useOwnEventsSync(): void {
   const filters = useMemo(() => {
     if (!pubkey) return null;
     const since = Math.floor(Date.now() / 1000) - BACKFILL_SEC;
-    return [{ authors: [pubkey], kinds: OWN_EVENT_KINDS, since, limit: PER_KIND_LIMIT }];
+    return [{ authors: [pubkey], kinds: SYNC_KINDS, since, limit: PER_KIND_LIMIT }];
   }, [pubkey]);
 
   const { events } = useSubscribe({ filters, opts: OWN_SUBSCRIBE_OPTS });

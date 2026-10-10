@@ -1,27 +1,21 @@
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 
 import { storeLog } from '@/shared/lib/logger';
 
 type NearPaySessionPhase = 'picking' | 'transitioning' | 'amount';
 
-/**
- * How this session's token is locked. Every Nut Drop send is delivered the same
- * way — a private Noise DM to a creq-confirmed Sovran peer — so the distinction
- * is the token lock:
- * - `locked: true`: P2PK-locked to the recipient's announced key (a Sovran
- *   peer). Only they can redeem it.
- * - `locked: false`: an unlocked bearer token from a shared mint, used only
- *   when the peer advertised a valid creq but we cannot P2PK-lock offline.
- */
-export type NearPayDelivery = { locked: boolean };
+/** Every new nearby payment is locked to the authenticated recipient. */
+export type NearPayDelivery = { locked: true };
 
 interface NearPayRecipient {
   peerID: string;
   nickname: string;
   hasDirectLink: boolean;
   lastSeen: number;
-  /** Capability proof: the peer advertised a valid creq favorite before send. */
+  /** Request covered by the verified wallet capability before send. */
   creq?: string;
+  nostrPubkeyHex?: string;
+  walletCapabilityExpiresAt?: number;
   delivery: NearPayDelivery;
 }
 
@@ -30,6 +24,7 @@ interface NearPaySession {
   recipient: NearPayRecipient;
   startedAt: number;
   phase: NearPaySessionPhase;
+  presentation: 'radar' | 'route';
   amountEntry: string | null;
   /**
    * True while the mint picker route covers the radar for this session. The
@@ -48,7 +43,7 @@ interface NearPaySessionStore {
    * "Received payment" only when the radar is what the user is looking at.
    */
   radarVisible: boolean;
-  start: (recipient: NearPayRecipient) => void;
+  start: (recipient: NearPayRecipient, presentation?: 'radar' | 'route') => void;
   setAmountEntry: (amountEntry: string) => void;
   setMintPickerOpen: (open: boolean) => void;
   showAmount: () => void;
@@ -62,11 +57,14 @@ function createSessionId(peerID: string): string {
   return `${peerID}-${Date.now()}`;
 }
 
-export const useNearPaySessionStore = create<NearPaySessionStore>((set, get) => ({
+export const useNearPaySessionStore = create<NearPaySessionStore>({
+  name: 'useNearPaySessionStore',
+  scope: 'session',
+})((set, get) => ({
   active: null,
   radarVisible: false,
 
-  start: (recipient) => {
+  start: (recipient, presentation = 'radar') => {
     storeLog.info('near_pay.session.start', {
       peerID: recipient.peerID,
       hasDirectLink: recipient.hasDirectLink,
@@ -79,6 +77,7 @@ export const useNearPaySessionStore = create<NearPaySessionStore>((set, get) => 
         recipient,
         startedAt: Date.now(),
         phase: 'picking',
+        presentation,
         amountEntry: null,
         mintPickerOpen: false,
       },

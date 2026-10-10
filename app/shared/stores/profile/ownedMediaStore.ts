@@ -18,7 +18,7 @@
  * Deletion writes `deleteState` here but NEVER removes the entry, so the
  * settings "My media" page can show ✓ deleted / ✗ live and re-verify on demand.
  */
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { persist } from 'zustand/middleware';
 import { z } from 'zod';
 
@@ -89,7 +89,10 @@ const PersistedOwnedMediaStore = z.object({
   byBlob: tolerantRecord(z.string().max(600), PersistedEntry),
 });
 
-export const useOwnedMediaStore = create<OwnedMediaStore>()(
+export const useOwnedMediaStore = create<OwnedMediaStore>({
+  name: 'owned-media-store',
+  scope: 'profile',
+})(
   persist(
     (set) => ({
       ...INITIAL,

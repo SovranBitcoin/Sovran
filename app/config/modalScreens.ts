@@ -2,12 +2,18 @@ import { railHeaderTitle } from 'wallet';
 
 import { GRADIENT_HEADER_OPTIONS } from '@/navigation/headerOptions';
 import { Platform } from 'react-native';
+import { androidFlowPresentation } from './androidFlowPresentation';
 import type { NativeStackNavigationOptions } from 'expo-router';
 
 export interface ModalConfig {
   name: string;
   title?: string;
   options?: NativeStackNavigationOptions;
+  /**
+   * Android presents this route as a pushed screen with the native header, so
+   * the root stack gives it the app's back button in place of the system one.
+   */
+  androidPushed?: boolean;
 }
 
 /**
@@ -39,26 +45,22 @@ const ANDROID_SHEET_OPTIONS = {
 } satisfies Partial<NativeStackNavigationOptions>;
 
 /**
- * Modal flow hosting a nested stack. iOS: fullscreen pageSheet-style modal
- * (unchanged). Android: native bottom sheet — requires the flow's _layout to
- * pass { androidSheet: true } to createFlowLayoutScreenOptions so the nested
- * stack renders the JS FlowSheetHeader (native headers don't exist inside
- * Android formSheets). Opting a flow out is the two co-located lines:
- * `modalFlow('(x-flow)', { androidSheet: false })` here + `{ androidSheet:
- * false }` in its _layout — that reverts it to today's fullscreen modal.
+ * Modal flow hosting a nested stack. iOS: fullscreen pageSheet-style modal.
+ * Android: a pushed screen, or a native bottom sheet for the few flows
+ * `androidFlowPresentation` names. The flow's `_layout` renders
+ * `AndroidSheetFlowStack` with the same flow name, which picks the matching
+ * chrome, so the two can never disagree.
  */
-const modalFlow = (
-  name: string,
-  { androidSheet = true }: { androidSheet?: boolean } = {}
-): ModalConfig => ({
+const modalFlow = (name: string): ModalConfig => ({
   name,
   options:
-    Platform.OS === 'android' && androidSheet
-      ? ANDROID_SHEET_OPTIONS
-      : {
-          presentation: 'modal',
-          headerShown: false,
-        },
+    Platform.OS !== 'android'
+      ? { presentation: 'modal', headerShown: false }
+      : androidFlowPresentation(name) === 'sheet'
+        ? ANDROID_SHEET_OPTIONS
+        : // A pushed screen: entered with a horizontal slide, left with Back.
+          // The flow's own nested stack draws the native header.
+          { presentation: 'card', headerShown: false, animation: 'slide_from_right' },
 });
 
 /** Slide from right: nested layout handles headers, horizontal slide animation. */
@@ -88,24 +90,28 @@ const slideFromBottom = (name: string): ModalConfig => ({
 });
 
 /**
- * Standalone single-screen modal. iOS: pageSheet/formSheet with material blur
- * header (unchanged). Android: native bottom sheet (see ANDROID_SHEET_OPTIONS).
+ * Standalone single-screen route. iOS: pageSheet/formSheet with material blur
+ * header. Android: a pushed screen with the native header, or a native bottom
+ * sheet for the routes `androidFlowPresentation` names.
  */
 const modalWithGradient = (
   name: string,
   presentation: 'modal' | 'formSheet',
   title?: string
-): ModalConfig => ({
-  name,
-  ...(title && { title }),
-  options:
-    Platform.OS === 'android'
-      ? ANDROID_SHEET_OPTIONS
-      : {
-          presentation,
-          ...GRADIENT_HEADER_OPTIONS,
-        },
-});
+): ModalConfig => {
+  const config = { name, ...(title && { title }) };
+  if (Platform.OS !== 'android') {
+    return { ...config, options: { presentation, ...GRADIENT_HEADER_OPTIONS } };
+  }
+  if (androidFlowPresentation(name) === 'sheet') {
+    return { ...config, options: ANDROID_SHEET_OPTIONS };
+  }
+  return {
+    ...config,
+    androidPushed: true,
+    options: { presentation: 'card', animation: 'slide_from_right', ...GRADIENT_HEADER_OPTIONS },
+  };
+};
 
 /** Card with fade: for shared-element transitions. */
 const cardFade = (
@@ -178,6 +184,12 @@ const standaloneScreens: ModalConfig[] = [
   fullScreenModal('(stories-flow)', { contentStyle: { backgroundColor: '#000' } }),
   modalTransparent('camera', 'Scan QR'),
   modalWithGradient('share', 'formSheet'),
+  // Every fact about one payment, under the same header as every other
+  // standalone screen: the page sheet with a close button on iPhone, a pushed
+  // page with the back button on Android.
+  modalWithGradient('details', 'modal', 'Details'),
+  // The ecash held at one mint, picked by hand from the amount screen.
+  modalWithGradient('notes', 'modal', 'Pick notes'),
   modalWithGradient('lightningSend', 'modal', railHeaderTitle('lightningSend')),
   modalWithGradient('onchainSend', 'modal', railHeaderTitle('onchainSend')),
   modalWithGradient('receiveToken', 'modal', railHeaderTitle('ecashReceive')),

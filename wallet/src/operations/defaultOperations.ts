@@ -58,6 +58,7 @@ import {
   deriveSupportedUnitsFromInfo,
 } from "../mint-capabilities";
 import { getKeysetUnits } from "../core/keysetUnits";
+import { normalizeMintUrl } from "../transport/plan";
 import { assertPaymentRequestFeesSupported } from "../core/paymentRequestFees";
 import { parseHistoryEntryOnce } from "./historyEntry";
 
@@ -525,6 +526,13 @@ function buildRolledBackResult(
 // ---------------------------------------------------------------------------
 
 export interface DefaultOperationsConfig {
+  /** Capture recipient intent synchronously; persist its operation binding before execution. */
+  captureSendDelivery?: (input: {
+    manager: Manager;
+    mintUrl: string;
+    lockPubkey?: string;
+  }) => ((operationId: string) => Promise<void>) | undefined;
+
   getManager: () => Manager | null;
   /**
    * Onchain melt fee picker (NUT-30 fee_options). Called BEFORE prepare (no
@@ -693,6 +701,11 @@ export function createDefaultOperations(
       if (requestedLock !== undefined && !lock) {
         throw new Error("Invalid P2PK lock terms for this send.");
       }
+      const bindDelivery = config.captureSendDelivery?.({
+        manager: mgr,
+        mintUrl,
+        lockPubkey: lock?.pubkey,
+      });
       logger.info("operations.executeSend.prepare", {
         ...mintUrlFields(mintUrl),
         amount,
@@ -725,6 +738,14 @@ export function createDefaultOperations(
             }
           : {}),
       });
+      if (bindDelivery) {
+        try {
+          await bindDelivery(prepared.id);
+        } catch (error) {
+          await mgr.ops.send.cancel(prepared.id);
+          throw error;
+        }
+      }
       logger.info("operations.executeSend.prepared", {
         operationId: prepared.id,
         ...mintUrlFields(mintUrl),
@@ -783,26 +804,18 @@ export function createDefaultOperations(
         amount,
         hadMemo: !!normalizeMemo(memo),
       });
-      const prepared = await mgr.ops.send.prepare({ mintUrl, amount });
+      // Prepared from the mint's stored keysets without contacting it. Coco
+      // refuses, before reserving anything, when no exact match exists.
+      const prepared = await mgr.ops.send.prepare({
+        mintUrl,
+        amount,
+        offline: true,
+      });
       logger.info("operations.executeOfflineSend.prepared", {
         operationId: prepared.id,
         ...mintUrlFields(mintUrl),
         amount,
-        needsSwap: !!prepared.needsSwap,
       });
-
-      if (prepared.needsSwap) {
-        logger.warn("operations.executeOfflineSend.needsSwap", {
-          operationId: prepared.id,
-          ...mintUrlFields(mintUrl),
-          amount,
-        });
-        await mgr.ops.send.cancel(prepared.id);
-        logger.info("operations.executeOfflineSend.cancelledAfterNeedsSwap", {
-          operationId: prepared.id,
-        });
-        throw new Error("Offline send requires exact proof match");
-      }
 
       const { operation, token } = await executeSendWithRescue(mgr, prepared, {
         logPrefix: "executeOfflineSend",
@@ -1436,6 +1449,7 @@ export function createDefaultOperations(
           quoteId: quote.quoteId,
           quoteAmount: amountToNumber(quote.amount),
           feeReserve: amountToNumber(quote.fee_reserve),
+          expiresAt: quote.expiry,
           unit: quote.unit ?? unit,
           method: "bolt12" as const,
           mintUrl,
@@ -1473,6 +1487,7 @@ export function createDefaultOperations(
         quoteId: quote.quoteId,
         quoteAmount: amountToNumber(quote.amount),
         feeReserve: amountToNumber(quote.fee_reserve),
+        expiresAt: quote.expiry,
         unit: quote.unit ?? unit,
         method: "bolt11" as const,
         mintUrl,
@@ -1820,9 +1835,18 @@ export function createDefaultOperations(
       let operationId: string;
 
       if (nostrTransport && !httpTransport) {
-        if (info.hasSpendingCondition || info.lockP2pkPubkey) {
+        // Sovran creates plain permanent P2PK requests. Reject conditions we
+        // cannot preserve rather than silently stripping their tags.
+        const nut10 = info.lockP2pkPubkey
+          ? decodePaymentRequest(paymentRequest).nut10
+          : undefined;
+        const lock =
+          nut10?.kind === "P2PK" && !nut10.tags?.length
+            ? normalizeP2pkLock(nut10.data)
+            : null;
+        if ((info.hasSpendingCondition || info.lockP2pkPubkey) && !lock) {
           throw new Error(
-            "This request requires locked ecash, which Nostr payment requests do not support yet.",
+            "This request requires locked ecash with unsupported spending conditions.",
           );
         }
         logger.info("operations.executePaymentRequest.transport", {
@@ -1850,6 +1874,9 @@ export function createDefaultOperations(
           mintUrl,
           amount,
           unit,
+          ...(lock
+            ? { target: { type: "p2pk" as const, pubkey: lock.pubkey } }
+            : {}),
         });
         logger.info("operations.executePaymentRequest.nostr.prepared", {
           operationId: prepared.id,
@@ -1865,11 +1892,22 @@ export function createDefaultOperations(
           proofCount: token.proofs.length,
         });
 
+        // Echo the request's own spelling of our mint: Macadamia matches the
+        // payload mint by exact string, so `https://m.x/` ≠ `https://m.x`.
+        const payloadMint =
+          (info.requestedMints ?? info.mints).find(
+            (m) => normalizeMintUrl(m) === normalizeMintUrl(mintUrl),
+          ) ?? mintUrl;
         const payload = {
           id: info.requestId,
-          mint: mintUrl,
+          mint: payloadMint,
           unit,
-          proofs: token.proofs,
+          // cashu-ts `Amount` serializes as a string; NUT-18 wants an integer,
+          // and CDK-based wallets reject the whole payload otherwise.
+          proofs: token.proofs.map((proof) => ({
+            ...proof,
+            amount: proof.amount.toNumber(),
+          })),
         };
         try {
           if (mockFailEnabled("paymentRequest")) {
@@ -2000,84 +2038,26 @@ export function createDefaultOperations(
       return { historyEntry: JSON.stringify(enriched) };
     },
 
-    // Background mesh auto-redeem: receives a token and resolves the REAL
-    // persisted receive-history id by set difference (snapshot ids before,
-    // poll after) — coco's history flush races the receive call, and a
-    // synthesized id would break downstream linkage (location stamps,
-    // scan-history links). Retires the wallet-side direct-coco exception.
+    // Legacy mesh tokens use an operation-bound history projection. A concurrent
+    // receive from the same mint must never steal this token's annotation.
     executeAutoRedeem: async (tokenString, mintUrl) => {
       const mgr = requireManager();
-
-      let beforeIds = new Set<string>();
-      try {
-        const beforeHistory = await mgr.history.getPaginatedHistory(0, 100);
-        beforeIds = new Set(
-          beforeHistory
-            .filter((h) => h.type === "receive" && h.mintUrl === mintUrl)
-            .map((h) => h.id)
-            .filter(
-              (id): id is string => typeof id === "string" && id.length > 0,
-            ),
-        );
-      } catch (e) {
-        logger.warn("operations.executeAutoRedeem.snapshotFailed", {
-          ...mintUrlFields(mintUrl),
-          error: errField(e),
-        });
+      if (
+        normalizeMintUrl(getTokenMetadata(tokenString).mint) !==
+        normalizeMintUrl(mintUrl)
+      ) {
+        throw new Error("Receive mint does not match queued token");
       }
-
-      logger.info("operations.executeAutoRedeem.start", {
-        ...mintUrlFields(mintUrl),
-        beforeCount: beforeIds.size,
-        tokenLength: tokenString.length,
-      });
-      await mgr.wallet.receive(tokenString);
-      logger.info("operations.executeAutoRedeem.received", {
-        ...mintUrlFields(mintUrl),
-      });
-
-      // ~10s of polling at 200ms — waits out coco's history flush.
-      const MAX_ATTEMPTS = 50;
-      const DELAY_MS = 200;
-      for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-        try {
-          const after = await mgr.history.getPaginatedHistory(0, 100);
-          const newEntry = after.find(
-            (h) =>
-              h.type === "receive" &&
-              h.mintUrl === mintUrl &&
-              typeof h.id === "string" &&
-              h.id.length > 0 &&
-              !beforeIds.has(h.id),
-          );
-          if (newEntry) {
-            logger.info("operations.executeAutoRedeem.found", {
-              ...mintUrlFields(mintUrl),
-              historyEntryId: newEntry.id,
-              attempts: attempt + 1,
-            });
-            return {
-              historyEntryId: newEntry.id,
-              historyEntry: JSON.stringify(newEntry),
-            };
-          }
-        } catch (e) {
-          logger.warn("operations.executeAutoRedeem.pollFailed", {
-            attempt,
-            error: errField(e),
-          });
-        }
-        await new Promise((resolve) => setTimeout(resolve, DELAY_MS));
-      }
-
-      // The receive itself succeeded (proofs are persisted); only the
-      // history linkage couldn't be resolved. Callers treat null as
-      // "redeemed, unlinked" — loud log so the flush issue gets attention.
-      logger.error("operations.executeAutoRedeem.timeoutFallback", {
-        ...mintUrlFields(mintUrl),
-        polledMs: MAX_ATTEMPTS * DELAY_MS,
-      });
-      return { historyEntryId: null, historyEntry: null };
+      const prepared = await mgr.ops.receive.prepare({ token: tokenString });
+      const received = await mgr.ops.receive.execute(prepared);
+      const historyEntryId = operationHistoryId("receive", received.id);
+      const history = await mgr.history
+        .getHistoryEntryById(historyEntryId)
+        .catch(() => null);
+      return {
+        historyEntryId,
+        historyEntry: history ? JSON.stringify(history) : null,
+      };
     },
 
     // Lightning Address → Nostr hex pubkey via NIP-05. Best-effort. The
