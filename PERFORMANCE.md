@@ -666,3 +666,12 @@ change in F80 (a standing payment request no longer blocks removal).
 The map cache was then moved out of AsyncStorage into a file (F81). On the iOS simulator the file
 was written (5.3 MB) with no errors. One iOS run before that stalled during wallet startup after a
 dev-client reload and did not recur on the next run; it is unexplained.
+
+### Failed restart on a device, 2026-10-10
+
+On the iOS simulator, with the restart call forced to fail by a temporary edit (reverted) and a
+switch triggered from a temporary hook: adding a profile showed "Restart Required", left the
+active account unchanged in memory, tore the account providers down and refused a second switch.
+Reopening the app booted into the new profile with its wallet open. The same held switching back.
+The simulator was left on its original profile, with one extra empty derived profile added.
+A native sheet that was open stayed visible above the splash (F82).
