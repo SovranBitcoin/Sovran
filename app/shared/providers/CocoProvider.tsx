@@ -1,4 +1,4 @@
-import { createContext, useEffect, useState, ReactNode, useRef } from 'react';
+import { useEffect, useState, ReactNode, useRef } from 'react';
 import { CocoCashuProvider } from '@cashu/coco-react';
 import { Manager } from '@cashu/coco-core';
 import { CocoManager } from '@/shared/lib/cashu/manager';
@@ -17,20 +17,6 @@ import { useWalletLifecycleStore } from '@/shared/stores/global/walletLifecycleS
 import { initializeDefaultMints } from '@/shared/lib/cashu/initializeDefaultMints';
 
 initLog('Module', 'CocoProvider loaded');
-
-interface CocoContextValue {
-  manager: Manager | null;
-  isReady: boolean;
-  isMigrating: boolean;
-  migrationError: Error | null;
-}
-
-const CocoContext = createContext<CocoContextValue>({
-  manager: null,
-  isReady: false,
-  isMigrating: false,
-  migrationError: null,
-});
 
 interface CocoProviderProps {
   children: ReactNode;
@@ -51,7 +37,6 @@ type CocoPhase1Args = {
   privateKey: Uint8Array | undefined;
   onManager: (manager: Manager) => void;
   onReady: () => void;
-  onFailure: (error: Error) => void;
   /** False once the effect that started this phase has been cleaned up. */
   isCurrent: () => boolean;
 };
@@ -70,7 +55,6 @@ async function runCocoPhase1({
   privateKey,
   onManager,
   onReady,
-  onFailure,
   isCurrent,
 }: CocoPhase1Args): Promise<void> {
   try {
@@ -110,7 +94,6 @@ async function runCocoPhase1({
     log.error('coco.phase1.failed', {
       error: caught instanceof Error ? caught.message : String(caught),
     });
-    onFailure(failure);
     stage.error(failure.message);
   }
 }
@@ -238,8 +221,6 @@ export function CocoProvider({ children }: CocoProviderProps) {
   const privateKeyRef = useLatestRef(keys?.privateKey);
   const [manager, setManager] = useState<Manager | null>(null);
   const [isReady, setIsReady] = useState(false);
-  const isMigrating = false;
-  const [migrationError, setMigrationError] = useState<Error | null>(null);
   const hasStarted = useRef(false);
   const bgStarted = useRef(false);
 
@@ -256,7 +237,6 @@ export function CocoProvider({ children }: CocoProviderProps) {
       privateKey: privateKeyRef.current,
       onManager: setManager,
       onReady: () => setIsReady(true),
-      onFailure: setMigrationError,
       isCurrent: () => run.current,
     });
 
@@ -372,20 +352,7 @@ export function CocoProvider({ children }: CocoProviderProps) {
     return attachMintTestnutToManager(manager);
   }, [manager]);
 
-  const contextValue: CocoContextValue = {
-    manager,
-    isReady,
-    isMigrating,
-    migrationError,
-  };
+  if (!isReady || !manager) return null;
 
-  if (!isReady || !manager) {
-    return <CocoContext.Provider value={contextValue}>{null}</CocoContext.Provider>;
-  }
-
-  return (
-    <CocoContext.Provider value={contextValue}>
-      <CocoCashuProvider manager={manager}>{children}</CocoCashuProvider>
-    </CocoContext.Provider>
-  );
+  return <CocoCashuProvider manager={manager}>{children}</CocoCashuProvider>;
 }

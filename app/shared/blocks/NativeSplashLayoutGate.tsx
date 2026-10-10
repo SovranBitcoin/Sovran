@@ -160,7 +160,7 @@ export function NativeSplashLayoutGate({ children }: { children: React.ReactNode
   // from a prior cycle — during boot the same `isInitializing=true` signal
   // fires (gates registering) and we don't want it to bounce us back to
   // await_init from a later phase. Profile switches go through resetStages()
-  // which sets forceReinitialize=true, so the unmount→isInitializing=true
+  // which makes isInitializing true again, so the unmount→isInitializing=true
   // transition is the unambiguous "switch happened" signal.
   useEffect(() => {
     if (!isInitializing) return;

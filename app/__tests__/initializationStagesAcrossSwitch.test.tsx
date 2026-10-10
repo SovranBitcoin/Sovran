@@ -65,9 +65,7 @@ it('lets account stages start again after an in-process switch', () => {
   expect(probe.isInitializing).toBe(false);
 
   // The switch keeps the gate above the account providers and remounts below it.
-  act(() =>
-    probe.reset!.resetStages({ holdUntilCancel: true, keepStagesThatOutliveAccount: true })
-  );
+  act(() => probe.reset!.resetStages({ keepStagesThatOutliveAccount: true }));
   act(() => renderer!.update(tree(1)));
 
   // The migration gate did not register again, yet its dependant can start.
@@ -85,7 +83,7 @@ it('drops every stage on a reset that expects a restart', () => {
   });
   act(() => probe.migrations!.complete());
 
-  act(() => probe.reset!.resetStages({ holdUntilCancel: true }));
+  act(() => probe.reset!.resetStages());
   act(() => renderer!.update(tree(1)));
 
   // Nothing above the boundary registers again without a restart, so the

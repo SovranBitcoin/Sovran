@@ -73,7 +73,6 @@ interface Stage {
 }
 
 interface ResetStagesOptions {
-  holdUntilCancel?: boolean;
   /**
    * Keep stages registered above the account providers. An in-process profile
    * switch passes this; a switch that restarts the runtime does not need it.
@@ -124,25 +123,19 @@ interface InitializationProviderProps {
 
 export function InitializationProvider({ children }: InitializationProviderProps) {
   const [stages, setStages] = useState<Map<string, Stage>>(new Map());
-  // When true, forces isInitializing=true until real stages register (profile switch).
-  const [forceReinitialize, setForceReinitialize] = useState(false);
-  // When true, keeps the splash pinned even after stages re-register until explicitly released.
-  const [holdSplashVisible, setHoldSplashVisible] = useState(false);
+  // Set by a reset and cleared as soon as any stage is registered again, or by
+  // a cancel. It covers the gap after a reset in which no stage exists yet and
+  // the app would otherwise look initialised. It is not a lasting hold: the
+  // stages that register next keep the splash up through their own status.
+  const [awaitingStages, setAwaitingStages] = useState(false);
   useInitMount('InitializationProvider');
 
-  // Synchronous map of stage id → blocking flag. Updated immediately in
-  // registerStage so updateStage can check it before the next React render.
-  const blockingFlagsRef = useRef<Map<string, boolean>>(new Map());
-  // Stage ids whose owner outlives the account providers (see StageConfig).
-  const outlivesAccountRef = useRef<Set<string>>(new Set());
   // Track when each stage first transitioned to 'loading' so we can log a
   // duration when it reaches 'complete'.
   const stageStartTimes = useRef<Map<string, number>>(new Map());
 
   const registerStage = useCallback((id: string, config: StageConfig) => {
     const isBlocking = config.blocking !== false;
-    blockingFlagsRef.current.set(id, isBlocking);
-    if (config.outlivesAccount === true) outlivesAccountRef.current.add(id);
 
     initLog(
       'registerStage',
@@ -227,8 +220,7 @@ export function InitializationProvider({ children }: InitializationProviderProps
   );
 
   const isInitializing =
-    forceReinitialize ||
-    holdSplashVisible ||
+    awaitingStages ||
     Array.from(stages.values()).some(
       (stage) => stage.blocking && (stage.status === 'loading' || stage.status === 'pending')
     );
@@ -254,49 +246,33 @@ export function InitializationProvider({ children }: InitializationProviderProps
     prevInitializing.current = isInitializing;
   }, [isInitializing, stages]);
 
-  // Clear forceReinitialize / holdSplashVisible once real stages have registered
-  // (they'll keep isInitializing true via their own blocking status).
-  // This ensures the splash is released after a profile switch even if
-  // cancelResetStages() was never called (e.g. DevSettings.reload() in dev).
+  // The wait ends once stages exist again. This also covers a reset that kept
+  // its long-lived stages, and a development reload that never calls cancel.
   useEffect(() => {
-    if ((forceReinitialize || holdSplashVisible) && stages.size > 0) {
-      setForceReinitialize(false);
-      setHoldSplashVisible(false);
-    }
-  }, [forceReinitialize, holdSplashVisible, stages.size]);
+    if (awaitingStages && stages.size > 0) setAwaitingStages(false);
+  }, [awaitingStages, stages.size]);
 
   const resetStages = useCallback((options?: ResetStagesOptions) => {
-    log.info('init.provider.reset_stages', {
-      holdUntilCancel: options?.holdUntilCancel === true,
-      kept: options?.keepStagesThatOutliveAccount ? Array.from(outlivesAccountRef.current) : [],
-    });
-    setForceReinitialize(true);
-    setHoldSplashVisible(options?.holdUntilCancel === true);
-    if (options?.keepStagesThatOutliveAccount) {
+    const keep = options?.keepStagesThatOutliveAccount === true;
+    log.info('init.provider.reset_stages', { keepStagesThatOutliveAccount: keep });
+    setAwaitingStages(true);
+    setStages((prev) => {
+      const kept = new Map<string, Stage>();
       // Iterated with forEach, not spread: the React Native Babel preset
       // compiles array spread loosely, and spreading a Map there does not
       // yield its entries.
-      setStages((prev) => {
-        const kept = new Map<string, Stage>();
+      if (keep) {
         prev.forEach((stage, id) => {
           if (stage.outlivesAccount) kept.set(id, stage);
         });
-        return kept;
-      });
-      const flags = blockingFlagsRef.current;
-      flags.forEach((_blocking, id) => {
-        if (!outlivesAccountRef.current.has(id)) flags.delete(id);
-      });
-    } else {
-      setStages(new Map());
-      blockingFlagsRef.current.clear();
-    }
+      }
+      return kept;
+    });
     stageStartTimes.current.clear();
   }, []);
 
   const cancelResetStages = useCallback(() => {
-    setForceReinitialize(false);
-    setHoldSplashVisible(false);
+    setAwaitingStages(false);
   }, []);
 
   useEffect(() => {

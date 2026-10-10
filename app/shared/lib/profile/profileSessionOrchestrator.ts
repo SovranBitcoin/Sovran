@@ -89,7 +89,6 @@ export async function switchToExistingProfile(opts: {
     // Without a restart, a stage owned above the account providers never
     // registers again, so it must survive the reset or its dependents never start.
     lock.holdSplash(splashControls(opts), {
-      holdUntilCancel: true,
       keepStagesThatOutliveAccount: useSettingsStore.getState().inProcessProfileSwitch,
     });
     usePopupStore.getState().close();
@@ -225,7 +224,7 @@ export async function createAndSwitchProfile(opts?: {
     return false;
   }
   try {
-    lock.holdSplash(splashControls(opts), { holdUntilCancel: true });
+    lock.holdSplash(splashControls(opts));
     usePopupStore.getState().close();
 
     const profileStore = useProfileStore.getState();
@@ -356,7 +355,7 @@ export async function deleteAllProfiles(opts?: {
   // Set once the first irreversible deletion starts.
   let erasing = false;
   try {
-    lock.holdSplash(splashControls(opts), { holdUntilCancel: true });
+    lock.holdSplash(splashControls(opts));
     usePopupStore.getState().close();
 
     const profiles = useProfileStore.getState().profiles;

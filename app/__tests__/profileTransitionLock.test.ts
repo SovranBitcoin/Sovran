@@ -84,8 +84,8 @@ it('drops the splash on release only when this flow was holding it', async () =>
   expect(cancelResetStages).not.toHaveBeenCalled();
 
   const lock = acquireTransition()!;
-  lock.holdSplash({ resetStages, cancelResetStages }, { holdUntilCancel: true });
-  expect(resetStages).toHaveBeenCalledWith({ holdUntilCancel: true });
+  lock.holdSplash({ resetStages, cancelResetStages });
+  expect(resetStages).toHaveBeenCalledTimes(1);
   await lock.release();
   expect(cancelResetStages).toHaveBeenCalledTimes(1);
 });

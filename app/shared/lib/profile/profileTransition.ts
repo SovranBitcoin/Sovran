@@ -69,10 +69,7 @@ export async function clearTransitionGuardOnStartup(): Promise<void> {
 
 // ── Registered controls (set at runtime by layout components) ────
 export type TransitionControls = {
-  resetStages: (options?: {
-    holdUntilCancel?: boolean;
-    keepStagesThatOutliveAccount?: boolean;
-  }) => void;
+  resetStages: (options?: { keepStagesThatOutliveAccount?: boolean }) => void;
   cancelResetStages: () => void;
 };
 
@@ -217,7 +214,7 @@ interface TransitionLock {
   /** Cover the app with the splash until `release`. */
   holdSplash(
     controls: Partial<TransitionControls>,
-    options: Parameters<TransitionControls['resetStages']>[0]
+    options?: Parameters<TransitionControls['resetStages']>[0]
   ): void;
   /**
    * Give back everything this lock took: the splash if held, the in-memory

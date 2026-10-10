@@ -101,58 +101,57 @@ export function createProfileScopedStorage(
   ownerPubkey?: string,
   admittedWrite = false
 ): StateStorage & { profileStorageOwner?: string } {
+  const keyFor = (name: string, pubkey: string | undefined) =>
+    pubkey ? `${name}:profile:${pubkey}` : name;
+
+  /**
+   * The one path every save and removal takes. In order:
+   *
+   * 1. Dropped if the write barrier is up (an account switch is under way).
+   * 2. The owner is decided NOW, before anything is awaited: a write queued
+   *    for one profile must never resolve another profile's key later.
+   * 3. Dropped if the store was loaded for a different profile than the one
+   *    active now. A load before any profile existed recorded nothing, so the
+   *    first save after onboarding still lands.
+   * 4. Waits for migrations and for the profile list, then runs, counted by
+   *    the barrier so a switch can wait for it to land.
+   *
+   * A dropped write resolves like a completed one; callers cannot tell.
+   */
+  const mutateOwnedKey = (name: string, mutate: (key: string) => Promise<void>): Promise<void> => {
+    if (profilePersistWritesBlocked() && !admittedWrite) return Promise.resolve();
+    const pubkey = ownerPubkey ?? getActiveProfilePubkey();
+    const loaded = ownerPubkey ? undefined : loadedUnder.get(name);
+    if (loaded && pubkey && loaded !== pubkey) {
+      log.warn('profile.storage.cross_profile_write_refused', { store: name });
+      return Promise.resolve();
+    }
+    return trackProfilePersistWrite(
+      (async () => {
+        await _migrationGate;
+        await ensureProfileStoreHydrated();
+        // No profile existed when this was called (first launch): use whichever
+        // exists now, or the bare key if there is still none.
+        await mutate(keyFor(name, pubkey ?? getActiveProfilePubkey()));
+      })()
+    );
+  };
+
   return {
     profileStorageOwner: ownerPubkey,
     getItem: async (name: string) => {
       await _migrationGate;
       await ensureProfileStoreHydrated();
       const pubkey = ownerPubkey ?? getActiveProfilePubkey();
-      const key = pubkey ? `${name}:profile:${pubkey}` : name;
-      const value = await AsyncStorage.getItem(key);
+      const value = await AsyncStorage.getItem(keyFor(name, pubkey));
       // Recorded only once the read has succeeded, and only for a store that
       // follows the active profile; a captured owner cannot drift.
       if (!ownerPubkey && pubkey) loadedUnder.set(name, pubkey);
       return value;
     },
-    setItem: (name: string, value: string) => {
-      if (profilePersistWritesBlocked() && !admittedWrite) return Promise.resolve();
-      // Capture ownership before yielding; a queued A write must never resolve B's key.
-      const pubkey = ownerPubkey ?? getActiveProfilePubkey();
-      const loaded = ownerPubkey ? undefined : loadedUnder.get(name);
-      if (loaded && pubkey && loaded !== pubkey) {
-        // Not a first write after onboarding (nothing was loaded under a
-        // profile then): the store was loaded for one profile and is being
-        // saved while another is active.
-        log.warn('profile.storage.cross_profile_write_refused', { store: name });
-        return Promise.resolve();
-      }
-      const write = (async () => {
-        await _migrationGate;
-        await ensureProfileStoreHydrated();
-        const owner = pubkey ?? ownerPubkey ?? getActiveProfilePubkey();
-        const key = owner ? `${name}:profile:${owner}` : name;
-        await AsyncStorage.setItem(key, value);
-      })();
-      return trackProfilePersistWrite(write);
-    },
-    removeItem: (name: string) => {
-      if (profilePersistWritesBlocked() && !admittedWrite) return Promise.resolve();
-      const pubkey = ownerPubkey ?? getActiveProfilePubkey();
-      const loaded = ownerPubkey ? undefined : loadedUnder.get(name);
-      if (loaded && pubkey && loaded !== pubkey) {
-        log.warn('profile.storage.cross_profile_write_refused', { store: name });
-        return Promise.resolve();
-      }
-      return trackProfilePersistWrite(
-        (async () => {
-          await _migrationGate;
-          await ensureProfileStoreHydrated();
-          const owner = pubkey ?? ownerPubkey ?? getActiveProfilePubkey();
-          const key = owner ? `${name}:profile:${owner}` : name;
-          await AsyncStorage.removeItem(key);
-        })()
-      );
-    },
+    setItem: (name: string, value: string) =>
+      mutateOwnedKey(name, (key) => AsyncStorage.setItem(key, value)),
+    removeItem: (name: string) => mutateOwnedKey(name, (key) => AsyncStorage.removeItem(key)),
   };
 }
 

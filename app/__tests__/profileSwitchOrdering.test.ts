@@ -203,7 +203,7 @@ describe('createAndSwitchProfile — capacity', () => {
     // The bail happens after the stages were held, so releasing them is part
     // of the unwind — otherwise the boot gate stays up over a switch that is
     // not happening.
-    expect(resetStages).toHaveBeenCalledWith({ holdUntilCancel: true });
+    expect(resetStages).toHaveBeenCalledTimes(1);
     expect(cancelResetStages).toHaveBeenCalled();
     // Nothing was switched to, nothing was persisted, nothing restarted.
     expect(useProfileStore.getState().profiles).toHaveLength(MAX_PROFILES);
