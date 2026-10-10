@@ -20,18 +20,18 @@ from an older release. Each claim names the file that makes it true.
 
 ## What an account is made of
 
-| Piece | Where it lives | Keyed by |
-| --- | --- | --- |
-| Root recovery phrase | SecureStore, `user_mnemonic` | shared by every derived profile |
-| Derived keys and wallet phrase caches | SecureStore, `derived_keys_<i>`, `cashu_mnemonic_<i>`, `cashu_seed_<i>` | account index |
-| Imported key | SecureStore, `imported_nsec_<pubkey>` | pubkey |
-| Wallet | SQLite, `coco.db` for account 0, `coco-<i>.db` after it | account index |
-| Nostr cache | SQLite, `nostr` for account 0, `nostr-<i>` after it | account index |
-| Per-profile stores | AsyncStorage, `<store>:profile:<pubkey>` | pubkey |
-| Global stores | AsyncStorage, `<store>` | the installation |
-| Large caches | a file in the cache directory (the map cache) | the installation |
-| Payment secrets (Routstr) | SecureStore, through its own adapter | pubkey |
-| Everything running | React providers, zustand stores, module-level state, the wallet manager | the process |
+| Piece                                 | Where it lives                                                          | Keyed by                        |
+| ------------------------------------- | ----------------------------------------------------------------------- | ------------------------------- |
+| Root recovery phrase                  | SecureStore, `user_mnemonic`                                            | shared by every derived profile |
+| Derived keys and wallet phrase caches | SecureStore, `derived_keys_<i>`, `cashu_mnemonic_<i>`, `cashu_seed_<i>` | account index                   |
+| Imported key                          | SecureStore, `imported_nsec_<pubkey>`                                   | pubkey                          |
+| Wallet                                | SQLite, `coco.db` for account 0, `coco-<i>.db` after it                 | account index                   |
+| Nostr cache                           | SQLite, `nostr` for account 0, `nostr-<i>` after it                     | account index                   |
+| Per-profile stores                    | AsyncStorage, `<store>:profile:<pubkey>`                                | pubkey                          |
+| Global stores                         | AsyncStorage, `<store>`                                                 | the installation                |
+| Large caches                          | a file in the cache directory (the map cache)                           | the installation                |
+| Payment secrets (Routstr)             | SecureStore, through its own adapter                                    | pubkey                          |
+| Everything running                    | React providers, zustand stores, module-level state, the wallet manager | the process                     |
 
 The list of profiles and which one is active is itself a global store, `profile-store`.
 
@@ -70,15 +70,15 @@ Top to bottom, as nested in `app/app/_layout.tsx` and `AccountProviders.tsx`. Th
 order, not one awaited sequence: the migration gate, the key provider and the wallet provider each
 hold back what is below them; the others do not.
 
-| Step | What it does | If it fails |
-| --- | --- | --- |
-| Transition guard cleanup | clears the on-disk guard a previous run left; not waited for | nothing; a stale guard is ignored |
-| Splash gate | covers the app until the wallet screen is ready, or a blocking stage fails | fades after a timeout |
-| Global migrations (`GlobalMigrationGate`) | one-time storage moves, then opens per-profile storage | storage stays closed; a retry screen is shown |
-| Account boundary | lets an in-process switch unmount everything below | — |
-| Key provider | finds the keys and wallet phrase (`loadAccountKeys`), hands them to the wallet manager | key recovery screen |
-| Nostr providers, then wallet provider | mount in that order, but the wallet database opens first; the Nostr cache opens after it, deferred | the wallet stage fails and nothing below it renders; there is no retry screen for this yet (F85) |
-| App gate (`AppGate`) | settings loaded, terms accepted, reinstall check, onboarding, restore | its own screens |
+| Step                                      | What it does                                                                                       | If it fails                                                                                      |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Transition guard cleanup                  | clears the on-disk guard a previous run left; not waited for                                       | nothing; a stale guard is ignored                                                                |
+| Splash gate                               | covers the app until the wallet screen is ready, or a blocking stage fails                         | fades after a timeout                                                                            |
+| Global migrations (`GlobalMigrationGate`) | one-time storage moves, then opens per-profile storage                                             | storage stays closed; a retry screen is shown                                                    |
+| Account boundary                          | lets an in-process switch unmount everything below                                                 | —                                                                                                |
+| Key provider                              | finds the keys and wallet phrase (`loadAccountKeys`), hands them to the wallet manager             | key recovery screen                                                                              |
+| Nostr providers, then wallet provider     | mount in that order, but the wallet database opens first; the Nostr cache opens after it, deferred | the wallet stage fails and nothing below it renders; there is no retry screen for this yet (F85) |
+| App gate (`AppGate`)                      | settings loaded, terms accepted, reinstall check, onboarding, restore                              | its own screens                                                                                  |
 
 Three separate kinds of readiness, easy to confuse:
 
@@ -97,13 +97,13 @@ recovery of pending operations wait for any restore to finish.
 
 All five flows live in `app/shared/lib/profile/profileSessionOrchestrator.ts`.
 
-| Flow | Function | Takes | When it works | When it fails |
-| --- | --- | --- | --- | --- |
-| Switch profile | `switchToExistingProfile` | lock, disk guard, splash | restart, lock kept | before the restart call: gives up and releases; restart call fails: holds |
-| Add a derived profile | `createAndSwitchProfile` | lock, disk guard, splash | restart, lock kept | same as switch |
-| Recover from a phrase | `recoverMnemonicSession` | lock only | restart | releases; never holds |
-| Remove one profile | `removeInactiveProfile` | lock, disk guard | no restart, releases | stops at the failed step, reports what is left, releases |
-| Delete everything | `deleteAllProfiles` | lock, disk guard, splash | restart, lock kept | before the wipe starts: releases; after: holds |
+| Flow                  | Function                  | Takes                    | When it works        | When it fails                                                             |
+| --------------------- | ------------------------- | ------------------------ | -------------------- | ------------------------------------------------------------------------- |
+| Switch profile        | `switchToExistingProfile` | lock, disk guard, splash | restart, lock kept   | before the restart call: gives up and releases; restart call fails: holds |
+| Add a derived profile | `createAndSwitchProfile`  | lock, disk guard, splash | restart, lock kept   | same as switch                                                            |
+| Recover from a phrase | `recoverMnemonicSession`  | lock only                | restart              | releases; never holds                                                     |
+| Remove one profile    | `removeInactiveProfile`   | lock, disk guard         | no restart, releases | stops at the failed step, reports what is left, releases                  |
+| Delete everything     | `deleteAllProfiles`       | lock, disk guard, splash | restart, lock kept   | before the wipe starts: releases; after: holds                            |
 
 "Lock kept" means the flow does not release: the reload discards the in-memory lock and the next
 start clears the one on disk. The differences between the rows are deliberate (confirmed
@@ -118,14 +118,14 @@ the profile row before any of these flows takes the lock (`DrawerProfileChrome.t
 
 `A` is the account you are leaving, `B` the one you chose.
 
-| # | Step | Active account in memory | Active account on disk | Where |
-| --- | --- | --- | --- | --- |
-| 1 | Refuse unless the wallet is open and idle (not starting, closing or busy in the background), and no other flow holds the lock | A | A | `CocoManager.isReadyForCleanup`, `acquireTransition` |
-| 2 | Take the disk guard (refused if a guard under ten seconds old exists), raise the splash, close popups | A | A | `takeDiskGuard`, `holdSplash` |
-| 3 | Ask A's wallet to close. Carry on when it has closed, failed, or five seconds have passed; the close may still be running | A | A | `cleanupCocoWithTimeout` |
-| 4 | Write B as the active account, to disk only | **A** | **B** | `persistSwitchTargetToDisk` |
-| 5 | Ask the system to restart | A | B | `teardownAndRestart` |
-| 6 | New runtime starts as B | B | B | startup, above |
+| #   | Step                                                                                                                          | Active account in memory | Active account on disk | Where                                                |
+| --- | ----------------------------------------------------------------------------------------------------------------------------- | ------------------------ | ---------------------- | ---------------------------------------------------- |
+| 1   | Refuse unless the wallet is open and idle (not starting, closing or busy in the background), and no other flow holds the lock | A                        | A                      | `CocoManager.isReadyForCleanup`, `acquireTransition` |
+| 2   | Take the disk guard (refused if a guard under ten seconds old exists), raise the splash, close popups                         | A                        | A                      | `takeDiskGuard`, `holdSplash`                        |
+| 3   | Ask A's wallet to close. Carry on when it has closed, failed, or five seconds have passed; the close may still be running     | A                        | A                      | `cleanupCocoWithTimeout`                             |
+| 4   | Write B as the active account, to disk only                                                                                   | **A**                    | **B**                  | `persistSwitchTargetToDisk`                          |
+| 5   | Ask the system to restart                                                                                                     | A                        | B                      | `teardownAndRestart`                                 |
+| 6   | New runtime starts as B                                                                                                       | B                        | B                      | startup, above                                       |
 
 The two columns are only the active account's index. From step 3 A's wallet is closed and its
 credentials are cleared, whatever the index says.
@@ -199,21 +199,21 @@ default switch shows.
 
 They do different jobs and are not interchangeable.
 
-| Guard | Stops | Set by | Cleared by | File |
-| --- | --- | --- | --- | --- |
-| Transition lock (in memory) | two flows running at once | `acquireTransition` | `lock.release`, or a reload | `profileTransition.ts` |
-| Disk guard (`profile-transition-in-progress`) | a flow starting while one from the previous run may be finishing | `lock.takeDiskGuard` | removed on release and at startup, best effort; one over ten seconds old is ignored and overwritten; a storage error lets the flow in | `profileTransition.ts` |
-| Splash wait | the app looking ready with no stages registered | `lock.holdSplash` (`resetStages`) | the first render in which any stage exists, including one kept through the reset; or release | `InitializationProvider.tsx` |
-| Quiescing | a service starting up late during a switch or a hold | the in-process switch, and a hold | the in-process switch finishing; otherwise a reload | `accountRegistry.ts` |
-| Provider boundary | account UI and providers mounted during a switch or a hold | `boundary.suspend` | `boundary.resume` (in-process switch only) | `AccountProviders.tsx` |
-| Write barrier | per-profile saves during a switch or a hold (global stores are not covered) | `blockProfilePersistWrites` | `unblockProfilePersistWrites` (in-process switch only) | `profileWriteBarrier.ts` |
-| Skip-saves scope | saves caused by resetting state on purpose | `withSkippedPersistWrites` | end of that call | `profileWriteBarrier.ts` |
-| Loaded-profile check | a store saving under a profile it was not loaded for | each successful read with a profile active (before the schema has judged the data) | replaced by the next such read; applies only when both profiles are known | `profileScopedStorage.ts` |
-| Migration gate | any per-profile read or save before migrations finish | module load | `GlobalMigrationGate` on success | `profileScopedStorage.ts` |
-| Unreadable guard | a store overwriting data it could not load | a failed or rejected load | a failed read: the next successful read. A rejected blob: a side copy that already exists, or a new one that reads back. Removing the store's data on purpose is not guarded | `preserveUnreadable.ts` |
-| Wallet init and cleanup in flight | opening and closing the wallet overlapping | `initialize`, `cleanup` | when each settles | `cashu/manager.ts` |
-| Reset generation | a wallet that was already opening from finishing after delete-all | `completeReset` | never; compared, not cleared | `cashu/manager.ts` |
-| Staged credential revisions | cleanup wiping the next account's keys | the three credential setters | never; compared, not cleared | `cashu/manager.ts` |
+| Guard                                         | Stops                                                                       | Set by                                                                             | Cleared by                                                                                                                                                                   | File                         |
+| --------------------------------------------- | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
+| Transition lock (in memory)                   | two flows running at once                                                   | `acquireTransition`                                                                | `lock.release`, or a reload                                                                                                                                                  | `profileTransition.ts`       |
+| Disk guard (`profile-transition-in-progress`) | a flow starting while one from the previous run may be finishing            | `lock.takeDiskGuard`                                                               | removed on release and at startup, best effort; one over ten seconds old is ignored and overwritten; a storage error lets the flow in                                        | `profileTransition.ts`       |
+| Splash wait                                   | the app looking ready with no stages registered                             | `lock.holdSplash` (`resetStages`)                                                  | the first render in which any stage exists, including one kept through the reset; or release                                                                                 | `InitializationProvider.tsx` |
+| Quiescing                                     | a service starting up late during a switch or a hold                        | the in-process switch, and a hold                                                  | the in-process switch finishing; otherwise a reload                                                                                                                          | `accountRegistry.ts`         |
+| Provider boundary                             | account UI and providers mounted during a switch or a hold                  | `boundary.suspend`                                                                 | `boundary.resume` (in-process switch only)                                                                                                                                   | `AccountProviders.tsx`       |
+| Write barrier                                 | per-profile saves during a switch or a hold (global stores are not covered) | `blockProfilePersistWrites`                                                        | `unblockProfilePersistWrites` (in-process switch only)                                                                                                                       | `profileWriteBarrier.ts`     |
+| Skip-saves scope                              | saves caused by resetting state on purpose                                  | `withSkippedPersistWrites`                                                         | end of that call                                                                                                                                                             | `profileWriteBarrier.ts`     |
+| Loaded-profile check                          | a store saving under a profile it was not loaded for                        | each successful read with a profile active (before the schema has judged the data) | replaced by the next such read; applies only when both profiles are known                                                                                                    | `profileScopedStorage.ts`    |
+| Migration gate                                | any per-profile read or save before migrations finish                       | module load                                                                        | `GlobalMigrationGate` on success                                                                                                                                             | `profileScopedStorage.ts`    |
+| Unreadable guard                              | a store overwriting data it could not load                                  | a failed or rejected load                                                          | a failed read: the next successful read. A rejected blob: a side copy that already exists, or a new one that reads back. Removing the store's data on purpose is not guarded | `preserveUnreadable.ts`      |
+| Wallet init and cleanup in flight             | opening and closing the wallet overlapping                                  | `initialize`, `cleanup`                                                            | when each settles                                                                                                                                                            | `cashu/manager.ts`           |
+| Reset generation                              | a wallet that was already opening from finishing after delete-all           | `completeReset`                                                                    | never; compared, not cleared                                                                                                                                                 | `cashu/manager.ts`           |
+| Staged credential revisions                   | cleanup wiping the next account's keys                                      | the three credential setters                                                       | never; compared, not cleared                                                                                                                                                 | `cashu/manager.ts`           |
 
 A **hold** is four of these at once: quiescing on, the provider boundary down, the write barrier
 up, the lock kept. It only ends with a restart. Providers above the account boundary stay mounted,
@@ -224,12 +224,12 @@ and a sheet the system presented can stay visible on top (follow-up F82).
 `app/shared/lib/account/accountRegistry.ts` is where state that outlives React is declared. Only
 the in-process switch and profile removal act on it; the default switch restarts instead.
 
-| Kind | Registered with | On an in-process switch |
-| --- | --- | --- |
-| Store | `defineStore({ name, scope })`, scope `global`, `profile` or `session` | `profile` and `session` stores are reset; `profile` stores reload |
-| Holder | `registerAccountScoped(name, dispose)` | disposed |
-| Service | `registerProfileSwitchService(name, stop)` | stopped first |
-| Boundary | `registerProfileSwitchBoundary` | unmounted, then remounted |
+| Kind     | Registered with                                                        | On an in-process switch                                           |
+| -------- | ---------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| Store    | `defineStore({ name, scope })`, scope `global`, `profile` or `session` | `profile` and `session` stores are reset; `profile` stores reload |
+| Holder   | `registerAccountScoped(name, dispose)`                                 | disposed                                                          |
+| Service  | `registerProfileSwitchService(name, stop)`                             | stopped first                                                     |
+| Boundary | `registerProfileSwitchBoundary`                                        | unmounted, then remounted                                         |
 
 A lint rule bans creating a store any other way, and a test fails when a store is missing from the
 registry. Not in the registry, and tracked by their own owners instead: the wallet manager's staged
@@ -250,12 +250,12 @@ Nothing in this design may strand data written by v0.1.3 or earlier.
 
 What the tests hold:
 
-| Test | Holds |
-| --- | --- |
-| `releasedPersistedSurface.test.ts` | every store v0.1.3 declared is still declared under the same name, on the same kind of key, at no lower version; the SecureStore key names, database names and per-profile key format are unchanged. It compares declarations and source text, not behaviour |
-| `releaseUpgrade.test.ts` | hand-written blobs in the shape v0.1.0 wrote, for ten stores, survive migrate and merge and load through the real save-and-load path (over a mock disk) without being set aside. `routstr-store` is covered by its own test instead |
-| `persistSchemaDrift.test.ts`, `persistRoundTrip.test.ts` | a recorded schema shape cannot change unnoticed, and every store's schema accepts that store's initial state as saved, plus chosen filled-in cases |
-| `globalMigrationsRunner.test.ts` | with the marker a released build wrote, the migration runner writes nothing and resolves, which is what lets the gate open |
+| Test                                                     | Holds                                                                                                                                                                                                                                                        |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `releasedPersistedSurface.test.ts`                       | every store v0.1.3 declared is still declared under the same name, on the same kind of key, at no lower version; the SecureStore key names, database names and per-profile key format are unchanged. It compares declarations and source text, not behaviour |
+| `releaseUpgrade.test.ts`                                 | hand-written blobs in the shape v0.1.0 wrote, for ten stores, survive migrate and merge and load through the real save-and-load path (over a mock disk) without being set aside. `routstr-store` is covered by its own test instead                          |
+| `persistSchemaDrift.test.ts`, `persistRoundTrip.test.ts` | a recorded schema shape cannot change unnoticed, and every store's schema accepts that store's initial state as saved, plus chosen filled-in cases                                                                                                           |
+| `globalMigrationsRunner.test.ts`                         | with the marker a released build wrote, the migration runner writes nothing and resolves, which is what lets the gate open                                                                                                                                   |
 
 What was run on devices is in `PERFORMANCE.md`: v0.1.3's code created data on a fresh Android
 emulator and a fresh iOS simulator (new wallets, two profiles), and the current code loaded over
@@ -284,19 +284,19 @@ Rules:
 
 ## Where to look
 
-| Question | File |
-| --- | --- |
-| What happens on switch, add, recover, remove, delete? | `app/shared/lib/profile/profileSessionOrchestrator.ts` |
-| The lock, the disk guard and the shared restart steps | `app/shared/lib/profile/profileTransition.ts` |
-| The in-process switch, step by step | `app/shared/lib/profile/inProcessProfileSwitch.ts` |
-| What removal checks and deletes | `app/shared/lib/profile/profileRemovalStorage.ts` |
-| How an account's keys and wallet phrase are found | `app/shared/lib/nostr/loadAccountKeys.ts` |
-| How the wallet opens, closes and is wiped | `app/shared/lib/cashu/manager.ts` (`initialize`, `cleanup`, `completeReset`) |
-| How a per-profile store finds its key, and when a save is dropped | `app/shared/lib/cashu/profileScopedStorage.ts` |
-| What every store's save-and-load options are | `app/shared/lib/persist/persistConfig.ts` |
-| Which providers remount with the account, and in what order | `app/shared/providers/AccountProviders.tsx` |
-| Which startup stages block, and their order | `app/shared/providers/InitializationProvider.tsx` |
-| When the splash comes down | `app/shared/blocks/NativeSplashLayoutGate.tsx` |
-| What an account owns outside React | `app/shared/lib/account/accountRegistry.ts` |
-| Decisions | ADR 0029 (registry and switch), ADR 0030 (removal) |
-| Known gaps | `docs/architecture/follow-ups.md` (F72, F76, F77, F79 to F85) |
+| Question                                                          | File                                                                         |
+| ----------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| What happens on switch, add, recover, remove, delete?             | `app/shared/lib/profile/profileSessionOrchestrator.ts`                       |
+| The lock, the disk guard and the shared restart steps             | `app/shared/lib/profile/profileTransition.ts`                                |
+| The in-process switch, step by step                               | `app/shared/lib/profile/inProcessProfileSwitch.ts`                           |
+| What removal checks and deletes                                   | `app/shared/lib/profile/profileRemovalStorage.ts`                            |
+| How an account's keys and wallet phrase are found                 | `app/shared/lib/nostr/loadAccountKeys.ts`                                    |
+| How the wallet opens, closes and is wiped                         | `app/shared/lib/cashu/manager.ts` (`initialize`, `cleanup`, `completeReset`) |
+| How a per-profile store finds its key, and when a save is dropped | `app/shared/lib/cashu/profileScopedStorage.ts`                               |
+| What every store's save-and-load options are                      | `app/shared/lib/persist/persistConfig.ts`                                    |
+| Which providers remount with the account, and in what order       | `app/shared/providers/AccountProviders.tsx`                                  |
+| Which startup stages block, and their order                       | `app/shared/providers/InitializationProvider.tsx`                            |
+| When the splash comes down                                        | `app/shared/blocks/NativeSplashLayoutGate.tsx`                               |
+| What an account owns outside React                                | `app/shared/lib/account/accountRegistry.ts`                                  |
+| Decisions                                                         | ADR 0029 (registry and switch), ADR 0030 (removal)                           |
+| Known gaps                                                        | `docs/architecture/follow-ups.md` (F72, F76, F77, F79 to F85)                |
