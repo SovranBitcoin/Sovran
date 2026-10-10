@@ -12,6 +12,7 @@
  * it register the layout's hooks with the account flows.
  */
 import { resetProfileNavigation } from '@/shared/lib/profile/resetProfileNavigation';
+import { reportAsyncStorageUsage } from '@/shared/lib/persist/storageUsage';
 import { registerProfileSwitchBoundary } from '@/shared/lib/account/accountRegistry';
 import { useNavigationContainerRef } from 'expo-router';
 import { DmEcashAutoRedeemProvider } from '@/features/payments/hooks/useDmEcashAutoRedeem';
@@ -83,6 +84,8 @@ export function AccountScopedProviders({
 }
 
 /** Hold the old tree unmounted until all new-account stores have hydrated. */
+const STORAGE_USAGE_REPORT_DELAY_MS = 60_000;
+
 export function AccountSwitchBoundary({ children }: { children: React.ReactNode }) {
   const navigation = useNavigationContainerRef();
   const [suspended, setSuspended] = useState(false);
@@ -144,6 +147,10 @@ export function KeyDerivationRegistrar() {
 export function TransitionGuardCleanup() {
   useEffect(() => {
     void clearTransitionGuardOnStartup();
+    // Once per run, well after startup: how full AsyncStorage is. Android caps
+    // it, and a full database fails saves with nothing on screen to show for it.
+    const timer = setTimeout(() => void reportAsyncStorageUsage(), STORAGE_USAGE_REPORT_DELAY_MS);
+    return () => clearTimeout(timer);
   }, []);
   return null;
 }

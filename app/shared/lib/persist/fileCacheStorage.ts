@@ -34,10 +34,11 @@ export function createFileCacheStorage(): StateStorage {
   };
   const checkedForLeftoverRow = new Set<string>();
 
-  const pathFor = (key: string) => {
-    if (!FileSystem.cacheDirectory) throw new Error('No cache directory');
-    return `${FileSystem.cacheDirectory}store-${key.replace(/[^a-z0-9-]/gi, '_')}.json`;
-  };
+  const pathFor = (key: string) =>
+    `${FileSystem.cacheDirectory}store-${key.replace(/[^a-z0-9-]/gi, '_')}.json`;
+  // No cache directory (a platform without one, or a test without the file
+  // system): the cache simply does not persist. It is a cache.
+  const unavailable = () => !FileSystem.cacheDirectory;
 
   /** Take over the value an earlier release kept in AsyncStorage, then free its row. */
   const adoptLegacyRow = async (key: string): Promise<string | null> => {
@@ -63,6 +64,7 @@ export function createFileCacheStorage(): StateStorage {
   return {
     getItem: (key) =>
       inOrder(key, async () => {
+        if (unavailable()) return null;
         const path = pathFor(key);
         if ((await FileSystem.getInfoAsync(path)).exists) {
           // Once per run is enough to clear a row left beside the file.
@@ -76,9 +78,13 @@ export function createFileCacheStorage(): StateStorage {
         if (legacy !== null) await write(key, legacy).catch(() => undefined);
         return legacy;
       }),
-    setItem: (key, value) => inOrder(key, () => write(key, value)),
+    setItem: (key, value) =>
+      inOrder(key, async () => {
+        if (!unavailable()) await write(key, value);
+      }),
     removeItem: (key) =>
       inOrder(key, async () => {
+        if (unavailable()) return;
         const path = pathFor(key);
         await FileSystem.deleteAsync(path, { idempotent: true });
         await FileSystem.deleteAsync(`${path}.tmp`, { idempotent: true });

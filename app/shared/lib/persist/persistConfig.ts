@@ -57,6 +57,37 @@ interface PersistConfigOptions<TFull, TPartial> {
   preserveUnreadable?: boolean;
 }
 
+/**
+ * Log a save that the storage rejected, then pass the rejection on. Once per
+ * store and message: a full database fails every save the same way.
+ *
+ * The rejection must survive. Zustand ignores it for ordinary saves, but it
+ * awaits the save after a migration, and recovery awaits these writes and
+ * decides what to undo from whether they threw.
+ */
+function reportFailedSaves(logKey: string, storage: StateStorage): StateStorage {
+  let lastMessage: string | null = null;
+  return {
+    getItem: (name) => storage.getItem(name),
+    removeItem: (name) => storage.removeItem(name),
+    setItem: async (name, value) => {
+      try {
+        await storage.setItem(name, value);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (message !== lastMessage) {
+          lastMessage = message;
+          storeLog.error(`store.${logKey}.save_failed`, {
+            chars: value.length,
+            error: redactError(error),
+          });
+        }
+        throw error;
+      }
+    },
+  };
+}
+
 /** Derive a snake_case log slug from the kebab-case `<name>-store` storage key. */
 function deriveLogKey(name: string): string {
   return name.replace(/-store$/, '').replace(/-/g, '_');
@@ -128,12 +159,15 @@ export function persistConfig<TFull, TPartial>(
         removeItem: (name) => profilePersistWrite(() => opts.storage.removeItem(name)),
       }
     : opts.storage;
+  // Zustand does not look at the result of a save. One that fails (on Android,
+  // most often because AsyncStorage is full) would otherwise leave no trace.
+  const reported = reportFailedSaves(logKey, storage);
   const guard =
-    opts.preserveUnreadable === false ? null : guardUnreadable(opts.name, logKey, storage);
+    opts.preserveUnreadable === false ? null : guardUnreadable(opts.name, logKey, reported);
   const mergeWithSchema = createMergeWithSchema(logKey, opts.schema);
   return {
     name: opts.name,
-    storage: createJSONStorage(() => guard?.storage ?? storage),
+    storage: createJSONStorage(() => guard?.storage ?? reported),
     version,
     partialize: opts.partialize,
     migrate,

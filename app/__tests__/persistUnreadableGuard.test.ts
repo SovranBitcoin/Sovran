@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { create } from 'zustand';
 import { persist, type StateStorage } from 'zustand/middleware';
 
+import { storeLog } from '@/shared/lib/logger';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
 
 jest.mock('@/shared/lib/logger', () => ({
@@ -276,4 +277,32 @@ it('leaves a store that opted out exactly as before', async () => {
 
   expect(disk.has(SIDE)).toBe(false);
   expect(JSON.parse(disk.get(NAME)!).state.count).toBe(1);
+});
+
+it('logs a save that storage rejects, once, and still reports the failure', async () => {
+  // On Android a full database fails every save. Ordinary saves ignore the
+  // result, so the log is the only trace; callers that await a save (recovery,
+  // the save after a migration) still need it to throw.
+  const disk: Disk = new Map();
+  let full = false;
+  const store = await mount(
+    memoryStorage(disk, {
+      setItem: async (key, value) => {
+        if (full) throw new Error('database or disk is full');
+        disk.set(key, value);
+      },
+    })
+  );
+  full = true;
+  jest.mocked(storeLog.error).mockClear();
+  const storage = store.persist.getOptions().storage!;
+  const value = { state: { count: 1 }, version: 1 };
+
+  await expect(storage.setItem(NAME, value)).rejects.toThrow('database or disk is full');
+  await expect(storage.setItem(NAME, value)).rejects.toThrow('database or disk is full');
+
+  const failures = jest
+    .mocked(storeLog.error)
+    .mock.calls.filter(([event]) => String(event).endsWith('.save_failed'));
+  expect(failures).toHaveLength(1);
 });
