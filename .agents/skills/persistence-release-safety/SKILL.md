@@ -143,6 +143,13 @@ APK (GitHub release, checksum in `origin/release-state`), build the candidate wi
 Data and Keystore entries follow the package, not the certificate. Use an emulator that has
 no store-signed copy installed. iOS has no equivalent; it needs TestFlight.
 
+When the old binary is no longer downloadable (EAS artifacts expire), rebuild it: a detached
+`git worktree` at the release commit, `bun install --frozen-lockfile`, `git submodule update
+--init` for the vendored native sources, `expo prebuild`, `assembleRelease`. Say in the
+ledger that it is a rebuild. To carry money through the upgrade without a real wallet, mint
+a token from the public test mint (`testnut.cashu.space`, fake payments) and redeem it in
+the old build.
+
 ### 5. Independent roles
 
 Run these as separate agents (Codex with `codex exec --sandbox read-only`, detached, one

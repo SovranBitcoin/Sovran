@@ -4,9 +4,11 @@
 
 - Upgrades from **0.1.3 on Android: PASS.** The released 0.1.3 APK was upgraded in place to a
   release build of the candidate on an emulator, with nothing lost (below).
-- Upgrades from **0.1.0 to 0.1.2**, and from **0.1.3 on iOS**, have no open finding and pass
-  every test below, but no released binary of those was upgraded. An iOS binary upgrade needs
-  TestFlight; the simulator cannot run a store build.
+- Upgrades from **0.1.1 on Android: PASS**, with money. A release build of the 0.1.1 source
+  holding 63 test sats was upgraded in place to the candidate; the balance and the history
+  carried over (below). 0.1.0 and 0.1.1 are the only Android releases below 0.1.3.
+- Upgrades on **iOS** have no open finding and pass every test below, but no released iOS
+  binary was upgraded. That needs TestFlight; the simulator cannot run a store build.
 - Upgrades from **0.0.45 to 0.0.63** had three defects that lose data or a paid credential.
   All three are fixed and tested in this run. No real upgrade from those builds was run.
 - Upgrades from **0.0.1 to 0.0.40** (redux era, iOS only) no longer hand the user a new
@@ -77,6 +79,17 @@ released shape and the candidate reader for every row are in the persistence map
 | After, on the candidate | Opened straight to the wallet: no terms, no onboarding, no restore prompt, no retry screen. Same account active with the same npub; both accounts listed; mint still selected. Switched to the first account: same name and npub. Stopped and started again: still there. No error, refusal or recovery line from the app in the device log |
 | Not covered | Funds (both wallets were empty), Routstr, an install older than 0.1.3, iOS |
 
+**0.1.1 release build, funded, to the same candidate build, Android, 2026-10-10.**
+
+| | |
+| --- | --- |
+| Old | `assembleRelease` of `4203ea8ec` (0.1.1, the commit `main` was at when the 0.1.1 builds were made; EAS recorded no commit and its APKs have expired, so this is a rebuild, not the shipped file), `versionCode` 21. It carries Coco 1.0.1 and the storage modules of that release |
+| New | The same candidate APK as above (`3965e66bb`, `versionCode` 25), same local key |
+| State made on 0.1.1 | Terms accepted, wallet created, a 64 sat token from the public test mint (`testnut.cashu.space`, fake payments, no real money) pasted and redeemed, test mint trusted. Balance 63 after the swap fee, one receive in the history |
+| After, on the candidate | Asked to accept the updated terms and privacy documents (they changed after 0.1.1), then opened the wallet. The receive of 64 is in the history; the candidate offered a backup "because you have money here now"; the test mint is listed with **₿ 63**, under test bitcoin where the candidate files test mints. Stopped and started again: history still there. No error, refusal or recovery line from the app in the device log |
+| What this adds | A wallet database written by Coco 1.0.1 is opened and migrated by Coco 2.0.0 with its proofs intact, and the 0.1.1 stores (settings v3, profile v1) are read |
+| Not covered | Spending the migrated proofs; several accounts; Routstr; iOS |
+
 Earlier, weaker runs (in `PERFORMANCE.md`): 0.1.3's JavaScript, then the candidate's, inside
 the candidate's native build, on a fresh Android emulator and a fresh iOS simulator, with
 nothing lost.
@@ -89,7 +102,7 @@ To repeat it: download the release APK, `apksigner sign` it and a local `assembl
 
 | Gap | Why | Unblocked by |
 | --- | --- | --- |
-| A Coco database written by 0.6.0, rc.11, rc.30, rc.34, rc.47, 1.0.x opened by 2.0.0 | No database files from those builds exist to test with | Building one old revision per Coco version in a simulator and keeping its `coco.db` as a fixture |
+| A Coco database written by 0.6.0, rc.11, rc.30, rc.34, rc.47, 1.0.0 opened by 2.0.0 (1.0.1 is shown above) | No database files from those builds exist to test with | Building one old revision per Coco version in a simulator and keeping its `coco.db` as a fixture |
 | SecureStore keeping the same items across native versions older than 0.1.3, and on iOS | Shown for 0.1.3 → candidate on Android only | A TestFlight upgrade; an old Android build to upgrade from |
 | The 99 builds from 2024 | Source is not in this repository | The earlier repository |
 | Which builds are still installed | EAS does not record it | App Store Connect and Play Console (questions in the provenance record) |

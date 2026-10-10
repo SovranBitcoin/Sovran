@@ -809,3 +809,11 @@ same one active and the mint still selected; no prompt, no retry screen, and not
 app in the device log. The full record is in
 [the evidence ledger](docs/architecture/persistence/evidence-ledger.md#real-upgrades). Still
 not run: the same on iOS (TestFlight only), and with funds in the wallet.
+
+## A funded 0.1.1 release build upgraded to the candidate (Android, 2026-10-10)
+
+A release build of the 0.1.1 source, holding 63 test sats from the public test mint, was
+upgraded in place to the same candidate build. The balance, the mint and the history were
+there afterwards, so a wallet database written by Coco 1.0.1 is migrated by Coco 2.0.0 with
+its proofs intact. The only prompt was to accept the documents that changed after 0.1.1.
+Record: [evidence ledger](docs/architecture/persistence/evidence-ledger.md#real-upgrades).
