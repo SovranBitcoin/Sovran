@@ -83,6 +83,8 @@ interface ResetStagesOptions {
 
 interface InitializationContextValue {
   isInitializing: boolean;
+  /** A blocking stage has failed; whatever it rendered in place of the app is on screen. */
+  hasFailedStage: boolean;
   registerStage: (id: string, config: StageConfig) => void;
   updateStage: (
     id: string,
@@ -99,6 +101,7 @@ const noop = () => {};
 
 const InitializationContext = createContext<InitializationContextValue>({
   isInitializing: false,
+  hasFailedStage: false,
   registerStage: noop,
   updateStage: noop,
   canStageStart: () => true,
@@ -111,8 +114,8 @@ const useInitializationContext = () => {
 };
 
 export function useInitializationState() {
-  const { isInitializing } = useInitializationContext();
-  return { isInitializing };
+  const { isInitializing, hasFailedStage } = useInitializationContext();
+  return { isInitializing, hasFailedStage };
 }
 
 interface InitializationProviderProps {
@@ -230,6 +233,10 @@ export function InitializationProvider({ children }: InitializationProviderProps
       (stage) => stage.blocking && (stage.status === 'loading' || stage.status === 'pending')
     );
 
+  const hasFailedStage = Array.from(stages.values()).some(
+    (stage) => stage.blocking && stage.status === 'error'
+  );
+
   // Log isInitializing transitions. Written in an effect, not during render:
   // a render-phase ref write logs renders React went on to discard, and it is
   // the rule violation that stopped the compiler optimising this provider.
@@ -307,13 +314,22 @@ export function InitializationProvider({ children }: InitializationProviderProps
   const contextValue = useMemo<InitializationContextValue>(
     () => ({
       isInitializing,
+      hasFailedStage,
       registerStage,
       updateStage,
       canStageStart,
       resetStages,
       cancelResetStages,
     }),
-    [isInitializing, registerStage, updateStage, canStageStart, resetStages, cancelResetStages]
+    [
+      isInitializing,
+      hasFailedStage,
+      registerStage,
+      updateStage,
+      canStageStart,
+      resetStages,
+      cancelResetStages,
+    ]
   );
 
   return (

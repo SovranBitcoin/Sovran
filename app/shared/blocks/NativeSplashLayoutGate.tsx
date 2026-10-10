@@ -122,7 +122,7 @@ type SplashPhase = 'await_init' | 'await_anchor' | 'morphing' | 'fading' | 'unmo
 
 export function NativeSplashLayoutGate({ children }: { children: React.ReactNode }) {
   useInitMount('NativeSplashLayoutGate');
-  const { isInitializing } = useInitializationState();
+  const { isInitializing, hasFailedStage } = useInitializationState();
   const splash = useSplashGeometry();
   const [surfaceTertiary] = useThemeColor(['surface-tertiary'] as const);
   const rootViewRef = useRef<View>(null);
@@ -184,6 +184,15 @@ export function NativeSplashLayoutGate({ children }: { children: React.ReactNode
     overlayDeadlineRef.current = Date.now() + OVERLAY_LIFETIME_CAP_MS;
     setPhase('await_anchor');
   }, [phase, hasRootLaidOut]);
+
+  // A blocking stage failed: its recovery screen is what the app has to show,
+  // and the wallet screen's anchor will never be published. Waiting out the
+  // anchor fallback would keep that screen behind the splash for eight seconds.
+  useEffect(() => {
+    if (phase !== 'await_anchor' || !hasFailedStage) return;
+    initLog('SplashMorph', 'a blocking stage failed — fading out');
+    setPhase('fading');
+  }, [phase, hasFailedStage]);
 
   // Phase 2 — await_anchor: wait for the QR button to publish a stable
   // anchor. We poll `measureInWindow` for `LAYOUT_SETTLE_DELAY_MS` ms because

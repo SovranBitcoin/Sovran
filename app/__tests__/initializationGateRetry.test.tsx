@@ -3,7 +3,10 @@ import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 
 import { InitializationGate } from '@/shared/blocks/InitializationGate';
-import { InitializationProvider } from '@/shared/providers/InitializationProvider';
+import {
+  InitializationProvider,
+  useInitializationState,
+} from '@/shared/providers/InitializationProvider';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -82,4 +85,46 @@ it('renders nothing on failure when no failure screen is given', async () => {
 
   expect(renderer.toJSON()).toBeNull();
   expect(onSuccess).not.toHaveBeenCalled();
+});
+
+it('reports a failed blocking stage, and clears it when a retry is under way', async () => {
+  // The boot splash fades as soon as this is true, so the failure screen is
+  // not left behind it.
+  const run = jest
+    .fn<Promise<void>, []>()
+    .mockRejectedValueOnce(new Error('disk full'))
+    .mockResolvedValueOnce(undefined);
+  let retry: (() => void) | undefined;
+  const seen: boolean[] = [];
+  function Probe() {
+    seen.push(useInitializationState().hasFailedStage);
+    return null;
+  }
+
+  await act(async () => {
+    TestRenderer.create(
+      <InitializationProvider>
+        <Probe />
+        <InitializationGate
+          tag="TestGate"
+          stageId="test-gate"
+          message="working"
+          logEvent="gate.test"
+          run={run}
+          renderFailure={(onRetry) => {
+            retry = onRetry;
+            return 'failed';
+          }}>
+          opened
+        </InitializationGate>
+      </InitializationProvider>
+    );
+  });
+  expect(seen.at(-1)).toBe(true);
+
+  await act(async () => {
+    retry?.();
+  });
+
+  expect(seen.at(-1)).toBe(false);
 });
