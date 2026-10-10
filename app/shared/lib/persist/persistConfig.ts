@@ -7,6 +7,7 @@ import type { LiveStore } from '@/shared/lib/account/accountRegistry';
 import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
 import { declaredStores } from '@/shared/lib/account/accountRegistry';
 import { guardUnreadable } from '@/shared/lib/persist/preserveUnreadable';
+import { markHydrationFailed, markHydrationStarted } from '@/shared/lib/persist/hydrationOutcome';
 
 const DEFAULT_VERSION = 1;
 
@@ -177,13 +178,17 @@ export function persistConfig<TFull, TPartial>(
       if (persisted && typeof persisted === 'object' && merged === current) guard?.reject();
       return merged;
     },
-    onRehydrateStorage: () => (state, error) => {
-      if (error) {
-        // An unparseable blob or a throwing `migrate` ends up here, not in `merge`.
-        guard?.reject();
-        storeLog.warn(`store.${logKey}.rehydrate_failed`, { error: redactError(error) });
-      }
-      opts.afterHydrate?.(state, error);
+    onRehydrateStorage: () => {
+      markHydrationStarted(opts.name);
+      return (state, error) => {
+        if (error) {
+          // An unparseable blob or a throwing `migrate` ends up here, not in `merge`.
+          guard?.reject();
+          storeLog.warn(`store.${logKey}.rehydrate_failed`, { error: redactError(error) });
+          markHydrationFailed(opts.name);
+        }
+        opts.afterHydrate?.(state, error);
+      };
     },
   };
 }
