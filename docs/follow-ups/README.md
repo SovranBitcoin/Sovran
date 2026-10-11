@@ -101,7 +101,6 @@ reports) keep their evidence, and link here for anything still open.
 | [F91](F91.md) | medium | fix | A wallet database for an unlisted account is never offered or deleted |
 | [F92](F92.md) | medium | fix | Profile removal and delete-all keep no durable record of the step they reached |
 | [F93](F93.md) | medium | decision | Decide how ecash leaves a mismatched account; run the identity check on devices |
-| [F94](F94.md) | medium | fix | Retrying a failed wallet open does not restage the wallet phrase and fails until restart |
 | [F95](F95.md) | low | fix | Recovery with an unreadable keychain accepts any phrase for imported accounts |
 | [F96](F96.md) | low | test | No native scenario for AccountMismatchScreen; the harness cannot plant a mismatched row |
 | [F97](F97.md) | medium | fix | A paid but unminted Lightning receive from 0.0.1 to 0.0.40 is recorded but never minted |

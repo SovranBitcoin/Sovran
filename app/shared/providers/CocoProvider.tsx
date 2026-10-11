@@ -15,6 +15,7 @@ import { attachMintMetadataToManager } from '@/shared/stores/global/mintMetadata
 import { log, initLog, initPhase, useInitMount, deferWork } from '@/shared/lib/logger';
 import { getBootMorphCompleted, subscribeBootMorphCompleted } from '@/shared/lib/qrButtonAnchor';
 import { awaitRestoreReady } from '@/shared/providers/awaitRestoreReady';
+import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { useWalletLifecycleStore } from '@/shared/stores/global/walletLifecycleStore';
 import { initializeDefaultMints } from '@/shared/lib/cashu/initializeDefaultMints';
 
@@ -210,6 +211,19 @@ async function runCocoPhase2({ bgStage, chainManager, isLive }: CocoPhase2Args):
   }
 }
 
+/**
+ * Stage the account's credentials again for a retry. Closing the attempt that
+ * failed cleared the wallet phrase and the imported flag, and the keys
+ * provider, which staged them, does not run again for a retry. Without this an
+ * imported account's retry is opened as a derived one, which the wallet-open
+ * check refuses, so every retry fails until the app is restarted.
+ */
+function restageWalletCredentials(cashuMnemonic: string | null): void {
+  const profile = useProfileStore.getState().getActiveProfile();
+  if (profile) CocoManager.setAccountIndex(profile.accountIndex, profile.source === 'imported');
+  if (cashuMnemonic) CocoManager.setCashuMnemonic(cashuMnemonic);
+}
+
 export function CocoProvider({ children }: CocoProviderProps) {
   useInitMount('CocoProvider');
   const stage = useInitializationStage('coco', {
@@ -222,12 +236,13 @@ export function CocoProvider({ children }: CocoProviderProps) {
     dependsOn: ['coco'],
     blocking: false,
   });
-  const { keys } = useNostrKeysContext();
+  const { keys, cashuMnemonic } = useNostrKeysContext();
   // Mirrored, not depended on: `privateKey` is a fresh `Uint8Array` on every
   // derivation, so making it a trigger would tear down and re-initialise
   // CocoManager whenever the keys context re-derived the SAME identity.
   // `pubkey` is the stable identity of the keypair and the real trigger.
   const privateKeyRef = useLatestRef(keys?.privateKey);
+  const cashuMnemonicRef = useLatestRef(cashuMnemonic);
   const [manager, setManager] = useState<Manager | null>(null);
   const [isReady, setIsReady] = useState(false);
   // A failed open is shown with a retry; each retry is a new attempt.
@@ -242,6 +257,7 @@ export function CocoProvider({ children }: CocoProviderProps) {
     if (hasStarted.current) return;
     hasStarted.current = true;
 
+    if (attempt > 0) restageWalletCredentials(cashuMnemonicRef.current);
     const run = { current: true };
     void runCocoPhase1({
       stage,
@@ -268,7 +284,7 @@ export function CocoProvider({ children }: CocoProviderProps) {
       });
     };
     // (`stage` is memoised — it moves only when `canStart` flips.)
-  }, [stage, keys?.pubkey, privateKeyRef, attempt]);
+  }, [stage, keys?.pubkey, privateKeyRef, cashuMnemonicRef, attempt]);
 
   // Phase 2: Non-blocking — Default mints + recovery (runs after app is visible)
   useEffect(() => {
