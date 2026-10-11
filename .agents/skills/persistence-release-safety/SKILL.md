@@ -115,7 +115,26 @@ For each epoch write down the states a real install could be in, not only the fr
 ### 4. Fixtures and tests
 
 Fixtures are built from what the old code actually wrote: take the shape from the old
-revision's source, not from the current schema. For each (epoch, durable thing):
+revision's source, not from the current schema.
+
+The fixtures live in `app/__tests__/releaseFixtures/`, one data file per epoch, and one test
+runs them all (`app/__tests__/releaseFixtures.test.ts`): each is loaded into in-memory storage
+and the candidate is started over it three times, through the global migrations, every
+persisted store, the keys of every account and an account switch. Start here:
+
+1. Run `releaseFixturesCompleteness.test.ts`. It names every epoch of the map, every version
+   in `store-builds.tsv` and every persisted store of the candidate that no fixture covers.
+   A version or an epoch added in phases 1 and 2 shows up here.
+2. For each one named, add or extend a fixture as
+   `app/__tests__/releaseFixtures/README.md` describes. The candidate's own fixture is
+   written from its store registry with `WRITE_RELEASE_FIXTURE=E<n> bun run release-fixture:new`
+   (in `app/`); every older one is written by hand from the old source.
+3. Run `releaseFixtures.test.ts`. A fixture that fails is a finding for phase 6. A loss that
+   stays open is recorded in that fixture's `knownGaps` with its follow-up id; nothing else
+   may be changed to get green.
+
+That suite is the floor: one used install per epoch, upgraded directly. It does not replace
+the cases below. For each (epoch, durable thing):
 
 - a fixture of the released state, and a test that the candidate reads it with nothing lost;
 - every upgrade path, including skipped epochs, ends in the same state as the direct path;

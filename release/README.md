@@ -12,6 +12,18 @@ After setup, change `app/app.json` → `expo.version`, run `bun run assets:gener
 review the brand gallery, and commit the generated artwork with the version bump
 before merging to protected `main`.
 
+The version bump also needs a release fixture, in the same commit. Every earlier release is
+upgraded to the tree under test by `app/__tests__/releaseFixtures.test.ts`, one fixture per
+run of releases that wrote the same things to disk. If this release changes nothing on disk,
+add its version to the newest fixture's `versions`. If it adds, removes, renames or
+re-versions a store, a SecureStore key or a database, write a new fixture; the
+[fixtures guide](../app/__tests__/releaseFixtures/README.md) has the four steps.
+`releaseFixturesCompleteness.test.ts` fails, naming what is missing, until one of the two is
+done, and again when a store changes after the fixture was written. After the release is
+published, run `python3 .agents/skills/persistence-release-safety/epochs.py builds` and commit
+the updated `docs/architecture/persistence/store-builds.tsv`, so the builds that shipped are
+the ones the fixtures are checked against.
+
 Refresh the marketing material in that same pre-merge step. Once a release is
 decided, run the full native capture campaign and commit its output: the website's
 phone scenes and generated social/OG rasters build directly from
