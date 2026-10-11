@@ -221,6 +221,22 @@ describe('forgetting', () => {
     } finally {
       AsyncStorage.setItem = real;
     }
+
+    // Trying again saves it, though memory already said forgotten.
+    await forgetWalletDatabases([1], 500);
+    const saved = JSON.parse((await AsyncStorage.getItem('profile-store'))!).state.profiles;
+    expect(saved[1].walletDatabaseCreated).not.toBe(true);
+  });
+
+  it('rejects when the saved list cannot be read back in time', async () => {
+    await flush();
+    const real = AsyncStorage.getItem;
+    AsyncStorage.getItem = () => new Promise(() => undefined);
+    try {
+      await expect(forgetWalletDatabases([1], 100)).rejects.toThrow('could not be saved');
+    } finally {
+      AsyncStorage.getItem = real;
+    }
   });
 
   it('does not carry over to an account added again at the same index', () => {

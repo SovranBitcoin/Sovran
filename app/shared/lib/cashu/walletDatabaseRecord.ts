@@ -18,7 +18,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { cashuLog } from '../logger';
-import { useProfileStore } from '@/shared/stores/global/profileStore';
+import {
+  PROFILE_STORE_PERSIST_VERSION,
+  useProfileStore,
+} from '@/shared/stores/global/profileStore';
 import { useWalletLifecycleStore } from '@/shared/stores/global/walletLifecycleStore';
 
 const isRecorded = (accountIndex: number): boolean =>
@@ -79,20 +82,31 @@ async function savedAsForgotten(accountIndexes: readonly number[]): Promise<bool
  * The store saves on its own and does not say whether the save landed. If it
  * did not and the deletion is interrupted, the next launch finds a recorded
  * database missing and asks for a restore of an account the person removed.
- * So this resolves only once the list on disk has forgotten them, and rejects
- * if it has not within `waitMs`: the caller must not delete anything then.
+ * So this writes the profile list itself, reads it back, and resolves only
+ * once the list on disk has forgotten them. It rejects when the write or the
+ * read fails or does not answer within `waitMs`: the caller must not delete
+ * anything then, and may call again.
  */
 export async function forgetWalletDatabases(
   accountIndexes: readonly number[],
   waitMs = 2000
 ): Promise<void> {
   useProfileStore.getState().setWalletDatabaseCreated(accountIndexes, false);
-  const deadline = Date.now() + waitMs;
-  while (!(await savedAsForgotten(accountIndexes))) {
-    if (Date.now() >= deadline) {
-      cashuLog.warn('cashu.wallet_database.forget_not_saved', { accountIndexes });
-      throw new Error('The wallet database record could not be saved');
-    }
-    await new Promise((resolve) => setTimeout(resolve, 25));
+  const { activeAccountIndex, profiles } = useProfileStore.getState();
+  const row = JSON.stringify({
+    state: { activeAccountIndex, profiles },
+    version: PROFILE_STORE_PERSIST_VERSION,
+  });
+  const confirmed = (async () => {
+    await AsyncStorage.setItem('profile-store', row);
+    return savedAsForgotten(accountIndexes);
+  })().catch(() => false);
+  const saved = await Promise.race([
+    confirmed,
+    new Promise<false>((resolve) => setTimeout(() => resolve(false), waitMs)),
+  ]);
+  if (!saved) {
+    cashuLog.warn('cashu.wallet_database.forget_not_saved', { accountIndexes });
+    throw new Error('The wallet database record could not be saved');
   }
 }
