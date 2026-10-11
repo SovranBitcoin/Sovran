@@ -1,0 +1,26 @@
+/**
+ * The stored data of each released fixture, by hash (`releaseFixturesFrozen.test.ts`).
+ * A line is added when a fixture stops being the newest, and changes only when
+ * the fixture misstated what the release wrote.
+ */
+export const FROZEN_FIXTURE_DATA: Readonly<Record<string, string>> = {
+  E1: '4ce27ef2c220616860ca2dd7ab79f48e10de0e22697e683f202216de4d374b01',
+  E10: '14442de4f50f8bbc320b6301ce0080462128d0140e4d072d991bb8b275ad9eb6',
+  E11: '17418adf7011952d113d29d303e36ca0302be89b931d9ef8ffbdff4cde24a9c3',
+  E12: 'c54c2554e5574321c0d28cfedfc4e5474adf8a037cd9e255b0d89abb8c840c4f',
+  E13: 'c9d4a8d2f017ea2a9fd7ea64bc75e8d5df9c74cf90a2158e9deb13530dd0033d',
+  E14: '4b27d9a2203a02848661579534d8fad0a97830e0dbc5f99c7d752e25a62dbaf7',
+  E15: '252fee2d3ab54f1d29a4340aa5aef798fa048f00c7151b3d8015e6435e9e7724',
+  E16: '6ec460fa7f36032e15e117a531e28b5640c4347bb918169599cca6e4d78ed6e7',
+  E17: 'bd18fc0b961a11fb7fe3ee1cb48c2ee15bdbb77c5fb34d7486831ae9e02a782e',
+  E18: '6d9c646d243999feb564fa56ba601cba73e691cea640f90053c562dbefd3ef29',
+  E19: 'f20679b41ac4f70aa3ddc9e110b23b1b71ac2d04c2a6e0351e5022aa2d5f909a',
+  E2: 'da1bcc278b1b9910d6bc1665b637202f9ced1517ec3fe511bee143695e503d5c',
+  E3: 'a607b66f390073fdfeb78676e731c77874a1b103a463f087dc5d1224bd58df9d',
+  E4: 'c96c15de966cfc114296bc0170cf003632fe72de5cf2afa0f62e475117c01f6e',
+  E5: '4997f21f080387f4e4378b098c4fa55a476b15e8e67d02c1a5433d41d3493f7c',
+  E6: '4c9412d25ca96a8bd12873d3bc1fe9a3f72101d800fe7f887a55928a3bfc4fe8',
+  E7: '5df16e5e3626408b41afcbdfa741d5b46e8203358fc39cc65c292a00005e80fc',
+  E8: '68dfe2985ca0a46bcd5039ad79cb521868b70669eee02c3bf747378af18d0772',
+  E9: '2496ec2b7dee5d631521fa3afdf1d3414f74f1335b4adfdf24a6c5504c9a6181',
+};

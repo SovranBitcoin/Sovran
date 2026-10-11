@@ -22,7 +22,9 @@ SQLite databases, render anything, or touch a real keychain; those need a device
   `git show <commit>:<path>` and cite it beside the row as `path:line@commit`. Never copy a
   shape from the current schema: a fixture written from today's schema cannot fail.
 - **A released fixture is frozen.** When a schema changes and a fixture fails, the fixture is
-  right and the change needs a migration.
+  right and the change needs a migration. `../releaseFixturesFrozen.test.ts` pins the stored
+  data of every fixture but the newest by hash (`frozen.ts`); add the line when a fixture stops
+  being the newest.
 - **Never weaken a check.** A real loss the current app has is recorded in the fixture's
   `knownGaps` with its row in `docs/follow-ups/`. The runner then expects that
   one check to fail, and fails when it starts passing so the entry gets removed.
