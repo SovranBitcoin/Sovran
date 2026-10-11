@@ -19,7 +19,7 @@
 import type { HistoryEntry } from '@cashu/coco-core';
 import type { AiRequestGroup } from 'wallet';
 
-import { amountToNumber } from 'wallet';
+import { amountToNumber } from 'wallet/amount';
 
 /** True when the money moved and then came back — or never went at all. */
 export function isAiRequestReturned(group: Pick<AiRequestGroup, 'state'>): boolean {

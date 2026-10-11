@@ -1,4 +1,4 @@
-import type { AmountValue } from 'wallet';
+import type { AmountValue } from 'wallet/amount';
 import { formatAmount } from '@/shared/lib/currency';
 import { CopyableValue } from '@/shared/ui/composed/CopyableValue';
 import { MiddleEllipsisValue } from '@/shared/ui/composed/MiddleEllipsisValue';

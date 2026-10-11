@@ -202,7 +202,6 @@ jest.mock('@/features/payments/hooks/useDmConversations', () => ({
   useDmConversations: (...args: unknown[]) => mockDmReader(...args),
 }));
 jest.mock('wallet', () => ({
-  amountToNumber: Number,
   getCounterparty: () => null,
   // The fixtures annotate a grouped AI request. Nothing in THIS file reads
   // that annotation back — it is about mock-mode isolation of contacts and

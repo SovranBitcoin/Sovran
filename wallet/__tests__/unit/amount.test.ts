@@ -18,6 +18,14 @@ describe('amountToNumber (display)', () => {
       expect(amountToNumber(bad)).toBe(0);
     }
     expect(amountToNumber({ toNumber: () => NaN })).toBe(0);
+    expect(amountToNumber({} as never)).toBe(0);
+    expect(
+      amountToNumber({
+        toNumber: () => {
+          throw new Error('exceeds Number.MAX_SAFE_INTEGER');
+        },
+      })
+    ).toBe(0);
   });
 });
 
@@ -40,7 +48,7 @@ describe('requireAmount (prices, fees and amounts to pay or accept)', () => {
   });
 
   it('refuses to invent a number', () => {
-    for (const bad of [null, undefined, 'abc', '', NaN, Infinity, -1, 1.5, '1.5', unsafe]) {
+    for (const bad of [null, undefined, 'abc', '', NaN, Infinity, -1, 1.5, '1.5', unsafe, '1e3', '0x10', ' 21 ']) {
       expect(() => requireAmount(bad)).toThrow(TypeError);
     }
   });

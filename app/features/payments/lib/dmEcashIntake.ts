@@ -96,6 +96,8 @@ export async function intakeDmEcash(
 
   const classified = classifyMeshToken(token, deps.myPubkey33);
   if (classified.classification === 'locked-to-other') return 'locked-to-other';
+  // A proof amount that could not be read: the total is not the token's value.
+  if (classified.classification === 'invalid') return 'unsupported';
   if (!classified.mintUrl) return 'no-mint';
 
   const tokenHash = meshTokenDedupeKey(token);

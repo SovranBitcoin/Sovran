@@ -7,7 +7,7 @@ import {
   looksLikeBitcoinAddress,
 } from 'wallet';
 
-import { amountToNumber, type AmountValue } from 'wallet';
+import { amountToNumber, type AmountValue } from 'wallet/amount';
 import { cashuLog } from '@/shared/lib/logger';
 
 type EntryRecord = Record<string, unknown>;

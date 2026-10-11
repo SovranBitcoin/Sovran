@@ -18,7 +18,7 @@ import { decodePaymentRequest, getDecodedToken } from '@cashu/cashu-ts';
 import { wrapEvent } from 'nostr-tools/nip17';
 import * as nip19 from 'nostr-tools/nip19';
 import { generateSecretKey } from 'nostr-tools/pure';
-import { requireAmount } from 'wallet';
+import { requireAmount } from 'wallet/amount';
 
 interface NostrPaymentRequestTarget {
   requestId: string;

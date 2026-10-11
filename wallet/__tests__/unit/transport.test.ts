@@ -60,6 +60,16 @@ describe("classifyMeshToken", () => {
     });
   });
 
+  it("is invalid when the proofs add up to more than a number can hold exactly", () => {
+    const big = 2 ** 52;
+    const token = encode([
+      proof("aa".repeat(32), big),
+      proof("bb".repeat(32), big),
+      proof("cc".repeat(32), 1),
+    ]);
+    expect(classifyMeshToken(token, MY_PUBKEY).classification).toBe("invalid");
+  });
+
   it("matches the lock key case-insensitively", () => {
     const token = encode([proof(p2pkSecret(MY_PUBKEY))]);
     expect(

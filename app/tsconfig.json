@@ -43,6 +43,7 @@
       "nostr/schemas": ["../nostr/src/schemas.ts"],
       "wallet": ["../wallet/src/index.ts"],
       "wallet/react": ["../wallet/src/react/index.ts"],
+      "wallet/amount": ["../wallet/src/amount.ts"],
       "wallet/units": ["../wallet/src/units/index.ts"],
       "wallet/safeFetch": ["../wallet/src/safeFetch.ts"],
       "wallet/operations": ["../wallet/src/operations/index.ts"],

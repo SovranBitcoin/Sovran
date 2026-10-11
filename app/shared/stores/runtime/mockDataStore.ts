@@ -20,7 +20,7 @@ import {
   useNostrMetadataCache,
   type NostrProfileMetadata,
 } from '@/shared/stores/global/nostrMetadataCache';
-import { amountToNumber } from 'wallet';
+import { amountToNumber } from 'wallet/amount';
 import type { HistoryEntry } from '@cashu/coco-core';
 import { asHistoryEntry } from '@/shared/lib/cashu/syntheticHistory';
 // Type-only import — `useRecentContacts` does not import this file at runtime

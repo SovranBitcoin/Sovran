@@ -1,6 +1,7 @@
 import type { Proof } from '@cashu/cashu-ts';
 import type { Manager } from '@cashu/coco-core';
-import { amountToNumber, requireAmount, type RebalanceWalletPort } from 'wallet';
+import type { RebalanceWalletPort } from 'wallet';
+import { amountToNumber, requireAmount } from 'wallet/amount';
 
 import { releaseTrustWindow } from '@/features/mint/components/rebalance';
 import { prepareBolt11MeltQuote, prepareBolt11MintQuote } from '@/shared/lib/cashu/cocoOperations';

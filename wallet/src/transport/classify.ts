@@ -128,6 +128,9 @@ export function classifyMeshToken(
 
     for (const proof of token.proofs) {
       amount += requireAmount(proof.amount);
+      if (!Number.isSafeInteger(amount)) {
+        throw new TypeError("token total is too large to hold exactly");
+      }
       let secret: ReturnType<typeof parseP2PKSecret>;
       try {
         secret = parseP2PKSecret(proof.secret);

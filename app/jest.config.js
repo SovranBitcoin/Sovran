@@ -21,6 +21,7 @@ module.exports = {
     '^nostr/schemas$': '<rootDir>/../nostr/src/schemas.ts',
     '^wallet$': '<rootDir>/../wallet/src/index.ts',
     '^wallet/react$': '<rootDir>/../wallet/src/react/index.ts',
+    '^wallet/amount$': '<rootDir>/../wallet/src/amount.ts',
     '^wallet/units$': '<rootDir>/../wallet/src/units/index.ts',
     '^wallet/safeFetch$': '<rootDir>/../wallet/src/safeFetch.ts',
     '^wallet/operations$': '<rootDir>/../wallet/src/operations/index.ts',

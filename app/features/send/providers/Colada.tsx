@@ -49,7 +49,7 @@ import { parseRawMetadata } from '@/shared/hooks/useNostrProfileMetadata';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { paymentLog, mintUrlLogFields } from '@/shared/lib/logger';
 import { actionMenuSheet } from '@/shared/lib/popup/popups/actionMenuSheet';
-import { amountToNumber } from 'wallet';
+import { requireAmount } from 'wallet/amount';
 import { sendDirectMessageToRelays } from '@/shared/lib/nostr/sendDirectMessage';
 import { getOwnWriteRelays } from '@/shared/lib/nostr/outbox/relayListStore';
 import { buildSignedZapRequestJson, lnurlBech32 } from '@/shared/lib/nostr/zap/buildZapRequest';
@@ -418,7 +418,7 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
               },
               buttons: options.map((option) => ({
                 text: `~${option.estimated_blocks} block${option.estimated_blocks === 1 ? '' : 's'}`,
-                description: `${amountToNumber(option.fee_reserve)} sat fee reserve`,
+                description: `${requireAmount(option.fee_reserve)} sat fee reserve`,
                 testID: `onchain-fee-${option.fee_index}`,
                 onPress: () => {
                   paymentLog.info('send.onchain.fee_selected', {

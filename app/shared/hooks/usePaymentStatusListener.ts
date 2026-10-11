@@ -24,7 +24,7 @@ import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStor
 import { isSwapStatusActive } from '@/shared/stores/runtime/swapStatusStore';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { setTransactionAnnotation } from '@/shared/stores/profile/transactionAnnotationStore';
-import { amountToNumber } from 'wallet';
+import { amountToNumber } from 'wallet/amount';
 import { paymentLog, mintUrlLogFields } from '@/shared/lib/logger';
 
 const NPC_RECEIVE_POPUP_MAX_AGE_MS = 5 * 60 * 1000;

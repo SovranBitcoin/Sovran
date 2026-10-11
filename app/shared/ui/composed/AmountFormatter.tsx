@@ -12,7 +12,7 @@ import { LiquidGlassText } from 'liquid-glass-text';
 import type { GlassVariant } from 'liquid-glass-text';
 
 import { formatAmount } from '@/shared/lib/currency';
-import { type AmountValue } from 'wallet';
+import { type AmountValue } from 'wallet/amount';
 import { Log, paymentLog } from '@/shared/lib/logger';
 import { cn } from '@/shared/lib/classNames';
 import { useCapabilities } from '@/shared/ui/capability';

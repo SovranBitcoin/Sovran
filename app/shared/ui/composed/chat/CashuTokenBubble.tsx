@@ -14,7 +14,7 @@ import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { formatAmount } from '@/shared/lib/currency';
 import { buildReceiveHistoryEntry } from '@/shared/lib/cashu/utils';
-import { amountToNumber } from 'wallet';
+import { amountToNumber } from 'wallet/amount';
 import { staticPopup } from '@/shared/lib/popup';
 import { log, mintUrlLogFields } from '@/shared/lib/logger';
 import { alpha, radius, spacing } from '@/shared/styles/tokens';

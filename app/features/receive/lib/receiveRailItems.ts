@@ -28,7 +28,7 @@ import type {
   PaymentRequestReceiveOperation,
 } from '@cashu/coco-core';
 
-import { amountToNumber, type AmountValue } from 'wallet';
+import { amountToNumber, type AmountValue } from 'wallet/amount';
 import type { CopyTarget } from '@/shared/lib/popup/popups/copy';
 import { getMintDisplayName } from '@/shared/lib/url';
 import { useMintMetadataStore } from '@/shared/stores/global/mintMetadataStore';

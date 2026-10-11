@@ -18,7 +18,7 @@ import { Screen } from '@/shared/ui/composed/Screen';
 import { useMints, useBalanceContext } from '@cashu/coco-react';
 import type { GetInfoResponse } from '@cashu/cashu-ts';
 import { useMintManagement } from '@/features/mint/hooks/useMintManagement';
-import { amountToNumber } from 'wallet';
+import { amountToNumber } from 'wallet/amount';
 import { useMintKeysetUnits } from '@/features/wallet/hooks/useMintKeysetUnits';
 import { useIsTestnutMint } from '@/shared/stores/global/mintTestnutStore';
 import { deriveSupportedUnitsFromInfo, isTestnutUnit, toRealUnit } from 'wallet';

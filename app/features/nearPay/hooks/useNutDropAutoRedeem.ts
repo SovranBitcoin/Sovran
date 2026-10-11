@@ -96,6 +96,11 @@ export function useNutDropAutoRedeem(): void {
         });
         return;
       }
+      if (classified.classification === 'invalid') {
+        // Its amount could not be read, and a bad amount fails the whole stored queue.
+        paymentLog.warn('near_pay.redeem.ignored_invalid', { senderPeerID: event.peerID });
+        return;
+      }
       if (!classified.mintUrl) {
         paymentLog.warn('near_pay.redeem.ignored_missing_mint', {
           classification: classified.classification,

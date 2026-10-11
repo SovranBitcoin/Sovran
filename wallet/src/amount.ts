@@ -21,8 +21,15 @@ function parseAmount(value: AmountValue): number | undefined {
   } else if (typeof value === "string") {
     // `Number("")` is 0, which would turn a blank field into a real amount.
     result = value.trim() === "" ? NaN : Number(value);
+  } else if (typeof value.toNumber === "function") {
+    try {
+      // cashu-ts throws for an amount too large to hold exactly.
+      result = value.toNumber();
+    } catch {
+      result = NaN;
+    }
   } else {
-    result = value.toNumber();
+    result = NaN;
   }
   if (Number.isFinite(result)) return result;
   // Runs on every rendered amount, so only the anomaly is logged.
@@ -50,7 +57,11 @@ export function amountToNumberOrUndefined(
  * the value is missing, unreadable, fractional, negative or too large to hold exactly.
  */
 export function requireAmount(value: AmountValue): number {
-  const amount = parseAmount(value);
+  // Plain digits only: `Number` would also read "1e3", "0x10" and " 21 ".
+  const amount =
+    typeof value === "string" && !/^\d+$/.test(value)
+      ? undefined
+      : parseAmount(value);
   if (amount === undefined || !Number.isSafeInteger(amount) || amount < 0) {
     throw new TypeError("amount is not a whole, non-negative number");
   }

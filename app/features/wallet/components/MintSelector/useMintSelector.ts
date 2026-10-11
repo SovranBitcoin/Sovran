@@ -14,7 +14,7 @@ import {
   HEADER_LAYOUT,
 } from '@/features/wallet/lib/walletHeader';
 import { getMintDisplayName } from '@/shared/lib/url';
-import { amountToNumber } from 'wallet';
+import { amountToNumber } from 'wallet/amount';
 import { walletLog, mintUrlLogFields } from '@/shared/lib/logger';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 

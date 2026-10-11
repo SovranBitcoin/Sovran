@@ -1,5 +1,5 @@
 import { extractDomain } from '@/shared/lib/url';
-import { amountToNumber, type AmountValue } from 'wallet';
+import { amountToNumber, type AmountValue } from 'wallet/amount';
 import { cashuLog, mintUrlLogFields } from '@/shared/lib/logger';
 
 type BalanceMap = Record<string, { total?: AmountValue } | undefined>;

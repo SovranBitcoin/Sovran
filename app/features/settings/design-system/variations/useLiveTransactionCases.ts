@@ -10,7 +10,7 @@
 import { isP2PKLocked, isSendTokenCancelled } from 'wallet';
 
 import { useHistoryWithMelts } from '@/features/transactions';
-import { amountToNumber } from 'wallet';
+import { amountToNumber } from 'wallet/amount';
 import { getOnchainMintAddress } from '@/shared/lib/cashu/onchainMint';
 import { formatAmount } from '@/shared/lib/currency';
 import { formatDate, formatRelative } from '@/shared/lib/date';

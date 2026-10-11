@@ -6,7 +6,7 @@ import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
 import { Surface } from '@/shared/ui/composed/Surface';
 import { useStylePaint } from '@/shared/styles/appStyle';
 import { formatAmount } from '@/shared/lib/currency';
-import { amountToNumber } from 'wallet';
+import { amountToNumber } from 'wallet/amount';
 import Icon from '@/assets/icons';
 import { withAlpha } from '@/shared/lib/color';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';

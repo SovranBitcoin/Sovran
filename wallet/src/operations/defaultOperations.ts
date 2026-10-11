@@ -305,6 +305,8 @@ async function executeOnchainMelt(
   if (feeOptions.length === 0) {
     throw new Error("Mint returned no onchain fee options");
   }
+  // Every branch below goes on to pay one of these, so none may carry a fee that cannot be read.
+  for (const option of feeOptions) requireAmount(option.fee_reserve);
 
   let feeIndex: number | null;
   if (feeOptions.length === 1) {
