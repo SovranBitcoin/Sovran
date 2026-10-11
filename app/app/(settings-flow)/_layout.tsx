@@ -1,9 +1,9 @@
 /**
- * @fileoverview Settings Flow Modal Layout
+ * @fileoverview Settings Flow Layout
  *
- * Nested stack inside a modal presentation, same pattern as receive-flow.
- * Parent root Stack presents this group as a modal (slides up from bottom).
- * Screens within push horizontally with close/back header.
+ * Nested stack for the settings pages. The root Stack presents this group as a
+ * pushed page (`slideFromRight('(settings-flow)')` in config/modalScreens.ts);
+ * screens within push horizontally with a back header.
  */
 
 import { useMemo } from 'react';
