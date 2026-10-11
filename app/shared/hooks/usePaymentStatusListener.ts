@@ -20,6 +20,7 @@ import {
   standingPaymentRequestKey,
 } from 'wallet';
 import { paymentStatusPopup } from '@/shared/lib/popup';
+import { describeError } from '@/shared/lib/errors';
 import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
 import { isSwapStatusActive } from '@/shared/stores/runtime/swapStatusStore';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
@@ -818,7 +819,9 @@ export function usePaymentStatusListener(): void {
         amount,
         unit,
         state: 'failed',
-        errorMessage: operation.error ?? 'Payment was rolled back',
+        errorMessage: operation.error
+          ? describeError({ message: operation.error }, 'cashu').text
+          : 'Payment was rolled back',
       });
       paymentStatusPopup({ variant: 'melt', id, mintUrl, amount, unit });
     });

@@ -14,6 +14,7 @@ import { BottomSheet, Menu } from 'heroui-native';
 
 import Icon from 'assets/icons';
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
+import { describeError } from '@/shared/lib/errors';
 import { cashuLog } from '@/shared/lib/logger';
 
 import { showActionSheet } from './bridge';
@@ -55,7 +56,7 @@ export function SendFallbackContent({ payload, close }: SendFallbackContentProps
             <SheetMenuRowContent
               icon={<Icon name="mdi:alert-circle-outline" size={20} />}
               title={failed.label}
-              description={failed.message}
+              description={describeError({ message: failed.message }, 'cashu').text}
             />
           </Menu.Item>
         </MenuRowTint>

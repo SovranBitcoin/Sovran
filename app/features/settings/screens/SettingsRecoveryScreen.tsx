@@ -376,10 +376,10 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
         } catch (error) {
           // addMint failed — the mint is unreachable, so no keyset ran at all.
           failedKeysets = Math.max(failedKeysets, 1);
-          mintError = (error as Error)?.message;
+          mintError = describeError(error, 'cashu').text;
           cashuLog.warn('recovery.mint.restore_threw', {
             ...mintUrlLogFields(mintUrl),
-            error: mintError,
+            error: (error as Error)?.message,
           });
         }
 
@@ -455,7 +455,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
           // mint would otherwise stall every mint behind it.
           patch(i, {
             status: 'failed',
-            error: (error as Error)?.message ?? 'Timed out',
+            error: describeError(error, 'cashu').text,
             durationMs: null,
           });
           cashuLog.warn('recovery.mint.timed_out', {

@@ -22,6 +22,7 @@ import { scanFromURLAsync } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { hasFeature } from '@/shared/config/features';
+import { describeError } from '@/shared/lib/errors';
 import { paymentLog, mintUrlLogFields } from '@/shared/lib/logger';
 import { parseHistoryEntryOnce, type ParsedHistoryEntry } from 'wallet/operations';
 import { z } from 'zod';
@@ -678,7 +679,10 @@ export function createSovranNotifications(
       });
     },
     NFC_WRITE_FAILED: ({ code: _code, message, data: _data }) => {
-      paramPopup('nfc-error', { title: 'NFC Write Failed', message });
+      paramPopup('nfc-error', {
+        title: 'NFC Write Failed',
+        message: describeError({ message }, 'cashu').text,
+      });
     },
     NFC_SESSION_LOST: ({ code: _code, message, data: _data }) => {
       paramPopup('nfc-error', { title: 'NFC Connection Lost', message });
@@ -854,9 +858,10 @@ export function createSovranNotifications(
         activeId: store.active?.id ?? null,
         activeState: store.active?.state ?? null,
       });
-      const msg = data.rolledBack
-        ? `${data.message}\nYour funds have been returned.`
-        : data.message;
+      // `data.message` is the exception's own text. It reaches the screen
+      // only as catalogue copy; the log above keeps the original.
+      const reason = describeError({ message: data.message }, 'cashu').text;
+      const msg = data.rolledBack ? `${reason}\nYour funds have been returned.` : reason;
       const variant = data.variant === 'paymentRequest' ? 'payment-request' : data.variant;
       const active = store.active;
       if (
@@ -903,7 +908,7 @@ export function createSovranNotifications(
         activeState: active.state,
         rolledBack: data.rolledBack,
       });
-      store.setFailed(active.id, new Error(msg));
+      store.setFailed(active.id, new Error(data.message));
     },
     onScanEmpty: (source) => {
       if (source === 'clipboard') staticPopup('no-clipboard-address');
@@ -911,7 +916,7 @@ export function createSovranNotifications(
     },
     onScanError: (source, err) => {
       if (source === 'gallery') staticPopup('qr-scan-failed');
-      else staticPopup('general-error', { text: err.message });
+      else staticPopup('general-error', { failure: { service: 'app', error: err } });
     },
     onMissingMintForAmount: () => {
       staticPopup('no-mint-selected');
@@ -963,7 +968,8 @@ export function createSovranNotifications(
       });
     },
     onNfcWriteFailed: ({ message, rolledBack, stage }) => {
-      const errorMsg = rolledBack ? `${message} Your funds have been returned.` : message;
+      const reason = describeError({ message }, 'cashu').text;
+      const errorMsg = rolledBack ? `${reason} Your funds have been returned.` : reason;
       // Before the token exists nothing has touched the tag: "write failed"
       // would send the user chasing the NFC link when the mint or the fee
       // gate is what refused.
@@ -2065,8 +2071,10 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
             return;
           }
           const code = rawError instanceof NfcError ? rawError.code : 'WRITE_FAILED';
+          // An NfcError carries this app's own wording; anything else is
+          // another library's text and goes through the catalogue.
           const message =
-            rawError instanceof Error ? rawError.message : 'Unable to write token via NFC.';
+            rawError instanceof NfcError ? rawError.message : describeError(rawError, 'app').text;
           const lostConnection = code === 'TAG_LOST' || code === 'TRANSCEIVE_FAILED';
 
           if (lostConnection && entry.operationId) {
@@ -2084,8 +2092,7 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
               });
               nfcSendFailedPopup({
                 rollbackFailed: true,
-                text:
-                  rollbackError instanceof Error ? rollbackError.message : String(rollbackError),
+                text: describeError(rollbackError, 'cashu').text,
               });
               return;
             }

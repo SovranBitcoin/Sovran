@@ -18,6 +18,7 @@ import { decodeEcashTokenMetadata, defaultDetectors, type AnnotatedOption } from
 
 import Icon from 'assets/icons';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
+import { describeError } from '@/shared/lib/errors';
 import { cashuLog } from '@/shared/lib/logger';
 
 import { getMethodIcon, getMethodLabel } from './paymentMethodPresentation';
@@ -92,7 +93,9 @@ function OptionRow({ annotated, unit, isFailed, failedReason, onPress }: OptionR
   const hasAmount = amount != null && amount > 0;
   const disabled = status === 'disabled' || isFailed;
   const descriptionText = isFailed
-    ? (failedReason ?? 'Failed')
+    ? failedReason
+      ? describeError({ message: failedReason }, 'cashu').text
+      : 'Failed'
     : disabled
       ? annotated.reason?.message
       : status === 'recommended'

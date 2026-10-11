@@ -338,7 +338,8 @@ describe('runMintReviewInfoEffect', () => {
     if (result.isOk()) return;
     expect(result.error.data).toMatchObject({
       code: 'UNSUPPORTED_INPUT',
-      message: 'Info unavailable',
+      // The exception's own text stays in the log; the app shows this field as is.
+      message: 'Failed to load mints',
     });
   });
 
@@ -388,7 +389,7 @@ describe('runTrustMintEffect', () => {
     if (result.isOk()) return;
     expect(result.error.data).toMatchObject({
       code: 'UNSUPPORTED_INPUT',
-      message: 'Trust failed',
+      message: 'Failed to trust mint',
     });
   });
 

@@ -34,7 +34,7 @@ reports) keep their evidence, and link here for anything still open.
 | Id | Priority | Needs | What |
 | --- | --- | --- | --- |
 | [F02](F02.md) | high | decision | Private message plaintext is stored unencrypted at three sites; stop it and erase old data |
-| [F04](F04.md) | high | fix | Raw exception text reaches user-facing surfaces across the app |
+| [F04](F04.md) | high | decision | Raw exception text reaches user-facing surfaces across the app |
 | [F07](F07.md) | medium | fix | Add app-wide translation: one locale service with Lingui catalogs |
 | [F08](F08.md) | medium | fix | date.ts: iso style is not ISO 8601, Yesterday uses 48 hours, 'en' is read as system |
 | [F09](F09.md) | medium | fix | apiClient loosens the shared profile schemas locally; reconcile with the schemas package |

@@ -218,6 +218,8 @@ export const CASHU_MESSAGE_RULES: readonly (readonly [RegExp, ErrorId])[] = [
   [/\bwitness is missing for p2pk\b/i, 'cashu.signature'],
   [/\b(?:no_route|FAILURE_REASON_NO_ROUTE|ran out of routes)\b/i, 'cashu.no_route'],
   [/\blnd is not ready\b/i, 'cashu.lightning_unavailable'],
+  // The wallet package's own wording for a mint it could not reach.
+  [/^mint unreachable$/i, 'cashu.network'],
   [/\bFAILURE_REASON_TIMEOUT\b/, 'cashu.timeout'],
   [/\blightning payment failed\b/i, 'cashu.lightning_failed'],
   [/\binsufficient (?:funds|balance)\b/i, 'cashu.insufficient_funds'],

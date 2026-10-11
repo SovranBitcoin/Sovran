@@ -9,6 +9,7 @@
  */
 
 import { createSovranNotifications } from '@/features/send/lib/sovranPaymentConfig';
+import { ERROR_COPY } from '@/shared/lib/errors/catalog';
 import { paymentStatusPopup } from '@/shared/lib/popup';
 import { setTransactionAnnotation } from '@/shared/stores/profile/transactionAnnotationStore';
 import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
@@ -121,6 +122,7 @@ describe('payment toast gating (onchain melt)', () => {
     expect(paymentStatusPopup).toHaveBeenCalledTimes(1);
   });
 
+  // The message is the exception's own text, so the toast shows catalogue copy for it.
   it('creates a fresh failed toast when a payment fails with no active toast', () => {
     const notifications = createSovranNotifications();
     void notifications.onPaymentFailed!({
@@ -132,7 +134,7 @@ describe('payment toast gating (onchain melt)', () => {
     expect(activeStatus()).toMatchObject({
       variant: 'melt',
       state: 'failed',
-      errorMessage: 'Mint rejected the melt\nYour funds have been returned.',
+      errorMessage: `${ERROR_COPY['cashu.unknown']}\nYour funds have been returned.`,
     });
     expect(paymentStatusPopup).toHaveBeenCalledTimes(1);
   });
@@ -163,14 +165,14 @@ describe('payment toast gating (onchain melt)', () => {
     void notifications.onPaymentFailed!({
       variant: 'melt',
       ...BASE,
-      message: 'This melt failed',
+      message: 'Proofs already spent',
     });
     expect(activeStatus()).toMatchObject({
       variant: 'melt',
       mintUrl: BASE.mintUrl,
       amount: BASE.amount,
       state: 'failed',
-      errorMessage: 'This melt failed',
+      errorMessage: ERROR_COPY['cashu.proofs_spent'],
     });
     expect(activeStatus()?.id).not.toBe('other-melt');
     expect(paymentStatusPopup).toHaveBeenCalledTimes(1);

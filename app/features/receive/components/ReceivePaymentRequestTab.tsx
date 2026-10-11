@@ -21,6 +21,7 @@ import { type UseStandingPaymentRequestResult } from 'wallet/react';
 import { paymentLog } from '@/shared/lib/logger';
 import { expectedQrPayloadLength } from '@/shared/lib/qr';
 import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
+import { describeError } from '@/shared/lib/errors';
 import { CreqCustomizationCard } from '@/features/receive/components/CreqCustomizationCard';
 import { ReceiveRailPlaceholder } from '@/features/receive/components/ReceiveRailPlaceholder';
 import { ActionSegmentsCard } from '@/shared/ui/composed/ActionSegmentsCard';
@@ -153,7 +154,9 @@ export const ReceivePaymentRequestTab = memo(function ReceivePaymentRequestTab({
   // skeleton on toggle was jarring. The placeholder only shows before the
   // FIRST request resolves.
   if (!request && error) {
-    return renderEmptyState(`Could not load the payment request: ${error}`);
+    return renderEmptyState(
+      `Could not load the payment request. ${describeError({ message: error }, 'cashu').text}`
+    );
   }
 
   if (!request) {

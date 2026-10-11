@@ -484,8 +484,8 @@ function toMintReviewInfoEffectError(
     cause,
     data: {
       code: 'UNSUPPORTED_INPUT',
-      message:
-        cause instanceof Error ? cause.message : t('LOAD_MINTS_FAILED', locale),
+      // Shown as is by the app; the cause is in the log line above.
+      message: t('LOAD_MINTS_FAILED', locale),
     },
   };
 }
@@ -502,8 +502,7 @@ function toTrustMintEffectError(
     cause,
     data: {
       code: 'UNSUPPORTED_INPUT',
-      message:
-        cause instanceof Error ? cause.message : t('TRUST_MINT_FAILED', locale),
+      message: t('TRUST_MINT_FAILED', locale),
     },
   };
 }
