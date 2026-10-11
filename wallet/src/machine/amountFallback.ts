@@ -1,5 +1,6 @@
 import { composeSatoshis } from '../offline';
 import { logger } from '../logger';
+import { accountMintUrls } from '../mint-capabilities';
 import type { MintCandidate, WalletContext } from '../types';
 import type { Destination, FlowContext, StepDataMap } from './types';
 
@@ -125,7 +126,8 @@ export function findFullAmountCandidates(
   allowedMints?: string[],
 ): MintCandidate[] {
   const allowed = allowedMints?.length ? new Set(allowedMints) : null;
-  const candidates = walletCtx.trustedMintUrls
+  // The active account's mints only, as every mint choice in a flow.
+  const candidates = accountMintUrls(walletCtx)
     .map((mintUrl) => ({
       mintUrl,
       balance: walletCtx.mintBalances[mintUrl] ?? 0,
@@ -327,7 +329,7 @@ function pickFallbackMint(
   }
 
   const fallback =
-    walletCtx.trustedMintUrls
+    accountMintUrls(walletCtx)
       .map((mintUrl) => toFallbackMint(mintUrl))
       .filter((mint): mint is FallbackMint => mint != null)
       .sort((a, b) => b.balance - a.balance)[0] ?? null;
@@ -350,7 +352,7 @@ function pickHighestBalanceFallbackMint(
     : null;
 
   const fallback =
-    walletCtx.trustedMintUrls
+    accountMintUrls(walletCtx)
       .filter((mintUrl) => !allowed || allowed.has(mintUrl))
       .map((mintUrl) => ({
         mintUrl,

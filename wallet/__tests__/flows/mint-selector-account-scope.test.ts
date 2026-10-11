@@ -17,7 +17,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { createTestMachine } from '../_harness';
-import { MINT1, MINT2 } from '../_harness/fixtures';
+import { INPUTS, MINT1, MINT2 } from '../_harness/fixtures';
 import { deriveMintMethodCapabilityMapFromTrustedMints } from '../../src/mint-capabilities';
 import type { StepDataMap } from '../../src/machine/types';
 
@@ -114,6 +114,20 @@ describe('mint selector — account scope', () => {
     });
     await tm.machine.enterAmount({ value: 100, unit: 'sat' }, '', { destination: 'sendEcash' });
     expect(tm.machine.getContext().mintUrl).not.toBe(MINT2);
+    expect(tm.machine.getStep()).not.toBe('sendComplete');
+    expect(tm.operationCalls.filter((call) => call.name.startsWith('execute'))).toEqual([]);
+  });
+
+  it('does not pay a payment request from the other account because only its mint is allowed', async () => {
+    const tm = createTestMachine({
+      wallet: twoInAccount,
+      detectors: {
+        getPaymentRequestInfo: () => ({ unit: 'sat', amount: 100, mints: [MINT2] }),
+      },
+    });
+    await tm.machine.scan!(INPUTS.paymentRequestBasic);
+    expect(tm.machine.getContext().mintUrl).not.toBe(MINT2);
+    expect(tm.operationCalls.filter((call) => call.name.startsWith('execute'))).toEqual([]);
   });
 
   it("lists both sides in the wallet's own picker", async () => {

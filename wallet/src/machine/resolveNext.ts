@@ -802,16 +802,17 @@ export function resolveNext(
         enableEcashSendMemo,
       );
     }
-    if (!requirement && walletCtx.trustedMintUrls.length === 1) {
+    const accountMints = accountMintUrls(walletCtx);
+    if (!requirement && accountMints.length === 1) {
       logger.info("resolveNext.mint.selected", {
         reason: "single-trusted-mint",
         destination,
         amount,
         unit,
-        mintUrlLength: walletCtx.trustedMintUrls[0].length,
+        mintUrlLength: accountMints[0].length,
       });
       return resolveWithMint(
-        walletCtx.trustedMintUrls[0],
+        accountMints[0],
         destination,
         amount,
         unit,
