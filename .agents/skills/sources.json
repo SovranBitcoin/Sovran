@@ -371,6 +371,24 @@
       "kind": "local",
       "reviewed_on": "2026-10-10",
       "purpose": "Sovran's own procedure for certifying that a release upgrades every released durable state; requested by the maintainer."
+    },
+    {
+      "name": "audit-commit",
+      "kind": "local",
+      "reviewed_on": "2026-10-11",
+      "purpose": "Sovran's own procedure for auditing one commit with independent reviewers and a verification pass, ending in a verdict; requested by the maintainer."
+    },
+    {
+      "name": "plan-a-change",
+      "kind": "local",
+      "reviewed_on": "2026-10-11",
+      "purpose": "Sovran's own procedure for turning a described change into owner decisions and an ordered list of small commits; requested by the maintainer."
+    },
+    {
+      "name": "retro",
+      "kind": "local",
+      "reviewed_on": "2026-10-11",
+      "purpose": "Sovran's own procedure for mining past Claude and Codex sessions for repeated instructions and turning them into checks, pointers or documentation; requested by the maintainer. Shaped by the upstream mattpocock/skills retro, which reviews a single session."
     }
   ]
 }
