@@ -112,7 +112,7 @@ reports) keep their evidence, and link here for anything still open.
 | [F108](F108.md) | medium | fix | Open work recorded in other documents has not been moved into this ledger |
 | [F109](F109.md) | high | test | The newest release fixture is mostly defaults, and nothing generates or freezes a fixture |
 | [F111](F111.md) | medium | device | No old build is kept for iPhone, and the upgrade from the last release is run by hand |
-| [F112](F112.md) | medium | investigation | A wallet from 0.0.61 or earlier has no keysets after upgrading until its mint answers |
+| [F112](F112.md) | medium | device | A wallet from 0.0.61 or earlier has no keysets after upgrading until its mint answers |
 | [F113](F113.md) | high | decision | A store with one bad saved field runs on defaults for every field, and nothing says so |
 | [F116](F116.md) | medium | fix | A swap step that depends on money still settling is retried or skipped as if it had not been sent |
 | [F118](F118.md) | medium | fix | The wallet counter guard reads then writes; one statement would close the window a transaction can use |

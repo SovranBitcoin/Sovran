@@ -229,3 +229,9 @@ To repeat it: download the release APK, `apksigner sign` it and a local `assembl
 | Which builds are still installed | EAS does not record it | App Store Connect and Play Console (questions in the provenance record) |
 | Android signing certificate named in the old release guide differs from 0.1.3's | Probably upload key against Play's signing key; not confirmed | Play Console → App integrity |
 | Two launches at once; a native call that never returns at startup | No test seam | F92, F83 |
+
+## Coco versions covered
+
+`cocoDatabaseUpgrade.test.ts` opens a wallet database written by each Coco storage version that shipped, with the
+candidate's Coco and through the app's own open path: 0.6.0, 1.0.0-rc11, 1.1.2-rc.30, 1.1.2-rc.32, 1.1.2-rc.34, 1.1.2-rc.47, 1.0.0-rc.0, 1.0.0-rc.5, 1.0.0, 1.0.1, 2.0.0. Which releases carried each is in
+[persistence-map.md](persistence-map.md) and in `app/__tests__/cocoDatabases/manifest.json`.

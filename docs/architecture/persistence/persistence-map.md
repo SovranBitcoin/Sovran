@@ -157,6 +157,25 @@ Derivation notation:
 | 0.1.1; `4203ea8ec` | Same filenames. `shared/lib/cashu/manager.ts:132,212@4203ea8ec` | Coco packages **1.0.1**, cashu-ts **3.5.0**. `bun.lock:399–403@4203ea8ec` | Same derivation. `shared/lib/nostr/keyDerivation.ts:65–88,127–142@4203ea8ec` |
 | 0.1.2–HEAD; `148ebd085`, `d9ad12c4b`, `HEAD` | Same filenames; opens existing DB and initializes repositories. `app/shared/lib/cashu/manager.ts:682–706,737–741@HEAD` | Coco packages **2.0.0**, cashu-ts **5.0.0-rc.4**. `bun.lock:439–443@148ebd085`; `bun.lock:459–463@HEAD` | D64 / I64; seed cache checked against mnemonic hash and account index. `app/shared/lib/cashu/manager.ts:749–768@HEAD` |
 
+**Every Coco version that shipped.** The table above gives one representative revision per epoch, so it skips
+versions that only some builds of a release carried. This is the full list, one row per database in
+`app/__tests__/cocoDatabases/manifest.json`, each of which `cocoDatabaseUpgrade.test.ts` opens with the
+candidate's Coco. `cocoVersionsDocumented.test.ts` fails when a database is added there and not here.
+
+| Storage package and version | Core | Releases |
+| --- | --- | --- |
+| `coco-cashu-expo-sqlite` 0.6.0 | 1.0.0-rc10 | 0.0.45 (build 25) |
+| `coco-cashu-expo-sqlite` 1.0.0-rc11 | 1.0.0-rc11 | 0.0.45 (build 1), 0.0.50, 0.0.51 (first builds) |
+| `coco-cashu-expo-sqlite` 1.1.2-rc.30 | 1.1.2-rc.30 | 0.0.51 |
+| `coco-cashu-expo-sqlite` 1.1.2-rc.32 | 1.1.2-rc.32 | 0.0.51 (builds 19 to 21) |
+| `coco-cashu-expo-sqlite` 1.1.2-rc.34 | 1.1.2-rc.34 | 0.0.51 (last builds), 0.0.52, 0.0.53, 0.0.54, 0.0.55, 0.0.56 (before build 31) |
+| `coco-cashu-expo-sqlite` 1.1.2-rc.47 | 1.1.2-rc.47 | 0.0.56 (builds 31 to 43), 0.0.57, 0.0.58, 0.0.60, 0.0.61 |
+| `@cashu/coco-expo-sqlite` 1.0.0-rc.0 | 1.0.0-rc.0 | 0.0.62, 0.0.63 (builds before 2026-04-28) |
+| `@cashu/coco-expo-sqlite` 1.0.0-rc.5 | 1.0.0-rc.5 | 0.0.63 (builds from 2026-04-28, inferred) |
+| `@cashu/coco-expo-sqlite` 1.0.0 | 1.0.0 | 0.1.0 |
+| `@cashu/coco-expo-sqlite` 1.0.1 | 1.0.1 | 0.1.1 |
+| `@cashu/coco-expo-sqlite` 2.0.0 | 2.0.0 | 0.1.2, 0.1.3, 0.1.4 (unreleased) |
+
 **Manifest/lock discrepancy:** the early 0.0.51 manifest and committed lock disagree. The table reports the lock resolution, not proof of the library bundled in a released binary.
 
 **Nostr cache:** 0.0.58–0.0.61 still used one database, **`nostr`**, rather than `nostr-i`. Account-indexed names appear by 0.0.62 and persist at HEAD. `providers/NostrNDKProvider.tsx:8@59a27ff7a`; `:9@a838d5bc3`; `shared/providers/NostrNDKProvider.tsx:32@19388f0e3`; `app/shared/providers/NostrNDKProvider.tsx:156–165@HEAD`.
