@@ -1,8 +1,7 @@
 import { useEffect } from 'react';
 import { useManagerContext } from '@cashu/coco-react';
 
-import { reconcileSwapLegs } from '@/shared/lib/cashu/reconcileSwapLegs';
-import { cashuLog, redactError } from '@/shared/lib/logger';
+import { createSwapLegReconciler } from '@/shared/lib/cashu/reconcileSwapLegs';
 
 /**
  * Keeps saved swap legs honest after their run has ended: once when the wallet
@@ -14,35 +13,15 @@ export function useSwapLegReconciler(): void {
 
   useEffect(() => {
     if (!manager) return;
-    let active = true;
-    let running = false;
-    let again = false;
-    // One pass at a time; events that land during a pass ask for one more.
-    const run = async () => {
-      if (running) {
-        again = true;
-        return;
-      }
-      running = true;
-      try {
-        do {
-          again = false;
-          await reconcileSwapLegs(manager);
-        } while (again && active);
-      } catch (error) {
-        cashuLog.warn('swap.reconcile.failed', { error: redactError(error) });
-      } finally {
-        running = false;
-      }
-    };
-    void run();
+    const reconciler = createSwapLegReconciler(manager);
+    reconciler.run();
     const offs = [
-      manager.on('mint-op:finalized', () => void run()),
-      manager.on('melt-op:finalized', () => void run()),
-      manager.on('melt-op:rolled-back', () => void run()),
+      manager.on('mint-op:finalized', reconciler.run),
+      manager.on('melt-op:finalized', reconciler.run),
+      manager.on('melt-op:rolled-back', reconciler.run),
     ];
     return () => {
-      active = false;
+      reconciler.stop();
       offs.forEach((off) => off());
     };
   }, [manager]);

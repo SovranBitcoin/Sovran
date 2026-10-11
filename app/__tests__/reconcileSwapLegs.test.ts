@@ -6,7 +6,7 @@
  * its final state from Coco's own operations, and never guessed.
  */
 
-import { reconcileSwapLegs } from '@/shared/lib/cashu/reconcileSwapLegs';
+import { createSwapLegReconciler, reconcileSwapLegs } from '@/shared/lib/cashu/reconcileSwapLegs';
 import { useSwapTransactionsStore } from '@/shared/stores/profile/swapTransactionsStore';
 
 jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({
@@ -167,4 +167,16 @@ it('keeps going when one read fails', async () => {
 
   expect(first().localStatus).toBe('settling');
   expect(second().localStatus).toBe('done');
+});
+
+it('runs one pass at a time, and one more for requests that land during it', async () => {
+  savedLeg('settling');
+  const coco = manager({ mint: { state: 'pending' } });
+  const reconciler = createSwapLegReconciler(coco);
+
+  for (let i = 0; i < 40; i++) reconciler.run();
+  for (let i = 0; i < 20; i++) await new Promise((resolve) => setImmediate(resolve));
+
+  // Two passes over one unsettled leg, not forty.
+  expect(coco.ops.mint.get).toHaveBeenCalledTimes(2);
 });

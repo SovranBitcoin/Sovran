@@ -85,3 +85,35 @@ export async function reconcileSwapLegs(manager: SwapLegOperations): Promise<voi
     }
   }
 }
+
+/**
+ * Runs `reconcileSwapLegs` one pass at a time. A request that lands during a
+ * pass asks for one more instead of starting its own, so a burst of operation
+ * events costs two passes, not one each.
+ */
+export function createSwapLegReconciler(manager: SwapLegOperations) {
+  let active = true;
+  let running = false;
+  let again = false;
+  const pass = async () => {
+    running = true;
+    try {
+      do {
+        again = false;
+        await reconcileSwapLegs(manager);
+      } while (again && active);
+    } catch (error) {
+      cashuLog.warn('swap.reconcile.failed', { error: redactError(error) });
+    }
+    running = false;
+  };
+  return {
+    run: () => {
+      if (running) again = true;
+      else void pass();
+    },
+    stop: () => {
+      active = false;
+    },
+  };
+}
