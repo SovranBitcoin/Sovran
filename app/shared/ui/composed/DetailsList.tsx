@@ -125,7 +125,7 @@ function renderValueContent(
       return (
         <VStack align="center" className="flex-1" justify="center">
           <Text size={18} color={withAlpha(colors.foreground, 0.9)} style={{ textAlign: 'center' }}>
-            {truncateMiddle(layout.username, 8)}
+            {truncateMiddle(layout.username)}
           </Text>
           <Pressable className="flex-row items-center">
             <StyledText

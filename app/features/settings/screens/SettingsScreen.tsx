@@ -81,7 +81,7 @@ const ProfileButton = () => {
                 loading={!nostrKeys?.npub}
                 placeholder="npub1…publickey"
                 accessible={false}>
-                {nostrKeys?.npub ? truncateMiddle(nostrKeys.npub, 14) : undefined}
+                {nostrKeys?.npub ? truncateMiddle(nostrKeys.npub, 'detail') : undefined}
               </Text>
             </ListGroup.ItemContent>
             <ListGroup.ItemSuffix />

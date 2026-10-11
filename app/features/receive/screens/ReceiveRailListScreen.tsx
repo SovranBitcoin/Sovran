@@ -173,7 +173,7 @@ const ReceiveRailRow = memo(function ReceiveRailRow({
       testID={`receive-rail-item-${item.key}`}
       accessibilityRole="button"
       accessibilityLabel={[
-        `${action} ${truncateMiddle(item.request, 12)}`,
+        `${action} ${truncateMiddle(item.request, 'detail')}`,
         item.listening === true && item.status !== 'paid' ? 'Listening' : badge.label,
         ...descriptionParts,
       ].join(', ')}
@@ -190,7 +190,7 @@ const ReceiveRailRow = memo(function ReceiveRailRow({
           </ListGroup.ItemPrefix>
           <ListGroup.ItemContent>
             <ListGroup.ItemTitle numberOfLines={1}>
-              {truncateMiddle(item.request, 12)}
+              {truncateMiddle(item.request, 'detail')}
             </ListGroup.ItemTitle>
             <ListGroup.ItemDescription numberOfLines={1}>
               {descriptionParts.join(' · ')}

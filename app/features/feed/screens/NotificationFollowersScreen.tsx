@@ -252,7 +252,7 @@ function FollowerRow({
 }) {
   const profile = result.profilesMap.get(notification.event.pubkey);
   const npub = tryNpubEncode(notification.event.pubkey);
-  const displayPubkey = truncateMiddle(npub || notification.event.pubkey, 10);
+  const displayPubkey = truncateMiddle(npub || notification.event.pubkey);
   const name = profile?.name || displayPubkey;
   const timestamp = formatRelativeUnixSeconds(notification.event.created_at);
 

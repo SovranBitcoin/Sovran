@@ -168,7 +168,7 @@ describe('DetectedActionRow', () => {
     });
     const subtitle = findRow(renderer!).props.subtitle as string;
     expect(subtitle).toContain('…');
-    expect(subtitle.startsWith('lnbc2500u1')).toBe(true);
+    expect(subtitle.startsWith('lnbc2500')).toBe(true);
     expect(subtitle.endsWith('fj9srp')).toBe(true);
     expect(subtitle.length).toBeLessThan(raw.length);
   });

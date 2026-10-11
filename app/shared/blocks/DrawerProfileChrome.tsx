@@ -237,7 +237,7 @@ export function DrawerProfileChrome({ closeDrawer }: { closeDrawer: () => void }
   const handleLine = metadata?.nip05
     ? formatNip05Handle(metadata.nip05)
     : pubkey
-      ? truncateMiddle(nip19.npubEncode(pubkey), 8)
+      ? truncateMiddle(nip19.npubEncode(pubkey))
       : '';
 
   const mutedColor = withAlpha(foreground, alpha.disabled);

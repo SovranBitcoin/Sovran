@@ -234,7 +234,7 @@ function buildProfileInfoItems(
     {
       key: 'npub',
       prefix: <CurrencyIcon colors={[iconColor]} width={20} currency="nostr" />,
-      title: truncateMiddle(npub, 10),
+      title: truncateMiddle(npub),
       suffixIcon: 'lets-icons:copy',
       accessibilityLabel: 'Copy npub',
       onPress: () => {

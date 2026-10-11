@@ -47,7 +47,6 @@ reports) keep their evidence, and link here for anything still open.
 | [F18](F18.md) | medium | fix | dev:wda runs start-wda.sh, which is git-ignored, so it fails from a fresh checkout |
 | [F19](F19.md) | low | fix | Rename overloaded payment, profile, key and time names, one cluster at a time |
 | [F20](F20.md) | low | fix | Cleanup measurements skip wallet/src and nostr/src and pass with no detector output |
-| [F21](F21.md) | medium | fix | truncateMiddle can lengthen strings and uses three periods; merge with the second helper |
 | [F22](F22.md) | high | device | Not every route, alias, gesture and modal exit has a native journey on both platforms |
 | [F23](F23.md) | high | device | Run the headers suite on both platforms and reproduce the P2PK body text disappearing |
 | [F24](F24.md) | high | device | The NIP-46 pairing secret travels in navigation state; hold it in a runtime store |

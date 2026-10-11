@@ -46,8 +46,6 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 
-const EVENT_ID_TRUNCATE_CHARS = 8;
-
 const ENCRYPTED_CONTENT_NOTE = 'Encrypted content is never stored or displayed.';
 const TECHNICAL_DETAILS_LABEL = 'Technical details';
 
@@ -98,7 +96,7 @@ function CopyableEventId({ eventId }: { eventId: string }) {
       style={{ paddingVertical: 2 }}>
       <HStack gap={6} style={{ alignItems: 'center' }}>
         <Text size={14} bold color={foreground}>
-          {truncateMiddle(eventId, EVENT_ID_TRUNCATE_CHARS)}
+          {truncateMiddle(eventId)}
         </Text>
         <Icon name="lets-icons:copy" size={16} color={muted} />
       </HStack>
