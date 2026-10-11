@@ -5,7 +5,11 @@ import { isValidSatAmount } from "../guards";
 import { defaultDetectors } from "../detectors";
 import type { P2pkLockSpec } from "../p2pk";
 import { createMintRowRules } from "../mint-list-rows";
-import { isMeltUserCancelledError, isMintOfflineError } from "../errors";
+import {
+  failureText,
+  isMeltUserCancelledError,
+  isMintOfflineError,
+} from "../errors";
 import { isLockedSend } from "../p2pk";
 import { t } from "../formatting/locales";
 import { compareMintDisplayOrder } from "../mint-capabilities";
@@ -534,7 +538,11 @@ export function createPaymentMachine(
     return {
       amount: data.amount,
       unit: data.unit,
-      failed: { label: "as Locked Ecash", message: error.message },
+      failed: {
+        label: "as Locked Ecash",
+        message: error.message,
+        authored: error.data?.authored === true,
+      },
       alternatives: [
         {
           id: "ecash",
@@ -566,18 +574,22 @@ export function createPaymentMachine(
     }
     const npcTarget = operations?.npcAddressForPubkey?.(flowCtx.recipientPubkey);
     if (!npcTarget) return null;
-    const message = err instanceof Error ? err.message : "Lightning payment failed";
+    const { message, authored } = failureText(err, "Lightning payment failed");
     sendFallback = {
       amount: data.amount,
       unit: data.unit,
       mintUrl: data.mintUrl,
       npcTarget,
-      error: { code: "MELT_FAILED", message },
+      error: {
+        code: "MELT_FAILED",
+        message,
+        ...(authored ? { data: { authored: true } } : {}),
+      },
     };
     return {
       amount: data.amount,
       unit: data.unit,
-      failed: { label: `as Lightning (${target.trim()})`, message },
+      failed: { label: `as Lightning (${target.trim()})`, message, authored },
       alternatives: [
         {
           id: "lightning-npc",
@@ -618,11 +630,12 @@ export function createPaymentMachine(
       return;
     }
 
-    const message = isMintOfflineError(err)
-      ? t("MINT_UNREACHABLE", getLocale?.() ?? "en")
-      : err instanceof Error
-        ? err.message
-        : `${variant === "melt" ? "Melt" : "Payment request"} failed`;
+    const { message, authored } = isMintOfflineError(err)
+      ? { message: t("MINT_UNREACHABLE", getLocale?.() ?? "en"), authored: true }
+      : failureText(
+          err,
+          `${variant === "melt" ? "Melt" : "Payment request"} failed`,
+        );
 
     // Always notify failure so the processing notification is dismissed.
     void notifications?.onPaymentFailed?.({
@@ -631,6 +644,7 @@ export function createPaymentMachine(
       amount: data.amount,
       unit: data.unit,
       message,
+      authored,
       rolledBack: opts?.rolledBack,
     });
 
@@ -658,6 +672,7 @@ export function createPaymentMachine(
           unit: flowCtx.unit,
           failedOptionValues: failedValues,
           lastFailedMessage: message,
+          lastFailedAuthored: authored,
         });
         return;
       }

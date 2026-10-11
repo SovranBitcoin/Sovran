@@ -48,7 +48,11 @@ import {
   type LnurlPayExtrasProvider,
 } from "../lnurl";
 import { parsePaymentInput } from "../parse";
-import { MeltUserCancelledError, UnitRateUnavailableError } from "../errors";
+import {
+  AuthoredError,
+  MeltUserCancelledError,
+  UnitRateUnavailableError,
+} from "../errors";
 import { normalizeNostrPubkey, resolveRecipientPubkey } from "../recipient";
 import { amountToNumber, requireAmount, type AmountLike } from "../amount";
 import { toAccountUnit } from "../units/accounts";
@@ -303,7 +307,7 @@ async function executeOnchainMelt(
     feeOptionCount: feeOptions.length,
   });
   if (feeOptions.length === 0) {
-    throw new Error("Mint returned no onchain fee options");
+    throw new AuthoredError("Mint returned no onchain fee options");
   }
   // Every branch below goes on to pay one of these, so none may carry a fee that cannot be read.
   for (const option of feeOptions) requireAmount(option.fee_reserve);
@@ -701,7 +705,7 @@ export function createDefaultOperations(
       const requestedLock = options?.p2pkLock ?? options?.p2pkLockPubkey;
       const lock = normalizeP2pkLock(requestedLock);
       if (requestedLock !== undefined && !lock) {
-        throw new Error("Invalid P2PK lock terms for this send.");
+        throw new AuthoredError("Invalid P2PK lock terms for this send.");
       }
       const bindDelivery = config.captureSendDelivery?.({
         manager: mgr,
@@ -1805,7 +1809,7 @@ export function createDefaultOperations(
         logger.warn("operations.executePaymentRequest.parseFailed", {
           paymentRequestLength: paymentRequest.length,
         });
-        throw new Error("Invalid payment request");
+        throw new AuthoredError("Invalid payment request");
       }
       logger.info("operations.executePaymentRequest.parseDone", {
         ...mintUrlFields(mintUrl),
@@ -1827,7 +1831,7 @@ export function createDefaultOperations(
           requestUnit,
           unit,
         });
-        throw new Error(
+        throw new AuthoredError(
           `Payment request unit (${requestUnit}) does not match the wallet unit (${unit})`,
         );
       }
@@ -1847,7 +1851,7 @@ export function createDefaultOperations(
             ? normalizeP2pkLock(nut10.data)
             : null;
         if ((info.hasSpendingCondition || info.lockP2pkPubkey) && !lock) {
-          throw new Error(
+          throw new AuthoredError(
             "This request requires locked ecash with unsupported spending conditions.",
           );
         }
@@ -1869,7 +1873,7 @@ export function createDefaultOperations(
         // silently override the amount the user approved (BTC-04).
         if (!amount || amount <= 0) {
           logger.warn("operations.executePaymentRequest.nostr.missingAmount");
-          throw new Error("Amount is required for Nostr payment requests");
+          throw new AuthoredError("Amount is required for Nostr payment requests");
         }
 
         const prepared = await mgr.ops.send.prepare({

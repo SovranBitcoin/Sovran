@@ -40,6 +40,7 @@ type PaymentOptionsPayload = {
 type PaymentFallbackPayload = PaymentOptionsPayload & {
   failedOptionValues: readonly string[];
   lastFailedMessage?: string;
+  lastFailedAuthored?: boolean;
 };
 
 type SendFallbackPayload = StepDataMap['chooseSendFallback'] & {

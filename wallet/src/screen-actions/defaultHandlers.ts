@@ -13,7 +13,7 @@
 
 import { getEncodedToken, getTokenMetadata } from "@cashu/cashu-ts";
 
-import { isMintOfflineError } from "../errors";
+import { AuthoredError, isMintOfflineError } from "../errors";
 import { errField, logger, mintUrlFields } from "../logger";
 import { meltMethodForTarget } from "../melt-target";
 import type { P2pkLockSpec } from "../p2pk";
@@ -891,7 +891,7 @@ export function createDefaultScreenActionHandlers(
           }
         } else if (variantId === "ecash" || variantId === "locked-ecash") {
           if (variantId === "locked-ecash" && !requestedLock && !seededLock) {
-            throw new Error("Locked ecash requires spending conditions");
+            throw new AuthoredError("Locked ecash requires spending conditions");
           }
           if (entryDestination === "mintQuote") {
             // Receive "as Ecash": a single-use NUT-18 request. Route it through

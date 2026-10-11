@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Manager } from "@cashu/coco-core";
 
+import { failureText, type FailureText } from "../errors";
 import { logger, mintUrlFields } from "../logger";
 import {
   ensureReusableMintQuote,
@@ -21,7 +22,8 @@ export interface UseReusableMintQuoteResult {
   /** The standing quote (offer/address in `quote.request`), null while loading. */
   quote: ReusableMintQuote | null;
   isLoading: boolean;
-  error: string | null;
+  /** Why the last load failed; `authored` says whether the message can be shown as is. */
+  error: FailureText | null;
   /** Re-run get-or-create (e.g. after the quote expired). */
   refresh: () => void;
   /**
@@ -44,20 +46,20 @@ async function resolveReusableQuote(
   input: EnsureReusableMintQuoteInput,
   identityStore: ReusableQuoteIdentityStore,
 ): Promise<
-  { ok: true; quote: ReusableMintQuote } | { ok: false; message: string }
+  { ok: true; quote: ReusableMintQuote } | { ok: false; failure: FailureText }
 > {
   try {
     const quote = await ensureReusableMintQuote(manager, input, identityStore);
     return { ok: true, quote };
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    const failure = failureText(err, String(err));
     logger.warn("quotes.reusable.ensure_failed", {
       ...mintUrlFields(input.mintUrl),
       method: input.method,
       unit: input.unit,
-      error: message,
+      error: failure.message,
     });
-    return { ok: false, message };
+    return { ok: false, failure };
   }
 }
 
@@ -71,7 +73,7 @@ async function rotateReusableQuote(
   identityStore: ReusableQuoteIdentityStore,
   reason: "manual" | "deposit_received",
 ): Promise<
-  { ok: true; quote: ReusableMintQuote } | { ok: false; message: string }
+  { ok: true; quote: ReusableMintQuote } | { ok: false; failure: FailureText }
 > {
   try {
     const quote = await rotateReusableMintQuote(
@@ -82,14 +84,14 @@ async function rotateReusableQuote(
     );
     return { ok: true, quote };
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    const failure = failureText(err, String(err));
     logger.warn("quotes.reusable.rotate_failed", {
       ...mintUrlFields(input.mintUrl),
       method: input.method,
       unit: input.unit,
-      error: message,
+      error: failure.message,
     });
-    return { ok: false, message };
+    return { ok: false, failure };
   }
 }
 
@@ -111,7 +113,7 @@ export function useReusableMintQuote(
     input ? peekReusableMintQuote(manager, input) : null,
   );
   const [isLoading, setIsLoading] = useState(!!input && !quote);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<FailureText | null>(null);
   const [generation, setGeneration] = useState(0);
 
   const mountedRef = useRef(true);
@@ -155,7 +157,7 @@ export function useReusableMintQuote(
       );
       if (cancelled || !mountedRef.current) return;
       if (outcome.ok) setQuote(outcome.quote);
-      else setError(outcome.message);
+      else setError(outcome.failure);
       setIsLoading(false);
     })().catch(() => {
       // Restores the guarantee the old `try/finally` gave: whatever went wrong
@@ -217,7 +219,7 @@ export function useReusableMintQuote(
       );
       if (!mountedRef.current) return;
       if (outcome.ok) setQuote(outcome.quote);
-      else setError(outcome.message);
+      else setError(outcome.failure);
     },
     [manager, mintUrl, method, unit, identityStoreRef, mountedRef],
   );

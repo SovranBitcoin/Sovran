@@ -45,7 +45,12 @@ describe('send fallback — optional lock', () => {
       failed: { label: string; message: string };
       alternatives: { id: string }[];
     };
-    expect(data.failed).toEqual({ label: 'as Locked Ecash', message: 'Mint rejected the lock' });
+    // Not this package's wording, so the app replaces it before showing it.
+    expect(data.failed).toEqual({
+      label: 'as Locked Ecash',
+      message: 'Mint rejected the lock',
+      authored: false,
+    });
     expect(data.alternatives.map((alternative) => alternative.id)).toEqual(['ecash']);
 
     await tm.machine.chooseSendFallback('ecash');

@@ -10,7 +10,7 @@
 import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
 
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
-import { describeError } from '@/shared/lib/errors';
+import { describeWalletFailure } from '@/shared/lib/errors';
 
 import {
   buildBip321OnchainUri,
@@ -290,7 +290,7 @@ export const ReceiveReusableQuoteTab = memo(function ReceiveReusableQuoteTab({
 
   if (error && !request) {
     return renderEmptyState(
-      `Could not load the standing ${method === 'bolt12' ? 'offer' : 'address'}. ${describeError({ message: error }, 'cashu').text}`
+      `Could not load the standing ${method === 'bolt12' ? 'offer' : 'address'}. ${describeWalletFailure(error)}`
     );
   }
 

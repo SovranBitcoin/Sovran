@@ -63,6 +63,35 @@ export function isMintOfflineError(err: unknown): boolean {
 }
 
 /**
+ * An error whose message this package wrote for the person using the app.
+ * Everything else that can be thrown here (a mint's reply, a library's
+ * exception) carries someone else's wording: the app shows its own copy for
+ * that instead of the text.
+ */
+export class AuthoredError extends Error {
+  readonly authored = true;
+  constructor(message: string, options?: { cause?: unknown }) {
+    super(message, options);
+    this.name = "AuthoredError";
+  }
+}
+
+export interface FailureText {
+  message: string;
+  /** True when `message` was written by this package and can be shown as is. */
+  authored: boolean;
+}
+
+/** The message a failure is reported with, and whether this package wrote it. */
+export function failureText(cause: unknown, fallback: string): FailureText {
+  if (!(cause instanceof Error)) return { message: fallback, authored: true };
+  return {
+    message: cause.message,
+    authored: (cause as { authored?: unknown }).authored === true,
+  };
+}
+
+/**
  * The user deliberately backed out of a melt mid-flow (e.g. dismissed the
  * onchain NUT-30 fee sheet before any proofs were reserved). Failure routing
  * treats this as a quiet cancel — no failure toast, no error step.

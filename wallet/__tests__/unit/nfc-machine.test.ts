@@ -322,7 +322,12 @@ describe("NFC mint choice honours the payment-request gate", () => {
     expect(adapter.writeToken).not.toHaveBeenCalled();
     expect(tm.notificationCalls).toContainEqual({
       key: "onNfcWriteFailed",
-      data: { message: "mint offline", rolledBack: false, stage: "prepare" },
+      data: {
+        message: "mint offline",
+        authored: false,
+        rolledBack: false,
+        stage: "prepare",
+      },
     });
   });
 });

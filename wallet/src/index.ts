@@ -312,6 +312,9 @@ export type {
 
 // Errors
 export {
+  AuthoredError,
+  failureText,
+  type FailureText,
   isMeltUserCancelledError,
   MeltUserCancelledError,
   isUnitRateUnavailableError,

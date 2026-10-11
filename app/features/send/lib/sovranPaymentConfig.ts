@@ -22,7 +22,7 @@ import { scanFromURLAsync } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { hasFeature } from '@/shared/config/features';
-import { describeError } from '@/shared/lib/errors';
+import { describeError, describeWalletFailure } from '@/shared/lib/errors';
 import { paymentLog, mintUrlLogFields } from '@/shared/lib/logger';
 import { parseHistoryEntryOnce, type ParsedHistoryEntry } from 'wallet/operations';
 import { z } from 'zod';
@@ -678,10 +678,10 @@ export function createSovranNotifications(
         failure: { service: 'cashu', error: { message, data: _data } },
       });
     },
-    NFC_WRITE_FAILED: ({ code: _code, message, data: _data }) => {
+    NFC_WRITE_FAILED: ({ code: _code, message, data }) => {
       paramPopup('nfc-error', {
         title: 'NFC Write Failed',
-        message: describeError({ message }, 'cashu').text,
+        message: describeWalletFailure({ message, authored: data?.authored === true }),
       });
     },
     NFC_SESSION_LOST: ({ code: _code, message, data: _data }) => {
@@ -858,9 +858,10 @@ export function createSovranNotifications(
         activeId: store.active?.id ?? null,
         activeState: store.active?.state ?? null,
       });
-      // `data.message` is the exception's own text. It reaches the screen
-      // only as catalogue copy; the log above keeps the original.
-      const reason = describeError({ message: data.message }, 'cashu').text;
+      // `data.message` is the exception's own text. Unless the wallet package
+      // wrote it, it reaches the screen only as catalogue copy; the log above
+      // keeps the original.
+      const reason = describeWalletFailure(data);
       const msg = data.rolledBack ? `${reason}\nYour funds have been returned.` : reason;
       const variant = data.variant === 'paymentRequest' ? 'payment-request' : data.variant;
       const active = store.active;
@@ -908,7 +909,7 @@ export function createSovranNotifications(
         activeState: active.state,
         rolledBack: data.rolledBack,
       });
-      store.setFailed(active.id, new Error(data.message));
+      store.setFailed(active.id, undefined, msg);
     },
     onScanEmpty: (source) => {
       if (source === 'clipboard') staticPopup('no-clipboard-address');
@@ -967,8 +968,8 @@ export function createSovranNotifications(
         },
       });
     },
-    onNfcWriteFailed: ({ message, rolledBack, stage }) => {
-      const reason = describeError({ message }, 'cashu').text;
+    onNfcWriteFailed: ({ message, authored, rolledBack, stage }) => {
+      const reason = describeWalletFailure({ message, authored });
       const errorMsg = rolledBack ? `${reason} Your funds have been returned.` : reason;
       // Before the token exists nothing has touched the tag: "write failed"
       // would send the user chasing the NFC link when the mint or the fee
@@ -2071,10 +2072,13 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
             return;
           }
           const code = rawError instanceof NfcError ? rawError.code : 'WRITE_FAILED';
-          // An NfcError carries this app's own wording; anything else is
-          // another library's text and goes through the catalogue.
+          // An NfcError carries this app's own wording, except WRITE_FAILED,
+          // which wraps the NFC library's message. That, and anything else,
+          // goes through the catalogue.
           const message =
-            rawError instanceof NfcError ? rawError.message : describeError(rawError, 'app').text;
+            rawError instanceof NfcError && code !== 'WRITE_FAILED'
+              ? rawError.message
+              : describeError(rawError, 'app').text;
           const lostConnection = code === 'TAG_LOST' || code === 'TRANSCEIVE_FAILED';
 
           if (lostConnection && entry.operationId) {

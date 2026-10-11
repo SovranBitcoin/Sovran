@@ -172,6 +172,8 @@ export interface StepDataMap {
     unit: string;
     failedOptionValues: string[];
     lastFailedMessage?: string;
+    /** True when the wallet package wrote `lastFailedMessage`; see `AuthoredError`. */
+    lastFailedAuthored?: boolean;
   };
   /**
    * A send the user picked from the amount screen failed, and a different way
@@ -182,7 +184,8 @@ export interface StepDataMap {
   chooseSendFallback: {
     amount: number;
     unit: string;
-    failed: { label: string; message: string };
+    /** `authored`: the wallet package wrote `message`; see `AuthoredError`. */
+    failed: { label: string; message: string; authored?: boolean };
     alternatives: SendFallbackAlternative[];
   };
   enterAmount: {
@@ -777,7 +780,12 @@ export type NotificationHandlerMap = {
     mintUrl: string;
     amount: number;
     unit: string;
+    /**
+     * The exception's own text. Show it as is only when `authored` is true:
+     * otherwise it is a mint's or a library's wording.
+     */
     message: string;
+    authored?: boolean;
     rolledBack?: boolean;
   }) => MaybeAsync;
   /**
@@ -793,7 +801,9 @@ export type NotificationHandlerMap = {
    * were successfully reclaimed.
    */
   onNfcWriteFailed?: (data: {
+    /** As `onPaymentFailed`: show as is only when `authored` is true. */
     message: string;
+    authored?: boolean;
     rolledBack: boolean;
     /**
      * `prepare`: the token was never created, nothing reached the tag.

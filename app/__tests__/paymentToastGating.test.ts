@@ -151,6 +151,35 @@ describe('payment toast gating (onchain melt)', () => {
     expect(paymentStatusPopup).not.toHaveBeenCalled();
   });
 
+  it('says the funds came back when the failed payment already had a toast', () => {
+    usePaymentStatusStore.setState({ active: { ...PROCESSING_MELT, ...BASE } });
+    void createSovranNotifications().onPaymentFailed!({
+      variant: 'melt',
+      ...BASE,
+      message: 'Route failed',
+      rolledBack: true,
+    });
+    expect(activeStatus()).toMatchObject({
+      id: 'melt-1',
+      state: 'failed',
+      errorMessage: `${ERROR_COPY['cashu.unknown']}\nYour funds have been returned.`,
+    });
+  });
+
+  it("shows the wallet package's own wording as it is", () => {
+    usePaymentStatusStore.setState({ active: { ...PROCESSING_MELT, ...BASE } });
+    void createSovranNotifications().onPaymentFailed!({
+      variant: 'melt',
+      ...BASE,
+      message: 'Amount must be between 1 and 10 sats',
+      authored: true,
+    });
+    expect(activeStatus()).toMatchObject({
+      state: 'failed',
+      errorMessage: 'Amount must be between 1 and 10 sats',
+    });
+  });
+
   it('replaces an unrelated status instead of failing the wrong payment', () => {
     usePaymentStatusStore.setState({
       active: {
@@ -165,14 +194,15 @@ describe('payment toast gating (onchain melt)', () => {
     void notifications.onPaymentFailed!({
       variant: 'melt',
       ...BASE,
-      message: 'Proofs already spent',
+      message: 'This melt failed',
+      authored: true,
     });
     expect(activeStatus()).toMatchObject({
       variant: 'melt',
       mintUrl: BASE.mintUrl,
       amount: BASE.amount,
       state: 'failed',
-      errorMessage: ERROR_COPY['cashu.proofs_spent'],
+      errorMessage: 'This melt failed',
     });
     expect(activeStatus()?.id).not.toBe('other-melt');
     expect(paymentStatusPopup).toHaveBeenCalledTimes(1);

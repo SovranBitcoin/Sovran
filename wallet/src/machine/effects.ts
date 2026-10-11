@@ -1,6 +1,6 @@
 import { errAsync, okAsync, ResultAsync } from 'neverthrow';
 
-import { isMintOfflineError } from '../errors';
+import { failureText, isMintOfflineError } from '../errors';
 import { t } from '../formatting/locales';
 import { errField, logger, mintUrlFields } from '../logger';
 import { parseHistoryEntryOnce } from '../operations/historyEntry';
@@ -797,8 +797,7 @@ function buildNfcWriteBackError(args: {
   rolledBack: boolean;
   stage: 'prepare' | 'write';
 }): NfcWriteBackEffectError {
-  const message =
-    args.cause instanceof Error ? args.cause.message : 'NFC write failed';
+  const { message, authored } = failureText(args.cause, 'NFC write failed');
 
   logger.warn('effects.nfcWriteBack.error', {
     rolledBack: args.rolledBack,
@@ -810,11 +809,20 @@ function buildNfcWriteBackError(args: {
     kind: 'failed',
     cause: args.cause,
     rolledBack: args.rolledBack,
-    data: { code: 'NFC_WRITE_FAILED', message },
+    data: {
+      code: 'NFC_WRITE_FAILED',
+      message,
+      ...(authored ? { data: { authored: true } } : {}),
+    },
     notifications: [
       {
         type: 'onNfcWriteFailed',
-        data: { message, rolledBack: args.rolledBack, stage: args.stage },
+        data: {
+          message,
+          authored,
+          rolledBack: args.rolledBack,
+          stage: args.stage,
+        },
       },
     ],
   };
@@ -928,17 +936,23 @@ function toConfirmSendEffectError(args: {
       ? errField(args.fallbackFailure)
       : undefined,
   });
+  const failure = mintUnreachable
+    ? { message: t('MINT_UNREACHABLE', args.locale), authored: true }
+    : failureText(args.cause, t('SEND_FAILED', args.locale));
   return {
     kind: 'failed',
     cause: args.cause,
     data: {
       code: 'SEND_FAILED',
-      message: mintUnreachable
-        ? t('MINT_UNREACHABLE', args.locale)
-        : args.cause instanceof Error
-          ? args.cause.message
-          : t('SEND_FAILED', args.locale),
-      ...(mintUnreachable ? { data: { mintUnreachable: true } } : {}),
+      message: failure.message,
+      ...(mintUnreachable || failure.authored
+        ? {
+            data: {
+              ...(mintUnreachable ? { mintUnreachable: true } : {}),
+              ...(failure.authored ? { authored: true } : {}),
+            },
+          }
+        : {}),
     },
     ...(args.contextPatch ? { context: args.contextPatch } : {}),
     ...(args.fallbackFailure ? { fallbackFailure: args.fallbackFailure } : {}),

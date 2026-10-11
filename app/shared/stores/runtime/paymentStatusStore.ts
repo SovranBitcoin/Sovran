@@ -32,7 +32,8 @@ type PaymentStatusStore = {
   setWaiting: (id: string, copy: { title: string; subtitle: string }) => void;
   setDelivered: (id: string) => void;
   setConfirmed: (id: string, extra?: { operationId?: string; receiveEntryId?: string }) => void;
-  setFailed: (id: string, error?: unknown) => void;
+  /** `text`, when given, is shown as is; otherwise the error is described from the catalogue. */
+  setFailed: (id: string, error?: unknown, text?: string) => void;
 };
 
 /** Debug-log a refused transition; call sites keep their literal event keys. */
@@ -177,7 +178,7 @@ export const usePaymentStatusStore = create<PaymentStatusStore>({
         active: { ...withoutStatusCopy(s.active!), state: 'confirmed' as const, ...extra },
       };
     }),
-  setFailed: (id, error) =>
+  setFailed: (id, error, text) =>
     set((s) => {
       if (s.active?.id !== id) {
         logSkip('payment.status.failed.skipped', s, id, 'id_mismatch');
@@ -191,7 +192,8 @@ export const usePaymentStatusStore = create<PaymentStatusStore>({
         logSkip('payment.status.failed.skipped', s, id, 'terminal_or_waiting_state');
         return s;
       }
-      const errorMessage = error !== undefined ? describeError(error, 'cashu').text : undefined;
+      const errorMessage =
+        text ?? (error !== undefined ? describeError(error, 'cashu').text : undefined);
       paymentLog.error('payment.status.failed', {
         id,
         variant: s.active.variant,

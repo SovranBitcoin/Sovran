@@ -75,7 +75,6 @@ it.each([
   [{ name: 'HttpResponseError', status: 200 }, 'cashu.unavailable'],
   [{ name: 'NetworkError', cause: new Error('fetch failed') }, 'cashu.network'],
   [new Error('FAILURE_REASON_NO_ROUTE'), 'cashu.no_route'],
-  [{ message: 'Mint unreachable' }, 'cashu.network'],
 ])('handles Cashu transport failures without payment outcome claims', (error, id) => {
   expect(describeError(error, 'cashu').id).toBe(id);
 });

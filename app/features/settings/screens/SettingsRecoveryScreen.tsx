@@ -15,7 +15,7 @@ import { MintIcon } from '@/shared/ui/composed/MintIcon';
 import { Surface } from '@/shared/ui/composed/Surface';
 import { useStylePaint } from '@/shared/styles/appStyle';
 import { Switch } from '@/shared/ui/primitives/Switch';
-import { cashuLog, useLifecycleLogger, mintUrlLogFields } from '@/shared/lib/logger';
+import { cashuLog, useLifecycleLogger, mintUrlLogFields, redactError } from '@/shared/lib/logger';
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { useMintManagement } from '@/features/mint';
 import { useNavigation } from 'expo-router';
@@ -453,14 +453,18 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
         } catch (error) {
           // coco's request provider has no HTTP timeout, so one unresponsive
           // mint would otherwise stall every mint behind it.
+          // The catalogue's timeout copy is about a payment whose outcome is
+          // unknown, which a restore is not.
+          const timedOut = error instanceof Error && error.name === 'TimeoutError';
           patch(i, {
             status: 'failed',
-            error: describeError(error, 'cashu').text,
+            error: timedOut ? 'Timed out' : describeError(error, 'cashu').text,
             durationMs: null,
           });
-          cashuLog.warn('recovery.mint.timed_out', {
+          cashuLog.warn(timedOut ? 'recovery.mint.timed_out' : 'recovery.mint.restore_failed', {
             ...mintUrlLogFields(allMintUrls[i]),
             timeoutMs: MINT_RESTORE_TIMEOUT_MS,
+            error: redactError(error),
           });
         }
       }

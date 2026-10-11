@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { Manager } from "@cashu/coco-core";
 
+import { failureText, type FailureText } from "../errors";
 import { logger } from "../logger";
 import {
   ensureStandingPaymentRequest,
@@ -18,14 +19,15 @@ import { useLatestRef } from "./useLatestRef";
 export interface UseStandingPaymentRequestResult {
   request: StandingPaymentRequest | null;
   isLoading: boolean;
-  error: string | null;
+  /** Why the last load failed; `authored` says whether the message can be shown as is. */
+  error: FailureText | null;
   /** Cancel the current request and mint a fresh one (new request id). */
   rotate: () => Promise<void>;
 }
 
 type StandingOutcome =
   | { ok: true; request: StandingPaymentRequest }
-  | { ok: false; message: string };
+  | { ok: false; failure: FailureText };
 
 /**
  * Resolve (or, with `wantFresh`, rotate then resolve) the standing request.
@@ -49,12 +51,12 @@ async function resolveStandingRequest(
         );
     return { ok: true, request };
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    const failure = failureText(err, String(err));
     logger.warn("creq.standing.ensure_failed", {
       unit: requestInput.unit,
-      error: message,
+      error: failure.message,
     });
-    return { ok: false, message };
+    return { ok: false, failure };
   }
 }
 
@@ -72,12 +74,12 @@ async function rotateStandingRequest(
     );
     return { ok: true, request };
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    const failure = failureText(err, String(err));
     logger.warn("creq.standing.rotate_failed", {
       unit: requestInput.unit,
-      error: message,
+      error: failure.message,
     });
-    return { ok: false, message };
+    return { ok: false, failure };
   }
 }
 
@@ -110,7 +112,7 @@ export function useStandingPaymentRequest(
     input && !freshOnMount ? peekStandingPaymentRequest(manager, input) : null,
   );
   const [isLoading, setIsLoading] = useState(!!input && !request);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<FailureText | null>(null);
   const [generation, setGeneration] = useState(0);
 
   const mountedRef = useRef(true);
@@ -195,7 +197,7 @@ export function useStandingPaymentRequest(
       );
       if (cancelled || !mountedRef.current) return;
       if (outcome.ok) setRequest(outcome.request);
-      else setError(outcome.message);
+      else setError(outcome.failure);
       setIsLoading(false);
     })().catch(() => {
       // Restores the guarantee the old `try/finally` gave: whatever went wrong
@@ -254,7 +256,7 @@ export function useStandingPaymentRequest(
     );
     if (!mountedRef.current) return;
     if (outcome.ok) setRequest(outcome.request);
-    else setError(outcome.message);
+    else setError(outcome.failure);
   }, [
     manager,
     unit,

@@ -22,6 +22,7 @@ import { PaymentRequest, decodePaymentRequest } from "@cashu/cashu-ts";
 import type { Manager } from "@cashu/coco-core";
 import { bytesToHex, randomBytes } from "@noble/hashes/utils.js";
 
+import { AuthoredError } from "./errors";
 import { logger } from "./logger";
 import type { ReusableQuoteIdentityStore } from "./quotes/reusable";
 
@@ -94,7 +95,7 @@ function narrowDisplayMints(
 ): string[] | undefined {
   if (!displayMints) return mints;
   if (displayMints.length === 0) {
-    if (failClosed) throw new Error("No accepted mints");
+    if (failClosed) throw new AuthoredError("No accepted mints");
     return mints;
   }
   if (!mints || mints.length === 0) return mints;
@@ -105,7 +106,7 @@ function narrowDisplayMints(
     opMintCount: mints.length,
     displayMintCount: displayMints.length,
   });
-  if (failClosed) throw new Error("No accepted mints in standing request");
+  if (failClosed) throw new AuthoredError("No accepted mints in standing request");
   return mints;
 }
 
