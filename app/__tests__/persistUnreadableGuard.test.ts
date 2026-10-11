@@ -327,7 +327,7 @@ it('keeps the fields that parse and still copies the original aside', async () =
         name: NAME,
         logKey: `guard_test_${serial}`,
         storage: memoryStorage(disk),
-        schema: z.object({ count: z.number().int(), label: z.string() }),
+        schema: z.object({ count: z.number().int().default(0), label: z.string() }),
         partialize: (state) => ({ count: state.count, label: state.label }),
         independentFields: true,
       })

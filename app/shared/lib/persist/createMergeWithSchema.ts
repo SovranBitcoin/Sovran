@@ -39,26 +39,31 @@ export function createMergeWithSchema<TPartial>(
     const fields = options.independentFields ? fieldSchemas(schema) : null;
     if (!fields) return current;
 
-    // One bad field must not cost the others. Each saved field is read on its
-    // own; one that fails, or is absent, keeps the store's default.
-    const kept: Record<string, unknown> = {};
-    const dropped: string[] = [];
-    for (const [key, field] of Object.entries(fields)) {
-      if (!(key in persisted)) continue;
-      const parsed = field.safeParse((persisted as Record<string, unknown>)[key]);
-      if (parsed.success) kept[key] = parsed.data;
-      else dropped.push(key);
-    }
-    log.warn(`store.${name}.merge_kept_fields`, { kept: Object.keys(kept), dropped });
-    return { ...current, ...kept } as TFull;
+    // One bad field must not cost the others. Take out the fields that do
+    // not parse on their own and ask the schema again: it fills their
+    // defaults exactly as a normal load would, and it still has the last word,
+    // so a blob that breaks a rule spanning fields, or lacks a field with no
+    // default, stays turned down.
+    const dropped = Object.keys(fields).filter(
+      (key) =>
+        key in persisted &&
+        !fields[key].safeParse((persisted as Record<string, unknown>)[key]).success
+    );
+    const withoutBadFields = Object.fromEntries(
+      Object.entries(persisted).filter(([key]) => !dropped.includes(key))
+    );
+    const again = schema.safeParse(withoutBadFields);
+    if (dropped.length === 0 || !again.success) return current;
+    log.warn(`store.${name}.merge_kept_fields`, { dropped });
+    return { ...current, ...again.data } as TFull;
   };
 }
 
 interface MergeWithSchemaOptions {
   /**
    * The saved fields mean the same whether or not their neighbours loaded, so
-   * a blob the schema turns down is read field by field instead of being
-   * replaced by defaults. Leave it off for a store whose fields refer to each
+   * a blob the schema turns down is read again without the fields that do not
+   * parse, each of which needs a default in the schema. Leave it off for a store whose fields refer to each
    * other (an index into a list, an id that must exist in a map): half of
    * such a store is worse than none of it.
    */
