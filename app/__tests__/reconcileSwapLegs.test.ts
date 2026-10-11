@@ -25,6 +25,8 @@ jest.mock('@/shared/lib/logger', () => ({
 
 type Operation = { state: string; error?: string } | null;
 
+beforeEach(() => useSwapTransactionsStore.setState({ groups: {}, quoteIdToGroup: {} }));
+
 function manager(operations: { mint?: Operation; melt?: Operation }) {
   return {
     ops: {
@@ -34,7 +36,10 @@ function manager(operations: { mint?: Operation; melt?: Operation }) {
   };
 }
 
-function savedLeg(localStatus: 'settling' | 'paymentPending' | 'done') {
+function savedLeg(
+  localStatus: 'settling' | 'paymentPending' | 'melting' | 'verifying' | 'done',
+  ids = { mint: 'mint-op', melt: 'melt-op' }
+) {
   const store = useSwapTransactionsStore.getState();
   const groupId = store.startGroup({ unit: 'sat', title: 'Rebalance' });
   const legId = useSwapTransactionsStore.getState().addLeg(groupId, {
@@ -43,10 +48,11 @@ function savedLeg(localStatus: 'settling' | 'paymentPending' | 'done') {
     amount: 21,
   });
   const actions = useSwapTransactionsStore.getState();
-  actions.tagMintQuote(groupId, legId, { quoteId: 'mint-quote', operationId: 'mint-op' });
-  actions.tagMelt(groupId, legId, { quoteId: 'melt-quote', operationId: 'melt-op' });
+  actions.tagMintQuote(groupId, legId, { quoteId: `q-${ids.mint}`, operationId: ids.mint });
+  actions.tagMelt(groupId, legId, { quoteId: `q-${ids.melt}`, operationId: ids.melt });
   actions.setLegStatus(groupId, legId, { localStatus });
-  return () => useSwapTransactionsStore.getState().groups[groupId].legs[0];
+  const leg = () => useSwapTransactionsStore.getState().groups[groupId].legs[0];
+  return Object.assign(leg, { groupId, legId });
 }
 
 it('marks a settling leg done once its own mint operation is finalized', async () => {
@@ -98,15 +104,48 @@ it('leaves a pending payment alone while the melt is unresolved', async () => {
   expect(leg().localStatus).toBe('paymentPending');
 });
 
+it('marks a settling leg failed when its melt turns out to have been rolled back', async () => {
+  const leg = savedLeg('settling');
+
+  await reconcileSwapLegs(
+    manager({ melt: { state: 'rolled_back' }, mint: { state: 'finalized' } })
+  );
+
+  expect(leg().localStatus).toBe('failed');
+});
+
+it.each(['melting', 'verifying'] as const)(
+  'settles a leg a finished run left at %s, and leaves it alone while the run is going',
+  async (status) => {
+    const leg = savedLeg(status);
+    const coco = manager({ melt: { state: 'finalized' }, mint: { state: 'finalized' } });
+
+    await reconcileSwapLegs(coco);
+    expect(leg().localStatus).toBe(status);
+
+    useSwapTransactionsStore.getState().finalizeGroup(leg.groupId, 'finished');
+    await reconcileSwapLegs(coco);
+    expect(leg().localStatus).toBe('done');
+  }
+);
+
+it('does not overwrite a leg that changed while its operation was being read', async () => {
+  const leg = savedLeg('settling');
+  const coco = manager({});
+  coco.ops.mint.get.mockImplementation(async () => {
+    useSwapTransactionsStore
+      .getState()
+      .setLegStatus(leg.groupId, leg.legId, { localStatus: 'failed', errorMessage: 'x' });
+    return { state: 'finalized' };
+  });
+
+  await reconcileSwapLegs(coco);
+
+  expect(leg().localStatus).toBe('failed');
+});
+
 it('reads nothing when no leg is unsettled', async () => {
   savedLeg('done');
-  useSwapTransactionsStore.setState({
-    groups: Object.fromEntries(
-      Object.entries(useSwapTransactionsStore.getState().groups).filter(([, group]) =>
-        group.legs.every((leg) => leg.localStatus === 'done')
-      )
-    ),
-  });
   const coco = manager({});
 
   await reconcileSwapLegs(coco);
@@ -116,12 +155,16 @@ it('reads nothing when no leg is unsettled', async () => {
 });
 
 it('keeps going when one read fails', async () => {
-  const first = savedLeg('settling');
-  const second = savedLeg('settling');
-  const coco = manager({ mint: { state: 'finalized' } });
-  coco.ops.mint.get.mockRejectedValueOnce(new Error('database is locked'));
+  const first = savedLeg('settling', { mint: 'mint-a', melt: 'melt-a' });
+  const second = savedLeg('settling', { mint: 'mint-b', melt: 'melt-b' });
+  const coco = manager({ melt: { state: 'finalized' }, mint: { state: 'finalized' } });
+  coco.ops.mint.get.mockImplementation(async (...[id]: unknown[]) => {
+    if (id === 'mint-a') throw new Error('database is locked');
+    return { state: 'finalized' };
+  });
 
   await reconcileSwapLegs(coco);
 
-  expect([first().localStatus, second().localStatus].sort()).toContain('done');
+  expect(first().localStatus).toBe('settling');
+  expect(second().localStatus).toBe('done');
 });

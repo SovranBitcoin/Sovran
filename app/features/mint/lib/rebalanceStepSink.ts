@@ -68,8 +68,8 @@ function legUpdateToStepState(update: RebalanceLegUpdate): Partial<StepState> {
   if (update.invoice !== undefined) next.invoice = update.invoice;
   if (update.operationId !== undefined) next.operationId = update.operationId;
   if (update.status === 'paymentPending') {
-    // Still in flight: shown as sending, never as failed or retryable.
-    next.status = 'melting';
+    // Still in flight: never failed, and never run again by a retry.
+    next.status = 'paymentPending';
     next.routingDetail = PAYMENT_PENDING_DETAIL;
   } else if (update.status === 'settling') {
     next.status = 'settling';

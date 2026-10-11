@@ -269,7 +269,13 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
       if (isCleanFinalization(operation, expected)) return true;
       await clock.sleep(Math.min(RECEIPT_POLL_MS, Math.max(0, deadline - clock.now())));
     }
-    return false;
+    if (!isActive()) return false;
+    // The receipt may have finalized during the last sleep.
+    try {
+      return isCleanFinalization(await wallet.getMintOperation(expected.id), expected);
+    } catch {
+      return false;
+    }
   }
 
   // ── Preparation ───────────────────────────────────────────────────────

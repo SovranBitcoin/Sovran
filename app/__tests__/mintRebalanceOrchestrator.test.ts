@@ -398,9 +398,20 @@ test('a melt still unsettled after the settle window stays pending instead of fa
   });
   expect(result.current.runStatus).toBe('finished');
   expect(result.current.stepStates['step-1']).toMatchObject({
-    status: 'melting',
+    status: 'paymentPending',
     routingDetail: expect.stringContaining('Payment pending'),
   });
+  expect(mockTransactions.setLegStatus).toHaveBeenLastCalledWith(
+    'group-1',
+    'leg-1',
+    expect.objectContaining({ localStatus: 'paymentPending' })
+  );
+
+  // Retrying what failed must not send a payment whose outcome is unknown again.
+  await act(async () => {
+    await result.current.handleRetryFailed();
+  });
+  expect(mockManager.ops.melt.execute).toHaveBeenCalledTimes(1);
   expect(mockManager.ops.melt.execute).toHaveBeenCalledTimes(1);
   expect(mockRestore).not.toHaveBeenCalled();
   expect(mockStatus.setLegFailed).not.toHaveBeenCalled();

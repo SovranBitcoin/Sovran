@@ -74,7 +74,7 @@ export function computeRebalanceStepCounts(
   for (const step of steps) {
     const status = stepStates[step.id]?.status;
     if (status === 'done') completed++;
-    else if (status === 'settling') settling++;
+    else if (status === 'settling' || status === 'paymentPending') settling++;
     else if (status === 'failed') failed++;
     else if (status === 'skipped') skipped++;
     else if (status && EXECUTING_STATUSES.has(status)) executing = true;

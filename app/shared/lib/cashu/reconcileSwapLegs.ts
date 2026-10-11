@@ -2,6 +2,7 @@ import { cashuLog, redactError } from '@/shared/lib/logger';
 import {
   useSwapTransactionsStore,
   type SwapLeg,
+  type SwapLegLocalStatus,
 } from '@/shared/stores/profile/swapTransactionsStore';
 
 /** What a leg's own Coco operation looks like, as far as this needs to know. */
@@ -19,12 +20,20 @@ interface SwapLegOperations {
 
 const MELT_ROLLED_BACK = 'The payment did not go through. The funds are back in the sending mint.';
 
+/** Saved by a run that ended, or by an older build that had no value for an unknown outcome. */
+const LEFT_MID_FLIGHT: ReadonlySet<SwapLegLocalStatus | undefined> = new Set([
+  'melting',
+  'verifying',
+]);
+
 /**
  * Move saved swap legs that ended without a known outcome to their final
  * state, from Coco's record of each leg's own operations:
  *
- * - `paymentPending` (the melt was sent, its outcome unknown) becomes
- *   `settling` once the melt is finalized, or `failed` once it is rolled back.
+ * - A leg whose melt is rolled back is `failed`, whatever it said before.
+ * - `paymentPending` (the melt was sent, its outcome unknown), and a leg a
+ *   finished run left at `melting` or `verifying`, becomes `settling` once the
+ *   melt is finalized.
  * - `settling` (the melt was paid, the destination had not issued) becomes
  *   `done` once this leg's mint operation is finalized without an error.
  *
@@ -36,7 +45,8 @@ export async function reconcileSwapLegs(manager: SwapLegOperations): Promise<voi
   const unsettled: { groupId: string; leg: SwapLeg }[] = [];
   for (const group of Object.values(useSwapTransactionsStore.getState().groups)) {
     for (const leg of group.legs) {
-      if (leg.localStatus === 'settling' || leg.localStatus === 'paymentPending') {
+      const stale = group.state !== 'running' && LEFT_MID_FLIGHT.has(leg.localStatus);
+      if (leg.localStatus === 'settling' || leg.localStatus === 'paymentPending' || stale) {
         unsettled.push({ groupId: group.id, leg });
       }
     }
@@ -44,23 +54,30 @@ export async function reconcileSwapLegs(manager: SwapLegOperations): Promise<voi
 
   for (const { groupId, leg } of unsettled) {
     try {
-      const setStatus = useSwapTransactionsStore.getState().setLegStatus;
       let status = leg.localStatus;
-      if (status === 'paymentPending' && leg.meltOperationId) {
+      /** Write only while the leg still says what this pass read. */
+      const move = (localStatus: SwapLegLocalStatus, errorMessage?: string) => {
+        const store = useSwapTransactionsStore.getState();
+        const current = store.groups[groupId]?.legs.find((saved) => saved.id === leg.id);
+        if (current?.localStatus !== status) return false;
+        store.setLegStatus(groupId, leg.id, { localStatus, errorMessage });
+        status = localStatus;
+        return true;
+      };
+
+      if (leg.meltOperationId) {
         const melt = await manager.ops.melt.get(leg.meltOperationId);
         if (melt?.state === 'rolled_back') {
-          setStatus(groupId, leg.id, { localStatus: 'failed', errorMessage: MELT_ROLLED_BACK });
+          move('failed', MELT_ROLLED_BACK);
           continue;
         }
-        if (melt?.state !== 'finalized') continue;
-        status = 'settling';
-        setStatus(groupId, leg.id, { localStatus: 'settling' });
+        if (status !== 'settling') {
+          if (melt?.state !== 'finalized' || !move('settling')) continue;
+        }
       }
       if (status === 'settling' && leg.mintOperationId) {
         const mint = await manager.ops.mint.get(leg.mintOperationId);
-        if (mint?.state === 'finalized' && !mint.error) {
-          setStatus(groupId, leg.id, { localStatus: 'done' });
-        }
+        if (mint?.state === 'finalized' && !mint.error) move('done');
       }
     } catch (error) {
       // A read is idempotent; the next run tries this leg again.
