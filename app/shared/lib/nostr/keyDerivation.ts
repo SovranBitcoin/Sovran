@@ -14,7 +14,8 @@ import { log } from '../logger';
 let _cachedMnemonic: string | null = null;
 let _cachedRootSeed: Uint8Array | null = null;
 
-function getRootSeed(mnemonic: string): Uint8Array {
+/** The BIP-39 seed of a phrase, stretched once per run and kept for the next caller. */
+export function getRootSeed(mnemonic: string): Uint8Array {
   if (_cachedMnemonic === mnemonic && _cachedRootSeed) return _cachedRootSeed;
   _cachedRootSeed = bip39.mnemonicToSeedSync(mnemonic);
   _cachedMnemonic = mnemonic;

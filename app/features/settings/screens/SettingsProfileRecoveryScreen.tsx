@@ -72,6 +72,7 @@ function RecoveryDetails({
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  const [showStored, setShowStored] = useState(false);
   const request = useRef({ generation: 0 });
   useEffect(() => {
     const pending = request.current;
@@ -82,6 +83,7 @@ function RecoveryDetails({
       if (state !== 'active') {
         pending.generation++;
         setInformation(null);
+        setShowStored(false);
         setLoading(false);
       }
     });
@@ -126,6 +128,28 @@ function RecoveryDetails({
       }
       onBack={onBack}>
       {selection}
+      {information?.storedCashuMnemonic && (
+        <VStack className="mb-4 gap-2" testID="profile-recovery-stored-wallet-phrase">
+          <Text bold>Wallet phrase stored on this device</Text>
+          <Text>
+            This device holds a wallet phrase for this profile that differs from the one your
+            recovery phrase produces. The wallet may have been opened with it. Keep a copy of both.
+          </Text>
+          {showStored ? (
+            <Text selectable testID="profile-recovery-stored-wallet-phrase-value">
+              {information.storedCashuMnemonic}
+            </Text>
+          ) : (
+            <Button
+              variant="secondary"
+              text="Show stored wallet phrase"
+              testID="profile-recovery-stored-wallet-phrase-show"
+              accessibilityLabel="Show the wallet phrase stored on this device"
+              onPress={() => setShowStored(true)}
+            />
+          )}
+        </VStack>
+      )}
       {!information && !loading && (
         <VStack className="mb-4 gap-2">
           <Text>

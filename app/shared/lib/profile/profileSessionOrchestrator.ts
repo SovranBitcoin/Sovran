@@ -28,7 +28,17 @@ import { Alert } from 'react-native';
 import { log, nostrLog, redactError } from '../logger';
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { forgetWalletDatabases } from '@/shared/lib/cashu/walletDatabaseRecord';
-import { deriveNostrKeys } from '@/shared/lib/nostr/keyDerivation';
+import { getPublicKey } from 'nostr-tools/pure';
+import { decode as decodeNip19 } from 'nostr-tools/nip19';
+import {
+  storedPhraseDerivesAccount,
+  reportIntegrityFailure,
+  verifyStoredAccount,
+} from '@/shared/lib/nostr/accountIntegrity';
+import {
+  expectedDerivedPubkey,
+  expectedImportedAccountNumber,
+} from '@/shared/lib/nostr/derivationIntegrity';
 import { useSecureStoreState } from '@/shared/stores/runtime/secureStoreState';
 import { useWalletLifecycleStore } from '@/shared/stores/global/walletLifecycleStore';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
@@ -66,8 +76,37 @@ import {
 const KEY_DERIVATION_TIMEOUT_MS = 30_000;
 const WALLET_CLOSE_TIMEOUT_MS = 10_000;
 
+/**
+ * Whether a saved account may become the active one: everything stored for it
+ * must still follow from the recovery phrase, or from its imported key. A
+ * mismatch is recorded for the critical screen and the switch is refused, with
+ * the active account left as it is. Nothing is written either way.
+ */
+async function targetPassesIntegrity(accountIndex: number): Promise<boolean> {
+  const row = useProfileStore.getState().profiles.find((p) => p.accountIndex === accountIndex);
+  // A missing row is refused by the caller's own existence check.
+  if (!row) return true;
+  try {
+    // Worth the pause if there is one: this account is about to be opened.
+    const result = await verifyStoredAccount(row, { thorough: true });
+    // Null: the phrase cannot be read. Startup handles that on its own screen.
+    if (!result || result.ok) return true;
+    reportIntegrityFailure(result);
+    return false;
+  } catch {
+    // The error is not logged: it may quote a secret.
+    log.warn('profile.orchestrator.integrity_check_failed', { accountIndex });
+    return false;
+  }
+}
+
 export async function switchToExistingProfile(opts: {
   accountIndex: number;
+  /**
+   * The active account is stopped on the critical screen, so its wallet was
+   * never opened: there is nothing to wait for, and the switch always restarts.
+   */
+  fromStoppedAccount?: boolean;
   resetStages?: TransitionControls['resetStages'];
   cancelResetStages?: TransitionControls['cancelResetStages'];
 }): Promise<boolean> {
@@ -75,7 +114,7 @@ export async function switchToExistingProfile(opts: {
     log.warn('profile.orchestrator.switch_blocked_in_flight');
     return false;
   }
-  if (!CocoManager.isReadyForCleanup()) {
+  if (!opts.fromStoppedAccount && !CocoManager.isReadyForCleanup()) {
     // Log the full component breakdown so a "switch did nothing" report says
     // WHICH condition blocked it (BTC-14).
     log.warn('profile.orchestrator.switch_blocked_coco_not_ready', {
@@ -93,9 +132,18 @@ export async function switchToExistingProfile(opts: {
     log.info('profile.orchestrator.switch_start', { accountIndex: opts.accountIndex });
     // Without a restart, a stage owned above the account providers never
     // registers again, so it must survive the reset or its dependents never start.
-    lock.holdSplash(splashControls(opts), {
-      keepStagesThatOutliveAccount: useSettingsStore.getState().inProcessProfileSwitch,
-    });
+    // Before the splash and before any teardown: a refused target must leave
+    // the running account exactly as it was.
+    if (!(await targetPassesIntegrity(opts.accountIndex))) {
+      log.warn('profile.orchestrator.switch_refused_integrity', {
+        accountIndex: opts.accountIndex,
+      });
+      await lock.release();
+      return false;
+    }
+    const inProcess =
+      !opts.fromStoppedAccount && useSettingsStore.getState().inProcessProfileSwitch;
+    lock.holdSplash(splashControls(opts), { keepStagesThatOutliveAccount: inProcess });
     usePopupStore.getState().close();
 
     // Validate the target up front — the same existence check
@@ -108,7 +156,7 @@ export async function switchToExistingProfile(opts: {
     }
 
     const release = () => lock.release();
-    return useSettingsStore.getState().inProcessProfileSwitch
+    return inProcess
       ? await switchWithoutRestart(opts.accountIndex, release)
       : await restartInto(opts.accountIndex);
   } catch (error) {
@@ -264,6 +312,14 @@ export async function createAndSwitchProfile(opts?: {
       return false;
     }
 
+    // The row about to be saved is checked against a derivation of its own:
+    // a profile must never be recorded under a key the phrase does not derive.
+    if (!(await storedPhraseDerivesAccount(nextIndex, newKeys.pubkey))) {
+      log.error('profile.orchestrator.create_refused_integrity', { nextIndex });
+      await lock.release();
+      return false;
+    }
+
     // Not fire-and-forget: at `MAX_PROFILES` the store refuses, and switching
     // into an index it does not hold would leave the app running as an account
     // nothing knows about — profile-scoped storage included.
@@ -281,6 +337,20 @@ export async function createAndSwitchProfile(opts?: {
   }
 }
 
+/** Whether an import names one identity: the key, its public key and its account number agree. */
+function importIsConsistent(opts: { accountIndex: number; pubkeyHex: string; nsec: string }) {
+  try {
+    const decoded = decodeNip19(opts.nsec);
+    return (
+      decoded.type === 'nsec' &&
+      getPublicKey(decoded.data) === opts.pubkeyHex &&
+      expectedImportedAccountNumber(opts.pubkeyHex) === opts.accountIndex
+    );
+  } catch {
+    return false;
+  }
+}
+
 type ImportProfileResult =
   /** The key is stored, the profile added, and the app is restarting into it (or held). */
   | 'switching'
@@ -290,6 +360,8 @@ type ImportProfileResult =
   | 'busy'
   /** Secure storage refused the key. Nothing was changed. */
   | 'key-not-stored'
+  /** The key, public key and account number do not describe one identity. Nothing was changed. */
+  | 'key-mismatch'
   /** The profile list is full. The key was stored, and nothing else changed. */
   | 'limit';
 
@@ -305,6 +377,10 @@ export async function importAndSwitchProfile(opts: {
   nsec: string;
 }): Promise<ImportProfileResult> {
   if (useProfileStore.getState().hasPubkey(opts.pubkeyHex)) return 'exists';
+  if (!importIsConsistent(opts)) {
+    log.error('profile.orchestrator.import_refused_integrity');
+    return 'key-mismatch';
+  }
   if (isTransitionInFlight() || !CocoManager.isReadyForCleanup()) {
     log.warn('profile.orchestrator.import_blocked', { ...CocoManager.getCleanupReadiness() });
     return 'busy';
@@ -358,17 +434,24 @@ export async function recoverMnemonicSession(mnemonic: string): Promise<boolean>
       !useProfileStore.getState().profiles.some((p) => p.source !== 'imported')
     )
       return false;
-    if (
-      !onboarding &&
-      useProfileStore
-        .getState()
-        .profiles.some(
-          (profile) =>
-            profile.source !== 'imported' &&
-            deriveNostrKeys(mnemonic, profile.accountIndex).pubkey !== profile.pubkey
+    // The rule that keeps recovery and the integrity check in step: a phrase
+    // is only accepted if it derives every derived account already saved
+    // here. After it, each of those rows still follows from the stored
+    // phrase, so the check has nothing to object to. During onboarding the
+    // list is emptied below instead, and imported accounts answer to their
+    // own stored key, whatever the phrase.
+    const derivedRows = onboarding
+      ? []
+      : useProfileStore.getState().profiles.filter((profile) => profile.source !== 'imported');
+    if (derivedRows.length > 0) {
+      const rootSeed = bip39.mnemonicToSeedSync(mnemonic, '');
+      if (
+        derivedRows.some(
+          (profile) => expectedDerivedPubkey(rootSeed, profile.accountIndex) !== profile.pubkey
         )
-    )
-      return false;
+      )
+        return false;
+    }
     // Bounded, and refused on a timeout: the phrase must not be replaced while
     // the wallet opened under the old one may still be writing.
     if ((await settleWithin(CocoManager.cleanup(), WALLET_CLOSE_TIMEOUT_MS)) === TIMED_OUT) {

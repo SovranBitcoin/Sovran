@@ -9,6 +9,11 @@ import { recoverMnemonicSession } from './profileSessionOrchestrator';
 import { restartApp } from './appRestart';
 
 export function openMnemonicRecovery(): void {
+  showMnemonicRecovery(recoverMnemonicSession);
+}
+
+/** The recovery-phrase form. `recover` is told a valid phrase and says whether it took. */
+export function showMnemonicRecovery(recover: (mnemonic: string) => Promise<boolean>): void {
   actionMenuPopup({
     title: 'Enter recovery phrase',
     inputs: [
@@ -31,7 +36,7 @@ export function openMnemonicRecovery(): void {
           setError('Enter a valid 12-word recovery phrase.');
           return;
         }
-        if (!(await recoverMnemonicSession(mnemonic))) {
+        if (!(await recover(mnemonic))) {
           setError(
             'Recovery could not finish. Retry, or close and reopen the app if the phrase was saved.'
           );
@@ -46,6 +51,17 @@ export function openMnemonicRecovery(): void {
 export function openNsecRecovery(): void {
   const profile = useProfileStore.getState().getActiveProfile();
   if (!profile) return;
+  showNsecRecovery(profile.pubkey, { save: storeImportedNsec, restart: restartApp });
+}
+
+/** The key re-import form for the account with this public key. */
+export function showNsecRecovery(
+  pubkey: string,
+  actions: {
+    save: (pubkey: string, nsec: string) => Promise<boolean>;
+    restart: () => boolean;
+  }
+): void {
   actionMenuPopup({
     title: 'Re-import Nostr key',
     inputs: [
@@ -65,7 +81,7 @@ export function openNsecRecovery(): void {
         const nsec = values['recovery-nsec'].trim();
         try {
           const decoded = nip19.decode(nsec);
-          if (decoded.type !== 'nsec' || getPublicKey(decoded.data) !== profile.pubkey) {
+          if (decoded.type !== 'nsec' || getPublicKey(decoded.data) !== pubkey) {
             setError('This key does not match the saved account.');
             return;
           }
@@ -73,11 +89,11 @@ export function openNsecRecovery(): void {
           setError('Enter a valid Nostr private key (nsec).');
           return;
         }
-        if (!(await storeImportedNsec(profile.pubkey, nsec))) {
+        if (!(await actions.save(pubkey, nsec))) {
           setError('The key could not be saved. Try again.');
           return;
         }
-        if (!restartApp()) {
+        if (!actions.restart()) {
           setError('Key saved. Close and reopen the app to continue.');
           return;
         }

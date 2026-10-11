@@ -55,3 +55,26 @@ export const profileRemovalCopy = {
     'imported-confirmation': "Confirm separately that the imported key will be deleted and cannot be recovered from your recovery phrase.",
   },
 } as const;
+
+// Shown when an account's saved identity does not follow from the recovery
+// phrase (or, for an imported account, from its stored key). The app stops and
+// repairs nothing, so every line here has to be true without a fix having run.
+export const accountMismatchCopy = {
+  title: "This account does not match your recovery phrase",
+  foundDerived: "{profile} has a saved identity that your recovery phrase does not produce on this device.",
+  foundImported: "{profile} has a saved identity that does not match the private key stored for it on this device.",
+  unchanged: "Nothing has been changed. Sovran stopped before opening this account's wallet and will not repair it by itself, because a repair could put the wrong keys in place.",
+  risk: "Money sent to this account may not be recoverable from this recovery phrase alone. Keep this app installed and do not delete its data.",
+  actions: "What you can do",
+  view: "View recovery information",
+  viewHint: "Write down your recovery phrase, and this account's key if this device still has it.",
+  copyCode: "Copy diagnostic code",
+  codeCopied: "Diagnostic code copied",
+  codeHint: "The code contains no keys. Send it when you contact us.",
+  enterPhrase: "Enter this account's recovery phrase",
+  enterPhraseHint: "If you have the phrase this account was made with, entering it replaces the phrase on this device. Write the current one down first.",
+  switchTo: "Switch to {profile}",
+  switchFailed: "That account could not be opened. Nothing was changed.",
+  keepUsing: "Keep using the current account",
+  contact: "Contact {email} and include the diagnostic code.",
+} as const;

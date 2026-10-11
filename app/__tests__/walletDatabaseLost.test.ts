@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as SQLite from 'expo-sqlite';
+import { getPublicKey } from 'nostr-tools/pure';
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { createSovranCocoRepositories } from '@/shared/lib/cashu/cocoRepositories';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
@@ -61,7 +62,10 @@ const openDatabase = SQLite.openDatabaseAsync as jest.Mock;
 const getInfo = FileSystem.getInfoAsync as jest.Mock;
 const repositories = createSovranCocoRepositories as jest.Mock;
 
-const A = 'a'.repeat(64);
+// The wallet refuses to open under a signer key that is not the saved row's,
+// so account 0's row carries the public key of the key staged below.
+const SIGNER_KEY = new Uint8Array(32).fill(1);
+const A = getPublicKey(SIGNER_KEY);
 const B = 'b'.repeat(64);
 const tick = () => new Promise((resolve) => setImmediate(resolve));
 const status = () => useWalletLifecycleStore.getState().restoreStatus;
@@ -108,7 +112,7 @@ beforeEach(async () => {
   useWalletLifecycleStore.setState({ seedCreatedAt: 5, restoreStatus: 'complete' });
   CocoManager.setAccountIndex(0);
   CocoManager.setCashuMnemonic('phrase of account a');
-  CocoManager.setSignerKey(new Uint8Array(32).fill(1));
+  CocoManager.setSignerKey(SIGNER_KEY);
 });
 
 it('records an account once its wallet has opened', async () => {

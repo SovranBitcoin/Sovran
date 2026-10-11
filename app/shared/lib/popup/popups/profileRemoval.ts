@@ -1,7 +1,7 @@
 import { profileRemovalCopy as copy } from 'copy/onboarding';
 import type { ProfileEntry } from '@/shared/stores/global/profileStore';
 import type { ProfileSwitcherAction } from '../actionSheetTypes';
-import { replaceActionMenuPopup } from './actionMenu';
+import { actionMenuPopup, replaceActionMenuPopup } from './actionMenu';
 
 /** Separate imported-key acknowledgement, never inferred from the first confirmation. */
 export function confirmProfileRemoval(
@@ -49,6 +49,22 @@ export function confirmProfileRemoval(
         },
       },
       cancel,
+    ],
+  });
+}
+
+/** Says why a profile is still listed after a removal was asked for. */
+export function showProfileNotRemoved(reason: string): void {
+  actionMenuPopup({
+    title: 'Profile not removed',
+    buttons: [
+      {
+        text: 'Close',
+        description: reason,
+        testID: 'profile-remove-result-close',
+        accessibilityLabel: 'Close removal result',
+        onPress: (close) => close(),
+      },
     ],
   });
 }

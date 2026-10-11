@@ -1,5 +1,5 @@
 import { profileRemovalCopy } from 'copy/onboarding';
-import { actionMenuPopup } from '@/shared/lib/popup/popups/actionMenu';
+import { showProfileNotRemoved } from '@/shared/lib/popup/popups/profileRemoval';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 /**
  * Drawer profile chrome: the top-of-drawer header. A single row with the
@@ -51,6 +51,7 @@ const DRAWER_CLOSE_SETTLE_MS = 300;
 const IMPORT_REFUSALS = {
   exists: 'This identity already exists as a profile.',
   'key-not-stored': 'Failed to store nsec securely.',
+  'key-mismatch': 'This key does not match the profile being added. Nothing was saved.',
   limit: 'Profile limit reached.',
 } as const;
 
@@ -98,18 +99,7 @@ function useProfileSwitcher(closeDrawer: () => void) {
             result.kind === 'refused'
               ? profileRemovalCopy.refusals[result.reason]
               : `Removal stopped at: ${result.failed}. Completed: ${result.completed.join(', ') || 'nothing'}. Not completed (the failed step may be partial): ${result.remaining.join(', ')}. The profile is still listed. You can try again.`;
-          actionMenuPopup({
-            title: 'Profile not removed',
-            buttons: [
-              {
-                text: 'Close',
-                description: reason,
-                testID: 'profile-remove-result-close',
-                accessibilityLabel: 'Close removal result',
-                onPress: (close) => close(),
-              },
-            ],
-          });
+          showProfileNotRemoved(reason);
         }
         break;
       }

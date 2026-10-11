@@ -2,7 +2,9 @@ import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
 import * as nip19 from 'nostr-tools/nip19';
 import { getPublicKey } from 'nostr-tools/pure';
 
-import { initLog, initPhase, log } from '@/shared/lib/logger';
+import { initLog, initPhase } from '@/shared/lib/logger';
+import { phraseDerivesAccount, verifyStoredAccount } from '@/shared/lib/nostr/accountIntegrity';
+import { AccountIntegrityError, type IntegrityRow } from '@/shared/lib/nostr/derivationIntegrity';
 import {
   deriveCashuMnemonic,
   deriveCashuMnemonicForImported,
@@ -10,11 +12,8 @@ import {
   pubkeyToAccountNumber,
 } from '@/shared/lib/nostr/keyDerivation';
 import {
-  clearAccountDerivedCache,
   hashMnemonic,
-  retrieveCashuMnemonic,
-  retrieveDerivedKeys,
-  retrieveImportedNsec,
+  readAccountSecretsUnchanged,
   storeCashuMnemonic,
   storeDerivedKeys,
   type CachedDerivedKeys,
@@ -36,30 +35,35 @@ interface LoadedAccountKeys {
 }
 
 /**
- * Work out the Nostr keys and the wallet phrase for the active account.
+ * Work out the Nostr keys and the wallet phrase for the active account, and
+ * prove they are the account's before anything uses them.
  *
- * Three cases, in the order they are tried:
+ * The order is the point:
  *
- * 1. **Imported profile** with its nsec in secure storage: the identity is the
- *    stored key; the wallet phrase is derived from the root phrase and the
- *    key's account number.
- * 2. **Imported profile whose nsec is missing**: if the root phrase derives the
- *    same public key at that index, the profile was derived all along. Its row
- *    is repaired and it continues as case 3. Otherwise it needs a re-import.
- * 3. **Derived profile**: keys cached in secure storage are used when they were
- *    made from this root phrase; otherwise both are derived and cached.
+ * 1. **Read.** Everything secure storage holds for the account is read as it
+ *    is. Nothing is deleted, even a cache that will not parse: in a mismatch it
+ *    may be the only copy of a key.
+ * 2. **Choose.** An imported profile takes its identity from its stored key
+ *    and its wallet phrase from the root phrase and the key's account number.
+ *    A derived profile uses its caches when they were made from this root
+ *    phrase, and derives otherwise. A profile saved as imported whose key is
+ *    missing is treated as derived only if the root phrase derives its saved
+ *    public key; otherwise it needs a re-import.
+ * 3. **Check.** Every invariant in `derivationIntegrity.ts` runs against the
+ *    row, the stored secrets and what step 2 chose, with a root seed the check
+ *    stretched for itself. A mismatch throws `AccountIntegrityError`; the
+ *    provider stops on the critical screen, and the row, the caches and the
+ *    phrase are exactly as they were.
+ * 4. **Write.** Only now: the label of a row that turned out to be derived is
+ *    corrected, and freshly derived values are cached (not awaited).
  *
  * Throws when the account cannot be loaded; the provider shows the recovery
- * screen. Returns null when `shouldContinue` says the caller has gone away. That
- * is checked once, when an imported key turns out to be missing and before the
- * repair begins; a caller that goes away during the repair's own awaits is not
- * caught here.
+ * screen. Returns null when `shouldContinue` says the caller has gone away,
+ * which is asked before the check and again before anything is written.
  *
- * Side effects: it reads secure storage, writes the derived-key and wallet
- * phrase caches (not awaited), may repair the profile row as in case 2, and
- * reports progress through `onProgress`. It never touches React state, the
- * startup stage's outcome or the wallet core: the provider applies the result,
- * so a load that finishes late can be dropped.
+ * It never touches React state, the startup stage's outcome or the wallet
+ * core: the provider applies the result, so a load that finishes late can be
+ * dropped.
  */
 export async function loadAccountKeys({
   mnemonic,
@@ -73,132 +77,163 @@ export async function loadAccountKeys({
   shouldContinue: () => boolean;
 }): Promise<LoadedAccountKeys | null> {
   const mHash = await initPhase('NostrKeys.hashMnemonic', async () => hashMnemonic(mnemonic));
+  const activeProfile = useProfileStore.getState().getActiveProfile();
+
+  // ── 1. Read ──
+  const stored = await initPhase('NostrKeys.cacheRead', () =>
+    readAccountSecretsUnchanged(
+      accountIndex,
+      activeProfile?.source === 'imported' ? activeProfile.pubkey : null
+    )
+  );
+  if (!shouldContinue()) return null;
+
+  // ── 2. Choose ──
+  // A row reads as imported when it is, and also when a newer build saved a
+  // `source` this one does not know. With no stored key it can only be loaded
+  // if it was derived all along.
+  let relabel = false;
+  if (activeProfile?.source === 'imported' && !stored.importedNsec) {
+    const derived = await phraseDerivesAccount(
+      mnemonic,
+      activeProfile.accountIndex,
+      activeProfile.pubkey
+    );
+    if (!derived) throw new Error('Saved account requires re-import');
+    relabel = true;
+  }
+  const isImported = activeProfile?.source === 'imported' && !relabel;
+
   let keys: NostrKeys | null = null;
   let cashuMnemonic: string | null = null;
-
-  // Check if the active profile is an imported nsec profile
-  const activeProfile = useProfileStore.getState().getActiveProfile();
-  let isImported = activeProfile?.source === 'imported';
-  let repairedSource = false;
-  let nsecValue: string | null = null;
-  if (isImported && activeProfile) {
-    nsecValue = await retrieveImportedNsec(activeProfile.pubkey);
-    if (!nsecValue && !shouldContinue()) return null;
-    if (!nsecValue) {
-      const candidate = deriveNostrKeys(mnemonic, activeProfile.accountIndex);
-      if (
-        candidate.pubkey !== activeProfile.pubkey ||
-        !(await clearAccountDerivedCache(activeProfile.accountIndex)) ||
-        !useProfileStore
-          .getState()
-          .repairDerivedSource(activeProfile.accountIndex, candidate.pubkey)
-      ) {
-        throw new Error('Saved account requires re-import');
-      }
-      keys = candidate;
-      repairedSource = true;
-      isImported = false;
-    }
-  }
+  const cacheWrites: (() => void)[] = [];
 
   if (isImported && activeProfile) {
-    // ── Imported nsec profile: load identity from SecureStore ──
     onProgress('Loading imported profile...');
     initLog('NostrKeys', 'imported profile — loading nsec from SecureStore');
-
-    if (!nsecValue) {
-      throw new Error('Imported nsec not found in secure storage');
+    // A stored value that is not this account's key leaves `keys` empty; the
+    // check below names it as a mismatch.
+    const privateKey = secretKeyOfNsec(stored.importedNsec);
+    const pubkeyHex = privateKey && publicKeyOf(privateKey);
+    if (privateKey && pubkeyHex && stored.importedNsec) {
+      keys = {
+        npub: nip19.npubEncode(pubkeyHex),
+        nsec: stored.importedNsec,
+        pubkey: pubkeyHex,
+        privateKey,
+      };
     }
-
-    const decoded = nip19.decode(nsecValue);
-    if (decoded.type !== 'nsec') {
-      throw new Error('Stored imported key is not a valid nsec');
-    }
-
-    const privateKey = decoded.data;
-    const pubkeyHex = getPublicKey(privateKey);
-    if (pubkeyHex !== activeProfile.pubkey) throw new Error('Saved account requires re-import');
-
-    keys = {
-      npub: nip19.npubEncode(pubkeyHex),
-      nsec: nsecValue,
-      pubkey: pubkeyHex,
-      privateKey,
-    };
-
-    const npubNumber = pubkeyToAccountNumber(pubkeyHex);
-    initLog('NostrKeys', `imported npubNumber=${npubNumber}, deriving Cashu mnemonic (chain 1)...`);
-
-    // Try cached Cashu mnemonic first
-    const cachedCashu = await retrieveCashuMnemonic(accountIndex);
-    if (cachedCashu?.mnemonicHash === mHash) {
-      cashuMnemonic = cachedCashu.value;
-    } else {
-      cashuMnemonic = deriveCashuMnemonicForImported(mnemonic, npubNumber);
-      storeCashuMnemonic(accountIndex, cashuMnemonic, mHash).catch((e) =>
-        initLog('NostrKeys', `imported cashu cache write failed: ${e}`)
+    if (stored.walletPhrase?.mnemonicHash === mHash) {
+      cashuMnemonic = stored.walletPhrase.value;
+    } else if (pubkeyHex === activeProfile.pubkey) {
+      const derivedPhrase = deriveCashuMnemonicForImported(
+        mnemonic,
+        pubkeyToAccountNumber(pubkeyHex)
       );
+      cashuMnemonic = derivedPhrase;
+      cacheWrites.push(() => {
+        storeCashuMnemonic(accountIndex, derivedPhrase, mHash).catch((e) =>
+          initLog('NostrKeys', `imported cashu cache write failed: ${e}`)
+        );
+      });
     }
-    initLog('NostrKeys', 'imported profile keys loaded');
   } else {
-    // ── Derived profile: existing NIP-06 derivation path ──
-    // Try loading cached keys from SecureStore (fast path)
-    const [cachedDerived, cachedCashu] = await initPhase('NostrKeys.cacheRead', () =>
-      Promise.all([retrieveDerivedKeys(accountIndex), retrieveCashuMnemonic(accountIndex)])
-    );
-    initLog('NostrKeys', `cache read done — derived=${!!cachedDerived} cashu=${!!cachedCashu}`);
-
-    const cacheValid =
-      !repairedSource &&
-      cachedDerived?.mnemonicHash === mHash &&
-      cachedCashu?.mnemonicHash === mHash;
-    initLog('NostrKeys', `cache valid: ${cacheValid}`);
-
-    if (cacheValid && cachedDerived && cachedCashu) {
+    // With no saved row there is nothing to hold a cached key against, so the
+    // key the row is about to be made from is derived afresh.
+    const cachedKeys = activeProfile ? stored.derivedKeys : null;
+    const cachedPhrase = stored.walletPhrase;
+    if (cachedKeys?.mnemonicHash === mHash && cachedPhrase?.mnemonicHash === mHash) {
       onProgress('Loading cached keys...');
       initLog('NostrKeys', 'using cached keys (fast path)');
       keys = {
-        npub: cachedDerived.npub,
-        nsec: cachedDerived.nsec,
-        pubkey: cachedDerived.pubkey,
-        privateKey: hexToBytes(cachedDerived.privateKeyHex),
+        npub: cachedKeys.npub,
+        nsec: cachedKeys.nsec,
+        pubkey: cachedKeys.pubkey,
+        privateKey: hexToBytes(cachedKeys.privateKeyHex),
       };
-      cashuMnemonic = cachedCashu.value;
+      cashuMnemonic = cachedPhrase.value;
     } else {
       onProgress('Deriving keys...');
-      keys ??= await initPhase('NostrKeys.deriveNip06', async () =>
+      const derivedKeys = await initPhase('NostrKeys.deriveNip06', async () =>
         deriveNostrKeys(mnemonic, accountIndex)
       );
-
-      cashuMnemonic = await initPhase('NostrKeys.deriveCashuMnemonic', async () =>
+      const derivedPhrase = await initPhase('NostrKeys.deriveCashuMnemonic', async () =>
         deriveCashuMnemonic(mnemonic, accountIndex)
       );
-
+      keys = derivedKeys;
+      cashuMnemonic = derivedPhrase;
       const cachePayload: CachedDerivedKeys = {
-        npub: keys.npub,
-        nsec: keys.nsec,
-        pubkey: keys.pubkey,
-        privateKeyHex: bytesToHex(keys.privateKey),
+        npub: derivedKeys.npub,
+        nsec: derivedKeys.nsec,
+        pubkey: derivedKeys.pubkey,
+        privateKeyHex: bytesToHex(derivedKeys.privateKey),
         mnemonicHash: mHash,
       };
-      Promise.all([
-        storeDerivedKeys(accountIndex, cachePayload),
-        storeCashuMnemonic(accountIndex, cashuMnemonic, mHash),
-      ]).catch((e) => initLog('NostrKeys', `cache write failed: ${e}`));
+      cacheWrites.push(() => {
+        Promise.all([
+          storeDerivedKeys(accountIndex, cachePayload),
+          storeCashuMnemonic(accountIndex, derivedPhrase, mHash),
+        ]).catch((e) => initLog('NostrKeys', `cache write failed: ${e}`));
+      });
     }
   }
 
-  if (activeProfile && keys?.pubkey !== activeProfile.pubkey) {
-    if (isImported) throw new Error('Saved account requires re-import');
-    // A derived account whose saved row names another key is a state
-    // 0.1.3 produced and then ran in: an Android backup restored the
-    // profile row and the wallet database without the keychain, a new
-    // root was generated, and boot carried on with the keys derived from
-    // it. Refusing here stops that user at a form asking for an nsec
-    // they never held, with their funds behind it. The row is left as
-    // it is, because the account's stored data is filed under its key.
-    log.warn('nostr.keys.profile_pubkey_mismatch', { defaultAccountIndex: accountIndex });
+  // ── 3. Check ──
+  // The row as it will be once this load has finished: the saved one, the
+  // saved one with its label corrected, or the one about to be created.
+  const row: IntegrityRow | null = activeProfile
+    ? { ...activeProfile, source: isImported ? 'imported' : 'derived' }
+    : keys
+      ? { accountIndex, pubkey: keys.pubkey, source: 'derived' }
+      : null;
+  if (row) {
+    const integrity = await initPhase('NostrKeys.integrity', () =>
+      verifyStoredAccount(row, {
+        phrase: mnemonic,
+        stored,
+        session: { signerKey: keys?.privateKey ?? null, walletPhrase: cashuMnemonic },
+        thorough: true,
+      })
+    );
+    // Nothing is repaired and nothing is written. 0.1.3 could leave a derived
+    // row naming another key (a restored backup without the keychain) and ran
+    // on regardless, opening a wallet database made under a seed this phrase
+    // cannot make again. It stops here instead, and a person decides.
+    if (integrity && !integrity.ok) throw new AccountIntegrityError(integrity);
   }
+  if (!keys) throw new Error('Saved account requires re-import');
+  if (!shouldContinue()) return null;
+
+  // ── 4. Write ──
+  // Only the label changes: the account has just been shown to be sound, so
+  // its caches are its own and stay.
+  if (
+    relabel &&
+    activeProfile &&
+    !useProfileStore.getState().repairDerivedSource(activeProfile.accountIndex, keys.pubkey)
+  ) {
+    throw new Error('Saved account requires re-import');
+  }
+  for (const write of cacheWrites) write();
 
   return { keys, cashuMnemonic, isImported };
+}
+
+function secretKeyOfNsec(nsec: string | null): Uint8Array | null {
+  if (!nsec) return null;
+  try {
+    const decoded = nip19.decode(nsec);
+    return decoded.type === 'nsec' ? decoded.data : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Null for bytes that are not a usable key (a zero scalar, for one), instead of a throw. */
+function publicKeyOf(secretKey: Uint8Array): string | null {
+  try {
+    return getPublicKey(secretKey);
+  } catch {
+    return null;
+  }
 }

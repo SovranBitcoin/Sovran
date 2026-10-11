@@ -31,7 +31,6 @@ jest.mock('@/shared/lib/nostr/secureStorage', () => ({
   readSensitiveValue: jest.fn().mockResolvedValue(null),
   writeSensitiveValue: jest.fn().mockResolvedValue(undefined),
   retrieveMnemonic: jest.fn().mockResolvedValue(null),
-  retrieveDerivedKeys: jest.fn().mockResolvedValue(null),
   storeMnemonic: jest.fn(),
   prepareSecureDataReset: jest.fn(),
   getMnemonic: jest.fn().mockResolvedValue(null),

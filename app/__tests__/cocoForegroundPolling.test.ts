@@ -20,6 +20,8 @@ jest.mock('@/shared/lib/nostr/keyDerivation', () => ({}));
 jest.mock('@/shared/lib/cashu/cocoRepositories', () => ({}));
 jest.mock('@/shared/lib/cashu/managerInternals', () => ({}));
 jest.mock('@/shared/lib/cashu/walletDatabaseRecord', () => ({}));
+// No profile row in this test, so there is nothing for the wallet-open check to compare.
+jest.mock('@/shared/lib/nostr/accountIntegrity', () => ({ checkStagedCredentials: () => null }));
 jest.mock('@/shared/lib/cashu/paymentRequestNostrTransport', () => ({}));
 
 /**

@@ -49,6 +49,8 @@ import { getInflightProofs, restoreProofsToReady } from './managerInternals';
 import { reconcileE2EReadyProofs } from './e2eReadyProofReconciliation';
 import { maybeCreateMintFaultWebSocketFactory } from '@/shared/lib/e2e/mintFaults/webSocketFactory';
 import * as FileSystem from 'expo-file-system/legacy';
+import { checkStagedCredentials } from '@/shared/lib/nostr/accountIntegrity';
+import { AccountIntegrityError } from '@/shared/lib/nostr/derivationIntegrity';
 import { finalizeEvent, getPublicKey } from 'nostr-tools/pure';
 import type { EventTemplate, VerifiedEvent } from 'nostr-tools/core';
 import * as Sharing from 'expo-sharing';
@@ -712,6 +714,22 @@ export class CocoManager {
 
         // 1. SQLite database (async to avoid blocking JS thread during profile switch)
         const dbName = this.getDbName();
+        // The account, the imported flag and the signer key must be the saved
+        // row's before its database is opened under them. This is a fault in
+        // what was staged, not in what is stored (the key loader has already
+        // checked that), so the open fails and nothing else is raised.
+        const staged = checkStagedCredentials({
+          accountIndex,
+          isImported,
+          signerKey: p2pkImportSecretKey,
+        });
+        if (staged && !staged.ok) {
+          cashuLog.error('cashu.manager.staged_credentials_mismatch', {
+            accountIndex,
+            code: staged.diagnosticCode,
+          });
+          throw new AccountIntegrityError(staged);
+        }
         cashuLog.info('cashu.manager.initialize.start', {
           accountIndex: this.accountIndex,
           dbName,

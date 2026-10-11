@@ -41,9 +41,11 @@ Three things that are easy to get wrong:
   phrase is derived from the root phrase plus a number computed from its pubkey
   (`app/shared/lib/nostr/loadAccountKeys.ts`). The imported key alone cannot reproduce that wallet
   phrase: recovering the wallet from scratch needs the original root phrase.
-- A **derived** profile's saved pubkey can differ from the key the phrase derives. v0.1.3 produced
-  that state (a restored backup without the keychain) and ran in it, so startup tolerates it rather
-  than strand the funds. "The saved pubkey" and "the signing key" are therefore not always the same.
+- A **derived** profile's saved pubkey must be the key the phrase derives, and an imported one's
+  must be the key stored for it. v0.1.3 could leave a derived row naming another key (a restored
+  backup without the keychain) and ran in that state. Startup no longer does: the account stops on
+  a critical screen and nothing is repaired or written. The whole chain, the invariants and where
+  each is checked are in [persistence/derivation.md](persistence/derivation.md).
 - Before any profile exists (first launch), a per-profile store reads its bare key. A save made
   then lands under whichever profile exists once storage is ready, or the bare key if there is
   still none. Bare rows are bootstrap leftovers, not account 0's data.
@@ -76,7 +78,7 @@ hold back what is below them; the others do not.
 | Splash gate                               | covers the app until the wallet screen is ready, or a blocking stage fails                         | fades after a timeout                            |
 | Global migrations (`GlobalMigrationGate`) | one-time storage moves, then opens per-profile storage                                             | storage stays closed; a retry screen is shown    |
 | Account boundary                          | lets an in-process switch unmount everything below                                                 | —                                                |
-| Key provider                              | finds the keys and wallet phrase (`loadAccountKeys`), hands them to the wallet manager             | key recovery screen                              |
+| Key provider                              | reads what is stored unchanged, finds the keys and wallet phrase (`loadAccountKeys`), runs the full integrity check, and only then writes caches and hands them to the wallet manager | key recovery screen; a row that does not follow from the phrase stops on the account mismatch screen ([derivation](persistence/derivation.md)) |
 | Nostr providers, then wallet provider     | mount in that order, but the wallet database opens first; the Nostr cache opens after it, deferred | a wallet that will not open shows a retry screen |
 | App gate (`AppGate`)                      | settings loaded, terms accepted, reinstall check, onboarding, restore                              | its own screens                                  |
 
@@ -303,6 +305,7 @@ Rules:
 | The in-process switch, step by step                                     | `app/shared/lib/profile/inProcessProfileSwitch.ts`                           |
 | What removal checks and deletes                                         | `app/shared/lib/profile/profileRemovalStorage.ts`                            |
 | How an account's keys and wallet phrase are found                       | `app/shared/lib/nostr/loadAccountKeys.ts`                                    |
+| How every value follows from the phrase, and what checks that it does   | `docs/architecture/persistence/derivation.md`, `derivationIntegrity.ts`      |
 | How the wallet opens, closes and is wiped                               | `app/shared/lib/cashu/manager.ts` (`initialize`, `cleanup`, `completeReset`) |
 | Which credentials the next wallet opens with, and when they are cleared | `app/shared/lib/cashu/credentialStaging.ts`                                  |
 | How a per-profile store finds its key, and when a save is dropped       | `app/shared/lib/cashu/profileScopedStorage.ts`                               |
@@ -312,4 +315,4 @@ Rules:
 | When the splash comes down                                              | `app/shared/blocks/NativeSplashLayoutGate.tsx`                               |
 | What an account owns outside React                                      | `app/shared/lib/account/accountRegistry.ts`                                  |
 | Decisions                                                               | ADR 0029 (registry and switch), ADR 0030 (removal)                           |
-| Known gaps                                                              | `docs/architecture/follow-ups.md` (F72, F76, F77, F79 to F83)                |
+| Known gaps                                                              | `docs/architecture/follow-ups.md` (F72, F76, F77, F79 to F83, F93 to F96)    |

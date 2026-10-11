@@ -7,6 +7,8 @@
  * is reopened; the account is never flipped in memory on this path.
  */
 import AsyncStorageMock from '@react-native-async-storage/async-storage';
+import { nsecEncode } from 'nostr-tools/nip19';
+import { getPublicKey } from 'nostr-tools/pure';
 
 // A literal, identical in every module graph, so it does not need re-requiring
 // after `jest.resetModules()` the way the stateful modules below do.
@@ -28,6 +30,15 @@ jest.mock('@/shared/lib/cashu/manager', () => ({
     isInitialized: jest.fn(() => true),
     getCleanupReadiness: jest.fn(() => ({ ready: true })),
   },
+}));
+
+// These tests are about ordering and locks, and use made-up keys. What the
+// integrity check does at each of these boundaries is in
+// accountIntegrityBoundaries.test.ts.
+jest.mock('@/shared/lib/nostr/accountIntegrity', () => ({
+  verifyStoredAccount: jest.fn(async () => ({ ok: true })),
+  storedPhraseDerivesAccount: jest.fn(async () => true),
+  reportIntegrityFailure: jest.fn(),
 }));
 
 jest.mock('@/shared/lib/logger', () => {
@@ -497,7 +508,15 @@ describe('waits made while the lock is held are bounded', () => {
 });
 
 describe('importAndSwitchProfile', () => {
-  const imported = { accountIndex: 77, pubkeyHex: 'c'.repeat(64), nsec: 'nsec1example' };
+  // A real key: an import is refused unless its key, public key and account
+  // number describe one identity.
+  const secretKey = new Uint8Array(32).fill(7);
+  const pubkeyHex = getPublicKey(secretKey);
+  const imported = {
+    accountIndex: Number(BigInt(`0x${pubkeyHex}`) % 0x80000000n),
+    pubkeyHex,
+    nsec: nsecEncode(secretKey),
+  };
   const storeImportedNsec = jest.fn();
 
   beforeEach(() => {
@@ -522,9 +541,11 @@ describe('importAndSwitchProfile', () => {
     expect(await importAndSwitchProfile(imported)).toBe('switching');
 
     expect(storeImportedNsec).toHaveBeenCalledWith(imported.pubkeyHex, imported.nsec);
-    const added = useProfileStore.getState().profiles.find((p) => p.accountIndex === 77);
+    const added = useProfileStore
+      .getState()
+      .profiles.find((p) => p.accountIndex === imported.accountIndex);
     expect(added).toMatchObject({ pubkey: imported.pubkeyHex, source: 'imported' });
-    expect(persistedActiveIndex(AsyncStorage)).toBe(77);
+    expect(persistedActiveIndex(AsyncStorage)).toBe(imported.accountIndex);
     // Not flipped in memory, and the lock is kept for the restart.
     expect(useProfileStore.getState().activeAccountIndex).toBe(0);
     expect(await switchToExistingProfile({ accountIndex: 1 })).toBe(false);

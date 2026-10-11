@@ -1,3 +1,4 @@
+import { AccountMismatchScreen } from '@/shared/blocks/AccountMismatchScreen';
 import { KeyRecoveryScreen } from '@/shared/blocks/KeyRecoveryScreen';
 import { useSecureStoreState } from '@/shared/stores/runtime/secureStoreState';
 import {
@@ -10,7 +11,7 @@ import {
   useMemo,
   useRef,
 } from 'react';
-import { InteractionManager } from 'react-native';
+import { InteractionManager, View } from 'react-native';
 import {
   ensureMnemonicExists,
   retrieveMnemonic,
@@ -21,6 +22,12 @@ import {
   deriveCashuMnemonic as deriveCashuMnemonicPure,
 } from '@/shared/lib/nostr/keyDerivation';
 import { loadAccountKeys, type NostrKeys } from '@/shared/lib/nostr/loadAccountKeys';
+import {
+  reportIntegrityFailure,
+  useIntegrityFailures,
+  verifyOtherAccountsInBackground,
+} from '@/shared/lib/nostr/accountIntegrity';
+import { AccountIntegrityError } from '@/shared/lib/nostr/derivationIntegrity';
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { useInitializationStage } from './InitializationProvider';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
@@ -95,6 +102,16 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
   const [isReady, setIsReady] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Every account's failure is kept. This account's always wins and stops it;
+  // another account's only covers the app, and closing that one can never
+  // hide this one.
+  const integrityFailures = useIntegrityFailures();
+  const ownFailure = integrityFailures.find(
+    (failure) => failure.accountIndex === defaultAccountIndex
+  );
+  const otherFailure = integrityFailures.find(
+    (failure) => failure.accountIndex !== defaultAccountIndex
+  );
   // Caches are refs, not state: derivation is memoised between calls but is
   // never read in render output. Using state would shake context identity for
   // all 23 consumers on every cache write.
@@ -344,6 +361,9 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
         // The stage is keyed by id, not by mount: reporting a failure after
         // unmount would mark the remounted provider's stage as failed.
         if (!mounted.current) return;
+        // A saved account that does not follow from the phrase: the critical
+        // screen takes over. Nothing was written, and nothing is retried.
+        if (err instanceof AccountIntegrityError) reportIntegrityFailure(err.result);
         log.error('nostr.keys.init_failed', { error: redactError(err) });
         // Display text for the init screen and KeyRecoveryScreen.
         const errorMessage = err instanceof Error ? err.message : 'Failed to initialize keys';
@@ -376,6 +396,19 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
     return () => task.cancel();
   }, [isReady]);
 
+  // This account was checked in full before it was allowed to become ready.
+  // The others get their check once it is up, off the startup path. It reads
+  // and compares only; a mismatch raises the screen.
+  const integrityCheckedRef = useRef(false);
+  useEffect(() => {
+    if (!isReady || integrityCheckedRef.current) return;
+    integrityCheckedRef.current = true;
+    const task = InteractionManager.runAfterInteractions(() => {
+      void verifyOtherAccountsInBackground(defaultAccountIndex, () => mounted.current);
+    });
+    return () => task.cancel();
+  }, [isReady, defaultAccountIndex]);
+
   // Update error state based on mnemonic error
   useEffect(() => {
     if (mnemonicError) {
@@ -407,6 +440,16 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
     ]
   );
 
+  // A mismatch on this account stops it. Nothing below may run on keys that
+  // are not the row's, so the account's tree is not mounted at all.
+  if (ownFailure) {
+    return (
+      <NostrKeysContext.Provider value={contextValue}>
+        <AccountMismatchScreen failure={ownFailure} stopped />
+      </NostrKeysContext.Provider>
+    );
+  }
+
   if (locked || (error && !isReady)) {
     return (
       <NostrKeysContext.Provider value={contextValue}>
@@ -421,5 +464,16 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
     return <NostrKeysContext.Provider value={contextValue}>{null}</NostrKeysContext.Provider>;
   }
 
-  return <NostrKeysContext.Provider value={contextValue}>{children}</NostrKeysContext.Provider>;
+  return (
+    <NostrKeysContext.Provider value={contextValue}>
+      {children}
+      {otherFailure && (
+        // Another account failed its check. This one is sound and keeps
+        // running underneath; the screen covers it until it is closed.
+        <View className="absolute inset-0">
+          <AccountMismatchScreen failure={otherFailure} stopped={false} />
+        </View>
+      )}
+    </NostrKeysContext.Provider>
+  );
 }

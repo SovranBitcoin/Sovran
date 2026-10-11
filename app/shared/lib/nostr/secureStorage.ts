@@ -11,6 +11,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { nostrLog, redactError } from '../logger';
 import { useSecureStoreState } from '@/shared/stores/runtime/secureStoreState';
+import { derivedKeysAreWellFormed } from './derivationIntegrity';
 import { maybeExportSeedForE2E } from './e2eSeedExport';
 import { REDUX_ERA_ROW, readReduxEraRoot, type ReduxEraRoot } from './reduxEraRoot';
 import {
@@ -609,16 +610,6 @@ export async function prepareSecureDataReset(
   };
 }
 
-/** A source repair must discard both mnemonic and PBKDF2 caches from the old chain. */
-export async function clearAccountDerivedCache(accountIndex: number): Promise<boolean> {
-  const results = await Promise.all(
-    [derivedKeysKey(accountIndex), cashuMnemonicKey(accountIndex), cashuSeedKey(accountIndex)].map(
-      (key) => secureDelete(key, 'clear_derived_cache')
-    )
-  );
-  return results.every(Boolean);
-}
-
 // ── Derived Keys Cache ──────────────────────────────────────────
 
 function derivedKeysKey(accountIndex: number): string {
@@ -653,9 +644,9 @@ export function storeDerivedKeys(accountIndex: number, keys: CachedDerivedKeys):
   return secureSet(derivedKeysKey(accountIndex), JSON.stringify(keys), 'store_keys');
 }
 
-// Both caches can be made again from the root phrase, so a blob of the wrong
-// shape is deleted and counts as absent. Served as it is, a matching hash
-// would select it and the account would fail to load on every launch.
+// The shape each cache must have to be used. A blob of any other shape is
+// read as absent by `readAccountSecretsUnchanged` and left where it is; the
+// next cache write, made only once the account has passed its check, replaces it.
 const HEX_64 = /^[0-9a-fA-F]{64}$/;
 const DerivedKeysCache = z.object({
   npub: z.string().startsWith('npub1'),
@@ -676,15 +667,6 @@ function parseCache<T>(schema: z.ZodType<T>, raw: string, name: string): T {
   return parsed.data;
 }
 
-export async function retrieveDerivedKeys(accountIndex: number): Promise<CachedDerivedKeys | null> {
-  const key = derivedKeysKey(accountIndex);
-  const raw = await secureGet(key, 'retrieve_keys');
-  if (!raw) return null;
-  return parseOrSelfHeal(raw, key, 'retrieve_keys', (s) =>
-    parseCache(DerivedKeysCache, s, 'derived keys')
-  );
-}
-
 export function storeCashuMnemonic(
   accountIndex: number,
   cashuMnemonicValue: string,
@@ -692,17 +674,6 @@ export function storeCashuMnemonic(
 ): Promise<boolean> {
   const payload = JSON.stringify({ value: cashuMnemonicValue, mnemonicHash });
   return secureSet(cashuMnemonicKey(accountIndex), payload, 'store_cashu_mnemonic');
-}
-
-export async function retrieveCashuMnemonic(
-  accountIndex: number
-): Promise<{ value: string; mnemonicHash: string } | null> {
-  const key = cashuMnemonicKey(accountIndex);
-  const raw = await secureGet(key, 'retrieve_cashu_mnemonic');
-  if (!raw) return null;
-  return parseOrSelfHeal(raw, key, 'retrieve_cashu_mnemonic', (s) =>
-    parseCache(CashuMnemonicCache, s, 'cashu mnemonic')
-  );
 }
 
 // ── Cashu Seed Cache ────────────────────────────────────────────
@@ -739,6 +710,70 @@ export async function retrieveCashuSeed(
     }
     return { seed, mnemonicHash: parsed.mnemonicHash };
   });
+}
+
+/** What secure storage holds for one account, as the integrity check reads it. */
+export interface StoredAccountSecrets {
+  importedNsec: string | null;
+  derivedKeys: CachedDerivedKeys | null;
+  walletPhrase: { value: string; mnemonicHash: string } | null;
+  walletSeed: { seed: Uint8Array; mnemonicHash: string } | null;
+  /**
+   * The `nsec` inside `derived_keys_<i>`, read even when the rest of the blob
+   * is the wrong shape. Recovery information shows it; nothing loads from it.
+   */
+  keptDerivedNsec: string | null;
+}
+
+/**
+ * Read an account's stored secrets and change nothing. Unlike the `retrieve*`
+ * readers, a blob of the wrong shape is left where it is and read as absent:
+ * only a well-formed value that disagrees is evidence of a mismatch, and
+ * a check that deleted what it was checking could destroy the only copy of a
+ * key. `importedPubkey` is the row's key when the account is imported.
+ */
+export async function readAccountSecretsUnchanged(
+  accountIndex: number,
+  importedPubkey: string | null
+): Promise<StoredAccountSecrets> {
+  const parse = <T>(raw: string | null, read: (raw: string) => T): T | null => {
+    if (!raw) return null;
+    try {
+      return read(raw);
+    } catch {
+      return null;
+    }
+  };
+  const [keys, phrase, seed, nsec] = await Promise.all([
+    secureGet(derivedKeysKey(accountIndex), 'integrity_read_keys'),
+    secureGet(cashuMnemonicKey(accountIndex), 'integrity_read_cashu_mnemonic'),
+    secureGet(cashuSeedKey(accountIndex), 'integrity_read_cashu_seed'),
+    importedPubkey && isNostrPubkeyHex(importedPubkey)
+      ? secureGet(importedNsecKey(importedPubkey), 'integrity_read_nsec')
+      : null,
+  ]);
+  return {
+    importedNsec: nsec,
+    derivedKeys: parse(keys, (raw) => {
+      const cache = parseCache(DerivedKeysCache, raw, 'derived keys');
+      if (!derivedKeysAreWellFormed(cache)) throw new Error('derived keys cache holds no key');
+      return cache;
+    }),
+    keptDerivedNsec: parse(keys, (raw) => {
+      const nsec = (JSON.parse(raw) as { nsec?: unknown }).nsec;
+      return typeof nsec === 'string' ? nsec : null;
+    }),
+    walletPhrase: parse(phrase, (raw) => parseCache(CashuMnemonicCache, raw, 'cashu mnemonic')),
+    walletSeed: parse(seed, (raw) => {
+      const parsed = JSON.parse(raw) as { hex: string; mnemonicHash: string };
+      if (typeof parsed.mnemonicHash !== 'string') throw new Error('cashu seed cache has no hash');
+      const seed = hexToBytes(parsed.hex);
+      // The same rule as `retrieveCashuSeed`: anything but 64 bytes is not a
+      // seed. It says nothing about which wallet this is, so it reads as absent.
+      if (seed.length !== 64) throw new Error('cashu seed cache has the wrong length');
+      return { seed, mnemonicHash: parsed.mnemonicHash };
+    }),
+  };
 }
 
 // ── Migrations Complete Flag (per-account) — tombstone ──────────

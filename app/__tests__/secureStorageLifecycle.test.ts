@@ -47,12 +47,10 @@ import { bytesToHex } from '@noble/hashes/utils.js';
 import { deriveCashuMnemonic, deriveNostrKeys } from '@/shared/lib/nostr/keyDerivation';
 import {
   clearAllSecureData,
-  clearAccountDerivedCache,
   ensureMnemonicExists,
   hashMnemonic,
-  retrieveCashuMnemonic,
   retrieveCashuSeed,
-  retrieveDerivedKeys,
+  readAccountSecretsUnchanged,
   retrieveMnemonic,
   storeCashuMnemonic,
   storeCashuSeed,
@@ -405,7 +403,10 @@ describe('secureStorage mnemonic and seed lifecycle', () => {
     });
   });
 
+  // The startup reader. It must never delete: in a mismatched account a
+  // damaged cache can be the only copy of a key.
   describe('a cache that matches the phrase but has the wrong shape', () => {
+    const read = () => readAccountSecretsUnchanged(0, null);
     const hash = hashMnemonic(VALID_MNEMONIC);
     const derived = deriveNostrKeys(VALID_MNEMONIC, 0);
     const good = {
@@ -421,8 +422,11 @@ describe('secureStorage mnemonic and seed lifecycle', () => {
       await storeDerivedKeys(0, good);
       await storeCashuMnemonic(0, cashu, hash);
 
-      await expect(retrieveDerivedKeys(0)).resolves.toEqual(good);
-      await expect(retrieveCashuMnemonic(0)).resolves.toEqual({ value: cashu, mnemonicHash: hash });
+      await expect(read()).resolves.toMatchObject({
+        derivedKeys: good,
+        walletPhrase: { value: cashu, mnemonicHash: hash },
+        keptDerivedNsec: good.nsec,
+      });
       expect(SecureStore.deleteItemAsync).not.toHaveBeenCalled();
     });
 
@@ -436,13 +440,17 @@ describe('secureStorage mnemonic and seed lifecycle', () => {
       ['no hash', { ...good, mnemonicHash: undefined }],
       ['a list', [good]],
       ['null', null],
-    ])('treats derived keys with %s as absent and deletes them', async (_case, blob) => {
-      mockSecureBacking.set('derived_keys_0', JSON.stringify(blob));
+    ])(
+      'treats derived keys with %s as absent and leaves them where they are',
+      async (_case, blob) => {
+        mockSecureBacking.set('derived_keys_0', JSON.stringify(blob));
 
-      await expect(retrieveDerivedKeys(0)).resolves.toBeNull();
+        expect((await read()).derivedKeys).toBeNull();
 
-      expect(mockSecureBacking.has('derived_keys_0')).toBe(false);
-    });
+        expect(mockSecureBacking.get('derived_keys_0')).toBe(JSON.stringify(blob));
+        expect(SecureStore.deleteItemAsync).not.toHaveBeenCalled();
+      }
+    );
 
     it.each([
       ['no phrase', { mnemonicHash: hash }],
@@ -450,22 +458,62 @@ describe('secureStorage mnemonic and seed lifecycle', () => {
       ['a phrase with a bad checksum', { value: INVALID_CHECKSUM, mnemonicHash: hash }],
       ['no hash', { value: VALID_MNEMONIC }],
       ['a bare string', VALID_MNEMONIC],
-    ])('treats a wallet phrase cache with %s as absent and deletes it', async (_case, blob) => {
-      mockSecureBacking.set('cashu_mnemonic_0', JSON.stringify(blob));
+    ])(
+      'treats a wallet phrase cache with %s as absent and leaves it where it is',
+      async (_case, blob) => {
+        mockSecureBacking.set('cashu_mnemonic_0', JSON.stringify(blob));
 
-      await expect(retrieveCashuMnemonic(0)).resolves.toBeNull();
+        expect((await read()).walletPhrase).toBeNull();
 
-      expect(mockSecureBacking.has('cashu_mnemonic_0')).toBe(false);
+        expect(mockSecureBacking.get('cashu_mnemonic_0')).toBe(JSON.stringify(blob));
+        expect(SecureStore.deleteItemAsync).not.toHaveBeenCalled();
+      }
+    );
+
+    it.each([
+      ['one byte', '00'],
+      ['63 bytes', 'ab'.repeat(63)],
+      ['65 bytes', 'ab'.repeat(65)],
+      ['not hex', 'zz'.repeat(64)],
+    ])(
+      'treats a wallet seed cache of %s as absent and leaves it where it is',
+      async (_case, hex) => {
+        const blob = JSON.stringify({ hex, mnemonicHash: hash });
+        mockSecureBacking.set('cashu_seed_0', blob);
+
+        expect((await read()).walletSeed).toBeNull();
+
+        expect(mockSecureBacking.get('cashu_seed_0')).toBe(blob);
+        expect(SecureStore.deleteItemAsync).not.toHaveBeenCalled();
+      }
+    );
+
+    it('reads a 64-byte wallet seed cache', async () => {
+      mockSecureBacking.set(
+        'cashu_seed_0',
+        JSON.stringify({ hex: 'ab'.repeat(64), mnemonicHash: hash })
+      );
+      expect((await read()).walletSeed?.seed).toHaveLength(64);
     });
 
-    it('keeps the secret fields of a rejected cache out of the log', async () => {
+    it('treats a key cache whose private key is no key as absent', async () => {
+      mockSecureBacking.set(
+        'derived_keys_0',
+        JSON.stringify({ ...good, privateKeyHex: '0'.repeat(64) })
+      );
+      expect((await read()).derivedKeys).toBeNull();
+      expect(mockSecureBacking.has('derived_keys_0')).toBe(true);
+    });
+
+    it('still hands over the nsec of a damaged key cache, and logs none of it', async () => {
       mockSecureBacking.set('derived_keys_0', JSON.stringify({ ...good, pubkey: 'short' }));
 
-      await retrieveDerivedKeys(0);
+      const stored = await read();
 
-      const [[, params]] = jest.mocked(nostrLog.error).mock.calls;
-      const logged = JSON.stringify(params) + String(Object.values(params ?? {})[0]);
-      expect(logged).toContain('wrong shape');
+      expect(stored.derivedKeys).toBeNull();
+      // Recovery information can still show it to the person.
+      expect(stored.keptDerivedNsec).toBe(good.nsec);
+      const logged = JSON.stringify(jest.mocked(nostrLog.error).mock.calls);
       expect(logged).not.toContain(good.nsec);
       expect(logged).not.toContain(good.privateKeyHex);
     });
@@ -573,16 +621,6 @@ describe('secureStorage mnemonic and seed lifecycle', () => {
     expect(deleted.at(-1)).toBe('secure_key_index');
     expect(mockSecureBacking.size).toBe(0);
   });
-});
-
-it('clears every derived cache before source repair, including the PBKDF2 seed', async () => {
-  jest.clearAllMocks();
-  await expect(clearAccountDerivedCache(7)).resolves.toBe(true);
-  expect(jest.mocked(SecureStore.deleteItemAsync).mock.calls.map(([key]) => key)).toEqual([
-    'derived_keys_7',
-    'cashu_mnemonic_7',
-    'cashu_seed_7',
-  ]);
 });
 
 it('retains the key index when any secure deletion fails so retry can enumerate leftovers', async () => {

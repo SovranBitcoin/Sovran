@@ -14,7 +14,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { z } from 'zod';
 
-import { deriveNostrKeys } from '@/shared/lib/nostr/keyDerivation';
+import { deriveNostrKeys, getRootSeed } from '@/shared/lib/nostr/keyDerivation';
+import { phraseDerivesPubkey } from '@/shared/lib/nostr/derivationIntegrity';
 import { retrieveMnemonic } from '@/shared/lib/nostr/secureStorage';
 import { PROFILE_PRIMARY_UNIT_ID, isBuiltinColorTheme } from '@/shared/lib/theme/builtinAlbums';
 import { log } from '../logger';
@@ -222,20 +223,26 @@ async function adoptLeftoverBareStores(): Promise<void | typeof RUN_AGAIN> {
   // The leftovers were written by the first account of the stored phrase. An
   // imported identity at index 0, or one from another phrase, is not their
   // owner: they stay where they are.
-  let owner: string;
+  // The one checker decides, so this and startup cannot disagree about whose
+  // key the phrase derives.
+  const owner = accountZero.pubkey;
+  let ownsLeftovers: boolean;
   try {
     const phrase = await retrieveMnemonic();
     if (!phrase) return RUN_AGAIN;
-    owner = deriveNostrKeys(phrase, 0).pubkey;
+    ownsLeftovers = phraseDerivesPubkey(getRootSeed(phrase), 0, owner);
   } catch {
     // The error is not logged: it may quote the phrase.
     return RUN_AGAIN;
   }
-  if (owner !== accountZero.pubkey) {
+  if (!ownsLeftovers) {
     log.warn('migrations.global.leftover_bare_stores.not_owner', {
       leftoverCount: leftovers.length,
     });
-    return;
+    // Nothing is moved, and it is not recorded as done: the phrase on the
+    // device may be the wrong one for now. Once the person has entered the
+    // phrase account 0 was made with, the next launch adopts them.
+    return RUN_AGAIN;
   }
 
   let adoptedCount = 0;

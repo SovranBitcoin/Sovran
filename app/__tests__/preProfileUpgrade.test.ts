@@ -374,6 +374,30 @@ describe('an install that passed through 0.0.62 to 0.1.3 with its stores left be
 
     expect(mockStorage['routstr-store']).toBe(MOVED['routstr-store']);
     expect(mockStorage[`routstr-store:profile:${imported}`]).toBeUndefined();
+    // Not recorded as done: the phrase on the device may be the wrong one for
+    // now, and the leftovers must still be adopted once the right one is back.
+    expect(completed()).not.toContain(ADOPT_MIGRATION);
+  });
+
+  it('adopts them on a later launch, once the phrase that owns account 0 is back', async () => {
+    strandedInstall();
+    const saved = mockStorage['profile-store'];
+    const right = mockSecureBacking.get('user_mnemonic')!;
+    mockSecureBacking.set(
+      'user_mnemonic',
+      'legal winner thank year wave sausage worth useful legal winner thank yellow'
+    );
+    await runGlobalMigrations();
+    expect(completed()).not.toContain(ADOPT_MIGRATION);
+    expect(mockStorage['routstr-store']).toBe(MOVED['routstr-store']);
+
+    // The person enters the phrase account 0 was made with.
+    mockSecureBacking.set('user_mnemonic', right);
+    expect(mockStorage['profile-store']).toBe(saved);
+    await runGlobalMigrations();
+
+    expect(completed()).toContain(ADOPT_MIGRATION);
+    expect(mockStorage['routstr-store']).toBeUndefined();
   });
 
   it('waits when the keychain cannot say whose they are', async () => {
