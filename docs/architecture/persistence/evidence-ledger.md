@@ -82,6 +82,28 @@ invoices, several accounts, Coco's SQLite storage, and any phone.
 | What this adds | The identity check on iOS over 0.1.3's keychain items and caches; and the ecash claim on a device, against a real mint, through Coco's SQLite storage |
 | Not covered | A real phone; a row from a real 2024 install; removal of the row (needs a row whose phrase is the stored one); the prompt for an untrusted mint on a device |
 
+**The ecash claim's prompt, and removal of the old row, iPhone simulator, 2026-10-11.** A
+fresh install of a release build of `4212c2825` (keychain reset first), with old-format rows
+planted in its AsyncStorage while the app was stopped. Each row held real, unspent proofs
+minted at `testnut.cashu.space`.
+
+| Step | What the device showed |
+| --- | --- |
+| Row with 21 sat at a mint the wallet does not trust, planted before onboarding finished | After onboarding, the prompt "Claim your old ecash: Trust testnut.cashu.space to claim 21 sats". The claim record read `awaiting-trust`, 21 awaiting, nothing claimed; the wallet database was empty |
+| "Review mint", then "Add mint" on the mint page | The claim ran without anything else being pressed: the record read `settled`, 21 claimed; the wallet database held two proofs summing 20 (21 less the mint's 1 sat fee). The row stayed, having no phrase in it |
+| A new row with 16 sat whose phrase is the wallet's own (copied from the app's recovery page), the earlier record cleared | Claimed 16; the wallet held six proofs summing 35. **The row was removed** and the record kept a note: one group, 16 sat claimed, nothing spent |
+| Next launch | Opened normally to the backup offer; still 35; no mismatch, failed load, refused write or failed migration in the log |
+
+So the prompt, the trust step, the claim and the cleanup have each been seen on a device with
+Coco's real storage. Still not seen: a row written by a real 2024 build, and a proof the mint
+rejects or reports pending.
+
+**An attempt to upgrade a real 0.0.63 build, 2026-10-11.** The 0.0.63 source (`28bf7713a`)
+was built for the simulator; the native code compiled and the JavaScript bundle step failed
+("Cannot read properties of undefined (reading 'transformFile')"), probably because the
+dependencies were installed without the frozen lockfile. It was not retried: the disk had 6
+GB free. Builds before 0.1.0 therefore remain covered by the release fixtures only.
+
 **The prompts gallery on the emulator, 2026-10-11.** In the same release build the page
 opened at `sovran://design-system-prompts`, listed its entries, and the "Claim your old ecash"
 prompt and the account-mismatch screen each opened and drew correctly with their sample
