@@ -45,12 +45,33 @@ the prompts gallery (`7fa277163`).
 | Log | No mismatch, failed load, refused write, failed migration or lost-database line across a cold start, a switch and an account creation. One line matched the filter once during the first account creation and was lost when the emulator was shut down; it did not appear again when the same steps were repeated |
 | Not covered | Several accounts made on 0.1.3 and then upgraded (covered by the release fixtures and the earlier two-account run, not by this one); iOS; a real phone's PBKDF2; the mismatch screen itself, which cannot be reached on a healthy install |
 
-Still **not run** in a device build:
+**0.1.1 release build, funded, to the same build of `7fa277163`, Android emulator, 2026-10-11.**
 
-| Change | Evidence so far | What is missing |
-| --- | --- | --- |
-| Ecash claim (`3338b70da`) | 53 app and 11 wallet tests against a mint faked at `fetch`; two Codex reviews, all findings fixed. On the upgrade above it had nothing to do, and did nothing | A real mint and a real 2024 row. It is the first code that deletes the old row |
-| Prompts gallery (`7fa277163`) | A test presses every control in every preview | Nobody has looked at it on a screen |
+| | |
+| --- | --- |
+| Old | A rebuild of `4203ea8ec` (0.1.1), onboarded, a 64 sat test-mint token redeemed (balance 63), test mint trusted |
+| After the upgrade | Asked to accept the updated documents, then the wallet: the receive in the history, the backup offer, the test mint listed with **₿ 63**. No mismatch screen, so the key and wallet caches 0.1.1 wrote pass the check. No mismatch, failed load, refused write, failed migration or lost-database line in the log |
+
+**The ecash claim against the real test mint, 2026-10-11.** The real claim code, mint adapter
+and cashu-ts ran against `testnut.cashu.space` with a real Coco wallet on in-memory storage;
+only AsyncStorage, the stored phrase and the profile list were stand-ins. The mint charged 1
+sat per swap of up to ten proofs.
+
+| Scenario | Held in the old row | Requests to the mint | Result |
+| --- | --- | --- | --- |
+| Trusted mint, nothing spent | 31 sat in 5 proofs | one state check, one swap | Claimed 31; wallet holds 30 after the fee; row removed; a second run made no request |
+| One batch already spent | 21 spent, 10 unspent | one state check, one swap | 21 recorded spent, 10 claimed (9 in the wallet); row removed; a second run made no request |
+| Untrusted mint | 10 sat | one state check | Nothing claimed; the prompt was set; a relaunch made no request. Once the mint was trusted, Coco's own event started the claim: 10 claimed, prompt gone, row removed |
+| Stored phrase differs from the row's | 5 sat | state check, keysets, swap | Claimed; row kept, as the rule requires |
+
+Not exercised live: keyset ids in the 2024 formats (the mint no longer issues them), a proof
+the mint reports pending or rejects, an unreachable mint, a kill between swap and record, old
+invoices, several accounts, Coco's SQLite storage, and any phone.
+
+**The prompts gallery on the emulator, 2026-10-11.** In the same release build the page
+opened at `sovran://design-system-prompts`, listed its entries, and the "Claim your old ecash"
+prompt and the account-mismatch screen each opened and drew correctly with their sample
+data. The other entries were not opened by hand.
 
 ## Rows that are not PASS
 
