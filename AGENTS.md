@@ -10,11 +10,12 @@ pushes or destructive actions.
 ## How work runs here
 
 1. **Understand before changing.** Ask the code first: `jg "<question>"` for how or why
-   something works (one question at a time; it can take a minute or two), plain search for an
-   exact name, then the page for the area in the table below. For wallet or protocol behaviour, read how
-   `../../coco`, `../../cashu-ts`, `../../cdk`, `../../nutshell`, `../../cashu.me`,
-   `../../macadamia`, `../../minibits_wallet` and `../../eNuts` do it and what `../../nuts`
-   says: as common practice to weigh, not as the answer.
+   something works (one question at a time; if it hangs or reports incomplete, search
+   instead), plain search for an exact name, then the page for the area in the table below.
+   When the change decides how the wallet treats a mint, a payment or another wallet, also
+   read how the relevant ones of `../../coco`, `../../cashu-ts`, `../../cdk`, `../../nutshell`,
+   `../../cashu.me`, `../../macadamia`, `../../minibits_wallet` and `../../eNuts` do it and
+   what `../../nuts` says: as common practice to weigh, not as the answer.
 2. **Plan anything bigger than one commit** with the `plan-a-change` skill. Facts are yours to
    find. Decisions go to the owner as multiple choice, in plain words about what the person
    using the app sees, recommended choice first.
@@ -51,13 +52,14 @@ working in the same checkout: if the tree has changes you did not make, work in 
 | A screen or component | [Building a screen](docs/review/building-screens.md) | `bun run check:styling`; look at it running |
 | A route, sheet or flow | [Navigation and routes](docs/protocols/navigation-and-routes.md) | Register the page for the native harness (below) |
 | Anything saved on the phone: a store, secure key, database, cache or migration | [Account lifecycle](docs/architecture/account-lifecycle.md) ("Adding state for an account", "Upgrading from an older release"); [state conventions](docs/review/conventions-state.md) | The `persistence-release-safety` skill, every time |
-| Payments, the wallet package, Coco | [Architecture overview](docs/architecture/overview.md); [contracts](docs/review/contracts.md) | The wallet core ships unmodified ([ADR 0017](app/docs/adr/0017-the-wallet-core-ships-unmodified.md)): turn a feature off before patching Coco |
+| Payments, the wallet package, Coco | [Architecture overview](docs/architecture/overview.md); [contracts](docs/review/contracts.md) | Coco carries one patch, for offline send ([ADR 0017](app/docs/adr/0017-the-wallet-core-ships-unmodified.md)); turn a feature off before adding another. Before changing the Coco version: [wallet databases](app/__tests__/cocoDatabases/README.md) |
 | Wording people read | `copy/` and the `wallet` copy catalogue; [CLAIMS.md](CLAIMS.md) for public claims | `bun run copy:lint` |
-| A release | [release/README.md](release/README.md) | `persistence-release-safety`, including a new era fixture |
+| A release | [release/README.md](release/README.md) | `persistence-release-safety`; the release fixture step in that README |
 
-Never rename, remove or tighten a saved field, store name, storage key, secure key or database
-name. Add fields with a default. An old install whose saved data no longer parses loses that
-whole store.
+Do not rename a store, storage key, secure key or database, and do not rename, remove or
+tighten a saved field: an old install whose saved data no longer parses loses that whole store.
+Add fields with a default, without a version bump. The state conventions have the narrow
+exceptions.
 
 ## Layout
 
@@ -106,7 +108,7 @@ run a destructive or funded scenario against a real wallet.
 
 Every page and action must be operable by the JSON native harness on iPhone and Android
 ([architecture](app/docs/testing-json-native-adr.md)). For a new or changed route, control or
-sheet: register the page in `CANONICAL_PAGES` and its aliases in `PAGE_ROUTES`; give each
+sheet: register the page in `CANONICAL_PAGES` and its aliases in `PAGE_ROUTES` (`app/e2e/schema`); give each
 control a stable `testID` and an accessible label; expose state that has no visible node
 through `E2EAccessibilityProbe`; add the smallest scenario that enters, operates and leaves,
 waiting on state rather than time and never retrying a send, publish or delete; run it on both
@@ -130,7 +132,7 @@ local skill is for a procedure with steps and an end.
 | --- | --- |
 | plan-a-change | Before building anything bigger than one commit |
 | audit-commit | After each commit that changes behaviour; when asked to audit or review a commit |
-| persistence-release-safety | After any change to saved data; before a release |
+| persistence-release-safety | Before and after any change to saved data or a storage library; before a release |
 | diagnosing-bugs | Something is broken, failing or slow |
 | retro | Asked what keeps going wrong, or to improve this file, the skills or the checks |
 

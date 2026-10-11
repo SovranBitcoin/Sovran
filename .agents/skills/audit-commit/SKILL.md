@@ -39,8 +39,8 @@ and the callers of what it changed:
 
 One reviewer per lens, through whatever the host offers (Claude: subagents; Codex: its own).
 A commit that touches money, keys or saved data also gets one reviewer from the other tool
-(`codex exec --sandbox read-only`, or `claude -p`) as one more opinion, not a judge. A small
-commit, or one that is only documentation or tooling, needs two reviewers, not five.
+(`codex exec --sandbox read-only`, or `claude -p`) as one more opinion, not a judge. For a
+small commit, or one that is only documentation or tooling, two reviewers share the lenses.
 
 Each reviewer gets the sha, the parent, the paths, the history from step 2, and the instruction
 to read the diff with `git show --format= <sha>` so that it never sees the message. None gets

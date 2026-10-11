@@ -1,6 +1,6 @@
 ---
 name: retro
-description: Look back over one session, or over every past Claude and Codex session in this project, to find what the owner keeps having to say and what agents keep getting wrong, then fix the environment so it is not needed again. Use when asked for a retro or retrospective, "what do I keep repeating", "why do agents keep doing X", or to improve AGENTS.md, the skills or the checks from experience.
+description: Look back over one session, or over every past Claude and Codex session in this project, to find what the owner keeps having to say and what agents keep getting wrong, then propose changes to the checks, AGENTS.md, documents or skills so it is not needed again. Use when asked for a retro or retrospective, "what do I keep repeating", "why do agents keep doing X", or to improve AGENTS.md, the skills or the checks from experience.
 ---
 
 # Retro

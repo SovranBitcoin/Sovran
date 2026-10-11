@@ -1,6 +1,6 @@
 ---
 name: plan-a-change
-description: Turn a feature or change described in conversation into settled decisions and an ordered list of small commits before any code is written. Use when the owner describes something to build or change that is more than a one-commit fix, says "I want", "let's add", "we need", or asks for a plan, a breakdown or small logical commits.
+description: Turn a feature or change described in conversation into settled decisions and an ordered list of small commits before any code is written. Use when the owner describes something to build or change that will take more than one commit, or asks for a plan, a breakdown or small logical commits. Not for a single small fix.
 ---
 
 # Plan a change
