@@ -22,6 +22,7 @@ jest.mock('@/shared/lib/nostr/e2eSeedExport', () => ({
 import { act, renderHook } from '@testing-library/react-native';
 
 import { useMnemonic } from '@/shared/lib/nostr/secureStorage';
+import { useSecureStoreState } from '@/shared/stores/runtime/secureStoreState';
 
 describe('useMnemonic.refresh', () => {
   it('clears loading when the read throws', async () => {
@@ -33,6 +34,17 @@ describe('useMnemonic.refresh', () => {
     });
 
     expect(hook.result.current.loading).toBe(false);
+  });
+
+  it('locks the secure store when the read on mount throws', async () => {
+    mockExportSeed.mockRejectedValueOnce(new Error('bad e2e export config'));
+    const hook = renderHook(() => useMnemonic());
+
+    await act(async () => {});
+
+    expect(hook.result.current).toMatchObject({ value: null, loading: false });
+    expect(useSecureStoreState.getState().secureStoreState).toBe('locked');
+    useSecureStoreState.setState({ secureStoreState: 'available', errorName: null });
   });
 
   it('loads the stored phrase', async () => {

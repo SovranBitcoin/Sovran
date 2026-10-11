@@ -34,7 +34,7 @@ jest.mock('@/shared/providers/InitializationProvider', () => {
   return { useInitializationStage: () => stage };
 });
 jest.mock('@/shared/lib/nostr/secureStorage', () => ({
-  useMnemonic: () => ({ value: 'fixture-root', loading: false, error: null, refresh: jest.fn() }),
+  useMnemonic: () => ({ value: 'fixture-root', loading: false, refresh: jest.fn() }),
   hashMnemonic: () => 'root-hash',
   // No imported key, and a wallet phrase cache left by whatever chain the
   // row was last loaded under.

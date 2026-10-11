@@ -807,7 +807,6 @@ export function retrieveImportedNsec(pubkeyHex: string): Promise<string | null> 
 interface UseMnemonicReturn {
   value: string | null;
   loading: boolean;
-  error: string | null;
   refresh: () => Promise<void>;
 }
 
@@ -819,11 +818,8 @@ interface UseMnemonicReturn {
 export function useMnemonic(autoLoad: boolean = true): UseMnemonicReturn {
   const [value, setValue] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(autoLoad);
-  const [error, setError] = useState<string | null>(null);
-
   const refresh = useCallback(async () => {
     setLoading(true);
-    setError(null);
     let stored: string | null;
     try {
       stored = await retrieveMnemonic();
@@ -833,24 +829,21 @@ export function useMnemonic(autoLoad: boolean = true): UseMnemonicReturn {
       setLoading(false);
       throw error;
     }
+    // Null is "nothing stored" or a read that failed. A failed read has
+    // already locked the secure store (`useSecureStoreState`), which is where
+    // a caller tells the two apart.
     setValue(stored);
-    if (stored === null) {
-      // `retrieveMnemonic` swallows errors and returns null on either
-      // not-found or genuine failure; the hook exposes a generic message
-      // for the failure-shaped UI but does not distinguish — callers that
-      // need that distinction read SecureStore directly.
-      setError(null);
-    }
     setLoading(false);
   }, []);
 
   useEffect(() => {
-    if (autoLoad) {
-      void refresh();
-    }
+    if (!autoLoad) return;
+    // Nobody awaits this read, so a rejection is reported the way every other
+    // failed read is: the secure store locks.
+    refresh().catch(lockMnemonic);
   }, [autoLoad, refresh]);
 
-  return { value, loading, error, refresh };
+  return { value, loading, refresh };
 }
 
 /** Read and validate the account's manifests before any destructive step. */

@@ -55,7 +55,6 @@ reports) keep their evidence, and link here for anything still open.
 | [F26](F26.md) | medium | fix | Move receive, mint-quote and rebalance sequencing out of the app into wallet/ |
 | [F27](F27.md) | medium | fix | Payment-operations port and NIP-46 grant stores take look-alike positional strings |
 | [F28](F28.md) | medium | fix | Bitchat native calls pass private keys positionally; native events are not validated |
-| [F29](F29.md) | high | investigation | SecureStore key blobs are not shape-checked; useMnemonic never reports a failed read |
 | [F30](F30.md) | medium | fix | Persisted fields hold Nostr seconds under millisecond-style names; rename with migrations |
 | [F31](F31.md) | medium | fix | Nagg event schemas need per-item tolerance, then hex ids and size caps |
 | [F32](F32.md) | low | fix | MintCurrencyTabs and SendScreen animate layout per frame; three other workarounds remain |

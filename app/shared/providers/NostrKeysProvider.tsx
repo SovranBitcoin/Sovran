@@ -91,12 +91,7 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
     message: 'Initializing keys...',
     dependsOn: ['global-migrations'],
   });
-  const {
-    value: mnemonic,
-    loading: mnemonicLoading,
-    error: mnemonicError,
-    refresh: refreshMnemonic,
-  } = useMnemonic();
+  const { value: mnemonic, loading: mnemonicLoading, refresh: refreshMnemonic } = useMnemonic();
   const [keys, setKeys] = useState<NostrKeys | null>(null);
   const [cashuMnemonic, setCashuMnemonic] = useState<string | null>(null);
   const [isReady, setIsReady] = useState(false);
@@ -408,13 +403,6 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
     });
     return () => task.cancel();
   }, [isReady, defaultAccountIndex]);
-
-  // Update error state based on mnemonic error
-  useEffect(() => {
-    if (mnemonicError) {
-      setError(mnemonicError);
-    }
-  }, [mnemonicError]);
 
   const contextValue = useMemo<NostrKeysContextValue>(
     () => ({
