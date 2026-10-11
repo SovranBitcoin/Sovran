@@ -20,7 +20,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Follow-ups
-        run: node scripts/followups.mjs check
+        run: node --test scripts/followups.test.mjs && node scripts/followups.mjs check
 
       - name: Agent guide and skills
         run: python3 .agents/skills/manage.py check

@@ -7,14 +7,17 @@ named by its id.
   and commit it with the change that left it. In code, point at it with `// FOLLOWUP(F<n>): …`.
   A bare `TODO`, `FIXME`, `HACK` or `XXX` comment fails the check.
 - **Finishing one?** Delete its file and every mention of its id in the same commit, then run
-  `bun run followups index`. Git history is the record that it existed.
+  `bun run followups index`. Git history is the record that it existed; a document that needs
+  to remember the item says what it was, without the id.
 - **Changing one?** Edit the file. If the remaining work is a different job from the one the
   entry described, delete it and open a new one, so an id never changes meaning.
 - **Known gaps in tests** (`knownGaps` in release fixtures, `it.failing`) name the id too, so
   the gap and the entry are removed together.
 
-`bun run followups check` fails when an entry is malformed, when an id that appears anywhere in
-the tree has no file, or when the list below is stale. It runs with lint in CI.
+`bun run followups check` fails when an entry is malformed, when an id has no file, or when the
+list below is stale. It runs with lint in CI. It reads Markdown, where any id counts, and source
+files, where an id counts in a comment or beside the words "follow-up" or "known gap"; it does
+not read JSON or the vendored folders.
 
 Each entry says what is wrong, where, why it was left, and what "done" looks like. `needs` says
 what it is waiting for: `fix` (a code change an agent can make now), `investigation` (not yet

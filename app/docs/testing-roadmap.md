@@ -528,7 +528,7 @@ balance`. It ended on the wallet, swept the app to zero, reconciled cocod
       deficit rounding, display name, and outgoing `max_tokens` request body.
       The September 24 review added single-mint affordability, scope-change,
       secure-recovery, deadline and provider-ownership regressions; native
-      incremental streaming and funded recovery remain open (F50–F53).
+      incremental streaming and funded recovery remain open (F50, F51 and F53).
 
 ## 9. Native transport and untrusted input
 
