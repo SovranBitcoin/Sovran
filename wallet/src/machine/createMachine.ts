@@ -1204,8 +1204,16 @@ export function createPaymentMachine(
                 };
               }
               if (isStaleGeneration(sendGeneration, "nfc.switchUnit")) return;
-              walletCtx = getContext();
               unit = getUnit?.() ?? configUnit;
+              // A bound context catches up with the unit only when React next
+              // re-runs its binding, so its `mintBalances` may still be the old
+              // unit's here. `unitBalances` holds every unit and does not lag:
+              // it is what found this request funded above.
+              const switchedCtx = getContext();
+              const balances = switchedCtx.unitBalances?.[unit.trim().toLowerCase()];
+              walletCtx = balances
+                ? { ...switchedCtx, mintBalances: balances }
+                : switchedCtx;
               // A missing/unsupported host switch keeps the existing unit hard-stop.
             }
           }

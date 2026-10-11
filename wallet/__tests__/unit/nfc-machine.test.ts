@@ -16,6 +16,9 @@ function setup({
   switchEnabled = true,
   mintsPreferred = false,
   hasSpendingCondition = false,
+  contextLags = false,
+  satBalances = { [accepted]: 500, [other]: 1000, [third]: 2000 },
+  unitSwitchTakes = true,
   operations = {},
 }: {
   unit?: string;
@@ -25,6 +28,11 @@ function setup({
   switchEnabled?: boolean;
   mintsPreferred?: boolean;
   hasSpendingCondition?: boolean;
+  /** The bound wallet context still shows the old unit's balances after a switch. */
+  contextLags?: boolean;
+  satBalances?: Record<string, number>;
+  /** Whether the host's unit actually changes when asked to. */
+  unitSwitchTakes?: boolean;
   operations?: Partial<MachineOperations>;
 } = {}) {
   let activeUnit = "sat";
@@ -36,17 +44,17 @@ function setup({
     hasSpendingCondition,
   };
   const unitBalances: Record<string, Record<string, number>> = {
-    sat: { [accepted]: 500, [other]: 1000, [third]: 2000 },
+    sat: satBalances,
     [unit]: balances,
   };
   const getContext = (): WalletContext => ({
     trustedMintUrls: [accepted, other, third],
-    mintBalances: unitBalances[activeUnit] ?? {},
+    mintBalances: unitBalances[contextLags ? "sat" : activeUnit] ?? {},
     unitBalances,
     proofAmounts: {},
   });
   const switchUnit = vi.fn(async (next: string) => {
-    activeUnit = next;
+    if (unitSwitchTakes) activeUnit = next;
   });
   const adapter = {
     readPaymentRequest: vi.fn(async () => INPUTS.paymentRequestBasic),
@@ -93,6 +101,27 @@ describe("NFC terminal unit and mints", () => {
     expect(switchUnit).toHaveBeenCalledWith("usd");
     tm.assertStep("sendComplete");
     expect(sentMint(tm)?.args).toEqual([other, 50, "usd"]);
+  });
+  it("chooses by the new unit's balances when the wallet context has not caught up", async () => {
+    // `accepted` holds nothing in sat and the whole usd balance. A context
+    // still showing sat balances would find no mint able to pay.
+    const { tm } = setup({
+      unit: "usd",
+      mints: [accepted],
+      balances: { [accepted]: 100 },
+      satBalances: { [other]: 1000 },
+      contextLags: true,
+    });
+    await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
+    tm.assertStep("sendComplete");
+    expect(sentMint(tm)?.args).toEqual([accepted, 50, "usd"]);
+  });
+  it("stops when the host reports a switch that did not change the unit", async () => {
+    const { tm, adapter } = setup({ unit: "usd", unitSwitchTakes: false });
+    await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
+    expect(tm.machine.getStep()).not.toBe("sendComplete");
+    expect(sentMint(tm)).toBeUndefined();
+    expect(adapter.writeToken).not.toHaveBeenCalled();
   });
   it("honours strict m even when a different trusted mint holds more", async () => {
     const { tm } = setup({ balances: { [accepted]: 100, [other]: 1000 } });
