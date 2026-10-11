@@ -20,5 +20,11 @@ export { SettingsDesignSystemFadeStressScreen } from './screens/SettingsDesignSy
 export { SettingsDesignSystemPostsScreen } from './screens/SettingsDesignSystemPostsScreen';
 export { SettingsDesignSystemVariationsScreen } from './screens/SettingsDesignSystemVariationsScreen';
 export { SettingsDesignSystemScreensScreen } from './screens/SettingsDesignSystemScreensScreen';
+export { SettingsDesignSystemPromptsScreen } from './screens/SettingsDesignSystemPromptsScreen';
+export {
+  SettingsDesignSystemCtaSampleScreen,
+  SettingsDesignSystemPromptPreviewScreen,
+} from './screens/SettingsDesignSystemPromptPreviewScreen';
+export { findPromptEntry } from './design-system/prompts';
 export { SettingsNotificationPolicyScreen } from './screens/SettingsNotificationPolicyScreen';
 export { DeleteScreen } from './screens/DeleteScreen';

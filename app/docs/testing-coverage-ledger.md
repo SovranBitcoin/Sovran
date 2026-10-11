@@ -295,6 +295,7 @@ contracts only. The full matrix now includes 153 scenarios and 264 platform pair
 | `capture.onboarding` | Guarded first-run pages for the library | authored; presentation capture only, no product proof |
 | `capture.settings` | Settings pages without saving or revealing secrets | authored; presentation capture only, no product proof |
 | `capture.design-system` | Design component pages | authored; presentation capture only, no product proof |
+| `settings.design-system.prompts` | Design System · Prompts: open the update prompt on sample data and close it | authored; no native run; presentation only, no product proof |
 | `capture.history` | Native demo transaction details | authored; presentation capture only, no product proof |
 | `capture.local-navigation` | Local navigation without connecting or paying | authored; presentation capture only, no product proof |
 | `capture.account-entry` | Account forms and public keys without changing them | authored; presentation capture only, no product proof |

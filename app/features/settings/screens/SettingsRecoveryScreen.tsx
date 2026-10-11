@@ -115,11 +115,17 @@ interface SettingsRecoveryScreenProps {
    * screen falls back to `router.back()` via its own Close button.
    */
   onComplete?: () => void;
+  /**
+   * Design-system preview: lists these mints in place of the wallet's and
+   * starts nothing, so no mint is asked and no wallet state changes.
+   */
+  preview?: { mints: Mint[] };
 }
 
 export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
   gateMode = false,
   onComplete,
+  preview,
 }) => {
   useLifecycleLogger('SettingsRecoveryScreen');
   const { pad } = useStylePaint().style.space;
@@ -133,7 +139,8 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
       'surface-secondary',
     ] as const);
   const navigation = useNavigation();
-  const { mints, loadMints } = useMintManagement();
+  const { mints: walletMints, loadMints } = useMintManagement();
+  const mints = preview?.mints ?? walletMints;
 
   const [phase, setPhase] = useState<RecoveryPhase>('idle');
   const [results, setResults] = useState<MintRecoveryState[]>([]);
@@ -147,7 +154,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
   const [isDiscovering, setIsDiscovering] = useState(false);
 
   useEffect(() => {
-    if (!deepProbe) {
+    if (!deepProbe || preview) {
       setDiscoveredMintUrls([]);
       return;
     }
@@ -169,7 +176,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
       controller.abort();
       setIsDiscovering(false);
     };
-  }, [deepProbe, mints]);
+  }, [deepProbe, mints, preview]);
 
   // Lock navigation when recovery is in progress.
   // Skipped in gateMode — the screen isn't mounted as a route at all, so
@@ -194,6 +201,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
   }, [phase, navigation, gateMode]);
 
   const handleStartRecovery = async () => {
+    if (preview) return;
     // Module-scoped, so a remount cannot reset it. Two concurrent recoveries
     // race the same counters and each takes ~1.8x as long.
     if (recoveryInFlight) {

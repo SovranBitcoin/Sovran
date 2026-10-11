@@ -13,14 +13,24 @@ interface TermsAndConditionsScreenProps {
   onClose: () => void;
   settingsError?: boolean;
   onRetry?: () => void;
+  /** Whether earlier documents were accepted. Read from settings unless given. */
+  updated?: boolean;
+  /**
+   * Replaces opening the recovery page, which shows the real recovery phrase.
+   * Set by the design system, whose previews must not reach it.
+   */
+  onViewRecovery?: () => void;
 }
 
 export function TermsAndConditionsScreen({
   onClose,
   settingsError = false,
   onRetry,
+  updated,
+  onViewRecovery,
 }: TermsAndConditionsScreenProps) {
-  const previousAcceptance = useSettingsStore((s) => s.legalAcceptance ?? s.termsAccepted);
+  const acceptedBefore = useSettingsStore((s) => !!(s.legalAcceptance ?? s.termsAccepted));
+  const previousAcceptance = updated ?? acceptedBefore;
   const [step, setStep] = useState<'terms' | 'privacy'>('terms');
   const [isChecked, setIsChecked] = useState(false);
   const [privacyChecked, setPrivacyChecked] = useState(false);
@@ -50,7 +60,7 @@ export function TermsAndConditionsScreen({
       variant="ghost"
       testID="legal-view-recovery"
       accessibilityLabel="View existing recovery information"
-      onPress={() => setShowRecovery(true)}>
+      onPress={onViewRecovery ?? (() => setShowRecovery(true))}>
       <HerouiButton.Label>View existing recovery information</HerouiButton.Label>
     </HerouiButton>
   );

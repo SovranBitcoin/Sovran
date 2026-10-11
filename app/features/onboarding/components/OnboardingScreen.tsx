@@ -46,6 +46,11 @@ const SLIDE_DURATION_MS = Number.isFinite(E2E_SLIDE_MS) && E2E_SLIDE_MS > 0 ? E2
 
 type OnboardingScreenProps = {
   onComplete: () => void;
+  /**
+   * Replaces the recovery-phrase form. Set where the running app is already
+   * underneath (the design system), so no second menu host is mounted either.
+   */
+  onRecoveryPhrase?: () => void;
 };
 
 /**
@@ -64,7 +69,7 @@ function useSlideScroll() {
   return { ref, scrollToIndex };
 }
 
-const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
+const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete, onRecoveryPhrase }) => {
   useLifecycleLogger('OnboardingScreen');
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
 
@@ -236,7 +241,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
           testID="onboarding-recovery-phrase"
           text={onboardingCopy.recoveryPhrase}
           variant="underline"
-          onPress={openMnemonicRecovery}
+          onPress={onRecoveryPhrase ?? openMnemonicRecovery}
         />
 
         <GestureDetector gesture={Gesture.Race(panGesture, singleTap)}>
@@ -263,7 +268,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
           />
         </Animated.View>
       </View>
-      <ActionMenuHost />
+      {!onRecoveryPhrase && <ActionMenuHost />}
     </Log>
   );
 };

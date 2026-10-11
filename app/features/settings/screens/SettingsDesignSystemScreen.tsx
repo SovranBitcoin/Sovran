@@ -40,6 +40,7 @@ const DesignSystemLinkItem: React.FC<DesignSystemFamily> = ({ id, href, title, d
 
 const openScreens = () => router.navigate('/(settings-flow)/design-system-screens');
 const openVariations = () => router.navigate('/(settings-flow)/design-system-variations');
+const openPrompts = () => router.navigate('/(settings-flow)/design-system-prompts');
 
 interface FlowLink {
   id: string;
@@ -172,6 +173,28 @@ export function SettingsDesignSystemScreen() {
                     <ListGroup.ItemTitle>Variations</ListGroup.ItemTitle>
                     <ListGroup.ItemDescription>
                       Candidate redesigns of one component at a time, a tab each, on every case.
+                    </ListGroup.ItemDescription>
+                  </ListGroup.ItemContent>
+                  <ListGroup.ItemSuffix />
+                </ListGroup.Item>
+              </PressableFeedback.Scale>
+              <PressableFeedback.Ripple />
+            </PressableFeedback>
+            <Separator />
+            <PressableFeedback
+              testID="design-system-prompts-row"
+              accessible
+              accessibilityLabel="Prompts, every prompt, blocking screen and confirmation on made-up data"
+              accessibilityRole="button"
+              animation={false}
+              onPress={openPrompts}>
+              <PressableFeedback.Scale>
+                <ListGroup.Item disabled>
+                  <ListGroup.ItemContent>
+                    <ListGroup.ItemTitle>Prompts</ListGroup.ItemTitle>
+                    <ListGroup.ItemDescription>
+                      Every prompt, blocking screen, onboarding step and confirmation, opened on
+                      made-up data.
                     </ListGroup.ItemDescription>
                   </ListGroup.ItemContent>
                   <ListGroup.ItemSuffix />

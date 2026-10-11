@@ -95,6 +95,11 @@ export const PAGE_ROUTES: Partial<Record<(typeof CANONICAL_PAGES)[number], reado
   'settings-design-system-loading': ['(settings-flow)/design-system-loading.tsx'],
   'settings-design-system-posts': ['(settings-flow)/design-system-posts.tsx'],
   'settings-design-system-screens': ['(settings-flow)/design-system-screens.tsx'],
+  'settings-design-system-prompts': ['(settings-flow)/design-system-prompts.tsx'],
+  'settings-design-system-prompt': [
+    '(settings-flow)/design-system-prompt.tsx',
+    '(prompt-flow)/cta-sample.tsx',
+  ],
   'settings-design-system-variations': ['(settings-flow)/design-system-variations.tsx'],
   'settings-design-system-segmented': ['(settings-flow)/design-system-segmented.tsx'],
   'settings-design-system-skeleton-crossfade': [

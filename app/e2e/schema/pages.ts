@@ -99,6 +99,8 @@ export const CANONICAL_PAGES = [
   'settings-design-system-loading',
   'settings-design-system-posts',
   'settings-design-system-screens',
+  'settings-design-system-prompts', // every prompt and blocking screen, listed
+  'settings-design-system-prompt', // one of them, opened on sample data
   'settings-design-system-variations',
   'settings-design-system-segmented',
   'settings-design-system-skeleton-crossfade',

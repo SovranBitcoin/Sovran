@@ -19,16 +19,26 @@ import { withAlpha } from '@/shared/lib/color';
 
 export function DeleteScreen() {
   useLifecycleLogger('DeleteScreen');
-  const foreground = useThemeColor('foreground');
-  const [danger, red400] = useThemeColor(['danger', 'red-400'] as const);
-  const paint = useStylePaint();
-  const cardContent = { padding: paint.style.space.pad, gap: paint.style.space.related };
-
   const handleDelete = useCallback(async () => {
     log.warn('settings.delete.confirmed', { reason: 'user_initiated_slide_to_delete' });
     await deleteAllProfiles();
     log.info('settings.delete.complete');
   }, []);
+  return <DeleteScreenView onDelete={handleDelete} onCancel={() => router.back()} />;
+}
+
+/** The screen as drawn. `DeleteScreen` supplies the deletion; the design system does not. */
+export function DeleteScreenView({
+  onDelete,
+  onCancel,
+}: {
+  onDelete: () => void | Promise<void>;
+  onCancel: () => void;
+}) {
+  const foreground = useThemeColor('foreground');
+  const [danger, red400] = useThemeColor(['danger', 'red-400'] as const);
+  const paint = useStylePaint();
+  const cardContent = { padding: paint.style.space.pad, gap: paint.style.space.related };
 
   return (
     <ScreenWrapper name="DeleteScreen" scroll="custom" safeArea="scroll">
@@ -97,7 +107,7 @@ export function DeleteScreen() {
 
           <VStack gap={12} className="w-full items-center pb-6">
             <SlideToConfirm
-              onConfirm={handleDelete}
+              onConfirm={onDelete}
               iconName="mdi:trash-can-outline"
               label="Swipe to delete →"
               trackColor={danger}
@@ -111,7 +121,7 @@ export function DeleteScreen() {
                 variant="secondary"
                 text="Cancel"
                 testID="settings-delete-cancel"
-                onPress={() => router.back()}
+                onPress={onCancel}
               />
             </View>
           </VStack>

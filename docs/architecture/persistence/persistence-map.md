@@ -126,12 +126,16 @@ Files and HEAD-only additions:
 | E20 | Secure vault `routstr_v1_<pubkey>_<sha256(name)>_manifest`, chunks `<prefix>_<slot>_<index>`; manifest version 1 | `L/persist/secureVaultManifest.ts:6@HEAD`, `:13@HEAD`, `:18@HEAD` | `L/persist/secureVault.ts:25@HEAD` | New secure representation; verified committed generation read | `T/routstrSecureVault.test.ts:24@HEAD`, large-token round trip; `:32`, failed replacement |
 | E20 | Routstr SDK `routstr-sdk:<key>:profile:<pubkey>`; sensitive keys `api_keys`, `child_keys`, `xcashu_tokens`, `cached_receive_tokens` | `L/routstr/sdk/driver.ts:14@HEAD` | Same file `:45@HEAD` | Sensitive plaintext copied to verified vault then removed; nonsensitive values remain AsyncStorage | `T/routstrSecurePersistence.test.ts:136@HEAD`, captured-owner case |
 | E20 | Secure `nearby-payment-journal`: version 1 inbound/outbound intent | `app/features/nearPay/lib/nearbyPaymentStorage.ts:2@HEAD`; `nearbyPayments.ts:83@HEAD` | `nearbyPayments.ts:92@HEAD` | New vault; malformed journal throws rather than resetting | **NO old value to migrate** |
+| E21 | New global store `legacy-ecash-store`: `groups`, `quotes`, `rowRemoved`; version 1. Outcome of claiming the redux-era ecash; amounts and hashes of proof secrets, never proofs. Also the first code that removes `persist:SOVRAN` | `app/shared/stores/global/legacyEcashStore.ts@HEAD` | `app/shared/lib/cashu/legacyEcashClaim.ts@HEAD` | Absent on every release; starts empty. A lost or rejected blob reopens every group, which asks the mints again and cannot double-claim | **NO old value to migrate** (ADR 32) |
 
 The following HEAD query names are **not durable**: search-posts, feed-page, notification-followers-page, notifications-page, mint-reviews, dm-conversations, dm-thread and profile-search; their declarations specify `persist:false`. Evidence: respective files under `app/features/*/data`, including `searchPostsCache.ts:20@HEAD`, `feedCache.ts:19@HEAD`, `mintReviewsCache.ts:18@HEAD`, `dmSnapshotCaches.ts:20@HEAD`, `:33@HEAD`, and `profileSearchCache.ts:17@HEAD`.
 
 SecureStore options were unchanged at the JavaScript level: iOS `requireAuthentication:false`, Android `{}`; **no explicit `keychainService` or accessibility setting found**. Evidence: `helper/secureStorage.ts:12@bab1c891f`, `:35@bab1c891f`; `shared/lib/nostr/secureStorage.ts:29@19388f0e3`; `L/nostr/secureStorage.ts:55@HEAD`. Native continuity remains unproven across SecureStore major changes: `package.json:112@957eed9ea` (`^14.0.0`), `package.json:80@bab1c891f` (`~15.0.7`), `package.json:115@88fad9741` (`~55.0.8`), `app/package.json:147@HEAD` (`~56.0.4`).
 
 ## Wallet storage and seed derivation
+
+The present-day chain from the recovery phrase to every stored and used value, with the invariants
+the app checks between them, is in [derivation.md](derivation.md). This section is the history.
 
 Derivation notation:
 
