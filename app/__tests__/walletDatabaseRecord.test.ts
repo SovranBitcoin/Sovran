@@ -228,6 +228,18 @@ describe('forgetting', () => {
     expect(saved[1].walletDatabaseCreated).not.toBe(true);
   });
 
+  it('does not write over a profile list that has not loaded', async () => {
+    await flush();
+    const before = await AsyncStorage.getItem('profile-store');
+    const hasHydrated = jest.spyOn(useProfileStore.persist, 'hasHydrated').mockReturnValue(false);
+    try {
+      await expect(forgetWalletDatabases([1], 100)).rejects.toThrow('could not be saved');
+    } finally {
+      hasHydrated.mockRestore();
+    }
+    expect(await AsyncStorage.getItem('profile-store')).toBe(before);
+  });
+
   it('rejects when the saved list cannot be read back in time', async () => {
     await flush();
     const real = AsyncStorage.getItem;

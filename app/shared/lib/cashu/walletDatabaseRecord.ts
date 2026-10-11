@@ -91,6 +91,12 @@ export async function forgetWalletDatabases(
   accountIndexes: readonly number[],
   waitMs = 2000
 ): Promise<void> {
+  // A list that did not load is defaults in memory. Writing it would replace
+  // the saved one, which the store itself is guarded against doing.
+  if (!useProfileStore.persist.hasHydrated()) {
+    cashuLog.warn('cashu.wallet_database.forget_not_saved', { reason: 'profile-list-not-loaded' });
+    throw new Error('The wallet database record could not be saved');
+  }
   useProfileStore.getState().setWalletDatabaseCreated(accountIndexes, false);
   const { activeAccountIndex, profiles } = useProfileStore.getState();
   const row = JSON.stringify({

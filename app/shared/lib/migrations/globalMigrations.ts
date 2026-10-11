@@ -272,7 +272,9 @@ async function adoptLeftoverBareStores(): Promise<void | typeof RUN_AGAIN> {
     if (existing !== null && existing !== data) continue;
     if (existing === null) {
       await AsyncStorage.setItem(ownKey, data);
-      if ((await AsyncStorage.getItem(ownKey)) !== data) {
+      // A read-back that throws is treated as one that differs.
+      const copied = await AsyncStorage.getItem(ownKey).catch(() => null);
+      if (copied !== data) {
         // A save can be dropped, or land damaged, without an error. Whatever
         // is there now is this copy's own doing (the key was empty a moment
         // ago), and left in place it would pass for the account's own data on
