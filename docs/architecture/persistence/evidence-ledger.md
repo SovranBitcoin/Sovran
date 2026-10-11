@@ -1,6 +1,6 @@
 # Evidence ledger
 
-**Verdict, 2026-10-10, candidate 0.1.4 (`feat/offline-send-just-works`): INCONCLUSIVE.**
+**Verdict, 2026-10-11, candidate 0.1.4 (`feat/offline-send-just-works`): INCONCLUSIVE.**
 
 - Upgrades from **0.1.3 on Android: PASS.** The released 0.1.3 APK was upgraded in place to a
   release build of the candidate on an emulator, with nothing lost (below).
@@ -24,6 +24,23 @@ procedure. The builds are in [release-provenance.md](release-provenance.md), the
 surface in [persistence-map.md](persistence-map.md), the role reports in
 [audit-2026-10-10](audit-2026-10-10/). Tests are under `app/__tests__/`; every one named
 here was run on 2026-10-10 as part of the full suite.
+
+## Changes made after the last binary upgrade
+
+The binary upgrades below ran against `feaead880` (Android) and `1cf68f149` (iOS simulator) or
+earlier. Three changes landed afterwards, on 2026-10-11, and have **not** been run in a device
+build:
+
+| Change | Commit | Evidence so far | Why a device run matters |
+| --- | --- | --- | --- |
+| Every stored identity is checked against the recovery phrase before an account becomes ready; a mismatch stops on a critical screen | `c3eb6d2df` | Unit and boundary tests; the three 0.1.x release fixtures pass the checker in full; two Codex reviews, all findings fixed | A false alarm would stop every user at startup. The check relies on the platform's PBKDF2 (about 20 ms under Node); if that is missing on a phone it falls back to a JavaScript stretch that may take seconds on each cold start |
+| Ecash kept by builds before 0.0.45 is claimed through Coco, and the old row removed once settled | `3338b70da` | 53 app and 11 wallet tests against a mint faked at `fetch`; two Codex reviews, all findings fixed | Never run against a real mint or with a real 2024 row; it is the first code that deletes the old row |
+| Prompts gallery in the design system | `7fa277163` | A test presses every control in every preview | Layout has not been looked at |
+
+A device run was attempted on 2026-10-11 (released 0.1.3 APK to a release build of
+`7fa277163`) and abandoned: the emulator stopped responding under memory pressure. **Rerun the
+0.1.3 and 0.1.1 binary upgrades against the current commit before release**, and time the
+first screen.
 
 ## Rows that are not PASS
 
