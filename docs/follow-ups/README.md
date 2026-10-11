@@ -50,7 +50,7 @@ reports) keep their evidence, and link here for anything still open.
 | [F21](F21.md) | medium | fix | truncateMiddle can lengthen strings and uses three periods; merge with the second helper |
 | [F22](F22.md) | high | test | Not every route, alias, gesture and modal exit has a native journey on both platforms |
 | [F23](F23.md) | high | device | Run the headers suite on both platforms and reproduce the P2PK body text disappearing |
-| [F24](F24.md) | high | fix | The NIP-46 pairing secret travels in navigation state; hold it in a runtime store |
+| [F24](F24.md) | high | device | The NIP-46 pairing secret travels in navigation state; hold it in a runtime store |
 | [F25](F25.md) | medium | fix | Seven send/receive routes pass a whole JSON Colada entry as a route param; pass an id |
 | [F26](F26.md) | medium | fix | Move receive, mint-quote and rebalance sequencing out of the app into wallet/ |
 | [F27](F27.md) | medium | fix | Payment-operations port and NIP-46 grant stores take look-alike positional strings |

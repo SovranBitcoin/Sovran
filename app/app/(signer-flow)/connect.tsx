@@ -1,14 +1,15 @@
 /**
  * @fileoverview Deep-link target for nostrconnect:// system URLs
  *
- * `+native-intent.tsx` rewrites `nostrconnect://…` to
- * `/(signer-flow)/connect?uri=…`. This route re-validates the param at the
- * route boundary (deep-link params are attacker-controllable per AUDIT.md
- * dim-5; bounded length), then hands the raw URI to the shared
- * `openPairingFromUri` dispatch, which opens the 'signer-connect' sheet above
- * this minimal hub-style backdrop. Invalid/absent uri → error toast +
- * redirect to the signer hub. The URI embeds the pairing bearer secret —
- * never log it.
+ * `+native-intent.tsx` holds a `nostrconnect://…` link in memory and sends
+ * the app to `/(signer-flow)/connect?ticket=…`. This route redeems the ticket,
+ * bounds the link's length (it came from outside the app), then hands it to
+ * the shared `openPairingFromUri` dispatch, which opens the 'signer-connect'
+ * sheet above this minimal hub-style backdrop. An invalid link → error toast +
+ * redirect to the signer hub. A ticket with nothing behind it (already used,
+ * or the route was reached some other way) → the signer hub, quietly. The
+ * link embeds the pairing bearer secret, so it is never a route param and
+ * never logged.
  */
 
 import { useCallback, useEffect, useRef } from 'react';
@@ -21,6 +22,7 @@ import {
   PAIRING_ERROR_TITLE,
 } from '@/features/nostrSigner';
 import { MAX_NOSTRCONNECT_URI_LENGTH } from '@/features/nostrSigner/lib/nip46Uri';
+import { takePairingUri } from '@/features/nostrSigner/lib/pendingPairingUri';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 import { popup } from '@/shared/lib/popup';
@@ -31,7 +33,7 @@ import { View } from '@/shared/ui/primitives/View/View';
 const BACKDROP_STYLE = { flex: 1 } as const;
 
 const ParamsSchema = z.object({
-  uri: z.string().min(1).max(MAX_NOSTRCONNECT_URI_LENGTH),
+  ticket: z.string().regex(/^\d{1,9}$/),
 });
 
 function toastAndGoToHub(body: string): void {
@@ -42,12 +44,21 @@ function toastAndGoToHub(body: string): void {
 export default function SignerConnectRoute() {
   const onInvalid = useCallback(() => toastAndGoToHub(PAIRING_ERROR_INVALID_LINK), []);
   const params = useRouteParams(ParamsSchema, { where: 'signer-flow.connect', onInvalid });
-  const uri = params?.uri;
+  const ticket = params?.ticket;
   const openedRef = useRef(false);
 
   useEffect(() => {
-    if (uri === undefined || openedRef.current) return;
+    if (ticket === undefined || openedRef.current) return;
     openedRef.current = true;
+    const uri = takePairingUri(ticket);
+    if (uri === null) {
+      router.replace('/(signer-flow)' as never);
+      return;
+    }
+    if (uri.length > MAX_NOSTRCONNECT_URI_LENGTH) {
+      toastAndGoToHub(PAIRING_ERROR_INVALID_LINK);
+      return;
+    }
     const opened = openPairingFromUri(uri);
     if (opened.isErr()) {
       toastAndGoToHub(
@@ -56,7 +67,7 @@ export default function SignerConnectRoute() {
           : PAIRING_ERROR_INVALID_LINK
       );
     }
-  }, [uri]);
+  }, [ticket]);
 
   return (
     <Screen name="SignerConnectRoute" scroll="none">
