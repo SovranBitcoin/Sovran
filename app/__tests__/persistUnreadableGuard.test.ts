@@ -306,3 +306,41 @@ it('logs a save that storage rejects, once, and still reports the failure', asyn
     .mock.calls.filter(([event]) => String(event).endsWith('.save_failed'));
   expect(failures).toHaveLength(1);
 });
+
+it('keeps the fields that parse and still copies the original aside', async () => {
+  interface Prefs {
+    count: number;
+    label: string;
+    bump: () => void;
+  }
+  const original = blob({ count: 'seven', label: 'kept' });
+  const disk: Disk = new Map([[NAME, original]]);
+  serial += 1;
+  const store = create<Prefs>()(
+    persist(
+      (set) => ({
+        count: 0,
+        label: 'default',
+        bump: () => set((state) => ({ count: state.count + 1 })),
+      }),
+      persistConfig<Prefs, { count: number; label: string }>({
+        name: NAME,
+        logKey: `guard_test_${serial}`,
+        storage: memoryStorage(disk),
+        schema: z.object({ count: z.number().int(), label: z.string() }),
+        partialize: (state) => ({ count: state.count, label: state.label }),
+        independentFields: true,
+      })
+    )
+  );
+  await settle();
+
+  // The readable field survived; the unreadable one is on its default.
+  expect(store.getState()).toMatchObject({ count: 0, label: 'kept' });
+
+  store.getState().bump();
+  await settle();
+
+  expect(disk.get(SIDE)).toBe(original);
+  expect(JSON.parse(disk.get(NAME)!).state).toEqual({ count: 1, label: 'kept' });
+});

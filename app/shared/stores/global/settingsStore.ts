@@ -473,6 +473,9 @@ export const useSettingsStore = create<SettingsStore>({ name: 'settings-store', 
         name: 'settings-store',
         storage: AsyncStorage,
         schema: PersistedSettings,
+        // Every setting stands on its own: one that cannot be read must not
+        // cost terms acceptance, onboarding or the rest.
+        independentFields: true,
         // v1 -> v2: force every mock flag off. Mock mode (and its fixture
         // identities Bob/Alice) must never persist into a shipped/updated
         // install — it was leaking through after the toggle was disabled. This

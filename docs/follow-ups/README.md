@@ -125,7 +125,7 @@ reports) keep their evidence, and link here for anything still open.
 | [F110](F110.md) | medium | test | Nothing fails when a secure key, raw storage key, database name or storage library version changes |
 | [F111](F111.md) | medium | device | No old build is kept for iPhone, and the upgrade from the last release is run by hand |
 | [F112](F112.md) | medium | investigation | A wallet from 0.0.61 or earlier has no keysets after upgrading until its mint answers |
-| [F113](F113.md) | high | fix | A store with one bad saved field runs on defaults for every field, and nothing says so |
+| [F113](F113.md) | high | decision | A store with one bad saved field runs on defaults for every field, and nothing says so |
 | [F114](F114.md) | medium | investigation | Counter reads and the transaction scope sit outside the root write queue |
 | [F115](F115.md) | medium | fix | Switch and Connect saves the pairing link, with its secret, in plain AsyncStorage |
 | [F116](F116.md) | high | fix | A swap step that depends on money still settling is retried or skipped as if it had not been sent |

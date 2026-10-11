@@ -56,6 +56,12 @@ interface PersistConfigOptions<TFull, TPartial> {
    * that can be fetched again, where replacing a bad blob is the right outcome.
    */
   preserveUnreadable?: boolean;
+  /**
+   * The saved fields do not refer to each other, so when the schema turns the
+   * blob down, the fields that still parse are kept instead of every field
+   * falling back to its default. See `createMergeWithSchema`.
+   */
+  independentFields?: boolean;
 }
 
 /**
@@ -165,19 +171,19 @@ export function persistConfig<TFull, TPartial>(
   const reported = reportFailedSaves(logKey, storage);
   const guard =
     opts.preserveUnreadable === false ? null : guardUnreadable(opts.name, logKey, reported);
-  const mergeWithSchema = createMergeWithSchema(logKey, opts.schema);
+  // A turned-down blob is copied aside before the next save, whether or not
+  // some of its fields were kept.
+  const mergeWithSchema = createMergeWithSchema(logKey, opts.schema, {
+    independentFields: opts.independentFields,
+    onRejected: () => guard?.reject(),
+  });
   return {
     name: opts.name,
     storage: createJSONStorage(() => guard?.storage ?? reported),
     version,
     partialize: opts.partialize,
     migrate,
-    merge: (persisted, current) => {
-      const merged = mergeWithSchema(persisted, current);
-      // The schema merge hands back `current` itself when it turns a blob down.
-      if (persisted && typeof persisted === 'object' && merged === current) guard?.reject();
-      return merged;
-    },
+    merge: mergeWithSchema,
     onRehydrateStorage: () => {
       markHydrationStarted(opts.name);
       return (state, error) => {
