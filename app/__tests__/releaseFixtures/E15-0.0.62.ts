@@ -509,6 +509,14 @@ export const fixture: ReleaseFixture = {
         path: ['hasSeenOnboarding'],
         equals: true,
       },
+      // This release had no wallet lifecycle record. The stamp migration writes one for an
+      // install that finished onboarding, so the restore gate lets it through.
+      {
+        what: 'that no restore is needed',
+        store: 'wallet-lifecycle',
+        path: ['restoreStatus'],
+        equals: 'not-needed',
+      },
       {
         what: 'the display currency',
         store: 'settings-store',

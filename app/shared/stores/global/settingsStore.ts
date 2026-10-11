@@ -500,6 +500,16 @@ export const useSettingsStore = create<SettingsStore>({ name: 'settings-store', 
             mockFailMelt: false,
             mockFailPaymentRequest: false,
             mockNoGlass: false,
+            // Releases up to 0.0.61 had no onboarding flag: accepting the terms
+            // was all of onboarding, and their blobs never carry the key. Every
+            // release since saves it, true or false. Read as "not seen", such
+            // an install is shown the onboarding screens, or taken for a
+            // reinstall and offered a restore. This is the one point where the
+            // old blob can still be told apart: the save after this adds the key.
+            ...(!Object.keys(persisted).includes('hasSeenOnboarding') &&
+            persisted.termsAccepted?.termsAccepted === true
+              ? { hasSeenOnboarding: true }
+              : {}),
             // `avatarFallbackVariant` (the removed avatar-style picker enum) is
             // deliberately absent here: old blobs of any version still carry
             // the key, the plain `z.object` in `merge` strips unknown keys, and

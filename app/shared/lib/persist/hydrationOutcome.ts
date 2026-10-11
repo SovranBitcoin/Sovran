@@ -46,13 +46,19 @@ export function hydrationSettled(store: PersistedStore): Promise<boolean> {
 
 /**
  * Waits for stores the app cannot start without, reading again any that failed
- * last time. Throws when one still cannot be read, so the caller can stop on a
- * screen with a retry instead of starting on defaults.
+ * last time and any whose row has changed on disk since the store loaded (a
+ * migration wrote it). Throws when one still cannot be read, so the caller can
+ * stop on a screen with a retry instead of starting on defaults.
  */
-export async function loadRequiredStores(stores: readonly PersistedStore[]): Promise<void> {
+export async function loadRequiredStores(
+  stores: readonly PersistedStore[],
+  changedOnDisk: ReadonlySet<string> = new Set()
+): Promise<void> {
   for (const store of stores) {
     const name = store.persist.getOptions().name ?? '';
-    if (failed.has(name)) void store.persist.rehydrate();
+    // `rehydrate` marks the store as not loaded before it returns, so the wait
+    // below is for this read and not the earlier one.
+    if (failed.has(name) || changedOnDisk.has(name)) void store.persist.rehydrate();
   }
   const loaded = await Promise.all(stores.map(hydrationSettled));
   const unread = stores

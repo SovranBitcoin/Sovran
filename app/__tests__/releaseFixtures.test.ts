@@ -201,9 +201,9 @@ async function launch(fixture: ReleaseFixture): Promise<Launch> {
   const storeFiles = storeRegistryManifest.filter((e) => e.persisted).map((e) => e.file);
   for (const file of new Set(storeFiles)) require(`@/${file.replace(/\.tsx?$/, '')}`);
 
-  const { runGlobalMigrations } =
-    require('@/shared/lib/migrations/globalMigrations') as typeof import('@/shared/lib/migrations/globalMigrations');
-  const { hydrationSettled, loadRequiredStores } =
+  const { migrateThenLoad } =
+    require('@/shared/lib/migrations/migrateThenLoad') as typeof import('@/shared/lib/migrations/migrateThenLoad');
+  const { hydrationSettled } =
     require('@/shared/lib/persist/hydrationOutcome') as typeof import('@/shared/lib/persist/hydrationOutcome');
   const { signalMigrationsComplete } =
     require('@/shared/lib/cashu/profileScopedStorage') as typeof import('@/shared/lib/cashu/profileScopedStorage');
@@ -215,10 +215,6 @@ async function launch(fixture: ReleaseFixture): Promise<Launch> {
     require('@/shared/lib/profile/inProcessProfileSwitch') as typeof import('@/shared/lib/profile/inProcessProfileSwitch');
   const { useProfileStore } =
     require('@/shared/stores/global/profileStore') as typeof import('@/shared/stores/global/profileStore');
-  const { useSettingsStore } =
-    require('@/shared/stores/global/settingsStore') as typeof import('@/shared/stores/global/settingsStore');
-  const { useWalletLifecycleStore } =
-    require('@/shared/stores/global/walletLifecycleStore') as typeof import('@/shared/stores/global/walletLifecycleStore');
   const { ensureMnemonicExists, retrieveMnemonic } =
     require('@/shared/lib/nostr/secureStorage') as typeof import('@/shared/lib/nostr/secureStorage');
   const { loadAccountKeys } =
@@ -229,12 +225,8 @@ async function launch(fixture: ReleaseFixture): Promise<Launch> {
     require('@/shared/stores/runtime/secureStoreState') as typeof import('@/shared/stores/runtime/secureStoreState');
 
   // 1. `GlobalMigrationGate`: migrate, load the three required stores, open
-  //    per-account storage (shared/blocks/GlobalMigrationGate.tsx, migrateThenLoad).
-  await withTimeout('global migrations', runGlobalMigrations());
-  await withTimeout(
-    'required stores',
-    loadRequiredStores([useProfileStore, useSettingsStore, useWalletLifecycleStore])
-  );
+  //    per-account storage (shared/blocks/GlobalMigrationGate.tsx).
+  await withTimeout('global migrations and required stores', migrateThenLoad());
   signalMigrationsComplete();
 
   // 2. Every persisted store finishes reading its saved data.
@@ -418,35 +410,16 @@ describe.each(
 
   afterAll(() => quieted.forEach((spy) => spy.mockRestore()));
 
-  // Known gap F99. An install with no account list has no key to file Routstr
-  // under until the keys provider adds account 0, and nothing loads the store
-  // again in that session: it stays unread and refuses to save until the next
-  // launch. Everywhere below, exactly that is set aside for the first launch
-  // of such an install, and the test after this comment pins it.
-  const noAccountList = !('profile-store' in fixture.asyncStorage);
-  const routstrWaits = (n: number) => noAccountList && n === 0;
-  const unread = (each: Launch, n: number) =>
-    each.unreadStores.filter((name) => !(routstrWaits(n) && name === 'routstr-store'));
-  const rejected = (each: Launch, n: number) =>
-    each.rejections.filter((event) => !(routstrWaits(n) && event.startsWith('store.routstr.')));
-
-  if (noAccountList) {
-    it.failing('loads the Routstr store on the first launch [known gap F99]', () => {
-      expect(launches).toHaveLength(3);
-      expect(launches[0].unreadStores).toEqual([]);
-    });
-  }
-
   it('starts, three times over, without stopping on a failure or recovery screen', () => {
     expect({ error: startupError, rejections: startupRejections }).toEqual({
       error: undefined,
       rejections: [],
     });
     expect(launches).toHaveLength(3);
-    launches.forEach((each, n) => {
-      expect(unread(each, n)).toEqual([]);
+    for (const each of launches) {
+      expect(each.unreadStores).toEqual([]);
       expect(each.secureStoreState).toBe('available');
-    });
+    }
   });
 
   it('keeps the phrase and makes no new one', () => {
@@ -472,18 +445,15 @@ describe.each(
     for (const fact of survives.facts) {
       check(fact.what)(title(fact.what), () => {
         expect(launches).toHaveLength(3);
-        launches.forEach((each, n) => {
-          if (routstrWaits(n) && fact.store === 'routstr-store') return;
-          expect(each.facts[fact.what]).toEqual(fact.equals);
-        });
+        for (const each of launches) expect(each.facts[fact.what]).toEqual(fact.equals);
       });
     }
   }
 
   it('turns down no saved blob and sets none aside as unreadable', () => {
     expect(launches).toHaveLength(3);
-    for (const [n, each] of launches.entries()) {
-      expect(rejected(each, n)).toEqual([]);
+    for (const each of launches) {
+      expect(each.rejections).toEqual([]);
       const keys = [...Object.keys(each.disk.asyncStorage), ...Object.keys(each.disk.secureStore)];
       expect(keys.filter((key) => key.includes(':unreadable'))).toEqual([]);
     }
@@ -492,13 +462,9 @@ describe.each(
   it('loads no store that held data as its defaults', () => {
     expect(launches).toHaveLength(3);
     const accepted = fixture.knownGaps.map((known) => known.what);
-    const lost = (each: Launch, n: number) =>
-      each.defaultedRows.filter(
-        (row) =>
-          !accepted.some((what) => row.startsWith(`${what} `)) &&
-          !(routstrWaits(n) && row.startsWith('routstr-store '))
-      );
-    launches.forEach((each, n) => expect(lost(each, n)).toEqual([]));
+    const lost = (each: Launch) =>
+      each.defaultedRows.filter((row) => !accepted.some((what) => row.startsWith(`${what} `)));
+    for (const each of launches) expect(lost(each)).toEqual([]);
   });
 
   it('deletes nothing the fixture says must be kept', () => {

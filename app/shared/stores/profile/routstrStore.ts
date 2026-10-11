@@ -916,14 +916,29 @@ function saveOnlyAfterAcceptedLoad(storage: StateStorage) {
   // unseen. The adapter refuses a save over a blob it never read.
   let load: 'accepted' | 'pending' | 'rejected' = 'accepted';
   let refusalLogged = false;
+  /**
+   * A save arrived while a load was in flight. It cannot be written yet: the
+   * load may be turned down, and then it would be a save of defaults. It must
+   * not be lost either, since it may carry a key paid for a moment ago. If the
+   * load is accepted, the store is saved once more, as it then stands.
+   *
+   * An account switch never sets this. Its write barrier drops saves before
+   * they reach here, on purpose: what is set mid-switch belongs to no account.
+   */
+  let savedDuringLoad = false;
   const gated: StateStorage = {
     getItem: (name) => {
       load = 'pending';
       refusalLogged = false;
+      savedDuringLoad = false;
       return storage.getItem(name);
     },
     setItem: (name, value) => {
       if (load === 'accepted') return storage.setItem(name, value);
+      if (load === 'pending') {
+        savedDuringLoad = true;
+        return;
+      }
       if (!refusalLogged) {
         refusalLogged = true;
         storeLog.warn('store.routstr.write_refused', { reason: `load_${load}` });
@@ -933,16 +948,78 @@ function saveOnlyAfterAcceptedLoad(storage: StateStorage) {
   };
   return {
     storage: gated,
-    /** Wraps `merge`, the one place that learns whether the blob was accepted. */
-    watching<S>(merge: Merge<S>): Merge<S> {
+    /**
+     * Wraps `merge`, the one place that learns whether the blob was accepted.
+     * `keep` is given the loaded state and the state from before it, when a
+     * save was held back during the load, to carry over what must survive.
+     */
+    watching<S>(merge: Merge<S>, keep: (loaded: S, before: S) => S): Merge<S> {
       return (persisted, current) => {
         const merged = merge(persisted, current);
         // The schema merge hands back `current` itself when it turns a blob down.
         const turnedDown = isRecord(persisted) && merged === current;
         load = turnedDown ? 'rejected' : 'accepted';
-        return merged;
+        return !turnedDown && savedDuringLoad && merged !== current
+          ? keep(merged, current)
+          : merged;
       };
     },
+    /** The load threw. Nothing was read, so nothing may be saved over it. */
+    loadFailed() {
+      load = 'rejected';
+    },
+    /** True once, after an accepted load during which a save was held back. */
+    takeSaveOwed(): boolean {
+      const owed = load === 'accepted' && savedDuringLoad;
+      savedDuringLoad = false;
+      return owed;
+    },
+  };
+}
+
+/**
+ * What survives from the state the store held while a load was in flight.
+ *
+ * The stored blob wins for everything it holds, as in any load: it is the
+ * account's history, and the state before it was defaults plus seconds of use.
+ * Credentials are the exception, because each one is the only route to money
+ * already paid. A key or a recovery token set during the load and missing from
+ * the blob is kept. The stored key stays the live one; a key set during the
+ * load becomes live only if the blob had none, and is otherwise archived,
+ * where reclaim can reach it.
+ */
+function keepCredentialsSetDuringLoad(loaded: RoutstrStore, before: RoutstrStore): RoutstrStore {
+  let legacyAccounts = loaded.legacyAccounts ?? {};
+  for (const account of Object.values(before.legacyAccounts ?? {})) {
+    legacyAccounts = withArchivedAccount(
+      legacyAccounts,
+      account.nodeBaseUrl ?? null,
+      account.apiKey,
+      account.lastKnownBalanceMsats ?? null
+    );
+  }
+  const kept: RoutstrStore = {
+    ...loaded,
+    legacyAccounts,
+    pendingPayments: { ...before.pendingPayments, ...loaded.pendingPayments },
+  };
+  if (!before.apiKey || before.apiKey === loaded.apiKey) return kept;
+  if (loaded.apiKey === null) {
+    return {
+      ...kept,
+      apiKey: before.apiKey,
+      balance: before.balance,
+      nodeBaseUrl: before.nodeBaseUrl ?? loaded.nodeBaseUrl,
+    };
+  }
+  return {
+    ...kept,
+    legacyAccounts: withArchivedAccount(
+      legacyAccounts,
+      before.nodeBaseUrl,
+      before.apiKey,
+      before.balance
+    ),
   };
 }
 
@@ -1059,7 +1136,13 @@ const PersistedRoutstrStore = z.object({
     .catch(null),
 });
 
-const acceptedLoad = saveOnlyAfterAcceptedLoad(createRoutstrPersistence());
+const acceptedLoad = saveOnlyAfterAcceptedLoad(
+  createRoutstrPersistence({
+    // On a first launch the store loads before account 0 has its row and finds
+    // nothing. This is the same reload an account switch does.
+    onFirstAccount: () => void useRoutstrStore.persist.rehydrate(),
+  })
+);
 
 export const useRoutstrStore = create<RoutstrStore>({ name: 'routstr-store', scope: 'profile' })(
   persist(
@@ -1679,7 +1762,8 @@ export const useRoutstrStore = create<RoutstrStore>({ name: 'routstr-store', sco
         confirmSpend: state.confirmSpend,
         curatedModels: state.curatedModels,
       }),
-      afterHydrate: (state) => {
+      afterHydrate: (state, error) => {
+        if (error) acceptedLoad.loadFailed();
         if (!state) return;
         // `knownProviders` is derived and never persisted, so a rehydrated
         // store has claims and no rows until this runs. Done here rather than
@@ -1756,5 +1840,13 @@ export const useRoutstrStore = create<RoutstrStore>({ name: 'routstr-store', sco
 // store would stop saving, which the upgrade tests would catch.
 const schemaMerge = useRoutstrStore.persist.getOptions().merge;
 if (schemaMerge) {
-  useRoutstrStore.persist.setOptions({ merge: acceptedLoad.watching(schemaMerge) });
+  useRoutstrStore.persist.setOptions({
+    merge: acceptedLoad.watching(schemaMerge, keepCredentialsSetDuringLoad),
+  });
 }
+// A save held back during a load that was then accepted: save now, once, what
+// the store holds after the load. Otherwise a key paid for in that window
+// would live in memory only, until some later change happened to save it.
+useRoutstrStore.persist.onFinishHydration(() => {
+  if (acceptedLoad.takeSaveOwed()) useRoutstrStore.setState({});
+});

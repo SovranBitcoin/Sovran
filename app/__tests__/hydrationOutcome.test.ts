@@ -137,4 +137,18 @@ describe('hydration outcome of a real persisted store', () => {
     await expect(loadRequiredStores([store])).resolves.toBeUndefined();
     expect(store.getState().count).toBe(7);
   });
+
+  it('reads a loaded store again when its row has changed on disk since', async () => {
+    const disk = new Map<string, string>();
+    const store = mount('outcome-real-rewritten', disk, { fails: false });
+    await expect(hydrationSettled(store)).resolves.toBe(true);
+    // A migration writes the row after the store has loaded nothing.
+    disk.set('outcome-real-rewritten', '{"state":{"count":9},"version":1}');
+
+    await loadRequiredStores([store]);
+    expect(store.getState().count).toBe(0);
+
+    await loadRequiredStores([store], new Set(['outcome-real-rewritten']));
+    expect(store.getState().count).toBe(9);
+  });
 });

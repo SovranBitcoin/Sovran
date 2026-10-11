@@ -330,3 +330,51 @@ it.each([undefined, false, true, 'invalid'])(
     expect(store.getState().vertexCreditsEnabled).toBe(typeof value === 'boolean' ? value : true);
   }
 );
+
+describe('onboarding flag for an install from before it existed', () => {
+  // 0.0.61 and earlier: accepting the terms was all of onboarding, and the
+  // blob has no `hasSeenOnboarding` key (stores/settingsStore.ts:386@a838d5bc3).
+  const accepted = { termsAccepted: true, date: '2025-03-02T10:00:00.000Z' };
+
+  beforeEach(() => {
+    jest.resetModules();
+    for (const k of Object.keys(mockMemory)) delete mockMemory[k];
+  });
+
+  it('reads accepted terms with no flag as onboarding seen, and saves it', async () => {
+    preload({ termsAccepted: accepted, displayCurrency: 'gbp' }, 0);
+
+    const store = await loadStore();
+
+    expect(store.getState().hasSeenOnboarding).toBe(true);
+    expect(store.getState().termsAccepted).toEqual(accepted);
+    expect(store.getState().displayCurrency).toBe('gbp');
+    const saved = JSON.parse(mockMemory[STORAGE_KEY]) as { state: Record<string, unknown> };
+    expect(saved.state.hasSeenOnboarding).toBe(true);
+  });
+
+  it('leaves the flag unseen when the terms were never accepted', async () => {
+    preload({ termsAccepted: null }, 0);
+
+    const store = await loadStore();
+
+    expect(store.getState().hasSeenOnboarding).toBe(false);
+  });
+
+  it('keeps a saved "not seen": a release with the flag wrote it', async () => {
+    preload({ termsAccepted: accepted, hasSeenOnboarding: false }, 0);
+
+    const store = await loadStore();
+
+    expect(store.getState().hasSeenOnboarding).toBe(false);
+  });
+
+  it('does not add the flag to a blob this version wrote', async () => {
+    // A version 4 blob never reaches `migrate`; one without the key keeps the default.
+    preload({ termsAccepted: accepted }, 4);
+
+    const store = await loadStore();
+
+    expect(store.getState().hasSeenOnboarding).toBe(false);
+  });
+});

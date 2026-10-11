@@ -1,5 +1,8 @@
 /** @jest-environment node */
-import { runGlobalMigrations } from '@/shared/lib/migrations/globalMigrations';
+import {
+  globalRowsWrittenByMigrations,
+  runGlobalMigrations,
+} from '@/shared/lib/migrations/globalMigrations';
 
 type StorageMap = Record<string, string>;
 let mockStorage: StorageMap = {};
@@ -59,3 +62,71 @@ it.each(['pending', 'in-progress', 'failed', 'complete'])(
     expect(after['wallet-lifecycle']).toBe(recorded);
   }
 );
+
+describe('an install from before the onboarding flag (0.0.61 and earlier)', () => {
+  // stores/settingsStore.ts:386@a838d5bc3: the accepted terms, and no `hasSeenOnboarding` key.
+  const accepted = { termsAccepted: true, date: '2025-03-02T10:00:00.000Z' };
+  const settings = (state: Record<string, unknown>, version = 0) =>
+    JSON.stringify({ state: { language: 'en', ...state }, version });
+
+  it('is stamped from its accepted terms, and its settings are left as they were', async () => {
+    const saved = settings({ termsAccepted: accepted });
+
+    const after = await runStamp({ 'settings-store': saved });
+
+    const stamped = JSON.parse(after['wallet-lifecycle']!).state;
+    expect(typeof stamped.seedCreatedAt).toBe('number');
+    expect(stamped.restoreStatus).toBe('not-needed');
+    // The flag is the settings store's to add, in its own `migrate`.
+    expect(after['settings-store']).toBe(saved);
+  });
+
+  it('reports the lifecycle row as written, for the caller to load again', async () => {
+    await runStamp({ 'settings-store': settings({ termsAccepted: accepted }) });
+
+    expect([...globalRowsWrittenByMigrations()]).toContain('wallet-lifecycle');
+  });
+
+  it('is not stamped when the terms were never accepted', async () => {
+    const after = await runStamp({ 'settings-store': settings({ termsAccepted: null }) });
+
+    expect(after['wallet-lifecycle']).toBeUndefined();
+  });
+
+  it('is left alone when a restore has already been asked for', async () => {
+    const recorded = lifecycle({ seedCreatedAt: null, restoreStatus: 'pending' });
+
+    const after = await runStamp({
+      'settings-store': settings({ termsAccepted: accepted }),
+      'wallet-lifecycle': recorded,
+    });
+
+    expect(after['wallet-lifecycle']).toBe(recorded);
+  });
+});
+
+describe('an install that is not an existing wallet', () => {
+  it('writes nothing for a reinstall: the keychain survived and storage is empty', async () => {
+    const after = await runStamp({});
+
+    expect(after['wallet-lifecycle']).toBeUndefined();
+    expect(after['settings-store']).toBeUndefined();
+  });
+
+  it('does not stamp a release with the flag that accepted the terms and has not finished onboarding', async () => {
+    // 0.0.62 on always saves the key. This is a new install part-way through
+    // setup, or a reinstall the gate has yet to send to restore.
+    const midSetup = JSON.stringify({
+      state: {
+        termsAccepted: { termsAccepted: true, date: '2026-01-01T00:00:00.000Z' },
+        hasSeenOnboarding: false,
+      },
+      version: 4,
+    });
+
+    const after = await runStamp({ 'settings-store': midSetup });
+
+    expect(after['wallet-lifecycle']).toBeUndefined();
+    expect(after['settings-store']).toBe(midSetup);
+  });
+});

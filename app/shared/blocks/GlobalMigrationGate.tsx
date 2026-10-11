@@ -1,23 +1,12 @@
 import { ReactNode } from 'react';
 
 import { signalMigrationsComplete } from '@/shared/lib/cashu/profileScopedStorage';
-import { runGlobalMigrations } from '@/shared/lib/migrations/globalMigrations';
-import { loadRequiredStores } from '@/shared/lib/persist/hydrationOutcome';
-import { useProfileStore } from '@/shared/stores/global/profileStore';
-import { useSettingsStore } from '@/shared/stores/global/settingsStore';
-import { useWalletLifecycleStore } from '@/shared/stores/global/walletLifecycleStore';
+import { migrateThenLoad } from '@/shared/lib/migrations/migrateThenLoad';
 import { initLog } from '@/shared/lib/logger';
 import { InitializationGate } from '@/shared/blocks/InitializationGate';
 import { StartupFailedScreen } from '@/shared/blocks/StartupFailedScreen';
 
 initLog('Module', 'GlobalMigrationGate loaded');
-
-const REQUIRED_STORES = [useProfileStore, useSettingsStore, useWalletLifecycleStore];
-
-async function migrateThenLoad(): Promise<void> {
-  await runGlobalMigrations();
-  await loadRequiredStores(REQUIRED_STORES);
-}
 
 interface GlobalMigrationGateProps {
   children: ReactNode;

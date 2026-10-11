@@ -440,14 +440,19 @@ export const fixture: ReleaseFixture = {
         equals: true,
       },
       // This release had no such setting: accepting the terms was the whole of
-      // onboarding (components/blocks/AppGate.tsx:24@a838d5bc3). The current build reads the
-      // missing flag as "not seen", so its migration does not stamp the wallet
-      // lifecycle and its gate takes the install for a reinstall.
+      // onboarding (components/blocks/AppGate.tsx:24@a838d5bc3). The stamp migration takes the
+      // accepted terms as seen, and as a wallet made on this install.
       {
         what: 'that onboarding was seen',
         store: 'settings-store',
         path: ['hasSeenOnboarding'],
         equals: true,
+      },
+      {
+        what: 'that no restore is needed',
+        store: 'wallet-lifecycle',
+        path: ['restoreStatus'],
+        equals: 'not-needed',
       },
       {
         what: 'the display currency',
@@ -655,11 +660,5 @@ export const fixture: ReleaseFixture = {
     keptSecureStore: ['user_mnemonic'],
   },
   defaultRows: [],
-  knownGaps: [
-    {
-      what: 'that onboarding was seen',
-      followUp: 'F100',
-      why: 'These releases had no onboarding flag; accepting the terms was the whole of it, and this build reads the missing flag as not seen.',
-    },
-  ],
+  knownGaps: [],
 };

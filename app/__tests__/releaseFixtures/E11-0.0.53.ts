@@ -324,6 +324,20 @@ export const fixture: ReleaseFixture = {
         path: ['termsAccepted'],
         equals: { termsAccepted: true, date: '2025-06-02T09:30:00.000Z' },
       },
+      // This release had no "onboarding seen" setting: accepting the terms was the whole of
+      // it. The stamp migration takes that as seen and as a wallet made on this install.
+      {
+        what: 'that onboarding was seen',
+        store: 'settings-store',
+        path: ['hasSeenOnboarding'],
+        equals: true,
+      },
+      {
+        what: 'that no restore is needed',
+        store: 'wallet-lifecycle',
+        path: ['restoreStatus'],
+        equals: 'not-needed',
+      },
       {
         what: 'the display currency',
         store: 'settings-store',

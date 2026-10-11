@@ -73,13 +73,39 @@ export function getActiveProfilePubkey(): string | undefined {
   return state.profiles.find((p) => p.accountIndex === state.activeAccountIndex)?.pubkey;
 }
 
+/**
+ * No account has a row yet. This is the first launch of a new install, or of
+ * one from before accounts existed, until the keys provider adds account 0.
+ */
+export class NoProfileYetError extends Error {
+  constructor() {
+    super('Profile storage is not ready');
+    this.name = 'NoProfileYetError';
+  }
+}
+
 /** Capture after migrations/hydration, before starting an owner-bound service. */
 export async function captureProfileStorageOwner(): Promise<string> {
   await _migrationGate;
   await ensureProfileStoreHydrated();
   const pubkey = getActiveProfilePubkey();
-  if (!pubkey) throw new Error('Profile storage is not ready');
+  if (!pubkey) throw new NoProfileYetError();
   return pubkey;
+}
+
+/** Resolves with the active profile's key as soon as there is one. */
+export function profileStorageOwnerAppears(): Promise<string> {
+  return new Promise((resolve) => {
+    const found = () => {
+      const pubkey = getActiveProfilePubkey();
+      if (pubkey) resolve(pubkey);
+      return pubkey !== undefined;
+    };
+    if (found()) return;
+    const stop = useProfileStore.subscribe(() => {
+      if (found()) stop();
+    });
+  });
 }
 
 /**

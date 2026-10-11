@@ -260,9 +260,14 @@ it('writes only the completion marker on a fresh install, without reading the ke
 });
 
 describe('when the phrase cannot be used', () => {
-  // The settings theme is stripped by a later migration; these compare the rest.
+  // Later migrations strip the settings theme and stamp the wallet lifecycle
+  // (the terms were accepted, so this is an existing wallet). These compare the rest.
   const accountData = (storage: StorageMap) => {
-    const { 'settings-store': _settings, ...rest } = withoutMarker(storage);
+    const {
+      'settings-store': _settings,
+      'wallet-lifecycle': _lifecycle,
+      ...rest
+    } = withoutMarker(storage);
     return rest;
   };
 
@@ -280,6 +285,17 @@ describe('when the phrase cannot be used', () => {
     await expect(runGlobalMigrations()).resolves.toBeUndefined();
 
     expect(accountData(mockStorage)).toEqual(accountData(preProfileInstall()));
+    // The stamp does not depend on the phrase: the settings hold accepted
+    // terms from a release with no onboarding flag, so this install made its
+    // wallet. Exactly this record, and no restore decision.
+    expect(JSON.parse(mockStorage['wallet-lifecycle']!)).toEqual({
+      state: {
+        seedCreatedAt: expect.any(Number),
+        restoreStatus: 'not-needed',
+        lastRestoreAt: null,
+      },
+      version: 0,
+    });
     expect(log.warn).toHaveBeenCalledWith('migrations.global.pre_profile.phrase_unavailable', {
       storeCount: Object.keys(MOVED).length,
     });
@@ -295,10 +311,13 @@ describe('when the phrase cannot be used', () => {
     await runGlobalMigrations();
     const afterFailedLaunch = accountData(mockStorage);
     expect(afterFailedLaunch).toEqual(accountData(preProfileInstall()));
+    const stamp = mockStorage['wallet-lifecycle'];
+    expect(JSON.parse(stamp!).state.restoreStatus).toBe('not-needed');
 
     await runGlobalMigrations();
     const scoped = Object.keys(mockStorage).filter((key) => key.includes(':profile:'));
     expect(scoped).toHaveLength(Object.keys(MOVED).length);
+    expect(mockStorage['wallet-lifecycle']).toBe(stamp);
   });
 });
 
