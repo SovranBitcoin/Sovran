@@ -55,6 +55,7 @@ import '@/shared/stores/global/settingsStore';
 import { useMintMetadataStore } from '@/shared/stores/global/mintMetadataStore';
 import '@/shared/stores/global/walletLifecycleStore';
 import '@/shared/stores/global/ctaStore';
+import '@/shared/stores/global/legacyEcashStore';
 import '@/shared/stores/global/wallpaperStore';
 import '@/shared/stores/profile/dataMigrationStore';
 import '@/shared/stores/profile/dmLastMessageStore';

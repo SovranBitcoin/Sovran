@@ -6,6 +6,8 @@ import { CtaScreen } from '@/shared/blocks/CtaScreen';
 import { getLatestVersion } from '@/shared/lib/apiClient';
 import { CtaHost } from '@/shared/blocks/CtaHost';
 import { useCtaStore } from '@/shared/stores/global/ctaStore';
+import { useLegacyEcashStore } from '@/shared/stores/global/legacyEcashStore';
+import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { useWalletLifecycleStore } from '@/shared/stores/global/walletLifecycleStore';
 import { useSettingsHydration, useSettingsStore } from '@/shared/stores/global/settingsStore';
 import {
@@ -20,7 +22,12 @@ const mockReplace = jest.fn();
 const mockPreventRemove = jest.fn();
 const mockSetOptions = jest.fn();
 const mockAddListener = jest.fn((_event: string, _listener: () => void) => jest.fn());
-const mockScreenNavigation = { setOptions: mockSetOptions, addListener: mockAddListener };
+let mockFocused = true;
+const mockScreenNavigation = {
+  setOptions: mockSetOptions,
+  addListener: mockAddListener,
+  isFocused: () => mockFocused,
+};
 
 let mockBalance = 100;
 jest.mock('heroui-native', () => {
@@ -89,8 +96,15 @@ jest.mock('@/shared/ui/primitives/Pressable', () => ({ Pressable: 'Pressable' })
 jest.mock('@/shared/ui/primitives/SelectableCheck', () => ({ SelectableCheck: 'Check' }));
 jest.mock('@/shared/hooks/useThemeColor', () => ({ useThemeColor: () => 'foreground' }));
 jest.mock('@/shared/lib/e2e/E2EAccessibilityProbe', () => ({ E2EAccessibilityProbe: 'Probe' }));
-jest.mock('@/shared/lib/url', () => ({ openExternalUrl: jest.fn() }));
-function HostWithScreen({ id }: { id?: 'update-required' | 'backup-recovery-phrase' }) {
+jest.mock('@/shared/lib/url', () => ({
+  ...jest.requireActual('@/shared/lib/url'),
+  openExternalUrl: jest.fn(),
+}));
+function HostWithScreen({
+  id,
+}: {
+  id?: 'update-required' | 'backup-recovery-phrase' | 'claim-old-ecash';
+}) {
   return (
     <>
       <CtaHost />
@@ -125,6 +139,9 @@ beforeEach(async () => {
     recoveryPhraseVerifiedRevision: null,
   });
   mockNavigation = { key: 'root', routes: [{ name: '(drawer)' }] };
+  mockFocused = true;
+  useLegacyEcashStore.setState(useLegacyEcashStore.getInitialState(), true);
+  useProfileStore.setState({ activeAccountIndex: 0 });
   mockPush.mockClear();
   mockBalance = 100;
   delete process.env.EXPO_PUBLIC_E2E_STATE_MIRROR;
@@ -343,5 +360,116 @@ it('holds an optional update prompt while the prompt flow is open and shows it o
   expect(mockPush).toHaveBeenCalledWith({
     pathname: '/(prompt-flow)/cta',
     params: { id: 'update-required' },
+  });
+});
+
+describe('ecash from before 0.0.45 at a mint the wallet does not trust', () => {
+  const MINT = 'https://mint.example.com';
+  const GROUP = `0|009a1f293253e41e|${MINT}`;
+  const awaitingTrust = {
+    mintUrl: MINT,
+    keysetId: '009a1f293253e41e',
+    profileIndex: 0,
+    accountIndex: 0,
+    unit: 'sat',
+    status: 'awaiting-trust' as const,
+    claimed: 0,
+    spent: 0,
+    inWallet: 0,
+    failed: 0,
+    awaiting: 1234,
+    firstAccountComparison: 'compared' as const,
+    done: [],
+    attempts: 0,
+    nextAttemptAt: 0,
+    lastError: null,
+    claiming: null,
+    updatedAt: 0,
+  };
+  const CTA_ROUTE = { pathname: '/(prompt-flow)/cta', params: { id: 'claim-old-ecash' } };
+  const open = () => {
+    mockNavigation = { key: 'root', routes: [{ name: '(drawer)' }, { name: '(prompt-flow)' }] };
+    return render(<HostWithScreen id="claim-old-ecash" />);
+  };
+  const text = (view: ReturnType<typeof render>) =>
+    view.UNSAFE_getAllByType('Text' as never).map((node) => node.props.children);
+  beforeEach(() => useLegacyEcashStore.getState().writeGroup(GROUP, awaitingTrust));
+
+  it('asks ahead of the backup reminder, and not for another account', () => {
+    render(<HostWithScreen />);
+    expect(mockPush).toHaveBeenCalledTimes(1);
+    expect(mockPush).toHaveBeenCalledWith(CTA_ROUTE);
+  });
+
+  it('does not ask an account the ecash is not claimed into', () => {
+    useProfileStore.setState({ activeAccountIndex: 1 });
+    render(<HostWithScreen />);
+    expect(mockPush).not.toHaveBeenCalledWith(CTA_ROUTE);
+  });
+
+  it('names the mint and the amount, and opens the mint page where it is trusted', () => {
+    const view = open();
+    expect(text(view)).toContain(
+      'Trust mint.example.com to claim 1,234 sats. An earlier version of Sovran received it from this mint, and the mint may keep a small fee. If you decline, it stays on this phone and you can claim it later by adding the mint.'
+    );
+    fireEvent.press(view.UNSAFE_getByProps({ testID: 'cta-primary' }));
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(mint-flow)/info',
+      params: { mintInfoEntry: JSON.stringify({ mintUrl: MINT }) },
+    });
+    expect(useLegacyEcashStore.getState().groups[GROUP].status).toBe('awaiting-trust');
+    expect(useCtaStore.getState().dismissed).toEqual({});
+  });
+
+  it('records a refusal for that mint and does not ask again', async () => {
+    const view = open();
+    fireEvent.press(view.UNSAFE_getByProps({ testID: 'cta-decline' }));
+    expect(mockBack).toHaveBeenCalledTimes(1);
+    expect(useLegacyEcashStore.getState().groups[GROUP].status).toBe('left-unclaimed');
+    expect(useCtaStore.getState().dismissed).toEqual({});
+
+    mockPush.mockClear();
+    mockNavigation = { key: 'root', routes: [{ name: '(drawer)' }] };
+    view.rerender(<HostWithScreen />);
+    await act(async () => {});
+    expect(mockPush).not.toHaveBeenCalledWith(CTA_ROUTE);
+  });
+
+  it('only postpones on Not now, and asks again a day later', async () => {
+    const view = open();
+    fireEvent.press(view.UNSAFE_getByProps({ testID: 'cta-secondary' }));
+    expect(useLegacyEcashStore.getState().groups[GROUP].status).toBe('awaiting-trust');
+    const snoozedAt = useCtaStore.getState().dismissed['claim-old-ecash:snooze'].at;
+
+    mockPush.mockClear();
+    mockNavigation = { key: 'root', routes: [{ name: '(drawer)' }] };
+    view.rerender(<HostWithScreen />);
+    await act(async () => {});
+    expect(mockPush).not.toHaveBeenCalledWith(CTA_ROUTE);
+
+    // A later launch: what is on screen is not kept, the snooze is.
+    jest.spyOn(Date, 'now').mockReturnValue(snoozedAt + 24 * 60 * 60 * 1000);
+    view.unmount();
+    useCtaStore.setState({ activeId: null, closingId: null });
+    mockPush.mockClear();
+    render(<HostWithScreen />);
+    expect(mockPush).toHaveBeenCalledTimes(1);
+    expect(mockPush).toHaveBeenCalledWith(CTA_ROUTE);
+  });
+
+  it('closes itself, without a snooze, once the mint is trusted and it is back on top', async () => {
+    mockFocused = false;
+    const view = open();
+    await act(async () =>
+      useLegacyEcashStore.getState().writeGroup(GROUP, { ...awaitingTrust, status: 'open' })
+    );
+    // The mint page is still on top: going back now would close that instead.
+    expect(mockBack).not.toHaveBeenCalled();
+
+    const onFocus = mockAddListener.mock.calls.find(([event]) => event === 'focus')![1];
+    act(() => onFocus());
+    expect(mockBack).toHaveBeenCalledTimes(1);
+    expect(useCtaStore.getState().dismissed).toEqual({});
+    view.unmount();
   });
 });

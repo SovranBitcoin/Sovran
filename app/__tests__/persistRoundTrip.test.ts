@@ -57,6 +57,7 @@ const STORE_MODULES = [
   '@/shared/stores/global/settingsStore',
   '@/shared/stores/global/walletLifecycleStore',
   '@/shared/stores/global/ctaStore',
+  '@/shared/stores/global/legacyEcashStore',
   '@/shared/stores/global/wallpaperStore',
   '@/shared/stores/profile/dataMigrationStore',
   '@/shared/stores/profile/dmLastMessageStore',

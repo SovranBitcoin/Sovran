@@ -3,6 +3,7 @@ import { useEffect, useState, ReactNode, useRef } from 'react';
 import { CocoCashuProvider } from '@cashu/coco-react';
 import { Manager } from '@cashu/coco-core';
 import { CocoManager } from '@/shared/lib/cashu/manager';
+import { startLegacyEcashClaim } from '@/shared/lib/cashu/legacyEcashClaim';
 import { reclaimRoutstrBalances, recoverPendingPayments } from '@/shared/lib/routstr/reclaim';
 import { sweepUnsettledPayments } from '@/shared/lib/routstr/sdk/client';
 import { reportCocoApiFailure } from '@/shared/lib/cashu/cocoFeedback';
@@ -194,6 +195,9 @@ async function runCocoPhase2({ bgStage, chainManager, isLive }: CocoPhase2Args):
     }
 
     if (!isLive()) return;
+    // Ecash that releases before 0.0.45 stored themselves. Not awaited: it
+    // waits on mints that may be gone, and nothing after it depends on it.
+    void startLegacyEcashClaim(chainManager, isLive);
     bgStage.complete();
     initLog('Coco-bg', 'Phase 2 complete');
     log.info('coco.phase2.done');

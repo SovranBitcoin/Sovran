@@ -233,6 +233,14 @@ export const storeRegistryManifest = [
     profileStorage: false,
   },
   {
+    file: 'shared/stores/global/legacyEcashStore.ts',
+    name: 'legacy-ecash-store',
+    scope: 'global',
+    persisted: true,
+    queryCache: false,
+    profileStorage: false,
+  },
+  {
     file: 'shared/stores/global/mempoolAddressCache.ts',
     name: 'mempool-address-cache',
     scope: 'global',

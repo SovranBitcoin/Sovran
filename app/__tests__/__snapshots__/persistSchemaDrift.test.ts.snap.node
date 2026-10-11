@@ -806,6 +806,420 @@ exports[`persisted schema drift feed-ignore-store schema matches the golden snap
 }
 `;
 
+exports[`persisted schema drift legacy-ecash-store schema matches the golden snapshot for its version: legacy-ecash-store 1`] = `
+{
+  "name": "legacy-ecash-store",
+  "shape": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "groups": {
+          "additionalProperties": {
+            "properties": {
+              "accountIndex": {
+                "maximum": 9007199254740991,
+                "minimum": 0,
+                "type": "integer",
+              },
+              "attempts": {
+                "default": 0,
+                "maximum": 1000000,
+                "minimum": 0,
+                "type": "integer",
+              },
+              "awaiting": {
+                "default": 0,
+                "maximum": 9007199254740991,
+                "minimum": 0,
+                "type": "integer",
+              },
+              "claimed": {
+                "default": 0,
+                "maximum": 9007199254740991,
+                "minimum": 0,
+                "type": "integer",
+              },
+              "claiming": {
+                "anyOf": [
+                  {
+                    "properties": {
+                      "accountIndex": {
+                        "maximum": 9007199254740991,
+                        "minimum": 0,
+                        "type": "integer",
+                      },
+                      "amount": {
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991,
+                        "type": "integer",
+                      },
+                      "operationId": {
+                        "maxLength": 128,
+                        "type": "string",
+                      },
+                      "proofs": {
+                        "items": {
+                          "maxLength": 64,
+                          "type": "string",
+                        },
+                        "maxItems": 1000,
+                        "type": "array",
+                      },
+                    },
+                    "required": [
+                      "operationId",
+                      "accountIndex",
+                      "proofs",
+                      "amount",
+                    ],
+                    "type": "object",
+                  },
+                  {
+                    "type": "null",
+                  },
+                ],
+                "default": null,
+              },
+              "done": {
+                "default": [],
+                "items": {
+                  "maxLength": 64,
+                  "type": "string",
+                },
+                "maxItems": 20000,
+                "type": "array",
+              },
+              "failed": {
+                "default": 0,
+                "maximum": 9007199254740991,
+                "minimum": 0,
+                "type": "integer",
+              },
+              "firstAccountComparison": {
+                "default": "pending",
+                "enum": [
+                  "pending",
+                  "compared",
+                  "no-first-account",
+                ],
+                "type": "string",
+              },
+              "inWallet": {
+                "default": 0,
+                "maximum": 9007199254740991,
+                "minimum": 0,
+                "type": "integer",
+              },
+              "keysetId": {
+                "maxLength": 128,
+                "type": "string",
+              },
+              "lastError": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "transient",
+                      "pending",
+                      "claim-in-flight",
+                      "spent-during-claim",
+                      "keyset-unknown",
+                      "proofs-rejected",
+                      "wallet-refused",
+                    ],
+                    "type": "string",
+                  },
+                  {
+                    "type": "null",
+                  },
+                ],
+                "default": null,
+              },
+              "mintUrl": {
+                "maxLength": 512,
+                "type": "string",
+              },
+              "nextAttemptAt": {
+                "default": 0,
+                "maximum": 9007199254740991,
+                "minimum": 0,
+                "type": "integer",
+              },
+              "profileIndex": {
+                "maximum": 9007199254740991,
+                "minimum": 0,
+                "type": "integer",
+              },
+              "spent": {
+                "default": 0,
+                "maximum": 9007199254740991,
+                "minimum": 0,
+                "type": "integer",
+              },
+              "status": {
+                "default": "open",
+                "enum": [
+                  "open",
+                  "awaiting-trust",
+                  "settled",
+                  "could-not-claim",
+                  "left-unclaimed",
+                ],
+                "type": "string",
+              },
+              "unit": {
+                "anyOf": [
+                  {
+                    "maxLength": 32,
+                    "type": "string",
+                  },
+                  {
+                    "type": "null",
+                  },
+                ],
+                "default": null,
+              },
+              "updatedAt": {
+                "default": 0,
+                "maximum": 9007199254740991,
+                "minimum": 0,
+                "type": "integer",
+              },
+            },
+            "required": [
+              "mintUrl",
+              "keysetId",
+              "profileIndex",
+              "accountIndex",
+            ],
+            "type": "object",
+          },
+          "default": {},
+          "propertyNames": {
+            "type": "string",
+          },
+          "tolerantKey": {
+            "input": {
+              "maxLength": 700,
+              "type": "string",
+            },
+            "output": {
+              "maxLength": 700,
+              "type": "string",
+            },
+          },
+          "type": "object",
+        },
+        "quotes": {
+          "additionalProperties": {
+            "properties": {
+              "amount": {
+                "maximum": 9007199254740991,
+                "minimum": 0,
+                "type": "integer",
+              },
+              "attempts": {
+                "default": 0,
+                "maximum": 1000000,
+                "minimum": 0,
+                "type": "integer",
+              },
+              "mintUrl": {
+                "maxLength": 512,
+                "type": "string",
+              },
+              "nextAttemptAt": {
+                "default": 0,
+                "maximum": 9007199254740991,
+                "minimum": 0,
+                "type": "integer",
+              },
+              "status": {
+                "default": "open",
+                "enum": [
+                  "open",
+                  "nothing-to-claim",
+                  "paid-unclaimed",
+                  "unresolved",
+                ],
+                "type": "string",
+              },
+              "unit": {
+                "maxLength": 32,
+                "type": "string",
+              },
+            },
+            "required": [
+              "mintUrl",
+              "amount",
+              "unit",
+            ],
+            "type": "object",
+          },
+          "default": {},
+          "propertyNames": {
+            "type": "string",
+          },
+          "tolerantKey": {
+            "input": {
+              "maxLength": 64,
+              "type": "string",
+            },
+            "output": {
+              "maxLength": 64,
+              "type": "string",
+            },
+          },
+          "type": "object",
+        },
+        "rowRemoved": {
+          "anyOf": [
+            {
+              "properties": {
+                "at": {
+                  "maximum": 9007199254740991,
+                  "minimum": 0,
+                  "type": "integer",
+                },
+                "claimed": {
+                  "additionalProperties": {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer",
+                  },
+                  "default": {},
+                  "propertyNames": {
+                    "type": "string",
+                  },
+                  "tolerantKey": {
+                    "input": {
+                      "maxLength": 32,
+                      "type": "string",
+                    },
+                    "output": {
+                      "maxLength": 32,
+                      "type": "string",
+                    },
+                  },
+                  "type": "object",
+                },
+                "groups": {
+                  "maximum": 9007199254740991,
+                  "minimum": 0,
+                  "type": "integer",
+                },
+                "inWallet": {
+                  "additionalProperties": {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer",
+                  },
+                  "default": {},
+                  "propertyNames": {
+                    "type": "string",
+                  },
+                  "tolerantKey": {
+                    "input": {
+                      "maxLength": 32,
+                      "type": "string",
+                    },
+                    "output": {
+                      "maxLength": 32,
+                      "type": "string",
+                    },
+                  },
+                  "type": "object",
+                },
+                "spent": {
+                  "additionalProperties": {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer",
+                  },
+                  "default": {},
+                  "propertyNames": {
+                    "type": "string",
+                  },
+                  "tolerantKey": {
+                    "input": {
+                      "maxLength": 32,
+                      "type": "string",
+                    },
+                    "output": {
+                      "maxLength": 32,
+                      "type": "string",
+                    },
+                  },
+                  "type": "object",
+                },
+              },
+              "required": [
+                "at",
+                "groups",
+              ],
+              "type": "object",
+            },
+            {
+              "type": "null",
+            },
+          ],
+          "default": null,
+        },
+      },
+      "type": "object",
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "properties": {
+        "groups": {},
+        "quotes": {},
+        "rowRemoved": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "at": {
+                  "maximum": 9007199254740991,
+                  "minimum": 0,
+                  "type": "integer",
+                },
+                "claimed": {},
+                "groups": {
+                  "maximum": 9007199254740991,
+                  "minimum": 0,
+                  "type": "integer",
+                },
+                "inWallet": {},
+                "spent": {},
+              },
+              "required": [
+                "at",
+                "groups",
+                "claimed",
+                "spent",
+                "inWallet",
+              ],
+              "type": "object",
+            },
+            {
+              "type": "null",
+            },
+          ],
+          "default": null,
+        },
+      },
+      "required": [
+        "groups",
+        "quotes",
+        "rowRemoved",
+      ],
+      "type": "object",
+    },
+  },
+  "version": 1,
+}
+`;
+
 exports[`persisted schema drift mempool-address-cache schema matches the golden snapshot for its version: mempool-address-cache 1`] = `
 {
   "name": "mempool-address-cache",

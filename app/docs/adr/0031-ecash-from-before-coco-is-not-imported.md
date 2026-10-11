@@ -1,7 +1,8 @@
 # 31. Ecash from before Coco is not imported
 
 Date: 2026-10-10
-Status: Accepted.
+Status: Superseded on 2026-10-11 by [ADR 32](0032-ecash-from-before-coco-is-claimed-then-the-row-is-removed.md).
+The old ecash is now claimed and the row is removed once nothing in it is owed.
 
 Builds 0.0.1 to 0.0.40 (iOS, April 2024 to August 2025) kept ecash in one
 redux-persist row, `persist:SOVRAN`. Release 0.0.45 imported that row into Coco;

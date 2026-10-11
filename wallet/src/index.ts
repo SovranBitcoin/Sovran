@@ -658,3 +658,7 @@ export * from "./transport";
 export { disposeReusableQuoteFlights } from "./quotes/reusable";
 export { resetMeltTarget } from "./melt-target";
 export { disposeCashuSeedGetter } from "./wallet-seed";
+
+// Ecash the redux-era releases stored themselves: read from the old row and
+// received through the open wallet.
+export * from "./legacy-ecash";

@@ -1,3 +1,4 @@
+import { oldEcashClaimCopy } from 'copy/prompts';
 import { BACKUP_FLOW_REVISION } from '@/shared/lib/backup/revision';
 import type { CtaDefinition, CtaId } from './types';
 import { isNewerVersion } from './version';
@@ -43,10 +44,28 @@ export const CTA_DEFINITIONS: readonly CtaDefinition[] = [
     content: {
       icon: 'mdi:shield',
       title: 'Back up your wallet',
-      body: (balanceTotalSat) =>
+      body: ({ balanceTotalSat }) =>
         `${balanceTotalSat > 0 ? 'You have money here now. ' : ''}Write down your recovery phrase and check each word to keep a way back to your wallet.`,
       primary: { label: 'Back up now', action: 'back-up' },
       secondary: { label: 'Not now' },
+    },
+  },
+  {
+    id: 'claim-old-ecash',
+    priority: 5,
+    presentation: 'dismissable-modal',
+    // Closing it only postpones it. It returns until the mint is trusted or
+    // the person declines for that mint, which the screen records itself.
+    dismissPolicy: { snoozeMs: DAY_MS },
+    shouldShow: ({ oldEcash, mockMode, lifecycle }) =>
+      oldEcash !== null && !mockMode && lifecycle.restoreStatus !== 'pending',
+    content: {
+      icon: 'mdi:cash-refund',
+      title: oldEcashClaimCopy.title,
+      body: ({ oldEcash }) => oldEcashClaimCopy.body(oldEcash),
+      primary: { label: oldEcashClaimCopy.review, action: 'trust-mint' },
+      secondary: { label: oldEcashClaimCopy.later },
+      decline: { label: oldEcashClaimCopy.decline },
     },
   },
 ];

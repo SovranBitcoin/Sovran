@@ -17,6 +17,7 @@ import { useMintMetadataStore } from '@/shared/stores/global/mintMetadataStore';
 import { useMintTestnutStore } from '@/shared/stores/global/mintTestnutStore';
 import { useRelayMetadataStore } from '@/shared/stores/global/relayMetadataStore';
 import { useCtaStore } from '@/shared/stores/global/ctaStore';
+import { useLegacyEcashStore } from '@/shared/stores/global/legacyEcashStore';
 import { useNostrMetadataCache } from '@/shared/stores/global/nostrMetadataCache';
 import { usePricelistStore } from '@/shared/stores/global/pricelistStore';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
@@ -80,6 +81,7 @@ export const E2E_STORE_MANIFEST: Record<string, MirrorableStore> = {
   'global/profileStore': useProfileStore,
   'global/settingsStore': useSettingsStore,
   'global/ctaStore': useCtaStore,
+  'global/legacyEcashStore': useLegacyEcashStore,
   'global/walletLifecycleStore': useWalletLifecycleStore,
   'global/wallpaperStore': useWallpaperStore,
   'profile/dataMigrationStore': useDataMigrationStore,

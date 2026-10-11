@@ -1,5 +1,5 @@
 import { useColadaBalance } from 'wallet/react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { BackHandler } from 'react-native';
 import { useNavigation } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
@@ -15,8 +15,13 @@ import { ControlField, Label } from 'heroui-native';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { E2EAccessibilityProbe } from '@/shared/lib/e2e/E2EAccessibilityProbe';
 import { CTA_DEFINITIONS } from '@/shared/lib/cta/definitions';
-import type { CtaId } from '@/shared/lib/cta/types';
+import type { CtaBodyView, CtaDefinition, CtaId } from '@/shared/lib/cta/types';
 import { useCtaStore } from '@/shared/stores/global/ctaStore';
+import { legacyClaimPrompt, useLegacyEcashStore } from '@/shared/stores/global/legacyEcashStore';
+import { useCachedMintMetadata } from '@/shared/stores/global/mintMetadataStore';
+import { useProfileStore } from '@/shared/stores/global/profileStore';
+import { describeLegacyClaim } from '@/shared/lib/cta/oldEcashPrompt';
+import { buildMintInfoHref } from '@/shared/lib/nav/mintInfoRoutes';
 
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { openExternalUrl } from '@/shared/lib/url';
@@ -26,7 +31,6 @@ export function CtaScreen({ id }: { id: CtaId }) {
   const cta = CTA_DEFINITIONS.find((definition) => definition.id === id)!;
   const balance = useColadaBalance('sat');
   const navigation = useNavigation();
-  const foreground = useThemeColor('foreground');
   const previewOverride = useCtaStore((s) => s.previewOverride);
   const preview = previewOverride === id;
   const closing = useCtaStore((s) => s.closingId === id);
@@ -38,6 +42,11 @@ export function CtaScreen({ id }: { id: CtaId }) {
   const dismissalHandled = useRef(false);
   const removalRequested = useRef(false);
   const [updateError, setUpdateError] = useState(false);
+  const accountIndex = useProfileStore((s) => s.activeAccountIndex);
+  const legacyGroups = useLegacyEcashStore((s) => s.groups);
+  const claim = id === 'claim-old-ecash' ? legacyClaimPrompt(legacyGroups, accountIndex) : null;
+  const claimMintName = useCachedMintMetadata(claim?.mintUrl)?.displayName;
+  const claimSettled = id === 'claim-old-ecash' && !preview && claim === null;
   const blocking = cta.presentation === 'blocking-modal' && !exitingPreview && !closing;
   usePreventRemove(blocking, () => {});
   useEffect(() => {
@@ -69,6 +78,28 @@ export function CtaScreen({ id }: { id: CtaId }) {
       }
     });
   }, [cta.presentation, navigation, id, dontAsk, triggerVersion, closing, preview]);
+  useEffect(() => {
+    if (!claimSettled) return;
+    // The mint was trusted from the page this prompt opened, so there is
+    // nothing left to ask. Wait until this page is the one on top: going back
+    // earlier would close the mint page instead.
+    const close = () => {
+      if (removalRequested.current) return;
+      dismissalHandled.current = true;
+      removalRequested.current = true;
+      router.back();
+    };
+    if (navigation.isFocused()) return close();
+    return navigation.addListener('focus', close);
+  }, [claimSettled, navigation]);
+  const decline = () => {
+    if (dismissalHandled.current) return;
+    dismissalHandled.current = true;
+    removalRequested.current = true;
+    if (claim && !preview)
+      useLegacyEcashStore.getState().leaveUnclaimed(claim.mintUrl, accountIndex);
+    router.back();
+  };
   const dismiss = () => {
     if (dismissalHandled.current) return;
     dismissalHandled.current = true;
@@ -82,6 +113,12 @@ export function CtaScreen({ id }: { id: CtaId }) {
       setUpdateError(result.isErr());
       return;
     }
+    if (cta.content.primary.action === 'trust-mint') {
+      // The mint's own page is where a mint is added and trusted. This prompt
+      // stays underneath and closes itself once the mint is trusted.
+      if (claim) router.push(buildMintInfoHref(claim.mintUrl, { displayName: claimMintName }));
+      return;
+    }
     // Starting the backup is never a dismissal; the intro is the next page of
     // this same prompt flow, so it simply pushes.
     dismissalHandled.current = true;
@@ -89,31 +126,28 @@ export function CtaScreen({ id }: { id: CtaId }) {
     router.push('/(prompt-flow)/backup-intro');
   };
   return (
-    <Screen
-      name="CtaScreen"
-      scroll="custom"
-      safeArea
-      deferContent={false}
-      footer={
-        <BottomButtons>
-          <Button testID="cta-primary" text={cta.content.primary.label} onPress={primary} />
-          {!blocking && cta.content.secondary && (
-            <Button
-              testID="cta-secondary"
-              variant="secondary"
-              text={cta.content.secondary.label}
-              onPress={dismiss}
-            />
-          )}
-          {preview && (
+    <CtaView
+      cta={cta}
+      blocking={blocking}
+      body={{
+        balanceTotalSat: balance.total,
+        oldEcash: claim && describeLegacyClaim(claim, claimMintName),
+      }}
+      updateError={updateError}
+      dontAsk={dontAsk}
+      onDontAskChange={setDontAsk}
+      onPrimary={primary}
+      onDismiss={dismiss}
+      onDecline={decline}
+      footerEnd={
+        preview && (
+          <>
             <Button
               testID="cta-preview-back"
               variant="underline"
               text="Back"
               onPress={() => router.back()}
             />
-          )}
-          {preview && (
             <Button
               testID="cta-preview-close"
               variant="underline"
@@ -123,7 +157,92 @@ export function CtaScreen({ id }: { id: CtaId }) {
                 else router.back();
               }}
             />
+          </>
+        )
+      }>
+      {preview && (
+        <E2EAccessibilityProbe
+          testID={permanentlyDismissed ? 'cta-dismissed-yes' : 'cta-dismissed-no'}
+          accessibilityLabel="Reminder dismissed permanently"
+          value={permanentlyDismissed ? '1' : '0'}
+        />
+      )}
+      {claim && (
+        <E2EAccessibilityProbe
+          testID="cta-claim-mint"
+          accessibilityLabel="Mint holding old ecash"
+          value={claim.mintUrl}
+        />
+      )}
+      <E2EAccessibilityProbe
+        testID="cta-active"
+        accessibilityLabel="Active call to action"
+        value={id}
+      />
+    </CtaView>
+  );
+}
+
+/**
+ * The prompt as drawn, from props alone: it reads no store and navigates
+ * nowhere. `CtaScreen` supplies live state and the real actions; the design
+ * system supplies sample data and handlers that change nothing.
+ */
+export function CtaView({
+  cta,
+  blocking,
+  body,
+  updateError,
+  dontAsk,
+  onDontAskChange,
+  onPrimary,
+  onDismiss,
+  onDecline,
+  footerEnd,
+  children,
+}: {
+  cta: CtaDefinition;
+  /** A blocking prompt draws no way out. */
+  blocking: boolean;
+  body: CtaBodyView;
+  updateError: boolean;
+  dontAsk: boolean;
+  onDontAskChange: (value: boolean) => void;
+  onPrimary: () => void;
+  onDismiss: () => void;
+  onDecline: () => void;
+  /** Buttons after the prompt's own. */
+  footerEnd?: ReactNode;
+  /** Probes with no visible node. */
+  children?: ReactNode;
+}) {
+  const foreground = useThemeColor('foreground');
+  return (
+    <Screen
+      name="CtaScreen"
+      scroll="custom"
+      safeArea
+      deferContent={false}
+      footer={
+        <BottomButtons>
+          <Button testID="cta-primary" text={cta.content.primary.label} onPress={onPrimary} />
+          {!blocking && cta.content.secondary && (
+            <Button
+              testID="cta-secondary"
+              variant="secondary"
+              text={cta.content.secondary.label}
+              onPress={onDismiss}
+            />
           )}
+          {!blocking && cta.content.decline && (
+            <Button
+              testID="cta-decline"
+              variant="underline"
+              text={cta.content.decline.label}
+              onPress={onDecline}
+            />
+          )}
+          {footerEnd}
         </BottomButtons>
       }>
       <ScreenScrollView>
@@ -135,9 +254,7 @@ export function CtaScreen({ id }: { id: CtaId }) {
             {cta.content.title}
           </Text>
           <Text size={16} className="text-foreground/70 text-center">
-            {typeof cta.content.body === 'function'
-              ? cta.content.body(balance.total)
-              : cta.content.body}
+            {typeof cta.content.body === 'function' ? cta.content.body(body) : cta.content.body}
           </Text>
           {updateError && (
             <Text accessibilityRole="alert" className="text-center">
@@ -152,7 +269,7 @@ export function CtaScreen({ id }: { id: CtaId }) {
               accessibilityState={{ checked: dontAsk }}
               accessibilityValue={{ text: dontAsk ? '1' : '0' }}
               isSelected={dontAsk}
-              onSelectedChange={setDontAsk}>
+              onSelectedChange={onDontAskChange}>
               <View className="flex-1">
                 <Label>
                   <Label.Text className="text-sm">Do not ask me again</Label.Text>
@@ -163,18 +280,7 @@ export function CtaScreen({ id }: { id: CtaId }) {
           )}
         </View>
       </ScreenScrollView>
-      {preview && (
-        <E2EAccessibilityProbe
-          testID={permanentlyDismissed ? 'cta-dismissed-yes' : 'cta-dismissed-no'}
-          accessibilityLabel="Reminder dismissed permanently"
-          value={permanentlyDismissed ? '1' : '0'}
-        />
-      )}
-      <E2EAccessibilityProbe
-        testID="cta-active"
-        accessibilityLabel="Active call to action"
-        value={id}
-      />
+      {children}
     </Screen>
   );
 }

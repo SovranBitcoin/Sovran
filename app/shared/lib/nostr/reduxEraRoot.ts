@@ -9,8 +9,9 @@ import { z } from 'zod';
  * 0 into SecureStore and left the row as it was; that migration is gone, so a
  * phone that skipped those releases still has its only copy here.
  *
- * This module only reads. The row also holds the old ecash proofs, which
- * nothing imports, so it is never changed or removed.
+ * This module only reads. The row also holds the old ecash proofs. Those are
+ * claimed by `cashu/legacyEcashClaim`, which removes the row once every proof
+ * is in a wallet or spent and this phrase is the one in SecureStore (ADR 32).
  */
 export const REDUX_ERA_ROW = 'persist:SOVRAN';
 

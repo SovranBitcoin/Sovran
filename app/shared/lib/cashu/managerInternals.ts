@@ -35,6 +35,7 @@ interface ManagerInternals {
   proofRepository: {
     getReservedProofs(): Promise<CoreProof[]>;
     getInflightProofs(mintUrls?: string[]): Promise<CoreProof[]>;
+    getProofsBySecrets(mintUrl: string, secrets: string[]): Promise<CoreProof[]>;
   };
   proofService: {
     getReadyProofs(mintUrl: string): Promise<CoreProof[]>;
@@ -102,6 +103,19 @@ export async function getMintKeysetUnits(manager: Manager, mintUrl: string): Pro
     });
     throw error;
   }
+}
+
+/**
+ * The proofs this wallet stores under any of these secrets, in whatever state.
+ * Local read, no network. Lets the redux-era claim tell a proof an earlier
+ * release already imported from one the wallet has never seen.
+ */
+export function getStoredProofsBySecrets(
+  manager: Manager,
+  mintUrl: string,
+  proofSecrets: string[]
+): Promise<CoreProof[]> {
+  return internals(manager).proofRepository.getProofsBySecrets(mintUrl, proofSecrets);
 }
 
 /** Ready (UNSPENT, unreserved) proofs for one mint, via the private ProofService. */

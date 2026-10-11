@@ -5,6 +5,8 @@ import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import * as Application from 'expo-application';
 import { useColadaBalance } from 'wallet/react';
 import { useCtaStore } from '@/shared/stores/global/ctaStore';
+import { legacyClaimPrompt, useLegacyEcashStore } from '@/shared/stores/global/legacyEcashStore';
+import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useWalletLifecycleStore } from '@/shared/stores/global/walletLifecycleStore';
 import { useLatestVersionFetch } from '@/shared/hooks/useLatestVersionFetch';
@@ -21,6 +23,8 @@ export function CtaHost() {
   );
   const restoreStatus = useWalletLifecycleStore((s) => s.restoreStatus);
   const balance = useColadaBalance('sat');
+  const legacyGroups = useLegacyEcashStore((s) => s.groups);
+  const accountIndex = useProfileStore((s) => s.activeAccountIndex);
   const dismissed = useCtaStore((s) => s.dismissed);
   const activeId = useCtaStore((s) => s.activeId);
   const backupStartedAt = useCtaStore((s) => s.backupStartedAt);
@@ -61,6 +65,7 @@ export function CtaHost() {
         },
         balanceTotalSat: balance.total,
         backupStartedAt,
+        oldEcash: legacyClaimPrompt(legacyGroups, accountIndex),
         dismissed,
         mockMode,
         automation,
@@ -105,6 +110,8 @@ export function CtaHost() {
     restoreStatus,
     balance.total,
     backupStartedAt,
+    legacyGroups,
+    accountIndex,
     dismissed,
     mockMode,
     automation,
