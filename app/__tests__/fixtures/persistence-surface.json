@@ -42,6 +42,7 @@
     "app/shared/lib/cashu/legacyEcashClaim.ts",
     "app/shared/lib/cashu/npc.ts",
     "app/shared/lib/cashu/profileScopedStorage.ts",
+    "app/shared/lib/cashu/walletDatabaseRecord.ts",
     "app/shared/lib/debug/storageInventory.ts",
     "app/shared/lib/migrations/globalMigrations.ts",
     "app/shared/lib/nostr/secureStorage.ts",
