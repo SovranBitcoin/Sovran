@@ -1097,8 +1097,8 @@ interface UsePaymentFlowMachineConfig {
    * Explicit unit override for flows started while this screen is bound
    * (e.g. NearPay pins 'sat'). Omit to use the provider's `getUnit` — the
    * app's live active unit. Do NOT pass the active unit redundantly: the
-   * override is last-binder-wins across mounted screens, so redundant
-   * bindings can clobber each other.
+   * most recently bound screen's pin is the one in force, so a redundant
+   * binding can put a stale unit over a newer screen's.
    */
   unit?: string;
   onOptionDismiss?: () => void;
