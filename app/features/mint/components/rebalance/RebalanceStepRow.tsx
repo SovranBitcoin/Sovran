@@ -41,6 +41,8 @@ export type StepStatus =
   | 'melting'
   | 'verifying'
   | 'routing'
+  /** Sent; the receiving mint has not credited it yet. */
+  | 'settling'
   | 'done'
   | 'failed'
   | 'skipped';

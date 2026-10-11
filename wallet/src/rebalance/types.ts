@@ -102,7 +102,9 @@ export type RebalanceLegStatus =
   | 'failed'
   | 'skipped'
   /** The melt was sent and its outcome is not yet known; coco recovers it later. */
-  | 'paymentPending';
+  | 'paymentPending'
+  /** The melt settled; the destination mint had not issued within the wait. */
+  | 'settling';
 
 /** Structured routing context; the UI formats it for display. */
 export type RebalanceRoutingInfo =
@@ -155,6 +157,12 @@ export type RebalanceTransferOutcome =
   | { status: 'skipped' }
   /** Melt sent, settlement not confirmed in time. Never retried; coco reconciles it. */
   | { status: 'pending'; operationId: string }
+  /**
+   * The melt settled, so the money has left the source mint, but the destination
+   * had not issued within the wait. Never retried; the destination claims its
+   * quote on its own schedule.
+   */
+  | { status: 'settling' }
   | { status: 'failed'; error: unknown }
   /** Run cancelled or superseded; nothing further was published. */
   | { status: 'aborted' }

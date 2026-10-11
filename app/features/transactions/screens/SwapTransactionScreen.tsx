@@ -452,10 +452,13 @@ export function SwapTransactionScreen({ groupId }: Props) {
                               unit: group.unit,
                               type: 'melt' as const,
                               quoteId: leg.meltQuoteId,
+                              // A settling leg's melt was paid; only the destination is outstanding.
                               state:
-                                leg.localStatus === 'done'
+                                leg.localStatus === 'done' || leg.localStatus === 'settling'
                                   ? MeltQuoteState.PAID
-                                  : MeltQuoteState.UNPAID,
+                                  : leg.localStatus === 'paymentPending'
+                                    ? MeltQuoteState.PENDING
+                                    : MeltQuoteState.UNPAID,
                               amount: leg.amount,
                             }) as MeltHistoryEntry)
                           : undefined);

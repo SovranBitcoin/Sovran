@@ -27,6 +27,10 @@ import { setTransactionAnnotation } from '@/shared/stores/profile/transactionAnn
 export const PAYMENT_PENDING_DETAIL =
   'Payment pending. Please wait and reopen later; the app will recover this operation automatically.';
 
+/** Row copy for a transfer whose money has left but has not been seen to arrive. */
+export const SETTLING_DETAIL =
+  'Sent. The receiving mint has not credited it yet; this updates when it does.';
+
 function routingToStepState(routing: RebalanceRoutingInfo | null): Partial<StepState> {
   if (!routing) return { routingDetail: undefined };
   switch (routing.kind) {
@@ -67,6 +71,9 @@ function legUpdateToStepState(update: RebalanceLegUpdate): Partial<StepState> {
     // Still in flight: shown as sending, never as failed or retryable.
     next.status = 'melting';
     next.routingDetail = PAYMENT_PENDING_DETAIL;
+  } else if (update.status === 'settling') {
+    next.status = 'settling';
+    next.routingDetail = SETTLING_DETAIL;
   } else if (update.status) {
     next.status = update.status;
   }
@@ -79,8 +86,6 @@ function toSwapLegStatus(status: RebalanceLegStatus): SwapLegLocalStatus | null 
     case 'routing':
     case 'skipped':
       return null;
-    case 'paymentPending':
-      return 'melting';
     default:
       return status;
   }

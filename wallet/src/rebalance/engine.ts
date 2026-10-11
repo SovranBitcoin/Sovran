@@ -525,9 +525,14 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
         finalReceipt = hop.receipt;
         if (index < hopCount - 1) {
           // Wait for this hop's recipient operation before the next hop spends it.
-          await waitForReceipt(hop.receipt, INTERMEDIATE_RECEIPT_WAIT_MS, run.isActive);
+          const arrived = await waitForReceipt(
+            hop.receipt,
+            INTERMEDIATE_RECEIPT_WAIT_MS,
+            run.isActive
+          );
           if (!run.isActive()) return { status: 'incomplete', finalHopLegId };
-          run.sink.legUpdated(legId, { status: 'done', routing: null });
+          // The next hop still runs: it fails on its own if the money is not there.
+          run.sink.legUpdated(legId, { status: arrived ? 'done' : 'settling', routing: null });
         }
       }
       if (!finalReceipt || !finalHopLegId) return { status: 'incomplete', finalHopLegId };
@@ -849,8 +854,12 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
       if (!isActive()) return { status: 'aborted' };
       if (!recipientFinalized) {
         // The melt settled; the destination claims its quote on its own
-        // schedule, so a slow claim does not undo the transfer.
+        // schedule, so a slow claim does not undo the transfer. It is not
+        // done either: the money has not been seen to arrive.
         log.warn('mint.rebalance.balance_timeout');
+        sink.legUpdated(verifyingLegId, { status: 'settling', routing: null });
+        debug({ event: 'step_settling', stepId: id, amount: transferAmount });
+        return { status: 'settling' };
       }
 
       sink.legUpdated(verifyingLegId, { status: 'done', routing: null });
@@ -913,7 +922,7 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
           isActive: callbacks.isActive,
           sink: callbacks.sinkFor(step),
         });
-        if (outcome.status === 'pending') anyPending = true;
+        if (outcome.status === 'pending' || outcome.status === 'settling') anyPending = true;
         else if (outcome.status !== 'done' && outcome.status !== 'skipped') anyFailed = true;
         callbacks.onTransferSettled?.(step, outcome);
         log.info('swap.leg.complete', {
@@ -922,7 +931,9 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
           status: outcome.status,
         });
         // Space transfers out so the mints are not overwhelmed.
-        if (outcome.status === 'done') await clock.sleep(NEXT_TRANSFER_PAUSE_MS);
+        if (outcome.status === 'done' || outcome.status === 'settling') {
+          await clock.sleep(NEXT_TRANSFER_PAUSE_MS);
+        }
       }
       if (!callbacks.isActive()) return { status: 'aborted' };
       return { status: 'finished', anyFailed, anyPending };

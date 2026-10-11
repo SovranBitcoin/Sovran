@@ -23,7 +23,17 @@ import { tolerantRecord } from '@/shared/lib/persist/tolerant';
 type SwapGroupState = 'running' | 'finished' | 'cancelled';
 
 export type SwapLegLocalStatus =
-  'pending' | 'creatingInvoice' | 'invoiceReady' | 'melting' | 'verifying' | 'done' | 'failed';
+  | 'pending'
+  | 'creatingInvoice'
+  | 'invoiceReady'
+  | 'melting'
+  | 'verifying'
+  /** The melt was sent and its outcome is not yet known. */
+  | 'paymentPending'
+  /** The melt settled; the destination mint has not issued yet. */
+  | 'settling'
+  | 'done'
+  | 'failed';
 
 export interface SwapLeg {
   id: string;
@@ -123,7 +133,17 @@ type SwapTransactionsStore = SwapTransactionsState & SwapTransactionsActions;
 
 // Persisted-shape schema (defensive rehydrate validation).
 const SwapLegLocalStatusSchema = z
-  .enum(['pending', 'creatingInvoice', 'invoiceReady', 'melting', 'verifying', 'done', 'failed'])
+  .enum([
+    'pending',
+    'creatingInvoice',
+    'invoiceReady',
+    'melting',
+    'verifying',
+    'paymentPending',
+    'settling',
+    'done',
+    'failed',
+  ])
   .catch('failed');
 const SwapGroupStateSchema = z.enum(['running', 'finished', 'cancelled']).catch('cancelled');
 

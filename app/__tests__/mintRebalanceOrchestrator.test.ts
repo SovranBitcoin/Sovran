@@ -70,6 +70,7 @@ const mockStatus = {
   setLegSkipped: jest.fn(),
   setLegFailed: jest.fn(),
   complete: jest.fn(),
+  settleUnknown: jest.fn(),
   fail: jest.fn(),
   cancel: jest.fn(),
 };
@@ -254,6 +255,28 @@ test('recipient verification keeps the existing 15-second timeout and never repe
   expect(mockManager.ops.melt.execute).toHaveBeenCalledTimes(1);
   expect(mockRestore).not.toHaveBeenCalled();
   expect(cashuLog.warn).toHaveBeenCalledWith('mint.rebalance.balance_timeout');
+});
+
+test('a destination that has not issued within the wait is settling, never done', async () => {
+  keepRecipientPending();
+  const { result } = mount();
+  await act(async () => result.current.handleStart());
+  await act(async () => {
+    await jest.advanceTimersByTimeAsync(15500);
+  });
+  expect(result.current.runStatus).toBe('finished');
+  expect(result.current.stepStates['step-1']).toMatchObject({
+    status: 'settling',
+    routingDetail: expect.stringContaining('has not credited it yet'),
+  });
+  expect(mockTransactions.setLegStatus).toHaveBeenLastCalledWith(
+    'group-1',
+    'leg-1',
+    expect.objectContaining({ localStatus: 'settling' })
+  );
+  expect(mockStatus.setLegDone).not.toHaveBeenCalled();
+  expect(mockStatus.complete).not.toHaveBeenCalled();
+  expect(mockStatus.settleUnknown).toHaveBeenCalled();
 });
 
 test('a finalized recipient operation with unrecovered-proof error cannot release verification', async () => {

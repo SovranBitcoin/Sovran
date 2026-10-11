@@ -192,7 +192,8 @@ export function useMintRebalanceOrchestrator({
           isActive: () => isRunActive(runId),
           isSettled: (stepId) => {
             const status = stepStatesRef.current[stepId]?.status;
-            return status === 'done' || status === 'skipped';
+            // Settling counts: its money has left, so it must never run again.
+            return status === 'done' || status === 'skipped' || status === 'settling';
           },
           sinkFor,
           // Flip the toast pip to "active" before the transfer starts.

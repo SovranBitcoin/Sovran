@@ -67,17 +67,20 @@ export function computeRebalanceStepCounts(
   let completed = 0;
   let failed = 0;
   let skipped = 0;
+  // Sent and not yet seen to arrive: finished as far as the run goes, not completed.
+  let settling = 0;
   let executing = false;
 
   for (const step of steps) {
     const status = stepStates[step.id]?.status;
     if (status === 'done') completed++;
+    else if (status === 'settling') settling++;
     else if (status === 'failed') failed++;
     else if (status === 'skipped') skipped++;
     else if (status && EXECUTING_STATUSES.has(status)) executing = true;
   }
 
-  const terminal = completed + failed + skipped;
+  const terminal = completed + failed + skipped + settling;
   const counts = {
     completed,
     failed,
