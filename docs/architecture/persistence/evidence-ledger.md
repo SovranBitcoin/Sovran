@@ -8,10 +8,10 @@
   holding 63 test sats was upgraded in place to the candidate; the balance and the history
   carried over (below). The same was then done from **0.1.0**, onto the candidate with every
   fix of this audit in it. 0.1.0 and 0.1.1 are the only Android releases below 0.1.3.
-- Upgrades from **0.1.3 on iOS: PASS on the simulator**, with money. A release build of the
-  0.1.3 source holding 63 test sats was upgraded in place to a release build of the
-  candidate; the balance, the mint and the history carried over (below). A store build on a
-  phone (TestFlight) is still worth one run before release, for the device keychain.
+- Upgrades from **0.1.3 on iOS: PASS on the simulator**, with money, on the current code
+  (`22f7ed8c4`): the balance carried over, no identity mismatch was raised, and an old ecash
+  row planted beforehand was claimed on the device. A store build on a phone (TestFlight) is
+  still worth one run before release, for the device keychain.
 - Upgrades from **0.0.45 to 0.0.63** had three defects that lose data or a paid credential.
   All three are fixed and tested in this run. No real upgrade from those builds was run.
 - Upgrades from **0.0.1 to 0.0.40** (redux era, iOS only) no longer hand the user a new
@@ -67,6 +67,20 @@ sat per swap of up to ten proofs.
 Not exercised live: keyset ids in the 2024 formats (the mint no longer issues them), a proof
 the mint reports pending or rejects, an unreachable mint, a kill between swap and record, old
 invoices, several accounts, Coco's SQLite storage, and any phone.
+
+**Released-source 0.1.3, funded, to a release build of `22f7ed8c4`, with an old ecash row planted, iPhone simulator, 2026-10-11.**
+
+| | |
+| --- | --- |
+| Old | `xcodebuild` Release for the simulator of tag `v0.1.3`, on a simulator whose keychain had been reset; onboarded; a 64 sat test-mint token redeemed (six proofs, 63 sat); test mint trusted |
+| Planted | With the app stopped, a `persist:SOVRAN` row in the shape builds before 0.0.45 wrote was added to the app's AsyncStorage, holding one real, unspent 32 sat proof minted at `testnut.cashu.space` outside any wallet seed. The row held no phrase |
+| New | The same build of `22f7ed8c4`, which includes the identity check, the ecash claim and the fixes for F99 and F100. Installed over the stopped app |
+| After | Opened with no mismatch screen, no restore prompt and no retry screen, to the backup offer. The claim ran by itself: its record shows the one group `settled`, 32 claimed, nothing spent, no failed attempt. The app's `coco.db` went from six proofs summing 63 to eleven summing **94** (63 + 32 less the mint's 1 sat fee) |
+| Second launch | The claim record was byte for byte the same and the wallet still held 94 |
+| The row | Still there, as the rule requires: it held no phrase to match the stored one, so it is not removed |
+| Log | No mismatch, failed load, refused write, failed migration or lost-database line |
+| What this adds | The identity check on iOS over 0.1.3's keychain items and caches; and the ecash claim on a device, against a real mint, through Coco's SQLite storage |
+| Not covered | A real phone; a row from a real 2024 install; removal of the row (needs a row whose phrase is the stored one); the prompt for an untrusted mint on a device |
 
 **The prompts gallery on the emulator, 2026-10-11.** In the same release build the page
 opened at `sovran://design-system-prompts`, listed its entries, and the "Claim your old ecash"
