@@ -838,9 +838,12 @@ export function useMnemonic(autoLoad: boolean = true): UseMnemonicReturn {
 
   useEffect(() => {
     if (!autoLoad) return;
-    // Nobody awaits this read, so a rejection is reported the way every other
-    // failed read is: the secure store locks.
-    refresh().catch(lockMnemonic);
+    // Nobody awaits this read. A keychain failure never rejects: it locks the
+    // secure store inside `retrieveMnemonic`. What can reject is the
+    // development-only seed export, which must not look like locked keys.
+    refresh().catch((error: unknown) => {
+      nostrLog.warn('nostr.secure.mnemonic_autoload_failed', { error: redactError(error) });
+    });
   }, [autoLoad, refresh]);
 
   return { value, loading, refresh };
