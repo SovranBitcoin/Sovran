@@ -33,6 +33,7 @@ import { HeroTransitionProvider } from '@/shared/providers/hero-transition/HeroT
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { useProfileBalanceSync } from '@/features/wallet';
 import { usePaymentStatusListener } from '@/shared/hooks/usePaymentStatusListener';
+import { useSwapLegReconciler } from '@/shared/hooks/useSwapLegReconciler';
 import { useSwapStatusListener } from '@/shared/hooks/useSwapStatusListener';
 import { useOwnEventsSync } from '@/shared/lib/nostr/ownsync/useOwnEventsSync';
 import { useOwnSocialGraphSeed } from '@/shared/lib/nostr/ownsync/useOwnSocialGraphSeed';
@@ -96,6 +97,7 @@ function PaymentStatusListener() {
     };
   }, []);
   usePaymentStatusListener();
+  useSwapLegReconciler();
   return null;
 }
 

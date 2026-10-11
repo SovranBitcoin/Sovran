@@ -43,6 +43,8 @@ export interface SwapLeg {
 
   // Correlation / recovery ids
   mintQuoteId?: string;
+  /** Coco's operation for this leg's mint quote; a settling leg is reconciled from it. */
+  mintOperationId?: string;
   meltQuoteId?: string;
   meltOperationId?: string;
 
@@ -113,7 +115,11 @@ interface SwapTransactionsActions {
     leg: Omit<SwapLeg, 'id' | 'mintQuoteId' | 'meltQuoteId' | 'meltOperationId'>
   ) => string;
 
-  tagMintQuote: (groupId: string, legId: string, params: { quoteId: string }) => void;
+  tagMintQuote: (
+    groupId: string,
+    legId: string,
+    params: { quoteId: string; operationId?: string }
+  ) => void;
   tagMelt: (
     groupId: string,
     legId: string,
@@ -153,6 +159,7 @@ const PersistedLeg = z.looseObject({
   toMintUrl: z.string().max(2048),
   amount: z.number().int().nonnegative(),
   mintQuoteId: z.string().max(256).optional(),
+  mintOperationId: z.string().max(256).optional(),
   meltQuoteId: z.string().max(256).optional(),
   meltOperationId: z.string().max(256).optional(),
   chainId: z.string().max(128).optional(),
@@ -261,12 +268,16 @@ export const useSwapTransactionsStore = create<SwapTransactionsStore>({
         return legId;
       },
 
-      tagMintQuote: (groupId, legId, { quoteId }) => {
+      tagMintQuote: (groupId, legId, { quoteId, operationId }) => {
         if (!quoteId) return;
         storeLog.debug('store.swap_tx.tag_mint_quote', { groupId, legId, quoteId });
 
         set((state) => {
-          const next = patchLeg(state, groupId, legId, (leg) => ({ ...leg, mintQuoteId: quoteId }));
+          const next = patchLeg(state, groupId, legId, (leg) => ({
+            ...leg,
+            mintQuoteId: quoteId,
+            ...(operationId ? { mintOperationId: operationId } : {}),
+          }));
           if (next === state) return state;
           return {
             ...next,

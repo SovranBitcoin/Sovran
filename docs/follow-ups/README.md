@@ -84,7 +84,6 @@ reports) keep their evidence, and link here for anything still open.
 | [F58](F58.md) | high | device | Run quiet nearby payments between real phones in all three platform pairings |
 | [F59](F59.md) | medium | device | Run the NIP-05 verified identity scenarios on iOS and Android |
 | [F60](F60.md) | high | device | Send message ecash between two funded wallets on devices and see the review row |
-| [F61](F61.md) | high | fix | A cross-mint swap shows Done or sending while the money's outcome is still unknown |
 | [F62](F62.md) | high | fix | The redeem queue stores whole bearer tokens in plain AsyncStorage; move them to a vault |
 | [F63](F63.md) | medium | fix | 25 uses still import the library Button; the shared one lacks toggle, icon and toast forms |
 | [F64](F64.md) | medium | fix | Payment timeline cannot say why a mint has not credited or tell unreachable from slow |

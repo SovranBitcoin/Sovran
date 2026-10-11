@@ -523,8 +523,10 @@ test.each([0, 1])(
     expect(receipts.get(replacement)?.amount.toNumber()).toBe(
       receipts.get(abandoned)!.amount.toNumber() - 2
     );
+    // The replacement's operation is saved too: a settling leg is reconciled from it.
     expect(mockTransactions.tagMintQuote).toHaveBeenCalledWith('group-1', 'leg-1', {
       quoteId: replacement,
+      operationId: `mint-${replacement}`,
     });
     expect(setTransactionAnnotation).toHaveBeenCalledWith(
       `quote:${replacement}`,

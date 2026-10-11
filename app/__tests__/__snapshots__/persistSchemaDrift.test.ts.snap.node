@@ -6803,6 +6803,8 @@ exports[`persisted schema drift swap-transactions-store schema matches the golde
                         "invoiceReady",
                         "melting",
                         "verifying",
+                        "paymentPending",
+                        "settling",
                         "done",
                         "failed",
                       ],
@@ -6813,6 +6815,10 @@ exports[`persisted schema drift swap-transactions-store schema matches the golde
                       "type": "string",
                     },
                     "meltQuoteId": {
+                      "maxLength": 256,
+                      "type": "string",
+                    },
+                    "mintOperationId": {
                       "maxLength": 256,
                       "type": "string",
                     },
@@ -6979,6 +6985,8 @@ exports[`persisted schema drift swap-transactions-store schema matches the golde
                         "invoiceReady",
                         "melting",
                         "verifying",
+                        "paymentPending",
+                        "settling",
                         "done",
                         "failed",
                       ],
@@ -6989,6 +6997,10 @@ exports[`persisted schema drift swap-transactions-store schema matches the golde
                       "type": "string",
                     },
                     "meltQuoteId": {
+                      "maxLength": 256,
+                      "type": "string",
+                    },
+                    "mintOperationId": {
                       "maxLength": 256,
                       "type": "string",
                     },
