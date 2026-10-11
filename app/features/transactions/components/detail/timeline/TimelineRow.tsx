@@ -337,7 +337,7 @@ export function TimelineRow({
             </Text>
             {step.timestamp && (
               <Text size={13} style={{ color: foreground66 }}>
-                {formatDate(step.timestamp, 'iso')}
+                {formatDate(step.timestamp, 'to-the-second')}
               </Text>
             )}
             {step.info && !detail && (

@@ -35,11 +35,11 @@ type AbsoluteDateStyle =
   | 'long-date'
   /** Short date + time. en-US: `Mar 16, 2026, 3:42 PM`. */
   | 'short-date-time'
-  /** Machine-readable, locale-frozen `MM/DD/YYYY HH:MM:SS` (en-US, 24h).
-   *  Use only for debug screens, transaction-state timelines that need
-   *  second precision, and recovery export rows where the string has to
-   *  round-trip identically across devices. */
-  | 'iso';
+  /** To the second, and the same on every phone: `MM/DD/YYYY, HH:MM:SS` in
+   *  local time (en-US, 24h). For debug screens and transaction-state
+   *  timelines that need second precision. It is for reading, and it is not
+   *  ISO 8601: to store or send a time, use `Date#toISOString`. */
+  | 'to-the-second';
 
 type RelativeDateStyle =
   /** `Intl.RelativeTimeFormat` verbose form: `5 minutes ago`, `yesterday`,
@@ -55,8 +55,8 @@ type RelativeDateStyle =
    *  `2d`, `1w`, then a short locale-aware date. No `ago` — the row's
    *  position already says it is in the past (Bluesky/Primal/Damus form). */
   | 'terse'
-  /** Chat bubble: locale time today, `Yesterday` up to 48h, short date
-   *  older. Shared by every chat surface so bubbles read consistently. */
+  /** Chat bubble: locale time today, `Yesterday` for the calendar day
+   *  before, short date older. Shared by every chat surface so bubbles read consistently. */
   | 'chat-bubble'
   /** Conversation-list row: `Today at HH:MM`, `Yesterday at HH:MM`, full
    *  short date+time older. */
@@ -119,7 +119,10 @@ function getRelativeTimeFormat(locale: string): Intl.RelativeTimeFormat | null {
   }
 }
 
-const ABSOLUTE_OPTIONS: Record<Exclude<AbsoluteDateStyle, 'iso'>, Intl.DateTimeFormatOptions> = {
+const ABSOLUTE_OPTIONS: Record<
+  Exclude<AbsoluteDateStyle, 'to-the-second'>,
+  Intl.DateTimeFormatOptions
+> = {
   time: { hour: '2-digit', minute: '2-digit' },
   'short-date': { year: 'numeric', month: 'short', day: 'numeric' },
   'long-date': { year: 'numeric', month: 'long', day: 'numeric' },
@@ -132,7 +135,7 @@ const ABSOLUTE_OPTIONS: Record<Exclude<AbsoluteDateStyle, 'iso'>, Intl.DateTimeF
   },
 };
 
-const ISO_OPTIONS: Intl.DateTimeFormatOptions = {
+const TO_THE_SECOND_OPTIONS: Intl.DateTimeFormatOptions = {
   year: 'numeric',
   month: '2-digit',
   day: '2-digit',
@@ -150,7 +153,9 @@ const ISO_OPTIONS: Intl.DateTimeFormatOptions = {
 export function formatDate(input: DateInput, style: AbsoluteDateStyle): string {
   const date = toDate(input);
   if (Number.isNaN(date.getTime())) return '';
-  if (style === 'iso') return getDateTimeFormat('en-US', ISO_OPTIONS).format(date);
+  if (style === 'to-the-second') {
+    return getDateTimeFormat('en-US', TO_THE_SECOND_OPTIONS).format(date);
+  }
   return getDateTimeFormat(resolveLocale(), ABSOLUTE_OPTIONS[style]).format(date);
 }
 
@@ -201,31 +206,38 @@ function formatTerseRelative(timestampMs: number, locale: string, nowMs: number)
   );
 }
 
+const sameCalendarDay = (a: Date, b: Date) =>
+  a.getFullYear() === b.getFullYear() &&
+  a.getMonth() === b.getMonth() &&
+  a.getDate() === b.getDate();
+
+/**
+ * Which day a time fell on, as the person's own calendar counts it. Hours
+ * elapsed do not answer this: two minutes ago can be yesterday, 26 hours ago
+ * can be the day before, and a day is 23 or 25 hours long when the clocks
+ * change.
+ */
+function calendarDay(date: Date, nowMs: number): 'today' | 'yesterday' | 'other' {
+  const now = new Date(nowMs);
+  if (sameCalendarDay(date, now)) return 'today';
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  return sameCalendarDay(date, yesterday) ? 'yesterday' : 'other';
+}
+
 function formatChatBubble(timestampMs: number, nowMs: number): string {
   const date = new Date(timestampMs);
-  const diffHours = (nowMs - date.getTime()) / 3_600_000;
-  if (diffHours < 24) return formatDate(date, 'time');
-  if (diffHours < 48) return 'Yesterday';
+  const day = calendarDay(date, nowMs);
+  if (day === 'today') return formatDate(date, 'time');
+  if (day === 'yesterday') return 'Yesterday';
   return formatDate(date, 'short-date');
 }
 
 function formatConversationList(timestampMs: number, nowMs: number): string {
   const date = new Date(timestampMs);
-  const now = new Date(nowMs);
-  const sameDay =
-    date.getFullYear() === now.getFullYear() &&
-    date.getMonth() === now.getMonth() &&
-    date.getDate() === now.getDate();
-  if (sameDay) return `Today at ${formatDate(date, 'time')}`;
-  const yesterday = new Date(now);
-  yesterday.setDate(now.getDate() - 1);
-  if (
-    date.getFullYear() === yesterday.getFullYear() &&
-    date.getMonth() === yesterday.getMonth() &&
-    date.getDate() === yesterday.getDate()
-  ) {
-    return `Yesterday at ${formatDate(date, 'time')}`;
-  }
+  const day = calendarDay(date, nowMs);
+  if (day === 'today') return `Today at ${formatDate(date, 'time')}`;
+  if (day === 'yesterday') return `Yesterday at ${formatDate(date, 'time')}`;
   return formatDate(date, 'short-date-time');
 }
 

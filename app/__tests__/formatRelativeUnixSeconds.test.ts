@@ -50,7 +50,7 @@ describe("formatRelative 'terse'", () => {
 describe('invalid dates', () => {
   it("formats an unparseable input as '' instead of throwing a RangeError", () => {
     expect(formatDate('garbage', 'short-date')).toBe('');
-    expect(formatDate(NaN, 'iso')).toBe('');
+    expect(formatDate(NaN, 'to-the-second')).toBe('');
     expect(formatDate(new Date('garbage'), 'time')).toBe('');
     for (const style of [
       'verbose',
@@ -62,5 +62,47 @@ describe('invalid dates', () => {
       expect(formatRelative(NaN, style)).toBe('');
       expect(formatRelative('garbage', style)).toBe('');
     }
+  });
+});
+
+describe('which day a time fell on', () => {
+  // Built from local date parts, so these hold in whatever zone the test runs.
+  const at = (day: number, hour: number, minute = 0) =>
+    new Date(2026, 2, day, hour, minute).getTime();
+
+  it('calls two minutes ago yesterday when midnight is in between', () => {
+    const now = at(10, 0, 1);
+    expect(formatRelative(at(9, 23, 59), 'chat-bubble', now)).toBe('Yesterday');
+    expect(formatRelative(at(9, 23, 59), 'conversation-list', now)).toMatch(/^Yesterday at /);
+  });
+
+  it('does not call 26 hours ago yesterday when it was the day before', () => {
+    const now = at(10, 1);
+    expect(formatRelative(at(8, 23), 'chat-bubble', now)).not.toBe('Yesterday');
+    expect(formatRelative(at(8, 23), 'conversation-list', now)).not.toMatch(/^Yesterday/);
+  });
+
+  it('shows the time for anything earlier today, however long ago', () => {
+    const now = at(10, 23, 59);
+    expect(formatRelative(at(10, 0, 1), 'chat-bubble', now)).toBe(formatDate(at(10, 0, 1), 'time'));
+  });
+
+  it('holds across the days the clocks change, which are 23 and 25 hours long', () => {
+    // Both northern changes of 2026 (8 and 29 March) and one southern (5 April)
+    // fall in this run; the answer may not depend on which zone it is.
+    for (let day = 2; day <= 40; day++) {
+      const now = at(day, 12);
+      expect(formatRelative(at(day - 1, 0, 30), 'chat-bubble', now)).toBe('Yesterday');
+      expect(formatRelative(at(day - 1, 23, 30), 'chat-bubble', now)).toBe('Yesterday');
+      expect(formatRelative(at(day - 2, 23, 30), 'chat-bubble', now)).not.toBe('Yesterday');
+    }
+  });
+});
+
+describe("formatDate 'to-the-second'", () => {
+  it('reads the same on every phone, and is for reading, not for storing', () => {
+    const date = new Date(2026, 2, 9, 7, 5, 3);
+    expect(formatDate(date, 'to-the-second')).toBe('03/09/2026, 07:05:03');
+    expect(formatDate(date, 'to-the-second')).not.toBe(date.toISOString());
   });
 });
