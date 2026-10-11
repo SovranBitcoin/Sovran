@@ -122,7 +122,7 @@ NIP-17 gift-wrap routing exposes a recipient tag; do not confuse the outer rando
 signing key or randomized timestamp with verified real-sender identity or send time.
 
 **Follow-up:** the memory-only/encrypted-cache target (follow-up F02 in
-[docs/architecture/follow-ups.md](docs/architecture/follow-ups.md)) remains
+[docs/follow-ups/](docs/follow-ups/README.md)) remains
 implementation work. Audit each transport and deployment separately; this review
 did not inspect running Nagg services, device databases, or remote retention.
 

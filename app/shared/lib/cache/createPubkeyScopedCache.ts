@@ -291,10 +291,9 @@ export function createPubkeyScopedCache<T>(opts: PubkeyScopedCacheOpts<T>): Pubk
       }
     },
 
-    // TODO: wire callers to invoke this on profile switch once
-    // app-restart-on-switch is replaced with in-process switching. Today
-    // the JS runtime tears down on switch so the in-memory `scopes` Map
-    // resets automatically; the on-disk blobs stay scoped per pubkey.
+    // Nothing calls this on a profile switch, and nothing needs to while a
+    // switch restarts the app: the JS runtime tears down, so the in-memory
+    // `scopes` Map resets, and the on-disk blobs stay scoped per pubkey.
     evictFromMemory(scope) {
       const s = scopes.get(scope);
       if (!s) return;

@@ -46,7 +46,7 @@ but the onboarding fixture stopped at Terms acceptance before entering the
 gallery. The failed screenshot is in
 `app/e2e/artifacts/run-2026-09-19T20-56-19-653Z-710f98a4/settings.headers/001-P05-tapUntil.png`.
 The temporary emulator was shut down. Track the remaining visual checks in
-[F23](../../../docs/architecture/follow-ups.md), including P2PK's intermittent
+[F23](../../../docs/follow-ups/F23.md), including P2PK's intermittent
 body-text disappearance, which was not reproduced or proven fixed.
 
 Hunch 0.13.1 discovery inspected 4,460 chunks (4,460 requests, 12,658,997 input

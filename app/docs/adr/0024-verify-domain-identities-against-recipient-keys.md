@@ -54,4 +54,4 @@ usernames separately from LNURL addresses.
 
 Device layout, accessibility, native redirect handling and real-domain success
 remain subject to the verification boundary in
-[F59](../../../docs/architecture/follow-ups.md).
+[F59](../../../docs/follow-ups/F59.md).

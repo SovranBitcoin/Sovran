@@ -1,7 +1,7 @@
 # 8. One read lifecycle: status vocabulary, cache-first paint, sequential vs aggregate tiers
 
 Date: 2026-09-13
-Status: Accepted (builds on ADR 0003's facade; closes convention-audit follow-ups F01 and F06)
+Status: Accepted (builds on ADR 0003's facade; closes two convention-audit follow-ups: stale completions writing, and failed reads shown as empty)
 
 ## Context
 
@@ -33,7 +33,7 @@ counts render a dash, never a zero.
 ### One consumer over the query cache
 
 `createQueryCacheStore.run` has a per-key generation and a store-wide scope
-generation; a completion that is no longer current never writes (F01).
+generation; a completion that is no longer current never writes.
 `useCachedRead` is the one React consumer: `data` is the store selector, so
 persistence, LRU, scope and cold-start policy stay in the store. `seed` paints a
 value from a prior step as `revalidating`; `keepPreviousData` opts a same-surface
@@ -55,7 +55,7 @@ sharing in-flight work must not become a permanent negative cache.
 Feed, thread and notification results carry `read: ReadStatusMeta`
 (`ok | unavailable | disabled` with the tier attempt trail). Screens derive:
 unavailable with nothing retained → error with Retry; unavailable with retained
-rows → keep them, show degraded; ok with zero items → the empty state (F06).
+rows → keep them, show degraded; ok with zero items → the empty state.
 
 ### Two tier engines, chosen by the shape of the data
 

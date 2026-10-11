@@ -27,7 +27,7 @@ export interface SurvivingFact {
 interface KnownGap {
   /** The `what` of the fact, or one of the runner's named checks. */
   what: string;
-  /** Row id in `docs/architecture/follow-ups.md`, or `accepted` with the reason in `why`. */
+  /** Row id in `docs/follow-ups/`, or `accepted` with the reason in `why`. */
   followUp: string;
   why: string;
 }

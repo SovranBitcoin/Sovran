@@ -185,7 +185,7 @@ it from first state to last.
 
 These can happen and the timeline cannot yet say so, because the input it would
 need does not reach the model. Tracked in
-[follow-ups](../../../docs/architecture/follow-ups.md) F64.
+[follow-ups](../../../docs/follow-ups/README.md) F64.
 
 - **Why the mint did not credit.** The warning names both causes because the
   wallet cannot tell them apart: the mint's `min_amount` and the quote's expiry

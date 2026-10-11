@@ -496,7 +496,7 @@ export default defineConfig({
     // this one guards the code that is already there.
     // Replaces the two mint-side `errors/*` pack rules that were dropped above.
     // They could never fire in a wallet, while the concern they were kept for —
-    // F04 in docs/architecture/follow-ups.md, raw exception text reaching a
+    // F04 in docs/follow-ups/, raw exception text reaching a
     // user — was live in the tree the whole time and unflagged.
     "errors/raw-error-to-ui": ["warn", choice({
       instructions: "Does this put raw upstream error text in front of a user? The shape is an `Error.message`, `String(error)`, a caught value, a response body, `err.detail`, or a JSON-serialized error reaching an `Alert`, a toast, a popup, a sheet, or rendered text. This repository routes such text through `describeError(error, service)` (`app/shared/lib/errors`) or the payment copy catalog, which map a failure onto wording chosen for a user; passing an error to one of those, or to a logger, is correct and is unrelated. Also unrelated: showing a message the app itself authored, a validation message written for this form, an error surfaced only in a developer-only or `__DEV__` screen, and anything in a test. The concern is upstream prose the user cannot act on — a stack trace, an HTTP body, a mint or relay's own words, a library's internal message — presented as if it were app copy.",

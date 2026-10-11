@@ -24,7 +24,7 @@ SQLite databases, render anything, or touch a real keychain; those need a device
 - **A released fixture is frozen.** When a schema changes and a fixture fails, the fixture is
   right and the change needs a migration.
 - **Never weaken a check.** A real loss the current app has is recorded in the fixture's
-  `knownGaps` with its row in `docs/architecture/follow-ups.md`. The runner then expects that
+  `knownGaps` with its row in `docs/follow-ups/`. The runner then expects that
   one check to fail, and fails when it starts passing so the entry gets removed.
 - Every row the current app reads must hold something the user would miss and a fact that
   reads it back, or be named in `defaultRows`.

@@ -19,6 +19,9 @@ jobs:
       - name: Checkout app
         uses: actions/checkout@v6
 
+      - name: Follow-ups
+        run: node scripts/followups.mjs check
+
       - name: Setup Sovran
         uses: ./.github/actions/setup-sovran
         with:

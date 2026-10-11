@@ -162,7 +162,7 @@ public keys.
   native stretch and about 15 to 20 ms for the whole check.
 - Where it does not, the JavaScript stretch runs instead: about 5 ms each under Node, but seconds
   each on an old phone without a JIT. That pause is accepted for the account being opened, once
-  per launch. Nothing has been timed on a device; see [follow-ups](../follow-ups.md) F93.
+  per launch. Nothing has been timed on a device; see [follow-ups](../../follow-ups/README.md) F93.
 - A mismatch found with the native stretch is only believed after the JavaScript one confirms
   it, so a fault in the native call cannot put a healthy account on the critical screen.
 
@@ -191,7 +191,7 @@ the device. The app never does that on its own.
 One case the check cannot see: when the keychain is unreadable and only imported accounts exist,
 recovery accepts any valid phrase, and those accounts' wallets will then be derived from the new
 phrase. Nothing stored records which phrase an imported account's wallet was made with. See
-[follow-ups](../follow-ups.md).
+[follow-ups](../../follow-ups/README.md).
 
 ## When a check fails
 
@@ -227,7 +227,7 @@ on, with the row naming a key the new phrase cannot derive. Earlier builds of th
 logged it and carried on. This build stops on the critical screen on first launch. Nothing is
 lost by stopping: the database, the row and the phrase are all still there, and a person who has
 the original phrase can enter it. What they cannot do from this screen is spend the ecash already
-in that database; see [follow-ups](../follow-ups.md).
+in that database; see [follow-ups](../../follow-ups/README.md).
 
 ### More than one mismatched account
 

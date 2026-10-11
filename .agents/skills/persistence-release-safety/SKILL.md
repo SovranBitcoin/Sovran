@@ -38,7 +38,7 @@ Passing unit tests are one kind of evidence; they are not the verdict.
 | `docs/architecture/persistence/release-provenance.md` | Every version, the commit it was built from, how that is known, and a confidence level |
 | `docs/architecture/persistence/persistence-map.md` | Every durable thing the app writes, per epoch, and what the candidate does with it |
 | `docs/architecture/persistence/evidence-ledger.md` | One row per (epoch, durable thing) and per invariant, with evidence and a verdict |
-| `docs/architecture/follow-ups.md` | Anything found and not fixed |
+| `docs/follow-ups/` | Anything found and not fixed |
 
 Update these in place. A run that changes none of them did not happen.
 
