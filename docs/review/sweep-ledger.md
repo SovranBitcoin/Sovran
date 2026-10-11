@@ -269,9 +269,9 @@ Both abstentions hand-verified, no defects:
 Rule gap found and closed (the domain's real result):
 
 - [state/persisted-compatibility] app/shared/lib/persist/createMergeWithSchema.ts:24 — not flagged, but the defect is there
-  verdict: defect (pre-existing, registered as F05)
+  verdict: defect (pre-existing, registered as F113)
   evidence: `if (!r.success) return current;` discards the entire persisted blob on any `safeParse` failure, for 16 call sites including `settingsStore` (terms acceptance, onboarding) and `profileStore`. This is the shape behind the Balance-split enum rename wiping settings.
-  action: blocked as code (F05 is an existing entry; fixing it is a persisted-data change the protocol hands back). But the *rule* gap is closed: `persisted-compatibility` asks whether a **change** breaks stored data, so on `--all` there is no change and it correctly says nothing — nothing asked the standing question. Added `state/all-or-nothing-rehydrate` in `ab791089`, which asks what happens to the user's other fields when one fails to decode. Measured on `app/shared/lib/persist`, `settingsStore`, `routstrStore` and `createPubkeyScopedCache`: flags `createMergeWithSchema.ts` at 0.49 and `persistConfig.ts` at 0.12, and leaves the three stores alone — they consume the merge, they do not implement the discard.
+  action: blocked as code (F113 is an existing entry; fixing it is a persisted-data change the protocol hands back). But the *rule* gap is closed: `persisted-compatibility` asks whether a **change** breaks stored data, so on `--all` there is no change and it correctly says nothing — nothing asked the standing question. Added `state/all-or-nothing-rehydrate` in `ab791089`, which asks what happens to the user's other fields when one fails to decode. Measured on `app/shared/lib/persist`, `settingsStore`, `routstrStore` and `createPubkeyScopedCache`: flags `createMergeWithSchema.ts` at 0.49 and `persistConfig.ts` at 0.12, and leaves the three stores alone — they consume the merge, they do not implement the discard.
 
 Standing lesson for the rest of the sweep: a rule phrased around "does this
 **change** …" contributes nothing to a `--all` conformance pass. Several
