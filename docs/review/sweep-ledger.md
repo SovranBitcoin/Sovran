@@ -20,7 +20,7 @@ Branch: `feat/receive-nut-drop`.
 | 8 | `ui` | done | 22 findings, 22 false positives; rule sharpened 22 → 1 |
 | 9 | `nip17`, `nip59` | done | repo-wide re-run: 11 findings, 0 defects; `room-identity` de-selected |
 | 10 | `nip61`, `nip60`, `nip46`, `nip65`, `nip04`, `nip19`, `nip01`, `nip06` | done | unblocked on a 4th run once the provider recovered: 373/388, 19 findings, 0 new defects |
-| 11 | `nut06`, `nut10`, `nut11`, `nut12`, `nut18` | done | 3 defects **fixed** (one later, in its own change), 9 false-positive/intentional |
+| 11 | `nut06`, `nut10`, `nut11`, `nut12`, `nut18` | done | 2 defects **fixed**, 1 blocked (F44), 9 false-positive/intentional |
 | 12 | `bip32`, `bip39`, `bip43`, `bip21`, `bip321` | done | complete run, 0 failed; 4 findings, all false-positive |
 | 13 | `agents-md/root` | done | 1 defect fixed, 21 testability gaps recorded, 208-finding rule switched off |
 | 14 | `skill/*/*` (7 skills) | done | 21 findings, 0 defects; 1 compiled-rule scope gap recorded |
@@ -484,7 +484,7 @@ One defect deferred:
 - [nut18/transport-shape-and-preference] defaultOperations.ts:1759-1782 (0.78), machine/transitions.ts:79 (0.70)
   verdict: defect
   evidence: NUT-18 sorts a request's `t` array by preference. Selection does `find(t => t.type === 'nostr')` and `find(t => t.type === 'post')` independently, then takes Nostr only when there is no HTTP — so a payee listing `[nostr, post]` is paid over HTTP against their stated preference. The cause is recorded at :1790 as an implementation constraint: coco's `PaymentRequestsApi` has no Nostr support.
-  action: fixed later, in its own change — `executePaymentRequest` now walks `info.transports` in order and pays over the first one it can use, with a unit test over both orderings. Not run against a funded wallet.
+  action: blocked — recorded as **F44**. Changing transport selection in the payment path deserves its own focused change with coverage over both orderings, and funded E2E is off limits during the sweep.
 
 False positives (guard exists, in another package or in a dependency):
 

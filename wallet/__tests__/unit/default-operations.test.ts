@@ -504,54 +504,6 @@ describe("executePaymentRequest — HTTP transport", () => {
   });
 });
 
-describe("executePaymentRequest — the payee's order of transports (NUT-18)", () => {
-  const NOSTR = { type: "nostr", target: "nprofile1abc" };
-  const POST = { type: "post", target: "https://receiver.example.com/pay" };
-  const pay = async (
-    transports: { type: string; target: string }[],
-    options: { sendNostrDM?: boolean; extra?: Record<string, unknown> } = {},
-  ) => {
-    const sendNostrDM = vi.fn().mockResolvedValue(undefined);
-    const manager = createMockManager();
-    mockGetPRInfo.mockReturnValue({
-      mints: [MINT1],
-      amount: 100,
-      unit: "sat",
-      transports,
-      ...options.extra,
-    });
-    const ops = createDefaultOperations({
-      getManager: () => manager as unknown as Manager,
-      ...(options.sendNostrDM === false ? {} : { sendNostrDM }),
-    });
-    await ops.executePaymentRequest!(MINT1, "creqBoth", 100, "sat");
-    return {
-      overNostr: sendNostrDM.mock.calls.length > 0,
-      overHttp: manager.paymentRequests.execute.mock.calls.length > 0,
-    };
-  };
-
-  it("pays over Nostr when the payee lists it first", async () => {
-    expect(await pay([NOSTR, POST])).toEqual({ overNostr: true, overHttp: false });
-  });
-
-  it("pays over HTTP when the payee lists it first", async () => {
-    expect(await pay([POST, NOSTR])).toEqual({ overNostr: false, overHttp: true });
-  });
-
-  it("takes the next transport when the first cannot be used", async () => {
-    // No way to send a direct message.
-    expect(await pay([NOSTR, POST], { sendNostrDM: false })).toEqual({
-      overNostr: false,
-      overHttp: true,
-    });
-    // A spending condition this wallet cannot preserve in a token it builds.
-    expect(
-      await pay([NOSTR, POST], { extra: { hasSpendingCondition: true } }),
-    ).toEqual({ overNostr: false, overHttp: true });
-  });
-});
-
 // ---------------------------------------------------------------------------
 // Inband transport (no Nostr, no HTTP) — uses paymentRequests API fallback
 // ---------------------------------------------------------------------------
