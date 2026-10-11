@@ -57,7 +57,7 @@ import { useMempoolTxConfirmations } from '@/shared/hooks/useMempoolTxConfirmati
 import { useMintInfo } from '@/shared/hooks/useMintInfo';
 import { useOnchainMeltOutpointDiscovery } from '@/shared/hooks/useOnchainMeltOutpointDiscovery';
 import { useOnchainMeltQuote } from '@/shared/hooks/useOnchainMeltQuote';
-import { amountToNumber } from '@/shared/lib/cashu/amount';
+import { amountToNumber } from 'wallet';
 import { asHistoryEntry } from '@/shared/lib/cashu/syntheticHistory';
 import { staticPopup } from '@/shared/lib/popup';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';

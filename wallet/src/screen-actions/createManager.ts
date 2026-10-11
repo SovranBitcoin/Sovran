@@ -12,7 +12,7 @@
 
 import { getEncodedToken } from "@cashu/cashu-ts";
 
-import { amountToNumber, type AmountLike } from "../amount";
+import { amountToNumberOrUndefined, type AmountLike } from "../amount";
 import { createAmountActionManager } from "../amount-actions/createManager";
 import type {
   AmountResolution,
@@ -933,8 +933,8 @@ export function meltOperationToScreenActionEntry(
   // numeric contract here. Returning null for an object amount was the melt
   // twin of the history-path live-update drop: the fallback publish carried
   // no mintUrl/amount, so the preview match could never fire.
-  const amount = amountToNumber(operation.amount as AmountLike);
-  if (!Number.isFinite(amount)) return null;
+  const amount = amountToNumberOrUndefined(operation.amount as AmountLike);
+  if (amount === undefined) return null;
 
   return {
     id: operation.id,

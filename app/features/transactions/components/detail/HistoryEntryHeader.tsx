@@ -17,7 +17,7 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { formatAmount } from '@/shared/lib/currency';
-import { amountToNumber, type AmountValue } from '@/shared/lib/cashu/amount';
+import { amountToNumber, type AmountValue } from 'wallet';
 import { isOutgoingTransaction } from '@/shared/lib/utils';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata';

@@ -38,7 +38,7 @@ import { DetailsSection } from '@/shared/ui/composed/DetailsSection';
 import { ScreenErrorState, ScreenLoadingState } from '@/shared/ui/composed/ScreenStates';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { formatAmount } from '@/shared/lib/currency';
-import { amountToNumber } from '@/shared/lib/cashu/amount';
+import { amountToNumber } from 'wallet';
 import { MiddleEllipsisValue } from '@/shared/ui/composed/MiddleEllipsisValue';
 import { useMintInfo } from '@/shared/hooks/useMintInfo';
 import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata';

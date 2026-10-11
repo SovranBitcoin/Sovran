@@ -50,7 +50,7 @@ import {
 import { parsePaymentInput } from "../parse";
 import { MeltUserCancelledError, UnitRateUnavailableError } from "../errors";
 import { normalizeNostrPubkey, resolveRecipientPubkey } from "../recipient";
-import { amountToNumber, type AmountLike } from "../amount";
+import { amountToNumber, requireAmount, type AmountLike } from "../amount";
 import { toAccountUnit } from "../units/accounts";
 import {
   compareMintDisplayOrder,
@@ -322,7 +322,7 @@ async function executeOnchainMelt(
     feeIndex = await input.selectFeeIndex(feeOptions);
   } else {
     feeIndex = feeOptions.reduce((cheapest, option) =>
-      amountToNumber(option.fee_reserve) < amountToNumber(cheapest.fee_reserve)
+      requireAmount(option.fee_reserve) < requireAmount(cheapest.fee_reserve)
         ? option
         : cheapest,
     ).fee_index;
@@ -1447,8 +1447,8 @@ export function createDefaultOperations(
         });
         return {
           quoteId: quote.quoteId,
-          quoteAmount: amountToNumber(quote.amount),
-          feeReserve: amountToNumber(quote.fee_reserve),
+          quoteAmount: requireAmount(quote.amount),
+          feeReserve: requireAmount(quote.fee_reserve),
           expiresAt: quote.expiry,
           unit: quote.unit ?? unit,
           method: "bolt12" as const,
@@ -1485,8 +1485,8 @@ export function createDefaultOperations(
       });
       return {
         quoteId: quote.quoteId,
-        quoteAmount: amountToNumber(quote.amount),
-        feeReserve: amountToNumber(quote.fee_reserve),
+        quoteAmount: requireAmount(quote.amount),
+        feeReserve: requireAmount(quote.fee_reserve),
         expiresAt: quote.expiry,
         unit: quote.unit ?? unit,
         method: "bolt11" as const,

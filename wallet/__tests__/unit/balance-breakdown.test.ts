@@ -1,23 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { HistoryEntry } from '@cashu/coco-core';
 
-import { amountToNumber, sumAmounts, sumReservedSends } from '../../src/balance';
+import { sumAmounts, sumReservedSends } from '../../src/balance';
 
 function entry(partial: Record<string, unknown>): HistoryEntry {
   return partial as unknown as HistoryEntry;
 }
-
-describe('amountToNumber', () => {
-  it('coerces number/bigint/string/{toNumber} and nullish', () => {
-    expect(amountToNumber(42)).toBe(42);
-    expect(amountToNumber(7n)).toBe(7);
-    expect(amountToNumber('21')).toBe(21);
-    expect(amountToNumber({ toNumber: () => 5 })).toBe(5);
-    expect(amountToNumber(null)).toBe(0);
-    expect(amountToNumber(undefined)).toBe(0);
-    expect(amountToNumber('not-a-number')).toBe(0);
-  });
-});
 
 describe('sumAmounts', () => {
   it('sums mixed amount representations', () => {

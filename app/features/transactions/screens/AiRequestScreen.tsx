@@ -21,7 +21,7 @@ import type { HistoryEntry } from '@cashu/coco-core';
 import { groupAiRequests, type AiRequestGroup, type AiRequestState } from 'wallet';
 
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { amountToNumber } from '@/shared/lib/cashu/amount';
+import { amountToNumber } from 'wallet';
 import { withAlpha } from '@/shared/lib/color';
 import { formatAmount } from '@/shared/lib/currency';
 import { formatDate } from '@/shared/lib/date';

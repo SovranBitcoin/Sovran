@@ -238,7 +238,7 @@ confidence (0.16–0.23), all verified in source.
 - [money/amount-meaning] wallet/src/amount.ts:1-67 and wallet/src/balance/breakdown.ts:1-67 — `amountToNumber` loses the unknown-versus-zero distinction, and disagrees with itself across copies
   verdict: defect
   evidence: five implementations, four behaviours for bad input. `app/shared/lib/cashu/amount.ts` (24 importers) and `wallet/src/amount.ts` return `NaN` for an unparseable string with a warn/debug log; `wallet/src/balance/breakdown.ts:36` (`Number(value) || 0`) and `wallet/src/history/timeline/context.ts:44` silently return `0`; `app/e2e/funded-runtime/payment-request-payer.ts:64` throws. All five map `null` to `0`. Blame says incidental: `breakdown.ts` was last touched by `4b4b5020` "delete three pass-through wrappers" and `wallet/src/amount.ts` by `1911f46f` "remove dead code, assets, and duplicate implementations" — two cleanup passes that both missed it. No ADR, test or contract pins the divergence.
-  action: blocked — F03 extended in `c574b780` to name all five and the disagreement, and to take the e2e copy's refusal as the model. Converging them across ~35 call sites is a refactor, which the protocol forbids inside a fix commit.
+  action: fixed — one implementation in `wallet/src/amount.ts`: `amountToNumber` for display (missing or unreadable shows 0), `amountToNumberOrUndefined` where unknown must differ from zero, and `requireAmount`, which throws, for melt quotes, fee reserves, fee comparison, rebalance fees and incoming proof amounts.
 
 - [money/amount-meaning] nostr/src/facade/noteStatsContract.ts:1-58 — flagged for flooring `satsZapped`
   verdict: intentional
@@ -649,7 +649,7 @@ nothing and exits 2 — my first attempt did exactly that.
 
 - [money-integer-schema] wallet/src/operations/historyEntry.ts (via the amount union), routstr/api.ts (0.84, 0.75), ReceivePaymentRequestQuoteScreen (0.93)
   verdict: intentional (historyEntry), recorded (the rest)
-  evidence: `historyEntry.ts:21` is `amount: z.union([z.number(), z.string()]).optional()`, the rule's exact named shape, but the docstring explains it: "`amount` is a plain number in colada's own entries but a serialized coco `Amount` (a string) when the row comes straight from coco's history." The union is deliberate. The missing integer check is downstream in `amountToNumber`, which is already **F03**.
+  evidence: `historyEntry.ts:21` is `amount: z.union([z.number(), z.string()]).optional()`, the rule's exact named shape, but the docstring explains it: "`amount` is a plain number in colada's own entries but a serialized coco `Amount` (a string) when the row comes straight from coco's history." The union is deliberate. The integer check is downstream: `requireAmount` in `wallet/src/amount.ts` where the amount is a price or fee, and display coercion through `amountToNumber` elsewhere.
 
 - [hex-ids] 13 findings and [input-size-caps] 14 findings — `nostr/src/schemas.ts`, `envelope.ts`, `facade/mint-reviews.ts`, `facade/primal/schemas.ts`, `recipes/wallpapers.ts`, plus app-side stores
   verdict: defect

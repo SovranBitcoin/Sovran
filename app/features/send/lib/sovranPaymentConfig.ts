@@ -57,7 +57,7 @@ import {
 } from 'wallet';
 
 import { buildReceiveHistoryEntry } from '@/shared/lib/cashu/utils';
-import { amountToNumber, type AmountValue } from '@/shared/lib/cashu/amount';
+import { amountToNumber, type AmountValue } from 'wallet';
 import { requirePreparedOfflineReceiveDleq } from '@/shared/lib/cashu/offlineReceiveDleq';
 import type {
   SyntheticMeltHistoryEntry,

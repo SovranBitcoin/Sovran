@@ -34,7 +34,7 @@ import {
   beginRecoverySuppression,
   endRecoverySuppression,
 } from '@/shared/lib/cashu/recoverySuppression';
-import { amountToNumber } from '@/shared/lib/cashu/amount';
+import { amountToNumber } from 'wallet';
 import { ElapsedSeconds } from '@/shared/ui/composed/ElapsedSeconds';
 import {
   computeRecoveryCounts,

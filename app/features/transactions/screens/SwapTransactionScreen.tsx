@@ -35,7 +35,7 @@ import { Screen } from '@/shared/ui/composed/Screen';
 import { TransactionDetailShell } from '@/features/transactions/components/detail/TransactionDetailShell';
 import { useHistoryWithMelts } from '@/features/transactions';
 import type { HistoryEntry, MeltHistoryEntry, MintHistoryEntry } from '@cashu/coco-core';
-import { amountToNumber } from '@/shared/lib/cashu/amount';
+import { amountToNumber } from 'wallet';
 import { navigateToTransactionDetail } from '@/shared/lib/nav/transactionDetailRoutes';
 import {
   useSwapTransactionsStore,

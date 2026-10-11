@@ -21,7 +21,7 @@ import {
 } from 'wallet';
 
 import { projectMintMeta } from '@/features/mint/lib/auditInfo';
-import { amountToNumber } from '@/shared/lib/cashu/amount';
+import { amountToNumber } from 'wallet';
 import { describeError } from '@/shared/lib/errors';
 import { paymentLog, mintUrlLogFields } from '@/shared/lib/logger';
 import { newReadId, readErrorType, readEvents, readKeyHash } from '@/shared/lib/read/readLog';

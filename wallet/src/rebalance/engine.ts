@@ -16,7 +16,7 @@
 // injected, so the engine runs the same under tests and in the app.
 // ---------------------------------------------------------------------------
 
-import { amountToNumber } from '../balance';
+import { amountToNumber } from '../amount';
 import { logger as packageLogger, mintUrlFields, errField } from '../logger';
 import {
   computeInitialTransferAmount,

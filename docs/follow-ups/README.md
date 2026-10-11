@@ -33,8 +33,7 @@ reports) keep their evidence, and link here for anything still open.
 
 | Id | Priority | Needs | What |
 | --- | --- | --- | --- |
-| [F02](F02.md) | high | fix | Private message plaintext is stored unencrypted at three sites; stop it and erase old data |
-| [F03](F03.md) | high | fix | amountToNumber exists five times with four different answers for bad input |
+| [F02](F02.md) | high | decision | Private message plaintext is stored unencrypted at three sites; stop it and erase old data |
 | [F04](F04.md) | high | fix | Raw exception text reaches user-facing surfaces across the app |
 | [F05](F05.md) | high | investigation | A rejected stored blob resets the whole store to defaults, critical stores included |
 | [F07](F07.md) | medium | fix | Add app-wide translation: one locale service with Lingui catalogs |

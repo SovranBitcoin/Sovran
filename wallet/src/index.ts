@@ -241,6 +241,11 @@ export type {
 // Balance breakdown read model (framework-agnostic)
 export {
   amountToNumber,
+  amountToNumberOrUndefined,
+  requireAmount,
+} from "./amount";
+export type { AmountValue } from "./amount";
+export {
   emptyBalanceBreakdown,
   sumAmounts,
   sumReservedSends,

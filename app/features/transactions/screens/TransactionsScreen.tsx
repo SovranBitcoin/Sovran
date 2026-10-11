@@ -26,7 +26,7 @@ import {
 import { MonthSelector } from '@/features/transactions/components/MonthSelector';
 import type { MonthItem } from '@/features/transactions/lib/months';
 import { HistoryEntry, SendHistoryEntry } from '@cashu/coco-core';
-import { amountToNumber } from '@/shared/lib/cashu/amount';
+import { amountToNumber } from 'wallet';
 import { useHistoryWithMelts } from '@/features/transactions/hooks/useHistoryWithMelts';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';

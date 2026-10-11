@@ -2,8 +2,8 @@ import { useSyncExternalStore } from "react";
 import { Amount, type Manager } from "@cashu/coco-core";
 
 import { logger } from "../logger";
+import { amountToNumber } from "../amount";
 import {
-  amountToNumber,
   emptyBalanceBreakdown,
   sumReservedSends,
   type WalletBalanceBreakdown,

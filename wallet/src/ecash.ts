@@ -9,7 +9,7 @@
 
 import { getTokenMetadata } from "@cashu/cashu-ts";
 
-import { amountToNumber } from "./amount";
+import { amountToNumberOrUndefined } from "./amount";
 import { logger } from "./logger";
 import { extractP2PKPubkey } from "./p2pk";
 
@@ -66,8 +66,13 @@ export function decodeEcashTokenMetadata(
     });
     return null;
   }
+  const amount = amountToNumberOrUndefined(decoded.amount);
+  if (amount === undefined) {
+    logger.debug("ecash.decode.unreadableAmount", { inputLength: token.length });
+    return null;
+  }
   const metadata: EcashTokenMetadata = {
-    amount: amountToNumber(decoded.amount),
+    amount,
     mint: decoded.mint,
     unit: decoded.unit ?? "sat",
     ...(decoded.memo ? { memo: decoded.memo } : {}),

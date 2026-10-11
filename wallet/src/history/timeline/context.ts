@@ -18,6 +18,7 @@ import {
   createPaymentCopyResolver,
   type PaymentCopyResolver,
 } from "../../copy";
+import { amountToNumber, type AmountValue } from "../../amount";
 import { logger } from "../../logger";
 import { describeSendLock, getPaymentRequest } from "../../annotations";
 import { normalizeTimelineMintState, normalizeTimelineMeltState } from "../states";
@@ -33,21 +34,7 @@ export const EXPIRED_STATE = "expired";
 export const FAILED_STATE = "failed";
 
 export type EntryRecord = Record<string, unknown>;
-type AmountLike = number | bigint | string | { toNumber(): number };
-type AmountValue = AmountLike | null | undefined;
-
 export const DEFAULT_PAYMENT_COPY = createPaymentCopyResolver();
-
-function amountToNumber(value: AmountValue): number {
-  if (value == null) return 0;
-  if (typeof value === "number") return value;
-  if (typeof value === "bigint") return Number(value);
-  if (typeof value === "string") {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : 0;
-  }
-  return value.toNumber();
-}
 
 function getBip321OnchainAddress(value: string): string | null {
   if (!value.trim().toLowerCase().startsWith("bitcoin:")) return null;

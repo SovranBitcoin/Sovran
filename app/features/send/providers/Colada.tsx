@@ -49,7 +49,7 @@ import { parseRawMetadata } from '@/shared/hooks/useNostrProfileMetadata';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { paymentLog, mintUrlLogFields } from '@/shared/lib/logger';
 import { actionMenuSheet } from '@/shared/lib/popup/popups/actionMenuSheet';
-import { amountToNumber } from '@/shared/lib/cashu/amount';
+import { amountToNumber } from 'wallet';
 import { sendDirectMessageToRelays } from '@/shared/lib/nostr/sendDirectMessage';
 import { getOwnWriteRelays } from '@/shared/lib/nostr/outbox/relayListStore';
 import { buildSignedZapRequestJson, lnurlBech32 } from '@/shared/lib/nostr/zap/buildZapRequest';
