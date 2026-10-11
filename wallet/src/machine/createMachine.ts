@@ -1146,6 +1146,20 @@ export function createPaymentMachine(
       // Set when the NFC branch switched the host unit; a failed or abandoned tap
       // must restore the user's unit instead of leaving a terminal's choice behind.
       let revertNfcUnit: (() => Promise<void>) | null = null;
+      // The unit an NFC request switched the host to, for the rest of this
+      // dispatch. Every read of the wallet context below goes through
+      // `readContext`, which keeps the balances in that unit.
+      let nfcSwitchedUnit: string | null = null;
+      const readContext = (): ReturnType<typeof getContext> => {
+        const ctx = getContext();
+        if (!nfcSwitchedUnit) return ctx;
+        // No balances for the unit after all: no mint can pay, rather than
+        // the old unit's balances standing in for them.
+        return {
+          ...ctx,
+          mintBalances: ctx.unitBalances?.[nfcSwitchedUnit.trim().toLowerCase()] ?? {},
+        };
+      };
       // A terminal chooses one unit. Switch the host's whole cached view before
       // the ordinary transition can reject a cross-unit request (including BIP21).
       if (event.type === "EXECUTE" && lastScanSource === "nfc" && nfcAdapter) {
@@ -1209,11 +1223,8 @@ export function createPaymentMachine(
               // re-runs its binding, so its `mintBalances` may still be the old
               // unit's here. `unitBalances` holds every unit and does not lag:
               // it is what found this request funded above.
-              const switchedCtx = getContext();
-              const balances = switchedCtx.unitBalances?.[unit.trim().toLowerCase()];
-              walletCtx = balances
-                ? { ...switchedCtx, mintBalances: balances }
-                : switchedCtx;
+              if (switched.isOk()) nfcSwitchedUnit = unit;
+              walletCtx = readContext();
               // A missing/unsupported host switch keeps the existing unit hard-stop.
             }
           }
@@ -1413,7 +1424,7 @@ export function createPaymentMachine(
                 optionCount: options.length,
                 hasInvoiceFallback: !!invoiceAlternative,
               });
-              const walletCtxInner = getContext();
+              const walletCtxInner = readContext();
               const unitInner = getUnit?.() ?? configUnit;
               const r = transition(
                 step,
@@ -1438,7 +1449,7 @@ export function createPaymentMachine(
             nfcResolved = true;
           } else if (step === "selectMint") {
             const data = stepData as StepDataMap["selectMint"];
-            const walletCtxInner = getContext();
+            const walletCtxInner = readContext();
             const info = flowCtx.paymentRequest
               ? detectors.getPaymentRequestInfo(flowCtx.paymentRequest)
               : null;
@@ -1593,7 +1604,7 @@ export function createPaymentMachine(
                   ...mintUrlFields(data.mintUrl),
                   reason: payability.reason,
                 });
-                const walletCtxInner = getContext();
+                const walletCtxInner = readContext();
                 const unitInner = getUnit?.() ?? configUnit;
                 const r = transition(
                   step,

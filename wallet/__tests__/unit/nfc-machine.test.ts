@@ -116,6 +116,20 @@ describe("NFC terminal unit and mints", () => {
     tm.assertStep("sendComplete");
     expect(sentMint(tm)?.args).toEqual([accepted, 50, "usd"]);
   });
+  it("keeps the new unit's balances when it has to choose between several mints", async () => {
+    // Two accepted mints funded in usd; in sat only `third` holds anything.
+    // The choice between them is made after another read of the context.
+    const { tm } = setup({
+      unit: "usd",
+      mints: [accepted, other],
+      balances: { [accepted]: 60, [other]: 100 },
+      satBalances: { [third]: 2000 },
+      contextLags: true,
+    });
+    await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
+    tm.assertStep("sendComplete");
+    expect(sentMint(tm)?.args).toEqual([other, 50, "usd"]);
+  });
   it("stops when the host reports a switch that did not change the unit", async () => {
     const { tm, adapter } = setup({ unit: "usd", unitSwitchTakes: false });
     await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
