@@ -16,12 +16,24 @@
 import { holdPairingUri } from '@/features/nostrSigner/lib/pendingPairingUri';
 
 const NOSTRCONNECT_SCHEME_RE = /^nostrconnect:\/\//i;
+/** A link that names the connect route itself and carries the pairing link as a param. */
+const CONNECT_WITH_URI_RE = /\/connect\/?\?(?:[^#]*&)?uri=([^&#]*)/i;
+const CONNECT_ROUTE = '/(signer-flow)/connect';
 
 /** Exported for direct unit coverage. */
 export function rewriteSystemPath(path: string): string {
   try {
-    if (typeof path !== 'string' || !NOSTRCONNECT_SCHEME_RE.test(path)) return path;
-    return '/(signer-flow)/connect?ticket=' + holdPairingUri(path);
+    if (typeof path !== 'string') return path;
+    if (NOSTRCONNECT_SCHEME_RE.test(path)) return `${CONNECT_ROUTE}?ticket=${holdPairingUri(path)}`;
+    const carried = CONNECT_WITH_URI_RE.exec(path);
+    if (!carried) return path;
+    // Passing this through would put the link in navigation state before the
+    // route could refuse it.
+    try {
+      return `${CONNECT_ROUTE}?ticket=${holdPairingUri(decodeURIComponent(carried[1]))}`;
+    } catch {
+      return CONNECT_ROUTE;
+    }
   } catch {
     return path;
   }

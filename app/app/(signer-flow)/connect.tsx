@@ -33,7 +33,7 @@ import { View } from '@/shared/ui/primitives/View/View';
 const BACKDROP_STYLE = { flex: 1 } as const;
 
 const ParamsSchema = z.object({
-  ticket: z.string().regex(/^\d{1,9}$/),
+  ticket: z.string().regex(/^[a-z0-9]{1,24}$/),
 });
 
 function toastAndGoToHub(body: string): void {
@@ -45,11 +45,12 @@ export default function SignerConnectRoute() {
   const onInvalid = useCallback(() => toastAndGoToHub(PAIRING_ERROR_INVALID_LINK), []);
   const params = useRouteParams(ParamsSchema, { where: 'signer-flow.connect', onInvalid });
   const ticket = params?.ticket;
-  const openedRef = useRef(false);
+  const openedRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (ticket === undefined || openedRef.current) return;
-    openedRef.current = true;
+    // By ticket, not once per mount: a second link can arrive while this route is up.
+    if (ticket === undefined || openedRef.current === ticket) return;
+    openedRef.current = ticket;
     const uri = takePairingUri(ticket);
     if (uri === null) {
       router.replace('/(signer-flow)' as never);

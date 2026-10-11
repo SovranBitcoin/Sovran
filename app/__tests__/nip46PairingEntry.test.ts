@@ -60,7 +60,7 @@ describe('redirectSystemPath', () => {
   it('holds the link in memory and routes with a ticket, not the link', () => {
     const route = redirectSystemPath({ path: VALID_URI, initial: false });
 
-    expect(route).toMatch(/^\/\(signer-flow\)\/connect\?ticket=\d+$/);
+    expect(route).toMatch(/^\/\(signer-flow\)\/connect\?ticket=[a-z0-9]+$/);
     expect(route).not.toContain(SECRET);
     expect(route).not.toContain(CLIENT_PUBKEY);
     expect(takePairingUri(route.split('=')[1])).toBe(VALID_URI);
@@ -74,6 +74,37 @@ describe('redirectSystemPath', () => {
     expect(takePairingUri(first)).toBeNull();
     expect(takePairingUri(second)).toBe(mixedCase);
     expect(takePairingUri(second)).toBeNull();
+  });
+
+  it('gives the same link the same ticket while it is still held', () => {
+    const first = redirectSystemPath({ path: VALID_URI, initial: true });
+    expect(redirectSystemPath({ path: VALID_URI, initial: false })).toBe(first);
+    expect(takePairingUri(first.split('=')[1])).toBe(VALID_URI);
+  });
+
+  it('lets a held link lapse', () => {
+    jest.useFakeTimers();
+    try {
+      const ticket = redirectSystemPath({ path: VALID_URI, initial: false }).split('=')[1];
+      jest.advanceTimersByTime(5 * 60_000 + 1);
+      expect(takePairingUri(ticket)).toBeNull();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it.each(['sovran:///connect?uri=', '/(signer-flow)/connect?x=1&uri='])(
+    'takes a link carried as a param of %s out of the route',
+    (prefix) => {
+      const route = rewriteSystemPath(prefix + encodeURIComponent(VALID_URI));
+
+      expect(route).toMatch(/^\/\(signer-flow\)\/connect\?ticket=[a-z0-9]+$/);
+      expect(takePairingUri(route.split('=')[1])).toBe(VALID_URI);
+    }
+  );
+
+  it('drops a carried link it cannot decode', () => {
+    expect(rewriteSystemPath('sovran:///connect?uri=%E0%A4%A')).toBe('/(signer-flow)/connect');
   });
 
   it.each(['/', '/camera?action=signer-pair', 'sovran://pay', 'https://example.com', BUNKER_URI])(

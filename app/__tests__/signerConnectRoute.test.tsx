@@ -63,6 +63,17 @@ it('ignores a link passed as a route param', () => {
   expect(mockOpenPairingFromUri).not.toHaveBeenCalled();
 });
 
+it('opens a second link that arrives while the route is up', () => {
+  mockParams = { ticket: holdPairingUri(URI) };
+  const view = render(<SignerConnectRoute />);
+  const second = `${URI}&name=Second`;
+  mockParams = { ticket: holdPairingUri(second) };
+  view.rerender(<SignerConnectRoute />);
+
+  expect(mockOpenPairingFromUri).toHaveBeenLastCalledWith(second);
+  expect(mockOpenPairingFromUri).toHaveBeenCalledTimes(2);
+});
+
 it('goes to the signer hub, quietly, when the ticket has nothing behind it', () => {
   const ticket = holdPairingUri(URI);
   mockParams = { ticket };
