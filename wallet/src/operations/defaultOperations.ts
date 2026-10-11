@@ -1818,7 +1818,6 @@ export function createDefaultOperations(
       });
 
       const nostrTransport = info.transports?.find((t) => t.type === "nostr");
-      const httpTransport = info.transports?.find((t) => t.type === "post");
 
       // The machine enforces request-unit === active unit at scan time
       // (BTC-04); assert it again at the money seam so a future caller that
@@ -1840,17 +1839,32 @@ export function createDefaultOperations(
 
       let operationId: string;
 
-      if (nostrTransport && !httpTransport) {
-        // Sovran creates plain permanent P2PK requests. Reject conditions we
-        // cannot preserve rather than silently stripping their tags.
-        const nut10 = info.lockP2pkPubkey
-          ? decodePaymentRequest(paymentRequest).nut10
-          : undefined;
-        const lock =
-          nut10?.kind === "P2PK" && !nut10.tags?.length
-            ? normalizeP2pkLock(nut10.data)
-            : null;
-        if ((info.hasSpendingCondition || info.lockP2pkPubkey) && !lock) {
+      // Sovran creates plain permanent P2PK requests. Over Nostr this wallet
+      // builds the token itself, so it can only honour a lock it can preserve.
+      const nut10 = info.lockP2pkPubkey
+        ? decodePaymentRequest(paymentRequest).nut10
+        : undefined;
+      const lock =
+        nut10?.kind === "P2PK" && !nut10.tags?.length
+          ? normalizeP2pkLock(nut10.data)
+          : null;
+      const lockUnsupported =
+        (info.hasSpendingCondition || info.lockP2pkPubkey) && !lock;
+      // NUT-18: `t` is in the payee's order of preference, so the first
+      // transport this wallet can use is the one to pay over. A request that
+      // offers only Nostr still goes down the Nostr branch when it cannot be
+      // used, to fail there with the reason.
+      const chosen = info.transports?.find(
+        (t) =>
+          t.type === "post" ||
+          (t.type === "nostr" && !!config.sendNostrDM && !lockUnsupported),
+      );
+      const payOverNostr = chosen ? chosen.type === "nostr" : !!nostrTransport;
+
+      if (payOverNostr && nostrTransport) {
+        // Reject conditions we cannot preserve rather than silently stripping
+        // their tags.
+        if (lockUnsupported) {
           throw new AuthoredError(
             "This request requires locked ecash with unsupported spending conditions.",
           );
