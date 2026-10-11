@@ -24,7 +24,9 @@ Third artifact of the [persistence release safety](../../../.agents/skills/persi
 procedure. The builds are in [release-provenance.md](release-provenance.md), the durable
 surface in [persistence-map.md](persistence-map.md), the role reports in
 [audit-2026-10-10](audit-2026-10-10/). Tests are under `app/__tests__/`; every one named
-here was run on 2026-10-10 as part of the full suite.
+here was run on 2026-10-10 as part of the full suite, and again on 2026-10-11 at `7131591b5`:
+7,441 app tests passed and one is skipped, with the wallet (1,714) and Nostr (352) suites,
+type-check and lint.
 
 ## The identity check, the ecash claim and the gallery in a device build
 
