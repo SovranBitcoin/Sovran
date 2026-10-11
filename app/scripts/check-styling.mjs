@@ -131,7 +131,7 @@ if (regressions.length > 0) {
   console.error(
     '\n  Style with Tailwind classes instead — `className`, and the' +
       '\n  `contentContainerClassName` / `*ClassName` props Uniwind adds.' +
-      '\n  See skills/sovran-ui. If a site genuinely cannot take a class' +
+      '\n  See docs/review/building-screens.md. If a site genuinely cannot take a class' +
       '\n  (Reanimated worklets, Skia, native module props), record it with' +
       '\n  `node scripts/check-styling.mjs --update` and say why in the commit.'
   );

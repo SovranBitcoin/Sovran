@@ -13,7 +13,7 @@
  * invariant), and it is why the house rule is `.catch(D)` where a neutral
  * member exists and a tolerant collection where one does not.
  *
- * `skills/sovran-deslop/rules/persisted-enum-needs-catch.yml` enforces this
+ * The workspace's `persisted-enum-needs-catch` rule enforces this
  * syntactically, but it matches `z.enum(...)` text inside store-file globs, so
  * it cannot see:
  *   - an enum imported from elsewhere (`ThemeMode` from

@@ -16,7 +16,7 @@ import { log } from '@/shared/lib/logger';
  *
  * Pair with an explicit `version: N` and a `migrate(state, version)` on the
  * persist options so first-load migrations run before this validator sees the
- * shape. See `skills/sovran-data/references/caching.md`.
+ * shape. See `docs/review/conventions-state.md`.
  */
 export function createMergeWithSchema<TPartial>(
   name: string,

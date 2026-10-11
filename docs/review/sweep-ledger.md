@@ -165,7 +165,7 @@ Real findings:
 
 Intentional (verified, not fixed):
 
-- [secrets/disclosure] app/scripts/gen-giveaway-key.mjs, app/scripts/find-vanity-giveaway-key.mjs — operator CLI scripts whose stated purpose is printing a keypair they just generated, to stdout, for the operator to paste into `.env`/EAS. Both carry an explicit SECURITY note about bundle extractability and point at `skills/sovran-security/references/secure-storage-key-derivation.md`. No log, analytics or persistent sink.
+- [secrets/disclosure] app/scripts/gen-giveaway-key.mjs, app/scripts/find-vanity-giveaway-key.mjs — operator CLI scripts whose stated purpose is printing a keypair they just generated, to stdout, for the operator to paste into `.env`/EAS. Both carry an explicit SECURITY note about bundle extractability. No log, analytics or persistent sink.
 - [secrets/disclosure] app/scripts/generate-test-vectors.ts — prints derived values from the *published* NIP-06 spec mnemonics (`leader monkey parrot …`). Printing them is the script's purpose and they are public.
 - [secrets/disclosure] app/e2e/funded/custody.ts, app/e2e/funded-runtime/* — the funded-E2E custody handoff. `e2eSeedExport.ts` gates it on `__DEV__`, requires both an endpoint and a 64-hex token, and `assertOwnedLoopbackEndpoint` pins the target to `http://127.0.0.1:<port>/seed` with no credentials, query or fragment.
 

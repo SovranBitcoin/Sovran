@@ -20,8 +20,6 @@
  * `Intl` formatter instances are cached per `(locale, optionsKey)` so
  * high-frequency surfaces (feed, chat, transactions list) don't
  * re-allocate on every render.
- *
- * See `skills/sovran-data/references/dates.md` for guidance on which style to pick.
  */
 
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';

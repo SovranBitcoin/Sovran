@@ -25,7 +25,6 @@
 //
 // Historical trigger: repeated TS2341/private-reach-in failures across mint-op
 // cleanup, migration, and reserved-proof paths. Keep future reach-ins here.
-// See `skills/sovran-architecture`.
 
 import type { CoreProof, Manager } from '@cashu/coco-core';
 import type { Wallet } from '@cashu/cashu-ts';

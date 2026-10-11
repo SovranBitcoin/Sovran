@@ -5,7 +5,6 @@
  * cross-domain mixups fail to compile instead of failing at a mint.
  *
  * Brands are compile-time only — no runtime shape, no persisted-schema impact.
- * Dictionary + spec citations: skills/sovran-deslop/references/terminology.md.
  */
 
 import { z } from 'zod';

@@ -286,5 +286,4 @@ bun run codereview/log-doctor/index.ts coco   --latest
 4. Add scoped logs only if they make future diagnosis cheaper.
 5. Remove noisy or secret-risk logs before shipping.
 
-See also: `skills/sovran-quality/references/log-doctor.md` and
-`codereview/README.md` for token budgets and audit.md/fix.md integration.
+See also: `codereview/README.md` for token budgets and audit.md/fix.md integration.
