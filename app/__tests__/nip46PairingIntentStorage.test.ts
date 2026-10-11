@@ -1,5 +1,5 @@
 /**
- * Profile-switch pairing intent: raw-AsyncStorage single-take blob that must
+ * Profile-switch pairing intent: a single-take blob in secure storage that must
  * survive the restart-based profile switch. Load-bearing cases: take is
  * single-use (cleared before 'taken' resolves), and stale/mismatched intents
  * are cleared either way while reporting 'expired' | 'mismatch' | 'none'
@@ -24,17 +24,38 @@ jest.mock('@react-native-async-storage/async-storage', () => {
   };
 });
 
+jest.mock('expo-secure-store', () => {
+  const store = new Map<string, string>();
+  return {
+    getItemAsync: jest.fn((key: string) => Promise.resolve(store.get(key) ?? null)),
+    setItemAsync: jest.fn((key: string, value: string) => {
+      store.set(key, value);
+      return Promise.resolve();
+    }),
+    deleteItemAsync: jest.fn((key: string) => {
+      store.delete(key);
+      return Promise.resolve();
+    }),
+    __backing: store,
+  };
+});
+
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 
 import {
   clearPairingIntent,
+  LEGACY_PAIRING_INTENT_STORAGE_KEY,
   PAIRING_INTENT_STORAGE_KEY,
   setPairingIntent,
   takePairingIntent,
 } from '@/features/nostrSigner/lib/pairingIntentStorage';
 import { PAIRING_INTENT_TTL_MS } from '@/features/nostrSigner/lib/nip46Types';
 
-const mocked = AsyncStorage as unknown as { __backing: Map<string, string> };
+/** Where the intent lives now. */
+const mocked = SecureStore as unknown as { __backing: Map<string, string> };
+/** Plain storage, where older builds kept it. */
+const plain = AsyncStorage as unknown as { __backing: Map<string, string> };
 
 const TARGET_PUBKEY = 'c'.repeat(64);
 const OTHER_PUBKEY = 'd'.repeat(64);
@@ -45,6 +66,7 @@ const INPUT = { uri: URI, targetPubkey: TARGET_PUBKEY, targetAccountIndex: 2 };
 
 beforeEach(() => {
   mocked.__backing.clear();
+  plain.__backing.clear();
   jest.clearAllMocks();
 });
 
@@ -185,5 +207,39 @@ describe('clearPairingIntent', () => {
     const result = await clearPairingIntent();
     expect(result.isOk()).toBe(true);
     expect(mocked.__backing.has(PAIRING_INTENT_STORAGE_KEY)).toBe(false);
+  });
+});
+
+describe('the row older builds left in plain storage', () => {
+  const legacy = JSON.stringify({
+    uri: URI,
+    targetPubkey: TARGET_PUBKEY,
+    targetAccountIndex: 2,
+    createdAt: T0,
+    expiresAt: T0 + PAIRING_INTENT_TTL_MS,
+  });
+
+  it('is never written again: the link goes to secure storage only', async () => {
+    await setPairingIntent(INPUT, T0);
+
+    expect(mocked.__backing.has(PAIRING_INTENT_STORAGE_KEY)).toBe(true);
+    expect([...plain.__backing.values()].join('')).not.toContain('deadbeef');
+  });
+
+  it('is removed on the next take and never handed out', async () => {
+    plain.__backing.set(LEGACY_PAIRING_INTENT_STORAGE_KEY, legacy);
+
+    const outcome = await takePairingIntent(TARGET_PUBKEY, T0 + 1);
+
+    expect(outcome._unsafeUnwrap()).toEqual({ status: 'none' });
+    expect(plain.__backing.has(LEGACY_PAIRING_INTENT_STORAGE_KEY)).toBe(false);
+  });
+
+  it('is removed when the intent is cleared', async () => {
+    plain.__backing.set(LEGACY_PAIRING_INTENT_STORAGE_KEY, legacy);
+
+    await clearPairingIntent();
+
+    expect(plain.__backing.has(LEGACY_PAIRING_INTENT_STORAGE_KEY)).toBe(false);
   });
 });

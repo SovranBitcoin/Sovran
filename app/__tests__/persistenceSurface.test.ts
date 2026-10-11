@@ -51,7 +51,9 @@ function sourceFiles(dir: string, out: string[] = []): string[] {
 
 const ASYNC_STORAGE_CALL =
   /AsyncStorage\.(getItem|setItem|removeItem|mergeItem|multiGet|multiSet|multiRemove|multiMerge|getAllKeys|clear)\(\s*(?:(['"`])([^'"`]*)\2)?/g;
-const SECURE_STORE_CALL = /SecureStore\.(getItemAsync|setItemAsync|deleteItemAsync)\(/;
+/** Directly, or through secureStorage.ts's helpers for a caller's own key. */
+const SECURE_STORE_CALL =
+  /(SecureStore\.(getItemAsync|setItemAsync|deleteItemAsync)|\b(read|write|delete)SensitiveValue)\(/;
 const DATABASE_NAME = /(['"`])([A-Za-z0-9_${}.-]+\.db)\1/g;
 const DATABASE_OPEN = /(openDatabase(Sync|Async)?|deleteDatabase(Sync|Async)?)\(/;
 /** `KEY: 'value'` inside secureStorage.ts's STORAGE_KEYS, and the vault key prefix. */

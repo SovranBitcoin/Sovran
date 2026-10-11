@@ -21,8 +21,10 @@
   ],
   "secureStoreFiles": [
     "app/features/nostrSigner/lib/bunkerSecrets.ts",
+    "app/features/nostrSigner/lib/pairingIntentStorage.ts",
     "app/shared/lib/debug/storageInventory.ts",
-    "app/shared/lib/nostr/secureStorage.ts"
+    "app/shared/lib/nostr/secureStorage.ts",
+    "app/shared/lib/persist/secureVault.ts"
   ],
   "asyncStorageKeys": [
     "${opts.storagePrefixNeg}:${pubkey}",

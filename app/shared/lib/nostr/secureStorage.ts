@@ -190,6 +190,11 @@ export function readSensitiveValue(key: string): Promise<string | null> {
   return SecureStore.getItemAsync(key, secureOptions());
 }
 
+/** Remove a value written with `writeSensitiveValue`. */
+export function deleteSensitiveValue(key: string): Promise<void> {
+  return SecureStore.deleteItemAsync(key, secureOptions());
+}
+
 /** Register for Delete All before writing, then verify durable storage. */
 export async function writeSensitiveValue(
   key: string,
