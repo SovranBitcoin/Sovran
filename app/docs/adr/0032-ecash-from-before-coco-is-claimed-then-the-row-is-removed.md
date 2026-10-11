@@ -84,7 +84,13 @@ The row is removed, and a note of what was claimed is kept, only when all of the
 - every group is settled;
 - no old invoice is paid and unminted, and none is unresolved;
 - the reader skipped nothing it could not understand;
-- every phrase in the row is identical to the one in SecureStore.
+- every phrase in the row is identical to the one in SecureStore, and no profile holds a
+  private key without a phrase to derive it from.
+
+Empty strings are not secrets. Redux stayed mounted until 0.1.1, so every install from
+0.0.45 on has this row holding only redux's initial state: one empty profile, no ecash,
+no invoices, no phrase. It meets every condition above as it stands and is removed on the
+first run, with the same note and without a request to any mint.
 
 Otherwise the row is left exactly as it was. Proofs that were neither claimed nor
 confirmed spent are never deleted.

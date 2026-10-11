@@ -138,44 +138,81 @@ function parseJson(text: string): unknown {
   }
 }
 
+/** True for anything but an absent or empty value: a secret may be stored there. */
+function isFilled(value: unknown): boolean {
+  return value !== undefined && value !== null && value !== '';
+}
+
 /**
- * Every phrase the row holds, exactly as stored, or null when that cannot be
- * told. Old profiles each carried their own, so one row can hold several.
+ * The secrets the row holds. `phrases` is every recovery phrase, exactly as
+ * stored; old profiles each carried their own, so one row can hold several.
+ * `keyWithoutPhrase` is true when a profile holds a private key and no phrase
+ * to derive it from. Null when the row cannot be read well enough to tell.
+ *
+ * The old app wrote every field of a profile from the first launch, as empty
+ * strings, so an empty string is the absence of a secret, not a secret.
  */
-function reduxEraPhrases(raw: string): string[] | null {
+function reduxEraSecrets(raw: string): { phrases: string[]; keyWithoutPhrase: boolean } | null {
   const row = RowWithNostr.safeParse(parseJson(raw));
   if (!row.success) return null;
   const nostr = NostrSlice.safeParse(parseJson(row.data.nostr));
   if (!nostr.success) return null;
   const phrases = new Set<string>();
+  let keyWithoutPhrase = false;
   for (const profile of [nostr.data.currentProfile, ...nostr.data.profiles]) {
     if (typeof profile !== 'object' || profile === null) continue;
     const mnemonic: unknown = Reflect.get(profile, 'mnemonic');
-    if (mnemonic === undefined || mnemonic === null || mnemonic === '') continue;
-    // Something is stored where a phrase goes and it is not text.
-    if (typeof mnemonic !== 'string') return null;
-    phrases.add(mnemonic);
+    if (isFilled(mnemonic)) {
+      // Something is stored where a phrase goes and it is not text.
+      if (typeof mnemonic !== 'string') return null;
+      phrases.add(mnemonic);
+      continue;
+    }
+    const root: unknown = Reflect.get(profile, 'root');
+    const rootKey: unknown =
+      typeof root === 'object' && root !== null ? Reflect.get(root, 'xpriv') : root;
+    if (
+      isFilled(Reflect.get(profile, 'nsec')) ||
+      isFilled(Reflect.get(profile, 'nut13')) ||
+      isFilled(rootKey)
+    ) {
+      keyWithoutPhrase = true;
+    }
   }
-  return [...phrases];
+  return { phrases: [...phrases], keyWithoutPhrase };
 }
 
 /**
- * Removes the row when it is spent: every proof is in a wallet or was spent,
- * no old invoice has ecash waiting, and the only phrase in it is the one this
- * phone already keeps in SecureStore. Otherwise the row stays as it is.
+ * Removes the row when nothing in it is owed to the person any more.
+ *
+ * A row that holds ecash, old invoices or a phrase is removed once every proof
+ * is in a wallet or was spent, no old invoice has ecash waiting, and the only
+ * phrase in it is the one this phone already keeps in SecureStore.
+ *
+ * Most rows hold none of that. Redux stayed mounted until 0.1.1, so every
+ * install from 0.0.45 on wrote its initial state here: one empty profile and
+ * no ecash. Such a row is removed as it is, with no request to any mint.
+ *
+ * Otherwise the row stays exactly as it was.
  */
 async function removeRowIfSpent(raw: string, read: ReadRow, isLive: () => boolean): Promise<void> {
   const store = useLegacyEcashStore.getState();
   const verdict = legacyEcashVerdict(read, store);
   if (!verdict.rowIsSpent) return;
 
-  const phrases = reduxEraPhrases(raw);
+  const secrets = reduxEraSecrets(raw);
   const stored = await retrieveMnemonic();
   if (!isLive()) return;
-  const phraseIsKept =
-    phrases !== null && phrases.length > 0 && phrases.every((phrase) => phrase === stored);
-  if (!phraseIsKept) {
-    cashuLog.info('cashu.legacy_ecash.row_kept_for_phrase', { phrases: phrases?.length ?? null });
+  const nothingToLose =
+    secrets !== null &&
+    !secrets.keyWithoutPhrase &&
+    // Holds for a row with no phrase at all: it has none to lose.
+    secrets.phrases.every((phrase) => phrase === stored);
+  if (!nothingToLose) {
+    cashuLog.info('cashu.legacy_ecash.row_kept_for_secrets', {
+      phrases: secrets?.phrases.length ?? null,
+      keyWithoutPhrase: secrets?.keyWithoutPhrase ?? null,
+    });
     return;
   }
 

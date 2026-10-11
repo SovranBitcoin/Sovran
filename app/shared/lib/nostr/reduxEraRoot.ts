@@ -77,8 +77,27 @@ export function readReduxEraRoot(raw: string | null): ReduxEraRoot {
   }
 
   // The old app wrote this row on first launch, before any wallet existed,
-  // and wrote it again after a reset. Only that explicitly empty state is
-  // evidence that there was never a phrase to lose.
-  const neverSetUp = profiles.length === 0 && current?.mnemonic === undefined;
+  // and wrote it again after a reset. Releases 0.0.45 to 0.1.1 still wrote
+  // it, as redux's starting state: one profile whose identity and secrets are
+  // all empty strings. Only a row that explicitly names no identity is
+  // evidence that there was never a phrase to lose; a profile with a public
+  // key and no phrase is not.
+  const neverSetUp = profiles.every(isBlank) && isBlank(current);
   return neverSetUp ? { kind: 'none' } : { kind: 'unreadable' };
+}
+
+/** True for a profile whose identity, phrase and keys are all absent or empty. */
+function isBlank(profile: unknown): boolean {
+  if (profile === undefined) return true;
+  if (typeof profile !== 'object' || profile === null) return false;
+  const root: unknown = Reflect.get(profile, 'root');
+  const fields: unknown[] = [
+    Reflect.get(profile, 'pubkey'),
+    Reflect.get(profile, 'npub'),
+    Reflect.get(profile, 'mnemonic'),
+    Reflect.get(profile, 'nsec'),
+    Reflect.get(profile, 'nut13'),
+    typeof root === 'object' && root !== null ? Reflect.get(root, 'xpriv') : root,
+  ];
+  return fields.every((field) => field === undefined || field === '');
 }

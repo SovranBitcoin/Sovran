@@ -471,8 +471,8 @@ async function ensureMnemonicExistsInner(): Promise<string | null> {
     }
     if (reduxEra.kind === 'phrase') {
       // seedCreatedAt stays unset: this install did not create the phrase, so
-      // startup offers a restore from the mints. The old proofs are not
-      // imported and stay in the row, which is left untouched.
+      // startup offers a restore from the mints. The old proofs stay in the
+      // row until `cashu/legacyEcashClaim` has claimed them (ADR 32).
       if (!(await storeMnemonic(reduxEra.mnemonic))) {
         nostrLog.error('nostr.secure.store_redux_era_mnemonic_failed');
         return null;

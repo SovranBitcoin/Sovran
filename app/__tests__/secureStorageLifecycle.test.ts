@@ -369,6 +369,47 @@ describe('secureStorage mnemonic and seed lifecycle', () => {
       expect(getRandomValues).toHaveBeenCalledTimes(1);
     });
 
+    it('creates a wallet over the row 0.0.45 to 0.1.1 wrote before any wallet existed', async () => {
+      // Redux's starting state, as a 0.0.63 build wrote it on an iPhone
+      // simulator: one profile, every secret an empty string.
+      const blank = {
+        id: 0,
+        mnemonic: '',
+        pubkey: '',
+        npub: '',
+        nsec: '',
+        nut13: '',
+        root: { xpub: '', xpriv: '' },
+      };
+      mockReduxRow = reduxRow({ currentProfile: { id: 0 }, profiles: [blank] });
+      const getRandomValues = jest.fn((entropy: Uint8Array) => entropy.fill(0));
+      Object.defineProperty(globalThis, 'crypto', {
+        configurable: true,
+        value: { getRandomValues },
+      });
+
+      await expect(ensureMnemonicExists()).resolves.toBe(VALID_MNEMONIC);
+      expect(getRandomValues).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([
+      ['a key and no phrase', { nsec: 'nsec1notempty' }],
+      ['an extended private key and no phrase', { root: { xpub: '', xpriv: 'xprv9notempty' } }],
+      ['a phrase that does not validate', { mnemonic: 'not a real phrase' }],
+    ])('still locks over a row whose profile holds %s', async (_case, held) => {
+      const profile = { id: 0, mnemonic: '', nsec: '', nut13: '', root: { xpriv: '' }, ...held };
+      mockReduxRow = reduxRow({ currentProfile: { id: 0 }, profiles: [profile] });
+      const getRandomValues = jest.fn();
+      Object.defineProperty(globalThis, 'crypto', {
+        configurable: true,
+        value: { getRandomValues },
+      });
+
+      await expect(ensureMnemonicExists()).resolves.toBeNull();
+      expect(useSecureStoreState.getState().secureStoreState).toBe('locked');
+      expect(getRandomValues).not.toHaveBeenCalled();
+    });
+
     it('keeps a stored root over the phrase in the row', async () => {
       mockSecureBacking.set('user_mnemonic', VALID_MNEMONIC);
       mockReduxRow = reduxRow({ profiles: [reduxProfile(0, OTHER_MNEMONIC)] });

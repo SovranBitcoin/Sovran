@@ -667,6 +667,142 @@ describe('claiming', () => {
   });
 });
 
+describe('a row that holds nothing', () => {
+  /**
+   * `persist:SOVRAN` as a 0.0.63 build (28bf7713a) wrote it on an iPhone
+   * simulator: redux's initial state, with every field of the one profile
+   * empty. Copied from that run, less the list of public profile cards under
+   * `nostr.search`. Every install from 0.0.45 to 0.1.1 has this row.
+   */
+  const row0063 = (profile: Record<string, unknown> = {}, proofs: unknown = {}) =>
+    JSON.stringify({
+      settings: JSON.stringify({
+        settings: {
+          lang: 'en',
+          theme: 'dark',
+          display_btc: 3,
+          passcode: '',
+          experimental: false,
+          termsAccepted: null,
+        },
+      }),
+      cashu: JSON.stringify({
+        profiles: [{ mints: [], proofs, counters: {}, keysets: {}, transactions: [] }],
+        audits: {},
+        info: {},
+        keys: {},
+        keysets: {},
+        allocation: {},
+      }),
+      nostr: JSON.stringify({
+        currentProfile: { id: 0 },
+        search: [],
+        profiles: [
+          {
+            id: 0,
+            mnemonic: '',
+            pubkey: '',
+            profile: { created_at: 0, profileEvent: '', name: '', picture: '', image: '' },
+            npub: '',
+            nsec: '',
+            mints: [],
+            picture: '',
+            root: { xpub: '', xpriv: '' },
+            nut13: '',
+            ...profile,
+          },
+        ],
+        messages: { loaded_messages: [] },
+        follows: {},
+        contacts: [],
+      }),
+      _persist: '{"version":251,"rehydrated":true}',
+    });
+
+  it('removes the row a 0.0.63 build wrote, with a note and no mint request, and then does nothing', async () => {
+    mockDisk.set(ROW, row0063());
+    const coco = fakeCoco();
+
+    await launch(coco);
+
+    expect(mockDisk.has(ROW)).toBe(false);
+    expect(useLegacyEcashStore.getState()).toMatchObject({
+      groups: {},
+      quotes: {},
+      rowRemoved: { at: START, groups: 0, claimed: {}, spent: {}, inWallet: {} },
+    });
+    expect(mintRequest).not.toHaveBeenCalled();
+    expect(coco.operations.size).toBe(0);
+
+    const afterFirst = mockDisk.get(STORE);
+    now += 24 * HOUR_MS;
+    await launch(coco);
+    expect(storeWrites()).toBe(0);
+    expect(mockDisk.get(STORE)).toBe(afterFirst);
+    expect(mintRequest).not.toHaveBeenCalled();
+  });
+
+  it('removes it on a phone whose SecureStore holds no phrase to compare with', async () => {
+    mockDisk.set(ROW, row0063());
+    jest.mocked(retrieveMnemonic).mockResolvedValue(null);
+
+    await launch(fakeCoco());
+
+    expect(mockDisk.has(ROW)).toBe(false);
+  });
+
+  it('keeps a row with no ecash whose phrase is not the stored one', async () => {
+    const row = row0063({ mnemonic: OTHER_PHRASE });
+    mockDisk.set(ROW, row);
+
+    await launch(fakeCoco());
+
+    expect(mockDisk.get(ROW)).toBe(row);
+    expect(useLegacyEcashStore.getState().rowRemoved).toBeNull();
+    expect(mintRequest).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['a Nostr key', { nsec: 'nsec1fixture' }],
+    ['a root key', { root: { xpub: '', xpriv: 'xprvfixture' } }],
+    ['a Cashu phrase', { nut13: OTHER_PHRASE }],
+  ])('keeps a row whose profile holds %s and no phrase to derive it from', async (_name, held) => {
+    const row = row0063(held);
+    mockDisk.set(ROW, row);
+
+    await launch(fakeCoco());
+
+    expect(mockDisk.get(ROW)).toBe(row);
+  });
+
+  it('claims a proof from a row with an empty phrase the normal way, then removes the row', async () => {
+    mockDisk.set(ROW, row0063({}, { [MINT]: [PROOFS[0]] }));
+    const coco = fakeCoco();
+
+    await launch(coco);
+
+    // The row never cached the keyset's unit, so the mint's own list supplied it.
+    expect(coco.saved).toEqual([64]);
+    expect(group()).toMatchObject({ status: 'settled', claimed: 64, unit: 'sat' });
+    expect(mockDisk.has(ROW)).toBe(false);
+    expect(useLegacyEcashStore.getState().rowRemoved).toMatchObject({
+      groups: 1,
+      claimed: { sat: 64 },
+    });
+  });
+
+  it('keeps that row while its proof is unsettled', async () => {
+    const row = row0063({}, { [MINT]: [PROOFS[0]] });
+    mockDisk.set(ROW, row);
+    mint.reachable = false;
+
+    await launch(fakeCoco());
+
+    expect(group()).toMatchObject({ status: 'open', attempts: 1 });
+    expect(mockDisk.get(ROW)).toBe(row);
+  });
+});
+
 describe('a claim interrupted between the mint’s swap and the record', () => {
   async function killDuringClaim(coco: ReturnType<typeof fakeCoco>) {
     mockDisk.set(ROW, oldRow([oldProfile({ [MINT]: PROOFS })]));
