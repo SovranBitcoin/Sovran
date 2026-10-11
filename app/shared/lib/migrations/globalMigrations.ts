@@ -268,13 +268,23 @@ async function adoptLeftoverBareStores(): Promise<void | typeof RUN_AGAIN> {
   let unconfirmed = false;
   for (const [base, data] of leftovers) {
     const ownKey = `${base}:profile:${owner}`;
-    if ((await AsyncStorage.getItem(ownKey)) !== null) continue;
-    await AsyncStorage.setItem(ownKey, data);
-    if ((await AsyncStorage.getItem(ownKey)) !== data) {
-      // A save can be dropped without an error. Try again next launch.
-      unconfirmed = true;
-      continue;
+    const existing = await AsyncStorage.getItem(ownKey);
+    if (existing !== null && existing !== data) continue;
+    if (existing === null) {
+      await AsyncStorage.setItem(ownKey, data);
+      if ((await AsyncStorage.getItem(ownKey)) !== data) {
+        // A save can be dropped, or land damaged, without an error. Whatever
+        // is there now is this copy's own doing (the key was empty a moment
+        // ago), and left in place it would pass for the account's own data on
+        // the next launch and never be corrected. Take it back and try again
+        // next launch.
+        await AsyncStorage.removeItem(ownKey);
+        unconfirmed = true;
+        continue;
+      }
     }
+    // Reached with a confirmed copy, or with one an earlier run made and was
+    // stopped before removing its source.
     await AsyncStorage.removeItem(base);
     adoptedCount++;
   }

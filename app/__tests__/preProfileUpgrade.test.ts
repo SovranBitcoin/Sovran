@@ -378,6 +378,38 @@ describe('an install that passed through 0.0.62 to 0.1.3 with its stores left be
     expect(completed()).toContain(ADOPT_MIGRATION);
   });
 
+  it('takes back a copy that landed damaged, and adopts it properly on the next launch', async () => {
+    strandedInstall();
+    const realSet = jest.mocked(AsyncStorage.setItem).getMockImplementation()!;
+    jest.mocked(AsyncStorage.setItem).mockImplementation(async (key, value) => {
+      await realSet(key, key === ownKey('routstr-store') ? value.slice(0, 10) : value);
+    });
+
+    await runGlobalMigrations();
+
+    // Not left holding the damaged copy, which would pass for the account's own data.
+    expect(mockStorage[ownKey('routstr-store')]).toBeUndefined();
+    expect(mockStorage['routstr-store']).toBe(MOVED['routstr-store']);
+    expect(completed()).not.toContain(ADOPT_MIGRATION);
+
+    jest.mocked(AsyncStorage.setItem).mockImplementation(realSet);
+    await runGlobalMigrations();
+    expect(mockStorage[ownKey('routstr-store')]).toBe(MOVED['routstr-store']);
+    expect(mockStorage['routstr-store']).toBeUndefined();
+    expect(completed()).toContain(ADOPT_MIGRATION);
+  });
+
+  it('finishes an adoption that was stopped between the copy and removing its source', async () => {
+    strandedInstall();
+    mockStorage[ownKey('routstr-store')] = MOVED['routstr-store'];
+
+    await runGlobalMigrations();
+
+    expect(mockStorage[ownKey('routstr-store')]).toBe(MOVED['routstr-store']);
+    expect(mockStorage['routstr-store']).toBeUndefined();
+    expect(completed()).toContain(ADOPT_MIGRATION);
+  });
+
   it('does not hand the leftovers to an account 0 that is not the phrase\u2019s first account', async () => {
     strandedInstall();
     const imported = 'b'.repeat(64);

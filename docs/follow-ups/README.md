@@ -109,7 +109,6 @@ reports) keep their evidence, and link here for anything still open.
 | [F100](F100.md) | medium | device | An install left unstamped by 0.0.63 to 0.1.3 is still asked to restore, and the upgrade fix is unseen on a device |
 | [F101](F101.md) | low | decision | Confirm the curated For You account list and each key before the feed ships |
 | [F102](F102.md) | low | device | Re-test whether the bitchat announce patch is still needed against the current App Store build |
-| [F105](F105.md) | medium | fix | Adopting leftover stores skips a destination that holds the wrong data |
 | [F108](F108.md) | medium | fix | Open work recorded in other documents has not been moved into this ledger |
 | [F109](F109.md) | high | test | The newest release fixture is mostly defaults, and nothing generates or freezes a fixture |
 | [F111](F111.md) | medium | device | No old build is kept for iPhone, and the upgrade from the last release is run by hand |
