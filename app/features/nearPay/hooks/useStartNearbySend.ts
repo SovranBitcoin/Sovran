@@ -21,7 +21,11 @@ import {
 /** Destination-first entry shared by Send and the nearby list. */
 export function useStartNearbySend() {
   const walletContext = useWalletContext();
-  const machine = usePaymentFlowMachine({ walletContext, unit: 'sat' });
+  // No unit pin. A nearby send only starts when the active unit is sat (the
+  // check below), and then the machine's own unit is already sat. Pinning for
+  // as long as this hook is mounted put sat over the Send screen's unit for
+  // every other flow started from it.
+  const machine = usePaymentFlowMachine({ walletContext });
   const { isOffline } = useOfflineStatus();
   return async (peer: BLEPeer, beforeStart?: () => void) => {
     if (toRealUnit(useMintStore.getState().activeUnit) !== 'sat')

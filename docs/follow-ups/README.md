@@ -116,6 +116,5 @@ reports) keep their evidence, and link here for anything still open.
 | [F113](F113.md) | high | decision | A store with one bad saved field runs on defaults for every field, and nothing says so |
 | [F114](F114.md) | medium | investigation | Counter reads and the transaction scope sit outside the root write queue |
 | [F116](F116.md) | medium | fix | A swap step that depends on money still settling is retried or skipped as if it had not been sent |
-| [F117](F117.md) | medium | investigation | The Send screen pins sat over its own unit, because the nearby-send hook pins on mount |
 
 <!-- list:end -->
