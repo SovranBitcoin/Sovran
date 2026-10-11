@@ -64,11 +64,9 @@ describe('mint selector — account scope', () => {
   });
 
   // "as Onchain" resolves through `resolveNext`/`handleAmountEntered`, not
-  // `requestMintSelector`, and gets the account rule only indirectly: a mint
-  // across the split reads as method-UNSUPPORTED, and that reason is hidden
-  // from flow pickers. Locked here because the two rules are independent —
-  // dropping MINT_METHOD_UNSUPPORTED from the hide list would silently put the
-  // other account's mints back in this picker.
+  // `requestMintSelector`. It used to get the account rule only indirectly (a
+  // mint across the split reads as method-unsupported, and that reason is
+  // hidden from flow pickers); it now gets it by name, like every picker.
   it('leaves the other account out of an "as Onchain" receive picker', async () => {
     const tm = createTestMachine({ wallet });
     await tm.machine.enterAmount({ value: 100, unit: 'sat' }, '', {
@@ -77,6 +75,45 @@ describe('mint selector — account scope', () => {
     });
     tm.assertStep('selectMint');
     expect(candidateUrls(tm)).toEqual([MINT1]);
+  });
+
+  // The other account's mint is funded here on purpose. It normally reads as
+  // zero from inside this account, which is the only thing that kept it out of
+  // these pickers; the rule has to hold without that.
+  const fundedOtherAccount = {
+    ...wallet,
+    mintBalances: { [MINT1]: 1000, [MINT2]: 5000 },
+  };
+  const THIRD = 'https://third.mint.example';
+  const twoInAccount = {
+    mintBalances: { [MINT1]: 1000, [THIRD]: 1000, [MINT2]: 5000 },
+    trustedMintUrls: [MINT1, THIRD, MINT2],
+    mintMethodCapabilities: deriveMintMethodCapabilityMapFromTrustedMints([
+      { mintUrl: MINT1, mintInfo: bolt11Info },
+      { mintUrl: THIRD, mintInfo: bolt11Info },
+      { mintUrl: MINT2, mintInfo: bolt11Info, outsideAccount: true },
+    ]),
+  };
+
+  it('picks an ecash send mint from this account though the other account holds more', async () => {
+    const tm = createTestMachine({ wallet: twoInAccount });
+    await tm.machine.enterAmount({ value: 100, unit: 'sat' }, '', { destination: 'sendEcash' });
+    expect([MINT1, THIRD]).toContain(tm.machine.getContext().mintUrl);
+  });
+
+  it('leaves a funded mint of the other account out of a Lightning receive picker', async () => {
+    const tm = createTestMachine({ wallet: { ...twoInAccount } });
+    await tm.machine.enterAmount({ value: 100, unit: 'sat' }, '', { destination: 'mintQuote' });
+    tm.assertStep('selectMint');
+    expect(candidateUrls(tm)).not.toContain(MINT2);
+  });
+
+  it('never sends from the other account because it is the only funded mint', async () => {
+    const tm = createTestMachine({
+      wallet: { ...fundedOtherAccount, mintBalances: { [MINT1]: 0, [MINT2]: 5000 } },
+    });
+    await tm.machine.enterAmount({ value: 100, unit: 'sat' }, '', { destination: 'sendEcash' });
+    expect(tm.machine.getContext().mintUrl).not.toBe(MINT2);
   });
 
   it("lists both sides in the wallet's own picker", async () => {

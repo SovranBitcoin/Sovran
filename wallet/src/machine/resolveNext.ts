@@ -2,6 +2,8 @@ import type { LocalizedReason } from "../formatting/locales";
 import { logger } from "../logger";
 import { isLockedSend } from "../p2pk";
 import {
+  accountMintCandidates,
+  accountMintUrls,
   buildMethodAwareMintCandidates,
   createAmountEntryMethodContext,
   getCapabilityUnavailableReason,
@@ -838,7 +840,7 @@ export function resolveNext(
         },
       );
     }
-    const candidates = walletCtx.trustedMintUrls.map((mintUrl) => ({
+    const candidates = accountMintUrls(walletCtx).map((mintUrl) => ({
       mintUrl,
       balance: walletCtx.mintBalances[mintUrl] ?? 0,
     }));
@@ -847,7 +849,10 @@ export function resolveNext(
       {
         step: "selectMint",
         data: {
-          candidates: methodCandidates ?? candidates,
+          candidates: accountMintCandidates(
+            walletCtx,
+            methodCandidates ?? candidates,
+          ),
           supportedMintUrls,
           amount,
           unit,
