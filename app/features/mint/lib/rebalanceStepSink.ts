@@ -28,7 +28,7 @@ export const PAYMENT_PENDING_DETAIL =
   'Payment pending. Please wait and reopen later; the app will recover this operation automatically.';
 
 /** Row copy for a transfer whose money has left but has not been seen to arrive. */
-export const SETTLING_DETAIL =
+const SETTLING_DETAIL =
   'Sent. The receiving mint has not credited it yet; this updates when it does.';
 
 function routingToStepState(routing: RebalanceRoutingInfo | null): Partial<StepState> {
