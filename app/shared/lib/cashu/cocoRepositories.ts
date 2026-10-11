@@ -201,12 +201,19 @@ function wrapCounterRepository(
       if (held.length === 0) return { mintUrl, keysetId, counter: 0 };
       // Saved, not only reported: once that proof is sent it is no longer
       // held, and the next read would go back to 0.
+      // Another write may have raised the counter since the read above, so
+      // the answer is whatever the queued task finds or leaves saved.
+      let counter = 1;
       await enqueue(`${mintUrl}\u0000${keysetId}`, async () => {
         const current = await repository.getCounter(mintUrl, keysetId);
-        if (!current || current.counter < 1) await repository.setCounter(mintUrl, keysetId, 1);
+        if (current && current.counter >= 1) {
+          counter = current.counter;
+          return;
+        }
+        await repository.setCounter(mintUrl, keysetId, 1);
       });
-      cashuLog.info('cashu.repository.counter.zero_with_proofs_raised', { keysetId });
-      return { mintUrl, keysetId, counter: 1 };
+      cashuLog.info('cashu.repository.counter.zero_with_proofs_raised', { keysetId, counter });
+      return { mintUrl, keysetId, counter };
     },
     setCounter: async (mintUrl, keysetId, requested) => {
       const counter = Math.max(requested, 1);

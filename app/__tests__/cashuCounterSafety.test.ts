@@ -315,6 +315,23 @@ describe('a wallet an earlier build restored to counter 0', () => {
     });
   });
 
+  it('reports the saved counter when a higher write lands before its own', async () => {
+    const delegate = counterRepository();
+    await delegate.setCounter(MINT_URL, 'keyset-a', 0);
+    const proofs = proofRepository(['keyset-a']);
+    const wrapped = createSovranCocoRepositories(repositories(delegate, proofs));
+    // The proof lookup sits between the read of 0 and the queued write of 1.
+    proofs.getProofsByKeysetId.mockImplementationOnce(async (_mintUrl, keysetId) => {
+      await wrapped.counterRepository.setCounter(MINT_URL, 'keyset-a', 9);
+      return [{ id: keysetId, secret: 'secret', state: 'ready' }];
+    });
+
+    await expect(wrapped.counterRepository.getCounter(MINT_URL, 'keyset-a')).resolves.toMatchObject(
+      { counter: 9 }
+    );
+    expect(delegate.rows.get(`${MINT_URL}\u0000keyset-a`)).toMatchObject({ counter: 9 });
+  });
+
   it('does not look at proofs once the counter has moved', async () => {
     const delegate = counterRepository();
     const proofs = proofRepository(['keyset-a']);

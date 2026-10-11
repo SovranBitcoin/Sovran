@@ -119,7 +119,6 @@ reports) keep their evidence, and link here for anything still open.
 | [F100](F100.md) | medium | device | An install left unstamped by 0.0.63 to 0.1.3 is still asked to restore, and the upgrade fix is unseen on a device |
 | [F101](F101.md) | low | decision | Confirm the curated For You account list and each key before the feed ships |
 | [F102](F102.md) | low | device | Re-test whether the bitchat announce patch is still needed against the current App Store build |
-| [F103](F103.md) | high | fix | The wallet counter read can report 1 while a higher counter is saved |
 | [F104](F104.md) | medium | fix | Profile removal deletes the wallet database before the forget-record is known to be saved |
 | [F105](F105.md) | medium | fix | Adopting leftover stores skips a destination that holds the wrong data |
 | [F106](F106.md) | medium | fix | Ten adapter slots on the wallet provider are declared and never read |
