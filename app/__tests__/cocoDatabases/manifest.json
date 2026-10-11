@@ -1,0 +1,148 @@
+[
+  {
+    "package": "coco-cashu-expo-sqlite",
+    "version": "0.6.0",
+    "corePackage": "coco-cashu-core",
+    "coreVersion": "1.0.0-rc10",
+    "releases": [
+      "0.0.45 (build 25)"
+    ],
+    "database": "coco-cashu-expo-sqlite@0.6.0.db",
+    "written": "coco-cashu-expo-sqlite@0.6.0.json",
+    "sha256": "3e60bd9c708d423673a58ff81b3e0605f6e0a93035bf211cb27481254afee4e8"
+  },
+  {
+    "package": "coco-cashu-expo-sqlite",
+    "version": "1.0.0-rc11",
+    "corePackage": "coco-cashu-core",
+    "coreVersion": "1.0.0-rc11",
+    "releases": [
+      "0.0.45 (build 1)",
+      "0.0.50",
+      "0.0.51 (first builds)"
+    ],
+    "database": "coco-cashu-expo-sqlite@1.0.0-rc11.db",
+    "written": "coco-cashu-expo-sqlite@1.0.0-rc11.json",
+    "sha256": "e71a71e0840cb218df722a3b23fab6ec2cd992263017cdb3f080671bb831a0c4"
+  },
+  {
+    "package": "coco-cashu-expo-sqlite",
+    "version": "1.1.2-rc.30",
+    "corePackage": "coco-cashu-core",
+    "coreVersion": "1.1.2-rc.30",
+    "releases": [
+      "0.0.51"
+    ],
+    "database": "coco-cashu-expo-sqlite@1.1.2-rc.30.db",
+    "written": "coco-cashu-expo-sqlite@1.1.2-rc.30.json",
+    "sha256": "b82a1928453c851a812b3797a83f23ed59ea071356c0a9a4c6748c0f96f65b8b"
+  },
+  {
+    "package": "coco-cashu-expo-sqlite",
+    "version": "1.1.2-rc.32",
+    "corePackage": "coco-cashu-core",
+    "coreVersion": "1.1.2-rc.32",
+    "releases": [
+      "0.0.51 (builds 19 to 21)"
+    ],
+    "database": "coco-cashu-expo-sqlite@1.1.2-rc.32.db",
+    "written": "coco-cashu-expo-sqlite@1.1.2-rc.32.json",
+    "sha256": "26f898f8409845b5800a4dbdb0d3e50c45e56bfca00e70fbefcfc8592cd43ccc"
+  },
+  {
+    "package": "coco-cashu-expo-sqlite",
+    "version": "1.1.2-rc.34",
+    "corePackage": "coco-cashu-core",
+    "coreVersion": "1.1.2-rc.34",
+    "releases": [
+      "0.0.51 (last builds)",
+      "0.0.52",
+      "0.0.53",
+      "0.0.54",
+      "0.0.55",
+      "0.0.56 (before build 31)"
+    ],
+    "database": "coco-cashu-expo-sqlite@1.1.2-rc.34.db",
+    "written": "coco-cashu-expo-sqlite@1.1.2-rc.34.json",
+    "sha256": "7a476deb22b55cbb2ec639813847aa8e839b8553dbe704e0b794c325dca22e1a"
+  },
+  {
+    "package": "coco-cashu-expo-sqlite",
+    "version": "1.1.2-rc.47",
+    "corePackage": "coco-cashu-core",
+    "coreVersion": "1.1.2-rc.47",
+    "releases": [
+      "0.0.56 (builds 31 to 43)",
+      "0.0.57",
+      "0.0.58",
+      "0.0.60",
+      "0.0.61"
+    ],
+    "database": "coco-cashu-expo-sqlite@1.1.2-rc.47.db",
+    "written": "coco-cashu-expo-sqlite@1.1.2-rc.47.json",
+    "sha256": "588efb9dc56fa45a38aee1fc402ddf9c34edb3ab4fe2b44727d1f8044395de8f"
+  },
+  {
+    "package": "@cashu/coco-expo-sqlite",
+    "version": "1.0.0-rc.0",
+    "corePackage": "@cashu/coco-core",
+    "coreVersion": "1.0.0-rc.0",
+    "releases": [
+      "0.0.62",
+      "0.0.63 (builds before 2026-04-28)"
+    ],
+    "database": "cashu-coco-expo-sqlite@1.0.0-rc.0.db",
+    "written": "cashu-coco-expo-sqlite@1.0.0-rc.0.json",
+    "sha256": "75a54ffbad19af1485f545c17da81de84f038335ee15fcaf2845c927ea0a6288"
+  },
+  {
+    "package": "@cashu/coco-expo-sqlite",
+    "version": "1.0.0-rc.5",
+    "corePackage": "@cashu/coco-core",
+    "coreVersion": "1.0.0-rc.5",
+    "releases": [
+      "0.0.63 (builds from 2026-04-28, inferred)"
+    ],
+    "database": "cashu-coco-expo-sqlite@1.0.0-rc.5.db",
+    "written": "cashu-coco-expo-sqlite@1.0.0-rc.5.json",
+    "sha256": "7ff8ec58442c22e7f8f1f9af607d24a309e7ed5d9ae1c32c22772922337dfa33"
+  },
+  {
+    "package": "@cashu/coco-expo-sqlite",
+    "version": "1.0.0",
+    "corePackage": "@cashu/coco-core",
+    "coreVersion": "1.0.0",
+    "releases": [
+      "0.1.0"
+    ],
+    "database": "cashu-coco-expo-sqlite@1.0.0.db",
+    "written": "cashu-coco-expo-sqlite@1.0.0.json",
+    "sha256": "0674b320394022ba30c572f28eb13a2a1af1f06746b9d55124eb1d6c5c5db8b8"
+  },
+  {
+    "package": "@cashu/coco-expo-sqlite",
+    "version": "1.0.1",
+    "corePackage": "@cashu/coco-core",
+    "coreVersion": "1.0.1",
+    "releases": [
+      "0.1.1"
+    ],
+    "database": "cashu-coco-expo-sqlite@1.0.1.db",
+    "written": "cashu-coco-expo-sqlite@1.0.1.json",
+    "sha256": "73161a640f1a0bede6e5a8290c86e64e719b9663de77b6747a9874286d94ae1e"
+  },
+  {
+    "package": "@cashu/coco-expo-sqlite",
+    "version": "2.0.0",
+    "corePackage": "@cashu/coco-core",
+    "coreVersion": "2.0.0",
+    "releases": [
+      "0.1.2",
+      "0.1.3",
+      "0.1.4 (unreleased)"
+    ],
+    "database": "cashu-coco-expo-sqlite@2.0.0.db",
+    "written": "cashu-coco-expo-sqlite@2.0.0.json",
+    "sha256": "e439cb8e33cf85d8b2476d8720f8e6624531cd7feb55ea05e786ba9614b5dd7d"
+  }
+]

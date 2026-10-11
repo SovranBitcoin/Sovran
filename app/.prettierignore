@@ -20,3 +20,6 @@ e2e/fixtures/*.json
 # Deterministic generator output; validated by assets:check / publicDemoSnapshot tests.
 assets/brand/generated/**
 shared/stores/runtime/fixtures/publicDemoSnapshot.json
+
+# Written by scripts/make-coco-fixture.mjs; checked by cocoDatabaseUpgrade.test.ts.
+__tests__/cocoDatabases/*.json

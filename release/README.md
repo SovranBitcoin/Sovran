@@ -24,6 +24,12 @@ published, run `python3 .agents/skills/persistence-release-safety/epochs.py buil
 the updated `docs/architecture/persistence/store-builds.tsv`, so the builds that shipped are
 the ones the fixtures are checked against.
 
+The wallet's own databases have the same guard. `app/__tests__/cocoDatabaseUpgrade.test.ts`
+opens a database written by every Coco version that shipped and fails when `app/package.json`
+names a Coco that has none; a release that keeps the Coco version adds its name to the last
+entry of `app/__tests__/cocoDatabases/manifest.json`. `cd app && bun run test:upgrade` runs
+every upgrade test in one command.
+
 Refresh the marketing material in that same pre-merge step. Once a release is
 decided, run the full native capture campaign and commit its output: the website's
 phone scenes and generated social/OG rasters build directly from

@@ -88,6 +88,7 @@
     "ios": "expo run:ios",
     "screenshots": "node scripts/resize-screenshots.js",
     "test": "jest",
+    "test:upgrade": "jest __tests__/releaseFixtures.test.ts __tests__/releaseFixturesCompleteness.test.ts __tests__/releasedPersistedSurface.test.ts __tests__/cocoDatabaseUpgrade.test.ts --runInBand",
     "test:design-system": "jest __tests__/designSystemScenarioSnapshots.test.tsx __tests__/designSystemComponentInventory.test.ts --runInBand",
     "test:release": "node --test ../release/tests/*.test.mjs && python3 -m unittest discover -s ../release/tests -p 'test_*.py'",
     "probe:nagg": "bun features/feed/data/__scripts__/probeNagg.ts"

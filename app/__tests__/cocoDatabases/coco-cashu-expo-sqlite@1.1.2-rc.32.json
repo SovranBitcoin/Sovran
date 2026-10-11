@@ -1,0 +1,338 @@
+{
+  "package": "coco-cashu-expo-sqlite",
+  "version": "1.1.2-rc.32",
+  "lastMigrationAtWrite": "009_history_send_operation",
+  "written": {
+    "mints": [
+      {
+        "mintUrl": "https://mint-a.fixture.example",
+        "name": "Fixture mint A",
+        "trusted": true
+      },
+      {
+        "mintUrl": "https://mint-b.fixture.example/Bitcoin",
+        "name": "Fixture mint B",
+        "trusted": false
+      }
+    ],
+    "keysets": [
+      {
+        "mintUrl": "https://mint-a.fixture.example",
+        "id": "00a1b2c3d4e5f601",
+        "unit": "sat",
+        "active": true,
+        "feePpk": 0
+      },
+      {
+        "mintUrl": "https://mint-a.fixture.example",
+        "id": "00a1b2c3d4e5f602",
+        "unit": "sat",
+        "active": false,
+        "feePpk": 100
+      },
+      {
+        "mintUrl": "https://mint-b.fixture.example/Bitcoin",
+        "id": "00b1b2c3d4e5f601",
+        "unit": "sat",
+        "active": true,
+        "feePpk": 0
+      }
+    ],
+    "counters": [
+      {
+        "mintUrl": "https://mint-a.fixture.example",
+        "keysetId": "00a1b2c3d4e5f601",
+        "counter": 42
+      },
+      {
+        "mintUrl": "https://mint-a.fixture.example",
+        "keysetId": "00a1b2c3d4e5f602",
+        "counter": 5
+      },
+      {
+        "mintUrl": "https://mint-b.fixture.example/Bitcoin",
+        "keysetId": "00b1b2c3d4e5f601",
+        "counter": 7
+      }
+    ],
+    "proofs": [
+      {
+        "mintUrl": "https://mint-a.fixture.example",
+        "id": "00a1b2c3d4e5f601",
+        "amount": 1,
+        "secret": "6e654c7e8c8b65b084c2839c535abce42428991823f05be53242b741ce3e4317",
+        "C": "02c3e5f302a1ed9bd7234e56f6017aefb9b8bd1ca83f5e0501821978728eb56d56",
+        "state": "ready"
+      },
+      {
+        "mintUrl": "https://mint-a.fixture.example",
+        "id": "00a1b2c3d4e5f601",
+        "amount": 2,
+        "secret": "d66789e05244c4a0bd4097cfcb2264d47a7d7f7573fd35ae16bf463c7856fc5d",
+        "C": "025f99ef49924466b5a13c5c99d04ed34bb70caebc7562685dcd21998842e7683b",
+        "state": "ready"
+      },
+      {
+        "mintUrl": "https://mint-a.fixture.example",
+        "id": "00a1b2c3d4e5f601",
+        "amount": 4,
+        "secret": "c91c0d8ade777f95e0202fc4c15e154c4150dc6e1e2bd9a0a3bafcbdf0565028",
+        "C": "02c6e3d45e522017b13a4fcb6fca60585bf340d8da0f4fabeb712b8ed6427881c5",
+        "state": "ready"
+      },
+      {
+        "mintUrl": "https://mint-a.fixture.example",
+        "id": "00a1b2c3d4e5f601",
+        "amount": 8,
+        "secret": "4c35aaee607a5b0d38db6233868311ddf78a97f8b275c69eb8579f7763efdc63",
+        "C": "02e032b521a856432b49403947cef14fd7d6bb8fd07df310e7bf9d8532b380d7e2",
+        "state": "ready"
+      },
+      {
+        "mintUrl": "https://mint-a.fixture.example",
+        "id": "00a1b2c3d4e5f601",
+        "amount": 16,
+        "secret": "09f9a766cdd049eba3ad41cd6408e81441f6474507c63a87fcb4c302eaa2f9bd",
+        "C": "02659898df3533c4d89e2fc2b089377460d797746a0534b6bdafc6afb478be3bd2",
+        "state": "ready"
+      },
+      {
+        "mintUrl": "https://mint-a.fixture.example",
+        "id": "00a1b2c3d4e5f601",
+        "amount": 32,
+        "secret": "7422324ee3317553579aaa03e35b697a2fcffd58730c55bd56f87c304e46c407",
+        "C": "02c1761075c0285d779765282168942b4b5ecfdcad1d2856ef3a06c93d8cde2a16",
+        "state": "ready",
+        "usedByOperationId": "fixture-send-prepared"
+      },
+      {
+        "mintUrl": "https://mint-a.fixture.example",
+        "id": "00a1b2c3d4e5f601",
+        "amount": 64,
+        "secret": "a664d43500baa5612534fcc5a9f9cd9f4f7585bc3ab62ad84ef47f5fbdbc4963",
+        "C": "02d90922bebdcbe5b91b43a46d95d1da6f5bd9e2fc0cc22feeebca3f90888116ef",
+        "state": "inflight"
+      },
+      {
+        "mintUrl": "https://mint-a.fixture.example",
+        "id": "00a1b2c3d4e5f601",
+        "amount": 128,
+        "secret": "b3ad3710c1c88ec11acce1d59742c737a497f9451d92598028e36fd589fe4373",
+        "C": "022e4b5a069ace842d6c423e8b942eeba3cebeb621cb6646c931e4503c4beb94b7",
+        "state": "spent"
+      },
+      {
+        "mintUrl": "https://mint-a.fixture.example",
+        "id": "00a1b2c3d4e5f602",
+        "amount": 2,
+        "secret": "f420cf7e08d6b6a2db93e8c62b3166cc792df7e6e14b80da6db5b13c2da274a6",
+        "C": "0233bff1ce5baae27b5e964287d56d37e4c147ff6b459755fbfb08e66c43a22396",
+        "state": "ready",
+        "dleq": {
+          "e": "065d9c204817764367c675cd64a3d16f7afb1eff8bb0be34fb1d38304c227fca",
+          "s": "ac26beba69c53a8cd633d558b05465e4990d91aa5cf07bb650e82408c338cb0a",
+          "r": "d6e449d8c49cb1018a31f84045af970238e14833cf6d9ff394dd6c7e651b95f7"
+        }
+      },
+      {
+        "mintUrl": "https://mint-b.fixture.example/Bitcoin",
+        "id": "00b1b2c3d4e5f601",
+        "amount": 4,
+        "secret": "1371f699cf8966949005fe51ec455628ded598bfef9b74413e19ae608f10230b",
+        "C": "0223e16c16675eb3dabb01a2ec8518c702053e58a7a13b06166603138f4a30a3c2",
+        "state": "ready"
+      },
+      {
+        "mintUrl": "https://mint-b.fixture.example/Bitcoin",
+        "id": "00b1b2c3d4e5f601",
+        "amount": 16,
+        "secret": "ea072ad09dc5bc0f94ac21476e06f45f9baefde64645073ded60fe68a1200a56",
+        "C": "02d09087cac56fe15eb4af3caae1caf0f78d545f8164f30aee6386e8015c17f427",
+        "state": "ready",
+        "witness": "{\"signatures\":[\"fixture\"]}"
+      },
+      {
+        "mintUrl": "https://mint-b.fixture.example/Bitcoin",
+        "id": "00b1b2c3d4e5f601",
+        "amount": 1,
+        "secret": "23b5c7737ce25390a6f79f86669eebe544a328af520df18f810caac1051b3547",
+        "C": "022807a90db649f3e617e040131e3c06f3d2ef88f609e61feef65af278926deb29",
+        "state": "spent"
+      }
+    ],
+    "mintQuotes": [
+      {
+        "mintUrl": "https://mint-a.fixture.example",
+        "quote": "fixture-mint-unpaid",
+        "state": "UNPAID",
+        "amount": 100,
+        "request": "lnbc1fixtureedfb5dfa0a2fda0329f320f411461cb1e9e4a813",
+        "unit": "sat",
+        "expiry": 1700003600
+      },
+      {
+        "mintUrl": "https://mint-a.fixture.example",
+        "quote": "fixture-mint-paid",
+        "state": "PAID",
+        "amount": 21,
+        "request": "lnbc1fixture6eb8124c216a7e5ed71e73170907e78927f97111",
+        "unit": "sat",
+        "expiry": 1700003600
+      },
+      {
+        "mintUrl": "https://mint-b.fixture.example/Bitcoin",
+        "quote": "fixture-mint-issued",
+        "state": "ISSUED",
+        "amount": 20,
+        "request": "lnbc1fixture98cd1c6df00998152ebf441b1bdaada593c70dc0",
+        "unit": "sat",
+        "expiry": 1700003600
+      }
+    ],
+    "meltQuotes": [
+      {
+        "mintUrl": "https://mint-a.fixture.example",
+        "quote": "fixture-melt-pending",
+        "state": "PENDING",
+        "amount": 60,
+        "fee_reserve": 4,
+        "request": "lnbc1fixture6c5218848d7ad7e8443cc6617e8e5fa503a284ea",
+        "unit": "sat",
+        "expiry": 1700003600
+      },
+      {
+        "mintUrl": "https://mint-b.fixture.example/Bitcoin",
+        "quote": "fixture-melt-paid",
+        "state": "PAID",
+        "amount": 1,
+        "fee_reserve": 0,
+        "payment_preimage": "d953846360b033e4312239537b761f6df68bae3da28b3dda69acf69124141db1",
+        "request": "lnbc1fixtureb94c4099d945793c839d36325bd97831cf7d3918",
+        "unit": "sat",
+        "expiry": 1700003600
+      }
+    ],
+    "history": [
+      {
+        "type": "mint",
+        "mintUrl": "https://mint-a.fixture.example",
+        "unit": "sat",
+        "amount": 21,
+        "createdAt": 1700000000,
+        "quoteId": "fixture-mint-paid",
+        "state": "PAID",
+        "paymentRequest": "lnbc1fixture6eb8124c216a7e5ed71e73170907e78927f97111"
+      },
+      {
+        "type": "melt",
+        "mintUrl": "https://mint-a.fixture.example",
+        "unit": "sat",
+        "amount": 60,
+        "createdAt": 1700000001,
+        "quoteId": "fixture-melt-pending",
+        "state": "PENDING"
+      },
+      {
+        "type": "receive",
+        "mintUrl": "https://mint-b.fixture.example/Bitcoin",
+        "unit": "sat",
+        "amount": 20,
+        "createdAt": 1700000002
+      }
+    ],
+    "keyPairs": [
+      {
+        "publicKeyHex": "02b7d90af545df2deb5f825c5e939862bec792fbe114f56a1e2c7f6230f5da4dd8",
+        "secretKeyHex": "c229357f57794f7195c4037f5e44ecd65cf8e658083f6d89da68cebd42b548da",
+        "derivationIndex": 0
+      }
+    ],
+    "sendOperations": [
+      {
+        "id": "fixture-send-prepared",
+        "mintUrl": "https://mint-a.fixture.example",
+        "amount": 30,
+        "unit": "sat",
+        "state": "prepared",
+        "method": "default",
+        "methodData": {},
+        "needsSwap": true,
+        "fee": 0,
+        "inputAmount": 32,
+        "inputProofSecrets": [
+          "7422324ee3317553579aaa03e35b697a2fcffd58730c55bd56f87c304e46c407"
+        ],
+        "outputData": {
+          "keep": [
+            {
+              "blindedMessage": {
+                "amount": 2,
+                "id": "00a1b2c3d4e5f601",
+                "B_": "02787ed428197e48603af630291e522295c60b21db7e32040f6630e14b5a13b0be"
+              },
+              "blindingFactor": "b732840956173f2e13ec84ed75882ff5899e2fb7dd0fd182b0716e88b28da0d9",
+              "secret": "fbab7d93c90503fdc34f1000079f8d51993d6e2f7a270672e5913b7d3e53751b"
+            }
+          ],
+          "send": [
+            {
+              "blindedMessage": {
+                "amount": 2,
+                "id": "00a1b2c3d4e5f601",
+                "B_": "02df130c1a0fca71635bbfb268e53e841cec5a6841d0ca5e9e7591e79b6600e2a1"
+              },
+              "blindingFactor": "b879be67f527eb6cf2f9b36b088469a7b7c720f4d03721c0d96760b42025fcba",
+              "secret": "84343a04ed376975d7c5e864a9c2f4416470c79951660c7bf50bec140100c657"
+            },
+            {
+              "blindedMessage": {
+                "amount": 4,
+                "id": "00a1b2c3d4e5f601",
+                "B_": "023ff54dc44139b40bba12e6581a0c1260b0f3c0e7506e3a3a2aceb130fb1af0dc"
+              },
+              "blindingFactor": "1fa2a1e63d5972b6341706ae0389454ddb5bc9e5c0fef8c6adb8d2723229eff3",
+              "secret": "9c11b5fd147e59686b9b4151930f5cd5c49eb77f67c5947bbb000694435d1553"
+            },
+            {
+              "blindedMessage": {
+                "amount": 8,
+                "id": "00a1b2c3d4e5f601",
+                "B_": "02d009fb0c693e95aa0c1d7c711fc523e2e9b72c7804f7cb2c59c70a22f0a44452"
+              },
+              "blindingFactor": "435ebc53f3c86d8467af1141b608564d3dc92350c3e7c698d3ef9f0d53259324",
+              "secret": "7ad9f4539ab6332c62d53594afd2503cbd621907b0dbceee547bc8c72e5225df"
+            },
+            {
+              "blindedMessage": {
+                "amount": 16,
+                "id": "00a1b2c3d4e5f601",
+                "B_": "021c2591bcbf113fde47b876beac1d442c204b3293670b63d06f0e4472086d0933"
+              },
+              "blindingFactor": "34b5fa7888d6258cc5739cc69ffb88d147292c7ddbd04eaa18786ef38ce74df2",
+              "secret": "94b70d7621883ba5b9f90cb4eec653a19f55d592ccd813ba70e036d8eedc0c01"
+            }
+          ]
+        },
+        "createdAt": 1700000000000,
+        "updatedAt": 1700000060000
+      },
+      {
+        "id": "fixture-send-done",
+        "mintUrl": "https://mint-a.fixture.example",
+        "amount": 128,
+        "unit": "sat",
+        "state": "completed",
+        "method": "default",
+        "methodData": {},
+        "needsSwap": false,
+        "fee": 0,
+        "inputAmount": 128,
+        "inputProofSecrets": [
+          "b3ad3710c1c88ec11acce1d59742c737a497f9451d92598028e36fd589fe4373"
+        ],
+        "createdAt": 1700000000000,
+        "updatedAt": 1700000060000
+      }
+    ]
+  }
+}
