@@ -462,6 +462,7 @@ function buildDefaultHandlers(refs: {
  */
 function buildDerivedAmountConfig(refs: {
   machineRef: MutableRefObject<ColadaRefs['machine']>;
+  walletContextSource: ColadaRefs['walletContextSource'];
   walletContextRef: ColadaRefs['walletContextRef'];
   getBtcPriceRef: ColadaRefs['getBtcPriceRef'];
   getDisplayCurrencyRef: ColadaRefs['getDisplayCurrencyRef'];
@@ -488,7 +489,10 @@ function buildDerivedAmountConfig(refs: {
         machineRef.current.getContext().mintUnreachableConfirmed === true,
     }),
     getMethodContext: () => {
-      const walletCtx = walletContextRef.current;
+      // The snapshot the payment machine itself reads, so the menu and the
+      // step that follows Next agree; the bound context only without one.
+      const walletCtx =
+        refs.walletContextSource?.getWalletContext() ?? walletContextRef.current;
       return walletCtx ? createAmountEntryMethodContext(walletCtx) : undefined;
     },
     getMintUrl: () => machineRef.current.getContext().mintUrl,
@@ -626,6 +630,7 @@ export function useScreenActions(
 ): UseScreenActionsResult<ScreenType, any> {
   const {
     machine,
+    walletContextSource,
     walletContextRef,
     screenActionHandlers,
     screenActionsBridge,
@@ -701,6 +706,7 @@ export function useScreenActions(
         ? undefined
         : buildDerivedAmountConfig({
             machineRef,
+            walletContextSource,
             walletContextRef,
             getBtcPriceRef,
             getDisplayCurrencyRef,
@@ -710,6 +716,7 @@ export function useScreenActions(
       isAmountEntry,
       options?.amountConfig,
       machineRef,
+      walletContextSource,
       walletContextRef,
       getBtcPriceRef,
       getDisplayCurrencyRef,
@@ -772,6 +779,14 @@ export function useScreenActions(
       session.dispose();
     };
   }, [isAmountEntry, screenType, session]);
+
+  // The amount screen gates Next on the wallet's mints and balances through
+  // a getter, so it has to be told when they change: funds arrived, a mint
+  // was trusted. No other screen reads them, so no other screen is told.
+  useEffect(() => {
+    if (!isAmountEntry || !walletContextSource) return;
+    return walletContextSource.subscribeWalletContext(() => session.refresh());
+  }, [isAmountEntry, walletContextSource, session]);
 
   const snapshot = useSyncExternalStore(
     session.subscribe,

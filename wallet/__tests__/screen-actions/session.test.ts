@@ -107,6 +107,33 @@ describe('createScreenActionSession', () => {
     session.dispose();
   });
 
+  it('recomputes cached action states when the bus says screen actions changed', () => {
+    const bus = createSubscriptionBus();
+    let offline = false;
+    const session = createScreenActionSession({
+      screenType: 'amountEntry',
+      handlers: {},
+      entrySeed: { destination: 'sendEcash', unit: 'sat' },
+      subscriptionBus: bus,
+      amountConfig: {
+        getMintUrl: () => undefined,
+        getProofAmounts: () => [],
+        getBtcPrice: () => 0,
+        offlineOptimization: false,
+        unit: 'sat',
+        getNetwork: () => ({ offline, mintUnreachable: false }),
+      },
+    });
+    const before = session.inspect().actions;
+
+    offline = true;
+    bus.publish({ type: 'screenActions.changed', reason: 'offline' });
+
+    // A new object: the manager rebuilt them instead of handing back its cache.
+    expect(session.inspect().actions).not.toBe(before);
+    session.dispose();
+  });
+
   it('refreshes source labels when screen actions change', () => {
     const bus = createSubscriptionBus();
     let source = 'Clipboard';
@@ -174,11 +201,20 @@ describe('createScreenActionSession', () => {
 
     // The mint's capabilities arrive, or another mint is trusted, while the screen is open.
     live = walletWith([{ method: 'onchain', unit: 'sat' }]);
-    bus.publish({ type: 'screenActions.changed', reason: 'walletContext' });
+    session.refresh();
 
-    expect(changed).toHaveBeenCalled();
+    expect(changed).toHaveBeenCalledTimes(1);
+    expect(onchain()).toBeDefined();
     expect(onchain()?.reason).not.toBe('No trusted mint supports onchain sending');
+
+    // And back, so the first reading was not just the entry's own copy.
+    live = opened;
+    session.refresh();
+    expect(onchain()?.reason).toBe('No trusted mint supports onchain sending');
+
     session.dispose();
+    session.refresh();
+    expect(changed).toHaveBeenCalledTimes(2);
   });
 
   it('applies mint info enrichment updates through the session bridge', () => {

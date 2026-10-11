@@ -18,7 +18,6 @@ export type ScreenActionsChangedReason =
   | 'transactionDistribution'
   | 'settings'
   | 'offline'
-  | 'walletContext'
   | 'unknown';
 
 interface BaseSubscriptionEvent {
