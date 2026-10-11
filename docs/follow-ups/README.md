@@ -39,7 +39,7 @@ reports) keep their evidence, and link here for anything still open.
 | [F08](F08.md) | medium | fix | date.ts: iso style is not ISO 8601, Yesterday uses 48 hours, 'en' is read as system |
 | [F09](F09.md) | medium | fix | apiClient loosens the shared profile schemas locally; reconcile with the schemas package |
 | [F10](F10.md) | medium | fix | imageCache prefetch has no queue cap or caller cancellation |
-| [F12](F12.md) | medium | fix | vendor-marmot-ts.sh tolerates a missing source and records no revision or license |
+| [F12](F12.md) | medium | upstream | vendor-marmot-ts.sh tolerates a missing source and records no revision or license |
 | [F13](F13.md) | medium | investigation | Check that a Nostr data layer rebuild leaves no old listener or late profile write |
 | [F14](F14.md) | low | fix | Move remaining StyleSheet.create and inline styles through the styling ratchet |
 | [F15](F15.md) | low | fix | Record image asset sources and licenses; shorten the 1 s image fade on dense rows |
