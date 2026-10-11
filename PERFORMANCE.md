@@ -830,3 +830,11 @@ the app's wallet database held the same six proofs. Record:
 A release build of tag `v0.1.0` holding 63 test sats was upgraded in place to a release build
 of `feaead880`. The balance, the mint and the history carried over. Record:
 [evidence ledger](docs/architecture/persistence/evidence-ledger.md#real-upgrades).
+
+## The startup identity check on a device (Android emulator, 2026-10-11)
+
+The released 0.1.3 APK was upgraded to a release build of `7fa277163`, which checks every
+stored identity against the recovery phrase before an account opens. It opened straight to
+the wallet. The platform's PBKDF2 does the key stretch in 4 ms on the emulator (the JavaScript
+fallback takes about a second), so the check does not add a visible delay. Record:
+[evidence ledger](docs/architecture/persistence/evidence-ledger.md).

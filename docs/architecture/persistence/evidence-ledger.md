@@ -25,22 +25,32 @@ surface in [persistence-map.md](persistence-map.md), the role reports in
 [audit-2026-10-10](audit-2026-10-10/). Tests are under `app/__tests__/`; every one named
 here was run on 2026-10-10 as part of the full suite.
 
-## Changes made after the last binary upgrade
+## The identity check, the ecash claim and the gallery in a device build
 
-The binary upgrades below ran against `feaead880` (Android) and `1cf68f149` (iOS simulator) or
-earlier. Three changes landed afterwards, on 2026-10-11, and have **not** been run in a device
-build:
+Three changes landed on 2026-10-11 after the binary upgrades recorded further down: every
+stored identity is checked against the recovery phrase before an account becomes ready
+(`c3eb6d2df`), ecash kept by builds before 0.0.45 is claimed through Coco (`3338b70da`), and
+the prompts gallery (`7fa277163`).
 
-| Change | Commit | Evidence so far | Why a device run matters |
-| --- | --- | --- | --- |
-| Every stored identity is checked against the recovery phrase before an account becomes ready; a mismatch stops on a critical screen | `c3eb6d2df` | Unit and boundary tests; the three 0.1.x release fixtures pass the checker in full; two Codex reviews, all findings fixed | A false alarm would stop every user at startup. The check relies on the platform's PBKDF2 (about 20 ms under Node); if that is missing on a phone it falls back to a JavaScript stretch that may take seconds on each cold start |
-| Ecash kept by builds before 0.0.45 is claimed through Coco, and the old row removed once settled | `3338b70da` | 53 app and 11 wallet tests against a mint faked at `fetch`; two Codex reviews, all findings fixed | Never run against a real mint or with a real 2024 row; it is the first code that deletes the old row |
-| Prompts gallery in the design system | `7fa277163` | A test presses every control in every preview | Layout has not been looked at |
+**Released 0.1.3 APK to a release build of `7fa277163`, Android emulator, 2026-10-11.**
 
-A device run was attempted on 2026-10-11 (released 0.1.3 APK to a release build of
-`7fa277163`) and abandoned: the emulator stopped responding under memory pressure. **Rerun the
-0.1.3 and 0.1.1 binary upgrades against the current commit before release**, and time the
-first screen.
+| | |
+| --- | --- |
+| Old | `sovran-0.1.3.apk` from the GitHub release (same checksum as before), re-signed with the local key; onboarded, one account (`forward-magpie`, `npub1dxc…ps9ezrrj`). A second account could not be added on 0.1.3 this time: its profile sheet did not draw on the emulator |
+| New | `assembleRelease` of `7fa277163`, `versionCode` 25, same key |
+| After the upgrade | Opened straight to the wallet: no mismatch screen, no retry screen, no prompt. Same account, same npub |
+| Then, on the new build | A second and a third account were generated (each passes the check before its row is saved), the app switched back to the first account, and was cold-started four times. Each time the same account opened |
+| Startup time | The wallet was on screen 10 to 11 seconds after launch on this emulator, measured through `uiautomator`, which adds several seconds of its own. No earlier figure was taken the same way, so this is not a before-and-after comparison |
+| The key stretch on the device | Measured in the dev build on the same emulator: the platform's PBKDF2 took **4 ms** and matched the JavaScript stretch, which took 1,036 ms. The check uses the platform's, so it adds a few milliseconds, not a second |
+| Log | No mismatch, failed load, refused write, failed migration or lost-database line across a cold start, a switch and an account creation. One line matched the filter once during the first account creation and was lost when the emulator was shut down; it did not appear again when the same steps were repeated |
+| Not covered | Several accounts made on 0.1.3 and then upgraded (covered by the release fixtures and the earlier two-account run, not by this one); iOS; a real phone's PBKDF2; the mismatch screen itself, which cannot be reached on a healthy install |
+
+Still **not run** in a device build:
+
+| Change | Evidence so far | What is missing |
+| --- | --- | --- |
+| Ecash claim (`3338b70da`) | 53 app and 11 wallet tests against a mint faked at `fetch`; two Codex reviews, all findings fixed. On the upgrade above it had nothing to do, and did nothing | A real mint and a real 2024 row. It is the first code that deletes the old row |
+| Prompts gallery (`7fa277163`) | A test presses every control in every preview | Nobody has looked at it on a screen |
 
 ## Rows that are not PASS
 
