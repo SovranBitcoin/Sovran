@@ -88,25 +88,37 @@ const getItem = (): ResultAsync<string | null, PairingIntentError> =>
     return { type: 'storage-read-failed', cause } as const;
   });
 
-const setItem = (value: string): ResultAsync<void, PairingIntentError> =>
-  ResultAsync.fromPromise(writeSensitiveValue(PAIRING_INTENT_STORAGE_KEY, value), (error) => {
-    const cause = redactError(error);
-    nostrLog.error('nostr.signer.pairing_intent_write_failed', { error: cause });
-    return { type: 'storage-write-failed', cause } as const;
-  });
+/** Both removals run to the end before either failure is reported, so the queue is not released early. */
+async function removeEverywhere(): Promise<void> {
+  const results = await Promise.allSettled([
+    deleteSensitiveValue(PAIRING_INTENT_STORAGE_KEY),
+    AsyncStorage.removeItem(LEGACY_PAIRING_INTENT_STORAGE_KEY),
+  ]);
+  const failed = results.find((result) => result.status === 'rejected');
+  if (failed?.status === 'rejected') throw failed.reason;
+}
 
-const removeItem = (): ResultAsync<void, PairingIntentError> =>
+const setItem = (value: string): ResultAsync<void, PairingIntentError> =>
   ResultAsync.fromPromise(
-    Promise.all([
-      deleteSensitiveValue(PAIRING_INTENT_STORAGE_KEY),
-      AsyncStorage.removeItem(LEGACY_PAIRING_INTENT_STORAGE_KEY),
-    ]).then(() => undefined),
+    writeSensitiveValue(PAIRING_INTENT_STORAGE_KEY, value).catch(async (error: unknown) => {
+      // A write that could not be verified may still have stored the link.
+      // The caller is told it was not saved, so it must not be there to resume.
+      await deleteSensitiveValue(PAIRING_INTENT_STORAGE_KEY).catch(() => undefined);
+      throw error;
+    }),
     (error) => {
       const cause = redactError(error);
-      nostrLog.error('nostr.signer.pairing_intent_clear_failed', { error: cause });
+      nostrLog.error('nostr.signer.pairing_intent_write_failed', { error: cause });
       return { type: 'storage-write-failed', cause } as const;
     }
   );
+
+const removeItem = (): ResultAsync<void, PairingIntentError> =>
+  ResultAsync.fromPromise(removeEverywhere(), (error) => {
+    const cause = redactError(error);
+    nostrLog.error('nostr.signer.pairing_intent_clear_failed', { error: cause });
+    return { type: 'storage-write-failed', cause } as const;
+  });
 
 /** Persists a pending pairing intent before the restart-based profile switch. */
 export function setPairingIntent(

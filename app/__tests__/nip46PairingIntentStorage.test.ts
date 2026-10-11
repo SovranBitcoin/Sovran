@@ -243,3 +243,28 @@ describe('the row older builds left in plain storage', () => {
     expect(plain.__backing.has(LEGACY_PAIRING_INTENT_STORAGE_KEY)).toBe(false);
   });
 });
+
+describe('storage that fails', () => {
+  it('leaves no link behind when the write cannot be verified', async () => {
+    // Stored, but the read-back that verifies it answers with something else.
+    jest
+      .mocked(SecureStore.getItemAsync)
+      .mockImplementationOnce(async () => null)
+      .mockImplementationOnce(async () => 'not what was written');
+
+    const result = await setPairingIntent(INPUT, T0);
+
+    expect(result.isErr()).toBe(true);
+    expect(mocked.__backing.has(PAIRING_INTENT_STORAGE_KEY)).toBe(false);
+  });
+
+  it('finishes the secure removal before reporting that the plain one failed', async () => {
+    await setPairingIntent(INPUT, T0);
+    jest.mocked(AsyncStorage.removeItem).mockRejectedValueOnce(new Error('disk'));
+
+    const result = await clearPairingIntent();
+
+    expect(result.isErr()).toBe(true);
+    expect(mocked.__backing.has(PAIRING_INTENT_STORAGE_KEY)).toBe(false);
+  });
+});
