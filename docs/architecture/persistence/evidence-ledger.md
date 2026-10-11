@@ -12,6 +12,7 @@
   (`22f7ed8c4`): the balance carried over, no identity mismatch was raised, and an old ecash
   row planted beforehand was claimed on the device. A store build on a phone (TestFlight) is
   still worth one run before release, for the device keychain.
+- A real **0.0.63** build was upgraded on the iPhone simulator with nothing lost (below).
 - Upgrades from **0.0.45 to 0.0.63** had three defects that lose data or a paid credential.
   All three are fixed and tested in this run. No real upgrade from those builds was run.
 - Upgrades from **0.0.1 to 0.0.40** (redux era, iOS only) no longer hand the user a new
@@ -98,11 +99,16 @@ So the prompt, the trust step, the claim and the cleanup have each been seen on 
 Coco's real storage. Still not seen: a row written by a real 2024 build, and a proof the mint
 rejects or reports pending.
 
-**An attempt to upgrade a real 0.0.63 build, 2026-10-11.** The 0.0.63 source (`28bf7713a`)
-was built for the simulator; the native code compiled and the JavaScript bundle step failed
-("Cannot read properties of undefined (reading 'transformFile')"), probably because the
-dependencies were installed without the frozen lockfile. It was not retried: the disk had 6
-GB free. Builds before 0.1.0 therefore remain covered by the release fixtures only.
+**A real 0.0.63 build to a release build of `4212c2825`, iPhone simulator, 2026-10-11.** The
+first build of this age to be upgraded as a binary.
+
+| | |
+| --- | --- |
+| Old | `xcodebuild` Release for the simulator of `28bf7713a` (0.0.63), dependencies from its frozen lockfile, on a simulator with a reset keychain. Onboarded; Minibits selected. Not funded: pasting a token did nothing in that build on the simulator |
+| What it had written | `profile-store` at version 0 with one row and no `source`; `settings-store` at version 0 with accepted terms and `hasSeenOnboarding`; `wallet-lifecycle` `not-needed`; a bare `theme-store`; three migration ids; a wallet database of 15 tables; and `persist:SOVRAN` as redux's starting state (one profile, every identity and secret an empty string, no proofs) |
+| After | Recognised as an existing user: asked to accept the updated documents and nothing else. Same account and public key, same mint. `profile-store` now version 2, `settings-store` version 4 with the terms record kept, lifecycle still `not-needed`, the theme under the account's key, the fourth migration id recorded, the wallet database migrated to 18 tables. No `:unreadable` key; no mismatch, failed load, refused write or failed migration in the log |
+| What it showed | The empty `persist:SOVRAN` row was left in place: the cleanup only removed a row whose phrase matched the stored one. Every build from 0.0.45 to 0.1.1 writes that row. Fixed afterwards: such a row is now removed, and is no longer read as a wallet whose phrase is lost (`legacyEcashClaim.test.ts`, `secureStorageLifecycle.test.ts`, with the real row as the fixture). The fix itself has not been run on a device |
+| Not covered | Money in the 0.0.63 wallet; builds before 0.0.63, which use older toolchains and were not built |
 
 **The prompts gallery on the emulator, 2026-10-11.** In the same release build the page
 opened at `sovran://design-system-prompts`, listed its entries, and the "Claim your old ecash"
