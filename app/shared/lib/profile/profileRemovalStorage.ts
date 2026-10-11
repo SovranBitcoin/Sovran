@@ -282,9 +282,10 @@ export const profileRemovalPorts: RemovalPorts = {
       {
         name: 'wallet database',
         run: async () => {
-          // Forgotten first: a removal that stops before the row is dropped
-          // must not leave an account that asks for a restore when opened.
-          forgetWalletDatabases([profile.accountIndex]);
+          // Forgotten first, and known to be saved: a removal that stops
+          // before the row is dropped must not leave an account that asks for
+          // a restore when opened.
+          await forgetWalletDatabases([profile.accountIndex]);
           await deleteFiles(walletName(profile.accountIndex));
           deletedWallets.add(profile.pubkey);
         },

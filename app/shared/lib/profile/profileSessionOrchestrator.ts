@@ -571,11 +571,15 @@ export async function deleteAllProfiles(opts?: {
 
     const clearSecureData = await prepareSecureDataReset(accountIndexes, importedPubkeys);
 
+    // If the wipe stops after the databases are gone, reopening must not take
+    // their absence for a loss and ask for a restore. Waited for, but a list
+    // that cannot be saved does not stop the wipe: Delete All is also the way
+    // out when storage is unreadable, and it clears the list itself at the end.
+    await forgetWalletDatabases(accountIndexes).catch((error: unknown) => {
+      log.warn('profile.orchestrator.forget_not_saved', { error: redactError(error) });
+    });
     // 1. Close SQLite and destroy all Coco databases
     erasing = true;
-    // If the wipe stops after the databases are gone, reopening must not take
-    // their absence for a loss and ask for a restore.
-    forgetWalletDatabases(accountIndexes);
     await CocoManager.completeReset(accountIndexes);
 
     // 2. Clear ALL secure storage (mnemonic, derived keys, cashu mnemonics, imported nsecs)

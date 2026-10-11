@@ -189,11 +189,38 @@ describe('forgetting', () => {
     recordWalletDatabaseCreated(1);
   });
 
-  it('lets an account that was deleted on purpose open empty', () => {
-    forgetWalletDatabases([1]);
+  it('lets an account that was deleted on purpose open empty', async () => {
+    await forgetWalletDatabases([1]);
     askForRestoreIfWalletDatabaseLost(1, true);
     expect(status()).toBe('complete');
     expect(recorded()).toEqual([0]);
+  });
+
+  it('resolves only once the list on disk has forgotten the account', async () => {
+    await flush();
+    expect(
+      JSON.parse((await AsyncStorage.getItem('profile-store'))!).state.profiles[1]
+    ).toMatchObject({
+      walletDatabaseCreated: true,
+    });
+
+    await forgetWalletDatabases([1]);
+
+    const saved = JSON.parse((await AsyncStorage.getItem('profile-store'))!).state.profiles;
+    expect(saved[1].walletDatabaseCreated).not.toBe(true);
+    expect(saved[0].walletDatabaseCreated).toBe(true);
+  });
+
+  it('rejects when the save is dropped, so the caller deletes nothing', async () => {
+    await flush();
+    // A save that reports success and stores nothing.
+    const real = AsyncStorage.setItem;
+    AsyncStorage.setItem = async () => undefined;
+    try {
+      await expect(forgetWalletDatabases([1], 100)).rejects.toThrow('could not be saved');
+    } finally {
+      AsyncStorage.setItem = real;
+    }
   });
 
   it('does not carry over to an account added again at the same index', () => {
