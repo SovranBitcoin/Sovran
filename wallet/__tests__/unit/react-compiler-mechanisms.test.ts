@@ -2,6 +2,8 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
+import { createUnitPins } from "../../src/react/unitPins";
+
 /**
  * Guards the mechanisms that make `wallet/src/react` compilable.
  *
@@ -63,21 +65,42 @@ describe("ColadaProvider flow bindings", () => {
     // rejects outright. The provider exposes writers instead.
     expect(SOURCE).not.toMatch(/ctx\.\w+Ref\.current\s*=/);
     expect(SOURCE).toContain("ctx.bindings.setWalletContext(walletContext)");
-    expect(SOURCE).toContain("ctx.bindings.setUnitOverride(unit)");
-    expect(SOURCE).toContain("ctx.bindings.clearUnitOverride(unit)");
+    expect(SOURCE).toContain("return ctx.bindings.setUnitOverride(unit);");
     expect(SOURCE).toContain("ctx.bindings.setOptionDismiss(onOptionDismiss)");
     expect(SOURCE).toContain(
       "ctx.bindings.clearOptionDismiss(onOptionDismiss)",
     );
   });
 
-  it("keeps every release compare-and-clear", () => {
-    // A binder unmounting must never wipe a newer screen's override — the
-    // first-open-wrong-unit bug. Moving the assignments behind the writers
-    // must not have dropped the guard.
-    expect(SOURCE).toMatch(
-      /clearUnitOverride: \(unit\) => \{\s*if \(unitRef\.current === unit\) unitRef\.current = undefined;/,
-    );
+  it("releases a unit pin by owner, not by value", () => {
+    // A binder unmounting must never wipe another screen's override: not a
+    // newer one (the first-open-wrong-unit bug), and not an older one that
+    // pinned the same unit (the NearPay radar and its peer list both pin sat).
+    const unitRef: { current: string | undefined } = { current: undefined };
+    const pin = createUnitPins(unitRef);
+
+    const radar = pin("sat");
+    const peerList = pin("sat");
+    peerList();
+    expect(unitRef.current).toBe("sat");
+
+    const camera = pin("usd");
+    expect(unitRef.current).toBe("usd");
+    radar();
+    expect(unitRef.current).toBe("usd");
+    camera();
+    expect(unitRef.current).toBeUndefined();
+
+    // A release is good once.
+    const again = pin("eur");
+    camera();
+    peerList();
+    expect(unitRef.current).toBe("eur");
+    again();
+    expect(unitRef.current).toBeUndefined();
+  });
+
+  it("keeps the option-dismiss release compare-and-clear", () => {
     expect(SOURCE).toMatch(
       /clearOptionDismiss: \(onOptionDismiss\) => \{\s*if \(optionDismissRef\.current !== onOptionDismiss\) return false;/,
     );

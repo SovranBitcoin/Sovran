@@ -60,7 +60,6 @@ reports) keep their evidence, and link here for anything still open.
 | [F32](F32.md) | low | fix | MintCurrencyTabs and SendScreen animate layout per frame; three other workarounds remain |
 | [F33](F33.md) | low | upstream | Melt-cancel matches Coco's error text because Coco has no typed rollback error |
 | [F34](F34.md) | low | investigation | Re-run the Hunch audit to completion and explain the findings for switched-off rules |
-| [F35](F35.md) | medium | fix | clearUnitOverride releases the unit pin by value, so one binder clears another's pin |
 | [F36](F36.md) | medium | fix | NFC auto-pay can read the old unit's balances right after switchUnit |
 | [F37](F37.md) | low | fix | A testnut Nut Drop is announced as real sats; allow-list copy names a payment request |
 | [F38](F38.md) | low | fix | Mint audit copy says swap success, rounding differs between screens, dead fields remain |

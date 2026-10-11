@@ -21,6 +21,7 @@ import React, {
 } from "react";
 
 import { useLatestRef } from "./useLatestRef";
+import { createUnitPins } from "./unitPins";
 import {
   createInMemoryAnnotationStore,
   encodeAnnotation,
@@ -203,9 +204,12 @@ export interface ColadaProviderProps {
  */
 interface ColadaBindings {
   setWalletContext: (walletContext: WalletContext) => void;
-  setUnitOverride: (unit: string) => void;
-  /** Clears the override only if it is still the one `unit` set. */
-  clearUnitOverride: (unit: string) => void;
+  /**
+   * Pin the machine's unit for as long as the caller is bound. Returns the
+   * release for this pin and no other: two binders may pin the same unit, and
+   * one of them leaving must not unpin the other.
+   */
+  setUnitOverride: (unit: string) => () => void;
   setOptionDismiss: (onOptionDismiss: (() => void) | undefined) => void;
   /** Clears only if still the same callback; returns whether it cleared. */
   clearOptionDismiss: (onOptionDismiss: (() => void) | undefined) => boolean;
@@ -439,8 +443,8 @@ function buildProviderMachine(
  * handing a mutable ref across a context boundary is the reason it can. The
  * provider owns the mutation now; consumers ask for it.
  *
- * Every clear is compare-and-clear, exactly as the assignments were: a binder
- * unmounting must never wipe a newer screen's override.
+ * Every release is the binder's own: a binder unmounting must never wipe
+ * another screen's override, whether newer or pinning the same unit.
  */
 function buildProviderBindings(refs: {
   walletContextRef: React.MutableRefObject<WalletContext | null>;
@@ -448,16 +452,12 @@ function buildProviderBindings(refs: {
   optionDismissRef: React.MutableRefObject<(() => void) | undefined>;
 }): ColadaBindings {
   const { walletContextRef, unitRef, optionDismissRef } = refs;
+  const pinUnit = createUnitPins(unitRef);
   return {
     setWalletContext: (walletContext) => {
       walletContextRef.current = walletContext;
     },
-    setUnitOverride: (unit) => {
-      unitRef.current = unit;
-    },
-    clearUnitOverride: (unit) => {
-      if (unitRef.current === unit) unitRef.current = undefined;
-    },
+    setUnitOverride: pinUnit,
     setOptionDismiss: (onOptionDismiss) => {
       optionDismissRef.current = onOptionDismiss;
     },
@@ -1125,13 +1125,10 @@ export function usePaymentFlowMachine({
       ...summarizeWalletContext(walletContext),
     });
     if (unit === undefined) return;
-    ctx.bindings.setUnitOverride(unit);
-    return () => {
-      // Release the override when this binder unmounts (or changes unit) so
-      // a stale explicit unit can't leak into a later flow's reset. Guarded
-      // so we never clear a different screen's newer override.
-      ctx.bindings.clearUnitOverride(unit);
-    };
+    // Released when this binder unmounts (or changes unit), so a stale
+    // explicit unit can't leak into a later flow's reset. The release is this
+    // binder's own: it never clears another screen's pin.
+    return ctx.bindings.setUnitOverride(unit);
   }, [ctx, walletContext, unit]);
 
   useEffect(() => {
