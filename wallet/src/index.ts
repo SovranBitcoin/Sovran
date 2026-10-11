@@ -254,8 +254,6 @@ export type { WalletBalanceBreakdown } from "./balance";
 
 // Adapter contracts
 export type {
-  BleAdapter,
-  CameraAdapter,
   ChainAddressCounter,
   ChainAddressFundingTx,
   ChainAddressStats,
@@ -265,9 +263,7 @@ export type {
   ChainNetwork,
   ChainTransactionStatus,
   ClipboardAdapter,
-  ClockAdapter,
   ColadaAdapters,
-  HapticsAdapter,
   ImagePickerAdapter,
   JsonPrimitive,
   JsonRecord,
@@ -275,13 +271,8 @@ export type {
   LoggerAdapter,
   NfcAdapter,
   NostrAdapter,
-  NotificationsAdapter,
   QrDecoderAdapter,
-  QrEncoderAdapter,
-  RandomAdapter,
-  SecureStorageAdapter,
   ShareAdapter,
-  StorageAdapter,
 } from "./adapters";
 
 // Subscription bus

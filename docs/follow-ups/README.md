@@ -114,7 +114,6 @@ reports) keep their evidence, and link here for anything still open.
 | [F102](F102.md) | low | device | Re-test whether the bitchat announce patch is still needed against the current App Store build |
 | [F104](F104.md) | medium | fix | Profile removal deletes the wallet database before the forget-record is known to be saved |
 | [F105](F105.md) | medium | fix | Adopting leftover stores skips a destination that holds the wrong data |
-| [F106](F106.md) | medium | fix | Ten adapter slots on the wallet provider are declared and never read |
 | [F108](F108.md) | medium | fix | Open work recorded in other documents has not been moved into this ledger |
 | [F109](F109.md) | high | test | The newest release fixture is mostly defaults, and nothing generates or freezes a fixture |
 | [F110](F110.md) | medium | test | Nothing fails when a secure key, raw storage key, database name or storage library version changes |

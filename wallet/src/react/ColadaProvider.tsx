@@ -36,23 +36,14 @@ import { registerLocale } from "../formatting/locales";
 import { errField, logger, setLogger } from "../logger";
 import { createPaymentMachine } from "../machine/createMachine";
 import type {
-  BleAdapter,
-  CameraAdapter,
   ChainAdapter,
   ClipboardAdapter,
-  ClockAdapter,
-  HapticsAdapter,
   ImagePickerAdapter,
   LoggerAdapter,
   NfcAdapter,
-  NotificationsAdapter as SideEffectNotificationsAdapter,
   NostrAdapter,
   QrDecoderAdapter,
-  QrEncoderAdapter,
-  RandomAdapter,
-  SecureStorageAdapter,
   ShareAdapter,
-  StorageAdapter,
   ColadaAdapters,
 } from "../adapters/types";
 import type { Manager } from "@cashu/coco-core";
@@ -168,20 +159,11 @@ export interface ColadaProviderProps {
   paymentCopyOverrides?: Partial<PaymentCopyCatalog>;
   clipboardAdapter?: ClipboardAdapter;
   shareAdapter?: ShareAdapter;
-  cameraAdapter?: CameraAdapter;
   imagePickerAdapter?: ImagePickerAdapter;
-  hapticsAdapter?: HapticsAdapter;
-  notificationsAdapter?: SideEffectNotificationsAdapter;
   nostrAdapter?: NostrAdapter;
-  bleAdapter?: BleAdapter;
   nfcAdapter?: NfcAdapter;
   chainAdapter?: ChainAdapter;
-  storageAdapter?: StorageAdapter;
-  secureStorageAdapter?: SecureStorageAdapter;
-  qrEncoderAdapter?: QrEncoderAdapter;
   qrDecoderAdapter?: QrDecoderAdapter;
-  clockAdapter?: ClockAdapter;
-  randomAdapter?: RandomAdapter;
   loggerAdapter?: LoggerAdapter;
   /** Explicit scan sources override adapter-derived scan sources. */
   scanSources?: ScanSources;
@@ -491,20 +473,11 @@ export function ColadaProvider({
   paymentCopyOverrides,
   clipboardAdapter,
   shareAdapter,
-  cameraAdapter,
   imagePickerAdapter,
-  hapticsAdapter,
-  notificationsAdapter,
   nostrAdapter,
-  bleAdapter,
   nfcAdapter: nfcAdapterProp,
   chainAdapter,
-  storageAdapter,
-  secureStorageAdapter,
-  qrEncoderAdapter,
   qrDecoderAdapter,
-  clockAdapter,
-  randomAdapter,
   loggerAdapter,
   scanSources: scanSourcesProp,
   deepLinks,
@@ -514,39 +487,21 @@ export function ColadaProvider({
     () => ({
       clipboardAdapter,
       shareAdapter,
-      cameraAdapter,
       imagePickerAdapter,
-      hapticsAdapter,
-      notificationsAdapter,
       nostrAdapter,
-      bleAdapter,
       nfcAdapter: nfcAdapterProp,
       chainAdapter,
-      storageAdapter,
-      secureStorageAdapter,
-      qrEncoderAdapter,
       qrDecoderAdapter,
-      clockAdapter,
-      randomAdapter,
       loggerAdapter,
     }),
     [
       clipboardAdapter,
       shareAdapter,
-      cameraAdapter,
       imagePickerAdapter,
-      hapticsAdapter,
-      notificationsAdapter,
       nostrAdapter,
-      bleAdapter,
       nfcAdapterProp,
       chainAdapter,
-      storageAdapter,
-      secureStorageAdapter,
-      qrEncoderAdapter,
       qrDecoderAdapter,
-      clockAdapter,
-      randomAdapter,
       loggerAdapter,
     ],
   );

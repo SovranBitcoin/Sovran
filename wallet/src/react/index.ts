@@ -42,23 +42,14 @@ export {
 } from "./useStandingPaymentRequest";
 
 export type {
-  BleAdapter,
-  CameraAdapter,
   ChainAdapter,
   ClipboardAdapter,
-  ClockAdapter,
   ColadaAdapters,
-  HapticsAdapter,
   ImagePickerAdapter,
   NfcAdapter,
   NostrAdapter,
-  NotificationsAdapter,
   QrDecoderAdapter,
-  QrEncoderAdapter,
-  RandomAdapter,
-  SecureStorageAdapter,
   ShareAdapter,
-  StorageAdapter,
 } from "../adapters";
 
 export type {

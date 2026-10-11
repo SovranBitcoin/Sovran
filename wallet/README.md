@@ -24,9 +24,8 @@ The package has two public entry points:
   mint-info, mint-selector, and screen-action events.
 - Chain helpers: the default chain adapter talks to mempool.space and exposes
   fee, address summary, transaction status, broadcast, and confirmation helpers.
-- Native seams: clipboard, share, camera, image picker, haptics, notifications,
-  Nostr, BLE, NFC, chain, storage, secure storage, QR encode/decode, clock,
-  random, and logger integrations are adapter interfaces.
+- Native seams: clipboard, share, image picker, Nostr, NFC, chain, QR decode
+  and logger integrations are adapter interfaces.
 
 ## What Apps Own
 
@@ -114,7 +113,7 @@ Important props:
 | `screenActionsBridge` | App-owned bridge for extra action context, subscription binding, entry merge rules, decoration, locale, and source labels. |
 | `getOffline`, `getBtcPrice`, `getDisplayCurrency`, `getLocale` | Runtime getters read through refs so long-lived handlers see fresh values. |
 | `translations`, `paymentCopyOverrides` | Copy/i18n extensions for payment-state text. |
-| `clipboardAdapter`, `shareAdapter`, `cameraAdapter`, `imagePickerAdapter`, `hapticsAdapter`, `notificationsAdapter`, `nostrAdapter`, `bleAdapter`, `nfcAdapter`, `chainAdapter`, `storageAdapter`, `secureStorageAdapter`, `qrEncoderAdapter`, `qrDecoderAdapter`, `clockAdapter`, `randomAdapter`, `loggerAdapter` | JSON-shaped native/platform seams. |
+| `clipboardAdapter`, `shareAdapter`, `imagePickerAdapter`, `nostrAdapter`, `nfcAdapter`, `chainAdapter`, `qrDecoderAdapter`, `loggerAdapter` | JSON-shaped native/platform seams. |
 | `scanSources` | Optional explicit scan-source map. When omitted, clipboard and image-picker adapters derive default sources. |
 | `deepLinks` | Reactive deep-link input and scheme filtering. Accepted Cashu links are scanned by the machine. |
 | `navigation` | Default screen-action navigation callbacks such as `goBack`, `scanQr`, `mintInfo`, and `addMint`. |
