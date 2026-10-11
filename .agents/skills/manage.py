@@ -60,6 +60,18 @@ def main():
         if entry.get("license_file") and not (folder / entry["license_file"]).is_file():
             errors.append(f"Missing license: {name}")
 
+    # What every session reads has to stay short and has to name every skill, or agents
+    # stop following the first and never load the second.
+    guide = (ROOT / "AGENTS.md").read_text()
+    if guide.count("\n") > 150:
+        errors.append("AGENTS.md is over 150 lines; move detail into the document it points to")
+    for entry in manifest["skills"]:
+        if not re.search(rf"(?<![\w-]){re.escape(entry['name'])}(?![\w-])", guide):
+            errors.append(f"AGENTS.md does not name the skill: {entry['name']}")
+        body = SKILLS / entry["name"] / "SKILL.md"
+        if entry["kind"] == "local" and body.is_file() and body.read_text().count("\n") > 250:
+            errors.append(f"Local skill is over 250 lines: {entry['name']}")
+
     # Validate sources before making any links. Never overwrite a contributor's files.
     pending = []
     # .agents/skills holds the sources; Claude discovers them through per-skill links.

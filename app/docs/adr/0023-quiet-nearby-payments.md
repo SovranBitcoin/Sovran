@@ -70,4 +70,4 @@ Type checks, JavaScript bundles and native simulator compilation do not prove
 Bluetooth interoperability or actual settlement. iOS/iOS, iOS/Android and
 Android/Android notification silence, background/resume, profile/radio changes,
 public mesh routing, and simultaneous delivery/crash recovery remain explicit
-[device verification work](../../../docs/architecture/follow-ups.md).
+[device verification work](../../../docs/follow-ups/README.md).

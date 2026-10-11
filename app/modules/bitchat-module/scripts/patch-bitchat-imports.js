@@ -99,7 +99,7 @@ const MAINNET_UUID = 'F47B5E2D-4A9E-4C5A-9B3F-8E1D2C3A4B5C';
 // semantics by removing the guard that rejects on mismatch. `derivedPeerID`
 // stays live — the accept path below still consumes it. Idempotent: once the
 // guard is gone, the anchor won't match.
-// TODO(sovran): re-test against a current App Store bitchat build (v1.5.3+); if
+// FOLLOWUP(F102): re-test against a current App Store bitchat build (v1.5.3+); if
 // its announces now pass the derived-peerID check, drop this patch entirely.
 const MISMATCH_GUARD_ANCHOR =
   /        guard derivedPeerID == peerID else \{\n            return \.reject\(\.senderMismatch\(derivedPeerID: derivedPeerID\)\)\n        \}\n/;

@@ -38,7 +38,7 @@ Passing unit tests are one kind of evidence; they are not the verdict.
 | `docs/architecture/persistence/release-provenance.md` | Every version, the commit it was built from, how that is known, and a confidence level |
 | `docs/architecture/persistence/persistence-map.md` | Every durable thing the app writes, per epoch, and what the candidate does with it |
 | `docs/architecture/persistence/evidence-ledger.md` | One row per (epoch, durable thing) and per invariant, with evidence and a verdict |
-| `docs/architecture/follow-ups.md` | Anything found and not fixed |
+| `docs/follow-ups/` | Anything found and not fixed |
 
 Update these in place. A run that changes none of them did not happen.
 
@@ -132,6 +132,12 @@ persisted store, the keys of every account and an account switch. Start here:
 3. Run `releaseFixtures.test.ts`. A fixture that fails is a finding for phase 6. A loss that
    stays open is recorded in that fixture's `knownGaps` with its follow-up id; nothing else
    may be changed to get green.
+4. Run `cocoDatabaseUpgrade.test.ts`. It opens a wallet database written by every Coco
+   version that shipped, with the candidate's Coco and through the app's own open path. A
+   Coco version change needs a new database first, as
+   `app/__tests__/cocoDatabases/README.md` describes; the test fails until it exists.
+
+`cd app && bun run test:upgrade` runs all of these together.
 
 That suite is the floor: one used install per epoch, upgraded directly. It does not replace
 the cases below. For each (epoch, durable thing):

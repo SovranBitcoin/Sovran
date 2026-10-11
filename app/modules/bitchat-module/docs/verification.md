@@ -68,7 +68,7 @@ No two-phone payment or public-relay settlement was performed. Physical
 notification silence, iOS/Android radio interoperability, background suspension,
 profile/radio toggles, public relay hops, native storage interruption and
 simultaneous real BLE/Nostr arrival still need the matrix in
-[F58](../../../../docs/architecture/follow-ups.md). These are device verification
+[F58](../../../../docs/follow-ups/F58.md). These are device verification
 gaps, not evidence of successful native delivery.
 
 Quiet discovery is not radio invisibility. Stock-mesh participation is explicitly
@@ -100,4 +100,4 @@ runner also reproduced the existing Routstr import-after-teardown/open-handle
 problem (F55) and was terminated after assertions completed; a clean full-suite
 exit is not claimed. The authored unfunded settings scenario and live owned-domain
 and npub.cash checks remain unrun on devices; see F59 in the
-[follow-up ledger](../../../../docs/architecture/follow-ups.md).
+[follow-up ledger](../../../../docs/follow-ups/README.md).

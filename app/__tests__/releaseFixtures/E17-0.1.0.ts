@@ -1247,7 +1247,7 @@ export const fixture: ReleaseFixture = {
     ],
     keptAsyncStorage: [
       REDUX_ROW,
-      // F89: nothing reads split bills since 0.1.1; the row must stay for an importer.
+      // FOLLOWUP(F89): nothing reads split bills since 0.1.1; the row must stay for an importer.
       accountKey(SPLIT_BILL_STORE, A0),
       `nip04-cache:v1:${A0}`,
       `nip04-cache-neg:v1:${A0}`,

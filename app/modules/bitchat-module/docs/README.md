@@ -102,6 +102,6 @@ its behavior and cross-platform regression checks pass.
 Metro, TypeScript and Jest resolve the owned module source. A JavaScript reload
 cannot update native bridges: both platforms require rebuilt binaries. The
 native startup log records the vendor revision. See the
-[verification follow-up](../../../../docs/architecture/follow-ups.md) for the
+[verification follow-up](../../../../docs/follow-ups/README.md) for the
 physical-device matrix; JavaScript tests and simulator compilation cannot prove
 radio discovery, OS background behavior, or BLE/Nostr settlement races.

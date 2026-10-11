@@ -36,6 +36,7 @@
     "test": "bun run --filter '*' test",
     "test:app": "cd app && bun run test",
     "knip": "knip",
+    "followups": "node scripts/followups.mjs",
     "pretty": "cd app && bun run pretty",
     "pretty:check": "cd app && bun run pretty:check",
     "deps:sovran-latest": "cd app && bun run deps:sovran-latest",
