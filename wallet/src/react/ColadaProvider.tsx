@@ -446,11 +446,20 @@ function buildProviderBindings(refs: {
   walletContextRef: React.MutableRefObject<WalletContext | null>;
   unitRef: React.MutableRefObject<string | undefined>;
   optionDismissRef: React.MutableRefObject<(() => void) | undefined>;
+  subscriptionBusRef: React.MutableRefObject<ColadaSubscriptionBus>;
 }): ColadaBindings {
-  const { walletContextRef, unitRef, optionDismissRef } = refs;
+  const { walletContextRef, unitRef, optionDismissRef, subscriptionBusRef } =
+    refs;
   return {
     setWalletContext: (walletContext) => {
+      if (walletContextRef.current === walletContext) return;
       walletContextRef.current = walletContext;
+      // Open screens gate their actions on this context through getters, so
+      // they have to be told it changed: funds arrived, a mint was trusted.
+      subscriptionBusRef.current.publish({
+        type: "screenActions.changed",
+        reason: "walletContext",
+      });
     },
     setUnitOverride: (unit) => {
       unitRef.current = unit;
@@ -791,6 +800,7 @@ export function ColadaProvider({
         walletContextRef,
         unitRef,
         optionDismissRef,
+        subscriptionBusRef,
       }),
     };
   });

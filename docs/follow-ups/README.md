@@ -66,7 +66,6 @@ reports) keep their evidence, and link here for anything still open.
 | [F38](F38.md) | low | fix | Mint audit copy says swap success, rounding differs between screens, dead fields remain |
 | [F39](F39.md) | medium | fix | The amount-entry path filters mints to the active account only by accident |
 | [F40](F40.md) | medium | decision | Decide what the mint picker shows before testnut verdicts have loaded |
-| [F41](F41.md) | high | fix | The amount screen's Next menu uses a stale snapshot and can offer a rail with no mint |
 | [F42](F42.md) | high | device | Check the Routstr secure-vault migration on iOS and Android keychains |
 | [F43](F43.md) | medium | fix | Relay protocol opens a new WebSocket per request instead of one per relay |
 | [F44](F44.md) | medium | fix | Payment-request transport choice ignores the payee's preference order (NUT-18) |

@@ -7,6 +7,7 @@
 // ---------------------------------------------------------------------------
 
 import type { AmountEntryEnvelope } from '../mint-capabilities';
+import type { AmountEntryMethodContext } from '../types';
 
 /** Integer amount in a unit's minor denomination (sat, usd-cents, …). */
 export interface UnitAmount {
@@ -113,6 +114,13 @@ export interface CreateAmountActionManagerConfig {
    * locked ecash, onchain) while plain ecash stays on its offline path.
    */
   getNetwork?: () => { offline: boolean; mintUnreachable: boolean };
+  /**
+   * The wallet's trusted mints, balances and method capabilities as they are
+   * now. The entry the screen opened with carries a copy taken at that moment;
+   * with this getter the Next menu is gated on the live values instead, so a
+   * rail is offered only while the picker it opens has a mint to offer.
+   */
+  getMethodContext?: () => AmountEntryMethodContext | undefined;
   /** Returns the currently selected mint URL. */
   getMintUrl: () => string | undefined;
   /** Returns proof amounts for the selected mint, in the active unit's minor units. */

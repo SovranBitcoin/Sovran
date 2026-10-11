@@ -272,9 +272,11 @@ export function createScreenActionSession<S extends ScreenType>(
   }
 
   const unsubscribeManager = manager.subscribe(notify);
+  // Through the manager, not `notify` alone: the manager caches its action
+  // states, and a bare notify would hand the stale ones back.
   const unsubscribeScreenActionsChanged = subscriptionBus?.subscribe(
     { type: 'screenActions.changed' },
-    notify,
+    () => manager.refresh(),
   );
 
   function subscribeToEntryUpdates(): void {

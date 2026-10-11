@@ -127,11 +127,13 @@ export function createScreenActionManager<S extends ScreenType>(
   function getEffectiveEntry(): Record<string, unknown> | null {
     if (amountMgr && entry) {
       const network = amountConfig?.getNetwork?.();
+      const methodContext = amountConfig?.getMethodContext?.();
       return {
         ...mergeAmountResolution(entry, amountMgr.inspect()),
         ...(network
           ? { offline: network.offline, mintUnreachable: network.mintUnreachable }
           : {}),
+        ...(methodContext ? { methodContext } : {}),
       };
     }
     return entry;
@@ -324,7 +326,7 @@ export function createScreenActionManager<S extends ScreenType>(
     };
   };
 
-  return { execute, getEntry, setEntry, inspect, subscribe };
+  return { execute, getEntry, setEntry, inspect, subscribe, refresh: notify };
 }
 
 // ---------------------------------------------------------------------------

@@ -30,6 +30,7 @@ import type {
 } from '../amount-actions/types';
 import { logger } from '../logger';
 import {
+  createAmountEntryMethodContext,
   getUnitAmountEnvelope,
   type AmountEntryEnvelope,
 } from '../mint-capabilities';
@@ -486,6 +487,10 @@ function buildDerivedAmountConfig(refs: {
       mintUnreachable:
         machineRef.current.getContext().mintUnreachableConfirmed === true,
     }),
+    getMethodContext: () => {
+      const walletCtx = walletContextRef.current;
+      return walletCtx ? createAmountEntryMethodContext(walletCtx) : undefined;
+    },
     getMintUrl: () => machineRef.current.getContext().mintUrl,
     getProofAmounts: () => {
       const mint = machineRef.current.getContext().mintUrl;

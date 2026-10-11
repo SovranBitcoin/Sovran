@@ -10,6 +10,7 @@ import {
   createScreenActionSession,
   type ScreenActionsBridge,
 } from '../../src/screen-actions';
+import { deriveMintMethodCapabilityMapFromTrustedMints } from '../../src/mint-capabilities';
 import { createSubscriptionBus } from '../../src/subscriptions';
 import type { ColadaSubscriptionEvent } from '../../src';
 
@@ -130,6 +131,53 @@ describe('createScreenActionSession', () => {
 
     expect(notified).toBeGreaterThan(0);
     expect(session.inspect().source).toBe('QR Code');
+    session.dispose();
+  });
+
+  it('gates the amount screen from the live wallet context, not the entry it opened with', () => {
+    const bus = createSubscriptionBus();
+    const MINT = 'https://mint.example';
+    const walletWith = (methods: { method: string; unit: string }[]) => ({
+      trustedMintUrls: [MINT],
+      mintBalances: { [MINT]: 1_000_000 },
+      mintMethodCapabilities: deriveMintMethodCapabilityMapFromTrustedMints([
+        { mintUrl: MINT, mintInfo: { nuts: { '5': { methods } } } },
+      ]),
+    });
+    const opened = walletWith([{ method: 'bolt11', unit: 'sat' }]);
+    let live = opened;
+    const session = createScreenActionSession({
+      screenType: 'amountEntry',
+      handlers: {},
+      entrySeed: {
+        destination: 'meltQuote',
+        meltTarget: 'bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4',
+        unit: 'sat',
+        methodContext: opened,
+      },
+      subscriptionBus: bus,
+      amountConfig: {
+        getMintUrl: () => MINT,
+        getProofAmounts: () => [],
+        getBtcPrice: () => 0,
+        offlineOptimization: false,
+        unit: 'sat',
+        getMethodContext: () => live,
+      },
+    });
+    const changed = vi.fn();
+    session.subscribe(changed);
+    const onchain = () =>
+      session.inspect().actions.next.variants?.find((variant) => variant.id === 'onchain');
+
+    expect(onchain()?.reason).toBe('No trusted mint supports onchain sending');
+
+    // The mint's capabilities arrive, or another mint is trusted, while the screen is open.
+    live = walletWith([{ method: 'onchain', unit: 'sat' }]);
+    bus.publish({ type: 'screenActions.changed', reason: 'walletContext' });
+
+    expect(changed).toHaveBeenCalled();
+    expect(onchain()?.reason).not.toBe('No trusted mint supports onchain sending');
     session.dispose();
   });
 
