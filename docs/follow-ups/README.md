@@ -114,7 +114,6 @@ reports) keep their evidence, and link here for anything still open.
 | [F105](F105.md) | medium | fix | Adopting leftover stores skips a destination that holds the wrong data |
 | [F108](F108.md) | medium | fix | Open work recorded in other documents has not been moved into this ledger |
 | [F109](F109.md) | high | test | The newest release fixture is mostly defaults, and nothing generates or freezes a fixture |
-| [F110](F110.md) | medium | test | Nothing fails when a secure key, raw storage key, database name or storage library version changes |
 | [F111](F111.md) | medium | device | No old build is kept for iPhone, and the upgrade from the last release is run by hand |
 | [F112](F112.md) | medium | investigation | A wallet from 0.0.61 or earlier has no keysets after upgrading until its mint answers |
 | [F113](F113.md) | high | decision | A store with one bad saved field runs on defaults for every field, and nothing says so |

@@ -1,0 +1,72 @@
+{
+  "libraries": {
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "expo-secure-store": "~56.0.4",
+    "expo-sqlite": "~56.0.5",
+    "expo-file-system": "~56.0.8",
+    "zustand": "^5.0.8",
+    "@cashu/coco-core": "2.0.0",
+    "@cashu/coco-expo-sqlite": "2.0.0",
+    "@cashu/coco-react": "2.0.0"
+  },
+  "secureKeys": [
+    "cashu_mnemonic_",
+    "cashu_seed_",
+    "derived_keys_",
+    "imported_nsec_",
+    "migrations_complete",
+    "migrations_complete_",
+    "secure_key_index",
+    "user_mnemonic"
+  ],
+  "secureStoreFiles": [
+    "app/features/nostrSigner/lib/bunkerSecrets.ts",
+    "app/shared/lib/debug/storageInventory.ts",
+    "app/shared/lib/nostr/secureStorage.ts"
+  ],
+  "asyncStorageKeys": [
+    "${opts.storagePrefixNeg}:${pubkey}",
+    "${opts.storagePrefixNeg}:${scope}",
+    "${opts.storagePrefix}:${pubkey}",
+    "${opts.storagePrefix}:${scope}",
+    "profile-store",
+    "routstr-store:profile:${profile.pubkey}",
+    "settings-store",
+    "wallet-lifecycle"
+  ],
+  "asyncStorageFiles": [
+    "app/features/nostrSigner/lib/pairingIntentStorage.ts",
+    "app/features/whitenoise/storage/asyncStorageBackend.ts",
+    "app/features/whitenoise/storage/cleanup.ts",
+    "app/shared/lib/cache/createPubkeyScopedCache.ts",
+    "app/shared/lib/cashu/legacyEcashClaim.ts",
+    "app/shared/lib/cashu/npc.ts",
+    "app/shared/lib/cashu/profileScopedStorage.ts",
+    "app/shared/lib/debug/storageInventory.ts",
+    "app/shared/lib/migrations/globalMigrations.ts",
+    "app/shared/lib/nostr/secureStorage.ts",
+    "app/shared/lib/persist/fileCacheStorage.ts",
+    "app/shared/lib/persist/storageUsage.ts",
+    "app/shared/lib/profile/inProcessProfileSwitch.ts",
+    "app/shared/lib/profile/profileRemovalStorage.ts",
+    "app/shared/lib/profile/profileSessionOrchestrator.ts",
+    "app/shared/lib/profile/profileTransition.ts",
+    "app/shared/stores/global/btcMapStore.ts",
+    "app/shared/stores/global/legacyEcashStore.ts",
+    "app/shared/stores/global/mintMetadataStore.ts",
+    "app/shared/ui/composed/settledHeaderHeight.ts"
+  ],
+  "databaseNames": [
+    "${dbDirectory}coco-export.db",
+    "coco-${accountIndex}.db",
+    "coco-${activeProfile.accountIndex}.db",
+    "coco-${index}.db",
+    "coco-${this.accountIndex}.db",
+    "coco-N.db",
+    "coco.db"
+  ],
+  "databaseFiles": [
+    "app/shared/lib/cashu/manager.ts",
+    "app/shared/lib/profile/profileRemovalStorage.ts"
+  ]
+}
