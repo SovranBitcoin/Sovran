@@ -1,6 +1,13 @@
 import { describe, expect, test } from 'vitest';
 
+import { NaggFollowStatusEnvelopeSchema, NaggProfilesEnvelopeSchema } from '../src/envelope';
 import { coerceTags, toFeedEvent } from '../src/facade/event';
+import { DiscoverMintsResponseSchema, MintReviewsResponseSchema } from '../src/facade/mint-reviews';
+import {
+  PrimalFeedRangeContent,
+  PrimalNoteStatsContent,
+  PrimalNotificationContent,
+} from '../src/facade/primal/schemas';
 import { NOSTR_EVENT_LIMITS, NaggProfileInfoSchema, NaggServiceInfoSchema } from '../src/schemas';
 
 // What a relay or a cache hands over is held to the same ceilings as what the
@@ -93,4 +100,73 @@ test('an oversized profile name or picture is dropped on its own', () => {
   expect(NaggProfileInfoSchema.parse({ name: 'alice', picture: 'p'.repeat(2049) })).toEqual({
     name: 'alice',
   });
+});
+
+describe('mint directory and reviews from the backend', () => {
+  const mint = { mintUrl: 'https://mint.example', averageScore: 4, reviewCount: 2 };
+
+  test('one mint row that does not parse is left out of the directory', () => {
+    const parsed = DiscoverMintsResponseSchema.parse({
+      mints: [
+        mint,
+        { ...mint, mintUrl: 'https://two.example', operatorPubkey: 'npub1notHex', name: 'n'.repeat(257) },
+        { ...mint, mintUrl: 7 },
+        'not a mint',
+      ],
+      profiles: { [PUBKEY]: { name: 'Operator' }, other: 'not a profile' },
+    });
+    expect(parsed.mints.map((each) => each.mintUrl)).toEqual([
+      'https://mint.example',
+      'https://two.example',
+    ]);
+    // The row is kept; only the fields that did not fit are gone.
+    expect(parsed.mints[1]?.operatorPubkey).toBeUndefined();
+    expect(parsed.mints[1]?.name).toBeUndefined();
+    expect(parsed.profiles).toEqual({ [PUBKEY]: { name: 'Operator' } });
+  });
+
+  test('one review without hex ids is left out', () => {
+    const review = { eventId: ID, reviewerPubkey: PUBKEY, mintUrl: mint.mintUrl, score: 5, content: 'ok', createdAt: 1 };
+    const parsed = MintReviewsResponseSchema.parse({
+      summary: mint,
+      reviews: [review, { ...review, eventId: 'e1' }, { ...review, reviewerPubkey: 'someone' }],
+    });
+    expect(parsed.reviews).toEqual([review]);
+  });
+});
+
+describe('what Primal names in passing', () => {
+  test('an ordering element that is not an event id is left out of the order', () => {
+    expect(PrimalFeedRangeContent.parse({ elements: [ID, 'not-an-id', 7, PUBKEY] }).elements).toEqual([
+      ID,
+      PUBKEY,
+    ]);
+  });
+
+  test('counts need an event id; a notification keeps going without a bad reference', () => {
+    expect(PrimalNoteStatsContent.safeParse({ event_id: 'note-1', likes: 3 }).success).toBe(false);
+    const parsed = PrimalNotificationContent.parse({
+      pubkey: PUBKEY,
+      created_at: 1,
+      type: 1,
+      follower: 'not-a-key',
+      your_post: ID,
+    });
+    expect(parsed.follower).toBeUndefined();
+    expect(parsed.your_post).toBe(ID);
+  });
+});
+
+test('provider figures and follow edges are read one pubkey at a time', () => {
+  const base = { order: [], orderBy: 'rank', events: [], aggregates: {} };
+  const profiles = NaggProfilesEnvelopeSchema.parse({
+    ...base,
+    providers: { [PUBKEY]: { vertex: { rank: 1 } }, 'not-a-key': { vertex: { rank: 2 } }, [ID]: 'nope' },
+  });
+  expect(profiles.providers).toEqual({ [PUBKEY]: { vertex: { rank: 1 } } });
+  const follows = NaggFollowStatusEnvelopeSchema.parse({
+    ...base,
+    edges: { [PUBKEY]: { out: true, in: false }, 'not-a-key': { out: true, in: true }, [ID]: { out: 'yes' } },
+  });
+  expect(follows.edges).toEqual({ [PUBKEY]: { out: true, in: false } });
 });

@@ -657,7 +657,7 @@ nothing and exits 2 — my first attempt did exactly that.
 - [hex-ids] 13 findings and [input-size-caps] 14 findings — `nostr/src/schemas.ts`, `envelope.ts`, `facade/mint-reviews.ts`, `facade/primal/schemas.ts`, `recipes/wallpapers.ts`, plus app-side stores
   verdict: defect
   evidence: read in source after the first write-up marked them unverified. `nostr/src/schemas.ts` parses relay and Nagg responses, and `id` (:29) and `pubkey` (:31) are bare `z.string()` rather than 64-hex, `content` (:32) is unbounded, and `tags` (:33) is `z.array(z.array(z.string()))` with no cap. The same file caps one array at `:22` with `.max(5000)`, so the intent exists and is applied in exactly one place. `nostr/src` has no hex primitive of its own and cannot import the app's `NostrPubkeyHexSchema` from `protocolIds.ts`, because `nostr` must not import from `app`.
-  action: blocked — recorded as **F45**. The caps are a policy decision on the untrusted-input boundary, where too low rejects legitimate events, so they want choosing against real event sizes rather than by reflex at the end of a sweep.
+  action: done on 2026-10-12 as its own change. `nostr/src/schemas.ts` has `NostrHexId` and `NOSTR_EVENT_LIMITS`, with the ceilings and their reasons beside them; the envelope, the events read off relay and cache sockets, the mint, Primal and wallpaper schemas are bounded, most of them one item at a time so a wrong ceiling costs an item and not a page. The follow-up that recorded it is closed.
 
 - remaining 20 findings — `nostr-event-schema-bounds` (4), `route-json-param-unbounded` (4), `url-scheme` (3), `branded-id-as-cast` (2), `default-nested-container`, `use-parsed-output`, and the app-side members of the two clusters above
   verdict: recorded, not verified

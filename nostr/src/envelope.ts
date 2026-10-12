@@ -127,11 +127,22 @@ export const NaggNotificationsEnvelopeSchema = NaggEnvelopeSchema.extend({
     .transform((v) => v ?? false),
 });
 
+const ProviderFields = z.record(z.string().max(64), z.record(z.string().max(64), z.unknown()));
+
 /** Per-provider enrichment on the profile routes, e.g. `vertex.{rank,score}`, `nip05.valid`. */
-export const NaggProvidersSchema = z.record(
-  z.string(),
-  z.record(z.string(), z.record(z.string(), z.unknown())),
-);
+export const NaggProvidersSchema = z
+  .record(z.string(), z.unknown())
+  .transform((providers) => {
+    // Keyed by pubkey and read one at a time: a key that is not a pubkey, or a
+    // value of the wrong shape, costs that pubkey its enrichment and no more.
+    const out: Record<string, Record<string, Record<string, unknown>>> = {};
+    for (const [pubkey, raw] of Object.entries(providers)) {
+      if (!NostrHexId.safeParse(pubkey).success) continue;
+      const parsed = ProviderFields.safeParse(raw);
+      if (parsed.success) out[pubkey] = parsed.data;
+    }
+    return out;
+  });
 
 /** A number nagg could not establish is `null`, never 0 — kept as null here. */
 const nullableNumber = z
@@ -156,11 +167,10 @@ const stringList = z
  * Tolerant per field: a route that omits a block (a mint-only deployment
  * has no `firstEventAt`) still parses, and a field nagg adds later passes.
  */
-const HEX_64 = /^[0-9a-f]{64}$/;
 
 export const NaggIdentitySchema = z
   .object({
-    pubkey: z.string().regex(HEX_64),
+    pubkey: NostrHexId,
     npub: z.string().max(128).nullish(),
     profile: z
       .object({
@@ -210,7 +220,7 @@ export const NaggIdentitiesSchema = z
     if (!v) return out;
     let n = 0;
     for (const [key, identity] of Object.entries(v)) {
-      if (!identity || !HEX_64.test(key) || n >= 512) continue;
+      if (!identity || !NostrHexId.safeParse(key).success || n >= 512) continue;
       out[key] = identity;
       n += 1;
     }
@@ -228,11 +238,21 @@ export const NaggProfilesEnvelopeSchema = NaggEnvelopeSchema.extend({
   vertexFresh: z.boolean().nullish(),
 });
 
+const FollowEdge = z.object({ out: z.boolean(), in: z.boolean() });
+
 export const NaggFollowStatusEnvelopeSchema = NaggEnvelopeSchema.extend({
+  // Keyed by pubkey and read one at a time, like the providers.
   edges: z
-    .record(z.string(), z.object({ out: z.boolean(), in: z.boolean() }))
+    .record(z.string(), z.unknown())
     .nullish()
-    .transform((v): Record<string, { out: boolean; in: boolean }> => v ?? {}),
+    .transform((v): Record<string, { out: boolean; in: boolean }> => {
+      const out: Record<string, { out: boolean; in: boolean }> = {};
+      for (const [pubkey, raw] of Object.entries(v ?? {})) {
+        const parsed = FollowEdge.safeParse(raw);
+        if (parsed.success && NostrHexId.safeParse(pubkey).success) out[pubkey] = parsed.data;
+      }
+      return out;
+    }),
 });
 
 export type NaggAggregates = Record<string, Record<string, Record<string, number>>>;

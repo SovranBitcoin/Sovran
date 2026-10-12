@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { NaggIdentitiesSchema, type NaggIdentity } from '../envelope';
+import { NOSTR_EVENT_LIMITS, NostrHexId } from '../schemas';
 import type { NostrTier } from '@sovranbitcoin/schemas';
 import type { NaggFeedEvent } from '../map/feed';
 import type { RequestControls } from '../timeout';
@@ -101,50 +102,84 @@ export interface MintReviewsTier {
 }
 
 // The nagg server-side aggregate response (`GroupBy:["u"]` over kind 38000).
+/** A mint or image URL. */
+const url = z.string().max(2048);
+/** A short display string from user-authored metadata: dropped on its own when too long. */
+const displayText = (max: number) => z.string().max(max).optional().catch(undefined);
+
+/**
+ * Items that arrive from the network one by one: one that does not parse is
+ * left out, and the rest of the response is kept. Nothing past `max` is read.
+ */
+function eachOf<T extends z.ZodTypeAny>(item: T, max: number) {
+  return z
+    .array(z.unknown())
+    .transform((items): z.infer<T>[] =>
+      items.slice(0, max).flatMap((raw) => {
+        const parsed = item.safeParse(raw);
+        return parsed.success ? [parsed.data as z.infer<T>] : [];
+      }),
+    );
+}
+
+/** A record read one entry at a time, for the same reason. */
+function eachEntryOf<T extends z.ZodTypeAny>(entry: T) {
+  return z.record(z.string(), z.unknown()).transform((entries) =>
+    Object.fromEntries(
+      Object.entries(entries).flatMap(([key, raw]) => {
+        const parsed = entry.safeParse(raw);
+        return parsed.success ? [[key, parsed.data as z.infer<T>] as const] : [];
+      }),
+    ),
+  );
+}
+
 const MintAggregateSchema = z.object({
-  mintUrl: z.string(),
+  mintUrl: url,
   averageScore: z.number().nullable(),
   reviewCount: z.number(),
 });
 
 // Bundled kind-0 identity (reviewer or operator), keyed by pubkey.
 const ProfileInfoSchema = z
-  .object({ name: z.string().optional(), picture: z.string().optional() })
+  .object({ name: displayText(256), picture: url.optional().catch(undefined) })
   .passthrough();
 
 const MintReviewItemSchema = z.object({
-  eventId: z.string(),
-  reviewerPubkey: z.string(),
-  mintUrl: z.string(),
+  eventId: NostrHexId,
+  reviewerPubkey: NostrHexId,
+  mintUrl: url,
   score: z.number().nullable(),
-  content: z.string(),
+  content: z.string().max(NOSTR_EVENT_LIMITS.content),
   createdAt: z.number(),
 });
 
 export const MintReviewsResponseSchema = z.object({
   summary: MintAggregateSchema,
-  reviews: z.array(MintReviewItemSchema).optional(),
-  profiles: z.record(z.string(), ProfileInfoSchema).optional(),
+  // More than the largest page asked for; anything past it is not read.
+  reviews: eachOf(MintReviewItemSchema, 1000).optional(),
+  profiles: eachEntryOf(ProfileInfoSchema).optional(),
   identities: NaggIdentitiesSchema,
 });
 
 // The nagg rich discovery row (per-mint card data merged from auditor + Nostr).
 const DiscoverMintSchema = z.object({
-  mintUrl: z.string(),
-  name: z.string().optional(),
-  iconUrl: z.string().optional(),
-  description: z.string().optional(),
-  supportedUnits: z.array(z.string()).optional(),
+  mintUrl: url,
+  name: displayText(256),
+  iconUrl: url.optional().catch(undefined),
+  description: displayText(4096),
+  supportedUnits: eachOf(z.string().max(32), 64).optional().catch(undefined),
   averageScore: z.number().nullable(),
   reviewCount: z.number(),
   favouriteCount: z.number().optional(),
   hasAudit: z.boolean().optional(),
-  state: z.string().optional(),
+  state: z.string().max(64).optional().catch(undefined),
   nMints: z.number().optional(),
   nMelts: z.number().optional(),
   nErrors: z.number().optional(),
-  operatorPubkey: z.string().optional(),
-  operatorNpub: z.string().optional(),
+  // An operator key that is not one is read as no known operator.
+  operatorPubkey: NostrHexId.optional().catch(undefined),
+  operatorNpub: z.string().max(128).optional().catch(undefined),
   followers: z.number().optional(),
   follows: z.number().optional(),
   vertexRank: z.number().optional(),
@@ -152,8 +187,9 @@ const DiscoverMintSchema = z.object({
 });
 
 export const DiscoverMintsResponseSchema = z.object({
-  mints: z.array(DiscoverMintSchema),
-  profiles: z.record(z.string(), ProfileInfoSchema).optional(),
+  // A directory lists a few hundred mints; anything past this is not read.
+  mints: eachOf(DiscoverMintSchema, 5000),
+  profiles: eachEntryOf(ProfileInfoSchema).optional(),
   identities: NaggIdentitiesSchema,
 });
 
