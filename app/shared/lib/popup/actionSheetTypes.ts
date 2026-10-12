@@ -22,7 +22,6 @@ type ActionMenuSheetPayload = {
 
 export type ProfileSwitcherAction =
   | { type: 'switch'; accountIndex: number }
-  | { type: 'remove'; accountIndex: number; importedKeyConfirmed: boolean }
   | { type: 'create' }
   | { type: 'import'; nsec: string; pubkeyHex: string; accountIndex: number };
 

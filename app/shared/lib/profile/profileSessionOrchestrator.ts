@@ -681,24 +681,3 @@ export async function deleteAllProfiles(opts?: {
     return false;
   }
 }
-
-/** Single-profile removal shares admission with every account transition. */
-export async function removeInactiveProfile(accountIndex: number, importedKeyConfirmed = false) {
-  // The removed profile is not running, so nothing is torn down and no splash
-  // is shown; both guards still keep a switch from starting underneath it.
-  const lock = acquireTransition();
-  if (!lock) return { kind: 'refused', reason: 'busy' } as const;
-  try {
-    if (!useProfileStore.persist.hasHydrated())
-      return { kind: 'refused', reason: 'unreadable' } as const;
-    if (!(await lock.takeDiskGuard())) return { kind: 'refused', reason: 'busy' } as const;
-    const { removeProfileData } = await import('./removeProfile');
-    const { profileRemovalPorts } = await import('./profileRemovalStorage');
-    return await removeProfileData(accountIndex, importedKeyConfirmed, profileRemovalPorts);
-  } catch {
-    // Module/native initialization errors can carry sensitive context; disclose no records.
-    return { kind: 'refused', reason: 'unreadable' } as const;
-  } finally {
-    await lock.release();
-  }
-}

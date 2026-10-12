@@ -1,7 +1,9 @@
 # 30. Profile removal preserves custody
 
 Date: 2026-10-09
-Status: Accepted; native validation pending.
+Status: Accepted; native validation pending. Not offered in the app since 2026-10-12: the
+profile switcher switches on a tap and has no removal action. What has to change before it
+returns, from Settings, is in the follow-ups (F140).
 
 A profile is a local identity within the recovery phrase's account. Removing one
 must leave the shared phrase and every other profile untouched. Sign out is not

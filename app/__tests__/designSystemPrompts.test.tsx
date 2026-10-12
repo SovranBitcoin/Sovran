@@ -419,9 +419,6 @@ describe('what the Prompts page lists', () => {
         'reimport-nostr-key',
         'delete-account',
         'start-fresh',
-        'remove-profile-derived',
-        'remove-profile-imported',
-        'profile-not-removed',
       ]
     );
   });

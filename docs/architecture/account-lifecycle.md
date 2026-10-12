@@ -105,7 +105,7 @@ recovery of pending operations wait for any restore to finish.
 
 ## Changing the active account
 
-All six flows live in `app/shared/lib/profile/profileSessionOrchestrator.ts`.
+All five flows live in `app/shared/lib/profile/profileSessionOrchestrator.ts`.
 
 | Flow                  | Function                  | Takes                    | When it works        | When it fails                                                                         |
 | --------------------- | ------------------------- | ------------------------ | -------------------- | ------------------------------------------------------------------------------------- |
@@ -113,7 +113,6 @@ All six flows live in `app/shared/lib/profile/profileSessionOrchestrator.ts`.
 | Add a derived profile | `createAndSwitchProfile`  | lock, disk guard, splash | restart, lock kept   | same as switch                                                                        |
 | Import a key          | `importAndSwitchProfile`  | lock, disk guard, splash | restart, lock kept   | before the key is stored: refuses, nothing changed; after the wallet is closed: holds |
 | Recover from a phrase | `recoverMnemonicSession`  | lock only                | restart              | before the phrase is stored: puts back what it wrote and releases; after: holds       |
-| Remove one profile    | `removeInactiveProfile`   | lock, disk guard         | no restart, releases | stops at the failed step, reports what is left, releases                              |
 | Delete everything     | `deleteAllProfiles`       | lock, disk guard, splash | restart, lock kept   | before the wipe starts: releases; after: holds                                        |
 
 "Lock kept" means the flow does not release: the reload discards the in-memory lock and the next
@@ -179,6 +178,10 @@ and the map cache in memory; restart.
   success. Errors deleting Nostr caches are only logged.
 
 ### Remove one profile
+
+Not offered in the app at present (F140): nothing calls `removeProfileData`
+(`app/shared/lib/profile/removeProfile.ts`), and the flow that took the lock and disk guard for it
+is gone with the menu. What follows is what it does when it is called.
 
 Only a profile that is not active and not the last. Its wallet database is opened on a separate
 connection in query-only mode, with no migrations and no seed. Removal is refused unless the

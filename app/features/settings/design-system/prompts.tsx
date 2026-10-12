@@ -12,7 +12,6 @@
  */
 
 import type { Mint } from '@cashu/coco-core';
-import { profileRemovalCopy } from 'copy/onboarding';
 import { useState, type ReactElement } from 'react';
 
 import OnboardingScreen from '@/features/onboarding/components/OnboardingScreen';
@@ -26,11 +25,6 @@ import { CTA_DEFINITIONS } from '@/shared/lib/cta/definitions';
 import { describeLegacyClaim } from '@/shared/lib/cta/oldEcashPrompt';
 import type { CtaBodyView, CtaDefinition, CtaId } from '@/shared/lib/cta/types';
 import type { AccountIntegrityResult } from '@/shared/lib/nostr/derivationIntegrity';
-import { actionMenuPopup } from '@/shared/lib/popup/popups/actionMenu';
-import {
-  confirmProfileRemoval,
-  showProfileNotRemoved,
-} from '@/shared/lib/popup/popups/profileRemoval';
 import { showMnemonicRecovery, showNsecRecovery } from '@/shared/lib/profile/keyRecovery';
 import type { ProfileEntry } from '@/shared/stores/global/profileStore';
 
@@ -185,30 +179,6 @@ const openPhraseSample = () => showMnemonicRecovery(async () => true);
 const openKeySample = () =>
   showNsecRecovery(SAMPLE_IMPORTED_PUBKEY, { save: async () => true, restart: () => true });
 const openStartFreshSample = () => confirmStartFresh(NOTHING);
-
-/**
- * The confirmation replaces the menu a profile's row opens, so that menu
- * comes first here too. Nothing is removed at the end.
- */
-function openRemovalSample(profile: ProfileEntry): void {
-  actionMenuPopup({
-    title: profile.cachedDisplayName ?? '',
-    buttons: [
-      {
-        text: profileRemovalCopy.remove,
-        variant: 'dangerous',
-        testID: `ds-prompt-remove-${profile.source}`,
-        keepOpen: true,
-        onPress: () => confirmProfileRemoval(profile, NOTHING),
-      },
-      {
-        text: profileRemovalCopy.cancel,
-        testID: 'ds-prompt-remove-cancel',
-        onPress: (close) => close(),
-      },
-    ],
-  });
-}
 
 // ── Screens that keep a little state of their own ───────────────
 
@@ -457,27 +427,6 @@ const DELETION_ENTRIES: readonly PromptEntry[] = [
     title: 'Start fresh?',
     detail: 'Two confirmations, from the locked-keys screen',
     open: openStartFreshSample,
-  },
-  {
-    kind: 'menu',
-    id: 'remove-profile-derived',
-    title: 'Remove profile from this device?',
-    detail: 'A profile made from the recovery phrase',
-    open: () => openRemovalSample(SAVINGS),
-  },
-  {
-    kind: 'menu',
-    id: 'remove-profile-imported',
-    title: 'Remove profile, then delete its key?',
-    detail: 'An imported profile: the key is confirmed separately',
-    open: () => openRemovalSample(OLD_PHONE),
-  },
-  {
-    kind: 'menu',
-    id: 'profile-not-removed',
-    title: 'Profile not removed',
-    detail: 'A refusal: the profile still holds ecash',
-    open: () => showProfileNotRemoved(profileRemovalCopy.refusals.balance),
   },
 ];
 

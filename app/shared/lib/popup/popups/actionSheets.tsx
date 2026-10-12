@@ -1,9 +1,6 @@
 import { getPublicKey } from 'nostr-tools/pure';
 import * as nip19 from 'nostr-tools/nip19';
 
-import { confirmProfileRemoval } from './profileRemoval';
-import { profileRemovalCopy } from 'copy/onboarding';
-
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -72,33 +69,9 @@ export function profileSwitcherPopup(payload: ProfileSwitcherPopupPayload): void
           {isActive ? <Icon name="mdi:check-circle" size={18} /> : null}
         </HStack>
       ),
-      onPress: (close) =>
-        close(() =>
-          actionMenuPopup({
-            title: displayName,
-            buttons: [
-              {
-                text: 'Switch to this profile',
-                testID: `profile-switch-${profile.accountIndex}`,
-                onPress: () =>
-                  payload.onRequestAction({ type: 'switch', accountIndex: profile.accountIndex }),
-              },
-              {
-                text: profileRemovalCopy.remove,
-                variant: 'dangerous',
-                testID: `profile-remove-${profile.accountIndex}`,
-                accessibilityLabel: `${profileRemovalCopy.remove}: ${displayName}`,
-                keepOpen: true,
-                onPress: () => confirmProfileRemoval(profile, payload.onRequestAction),
-              },
-              {
-                text: profileRemovalCopy.cancel,
-                testID: 'profile-actions-cancel',
-                onPress: (close) => close(),
-              },
-            ],
-          })
-        ),
+      onPress: () => {
+        payload.onRequestAction({ type: 'switch', accountIndex: profile.accountIndex });
+      },
     };
   };
 
