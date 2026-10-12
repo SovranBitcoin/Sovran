@@ -1,6 +1,12 @@
 import { describe, expect, test } from 'vitest';
 
-import { NaggFollowStatusEnvelopeSchema, NaggProfilesEnvelopeSchema } from '../src/envelope';
+import {
+  NaggEnvelopeSchema,
+  NaggFollowStatusEnvelopeSchema,
+  NaggProfilesEnvelopeSchema,
+  latestKind0ByPubkey,
+} from '../src/envelope';
+import { supersedes } from '../src/replaceable';
 import { coerceTags, toFeedEvent } from '../src/facade/event';
 import { DiscoverMintsResponseSchema, MintReviewsResponseSchema } from '../src/facade/mint-reviews';
 import {
@@ -169,4 +175,31 @@ test('provider figures and follow edges are read one pubkey at a time', () => {
     edges: { [PUBKEY]: { out: true, in: false }, 'not-a-key': { out: true, in: true }, [ID]: { out: 'yes' } },
   });
   expect(follows.edges).toEqual({ [PUBKEY]: { out: true, in: false } });
+});
+
+describe('which of two replaceable events stands', () => {
+  const older = { id: 'b'.repeat(64), created_at: 100 };
+  const newer = { id: 'c'.repeat(64), created_at: 101 };
+  const sameSecondLowerId = { id: 'a'.repeat(64), created_at: 100 };
+
+  test('the newer one, and at the same second the lower id, whatever order they arrive in', () => {
+    expect(supersedes(newer, older)).toBe(true);
+    expect(supersedes(older, newer)).toBe(false);
+    expect(supersedes(sameSecondLowerId, older)).toBe(true);
+    expect(supersedes(older, sameSecondLowerId)).toBe(false);
+    expect(supersedes(older, older)).toBe(false);
+  });
+
+  test('the latest profile in an envelope does not depend on arrival order', () => {
+    const profile = (id: string) => ({ ...event({ id, kind: 0, created_at: 100 }) });
+    const low = profile('1'.repeat(64));
+    const high = profile('2'.repeat(64));
+    for (const events of [
+      [low, high],
+      [high, low],
+    ]) {
+      const envelope = NaggEnvelopeSchema.parse({ order: [], orderBy: 'rank', events, aggregates: {} });
+      expect(latestKind0ByPubkey(envelope).get(PUBKEY)?.id).toBe('1'.repeat(64));
+    }
+  });
 });

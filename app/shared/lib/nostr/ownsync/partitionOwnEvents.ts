@@ -15,6 +15,7 @@ import {
   Repost,
   ShortTextNote,
 } from 'nostr-tools/kinds';
+import { supersedes } from 'nostr';
 
 /**
  * Minimal Nostr event shape this layer needs. Defined here (not imported from
@@ -100,12 +101,12 @@ export function partitionOwnEvents(events: readonly OwnSyncEvent[]): OwnEventsPa
   for (const event of events) {
     switch (event.kind) {
       case Metadata:
-        if (!out.latestProfile || event.created_at > out.latestProfile.created_at) {
+        if (!out.latestProfile || supersedes(event, out.latestProfile)) {
           out.latestProfile = event;
         }
         break;
       case Contacts:
-        if (!out.latestContacts || event.created_at > out.latestContacts.created_at) {
+        if (!out.latestContacts || supersedes(event, out.latestContacts)) {
           out.latestContacts = event;
         }
         break;

@@ -10,6 +10,7 @@ import type {
   NaggReposterInfo,
 } from './map/feed';
 import { firstTagValue } from './map/feed';
+import { supersedes } from './replaceable';
 
 // ---------------------------------------------------------------------------
 // nagg v2 envelope — ONE generic response shape for every app-view route
@@ -439,7 +440,7 @@ export function latestKind0ByPubkey(envelope: NaggEnvelope): Map<string, NaggFee
   for (const event of envelope.events) {
     if (event.kind !== 0) continue;
     const current = latest.get(event.pubkey);
-    if (!current || event.created_at > current.created_at) latest.set(event.pubkey, event);
+    if (!current || supersedes(event, current)) latest.set(event.pubkey, event);
   }
   return latest;
 }

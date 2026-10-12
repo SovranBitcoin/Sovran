@@ -3,6 +3,7 @@
 // the read path is a plain events query instead of a bespoke relay subscription.
 import { z } from 'zod';
 
+import { supersedes } from '../replaceable';
 import type { EventQueryInput } from './rank';
 
 // Tag and content JSON is untrusted relay data, so it is parsed with these
@@ -169,7 +170,15 @@ export function parseWallpaperCatalog(
     const entry = parseWallpaperEvent(node, albumNamespace);
     if (!entry) continue;
     const existing = byTheme.get(entry.themeName);
-    if (existing && existing.createdAt >= entry.createdAt) continue;
+    if (
+      existing &&
+      !supersedes(
+        { created_at: entry.createdAt, id: entry.eventId },
+        { created_at: existing.createdAt, id: existing.eventId },
+      )
+    ) {
+      continue;
+    }
     byTheme.set(entry.themeName, entry);
   }
   const wallpapers = [...byTheme.values()].sort((a, b) => b.createdAt - a.createdAt);

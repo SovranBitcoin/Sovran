@@ -110,8 +110,6 @@ reports) keep their evidence, and link here for anything still open.
 | [F125](F125.md) | medium | fix | The app publishes no kind 10050 relay list, so a NIP-17 client cannot open a message with a Sovran user |
 | [F126](F126.md) | medium | fix | Controls the native harness cannot address: the sheet close button and the camera-permission button have no testID |
 | [F127](F127.md) | low | fix | Small type and import findings from the review sweep that were read and left |
-| [F128](F128.md) | medium | fix | Two amount schemas accept fractions: the payment-request route entry and the Routstr balance |
-| [F129](F129.md) | low | fix | Three places that keep the newest replaceable event break a same-second tie by arrival order |
 | [F130](F130.md) | low | investigation | About 300 review findings were grouped by rule and never read, and their locations were not kept |
 | [F131](F131.md) | low | fix | Avatar call sites and two screens that bypass the shared loading and timing paths |
 | [F132](F132.md) | low | investigation | Performance questions that were measured or noticed and never explained |

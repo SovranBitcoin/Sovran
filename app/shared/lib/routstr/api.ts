@@ -316,15 +316,23 @@ const ModelsResponseSpine = z.looseObject({
   ),
 });
 
+/**
+ * A count of millisats from a provider. They are whole by definition; a node
+ * that sends a fraction is rounded here, at the edge, so nothing downstream
+ * holds a balance that is not a whole number. Not refused: a fraction is the
+ * provider's arithmetic, not a reason to lose sight of the balance.
+ */
+export const RoutstrMsats = z.number().finite().transform(Math.round);
+
 const BalanceSpine = z.looseObject({
-  balance: z.number().optional(),
-  total_spent: z.number().optional(),
+  balance: RoutstrMsats.optional(),
+  total_spent: RoutstrMsats.optional(),
   api_key: z.string().optional(),
-  reserved: z.number().optional(),
+  reserved: RoutstrMsats.optional(),
 });
 
 const TopUpSpine = z.looseObject({
-  msats: z.number().optional(),
+  msats: RoutstrMsats.optional(),
 });
 
 // ── Types ────────────────────────────────────────────────────────────────

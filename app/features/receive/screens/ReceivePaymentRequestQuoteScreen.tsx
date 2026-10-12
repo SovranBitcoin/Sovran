@@ -42,14 +42,7 @@ import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
-
-const EntrySchema = z.object({
-  operationId: z.string().min(1).max(128),
-  encodedRequest: z.string().min(4).max(8192),
-  amount: z.number().positive(),
-  unit: z.string().min(1).max(16),
-  mints: z.array(z.string().max(2048)).max(16),
-});
+import { PaymentRequestEntrySchema } from '@/features/receive/lib/paymentRequestEntry';
 
 const ParamsSchema = z.object({
   paymentRequestEntry: z.string().min(2),
@@ -80,7 +73,7 @@ export const ReceivePaymentRequestQuoteScreen = memo(function ReceivePaymentRequ
   const entry = useMemo(() => {
     if (!params) return null;
     try {
-      return EntrySchema.parse(JSON.parse(params.paymentRequestEntry));
+      return PaymentRequestEntrySchema.parse(JSON.parse(params.paymentRequestEntry));
     } catch {
       return null;
     }
