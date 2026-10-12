@@ -48,6 +48,16 @@ export interface ProfileEntry {
    * See `walletDatabaseRecord.ts`.
    */
   walletDatabaseCreated?: boolean;
+  /**
+   * Imported accounts only: `hashMnemonic` of the recovery phrase this
+   * account's wallet was made from. An imported account's identity is its own
+   * key, but its wallet is derived from the phone's recovery phrase, and
+   * nothing else records which one. Without it, a recovery with a different
+   * phrase would quietly give the account a different wallet. Kept here and
+   * not in the keychain because it is needed exactly when the keychain cannot
+   * be read. It is 64 bits of a hash and reveals nothing of the phrase.
+   */
+  walletPhraseFingerprint?: string;
 }
 
 interface ProfileState {
@@ -73,6 +83,12 @@ interface ProfileActions {
     externalChain?: number
   ) => boolean;
   repairDerivedSource: (accountIndex: number, verifiedPubkey: string) => boolean;
+  /**
+   * Record which recovery phrase an imported account's wallet was made from.
+   * Written once: a fingerprint already recorded is evidence and is never
+   * replaced.
+   */
+  recordWalletPhraseFingerprint: (pubkey: string, fingerprint: string) => void;
   /** Set the active account index (caller is responsible for cleanup/resetStages before this) */
   switchProfile: (accountIndex: number) => boolean;
   /** Get the next available account index (only considers derived profiles) */
@@ -111,6 +127,9 @@ const PersistedProfileEntry = z.looseObject({
   // Absent means not recorded, which never asks for a restore. An unreadable
   // value is read the same way; rejecting it would discard the whole store.
   walletDatabaseCreated: z.boolean().optional().catch(undefined),
+  // Absent means not recorded, which checks nothing. An unreadable value is
+  // read the same way; rejecting it would discard the whole store.
+  walletPhraseFingerprint: z.string().max(64).optional().catch(undefined),
 });
 
 /**
@@ -247,6 +266,17 @@ export const useProfileStore = create<ProfileStore>({ name: 'profile-store', sco
         }));
         storeLog.info('profile.source.repaired');
         return true;
+      },
+
+      recordWalletPhraseFingerprint: (pubkey, fingerprint) => {
+        const profile = get().profiles.find((p) => p.pubkey === pubkey);
+        if (profile?.source !== 'imported' || profile.walletPhraseFingerprint) return;
+        set((state) => ({
+          profiles: state.profiles.map((p) =>
+            p === profile ? { ...p, walletPhraseFingerprint: fingerprint } : p
+          ),
+        }));
+        storeLog.info('profile.wallet_phrase_fingerprint.recorded');
       },
 
       switchProfile: (accountIndex: number) => {

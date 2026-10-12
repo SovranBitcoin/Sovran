@@ -4197,6 +4197,10 @@ exports[`persisted schema drift profile-store schema matches the golden snapshot
               "walletDatabaseCreated": {
                 "type": "boolean",
               },
+              "walletPhraseFingerprint": {
+                "maxLength": 64,
+                "type": "string",
+              },
             },
             "required": [
               "accountIndex",
@@ -4267,6 +4271,10 @@ exports[`persisted schema drift profile-store schema matches the golden snapshot
               },
               "walletDatabaseCreated": {
                 "type": "boolean",
+              },
+              "walletPhraseFingerprint": {
+                "maxLength": 64,
+                "type": "string",
               },
             },
             "required": [

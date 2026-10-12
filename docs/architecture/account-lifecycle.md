@@ -315,4 +315,4 @@ Rules:
 | When the splash comes down                                              | `app/shared/blocks/NativeSplashLayoutGate.tsx`                               |
 | What an account owns outside React                                      | `app/shared/lib/account/accountRegistry.ts`                                  |
 | Decisions                                                               | ADR 0029 (registry and switch), ADR 0030 (removal)                           |
-| Known gaps                                                              | `docs/follow-ups/` (F72, F77, F79 to F83, F93, F95, F96, F123) |
+| Known gaps                                                              | `docs/follow-ups/` (F72, F77, F79 to F83, F93, F96, F123, F124) |

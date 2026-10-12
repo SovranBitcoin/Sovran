@@ -18,6 +18,8 @@
 import * as bip39 from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english.js';
 import {
+  hashMnemonic,
+  retrieveMnemonic,
   storeImportedNsec,
   storeMnemonic,
   prepareSecureDataReset,
@@ -405,6 +407,23 @@ export async function importAndSwitchProfile(opts: {
       await lock.release();
       return 'limit';
     }
+    // An imported account's wallet is derived from this phone's recovery
+    // phrase. Record which one, so a later recovery with another phrase is
+    // refused instead of quietly giving the account a different wallet.
+    // A phrase that cannot be read just now records nothing; the import is
+    // not held up for it.
+    try {
+      const phrase = await retrieveMnemonic();
+      if (phrase) {
+        useProfileStore
+          .getState()
+          .recordWalletPhraseFingerprint(opts.pubkeyHex, hashMnemonic(phrase));
+      }
+    } catch (error) {
+      log.warn('profile.orchestrator.wallet_phrase_fingerprint_unrecorded', {
+        error: redactError(error),
+      });
+    }
     // From here on the endings are the switch's own: a restart or a hold.
     if (inProcess) await switchWithoutRestart(opts.accountIndex, () => lock.release());
     else await restartInto(opts.accountIndex);
@@ -451,6 +470,25 @@ export async function recoverMnemonicSession(mnemonic: string): Promise<boolean>
         )
       )
         return false;
+    }
+    // An imported account's key is its own, whatever the phrase, but its
+    // wallet is derived from the phrase. Where the account recorded which
+    // phrase that was, another phrase is refused: it would open a different,
+    // empty wallet for the same account. An account imported before that was
+    // recorded is not held against anything.
+    if (
+      !onboarding &&
+      useProfileStore
+        .getState()
+        .profiles.some(
+          (profile) =>
+            profile.source === 'imported' &&
+            profile.walletPhraseFingerprint !== undefined &&
+            profile.walletPhraseFingerprint !== hashMnemonic(mnemonic)
+        )
+    ) {
+      log.warn('profile.orchestrator.recovery_refused_wallet_phrase');
+      return false;
     }
     // Bounded, and refused on a timeout: the phrase must not be replaced while
     // the wallet opened under the old one may still be writing.

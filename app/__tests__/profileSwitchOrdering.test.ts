@@ -518,12 +518,15 @@ describe('importAndSwitchProfile', () => {
     nsec: nsecEncode(secretKey),
   };
   const storeImportedNsec = jest.fn();
+  const PHRASE =
+    'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';
 
   beforeEach(() => {
     storeImportedNsec.mockReset().mockResolvedValue(true);
     jest.doMock('@/shared/lib/nostr/secureStorage', () => ({
       ...jest.requireActual('@/shared/lib/nostr/secureStorage'),
       storeImportedNsec,
+      retrieveMnemonic: jest.fn(async () => PHRASE),
     }));
   });
   afterEach(() => jest.dontMock('@/shared/lib/nostr/secureStorage'));
@@ -545,6 +548,9 @@ describe('importAndSwitchProfile', () => {
       .getState()
       .profiles.find((p) => p.accountIndex === imported.accountIndex);
     expect(added).toMatchObject({ pubkey: imported.pubkeyHex, source: 'imported' });
+    // Which recovery phrase the account's wallet is made from, for a later
+    // recovery to be held against: 16 hex characters, never the phrase.
+    expect(added?.walletPhraseFingerprint).toMatch(/^[0-9a-f]{16}$/);
     expect(persistedActiveIndex(AsyncStorage)).toBe(imported.accountIndex);
     // Not flipped in memory, and the lock is kept for the restart.
     expect(useProfileStore.getState().activeAccountIndex).toBe(0);

@@ -402,6 +402,52 @@ describe('an imported account', () => {
   });
 });
 
+describe("the phrase an imported account's wallet was made from", () => {
+  const recorded = (root: string): AccountIntegrityInput => {
+    const input = importedAccount(root);
+    return { ...input, row: { ...input.row, walletPhraseFingerprint: hashPhrase(root) } };
+  };
+
+  it('passes while the phrase is the one the account recorded', () => {
+    expect(failed(recorded(ROOT))).toEqual([]);
+    expect(statusOf(recorded(ROOT), 'row.imported-wallet-phrase')).toMatchObject({
+      status: 'pass',
+    });
+  });
+
+  it('stops the account when another phrase would derive it a different wallet', () => {
+    // The key still matches, so nothing else objects: this is the only check
+    // that can, and it needs neither a derivation nor the keychain.
+    const result = checkAccountIntegrity({
+      ...recorded(ROOT),
+      phraseHash: hashPhrase(OTHER_ROOT),
+      rootSeed: null,
+      expectedWalletSeed: null,
+      stored: {},
+      session: undefined,
+    });
+    expect(result.ok).toBe(false);
+    expect(result.mismatches.map((mismatch) => mismatch.invariant)).toEqual([
+      'row.imported-wallet-phrase',
+    ]);
+    expect(result.diagnosticCode).toContain('-RW-');
+  });
+
+  it('holds an account imported before this was recorded against nothing', () => {
+    expect(statusOf(importedAccount(ROOT), 'row.imported-wallet-phrase')).toMatchObject({
+      status: 'not-checked',
+      reason: 'absent',
+    });
+  });
+
+  it('does not apply to an account made from the phrase', () => {
+    expect(statusOf(derivedAccount(ROOT, 0), 'row.imported-wallet-phrase')).toMatchObject({
+      status: 'not-checked',
+      reason: 'not-applicable',
+    });
+  });
+});
+
 describe('after a recovery', () => {
   it('ignores caches made from the phrase that was replaced', () => {
     // Recovery only accepts a phrase that derives the saved derived rows, or

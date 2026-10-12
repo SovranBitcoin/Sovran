@@ -41,6 +41,12 @@ export type IntegrityInvariant =
   | 'row.imported-key'
   /** An imported row's index is the number computed from its public key. */
   | 'row.imported-index'
+  /**
+   * An imported account's wallet was made from this recovery phrase. Its row
+   * records the phrase's fingerprint once; a different phrase would derive a
+   * different wallet for the same account.
+   */
+  | 'row.imported-wallet-phrase'
   /** The cached private key, nsec, npub and public key describe one key. */
   | 'cache.derived-keys-consistent'
   /** The cached derived key is the row's. */
@@ -63,6 +69,7 @@ const INVARIANT_CODE: Record<IntegrityInvariant, string> = {
   'row.derived-pubkey': 'RD',
   'row.imported-key': 'RK',
   'row.imported-index': 'RI',
+  'row.imported-wallet-phrase': 'RW',
   'cache.derived-keys-consistent': 'CC',
   'cache.derived-keys-row': 'CR',
   'cache.derived-keys-phrase': 'CP',
@@ -97,6 +104,8 @@ export interface IntegrityRow {
   pubkey: string;
   /** Absent means derived, as in the profile store. */
   source?: 'derived' | 'imported';
+  /** Imported rows: `hashMnemonic` of the phrase the wallet was made from, once recorded. */
+  walletPhraseFingerprint?: string;
 }
 
 export interface AccountIntegrityInput {
@@ -331,6 +340,18 @@ export function checkAccountIntegrity(input: AccountIntegrityInput): AccountInte
     skip('row.imported-index', 'not-applicable');
     if (derivedPubkey) compare('row.derived-pubkey', derivedPubkey, rowPubkey, pubkeyPrint);
     else skip('row.derived-pubkey', 'no-root-seed');
+  }
+  // Needs no derivation and no keychain: it is what still stands when the
+  // keychain cannot be read and a phrase has just been typed in.
+  if (!imported) skip('row.imported-wallet-phrase', 'not-applicable');
+  else if (!row.walletPhraseFingerprint) skip('row.imported-wallet-phrase', 'absent');
+  else {
+    compare(
+      'row.imported-wallet-phrase',
+      row.walletPhraseFingerprint,
+      phraseHash,
+      (hash) => `h:${hash.slice(0, 8)}`
+    );
   }
 
   // ── The derived-key cache (derived accounts only; an imported one never reads it) ──

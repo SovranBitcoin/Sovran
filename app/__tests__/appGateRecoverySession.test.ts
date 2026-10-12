@@ -29,6 +29,9 @@ jest.mock('@/shared/lib/logger', () => ({
   redactError: () => 'redacted',
 }));
 jest.mock('@/shared/lib/nostr/secureStorage', () => ({
+  // A stand-in fingerprint: the same phrase gives the same text, another gives another.
+  hashMnemonic: (mnemonic: string) => `fingerprint of ${mnemonic}`,
+  retrieveMnemonic: jest.fn(async () => null),
   storeMnemonic: jest.fn(async () => true),
   clearAllSecureData: jest.fn(async () => true),
   prepareSecureDataReset: jest.fn(
@@ -161,6 +164,40 @@ it('leaves databases and keys intact when reset enumeration fails', async () => 
   expect(CocoManager.completeReset).not.toHaveBeenCalled();
   expect(clearAllSecureData).not.toHaveBeenCalled();
   expect(AsyncStorage.clear).not.toHaveBeenCalled();
+});
+
+describe('an imported account whose wallet was made from a recorded phrase', () => {
+  const imported = (walletPhraseFingerprint?: string) => ({
+    accountIndex: 848431463,
+    pubkey: 'c'.repeat(64),
+    source: 'imported' as const,
+    addedAt: 2,
+    ...(walletPhraseFingerprint ? { walletPhraseFingerprint } : {}),
+  });
+  /** The keychain cannot be read, which is when a phrase is typed in for imported accounts. */
+  const lockedWith = (profile: ReturnType<typeof imported>) => {
+    useSecureStoreState.setState({ secureStoreState: 'locked', errorName: null });
+    useProfileStore.setState({ activeAccountIndex: profile.accountIndex, profiles: [profile] });
+  };
+  afterEach(() => useSecureStoreState.setState({ secureStoreState: 'available', errorName: null }));
+
+  it('refuses another phrase: it would derive the account a different wallet', async () => {
+    lockedWith(imported('fingerprint of some other twelve words'));
+    await expect(recoverMnemonicSession(phrase)).resolves.toBe(false);
+    expect(storeMnemonic).not.toHaveBeenCalled();
+    expect(CocoManager.cleanup).not.toHaveBeenCalled();
+  });
+
+  it('accepts the phrase the account recorded', async () => {
+    lockedWith(imported(`fingerprint of ${phrase}`));
+    await expect(recoverMnemonicSession(phrase)).resolves.toBe(true);
+    expect(storeMnemonic).toHaveBeenCalledWith(phrase);
+  });
+
+  it('holds an account imported before this was recorded against nothing', async () => {
+    lockedWith(imported());
+    await expect(recoverMnemonicSession(phrase)).resolves.toBe(true);
+  });
 });
 
 it('lets a derived account recover its matching phrase after a setup failure', async () => {
