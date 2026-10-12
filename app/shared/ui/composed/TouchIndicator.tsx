@@ -9,6 +9,7 @@ import Animated, {
 
 import { INVARIANT_WHITE } from '@/shared/lib/brandColors';
 import { withAlpha } from '@/shared/lib/color';
+import { log } from '@/shared/lib/logger';
 
 /**
  * Whether taps are drawn. Supplied by `TouchIndicatorProvider` from the
@@ -70,6 +71,10 @@ interface TouchIndicatorLayerProps {
  * app would draw taps inside a sheet in the wrong place. Each container
  * mounts its own layer instead. It only listens as touches bubble past; it
  * never becomes the responder, so nothing underneath behaves differently.
+ *
+ * The layer that draws a touch also logs it, `ui.touch` on landing and on
+ * lifting. A test runner sends touches from outside the app; these entries are
+ * how it knows the app received one.
  */
 export function TouchIndicatorLayer({ children, fill = true }: TouchIndicatorLayerProps) {
   // Switched off, a layer is nothing at all: no wrapper view, no listeners
@@ -117,6 +122,7 @@ function ActiveLayer({ children, fill }: Required<TouchIndicatorLayerProps>) {
   const release = () => {
     if (!owns.current) return;
     owns.current = false;
+    log.debug('ui.touch', { phase: 'end' });
     held.set(withTiming(0, { duration: 260, easing: easeOut() }));
     ripple.set(0);
     ripple.set(withTiming(1, { duration: 420, easing: easeOut() }));
@@ -132,6 +138,11 @@ function ActiveLayer({ children, fill }: Required<TouchIndicatorLayerProps>) {
         if (lastDrawn === key) return;
         lastDrawn = key;
         owns.current = true;
+        log.debug('ui.touch', {
+          phase: 'start',
+          x: event.nativeEvent.pageX,
+          y: event.nativeEvent.pageY,
+        });
         place(event);
         ripple.set(1);
         held.set(withTiming(1, { duration: 70, easing: easeOut() }));

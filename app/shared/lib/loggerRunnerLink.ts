@@ -102,7 +102,7 @@ export function connectRunnerLink(
  * cache writes go on for as long as the app runs and are not waited for.
  */
 const ON_SCREEN =
-  /^(e2e\.step|nav\.|screen\.|ui\.screen|render\.|visual\.|machine\.|screenAction|payment\.step|toast\.)|\.shift\./;
+  /^(e2e\.step|nav\.|screen\.|ui\.screen|ui\.touch|render\.|visual\.|machine\.|screenAction|payment\.step|toast\.)|\.shift\./;
 /** Frames with nothing happening on screen before the app calls itself settled. */
 const STILL_FRAMES = 2;
 /** A page whose slide never reports its end is taken to have stopped after this long. */

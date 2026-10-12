@@ -33,6 +33,7 @@ export {
   createLogger,
   monotonicNow,
   SHOW_LOGS,
+  IS_E2E_LOG_BUILD,
   log,
   initLog,
   initPhase,
