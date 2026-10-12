@@ -59,11 +59,25 @@ const FINAL_RECEIPT_WAIT_MS = 15_000;
 const RECEIPT_POLL_MS = 1_000;
 const NEXT_ROUTE_PAUSE_MS = 1_500;
 const NEXT_TRANSFER_PAUSE_MS = 500;
+/** How long a settled melt's receipt is waited for before it is given up on. An invoice lives less. */
+const ARRIVING_MAX_MS = 60 * 60 * 1000;
 
 /** Melt states in which the payment may already have left the mint. */
 const MELT_IN_FLIGHT_STATES = new Set(['executing', 'pending', 'finalized']);
 
 type Settlement = 'finalized' | 'pending' | 'aborted';
+
+type ArrivingReceipt = { receipt: RebalanceMintReceipt; since: number };
+/** What is in flight, per lock (one lock per screen), by the mint it is arriving at. */
+const arrivingByLock = new WeakMap<object, Map<string, ArrivingReceipt[]>>();
+function arrivingFor(lock: object): Map<string, ArrivingReceipt[]> {
+  let arriving = arrivingByLock.get(lock);
+  if (!arriving) {
+    arriving = new Map();
+    arrivingByLock.set(lock, arriving);
+  }
+  return arriving;
+}
 
 interface TransferRun {
   step: RebalanceTransfer;
@@ -77,7 +91,8 @@ type ChainResult =
   | { status: 'complete'; finalHopLegId: string; finalReceipt: RebalanceMintReceipt }
   /** A hop paid and its money has not been seen at the next mint. Nothing after it ran. */
   | { status: 'settling'; finalHopLegId: string; arrivingAt: string }
-  | { status: 'incomplete'; finalHopLegId?: string; error?: unknown };
+  /** `sentHops` counts hops that paid before the chain stopped: money that has left the source. */
+  | { status: 'incomplete'; finalHopLegId?: string; error?: unknown; sentHops: number };
 
 type HopResult =
   | { status: 'sent'; receipt: RebalanceMintReceipt }
@@ -349,18 +364,46 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
   // it. Receipts are remembered by the mint they are arriving at and forgotten
   // once seen to arrive.
 
-  const arriving = new Map<string, RebalanceMintReceipt[]>();
+  //
+  // The record belongs to the lock, which a screen keeps for its whole life,
+  // and not to the engine, which the screen rebuilds whenever its inputs
+  // change: a rebuilt engine must not forget what is in flight. An entry is
+  // also dropped after `ARRIVING_MAX_MS`. A melt recorded here may have been
+  // pending and later rolled back, in which case its receipt can never arrive;
+  // without a limit the steps behind it would be held, and its mint kept
+  // trusted, for as long as the screen lived.
+
+  const arriving = arrivingFor(config.lock);
 
   function noteArriving(receipt: RebalanceMintReceipt): void {
-    arriving.set(receipt.mintUrl, [...(arriving.get(receipt.mintUrl) ?? []), receipt]);
+    arriving.set(receipt.mintUrl, [
+      ...(arriving.get(receipt.mintUrl) ?? []),
+      { receipt, since: clock.now() },
+    ]);
+  }
+
+  /** Forget receipts too old to still be on their way. */
+  function forgetExpired(): void {
+    for (const [mintUrl, entries] of arriving) {
+      const live = entries.filter((entry) => clock.now() - entry.since < ARRIVING_MAX_MS);
+      if (live.length === entries.length) continue;
+      log.warn('mint.rebalance.arriving_expired', {
+        ...mintUrlFields(mintUrl),
+        expired: entries.length - live.length,
+      });
+      if (live.length === 0) arriving.delete(mintUrl);
+      else arriving.set(mintUrl, live);
+    }
   }
 
   /** True while money is still on its way to `mintUrl`. */
   async function stillArriving(mintUrl: string): Promise<boolean> {
-    const receipts = arriving.get(mintUrl);
-    if (!receipts) return false;
-    const waiting: RebalanceMintReceipt[] = [];
-    for (const receipt of receipts) {
+    forgetExpired();
+    const entries = arriving.get(mintUrl);
+    if (!entries) return false;
+    const waiting: ArrivingReceipt[] = [];
+    for (const entry of entries) {
+      const { receipt } = entry;
       let arrived = false;
       try {
         arrived = isCleanFinalization(await wallet.getMintOperation(receipt.id), receipt);
@@ -372,7 +415,7 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
           error,
         });
       }
-      if (!arrived) waiting.push(receipt);
+      if (!arrived) waiting.push(entry);
     }
     if (waiting.length === 0) arriving.delete(mintUrl);
     else arriving.set(mintUrl, waiting);
@@ -402,6 +445,7 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
     // A mint that money is still arriving at stays trusted. Untrusted now, it
     // has no balance yet to be noticed by, and the money would then arrive at
     // a mint the wallet no longer lists.
+    forgetExpired();
     const releasable = temporarilyTrusted.filter((url) => !arriving.has(url));
     const { stranded, untrustErrors } = await wallet.releaseTrust(releasable);
     for (const { url, error } of untrustErrors) {
@@ -581,10 +625,11 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
     const hopCount = route.path.length - 1;
     let finalHopLegId: string | undefined;
     let startedHops = 0;
+    let sentHops = 0;
     try {
       let finalReceipt: RebalanceMintReceipt | null = null;
       for (let index = 0; index < hopCount; index++) {
-        if (!run.isActive()) return { status: 'incomplete', finalHopLegId };
+        if (!run.isActive()) return { status: 'incomplete', finalHopLegId, sentHops };
         const legId = hopLegIds[index];
         finalHopLegId = legId;
         startedHops = index + 1;
@@ -595,7 +640,8 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
           chainId: attempt.chainId,
           firstHopCap: attempt.transferAmount,
         });
-        if (hop.status !== 'sent') return { status: 'incomplete', finalHopLegId };
+        if (hop.status !== 'sent') return { status: 'incomplete', finalHopLegId, sentHops };
+        sentHops += 1;
         finalReceipt = hop.receipt;
         if (index < hopCount - 1) {
           // Wait for this hop's recipient operation before the next hop spends it.
@@ -604,7 +650,7 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
             INTERMEDIATE_RECEIPT_WAIT_MS,
             run.isActive
           );
-          if (!run.isActive()) return { status: 'incomplete', finalHopLegId };
+          if (!run.isActive()) return { status: 'incomplete', finalHopLegId, sentHops };
           if (!arrived) {
             // The hop paid and its money has not been seen at the next mint.
             // The next hop would find that mint short and fail, and a failed
@@ -618,7 +664,7 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
           run.sink.legUpdated(legId, { status: 'done', routing: null });
         }
       }
-      if (!finalReceipt || !finalHopLegId) return { status: 'incomplete', finalHopLegId };
+      if (!finalReceipt || !finalHopLegId) return { status: 'incomplete', finalHopLegId, sentHops };
       return { status: 'complete', finalHopLegId, finalReceipt };
     } catch (error) {
       debug({
@@ -634,7 +680,7 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
       for (const legId of hopLegIds.slice(startedHops)) {
         run.sink.legUpdated(legId, { status: 'skipped' });
       }
-      return { status: 'incomplete', finalHopLegId, error };
+      return { status: 'incomplete', finalHopLegId, error, sentHops };
     }
   }
 
@@ -708,6 +754,13 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
       // Money is on its way through this route: no other route is tried.
       if (result.status === 'settling') return 'settling';
       if (result.error !== undefined) lastError = result.error;
+      // A hop of this route already paid, so the amount has left the source
+      // and sits at a mint on the way (the trust release above says where).
+      // Another route would send the same amount from the source again.
+      if (result.sentHops > 0) {
+        debug({ event: 'route_abandoned_after_paid_hop', stepId: id, sentHops: result.sentHops });
+        throw lastError;
+      }
       debug({
         event: 'candidate_route_failed_trying_next',
         stepId: id,

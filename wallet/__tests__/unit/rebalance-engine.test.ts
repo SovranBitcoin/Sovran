@@ -576,6 +576,87 @@ describe('rebalance engine — money still on its way', () => {
     expect(wallet.port.executeMelt).toHaveBeenCalledTimes(2);
   });
 
+  it('tries no other route once a hop has paid: the amount has already left the source', async () => {
+    const second: RebalanceRoute = { ...route, source: 'graph' };
+    const { run, wallet, recorder } = setup({ balances, routes: [route, second] });
+    const refused = new MintOperationError(11001, 'Token already spent');
+    wallet.port.executeMelt
+      .mockRejectedValueOnce(new MintOperationError(20004, 'no_route'))
+      // Hop one pays and arrives at the middleman (the default behaviour)...
+      .mockImplementationOnce(async (id: string) => {
+        wallet.payInvoice(wallet.invoiceByMelt.get(id) ?? '');
+        return { id, state: 'finalized' };
+      })
+      // ...and hop two is turned down for good.
+      .mockRejectedValueOnce(refused);
+
+    const outcome = await run();
+
+    expect(outcome).toEqual({ status: 'failed', error: refused });
+    // Direct attempt, hop one, hop two. No second route from the source.
+    expect(wallet.port.executeMelt).toHaveBeenCalledTimes(3);
+    expect(recorder.events.some((event) => event.legId.startsWith('step-1-hop-2'))).toBe(false);
+  });
+
+  it('remembers what is in flight when the engine is rebuilt for the same screen', async () => {
+    const first: RebalanceTransfer = { ...STEP, id: 'to-middle', toMintUrl: MIDDLEMAN };
+    const second: RebalanceTransfer = { ...STEP, id: 'onward', fromMintUrl: MIDDLEMAN };
+    const wallet = fakeWallet({ [SOURCE]: 1000, [MIDDLEMAN]: 0 });
+    const clock = fakeClock();
+    const lock = createRebalanceLock(clock);
+    const build = () =>
+      createRebalanceEngine({
+        wallet: wallet.port,
+        findRoutes: async () => [],
+        trustedMintUrls: new Set([SOURCE, MIDDLEMAN, DESTINATION]),
+        minTransferThreshold: 5,
+        minFeeReserve: 5,
+        lock,
+        clock,
+      });
+    wallet.port.executeMelt.mockImplementationOnce(paidNotIssued);
+    const recorder = recordingSink();
+    const settled = new Set<string>();
+    const callbacks = {
+      isActive: () => true,
+      isSettled: (stepId: string) => settled.has(stepId),
+      sinkFor: () => recorder.sink,
+      onTransferSettled: (step: RebalanceTransfer) => void settled.add(step.id),
+    };
+
+    await build().runTransfers([first, second], callbacks);
+    // The screen rebuilds its engine (its inputs changed) and runs again.
+    const result = await build().runTransfers([first, second], callbacks);
+
+    expect(result).toEqual({ status: 'finished', anyFailed: false, anyPending: true });
+    expect(settled.has('onward')).toBe(false);
+    expect(wallet.port.executeMelt).toHaveBeenCalledTimes(1);
+  });
+
+  it('gives up on money that has not arrived after an hour, so nothing is held for good', async () => {
+    const first: RebalanceTransfer = { ...STEP, id: 'to-middle', toMintUrl: MIDDLEMAN };
+    const second: RebalanceTransfer = { ...STEP, id: 'onward', fromMintUrl: MIDDLEMAN };
+    const { engine, wallet, clock, recorder } = setup({
+      balances: { [SOURCE]: 1000, [MIDDLEMAN]: 100 },
+      trusted: [SOURCE, MIDDLEMAN, DESTINATION],
+    });
+    wallet.port.executeMelt.mockImplementationOnce(paidNotIssued);
+    const settled = new Set<string>();
+    const callbacks = {
+      isActive: () => true,
+      isSettled: (stepId: string) => settled.has(stepId),
+      sinkFor: () => recorder.sink,
+      onTransferSettled: (step: RebalanceTransfer) => void settled.add(step.id),
+    };
+    await engine.runTransfers([first, second], callbacks);
+    expect(settled.has('onward')).toBe(false);
+
+    await clock.sleep(60 * 60 * 1000);
+    await engine.runTransfers([first, second], callbacks);
+    // No longer held: it runs on what the mint actually holds.
+    expect(settled.has('onward')).toBe(true);
+  });
+
   it('keeps a manually routed middleman trusted while the first hop is still arriving', async () => {
     const harness = setup({
       balances: { [SOURCE]: 1000, [MIDDLEMAN]: 0 },
