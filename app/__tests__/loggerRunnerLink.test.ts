@@ -11,6 +11,7 @@ import {
   connectRunnerLink,
   createSettleWatch,
   parseRunnerNote,
+  type RunnerRequests,
   type RunnerSocket,
 } from '@/shared/lib/loggerRunnerLink';
 
@@ -58,10 +59,20 @@ describe('parseRunnerNote', () => {
   });
 });
 
+const requests = (over: Partial<RunnerRequests> = {}): RunnerRequests => ({
+  onMark: jest.fn(),
+  readScreen: () => ({ elements: [] }),
+  ...over,
+});
+
 describe('connectRunnerLink', () => {
   it('holds entries logged before the runner answers and sends them in order', () => {
     const socket = new FakeSocket();
-    const link = connectRunnerLink({ url: 'ws://127.0.0.1:1', run: 'r1' }, () => socket, jest.fn());
+    const link = connectRunnerLink(
+      { url: 'ws://127.0.0.1:1', run: 'r1' },
+      () => socket,
+      requests()
+    );
 
     link.transport(entry('app.first'));
     link.transport(entry('app.second'));
@@ -81,7 +92,7 @@ describe('connectRunnerLink', () => {
   it("writes the runner's step mark into the app's log", () => {
     const socket = new FakeSocket();
     const onMark = jest.fn();
-    connectRunnerLink({ url: 'ws://127.0.0.1:1', run: 'r1' }, () => socket, onMark);
+    connectRunnerLink({ url: 'ws://127.0.0.1:1', run: 'r1' }, () => socket, requests({ onMark }));
     socket.onopen?.();
 
     socket.onmessage?.({ data: '{"type":"mark","step":"3-tap-send"}' });
@@ -92,9 +103,28 @@ describe('connectRunnerLink', () => {
     expect(onMark).toHaveBeenCalledWith('3-tap-send');
   });
 
+  it('answers a request for where the controls are, under the id it was asked with', () => {
+    const socket = new FakeSocket();
+    const screen = { width: 402, height: 874, elements: [{ id: 'wallet-send', x: 1, y: 2 }] };
+    connectRunnerLink(
+      { url: 'ws://127.0.0.1:1', run: 'r1' },
+      () => socket,
+      requests({ readScreen: () => screen })
+    );
+    socket.onopen?.();
+
+    socket.onmessage?.({ data: '{"type":"elements","id":7}' });
+
+    expect(JSON.parse(socket.sent.at(-1) ?? '')).toEqual({ type: 'elements', id: 7, ...screen });
+  });
+
   it('stops sending once the runner has gone', () => {
     const socket = new FakeSocket();
-    const link = connectRunnerLink({ url: 'ws://127.0.0.1:1', run: 'r1' }, () => socket, jest.fn());
+    const link = connectRunnerLink(
+      { url: 'ws://127.0.0.1:1', run: 'r1' },
+      () => socket,
+      requests()
+    );
     socket.onopen?.();
     socket.onclose?.();
 

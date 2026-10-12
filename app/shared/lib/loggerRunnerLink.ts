@@ -11,10 +11,13 @@
  *   folder before launch; without a note nothing connects.
  * - Loopback only. The note is refused unless it names this machine.
  * - Entries are the compacted, redacted ones every transport receives.
+ * - The runner can also ask where the controls are (`e2e/elementMap.ts`),
+ *   which replaces reading the simulator's accessibility tree.
  */
 import { Platform } from 'react-native';
 import { z } from 'zod';
 
+import { readScreen } from './e2e/elementMap';
 import { IS_E2E_LOG_BUILD, log, logClockMs, type LogEntry } from './loggerCore';
 
 const NOTE_DIR = 'e2e';
@@ -29,7 +32,18 @@ const RunnerNoteSchema = z.object({
 });
 export type RunnerNote = z.infer<typeof RunnerNoteSchema>;
 
-const MarkSchema = z.object({ type: z.literal('mark'), step: z.string().min(1).max(200) });
+const RequestSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('mark'), step: z.string().min(1).max(200) }),
+  z.object({ type: z.literal('elements'), id: z.number().int() }),
+]);
+
+/** What the app does when the runner asks. */
+export interface RunnerRequests {
+  /** A step begins: write it into the log. */
+  onMark: (step: string) => void;
+  /** Where the controls are now; sent back as it is returned. */
+  readScreen: () => unknown;
+}
 
 export function parseRunnerNote(text: string | null): RunnerNote | null {
   if (text === null) return null;
@@ -52,7 +66,7 @@ export interface RunnerSocket {
 export function connectRunnerLink(
   note: RunnerNote,
   open: (url: string) => RunnerSocket,
-  onMark: (step: string) => void
+  requests: RunnerRequests
 ): { transport: (entry: LogEntry) => void; send: (message: unknown) => void } {
   let held: LogEntry[] | null = [];
   let live = false;
@@ -78,8 +92,10 @@ export function connectRunnerLink(
   socket.onmessage = (message) => {
     if (typeof message.data !== 'string') return;
     try {
-      const mark = MarkSchema.safeParse(JSON.parse(message.data));
-      if (mark.success) onMark(mark.data.step);
+      const request = RequestSchema.safeParse(JSON.parse(message.data));
+      if (!request.success) return;
+      if (request.data.type === 'mark') requests.onMark(request.data.step);
+      else send({ type: 'elements', id: request.data.id, ...(requests.readScreen() as object) });
     } catch {
       // Not a message for the app.
     }
@@ -178,11 +194,10 @@ function readRunnerNote(): string | null {
 if (IS_E2E_LOG_BUILD && Platform.OS !== 'web') {
   const note = parseRunnerNote(readRunnerNote());
   if (note) {
-    const link = connectRunnerLink(
-      note,
-      (url) => new WebSocket(url) as unknown as RunnerSocket,
-      (step) => log.info('e2e.step', { step })
-    );
+    const link = connectRunnerLink(note, (url) => new WebSocket(url) as unknown as RunnerSocket, {
+      onMark: (step) => log.info('e2e.step', { step }),
+      readScreen: () => ({ appClockMs: logClockMs(), ...readScreen() }),
+    });
     log.addTransport(link.transport);
     const settle = createSettleWatch({
       nextFrame: (callback) => requestAnimationFrame(callback),

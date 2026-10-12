@@ -31,6 +31,31 @@ export interface AppSettled {
   forced: boolean;
 }
 
+/** A control as the app reports it: laid-out frame in points, tree order. */
+export interface AppElement {
+  id?: string;
+  label?: string;
+  value?: string;
+  text?: string;
+  disabled?: true;
+  /** `name` of the `Screen` the element is on. */
+  page?: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface AppScreen {
+  appClockMs: number;
+  /** Window size in points; an element's frame is in the same units. */
+  width: number;
+  height: number;
+  elements: AppElement[];
+  /** Where the map came from, which explains an empty one. */
+  source?: string;
+}
+
 export interface AppLink {
   /** Where the app is told to connect, as the iPhone simulator names this machine. */
   readonly url: string;
@@ -53,6 +78,8 @@ export interface AppLink {
    * arrived after `from` entries had (default: after everything received so far).
    */
   settled(options: { timeoutMs: number; from?: number }): Promise<AppSettled>;
+  /** Where the app's controls are now, from the app's own tree. */
+  screen(timeoutMs?: number): Promise<AppScreen>;
   close(): void;
 }
 
@@ -68,6 +95,8 @@ export function writeRunnerNote(containerDir: string, note: { url: string; run: 
 export function startAppLink(): AppLink {
   const entries: AppLogEntry[] = [];
   const settles: (AppSettled & { after: number })[] = [];
+  const screens = new Map<number, AppScreen>();
+  let nextRequest = 1;
   const watchers = new Set<() => void>();
   let hello: AppHello | null = null;
   let app: { send(data: string): unknown } | null = null;
@@ -90,7 +119,9 @@ export function startAppLink(): AppLink {
       },
       message(_socket, data) {
         if (typeof data !== 'string') return;
-        let message: { type?: unknown; entry?: unknown; forced?: unknown } & Partial<AppHello>;
+        let message: { type?: unknown; entry?: unknown; forced?: unknown; id?: unknown } & Partial<
+          AppHello & AppScreen
+        >;
         try {
           message = JSON.parse(data);
         } catch {
@@ -109,6 +140,18 @@ export function startAppLink(): AppLink {
             appClockMs: message.appClockMs,
             forced: message.forced === true,
             after: entries.length,
+          });
+        } else if (
+          message.type === 'elements' &&
+          typeof message.id === 'number' &&
+          Array.isArray(message.elements)
+        ) {
+          screens.set(message.id, {
+            appClockMs: Number(message.appClockMs),
+            width: Number(message.width),
+            height: Number(message.height),
+            elements: message.elements,
+            ...(typeof message.source === 'string' ? { source: message.source } : {}),
           });
         } else return;
         changed();
@@ -185,6 +228,21 @@ export function startAppLink(): AppLink {
         },
         timeoutMs,
         'the app to settle'
+      );
+    },
+    screen(timeoutMs = 2000) {
+      if (!app)
+        return Promise.reject(new Error('Cannot read the screen: the app is not connected'));
+      const id = nextRequest++;
+      app.send(JSON.stringify({ type: 'elements', id }));
+      return until(
+        () => {
+          const screen = screens.get(id) ?? null;
+          if (screen) screens.delete(id);
+          return screen;
+        },
+        timeoutMs,
+        'the app to say where its controls are'
       );
     },
     close() {

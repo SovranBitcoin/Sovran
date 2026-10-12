@@ -23,6 +23,19 @@ function connectApp(url: string): Promise<WebSocket> {
     };
     app.onmessage = (message) => {
       const { type, step } = JSON.parse(String(message.data));
+      if (type === 'elements')
+        app.send(
+          JSON.stringify({
+            type: 'elements',
+            id: JSON.parse(String(message.data)).id,
+            appClockMs: clock,
+            width: 402,
+            height: 874,
+            elements: [
+              { id: 'wallet-send', page: 'WalletScreen', x: 16, y: 700, width: 180, height: 56 },
+            ],
+          })
+        );
       if (type === 'mark')
         app.send(
           JSON.stringify({
@@ -128,6 +141,24 @@ describe('the runner end of the app link', () => {
       appClockMs: 290,
       forced: true,
     });
+  });
+
+  test('asks the app where its controls are', async () => {
+    link = startAppLink();
+    socket = await connectApp(link.url);
+    await link.connected(1000);
+
+    const [first, second] = await Promise.all([link.screen(), link.screen()]);
+
+    expect(first).toEqual({
+      appClockMs: 100,
+      width: 402,
+      height: 874,
+      elements: [
+        { id: 'wallet-send', page: 'WalletScreen', x: 16, y: 700, width: 180, height: 56 },
+      ],
+    });
+    expect(second).toEqual(first);
   });
 
   test('waiting with no app connected says so', async () => {
