@@ -440,6 +440,52 @@ describe("executePaymentRequest — Nostr transport", () => {
     });
   });
 
+  it.each([
+    ["a mint the request does not list", { mints: ["https://other.example"] }, 100],
+    ["an amount the request did not ask for", { mints: [MINT1] }, 99],
+  ])("refuses %s before any ecash is prepared", async (_what, request, amount) => {
+    const sendNostrDM = vi.fn().mockResolvedValue(undefined);
+    const mockManager = createMockManager();
+    mockGetPRInfo.mockReturnValue({
+      amount: 100,
+      unit: "sat",
+      transports: [{ type: "nostr", target: "nprofile1abc" }],
+      ...request,
+    });
+    const ops = createDefaultOperations({
+      getManager: () => mockManager as unknown as Manager,
+      sendNostrDM,
+    });
+
+    await expect(
+      ops.executePaymentRequest!({ mintUrl: MINT1, paymentRequest: "creqABC", amount, unit: "sat" }),
+    ).rejects.toThrow(/payment request/);
+    expect(mockManager.ops.send.prepare).not.toHaveBeenCalled();
+    expect(sendNostrDM).not.toHaveBeenCalled();
+  });
+
+  it("pays from a mint outside an advisory list, and any mint when the request lists none", async () => {
+    for (const request of [
+      { mints: ["https://other.example"], mintsPreferred: true },
+      { mints: [] },
+    ]) {
+      const sendNostrDM = vi.fn().mockResolvedValue(undefined);
+      const mockManager = createMockManager();
+      mockGetPRInfo.mockReturnValue({
+        amount: 100,
+        unit: "sat",
+        transports: [{ type: "nostr", target: "nprofile1abc" }],
+        ...request,
+      });
+      const ops = createDefaultOperations({
+        getManager: () => mockManager as unknown as Manager,
+        sendNostrDM,
+      });
+      await ops.executePaymentRequest!({ mintUrl: MINT1, paymentRequest: "creqABC", amount: 100, unit: "sat" });
+      expect(sendNostrDM).toHaveBeenCalledOnce();
+    }
+  });
+
   it("throws when the request unit does not match the flow unit (BTC-04)", async () => {
     const sendNostrDM = vi.fn().mockResolvedValue(undefined);
     const mockManager = createMockManager();

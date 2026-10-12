@@ -1876,6 +1876,43 @@ export function createDefaultOperations(
           throw new AuthoredError("Amount is required for Nostr payment requests");
         }
 
+        // The two refusals Coco's payment-request API makes for the HTTP
+        // transport, made here because this branch does not go through it. The
+        // machine checks both earlier; a caller that bypasses it must not pay
+        // from a mint the request does not list, or an amount it did not ask
+        // for. Checked, never substituted: the amount paid is still the one
+        // the user approved.
+        if (
+          !info.mintsPreferred &&
+          info.mints.length > 0 &&
+          !info.mints.some(
+            (accepted) => normalizeMintUrl(accepted) === normalizeMintUrl(mintUrl),
+          )
+        ) {
+          logger.warn("operations.executePaymentRequest.nostr.mintNotAccepted", {
+            ...mintUrlFields(mintUrl),
+            acceptedCount: info.mints.length,
+          });
+          throw new AuthoredError("This payment request does not accept that mint");
+        }
+        // Only a request amount that is itself valid is binding. One that is
+        // not a whole positive number was turned down by the machine, which
+        // had the person type the amount instead (BTC-04).
+        if (
+          info.amount !== undefined &&
+          Number.isSafeInteger(info.amount) &&
+          info.amount > 0 &&
+          info.amount !== amount
+        ) {
+          logger.warn("operations.executePaymentRequest.nostr.amountMismatch", {
+            requestedAmount: info.amount,
+            amount,
+          });
+          throw new AuthoredError(
+            `The payment request asks for ${info.amount}, not ${amount}`,
+          );
+        }
+
         const prepared = await mgr.ops.send.prepare({
           mintUrl,
           amount,
