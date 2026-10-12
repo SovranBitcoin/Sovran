@@ -233,11 +233,10 @@ describe('payment request — confirmPaymentRequest notification sequence', () =
 
     const opCall = tm.operationCalls.find((c) => c.name === 'executePaymentRequest');
     expect(opCall).toBeTruthy();
-    expect(opCall!.args[0]).toMatchObject({
-      mintUrl: MINT1,
-      paymentRequest: expect.any(String),
-      unit: 'sat',
-    });
+    const request = opCall!.args[0] as { mintUrl: string; paymentRequest: unknown; unit: string };
+    expect(request.mintUrl).toBe(MINT1);
+    expect(typeof request.paymentRequest).toBe('string');
+    expect(request.unit).toBe('sat');
   });
 
   it('full success sequence: onPaymentProcessing → onPaymentConfirmed → onTransactionCreated', async () => {
