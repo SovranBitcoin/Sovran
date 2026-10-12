@@ -65,6 +65,19 @@ it.each([
   expect(readBLEPrivateMessage(payload)).toBeNull();
 });
 
+it('cuts a display name that is too long instead of losing the message', () => {
+  const sender = 'n'.repeat(600);
+  expect(readBLEPrivateMessage({ ...PRIVATE_MESSAGE, sender })).toEqual({
+    ...PRIVATE_MESSAGE,
+    sender: 'n'.repeat(512),
+  });
+  expect(readNostrMessage({ ...GEOHASH_MESSAGE, sender })?.sender).toHaveLength(512);
+  expect(readBLEMessage({ ...PUBLIC_MESSAGE, sender })?.sender).toHaveLength(512);
+  expect(
+    readBLEDeliveryStatus({ messageID: 'm1', status: 'delivered', nickname: sender, reason: 7 })
+  ).toEqual({ messageID: 'm1', status: 'delivered', nickname: 'n'.repeat(512) });
+});
+
 it('keeps a body as large as a nearby payment can be', () => {
   const content = 'x'.repeat(262_144);
   expect(readBLEPrivateMessage({ ...PRIVATE_MESSAGE, content })?.content).toHaveLength(262_144);

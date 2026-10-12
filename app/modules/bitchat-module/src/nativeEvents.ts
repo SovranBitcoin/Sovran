@@ -35,6 +35,13 @@ const text = (value: unknown, max = MAX_SHORT): value is string =>
 const id = (value: unknown): value is string => text(value) && value.length > 0;
 const time = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
 const flag = (value: unknown): value is boolean => typeof value === 'boolean';
+/**
+ * A name shown beside a message. It is chosen by the other side and nothing
+ * depends on it, so one that is too long is cut, not a reason to lose the
+ * message it came with.
+ */
+const isLabel = (value: unknown): value is string => typeof value === 'string';
+const label = (value: string): string => value.slice(0, MAX_SHORT);
 /** An optional string: absent, null, or a string within `max`. */
 const optionalText = (value: unknown, max = MAX_SHORT): value is string | null | undefined =>
   value === undefined || value === null || text(value, max);
@@ -50,12 +57,12 @@ const DELIVERY_STATUSES: readonly BLEDeliveryStatus[] = [
 
 export function readBLEMessage(raw: unknown): BLEMessageEvent | null {
   const e = fields(raw);
-  if (!e || !id(e.id) || !text(e.content, MAX_BODY) || !text(e.sender)) return null;
+  if (!e || !id(e.id) || !text(e.content, MAX_BODY) || !isLabel(e.sender)) return null;
   if (!text(e.senderPeerID) || !time(e.timestamp) || !flag(e.isPrivate)) return null;
   return {
     id: e.id,
     content: e.content,
-    sender: e.sender,
+    sender: label(e.sender),
     senderPeerID: e.senderPeerID,
     timestamp: e.timestamp,
     isPrivate: e.isPrivate,
@@ -64,13 +71,13 @@ export function readBLEMessage(raw: unknown): BLEMessageEvent | null {
 
 export function readBLEPrivateMessage(raw: unknown): BLEPrivateMessageEvent | null {
   const e = fields(raw);
-  if (!e || !id(e.id) || !id(e.peerID) || !text(e.sender) || !text(e.content, MAX_BODY)) return null;
+  if (!e || !id(e.id) || !id(e.peerID) || !isLabel(e.sender) || !text(e.content, MAX_BODY)) return null;
   if (!time(e.timestamp) || !flag(e.isOwn) || !optionalText(e.profileScope)) return null;
   return {
     ...(e.profileScope ? { profileScope: e.profileScope } : {}),
     id: e.id,
     peerID: e.peerID,
-    sender: e.sender,
+    sender: label(e.sender),
     content: e.content,
     timestamp: e.timestamp,
     isOwn: e.isOwn,
@@ -93,12 +100,13 @@ export function readBLEDeliveryStatus(raw: unknown): BLEDeliveryStatusEvent | nu
   const e = fields(raw);
   if (!e || !id(e.messageID)) return null;
   const status = DELIVERY_STATUSES.find((known) => known === e.status);
-  if (!status || !optionalText(e.nickname) || !optionalText(e.reason)) return null;
+  if (!status) return null;
+  // Both are for display; a status is not lost over either.
   return {
     messageID: e.messageID,
     status,
-    ...(e.nickname ? { nickname: e.nickname } : {}),
-    ...(e.reason ? { reason: e.reason } : {}),
+    ...(isLabel(e.nickname) && e.nickname ? { nickname: label(e.nickname) } : {}),
+    ...(isLabel(e.reason) && e.reason ? { reason: label(e.reason) } : {}),
   };
 }
 
@@ -128,12 +136,12 @@ export function readBLEBackgroundTaskExpiring(raw: unknown): { handle: number } 
 
 export function readNostrMessage(raw: unknown): NostrMessageEvent | null {
   const e = fields(raw);
-  if (!e || !id(e.id) || !text(e.content, MAX_BODY) || !text(e.sender)) return null;
+  if (!e || !id(e.id) || !text(e.content, MAX_BODY) || !isLabel(e.sender)) return null;
   if (!id(e.senderPubkey) || !time(e.timestamp) || !text(e.geohash) || !flag(e.isOwn)) return null;
   return {
     id: e.id,
     content: e.content,
-    sender: e.sender,
+    sender: label(e.sender),
     senderPubkey: e.senderPubkey,
     timestamp: e.timestamp,
     geohash: e.geohash,
@@ -143,14 +151,14 @@ export function readNostrMessage(raw: unknown): NostrMessageEvent | null {
 
 export function readNostrPrivateMessage(raw: unknown): NostrPrivateMessageEvent | null {
   const e = fields(raw);
-  if (!e || !id(e.id) || !id(e.senderPubkey) || !text(e.sender)) return null;
+  if (!e || !id(e.id) || !id(e.senderPubkey) || !isLabel(e.sender)) return null;
   if (!text(e.content, MAX_BODY) || !time(e.timestamp) || !text(e.geohash) || !flag(e.isOwn)) {
     return null;
   }
   return {
     id: e.id,
     senderPubkey: e.senderPubkey,
-    sender: e.sender,
+    sender: label(e.sender),
     content: e.content,
     timestamp: e.timestamp,
     geohash: e.geohash,
