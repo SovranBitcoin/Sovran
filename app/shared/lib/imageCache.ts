@@ -18,6 +18,8 @@ const BOOT_GATE_MAX_MS = 8_000;
 const inflight = new Map<string, Promise<void>>();
 const waiting: ((granted: boolean) => void)[] = [];
 let activePrefetches = 0;
+/** Bumped when the account changes. A request from an earlier one is given up where it next looks. */
+let generation = 0;
 
 /** Resolves true with a slot held, or false when the request was given up while waiting. */
 async function acquirePrefetchSlot(): Promise<boolean> {
@@ -36,11 +38,13 @@ function releasePrefetchSlot(): void {
 }
 
 /**
- * Give up every prefetch still waiting for a slot. Called when the account
- * changes: the images were wanted by screens that are gone. Requests already
- * with the native loader run to their end.
+ * Give up every prefetch that has not reached the native loader: those waiting
+ * for a slot, and those still waiting for the boot animation. Called when the
+ * account changes: the images were wanted by screens that are gone. Requests
+ * already with the native loader run to their end.
  */
 export function discardQueuedPrefetches(): void {
+  generation += 1;
   for (const giveUp of waiting.splice(0)) giveUp(false);
 }
 registerAccountScoped('image.prefetch-queue', discardQueuedPrefetches, () => waiting.length === 0);
@@ -108,7 +112,9 @@ export function prefetchImage(url?: string | null): Promise<void> {
 }
 
 async function runPrefetch(normalized: string): Promise<void> {
+  const asked = generation;
   await awaitBootGate();
+  if (asked !== generation) return;
   if (!(await acquirePrefetchSlot())) return;
   try {
     const t0 = performance.now();
@@ -135,7 +141,9 @@ export async function prefetchImages(
   if (!urls || urls.length === 0) return;
   const newUrls = urls.filter((u) => u && !prefetchedUrls.has(u.trim()));
   if (newUrls.length === 0) return;
+  const asked = generation;
   await awaitBootGate();
+  if (asked !== generation) return;
   const t0 = performance.now();
   await Promise.all(newUrls.map((url) => prefetchImage(url)));
   const duration_ms = Math.round((performance.now() - t0) * 100) / 100;

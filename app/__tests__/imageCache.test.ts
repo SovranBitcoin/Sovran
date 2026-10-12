@@ -178,3 +178,30 @@ it('goes ahead after a wait when the boot animation never reports', async () => 
     jest.useRealTimers();
   }
 });
+
+it('gives up a request still waiting for the boot animation when the account changes', async () => {
+  jest.useFakeTimers();
+  mockMorphDone = false;
+  try {
+    let gated!: typeof import('@/shared/lib/imageCache');
+    jest.isolateModules(() => {
+      gated = require('@/shared/lib/imageCache');
+    });
+    const { Image: IsolatedImage } = jest.requireMock<typeof import('expo-image')>('expo-image');
+    jest.mocked(IsolatedImage.prefetch).mockResolvedValue(true);
+
+    const single = gated.prefetchImage('https://images.example/old-account');
+    const batch = gated.prefetchImages(['https://images.example/old-account-batch']);
+    gated.discardQueuedPrefetches();
+    await jest.advanceTimersByTimeAsync(8_001);
+    await Promise.all([single, batch]);
+    expect(IsolatedImage.prefetch).not.toHaveBeenCalled();
+
+    // The next account's requests are not held back by the earlier one's.
+    await gated.prefetchImage('https://images.example/new-account');
+    expect(IsolatedImage.prefetch).toHaveBeenCalledTimes(1);
+  } finally {
+    mockMorphDone = true;
+    jest.useRealTimers();
+  }
+});
