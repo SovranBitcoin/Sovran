@@ -33581,51 +33581,45 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
                   "children": [
                     {
                       "children": [
-                        {
-                          "children": [
-                            "1",
-                          ],
-                          "props": {
-                            "className": "css-text-146c3p1",
-                            "dir": "auto",
-                            "style": {
-                              "color": "rgba(16,16,16,1.00)",
-                              "fontFamily": "monospace,monospace",
-                              "fontSize": "22px",
-                            },
-                          },
-                          "type": "div",
-                        },
+                        "1",
                       ],
                       "props": {
-                        "className": "items-center justify-center gap-0.5 rounded-[13px] border-t",
-                        "style": [
-                          {
-                            "backgroundColor": "rgba(16, 16, 16, 0.07)",
-                            "borderColor": "rgba(16, 16, 16, 0.07)",
-                            "height": 46,
-                          },
-                          {
-                            "transform": [
-                              {
-                                "translateY": 0,
-                              },
-                            ],
-                          },
-                        ],
+                        "className": "css-text-146c3p1",
+                        "dir": "auto",
+                        "style": {
+                          "color": "rgba(16,16,16,1.00)",
+                          "fontFamily": "monospace,monospace",
+                          "fontSize": "22px",
+                        },
                       },
-                      "type": "View",
+                      "type": "div",
                     },
                   ],
                   "props": {
-                    "className": "css-view-g5y9jx",
-                    "dir": null,
-                    "style": {
-                      "backgroundColor": "rgba(16,16,16,0.04)",
-                      "height": "50px",
-                    },
+                    "className": "items-center justify-center gap-0.5 rounded-[20px]",
+                    "style": [
+                      {
+                        "borderCurve": "continuous",
+                      },
+                      {
+                        "height": 50,
+                      },
+                      {
+                        "backgroundColor": "rgb(224, 224, 224)",
+                        "borderColor": "rgba(16, 16, 16, 0.3)",
+                        "borderWidth": 1,
+                      },
+                      {
+                        "opacity": 1,
+                        "transform": [
+                          {
+                            "scale": 1,
+                          },
+                        ],
+                      },
+                    ],
                   },
-                  "type": "div",
+                  "type": "View",
                 },
               ],
               "props": {
@@ -33647,51 +33641,45 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
                   "children": [
                     {
                       "children": [
-                        {
-                          "children": [
-                            "2",
-                          ],
-                          "props": {
-                            "className": "css-text-146c3p1",
-                            "dir": "auto",
-                            "style": {
-                              "color": "rgba(16,16,16,1.00)",
-                              "fontFamily": "monospace,monospace",
-                              "fontSize": "22px",
-                            },
-                          },
-                          "type": "div",
-                        },
+                        "2",
                       ],
                       "props": {
-                        "className": "items-center justify-center gap-0.5 rounded-[13px] border-t",
-                        "style": [
-                          {
-                            "backgroundColor": "rgba(16, 16, 16, 0.07)",
-                            "borderColor": "rgba(16, 16, 16, 0.07)",
-                            "height": 46,
-                          },
-                          {
-                            "transform": [
-                              {
-                                "translateY": 0,
-                              },
-                            ],
-                          },
-                        ],
+                        "className": "css-text-146c3p1",
+                        "dir": "auto",
+                        "style": {
+                          "color": "rgba(16,16,16,1.00)",
+                          "fontFamily": "monospace,monospace",
+                          "fontSize": "22px",
+                        },
                       },
-                      "type": "View",
+                      "type": "div",
                     },
                   ],
                   "props": {
-                    "className": "css-view-g5y9jx",
-                    "dir": null,
-                    "style": {
-                      "backgroundColor": "rgba(16,16,16,0.04)",
-                      "height": "50px",
-                    },
+                    "className": "items-center justify-center gap-0.5 rounded-[20px]",
+                    "style": [
+                      {
+                        "borderCurve": "continuous",
+                      },
+                      {
+                        "height": 50,
+                      },
+                      {
+                        "backgroundColor": "rgb(224, 224, 224)",
+                        "borderColor": "rgba(16, 16, 16, 0.3)",
+                        "borderWidth": 1,
+                      },
+                      {
+                        "opacity": 1,
+                        "transform": [
+                          {
+                            "scale": 1,
+                          },
+                        ],
+                      },
+                    ],
                   },
-                  "type": "div",
+                  "type": "View",
                 },
               ],
               "props": {
@@ -33713,51 +33701,45 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
                   "children": [
                     {
                       "children": [
-                        {
-                          "children": [
-                            "3",
-                          ],
-                          "props": {
-                            "className": "css-text-146c3p1",
-                            "dir": "auto",
-                            "style": {
-                              "color": "rgba(16,16,16,1.00)",
-                              "fontFamily": "monospace,monospace",
-                              "fontSize": "22px",
-                            },
-                          },
-                          "type": "div",
-                        },
+                        "3",
                       ],
                       "props": {
-                        "className": "items-center justify-center gap-0.5 rounded-[13px] border-t",
-                        "style": [
-                          {
-                            "backgroundColor": "rgba(16, 16, 16, 0.07)",
-                            "borderColor": "rgba(16, 16, 16, 0.07)",
-                            "height": 46,
-                          },
-                          {
-                            "transform": [
-                              {
-                                "translateY": 0,
-                              },
-                            ],
-                          },
-                        ],
+                        "className": "css-text-146c3p1",
+                        "dir": "auto",
+                        "style": {
+                          "color": "rgba(16,16,16,1.00)",
+                          "fontFamily": "monospace,monospace",
+                          "fontSize": "22px",
+                        },
                       },
-                      "type": "View",
+                      "type": "div",
                     },
                   ],
                   "props": {
-                    "className": "css-view-g5y9jx",
-                    "dir": null,
-                    "style": {
-                      "backgroundColor": "rgba(16,16,16,0.04)",
-                      "height": "50px",
-                    },
+                    "className": "items-center justify-center gap-0.5 rounded-[20px]",
+                    "style": [
+                      {
+                        "borderCurve": "continuous",
+                      },
+                      {
+                        "height": 50,
+                      },
+                      {
+                        "backgroundColor": "rgb(224, 224, 224)",
+                        "borderColor": "rgba(16, 16, 16, 0.3)",
+                        "borderWidth": 1,
+                      },
+                      {
+                        "opacity": 1,
+                        "transform": [
+                          {
+                            "scale": 1,
+                          },
+                        ],
+                      },
+                    ],
                   },
-                  "type": "div",
+                  "type": "View",
                 },
               ],
               "props": {
@@ -33788,51 +33770,45 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
                   "children": [
                     {
                       "children": [
-                        {
-                          "children": [
-                            "4",
-                          ],
-                          "props": {
-                            "className": "css-text-146c3p1",
-                            "dir": "auto",
-                            "style": {
-                              "color": "rgba(16,16,16,1.00)",
-                              "fontFamily": "monospace,monospace",
-                              "fontSize": "22px",
-                            },
-                          },
-                          "type": "div",
-                        },
+                        "4",
                       ],
                       "props": {
-                        "className": "items-center justify-center gap-0.5 rounded-[13px] border-t",
-                        "style": [
-                          {
-                            "backgroundColor": "rgba(16, 16, 16, 0.07)",
-                            "borderColor": "rgba(16, 16, 16, 0.07)",
-                            "height": 46,
-                          },
-                          {
-                            "transform": [
-                              {
-                                "translateY": 0,
-                              },
-                            ],
-                          },
-                        ],
+                        "className": "css-text-146c3p1",
+                        "dir": "auto",
+                        "style": {
+                          "color": "rgba(16,16,16,1.00)",
+                          "fontFamily": "monospace,monospace",
+                          "fontSize": "22px",
+                        },
                       },
-                      "type": "View",
+                      "type": "div",
                     },
                   ],
                   "props": {
-                    "className": "css-view-g5y9jx",
-                    "dir": null,
-                    "style": {
-                      "backgroundColor": "rgba(16,16,16,0.04)",
-                      "height": "50px",
-                    },
+                    "className": "items-center justify-center gap-0.5 rounded-[20px]",
+                    "style": [
+                      {
+                        "borderCurve": "continuous",
+                      },
+                      {
+                        "height": 50,
+                      },
+                      {
+                        "backgroundColor": "rgb(224, 224, 224)",
+                        "borderColor": "rgba(16, 16, 16, 0.3)",
+                        "borderWidth": 1,
+                      },
+                      {
+                        "opacity": 1,
+                        "transform": [
+                          {
+                            "scale": 1,
+                          },
+                        ],
+                      },
+                    ],
                   },
-                  "type": "div",
+                  "type": "View",
                 },
               ],
               "props": {
@@ -33854,51 +33830,45 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
                   "children": [
                     {
                       "children": [
-                        {
-                          "children": [
-                            "5",
-                          ],
-                          "props": {
-                            "className": "css-text-146c3p1",
-                            "dir": "auto",
-                            "style": {
-                              "color": "rgba(16,16,16,1.00)",
-                              "fontFamily": "monospace,monospace",
-                              "fontSize": "22px",
-                            },
-                          },
-                          "type": "div",
-                        },
+                        "5",
                       ],
                       "props": {
-                        "className": "items-center justify-center gap-0.5 rounded-[13px] border-t",
-                        "style": [
-                          {
-                            "backgroundColor": "rgba(16, 16, 16, 0.07)",
-                            "borderColor": "rgba(16, 16, 16, 0.07)",
-                            "height": 46,
-                          },
-                          {
-                            "transform": [
-                              {
-                                "translateY": 0,
-                              },
-                            ],
-                          },
-                        ],
+                        "className": "css-text-146c3p1",
+                        "dir": "auto",
+                        "style": {
+                          "color": "rgba(16,16,16,1.00)",
+                          "fontFamily": "monospace,monospace",
+                          "fontSize": "22px",
+                        },
                       },
-                      "type": "View",
+                      "type": "div",
                     },
                   ],
                   "props": {
-                    "className": "css-view-g5y9jx",
-                    "dir": null,
-                    "style": {
-                      "backgroundColor": "rgba(16,16,16,0.04)",
-                      "height": "50px",
-                    },
+                    "className": "items-center justify-center gap-0.5 rounded-[20px]",
+                    "style": [
+                      {
+                        "borderCurve": "continuous",
+                      },
+                      {
+                        "height": 50,
+                      },
+                      {
+                        "backgroundColor": "rgb(224, 224, 224)",
+                        "borderColor": "rgba(16, 16, 16, 0.3)",
+                        "borderWidth": 1,
+                      },
+                      {
+                        "opacity": 1,
+                        "transform": [
+                          {
+                            "scale": 1,
+                          },
+                        ],
+                      },
+                    ],
                   },
-                  "type": "div",
+                  "type": "View",
                 },
               ],
               "props": {
@@ -33920,51 +33890,45 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
                   "children": [
                     {
                       "children": [
-                        {
-                          "children": [
-                            "6",
-                          ],
-                          "props": {
-                            "className": "css-text-146c3p1",
-                            "dir": "auto",
-                            "style": {
-                              "color": "rgba(16,16,16,1.00)",
-                              "fontFamily": "monospace,monospace",
-                              "fontSize": "22px",
-                            },
-                          },
-                          "type": "div",
-                        },
+                        "6",
                       ],
                       "props": {
-                        "className": "items-center justify-center gap-0.5 rounded-[13px] border-t",
-                        "style": [
-                          {
-                            "backgroundColor": "rgba(16, 16, 16, 0.07)",
-                            "borderColor": "rgba(16, 16, 16, 0.07)",
-                            "height": 46,
-                          },
-                          {
-                            "transform": [
-                              {
-                                "translateY": 0,
-                              },
-                            ],
-                          },
-                        ],
+                        "className": "css-text-146c3p1",
+                        "dir": "auto",
+                        "style": {
+                          "color": "rgba(16,16,16,1.00)",
+                          "fontFamily": "monospace,monospace",
+                          "fontSize": "22px",
+                        },
                       },
-                      "type": "View",
+                      "type": "div",
                     },
                   ],
                   "props": {
-                    "className": "css-view-g5y9jx",
-                    "dir": null,
-                    "style": {
-                      "backgroundColor": "rgba(16,16,16,0.04)",
-                      "height": "50px",
-                    },
+                    "className": "items-center justify-center gap-0.5 rounded-[20px]",
+                    "style": [
+                      {
+                        "borderCurve": "continuous",
+                      },
+                      {
+                        "height": 50,
+                      },
+                      {
+                        "backgroundColor": "rgb(224, 224, 224)",
+                        "borderColor": "rgba(16, 16, 16, 0.3)",
+                        "borderWidth": 1,
+                      },
+                      {
+                        "opacity": 1,
+                        "transform": [
+                          {
+                            "scale": 1,
+                          },
+                        ],
+                      },
+                    ],
                   },
-                  "type": "div",
+                  "type": "View",
                 },
               ],
               "props": {
@@ -33995,51 +33959,45 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
                   "children": [
                     {
                       "children": [
-                        {
-                          "children": [
-                            "7",
-                          ],
-                          "props": {
-                            "className": "css-text-146c3p1",
-                            "dir": "auto",
-                            "style": {
-                              "color": "rgba(16,16,16,1.00)",
-                              "fontFamily": "monospace,monospace",
-                              "fontSize": "22px",
-                            },
-                          },
-                          "type": "div",
-                        },
+                        "7",
                       ],
                       "props": {
-                        "className": "items-center justify-center gap-0.5 rounded-[13px] border-t",
-                        "style": [
-                          {
-                            "backgroundColor": "rgba(16, 16, 16, 0.07)",
-                            "borderColor": "rgba(16, 16, 16, 0.07)",
-                            "height": 46,
-                          },
-                          {
-                            "transform": [
-                              {
-                                "translateY": 0,
-                              },
-                            ],
-                          },
-                        ],
+                        "className": "css-text-146c3p1",
+                        "dir": "auto",
+                        "style": {
+                          "color": "rgba(16,16,16,1.00)",
+                          "fontFamily": "monospace,monospace",
+                          "fontSize": "22px",
+                        },
                       },
-                      "type": "View",
+                      "type": "div",
                     },
                   ],
                   "props": {
-                    "className": "css-view-g5y9jx",
-                    "dir": null,
-                    "style": {
-                      "backgroundColor": "rgba(16,16,16,0.04)",
-                      "height": "50px",
-                    },
+                    "className": "items-center justify-center gap-0.5 rounded-[20px]",
+                    "style": [
+                      {
+                        "borderCurve": "continuous",
+                      },
+                      {
+                        "height": 50,
+                      },
+                      {
+                        "backgroundColor": "rgb(224, 224, 224)",
+                        "borderColor": "rgba(16, 16, 16, 0.3)",
+                        "borderWidth": 1,
+                      },
+                      {
+                        "opacity": 1,
+                        "transform": [
+                          {
+                            "scale": 1,
+                          },
+                        ],
+                      },
+                    ],
                   },
-                  "type": "div",
+                  "type": "View",
                 },
               ],
               "props": {
@@ -34061,51 +34019,45 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
                   "children": [
                     {
                       "children": [
-                        {
-                          "children": [
-                            "8",
-                          ],
-                          "props": {
-                            "className": "css-text-146c3p1",
-                            "dir": "auto",
-                            "style": {
-                              "color": "rgba(16,16,16,1.00)",
-                              "fontFamily": "monospace,monospace",
-                              "fontSize": "22px",
-                            },
-                          },
-                          "type": "div",
-                        },
+                        "8",
                       ],
                       "props": {
-                        "className": "items-center justify-center gap-0.5 rounded-[13px] border-t",
-                        "style": [
-                          {
-                            "backgroundColor": "rgba(16, 16, 16, 0.07)",
-                            "borderColor": "rgba(16, 16, 16, 0.07)",
-                            "height": 46,
-                          },
-                          {
-                            "transform": [
-                              {
-                                "translateY": 0,
-                              },
-                            ],
-                          },
-                        ],
+                        "className": "css-text-146c3p1",
+                        "dir": "auto",
+                        "style": {
+                          "color": "rgba(16,16,16,1.00)",
+                          "fontFamily": "monospace,monospace",
+                          "fontSize": "22px",
+                        },
                       },
-                      "type": "View",
+                      "type": "div",
                     },
                   ],
                   "props": {
-                    "className": "css-view-g5y9jx",
-                    "dir": null,
-                    "style": {
-                      "backgroundColor": "rgba(16,16,16,0.04)",
-                      "height": "50px",
-                    },
+                    "className": "items-center justify-center gap-0.5 rounded-[20px]",
+                    "style": [
+                      {
+                        "borderCurve": "continuous",
+                      },
+                      {
+                        "height": 50,
+                      },
+                      {
+                        "backgroundColor": "rgb(224, 224, 224)",
+                        "borderColor": "rgba(16, 16, 16, 0.3)",
+                        "borderWidth": 1,
+                      },
+                      {
+                        "opacity": 1,
+                        "transform": [
+                          {
+                            "scale": 1,
+                          },
+                        ],
+                      },
+                    ],
                   },
-                  "type": "div",
+                  "type": "View",
                 },
               ],
               "props": {
@@ -34127,51 +34079,45 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
                   "children": [
                     {
                       "children": [
-                        {
-                          "children": [
-                            "9",
-                          ],
-                          "props": {
-                            "className": "css-text-146c3p1",
-                            "dir": "auto",
-                            "style": {
-                              "color": "rgba(16,16,16,1.00)",
-                              "fontFamily": "monospace,monospace",
-                              "fontSize": "22px",
-                            },
-                          },
-                          "type": "div",
-                        },
+                        "9",
                       ],
                       "props": {
-                        "className": "items-center justify-center gap-0.5 rounded-[13px] border-t",
-                        "style": [
-                          {
-                            "backgroundColor": "rgba(16, 16, 16, 0.07)",
-                            "borderColor": "rgba(16, 16, 16, 0.07)",
-                            "height": 46,
-                          },
-                          {
-                            "transform": [
-                              {
-                                "translateY": 0,
-                              },
-                            ],
-                          },
-                        ],
+                        "className": "css-text-146c3p1",
+                        "dir": "auto",
+                        "style": {
+                          "color": "rgba(16,16,16,1.00)",
+                          "fontFamily": "monospace,monospace",
+                          "fontSize": "22px",
+                        },
                       },
-                      "type": "View",
+                      "type": "div",
                     },
                   ],
                   "props": {
-                    "className": "css-view-g5y9jx",
-                    "dir": null,
-                    "style": {
-                      "backgroundColor": "rgba(16,16,16,0.04)",
-                      "height": "50px",
-                    },
+                    "className": "items-center justify-center gap-0.5 rounded-[20px]",
+                    "style": [
+                      {
+                        "borderCurve": "continuous",
+                      },
+                      {
+                        "height": 50,
+                      },
+                      {
+                        "backgroundColor": "rgb(224, 224, 224)",
+                        "borderColor": "rgba(16, 16, 16, 0.3)",
+                        "borderWidth": 1,
+                      },
+                      {
+                        "opacity": 1,
+                        "transform": [
+                          {
+                            "scale": 1,
+                          },
+                        ],
+                      },
+                    ],
                   },
-                  "type": "div",
+                  "type": "View",
                 },
               ],
               "props": {
@@ -34202,51 +34148,45 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
                   "children": [
                     {
                       "children": [
-                        {
-                          "children": [
-                            ".",
-                          ],
-                          "props": {
-                            "className": "css-text-146c3p1",
-                            "dir": "auto",
-                            "style": {
-                              "color": "rgba(16,16,16,1.00)",
-                              "fontFamily": "monospace,monospace",
-                              "fontSize": "22px",
-                            },
-                          },
-                          "type": "div",
-                        },
+                        ".",
                       ],
                       "props": {
-                        "className": "items-center justify-center gap-0.5 rounded-[13px] border-t",
-                        "style": [
-                          {
-                            "backgroundColor": "rgba(16, 16, 16, 0.07)",
-                            "borderColor": "rgba(16, 16, 16, 0.07)",
-                            "height": 46,
-                          },
-                          {
-                            "transform": [
-                              {
-                                "translateY": 0,
-                              },
-                            ],
-                          },
-                        ],
+                        "className": "css-text-146c3p1",
+                        "dir": "auto",
+                        "style": {
+                          "color": "rgba(16,16,16,1.00)",
+                          "fontFamily": "monospace,monospace",
+                          "fontSize": "22px",
+                        },
                       },
-                      "type": "View",
+                      "type": "div",
                     },
                   ],
                   "props": {
-                    "className": "css-view-g5y9jx",
-                    "dir": null,
-                    "style": {
-                      "backgroundColor": "rgba(16,16,16,0.04)",
-                      "height": "50px",
-                    },
+                    "className": "items-center justify-center gap-0.5 rounded-[20px]",
+                    "style": [
+                      {
+                        "borderCurve": "continuous",
+                      },
+                      {
+                        "height": 50,
+                      },
+                      {
+                        "backgroundColor": "rgb(224, 224, 224)",
+                        "borderColor": "rgba(16, 16, 16, 0.3)",
+                        "borderWidth": 1,
+                      },
+                      {
+                        "opacity": 1,
+                        "transform": [
+                          {
+                            "scale": 1,
+                          },
+                        ],
+                      },
+                    ],
                   },
-                  "type": "div",
+                  "type": "View",
                 },
               ],
               "props": {
@@ -34268,51 +34208,45 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
                   "children": [
                     {
                       "children": [
-                        {
-                          "children": [
-                            "0",
-                          ],
-                          "props": {
-                            "className": "css-text-146c3p1",
-                            "dir": "auto",
-                            "style": {
-                              "color": "rgba(16,16,16,1.00)",
-                              "fontFamily": "monospace,monospace",
-                              "fontSize": "22px",
-                            },
-                          },
-                          "type": "div",
-                        },
+                        "0",
                       ],
                       "props": {
-                        "className": "items-center justify-center gap-0.5 rounded-[13px] border-t",
-                        "style": [
-                          {
-                            "backgroundColor": "rgba(16, 16, 16, 0.07)",
-                            "borderColor": "rgba(16, 16, 16, 0.07)",
-                            "height": 46,
-                          },
-                          {
-                            "transform": [
-                              {
-                                "translateY": 0,
-                              },
-                            ],
-                          },
-                        ],
+                        "className": "css-text-146c3p1",
+                        "dir": "auto",
+                        "style": {
+                          "color": "rgba(16,16,16,1.00)",
+                          "fontFamily": "monospace,monospace",
+                          "fontSize": "22px",
+                        },
                       },
-                      "type": "View",
+                      "type": "div",
                     },
                   ],
                   "props": {
-                    "className": "css-view-g5y9jx",
-                    "dir": null,
-                    "style": {
-                      "backgroundColor": "rgba(16,16,16,0.04)",
-                      "height": "50px",
-                    },
+                    "className": "items-center justify-center gap-0.5 rounded-[20px]",
+                    "style": [
+                      {
+                        "borderCurve": "continuous",
+                      },
+                      {
+                        "height": 50,
+                      },
+                      {
+                        "backgroundColor": "rgb(224, 224, 224)",
+                        "borderColor": "rgba(16, 16, 16, 0.3)",
+                        "borderWidth": 1,
+                      },
+                      {
+                        "opacity": 1,
+                        "transform": [
+                          {
+                            "scale": 1,
+                          },
+                        ],
+                      },
+                    ],
                   },
-                  "type": "div",
+                  "type": "View",
                 },
               ],
               "props": {
@@ -34334,51 +34268,45 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
                   "children": [
                     {
                       "children": [
-                        {
-                          "children": [
-                            "000",
-                          ],
-                          "props": {
-                            "className": "css-text-146c3p1",
-                            "dir": "auto",
-                            "style": {
-                              "color": "rgba(16,16,16,1.00)",
-                              "fontFamily": "monospace,monospace",
-                              "fontSize": "22px",
-                            },
-                          },
-                          "type": "div",
-                        },
+                        "000",
                       ],
                       "props": {
-                        "className": "items-center justify-center gap-0.5 rounded-[13px] border-t",
-                        "style": [
-                          {
-                            "backgroundColor": "rgba(16, 16, 16, 0.07)",
-                            "borderColor": "rgba(16, 16, 16, 0.07)",
-                            "height": 46,
-                          },
-                          {
-                            "transform": [
-                              {
-                                "translateY": 0,
-                              },
-                            ],
-                          },
-                        ],
+                        "className": "css-text-146c3p1",
+                        "dir": "auto",
+                        "style": {
+                          "color": "rgba(16,16,16,1.00)",
+                          "fontFamily": "monospace,monospace",
+                          "fontSize": "22px",
+                        },
                       },
-                      "type": "View",
+                      "type": "div",
                     },
                   ],
                   "props": {
-                    "className": "css-view-g5y9jx",
-                    "dir": null,
-                    "style": {
-                      "backgroundColor": "rgba(16,16,16,0.04)",
-                      "height": "50px",
-                    },
+                    "className": "items-center justify-center gap-0.5 rounded-[20px]",
+                    "style": [
+                      {
+                        "borderCurve": "continuous",
+                      },
+                      {
+                        "height": 50,
+                      },
+                      {
+                        "backgroundColor": "rgb(224, 224, 224)",
+                        "borderColor": "rgba(16, 16, 16, 0.3)",
+                        "borderWidth": 1,
+                      },
+                      {
+                        "opacity": 1,
+                        "transform": [
+                          {
+                            "scale": 1,
+                          },
+                        ],
+                      },
+                    ],
                   },
-                  "type": "div",
+                  "type": "View",
                 },
               ],
               "props": {
@@ -34417,55 +34345,48 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
                 {
                   "children": [
                     {
-                      "children": [
-                        {
-                          "children": null,
-                          "props": {
-                            "color": "rgb(16, 16, 16)",
-                            "height": 22,
-                            "width": 22,
-                            "xml": "<svg viewBox="0 0 24 24" width="1em" height="1em" ><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 5a2 2 0 0 0-1.344.519l-6.328 5.74a1 1 0 0 0 0 1.481l6.328 5.741A2 2 0 0 0 10 19h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2zm2 4l6 6m0-6l-6 6"/></svg>",
-                          },
-                          "type": "SvgXml",
-                        },
-                      ],
+                      "children": null,
                       "props": {
-                        "className": "css-view-g5y9jx",
-                        "dir": null,
+                        "color": "rgb(16, 16, 16)",
+                        "height": 22,
+                        "width": 22,
+                        "xml": "<svg viewBox="0 0 24 24" width="1em" height="1em" ><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 5a2 2 0 0 0-1.344.519l-6.328 5.74a1 1 0 0 0 0 1.481l6.328 5.741A2 2 0 0 0 10 19h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2zm2 4l6 6m0-6l-6 6"/></svg>",
                       },
-                      "type": "div",
+                      "type": "SvgXml",
                     },
                   ],
                   "props": {
-                    "className": "items-center justify-center gap-0.5 rounded-[13px] border-t",
-                    "style": [
-                      {
-                        "backgroundColor": "rgba(16, 16, 16, 0.12)",
-                        "borderColor": "rgba(16, 16, 16, 0.07)",
-                        "flex": 1,
-                        "marginBottom": 4,
-                      },
-                      {
-                        "transform": [
-                          {
-                            "translateY": 0,
-                          },
-                        ],
-                      },
-                    ],
+                    "className": "css-view-g5y9jx",
+                    "dir": null,
                   },
-                  "type": "View",
+                  "type": "div",
                 },
               ],
               "props": {
-                "className": "css-view-g5y9jx",
-                "dir": null,
-                "style": {
-                  "backgroundColor": "rgba(16,16,16,0.04)",
-                  "flex": 1,
-                },
+                "className": "items-center justify-center gap-0.5 rounded-[20px]",
+                "style": [
+                  {
+                    "borderCurve": "continuous",
+                  },
+                  {
+                    "flex": 1,
+                  },
+                  {
+                    "backgroundColor": "rgb(224, 224, 224)",
+                    "borderColor": "rgba(16, 16, 16, 0.3)",
+                    "borderWidth": 1,
+                  },
+                  {
+                    "opacity": 1,
+                    "transform": [
+                      {
+                        "scale": 1,
+                      },
+                    ],
+                  },
+                ],
               },
-              "type": "div",
+              "type": "View",
             },
           ],
           "props": {
@@ -34510,51 +34431,45 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
                   "children": [
                     {
                       "children": [
-                        {
-                          "children": [
-                            "1",
-                          ],
-                          "props": {
-                            "className": "css-text-146c3p1",
-                            "dir": "auto",
-                            "style": {
-                              "color": "rgba(16,16,16,1.00)",
-                              "fontFamily": "monospace,monospace",
-                              "fontSize": "22px",
-                            },
-                          },
-                          "type": "div",
-                        },
+                        "1",
                       ],
                       "props": {
-                        "className": "items-center justify-center gap-0.5 rounded-[13px] border-t",
-                        "style": [
-                          {
-                            "backgroundColor": "rgba(16, 16, 16, 0.07)",
-                            "borderColor": "rgba(16, 16, 16, 0.07)",
-                            "height": 46,
-                          },
-                          {
-                            "transform": [
-                              {
-                                "translateY": 0,
-                              },
-                            ],
-                          },
-                        ],
+                        "className": "css-text-146c3p1",
+                        "dir": "auto",
+                        "style": {
+                          "color": "rgba(16,16,16,1.00)",
+                          "fontFamily": "monospace,monospace",
+                          "fontSize": "22px",
+                        },
                       },
-                      "type": "View",
+                      "type": "div",
                     },
                   ],
                   "props": {
-                    "className": "css-view-g5y9jx",
-                    "dir": null,
-                    "style": {
-                      "backgroundColor": "rgba(16,16,16,0.04)",
-                      "height": "50px",
-                    },
+                    "className": "items-center justify-center gap-0.5 rounded-[20px]",
+                    "style": [
+                      {
+                        "borderCurve": "continuous",
+                      },
+                      {
+                        "height": 50,
+                      },
+                      {
+                        "backgroundColor": "rgb(224, 224, 224)",
+                        "borderColor": "rgba(16, 16, 16, 0.3)",
+                        "borderWidth": 1,
+                      },
+                      {
+                        "opacity": 1,
+                        "transform": [
+                          {
+                            "scale": 1,
+                          },
+                        ],
+                      },
+                    ],
                   },
-                  "type": "div",
+                  "type": "View",
                 },
               ],
               "props": {
@@ -34574,51 +34489,45 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
                   "children": [
                     {
                       "children": [
-                        {
-                          "children": [
-                            "2",
-                          ],
-                          "props": {
-                            "className": "css-text-146c3p1",
-                            "dir": "auto",
-                            "style": {
-                              "color": "rgba(16,16,16,1.00)",
-                              "fontFamily": "monospace,monospace",
-                              "fontSize": "22px",
-                            },
-                          },
-                          "type": "div",
-                        },
+                        "2",
                       ],
                       "props": {
-                        "className": "items-center justify-center gap-0.5 rounded-[13px] border-t",
-                        "style": [
-                          {
-                            "backgroundColor": "rgba(16, 16, 16, 0.07)",
-                            "borderColor": "rgba(16, 16, 16, 0.07)",
-                            "height": 46,
-                          },
-                          {
-                            "transform": [
-                              {
-                                "translateY": 0,
-                              },
-                            ],
-                          },
-                        ],
+                        "className": "css-text-146c3p1",
+                        "dir": "auto",
+                        "style": {
+                          "color": "rgba(16,16,16,1.00)",
+                          "fontFamily": "monospace,monospace",
+                          "fontSize": "22px",
+                        },
                       },
-                      "type": "View",
+                      "type": "div",
                     },
                   ],
                   "props": {
-                    "className": "css-view-g5y9jx",
-                    "dir": null,
-                    "style": {
-                      "backgroundColor": "rgba(16,16,16,0.04)",
-                      "height": "50px",
-                    },
+                    "className": "items-center justify-center gap-0.5 rounded-[20px]",
+                    "style": [
+                      {
+                        "borderCurve": "continuous",
+                      },
+                      {
+                        "height": 50,
+                      },
+                      {
+                        "backgroundColor": "rgb(224, 224, 224)",
+                        "borderColor": "rgba(16, 16, 16, 0.3)",
+                        "borderWidth": 1,
+                      },
+                      {
+                        "opacity": 1,
+                        "transform": [
+                          {
+                            "scale": 1,
+                          },
+                        ],
+                      },
+                    ],
                   },
-                  "type": "div",
+                  "type": "View",
                 },
               ],
               "props": {
@@ -34638,51 +34547,45 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
                   "children": [
                     {
                       "children": [
-                        {
-                          "children": [
-                            "3",
-                          ],
-                          "props": {
-                            "className": "css-text-146c3p1",
-                            "dir": "auto",
-                            "style": {
-                              "color": "rgba(16,16,16,1.00)",
-                              "fontFamily": "monospace,monospace",
-                              "fontSize": "22px",
-                            },
-                          },
-                          "type": "div",
-                        },
+                        "3",
                       ],
                       "props": {
-                        "className": "items-center justify-center gap-0.5 rounded-[13px] border-t",
-                        "style": [
-                          {
-                            "backgroundColor": "rgba(16, 16, 16, 0.07)",
-                            "borderColor": "rgba(16, 16, 16, 0.07)",
-                            "height": 46,
-                          },
-                          {
-                            "transform": [
-                              {
-                                "translateY": 0,
-                              },
-                            ],
-                          },
-                        ],
+                        "className": "css-text-146c3p1",
+                        "dir": "auto",
+                        "style": {
+                          "color": "rgba(16,16,16,1.00)",
+                          "fontFamily": "monospace,monospace",
+                          "fontSize": "22px",
+                        },
                       },
-                      "type": "View",
+                      "type": "div",
                     },
                   ],
                   "props": {
-                    "className": "css-view-g5y9jx",
-                    "dir": null,
-                    "style": {
-                      "backgroundColor": "rgba(16,16,16,0.04)",
-                      "height": "50px",
-                    },
+                    "className": "items-center justify-center gap-0.5 rounded-[20px]",
+                    "style": [
+                      {
+                        "borderCurve": "continuous",
+                      },
+                      {
+                        "height": 50,
+                      },
+                      {
+                        "backgroundColor": "rgb(224, 224, 224)",
+                        "borderColor": "rgba(16, 16, 16, 0.3)",
+                        "borderWidth": 1,
+                      },
+                      {
+                        "opacity": 1,
+                        "transform": [
+                          {
+                            "scale": 1,
+                          },
+                        ],
+                      },
+                    ],
                   },
-                  "type": "div",
+                  "type": "View",
                 },
               ],
               "props": {
@@ -34711,51 +34614,45 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
                   "children": [
                     {
                       "children": [
-                        {
-                          "children": [
-                            "4",
-                          ],
-                          "props": {
-                            "className": "css-text-146c3p1",
-                            "dir": "auto",
-                            "style": {
-                              "color": "rgba(16,16,16,1.00)",
-                              "fontFamily": "monospace,monospace",
-                              "fontSize": "22px",
-                            },
-                          },
-                          "type": "div",
-                        },
+                        "4",
                       ],
                       "props": {
-                        "className": "items-center justify-center gap-0.5 rounded-[13px] border-t",
-                        "style": [
-                          {
-                            "backgroundColor": "rgba(16, 16, 16, 0.07)",
-                            "borderColor": "rgba(16, 16, 16, 0.07)",
-                            "height": 46,
-                          },
-                          {
-                            "transform": [
-                              {
-                                "translateY": 0,
-                              },
-                            ],
-                          },
-                        ],
+                        "className": "css-text-146c3p1",
+                        "dir": "auto",
+                        "style": {
+                          "color": "rgba(16,16,16,1.00)",
+                          "fontFamily": "monospace,monospace",
+                          "fontSize": "22px",
+                        },
                       },
-                      "type": "View",
+                      "type": "div",
                     },
                   ],
                   "props": {
-                    "className": "css-view-g5y9jx",
-                    "dir": null,
-                    "style": {
-                      "backgroundColor": "rgba(16,16,16,0.04)",
-                      "height": "50px",
-                    },
+                    "className": "items-center justify-center gap-0.5 rounded-[20px]",
+                    "style": [
+                      {
+                        "borderCurve": "continuous",
+                      },
+                      {
+                        "height": 50,
+                      },
+                      {
+                        "backgroundColor": "rgb(224, 224, 224)",
+                        "borderColor": "rgba(16, 16, 16, 0.3)",
+                        "borderWidth": 1,
+                      },
+                      {
+                        "opacity": 1,
+                        "transform": [
+                          {
+                            "scale": 1,
+                          },
+                        ],
+                      },
+                    ],
                   },
-                  "type": "div",
+                  "type": "View",
                 },
               ],
               "props": {
@@ -34775,51 +34672,45 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
                   "children": [
                     {
                       "children": [
-                        {
-                          "children": [
-                            "5",
-                          ],
-                          "props": {
-                            "className": "css-text-146c3p1",
-                            "dir": "auto",
-                            "style": {
-                              "color": "rgba(16,16,16,1.00)",
-                              "fontFamily": "monospace,monospace",
-                              "fontSize": "22px",
-                            },
-                          },
-                          "type": "div",
-                        },
+                        "5",
                       ],
                       "props": {
-                        "className": "items-center justify-center gap-0.5 rounded-[13px] border-t",
-                        "style": [
-                          {
-                            "backgroundColor": "rgba(16, 16, 16, 0.07)",
-                            "borderColor": "rgba(16, 16, 16, 0.07)",
-                            "height": 46,
-                          },
-                          {
-                            "transform": [
-                              {
-                                "translateY": 0,
-                              },
-                            ],
-                          },
-                        ],
+                        "className": "css-text-146c3p1",
+                        "dir": "auto",
+                        "style": {
+                          "color": "rgba(16,16,16,1.00)",
+                          "fontFamily": "monospace,monospace",
+                          "fontSize": "22px",
+                        },
                       },
-                      "type": "View",
+                      "type": "div",
                     },
                   ],
                   "props": {
-                    "className": "css-view-g5y9jx",
-                    "dir": null,
-                    "style": {
-                      "backgroundColor": "rgba(16,16,16,0.04)",
-                      "height": "50px",
-                    },
+                    "className": "items-center justify-center gap-0.5 rounded-[20px]",
+                    "style": [
+                      {
+                        "borderCurve": "continuous",
+                      },
+                      {
+                        "height": 50,
+                      },
+                      {
+                        "backgroundColor": "rgb(224, 224, 224)",
+                        "borderColor": "rgba(16, 16, 16, 0.3)",
+                        "borderWidth": 1,
+                      },
+                      {
+                        "opacity": 1,
+                        "transform": [
+                          {
+                            "scale": 1,
+                          },
+                        ],
+                      },
+                    ],
                   },
-                  "type": "div",
+                  "type": "View",
                 },
               ],
               "props": {
@@ -34839,51 +34730,45 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
                   "children": [
                     {
                       "children": [
-                        {
-                          "children": [
-                            "6",
-                          ],
-                          "props": {
-                            "className": "css-text-146c3p1",
-                            "dir": "auto",
-                            "style": {
-                              "color": "rgba(16,16,16,1.00)",
-                              "fontFamily": "monospace,monospace",
-                              "fontSize": "22px",
-                            },
-                          },
-                          "type": "div",
-                        },
+                        "6",
                       ],
                       "props": {
-                        "className": "items-center justify-center gap-0.5 rounded-[13px] border-t",
-                        "style": [
-                          {
-                            "backgroundColor": "rgba(16, 16, 16, 0.07)",
-                            "borderColor": "rgba(16, 16, 16, 0.07)",
-                            "height": 46,
-                          },
-                          {
-                            "transform": [
-                              {
-                                "translateY": 0,
-                              },
-                            ],
-                          },
-                        ],
+                        "className": "css-text-146c3p1",
+                        "dir": "auto",
+                        "style": {
+                          "color": "rgba(16,16,16,1.00)",
+                          "fontFamily": "monospace,monospace",
+                          "fontSize": "22px",
+                        },
                       },
-                      "type": "View",
+                      "type": "div",
                     },
                   ],
                   "props": {
-                    "className": "css-view-g5y9jx",
-                    "dir": null,
-                    "style": {
-                      "backgroundColor": "rgba(16,16,16,0.04)",
-                      "height": "50px",
-                    },
+                    "className": "items-center justify-center gap-0.5 rounded-[20px]",
+                    "style": [
+                      {
+                        "borderCurve": "continuous",
+                      },
+                      {
+                        "height": 50,
+                      },
+                      {
+                        "backgroundColor": "rgb(224, 224, 224)",
+                        "borderColor": "rgba(16, 16, 16, 0.3)",
+                        "borderWidth": 1,
+                      },
+                      {
+                        "opacity": 1,
+                        "transform": [
+                          {
+                            "scale": 1,
+                          },
+                        ],
+                      },
+                    ],
                   },
-                  "type": "div",
+                  "type": "View",
                 },
               ],
               "props": {
@@ -34912,51 +34797,45 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
                   "children": [
                     {
                       "children": [
-                        {
-                          "children": [
-                            "7",
-                          ],
-                          "props": {
-                            "className": "css-text-146c3p1",
-                            "dir": "auto",
-                            "style": {
-                              "color": "rgba(16,16,16,1.00)",
-                              "fontFamily": "monospace,monospace",
-                              "fontSize": "22px",
-                            },
-                          },
-                          "type": "div",
-                        },
+                        "7",
                       ],
                       "props": {
-                        "className": "items-center justify-center gap-0.5 rounded-[13px] border-t",
-                        "style": [
-                          {
-                            "backgroundColor": "rgba(16, 16, 16, 0.07)",
-                            "borderColor": "rgba(16, 16, 16, 0.07)",
-                            "height": 46,
-                          },
-                          {
-                            "transform": [
-                              {
-                                "translateY": 0,
-                              },
-                            ],
-                          },
-                        ],
+                        "className": "css-text-146c3p1",
+                        "dir": "auto",
+                        "style": {
+                          "color": "rgba(16,16,16,1.00)",
+                          "fontFamily": "monospace,monospace",
+                          "fontSize": "22px",
+                        },
                       },
-                      "type": "View",
+                      "type": "div",
                     },
                   ],
                   "props": {
-                    "className": "css-view-g5y9jx",
-                    "dir": null,
-                    "style": {
-                      "backgroundColor": "rgba(16,16,16,0.04)",
-                      "height": "50px",
-                    },
+                    "className": "items-center justify-center gap-0.5 rounded-[20px]",
+                    "style": [
+                      {
+                        "borderCurve": "continuous",
+                      },
+                      {
+                        "height": 50,
+                      },
+                      {
+                        "backgroundColor": "rgb(224, 224, 224)",
+                        "borderColor": "rgba(16, 16, 16, 0.3)",
+                        "borderWidth": 1,
+                      },
+                      {
+                        "opacity": 1,
+                        "transform": [
+                          {
+                            "scale": 1,
+                          },
+                        ],
+                      },
+                    ],
                   },
-                  "type": "div",
+                  "type": "View",
                 },
               ],
               "props": {
@@ -34976,51 +34855,45 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
                   "children": [
                     {
                       "children": [
-                        {
-                          "children": [
-                            "8",
-                          ],
-                          "props": {
-                            "className": "css-text-146c3p1",
-                            "dir": "auto",
-                            "style": {
-                              "color": "rgba(16,16,16,1.00)",
-                              "fontFamily": "monospace,monospace",
-                              "fontSize": "22px",
-                            },
-                          },
-                          "type": "div",
-                        },
+                        "8",
                       ],
                       "props": {
-                        "className": "items-center justify-center gap-0.5 rounded-[13px] border-t",
-                        "style": [
-                          {
-                            "backgroundColor": "rgba(16, 16, 16, 0.07)",
-                            "borderColor": "rgba(16, 16, 16, 0.07)",
-                            "height": 46,
-                          },
-                          {
-                            "transform": [
-                              {
-                                "translateY": 0,
-                              },
-                            ],
-                          },
-                        ],
+                        "className": "css-text-146c3p1",
+                        "dir": "auto",
+                        "style": {
+                          "color": "rgba(16,16,16,1.00)",
+                          "fontFamily": "monospace,monospace",
+                          "fontSize": "22px",
+                        },
                       },
-                      "type": "View",
+                      "type": "div",
                     },
                   ],
                   "props": {
-                    "className": "css-view-g5y9jx",
-                    "dir": null,
-                    "style": {
-                      "backgroundColor": "rgba(16,16,16,0.04)",
-                      "height": "50px",
-                    },
+                    "className": "items-center justify-center gap-0.5 rounded-[20px]",
+                    "style": [
+                      {
+                        "borderCurve": "continuous",
+                      },
+                      {
+                        "height": 50,
+                      },
+                      {
+                        "backgroundColor": "rgb(224, 224, 224)",
+                        "borderColor": "rgba(16, 16, 16, 0.3)",
+                        "borderWidth": 1,
+                      },
+                      {
+                        "opacity": 1,
+                        "transform": [
+                          {
+                            "scale": 1,
+                          },
+                        ],
+                      },
+                    ],
                   },
-                  "type": "div",
+                  "type": "View",
                 },
               ],
               "props": {
@@ -35040,51 +34913,45 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
                   "children": [
                     {
                       "children": [
-                        {
-                          "children": [
-                            "9",
-                          ],
-                          "props": {
-                            "className": "css-text-146c3p1",
-                            "dir": "auto",
-                            "style": {
-                              "color": "rgba(16,16,16,1.00)",
-                              "fontFamily": "monospace,monospace",
-                              "fontSize": "22px",
-                            },
-                          },
-                          "type": "div",
-                        },
+                        "9",
                       ],
                       "props": {
-                        "className": "items-center justify-center gap-0.5 rounded-[13px] border-t",
-                        "style": [
-                          {
-                            "backgroundColor": "rgba(16, 16, 16, 0.07)",
-                            "borderColor": "rgba(16, 16, 16, 0.07)",
-                            "height": 46,
-                          },
-                          {
-                            "transform": [
-                              {
-                                "translateY": 0,
-                              },
-                            ],
-                          },
-                        ],
+                        "className": "css-text-146c3p1",
+                        "dir": "auto",
+                        "style": {
+                          "color": "rgba(16,16,16,1.00)",
+                          "fontFamily": "monospace,monospace",
+                          "fontSize": "22px",
+                        },
                       },
-                      "type": "View",
+                      "type": "div",
                     },
                   ],
                   "props": {
-                    "className": "css-view-g5y9jx",
-                    "dir": null,
-                    "style": {
-                      "backgroundColor": "rgba(16,16,16,0.04)",
-                      "height": "50px",
-                    },
+                    "className": "items-center justify-center gap-0.5 rounded-[20px]",
+                    "style": [
+                      {
+                        "borderCurve": "continuous",
+                      },
+                      {
+                        "height": 50,
+                      },
+                      {
+                        "backgroundColor": "rgb(224, 224, 224)",
+                        "borderColor": "rgba(16, 16, 16, 0.3)",
+                        "borderWidth": 1,
+                      },
+                      {
+                        "opacity": 1,
+                        "transform": [
+                          {
+                            "scale": 1,
+                          },
+                        ],
+                      },
+                    ],
                   },
-                  "type": "div",
+                  "type": "View",
                 },
               ],
               "props": {
@@ -35113,51 +34980,45 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
                   "children": [
                     {
                       "children": [
-                        {
-                          "children": [
-                            "00",
-                          ],
-                          "props": {
-                            "className": "css-text-146c3p1",
-                            "dir": "auto",
-                            "style": {
-                              "color": "rgba(16,16,16,1.00)",
-                              "fontFamily": "monospace,monospace",
-                              "fontSize": "22px",
-                            },
-                          },
-                          "type": "div",
-                        },
+                        "00",
                       ],
                       "props": {
-                        "className": "items-center justify-center gap-0.5 rounded-[13px] border-t",
-                        "style": [
-                          {
-                            "backgroundColor": "rgba(16, 16, 16, 0.07)",
-                            "borderColor": "rgba(16, 16, 16, 0.07)",
-                            "height": 46,
-                          },
-                          {
-                            "transform": [
-                              {
-                                "translateY": 0,
-                              },
-                            ],
-                          },
-                        ],
+                        "className": "css-text-146c3p1",
+                        "dir": "auto",
+                        "style": {
+                          "color": "rgba(16,16,16,1.00)",
+                          "fontFamily": "monospace,monospace",
+                          "fontSize": "22px",
+                        },
                       },
-                      "type": "View",
+                      "type": "div",
                     },
                   ],
                   "props": {
-                    "className": "css-view-g5y9jx",
-                    "dir": null,
-                    "style": {
-                      "backgroundColor": "rgba(16,16,16,0.04)",
-                      "height": "50px",
-                    },
+                    "className": "items-center justify-center gap-0.5 rounded-[20px]",
+                    "style": [
+                      {
+                        "borderCurve": "continuous",
+                      },
+                      {
+                        "height": 50,
+                      },
+                      {
+                        "backgroundColor": "rgb(224, 224, 224)",
+                        "borderColor": "rgba(16, 16, 16, 0.3)",
+                        "borderWidth": 1,
+                      },
+                      {
+                        "opacity": 1,
+                        "transform": [
+                          {
+                            "scale": 1,
+                          },
+                        ],
+                      },
+                    ],
                   },
-                  "type": "div",
+                  "type": "View",
                 },
               ],
               "props": {
@@ -35177,51 +35038,45 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
                   "children": [
                     {
                       "children": [
-                        {
-                          "children": [
-                            "0",
-                          ],
-                          "props": {
-                            "className": "css-text-146c3p1",
-                            "dir": "auto",
-                            "style": {
-                              "color": "rgba(16,16,16,1.00)",
-                              "fontFamily": "monospace,monospace",
-                              "fontSize": "22px",
-                            },
-                          },
-                          "type": "div",
-                        },
+                        "0",
                       ],
                       "props": {
-                        "className": "items-center justify-center gap-0.5 rounded-[13px] border-t",
-                        "style": [
-                          {
-                            "backgroundColor": "rgba(16, 16, 16, 0.07)",
-                            "borderColor": "rgba(16, 16, 16, 0.07)",
-                            "height": 46,
-                          },
-                          {
-                            "transform": [
-                              {
-                                "translateY": 0,
-                              },
-                            ],
-                          },
-                        ],
+                        "className": "css-text-146c3p1",
+                        "dir": "auto",
+                        "style": {
+                          "color": "rgba(16,16,16,1.00)",
+                          "fontFamily": "monospace,monospace",
+                          "fontSize": "22px",
+                        },
                       },
-                      "type": "View",
+                      "type": "div",
                     },
                   ],
                   "props": {
-                    "className": "css-view-g5y9jx",
-                    "dir": null,
-                    "style": {
-                      "backgroundColor": "rgba(16,16,16,0.04)",
-                      "height": "50px",
-                    },
+                    "className": "items-center justify-center gap-0.5 rounded-[20px]",
+                    "style": [
+                      {
+                        "borderCurve": "continuous",
+                      },
+                      {
+                        "height": 50,
+                      },
+                      {
+                        "backgroundColor": "rgb(224, 224, 224)",
+                        "borderColor": "rgba(16, 16, 16, 0.3)",
+                        "borderWidth": 1,
+                      },
+                      {
+                        "opacity": 1,
+                        "transform": [
+                          {
+                            "scale": 1,
+                          },
+                        ],
+                      },
+                    ],
                   },
-                  "type": "div",
+                  "type": "View",
                 },
               ],
               "props": {
@@ -35241,51 +35096,45 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
                   "children": [
                     {
                       "children": [
-                        {
-                          "children": [
-                            "000",
-                          ],
-                          "props": {
-                            "className": "css-text-146c3p1",
-                            "dir": "auto",
-                            "style": {
-                              "color": "rgba(16,16,16,1.00)",
-                              "fontFamily": "monospace,monospace",
-                              "fontSize": "22px",
-                            },
-                          },
-                          "type": "div",
-                        },
+                        "000",
                       ],
                       "props": {
-                        "className": "items-center justify-center gap-0.5 rounded-[13px] border-t",
-                        "style": [
-                          {
-                            "backgroundColor": "rgba(16, 16, 16, 0.07)",
-                            "borderColor": "rgba(16, 16, 16, 0.07)",
-                            "height": 46,
-                          },
-                          {
-                            "transform": [
-                              {
-                                "translateY": 0,
-                              },
-                            ],
-                          },
-                        ],
+                        "className": "css-text-146c3p1",
+                        "dir": "auto",
+                        "style": {
+                          "color": "rgba(16,16,16,1.00)",
+                          "fontFamily": "monospace,monospace",
+                          "fontSize": "22px",
+                        },
                       },
-                      "type": "View",
+                      "type": "div",
                     },
                   ],
                   "props": {
-                    "className": "css-view-g5y9jx",
-                    "dir": null,
-                    "style": {
-                      "backgroundColor": "rgba(16,16,16,0.04)",
-                      "height": "50px",
-                    },
+                    "className": "items-center justify-center gap-0.5 rounded-[20px]",
+                    "style": [
+                      {
+                        "borderCurve": "continuous",
+                      },
+                      {
+                        "height": 50,
+                      },
+                      {
+                        "backgroundColor": "rgb(224, 224, 224)",
+                        "borderColor": "rgba(16, 16, 16, 0.3)",
+                        "borderWidth": 1,
+                      },
+                      {
+                        "opacity": 1,
+                        "transform": [
+                          {
+                            "scale": 1,
+                          },
+                        ],
+                      },
+                    ],
                   },
-                  "type": "div",
+                  "type": "View",
                 },
               ],
               "props": {
@@ -35322,55 +35171,48 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
                 {
                   "children": [
                     {
-                      "children": [
-                        {
-                          "children": null,
-                          "props": {
-                            "color": "rgb(16, 16, 16)",
-                            "height": 22,
-                            "width": 22,
-                            "xml": "<svg viewBox="0 0 24 24" width="1em" height="1em" ><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 5a2 2 0 0 0-1.344.519l-6.328 5.74a1 1 0 0 0 0 1.481l6.328 5.741A2 2 0 0 0 10 19h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2zm2 4l6 6m0-6l-6 6"/></svg>",
-                          },
-                          "type": "SvgXml",
-                        },
-                      ],
+                      "children": null,
                       "props": {
-                        "className": "css-view-g5y9jx",
-                        "dir": null,
+                        "color": "rgb(16, 16, 16)",
+                        "height": 22,
+                        "width": 22,
+                        "xml": "<svg viewBox="0 0 24 24" width="1em" height="1em" ><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 5a2 2 0 0 0-1.344.519l-6.328 5.74a1 1 0 0 0 0 1.481l6.328 5.741A2 2 0 0 0 10 19h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2zm2 4l6 6m0-6l-6 6"/></svg>",
                       },
-                      "type": "div",
+                      "type": "SvgXml",
                     },
                   ],
                   "props": {
-                    "className": "items-center justify-center gap-0.5 rounded-[13px] border-t",
-                    "style": [
-                      {
-                        "backgroundColor": "rgba(16, 16, 16, 0.12)",
-                        "borderColor": "rgba(16, 16, 16, 0.07)",
-                        "flex": 1,
-                        "marginBottom": 4,
-                      },
-                      {
-                        "transform": [
-                          {
-                            "translateY": 0,
-                          },
-                        ],
-                      },
-                    ],
+                    "className": "css-view-g5y9jx",
+                    "dir": null,
                   },
-                  "type": "View",
+                  "type": "div",
                 },
               ],
               "props": {
-                "className": "css-view-g5y9jx",
-                "dir": null,
-                "style": {
-                  "backgroundColor": "rgba(16,16,16,0.04)",
-                  "flex": 1,
-                },
+                "className": "items-center justify-center gap-0.5 rounded-[20px]",
+                "style": [
+                  {
+                    "borderCurve": "continuous",
+                  },
+                  {
+                    "flex": 1,
+                  },
+                  {
+                    "backgroundColor": "rgb(224, 224, 224)",
+                    "borderColor": "rgba(16, 16, 16, 0.3)",
+                    "borderWidth": 1,
+                  },
+                  {
+                    "opacity": 1,
+                    "transform": [
+                      {
+                        "scale": 1,
+                      },
+                    ],
+                  },
+                ],
               },
-              "type": "div",
+              "type": "View",
             },
           ],
           "props": {

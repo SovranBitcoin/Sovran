@@ -1,16 +1,15 @@
-import React, { memo, type ReactNode } from 'react';
-import Animated, { useAnimatedStyle } from 'react-native-reanimated';
+import React, { memo } from 'react';
 
 import Icon from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { withAlpha } from '@/shared/lib/color';
 import { Log } from '@/shared/lib/logger';
-import { Pressable } from '@/shared/ui/primitives/Pressable';
+import { useCapabilities } from '@/shared/ui/capability';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 
+import { KeypadGlassKey } from './KeypadGlassKey';
+import { KeypadKey } from './KeypadKey';
 import { useKeypadPress } from './useKeypadPress';
-import { usePressProgress } from './usePressProgress';
 
 /** A key in the function column: something other than typing a digit. */
 interface KeypadFunction {
@@ -43,51 +42,12 @@ const KEY_NAMES: Record<string, { testID: string; label: string }> = {
   '000': { testID: 'triple-zero', label: 'Thousand' },
 };
 
-/** How far a cap sinks into its base when pressed. */
-const TRAVEL = 4;
-
-/**
- * One physical key: a cap resting on a darker base, which is the key's own
- * shadow. Pressing sinks the cap into the base. The motion runs on the UI
- * thread from the touch itself, so typing never waits on a render.
- */
-function Cap({
-  height,
-  strong = false,
-  children,
-}: {
-  /** Omit to take whatever height the column gives. */
-  height?: number;
-  strong?: boolean;
-  children: ReactNode;
-}) {
-  const foreground = useThemeColor('foreground');
-  const { progress, touch } = usePressProgress(70);
-  const sink = useAnimatedStyle(() => ({ transform: [{ translateY: progress.get() * TRAVEL }] }));
-  const base = {
-    ...(height === undefined ? { flex: 1 } : { height: height + TRAVEL }),
-    backgroundColor: withAlpha(foreground, 0.04),
-  };
-  const cap = {
-    ...(height === undefined ? { flex: 1, marginBottom: TRAVEL } : { height }),
-    backgroundColor: withAlpha(foreground, strong ? 0.12 : 0.07),
-    borderColor: withAlpha(foreground, 0.07),
-  };
-  return (
-    <View className="rounded-[13px]" style={base} {...touch}>
-      <Animated.View
-        className="items-center justify-center gap-0.5 rounded-[13px] border-t"
-        style={[cap, sink]}>
-        {children}
-      </Animated.View>
-    </View>
-  );
-}
-
 /**
  * The amount keypad: a calculator's. Three columns of digits, and a fourth of
  * functions that starts with delete. The sat keypad has no decimal point, so
- * its bottom row offers `00` and `000` instead of leaving a hole.
+ * its bottom row offers `00` and `000` instead of leaving a hole. Where the
+ * device has Liquid Glass the keys are glass; elsewhere they wear the control
+ * chrome of the mint selector pill.
  */
 const CustomKeyboard: React.FC<CustomKeyboardProps> = ({
   onKeyPress,
@@ -99,14 +59,14 @@ const CustomKeyboard: React.FC<CustomKeyboardProps> = ({
 }) => {
   const foreground = useThemeColor('foreground');
   const handlePress = useKeypadPress(value, unit, onKeyPress);
-  const keyHeight = compact ? 46 : 54;
+  const keyHeight = compact ? 50 : 58;
   const rows = [
     ['1', '2', '3'],
     ['4', '5', '6'],
     ['7', '8', '9'],
     [unit === 'sat' ? '00' : '.', '0', '000'],
   ];
-  const state = { disabled: loading, busy: loading };
+  const Key = useCapabilities().liquidGlass ? KeypadGlassKey : KeypadKey;
 
   return (
     <Log name="CustomKeyboard">
@@ -115,61 +75,46 @@ const CustomKeyboard: React.FC<CustomKeyboardProps> = ({
           {rows.map((row) => (
             <View key={row.join('')} className="flex-row gap-2">
               {row.map((key) => (
-                <Pressable
+                <Key
                   key={key}
                   testID={`keypad-key-${KEY_NAMES[key]?.testID ?? key}`}
-                  accessibilityRole="button"
                   accessibilityLabel={KEY_NAMES[key]?.label ?? key}
-                  accessibilityState={state}
                   disabled={loading}
-                  activeOpacity={1}
-                  className="flex-1"
+                  height={keyHeight}
                   onPress={() => handlePress(key)}>
-                  <Cap height={keyHeight}>
-                    <Text family="mono" size={22} bold color={foreground}>
-                      {key}
-                    </Text>
-                  </Cap>
-                </Pressable>
+                  <Text family="mono" size={22} bold color={foreground}>
+                    {key}
+                  </Text>
+                </Key>
               ))}
             </View>
           ))}
         </View>
 
         <View className="flex-1 gap-2">
-          <Pressable
+          <Key
             testID="keypad-key-backspace"
-            accessibilityRole="button"
             accessibilityLabel="Delete"
-            accessibilityState={state}
             disabled={loading}
-            activeOpacity={1}
-            className="flex-1"
+            strong
             onPress={() => handlePress('<')}>
-            <Cap strong>
-              <Icon name="lucide:delete" size={22} color={foreground} />
-            </Cap>
-          </Pressable>
+            <Icon name="lucide:delete" size={22} color={foreground} />
+          </Key>
           {functions.map((fn) => (
-            <Pressable
+            <Key
               key={fn.testID}
               testID={fn.testID}
-              accessibilityRole="button"
               accessibilityLabel={fn.accessibilityLabel}
-              accessibilityState={state}
               disabled={loading}
-              activeOpacity={1}
-              className="flex-1"
+              strong
               onPress={fn.onPress}>
-              <Cap strong>
-                {fn.icon ? <Icon name={fn.icon} size={18} color={foreground} /> : null}
-                {fn.label ? (
-                  <Text family="mono" size={fn.icon ? 11 : 13} bold color={foreground}>
-                    {fn.label}
-                  </Text>
-                ) : null}
-              </Cap>
-            </Pressable>
+              {fn.icon ? <Icon name={fn.icon} size={18} color={foreground} /> : null}
+              {fn.label ? (
+                <Text family="mono" size={fn.icon ? 11 : 13} bold color={foreground}>
+                  {fn.label}
+                </Text>
+              ) : null}
+            </Key>
           ))}
         </View>
       </View>

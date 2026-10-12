@@ -12,7 +12,7 @@ import CustomKeyboard from '@/shared/ui/composed/CustomKeyboard';
 jest.mock('@/shared/hooks/useThemeColor', () => ({
   useThemeColor: () => 'theme-foreground',
 }));
-jest.mock('@/shared/lib/color', () => ({ withAlpha: (color: string) => color }));
+jest.mock('@/shared/styles/appStyle', () => ({ useControlChrome: () => ({}) }));
 
 jest.mock('@/shared/ui/primitives/Haptics', () => ({
   EnhancedHaptics: {
@@ -37,6 +37,12 @@ jest.mock('react-native-reanimated', () => {
     withTiming: (to: number) => to,
   };
 });
+
+// The glass key is iOS 26 only and is looked at on a device; this pins the
+// identity every key carries, which the plain key and the glass key share.
+jest.mock('@/shared/ui/capability', () => ({
+  useCapabilities: () => ({ liquidGlass: false }),
+}));
 
 jest.mock('@/shared/lib/logger', () => ({
   Log: ({ children }: { children?: React.ReactNode }) => children,
