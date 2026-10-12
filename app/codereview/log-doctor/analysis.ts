@@ -17,6 +17,20 @@ export interface AnalyzableEntry {
   error?: { name: string; message: string; stack: string[] };
 }
 
+// ─── Captured lines ──────────────────────────────────────────────────────────
+
+const ANSI_ESCAPE = /\u001b\[[0-9;]*m/g;
+
+/** The JSON text of one captured line, or null when the line holds no entry.
+ *  `bun run start` tees Metro's terminal, which colours each entry and puts a
+ *  level badge (` DEBUG `, ` LOG `) in front of it. */
+export function logLineJson(line: string): string | null {
+  const plain = line.replace(ANSI_ESCAPE, '');
+  const start = plain.indexOf('{');
+  if (start === -1) return null;
+  return plain.slice(start).trim();
+}
+
 // ─── Percentiles, distribution summary, sparkline ────────────────────────────
 
 function percentileSorted(sorted: number[], p: number): number {

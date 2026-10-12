@@ -120,6 +120,7 @@ import {
 // in its own module so it can be unit-tested without loading the CLI/WDA stack.
 import {
   clusterErrorEntries,
+  logLineJson,
   percentile,
   scanRedactionAudit,
   sparkline,
@@ -343,8 +344,10 @@ export function parseLogInput(raw: string): LogEntry[] {
       trimmed.startsWith('Device:')
     )
       continue;
+    const json = logLineJson(trimmed);
+    if (json === null) continue;
     try {
-      const parsed = JSON.parse(trimmed);
+      const parsed = JSON.parse(json);
       if (parsed.event && parsed.level) entries.push(parsed);
     } catch {
       // Not JSON — skip
@@ -456,8 +459,9 @@ function hasMultipleDevices(entries: LogEntry[]): boolean {
 
 // ─── Session detection ──────────────────────────────────────────────────────
 // When `expo start 2>&1 | tee log.txt` runs across hot-reloads or restarts,
-// multiple sessions are concatenated. A session boundary is detected when _t
-// jumps backwards (performance.now() resets on restart) or there is a gap > 60s.
+// multiple sessions are concatenated. A session boundary is a change of
+// logSessionId; entries without one fall back to the clock, where _t jumping
+// backwards (performance.now() resets on restart) or a gap > 60s is a boundary.
 
 function extractLatestSessionForOneClock(entries: LogEntry[]): LogEntry[] {
   if (entries.length === 0) return entries;
@@ -475,11 +479,12 @@ function extractLatestSessionForOneClock(entries: LogEntry[]): LogEntry[] {
       const currentRun = runSessionId(entries[i]);
       const prevRun = i > 0 ? runSessionId(entries[i - 1]) : null;
       const sameKnownSession = Boolean(currentRun && prevRun && currentRun === prevRun);
-      // _t going backwards is always a restart. A forward gap (>60s) only marks
-      // a new session when session ids are unavailable — with a stable
-      // logSessionId a big gap is just idle time (backgrounded app), and
-      // splitting there used to truncate real sessions.
-      if (delta < -500 || (delta > 60_000 && !sameKnownSession)) {
+      // The app mints logSessionId once per JS runtime, so within one id neither
+      // jump is a restart: Metro delivers entries out of order (a walk through
+      // airplane mode had 21 backward jumps in one run), and a big forward gap
+      // is just idle time (backgrounded app). Splitting there used to truncate
+      // real sessions. Without ids, the clock is all there is to go on.
+      if (!sameKnownSession && (delta < -500 || delta > 60_000)) {
         lastBoundary = i;
       }
     }
