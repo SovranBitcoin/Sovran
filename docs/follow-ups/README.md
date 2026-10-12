@@ -36,7 +36,7 @@ reports) keep their evidence, and link here for anything still open.
 | [F02](F02.md) | high | decision | Private message plaintext is stored unencrypted at three sites; stop it and erase old data |
 | [F04](F04.md) | high | decision | Raw exception text reaches user-facing surfaces across the app |
 | [F07](F07.md) | medium | decision | Add app-wide translation: one locale service with Lingui catalogs |
-| [F09](F09.md) | medium | fix | apiClient loosens the shared profile schemas locally; reconcile with the schemas package |
+| [F09](F09.md) | medium | upstream | apiClient loosens the shared profile schemas locally; reconcile with the schemas package |
 | [F10](F10.md) | medium | fix | imageCache prefetch has no queue cap or caller cancellation |
 | [F12](F12.md) | medium | upstream | vendor-marmot-ts.sh tolerates a missing source and records no revision or license |
 | [F13](F13.md) | medium | investigation | Check that a Nostr data layer rebuild leaves no old listener or late profile write |
@@ -48,7 +48,7 @@ reports) keep their evidence, and link here for anything still open.
 | [F22](F22.md) | high | device | Not every route, alias, gesture and modal exit has a native journey on both platforms |
 | [F23](F23.md) | high | device | Run the headers suite on both platforms and reproduce the P2PK body text disappearing |
 | [F24](F24.md) | high | device | The NIP-46 pairing secret travels in navigation state; hold it in a runtime store |
-| [F25](F25.md) | medium | fix | Seven send/receive routes pass a whole JSON Colada entry as a route param; pass an id |
+| [F25](F25.md) | medium | device | Seven send/receive routes pass a whole JSON Colada entry as a route param; pass an id |
 | [F26](F26.md) | medium | fix | Move receive, mint-quote and rebalance sequencing out of the app into wallet/ |
 | [F27](F27.md) | medium | fix | Payment-operations port and NIP-46 grant stores take look-alike positional strings |
 | [F28](F28.md) | medium | fix | Bitchat native calls pass private keys positionally; native events are not validated |
@@ -64,7 +64,7 @@ reports) keep their evidence, and link here for anything still open.
 | [F44](F44.md) | medium | fix | Payment-request transport choice ignores the payee's preference order (NUT-18) |
 | [F45](F45.md) | medium | fix | nostr/src schemas accept unbounded strings and arrays and do not check hex ids |
 | [F46](F46.md) | medium | device | Five surfaces re-arm on screen focus only, not when the app returns to the foreground |
-| [F47](F47.md) | medium | fix | 61 async findings: unchecked aborts, unbounded fan-out, uncancellable sleeps, leaky guards |
+| [F47](F47.md) | medium | upstream | 61 async findings: unchecked aborts, unbounded fan-out, uncancellable sleeps, leaky guards |
 | [F48](F48.md) | medium | fix | Persisted collections grow without an entry cap; trim in partialize as routstrStore does |
 | [F49](F49.md) | medium | device | Run a controlled Routstr pay-per-request payment on a device and check the amounts |
 | [F50](F50.md) | medium | device | Reproduce Routstr chat connection and mid-stream stalls on devices |
@@ -79,7 +79,7 @@ reports) keep their evidence, and link here for anything still open.
 | [F60](F60.md) | high | device | Send message ecash between two funded wallets on devices and see the review row |
 | [F62](F62.md) | high | decision | The redeem queue stores whole bearer tokens in plain AsyncStorage; move them to a vault |
 | [F63](F63.md) | medium | device | 25 uses still import the library Button; the shared one lacks toggle, icon and toast forms |
-| [F64](F64.md) | medium | fix | Payment timeline cannot say why a mint has not credited or tell unreachable from slow |
+| [F64](F64.md) | medium | device | Payment timeline cannot say why a mint has not credited or tell unreachable from slow |
 | [F65](F65.md) | medium | device | Open the Details modal on both platforms and add a scenario that enters it |
 | [F66](F66.md) | medium | device | Screenshot the restored wallet home on iPhone and Android, at 320pt and large text |
 | [F67](F67.md) | high | device | Check on devices that choosing a mint pops back to the same amount screen |
