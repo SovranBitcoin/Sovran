@@ -330,8 +330,43 @@ describe('background start-up and a teardown', () => {
     finishPlugins();
     await background;
 
-    expect(signer).toHaveBeenCalled();
+    // Nothing of the active account is read for a wallet that is gone.
+    expect(signer).not.toHaveBeenCalled();
     expect(addAccount).not.toHaveBeenCalled();
     expect(privates().npcAccount).toBeNull();
+  });
+
+  it('does not save an account that finished being added after the wallet changed', async () => {
+    const { finishPlugins } = parkedWallet();
+    jest.spyOn(privates(), 'getCurrentProfileSigner').mockResolvedValue({ signEvent: jest.fn() });
+    const nextWallet = { other: 'wallet' };
+    privates().npcPlugin!.addAccount.mockImplementation(async () => {
+      privates().instance = nextWallet;
+      return { getInfo: jest.fn() };
+    });
+    const background = CocoManager.enableNpcSyncAndProcessor().catch(() => undefined);
+    await tick();
+    finishPlugins();
+    await background;
+
+    expect(privates().npcAccount).toBeNull();
+  });
+
+  it('counts as running until every start has ended, whichever ends first', async () => {
+    const first = parkedWallet();
+    const one = CocoManager.enableNpcSyncAndProcessor().catch(() => undefined);
+    await tick();
+    const second = parkedWallet();
+    const two = CocoManager.enableNpcSyncAndProcessor().catch(() => undefined);
+    await tick();
+
+    // The abandoned first start ends; the second is still going.
+    first.finishPlugins();
+    await one;
+    expect(CocoManager.getCleanupReadiness().backgroundRunning).toBe(true);
+
+    second.finishPlugins();
+    await two;
+    expect(CocoManager.getCleanupReadiness().backgroundRunning).toBe(false);
   });
 });
