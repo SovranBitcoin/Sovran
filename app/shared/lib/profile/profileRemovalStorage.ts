@@ -237,9 +237,20 @@ const INSPECTION_TIMEOUT_MS = 10_000;
  * database that does not answer in time is reported unreadable, the removal is
  * refused before anything is deleted, and the lock is released.
  */
+/** Accounts whose inspection was given up on and has not finished: its database is still open. */
+const abandonedInspections = new Set<string>();
+
 async function inspectWalletWithin(profile: ProfileEntry): ReturnType<RemovalPorts['inspect']> {
-  const result = await settleWithin(inspectWallet(profile), INSPECTION_TIMEOUT_MS);
-  return result === TIMED_OUT ? 'unreadable' : result;
+  // A retry must not open the database again, and go on to delete its files,
+  // under a reader that is still holding it.
+  if (abandonedInspections.has(profile.pubkey)) return 'unreadable';
+  const work = inspectWallet(profile);
+  const result = await settleWithin(work, INSPECTION_TIMEOUT_MS);
+  if (result !== TIMED_OUT) return result;
+  abandonedInspections.add(profile.pubkey);
+  const finished = () => abandonedInspections.delete(profile.pubkey);
+  void work.then(finished, finished);
+  return 'unreadable';
 }
 
 export const profileRemovalPorts: RemovalPorts = {

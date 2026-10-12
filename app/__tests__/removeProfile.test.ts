@@ -16,6 +16,8 @@ let mockPaymentRequests: { state: string; singleUse: number }[] | undefined;
 let mockAttemptStates: string[] = [];
 let mockUnreadable = false;
 let mockNeverAnswers = false;
+/** Ends the open that never answered, as the native side eventually would. */
+let mockStalledOpenFails: (() => void) | undefined;
 let mockMissingWallet = false;
 let mockFileFailure = false;
 let mockSecureFailure = false;
@@ -55,7 +57,11 @@ jest.mock('expo-file-system/legacy', () => ({
 }));
 jest.mock('expo-sqlite', () => ({
   openDatabaseAsync: jest.fn(async () => {
-    if (mockNeverAnswers) return new Promise(() => undefined);
+    if (mockNeverAnswers) {
+      return new Promise((_, reject) => {
+        mockStalledOpenFails = () => reject(new Error('cannot open'));
+      });
+    }
     if (mockUnreadable) throw new Error('cannot open');
     return {
       execAsync: jest.fn(async () => {}),
@@ -199,6 +205,21 @@ test('a wallet database that never answers is refused instead of holding the rem
   }
   expect(mockDeleted.size).toBe(0);
   expect(useProfileStore.getState().profiles.some((p) => p.accountIndex === 1)).toBe(true);
+
+  // The reader that was given up on still holds the database: a retry is
+  // refused without opening it again, so nothing is deleted under it.
+  mockNeverAnswers = false;
+  const opens = jest.mocked(jest.requireMock('expo-sqlite').openDatabaseAsync);
+  const opened = opens.mock.calls.length;
+  expect(await remove()).toEqual({ kind: 'refused', reason: 'unreadable' });
+  expect(opens.mock.calls.length).toBe(opened);
+  expect(mockDeleted.size).toBe(0);
+
+  // Once it has ended, the removal can be tried again.
+  mockStalledOpenFails?.();
+  await new Promise((resolve) => setImmediate(resolve));
+  await remove();
+  expect(opens.mock.calls.length).toBeGreaterThan(opened);
 });
 
 test('missing wallet refuses rather than creating an empty database', async () => {
