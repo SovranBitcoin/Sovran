@@ -107,7 +107,7 @@ reports) keep their evidence, and link here for anything still open.
 | [F122](F122.md) | low | fix | The app can publish an event its own reader then leaves out |
 | [F123](F123.md) | medium | decision | A wallet initialise or teardown that never settles blocks every later open |
 | [F124](F124.md) | low | decision | An account imported before the wallet-phrase fingerprint existed has none |
-| [F125](F125.md) | medium | fix | The app publishes no kind 10050 relay list, so a NIP-17 client cannot open a message with a Sovran user |
+| [F125](F125.md) | medium | decision | The app publishes no kind 10050 relay list, so a NIP-17 client cannot open a message with a Sovran user |
 | [F126](F126.md) | medium | fix | Controls the native harness cannot address: the sheet close button and the camera-permission button have no testID |
 | [F127](F127.md) | low | fix | Small type and import findings from the review sweep that were read and left |
 | [F130](F130.md) | low | investigation | About 300 review findings were grouped by rule and never read, and their locations were not kept |
