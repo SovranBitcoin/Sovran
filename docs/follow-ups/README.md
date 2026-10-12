@@ -58,7 +58,7 @@ reports) keep their evidence, and link here for anything still open.
 | [F44](F44.md) | medium | decision | Payment-request transport choice ignores the payee's preference order (NUT-18) |
 | [F46](F46.md) | medium | device | Five surfaces re-arm on screen focus only, not when the app returns to the foreground |
 | [F47](F47.md) | medium | upstream | 61 async findings: unchecked aborts, unbounded fan-out, uncancellable sleeps, leaky guards |
-| [F48](F48.md) | medium | fix | Persisted collections grow without an entry cap; trim in partialize as routstrStore does |
+| [F48](F48.md) | medium | decision | Persisted collections grow without an entry cap; trim in partialize as routstrStore does |
 | [F49](F49.md) | medium | device | Run a controlled Routstr pay-per-request payment on a device and check the amounts |
 | [F50](F50.md) | medium | device | Reproduce Routstr chat connection and mid-stream stalls on devices |
 | [F51](F51.md) | medium | device | Capture whether Routstr replies stream incrementally on iOS and Android |
