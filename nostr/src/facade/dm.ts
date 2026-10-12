@@ -42,12 +42,19 @@ export type DmEnvelopesRequest = RequestControls & {
 export type DmEnvelopesBundle = {
   envelopes: DmEnvelope[];
   cursor: NostrCursor;
+  /**
+   * How many wraps the tier sent, counting any left out because they did not
+   * parse. A pager that judges "was this page full" by `envelopes.length`
+   * would stop at the first page that lost one. Absent: `envelopes.length`.
+   */
+  received?: number;
 };
 
 export type ResolvedDmEnvelopes = {
   tier: NostrTier;
   envelopes: DmEnvelope[];
   cursor: NostrCursor;
+  received?: number;
 };
 
 export interface DmTier {
@@ -79,5 +86,9 @@ export function bundleFromDmEnvelope(envelope: NaggEnvelope): DmEnvelopesBundle 
     };
   });
   const last = envelopes[envelopes.length - 1];
-  return { envelopes, cursor: last ? { createdAt: last.createdAtSec, id: last.id } : null };
+  return {
+    envelopes,
+    cursor: last ? { createdAt: last.createdAtSec, id: last.id } : null,
+    received: Math.max(envelope.order.length, envelopes.length),
+  };
 }

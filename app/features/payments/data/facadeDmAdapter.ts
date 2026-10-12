@@ -46,5 +46,9 @@ export function resolvedDmEnvelopesToPage(resolved: facade.ResolvedDmEnvelopes):
     tags: e.tags,
     ...(e.sig ? { sig: e.sig } : {}),
   }));
-  return { envelopes, hasNextPage: envelopes.length > 0 };
+  return {
+    envelopes,
+    hasNextPage: envelopes.length > 0,
+    ...(resolved.received === undefined ? {} : { received: resolved.received }),
+  };
 }

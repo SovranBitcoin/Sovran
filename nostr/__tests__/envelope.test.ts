@@ -466,7 +466,21 @@ describe('DM envelopes', () => {
 
   test('an empty DM envelope (no order, no cursor) yields an empty bundle', () => {
     const envelope = NaggEnvelopeSchema.parse({ order: [], orderBy: 'created_at', events: [], aggregates: {} });
-    expect(bundleFromDmEnvelope(envelope)).toEqual({ envelopes: [], cursor: null });
+    expect(bundleFromDmEnvelope(envelope)).toEqual({ envelopes: [], cursor: null, received: 0 });
+  });
+
+  test('counts a wrap that did not parse, so a full page is still known to be full', () => {
+    const good = event('8'.repeat(64), { kind: 1059, pubkey: ACTOR, content: 'ciphertext' });
+    const bad = event('9'.repeat(64), { kind: 1059, pubkey: 'not a key', content: 'ciphertext' });
+    const envelope = NaggEnvelopeSchema.parse({
+      order: ['9'.repeat(64), '8'.repeat(64)],
+      orderBy: 'created_at',
+      events: [bad, good],
+      aggregates: {},
+    });
+    const bundle = bundleFromDmEnvelope(envelope);
+    expect(bundle.envelopes.map((wrap) => wrap.id)).toEqual(['8'.repeat(64)]);
+    expect(bundle.received).toBe(2);
   });
 });
 
