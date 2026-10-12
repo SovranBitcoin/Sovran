@@ -44,7 +44,7 @@ reports) keep their evidence, and link here for anything still open.
 | [F15](F15.md) | low | fix | Record image asset sources and licenses; shorten the 1 s image fade on dense rows |
 | [F16](F16.md) | low | device | Run accessibility, reduced-motion and release-mode performance scenarios on devices |
 | [F19](F19.md) | low | fix | Rename overloaded payment, profile, key and time names, one cluster at a time |
-| [F20](F20.md) | low | fix | Cleanup measurements skip wallet/src and nostr/src and pass with no detector output |
+| [F20](F20.md) | low | upstream | Cleanup measurements skip wallet/src and nostr/src and pass with no detector output |
 | [F22](F22.md) | high | device | Not every route, alias, gesture and modal exit has a native journey on both platforms |
 | [F23](F23.md) | high | device | Run the headers suite on both platforms and reproduce the P2PK body text disappearing |
 | [F24](F24.md) | high | device | The NIP-46 pairing secret travels in navigation state; hold it in a runtime store |
