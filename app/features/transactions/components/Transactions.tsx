@@ -828,12 +828,7 @@ export const Transactions = React.memo(
       }
 
       if (timelineItems.length === 0) {
-        return (
-          <View>
-            <Spacer size={24} />
-            <EmptyStateCard title="No History" subtitle="Your history will show up here" />
-          </View>
-        );
+        return <EmptyStateCard title="No History" subtitle="Your history will show up here" />;
       }
 
       // The home is two clearly named blocks: what is still in flight, then
