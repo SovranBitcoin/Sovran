@@ -436,7 +436,7 @@ Findings triaged (all verified in source):
 - [nip01/single-connection-per-relay] nostr/src/facade/relay/protocol.ts:86 (0.80)
   verdict: defect
   evidence: `openWebSocket` at :163 and :220 opens a fresh socket per relay per request. NIP-01 asks for one connection per relay with subscriptions multiplexed over it. Unlike its sibling, this file's header documents the tier and the REQ/EVENT/EOSE wire but says nothing about socket lifecycle, so there is no recorded decision behind it. Blame `cdc8b5a4` is a JSON-parsing fix, unrelated.
-  action: blocked — recorded as **F43**. Connection pooling is an architectural change to the `nostr` package, not the smallest correct fix, and the protocol forbids a refactor inside a fix commit.
+  action: done on 2026-10-12 as its own change. One socket per relay, subscriptions told apart by id (`nostr/src/facade/relay/socket-pool.ts`); the follow-up that recorded it is closed.
 
 - [nip01/single-connection-per-relay] nostr/src/facade/primal/protocol.ts:1,87 (0.94, 0.95)
   verdict: intentional
@@ -804,6 +804,6 @@ Two were previously recorded unverified and are now read:
   verdict: false-positive
   evidence: the engine does exactly what NIP-46 requires, just not in the flagged chunk. `:865-869` answers an unrecognised method with `NIP46_ERRORS.unsupportedMethod` through `respondDetached`, and `isKnownMethod` at `:873` is `method === 'connect' || Object.hasOwn(methodHandlers, method)` — already prototype-safe, which is the guard `interpret.ts` was missing in `a789dbc6`. The rule fired on the `createNip46Engine` factory at `:244`, which contains no dispatch.
 
-**F43 stands.** `relay/protocol.ts`'s one-socket-per-request did not reappear
+**The relay socket finding stood at this sweep.** `relay/protocol.ts`'s one-socket-per-request did not reappear
 here, but 15 requests still went unanswered, so absence is not evidence — the
-finding was read in source on attempt 3 and the code is unchanged.
+finding was read in source on attempt 3. It was fixed on 2026-10-12 (one socket per relay).

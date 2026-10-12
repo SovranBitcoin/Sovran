@@ -55,7 +55,6 @@ reports) keep their evidence, and link here for anything still open.
 | [F38](F38.md) | low | upstream | Mint audit copy says swap success, rounding differs between screens, dead fields remain |
 | [F40](F40.md) | medium | decision | Decide what the mint picker shows before testnut verdicts have loaded |
 | [F42](F42.md) | high | device | Check the Routstr secure-vault migration on iOS and Android keychains |
-| [F43](F43.md) | medium | fix | Relay protocol opens a new WebSocket per request instead of one per relay |
 | [F44](F44.md) | medium | fix | Payment-request transport choice ignores the payee's preference order (NUT-18) |
 | [F45](F45.md) | medium | fix | nostr/src schemas accept unbounded strings and arrays and do not check hex ids |
 | [F46](F46.md) | medium | device | Five surfaces re-arm on screen focus only, not when the app returns to the foreground |

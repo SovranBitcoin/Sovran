@@ -1,10 +1,5 @@
-import {
-  openWebSocket,
-  sendWebSocket,
-  closeWebSocket,
-  type WebSocketLike,
-} from '../websocket';
-import { parseWireFrame } from '../wire-frame';
+import type { WebSocketLike } from '../websocket';
+import { createRelaySocketPool, type RelaySocketPool } from './socket-pool';
 import { ok, err, type Result } from 'neverthrow';
 import { DEFAULT_TIMEOUT_MS, type RequestControls } from '../../timeout';
 import type { NaggError } from '../../errors';
@@ -26,6 +21,11 @@ import { nostrLog } from '../../log';
 // Everything is UNTRUSTED and validated at the demux. Events are de-duped by id
 // across relays. The transport sits behind `RelayConnection` so the demux/tier
 // logic is fully testable against fake sockets.
+//
+// Sockets: one per relay, shared by every request and listener of this
+// connection and told apart by subscription id (`socket-pool.ts` has when one
+// opens and closes). A request ends its subscription with CLOSE; it does not
+// close the socket.
 // ---------------------------------------------------------------------------
 
 export type NostrFilter = {
@@ -81,6 +81,10 @@ export type RelayPoolConfig = {
   eoseQuorum?: number;
   /** Grace window (ms) after the EOSE quorum for stragglers to land. Default 50ms. */
   settleMs?: number;
+  /** How long a relay's socket stays open with no subscription on it. Default 5s. */
+  idleCloseMs?: number;
+  /** Subscriptions one socket carries before another is opened to the same relay. Default 8. */
+  maxSubscriptionsPerSocket?: number;
 };
 
 export function createRelayPoolConnection(config: RelayPoolConfig): RelayConnection {
@@ -88,6 +92,13 @@ export function createRelayPoolConnection(config: RelayPoolConfig): RelayConnect
     config.WebSocketImpl ?? (globalThis as { WebSocket?: new (url: string) => WebSocketLike }).WebSocket;
   const settleMs = config.settleMs ?? 50;
   let counter = 0;
+  const pool: RelaySocketPool | null = Ctor
+    ? createRelaySocketPool({
+        WebSocketImpl: Ctor,
+        idleCloseMs: config.idleCloseMs ?? 5_000,
+        maxSubscriptionsPerSocket: config.maxSubscriptionsPerSocket ?? 8,
+      })
+    : null;
 
   return {
     request(filters, controls) {
@@ -101,11 +112,11 @@ export function createRelayPoolConnection(config: RelayPoolConfig): RelayConnect
         );
       }
       const relays = config.relays.filter((r) => r.length > 0);
-      if (!Ctor || relays.length === 0) {
+      if (!pool || relays.length === 0) {
         return Promise.resolve(
           err<RawRelayEvent[], NaggError>({
             type: 'network',
-            message: !Ctor ? 'no WebSocket implementation available' : 'no relays configured',
+            message: !pool ? 'no WebSocket implementation available' : 'no relays configured',
             cause: undefined,
           }),
         );
@@ -117,7 +128,8 @@ export function createRelayPoolConnection(config: RelayPoolConfig): RelayConnect
       return new Promise<Result<RawRelayEvent[], NaggError>>((resolve) => {
         const subId = `sov-${++counter}`;
         const byId = new Map<string, RawRelayEvent>();
-        const sockets: WebSocketLike[] = [];
+        /** Per relay: how to end the subscription, and whether the relay said anything. */
+        const subscriptions: { url: string; end: () => void; heard: boolean }[] = [];
         const startedAt = Date.now();
         let eoseCount = 0;
         let closedCount = 0;
@@ -126,15 +138,21 @@ export function createRelayPoolConnection(config: RelayPoolConfig): RelayConnect
         let settled = false;
 
         const timeoutMs = controls?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-        const hardTimer = setTimeout(() => finish(), timeoutMs);
+        const hardTimer = setTimeout(() => finish('timeout'), timeoutMs);
+        const onAbort = () => finish('done');
 
-        function finish() {
+        function finish(reason: 'done' | 'timeout' = 'done') {
           if (settled) return;
           settled = true;
           clearTimeout(hardTimer);
-          controls?.signal?.removeEventListener('abort', finish);
+          controls?.signal?.removeEventListener('abort', onAbort);
           if (settleTimer) clearTimeout(settleTimer);
-          for (const socket of sockets) closeWebSocket(socket);
+          for (const subscription of subscriptions) {
+            // A relay that was asked and said nothing for the whole timeout is
+            // on a socket that may be dead without knowing it: do not reuse it.
+            if (reason === 'timeout' && !subscription.heard) pool?.discard(subscription.url, subId);
+            subscription.end();
+          }
           const events = [...byId.values()];
           if (events.length === 0 && !anyResponded) {
             nostrLog.warn('nostr.relay.failed', { relays: relays.length, durationMs: Date.now() - startedAt });
@@ -153,24 +171,15 @@ export function createRelayPoolConnection(config: RelayPoolConfig): RelayConnect
         function maybeSettle() {
           if (settled || settleTimer) return;
           if (eoseCount >= quorum) {
-            settleTimer = setTimeout(finish, settleMs);
+            settleTimer = setTimeout(() => finish('done'), settleMs);
           }
         }
 
-        controls?.signal?.addEventListener('abort', finish, { once: true });
+        controls?.signal?.addEventListener('abort', onAbort, { once: true });
 
         for (const url of relays) {
-          const opened = openWebSocket(Ctor, url);
-          if (opened.isErr()) {
-            closedCount += 1;
-            if (closedCount >= relays.length) finish();
-            continue;
-          }
-          const socket = opened.value;
-          sockets.push(socket);
-          // A real socket fires onerror THEN onclose for the same failure; count
-          // each socket's terminal state ONCE, or one dead relay would count twice
-          // and prematurely drive closedCount past the threshold.
+          // Each relay's terminal state counts ONCE, or one dead relay would
+          // count twice and prematurely drive closedCount past the threshold.
           let terminal = false;
           let receivedEose = false;
           const markClosed = () => {
@@ -179,73 +188,63 @@ export function createRelayPoolConnection(config: RelayPoolConfig): RelayConnect
             closedCount += 1;
             if (closedCount >= relays.length) finish();
           };
-          socket.onopen = () => {
-            if (settled) return;
-            if (sendWebSocket(socket, ['REQ', subId, ...filters]).isErr()) {
-              closeWebSocket(socket);
-              markClosed();
-            }
-          };
-          socket.onmessage = (event) => {
-            if (settled) return;
-            const message = parseWireFrame(event.data);
-            if (!message || message[1] !== subId) return;
-            anyResponded = true;
-            if (message[0] === 'EVENT') {
-              const raw = readRelayEvent(message[2]);
-              if (raw && !byId.has(raw.id)) byId.set(raw.id, raw);
-            } else if (message[0] === 'EOSE' && !receivedEose) {
-              receivedEose = true;
-              eoseCount += 1;
-              maybeSettle();
-            }
-          };
-          socket.onerror = markClosed;
-          socket.onclose = markClosed;
+          const state = { url, end: () => {}, heard: false };
+          const end = pool.subscribe(url, subId, filters, {
+            onFrame(message) {
+              if (settled) return;
+              anyResponded = true;
+              state.heard = true;
+              if (message[0] === 'EVENT') {
+                const raw = readRelayEvent(message[2]);
+                if (raw && !byId.has(raw.id)) byId.set(raw.id, raw);
+              } else if (message[0] === 'EOSE' && !receivedEose) {
+                receivedEose = true;
+                eoseCount += 1;
+                maybeSettle();
+              }
+            },
+            onClosed: markClosed,
+          });
+          if (!end) {
+            markClosed();
+            continue;
+          }
+          state.end = end;
+          subscriptions.push(state);
         }
       });
     },
 
     subscribe(filters, onEvent) {
       const relays = config.relays.filter((r) => r.length > 0);
-      if (!Ctor || relays.length === 0) return () => {};
+      if (!pool || relays.length === 0) return () => {};
 
       const subId = `sov-live-${++counter}`;
       const seen = new Set<string>();
-      const sockets: WebSocketLike[] = [];
+      const ends: (() => void)[] = [];
       let closed = false;
       nostrLog.debug('nostr.relay.listen', { relays: relays.length, filters: filters.length });
 
       for (const url of relays) {
-        const opened = openWebSocket(Ctor, url);
-        if (opened.isErr()) continue;
-        const socket = opened.value;
-        sockets.push(socket);
-        socket.onopen = () => {
-          if (!closed && sendWebSocket(socket, ['REQ', subId, ...filters]).isErr()) {
-            closeWebSocket(socket);
-          }
-        };
-        socket.onmessage = (event) => {
-          if (closed) return;
-          const message = parseWireFrame(event.data);
-          // Stay open past EOSE — a live listener only cares about EVENTs.
-          if (!message || message[1] !== subId || message[0] !== 'EVENT') return;
-          const candidate = readRelayEvent(message[2]);
-          if (!candidate || seen.has(candidate.id)) return;
-          seen.add(candidate.id);
-          onEvent(candidate);
-        };
-        // onerror/onclose: a dropped relay simply stops feeding the listener.
+        const end = pool.subscribe(url, subId, filters, {
+          onFrame(message) {
+            // Stay open past EOSE — a live listener only cares about EVENTs.
+            if (closed || message[0] !== 'EVENT') return;
+            const candidate = readRelayEvent(message[2]);
+            if (!candidate || seen.has(candidate.id)) return;
+            seen.add(candidate.id);
+            onEvent(candidate);
+          },
+          // A dropped relay simply stops feeding the listener.
+          onClosed: () => {},
+        });
+        if (end) ends.push(end);
       }
 
       return () => {
         if (closed) return;
         closed = true;
-        for (const socket of sockets) {
-          sendWebSocket(socket, ['CLOSE', subId]);
-          closeWebSocket(socket);
-        }
+        for (const end of ends) end();
       };
     },
   };
