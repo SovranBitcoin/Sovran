@@ -53,7 +53,7 @@ export function connectRunnerLink(
   note: RunnerNote,
   open: (url: string) => RunnerSocket,
   onMark: (step: string) => void
-): { transport: (entry: LogEntry) => void } {
+): { transport: (entry: LogEntry) => void; send: (message: unknown) => void } {
   let held: LogEntry[] | null = [];
   let live = false;
   const socket = open(note.url);
@@ -90,6 +90,78 @@ export function connectRunnerLink(
       if (live) send({ type: 'log', entry });
       else if (held && held.length < MAX_HELD_ENTRIES) held.push(entry);
     },
+    send: (message) => {
+      if (live) send(message);
+    },
+  };
+}
+
+/**
+ * What a person would see change: pages, navigation, layout, the payment flow
+ * and its toasts, and the runner's own step marks. Relays, mint polling and
+ * cache writes go on for as long as the app runs and are not waited for.
+ */
+const ON_SCREEN =
+  /^(e2e\.step|nav\.|screen\.|ui\.screen|render\.|visual\.|machine\.|screenAction|payment\.step|toast\.)|\.shift\./;
+/** Frames with nothing happening on screen before the app calls itself settled. */
+const STILL_FRAMES = 2;
+/** A page whose slide never reports its end is taken to have stopped after this long. */
+const SLIDE_GIVE_UP_MS = 3000;
+
+export interface SettleReport {
+  appClockMs: number;
+  /** True when a slide was given up on rather than seen to end. */
+  forced: boolean;
+}
+
+/**
+ * Tells the runner when the screen has stopped changing: no page is sliding and
+ * nothing on screen was logged for two frames. The frame loop runs only between
+ * something happening and the report, so an idle app is left alone.
+ */
+export function createSettleWatch(io: {
+  nextFrame: (callback: () => void) => void;
+  now: () => number;
+  onSettled: (report: SettleReport) => void;
+}): { note: (entry: LogEntry) => void } {
+  let sliding = 0;
+  let slidingSince = 0;
+  let changed = false;
+  let stillFrames = 0;
+  let looping = false;
+
+  const frame = () => {
+    const now = io.now();
+    let forced = false;
+    if (sliding > 0 && now - slidingSince >= SLIDE_GIVE_UP_MS) {
+      sliding = 0;
+      forced = true;
+    }
+    if (changed) {
+      changed = false;
+      stillFrames = 0;
+    } else stillFrames += 1;
+    if (sliding === 0 && (forced || stillFrames >= STILL_FRAMES)) {
+      looping = false;
+      io.onSettled({ appClockMs: now, forced });
+      return;
+    }
+    io.nextFrame(frame);
+  };
+
+  return {
+    note(entry) {
+      if (!ON_SCREEN.test(entry.event)) return;
+      if (entry.event === 'nav.transition.start') {
+        sliding += 1;
+        slidingSince = io.now();
+      } else if (entry.event === 'nav.transition.end') sliding = Math.max(0, sliding - 1);
+      changed = true;
+      if (looping) return;
+      looping = true;
+      stillFrames = 0;
+      io.nextFrame(frame);
+    },
   };
 }
 
@@ -112,5 +184,11 @@ if (IS_E2E_LOG_BUILD && Platform.OS !== 'web') {
       (step) => log.info('e2e.step', { step })
     );
     log.addTransport(link.transport);
+    const settle = createSettleWatch({
+      nextFrame: (callback) => requestAnimationFrame(callback),
+      now: monotonicNow,
+      onSettled: (report) => link.send({ type: 'settled', ...report }),
+    });
+    log.addTransport(settle.note);
   }
 }

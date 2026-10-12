@@ -24,6 +24,13 @@ export interface AppHello {
   appClockMs: number;
 }
 
+/** The app saying its screen has stopped changing. */
+export interface AppSettled {
+  appClockMs: number;
+  /** True when the app gave up on a page slide that never reported its end. */
+  forced: boolean;
+}
+
 export interface AppLink {
   /** Where the app is told to connect, as the iPhone simulator names this machine. */
   readonly url: string;
@@ -41,6 +48,11 @@ export interface AppLink {
     matches: (entry: AppLogEntry) => boolean,
     options: { timeoutMs: number; from?: number; what: string }
   ): Promise<AppLogEntry>;
+  /**
+   * The app's next report that its screen is still, counting only reports that
+   * arrived after `from` entries had (default: after everything received so far).
+   */
+  settled(options: { timeoutMs: number; from?: number }): Promise<AppSettled>;
   close(): void;
 }
 
@@ -55,6 +67,7 @@ export function writeRunnerNote(containerDir: string, note: { url: string; run: 
 
 export function startAppLink(): AppLink {
   const entries: AppLogEntry[] = [];
+  const settles: (AppSettled & { after: number })[] = [];
   const watchers = new Set<() => void>();
   let hello: AppHello | null = null;
   let app: { send(data: string): unknown } | null = null;
@@ -77,7 +90,7 @@ export function startAppLink(): AppLink {
       },
       message(_socket, data) {
         if (typeof data !== 'string') return;
-        let message: { type?: unknown; entry?: unknown } & Partial<AppHello>;
+        let message: { type?: unknown; entry?: unknown; forced?: unknown } & Partial<AppHello>;
         try {
           message = JSON.parse(data);
         } catch {
@@ -91,6 +104,12 @@ export function startAppLink(): AppLink {
           };
         } else if (message.type === 'log' && isEntry(message.entry)) {
           entries.push(message.entry);
+        } else if (message.type === 'settled' && typeof message.appClockMs === 'number') {
+          settles.push({
+            appClockMs: message.appClockMs,
+            forced: message.forced === true,
+            after: entries.length,
+          });
         } else return;
         changed();
       },
@@ -151,6 +170,23 @@ export function startAppLink(): AppLink {
       });
     },
     waitFor,
+    settled({ timeoutMs, from = entries.length }) {
+      let next = settles.length;
+      // A report already here counts if it came after the entries asked about.
+      while (next > 0 && settles[next - 1].after >= from) next--;
+      return until(
+        () => {
+          for (; next < settles.length; next++)
+            if (settles[next].after >= from) {
+              const { appClockMs, forced } = settles[next];
+              return { appClockMs, forced };
+            }
+          return null;
+        },
+        timeoutMs,
+        'the app to settle'
+      );
+    },
     close() {
       void server.stop(true);
     },

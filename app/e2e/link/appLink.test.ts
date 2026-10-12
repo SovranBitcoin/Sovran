@@ -100,6 +100,36 @@ describe('the runner end of the app link', () => {
     expect(link.entries.at(-1)).toEqual(mark);
   });
 
+  test('settled resolves on the report that follows what the step did, not an older one', async () => {
+    link = startAppLink();
+    socket = await connectApp(link.url);
+    await link.connected(1000);
+    socket.send(JSON.stringify({ type: 'settled', appClockMs: 120, forced: false }));
+    log(socket, 'screen.mount', 250, { screen: 'SendScreen' });
+    await link.waitFor((entry) => entry.event === 'screen.mount', { timeoutMs: 1000, what: 'it' });
+
+    const settled = link.settled({ timeoutMs: 1000 });
+    socket.send(JSON.stringify({ type: 'settled', appClockMs: 290, forced: false }));
+
+    expect(await settled).toEqual({ appClockMs: 290, forced: false });
+  });
+
+  test('settled does not wait again for a report that already followed the entries', async () => {
+    link = startAppLink();
+    socket = await connectApp(link.url);
+    await link.connected(1000);
+    const from = link.entries.length;
+    log(socket, 'screen.mount', 250, { screen: 'SendScreen' });
+    socket.send(JSON.stringify({ type: 'settled', appClockMs: 290, forced: true }));
+    await link.waitFor((entry) => entry.event === 'screen.mount', { timeoutMs: 1000, what: 'it' });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(await link.settled({ timeoutMs: 50, from: from + 1 })).toEqual({
+      appClockMs: 290,
+      forced: true,
+    });
+  });
+
   test('waiting with no app connected says so', async () => {
     link = startAppLink();
 
