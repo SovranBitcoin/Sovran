@@ -35,6 +35,7 @@ type RunnerNote = z.infer<typeof RunnerNoteSchema>;
 const RequestSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('mark'), step: z.string().min(1).max(200) }),
   z.object({ type: z.literal('elements'), id: z.number().int() }),
+  z.object({ type: z.literal('still'), id: z.number().int() }),
 ]);
 
 /** What the app does when the runner asks. */
@@ -43,6 +44,8 @@ export interface RunnerRequests {
   onMark: (step: string) => void;
   /** Where the controls are now; sent back as it is returned. */
   readScreen: () => unknown;
+  /** Call back once the screen is still: at once if it already is. */
+  whenStill: (reply: (report: SettleReport) => void) => void;
 }
 
 export function parseRunnerNote(text: string | null): RunnerNote | null {
@@ -67,7 +70,7 @@ export function connectRunnerLink(
   note: RunnerNote,
   open: (url: string) => RunnerSocket,
   requests: RunnerRequests
-): { transport: (entry: LogEntry) => void; send: (message: unknown) => void } {
+): { transport: (entry: LogEntry) => void } {
   let held: LogEntry[] | null = [];
   let live = false;
   const socket = open(note.url);
@@ -94,8 +97,11 @@ export function connectRunnerLink(
     try {
       const request = RequestSchema.safeParse(JSON.parse(message.data));
       if (!request.success) return;
-      if (request.data.type === 'mark') requests.onMark(request.data.step);
-      else send({ type: 'elements', id: request.data.id, ...(requests.readScreen() as object) });
+      const asked = request.data;
+      if (asked.type === 'mark') requests.onMark(asked.step);
+      else if (asked.type === 'elements')
+        send({ type: 'elements', id: asked.id, ...(requests.readScreen() as object) });
+      else requests.whenStill((report) => send({ type: 'still', id: asked.id, ...report }));
     } catch {
       // Not a message for the app.
     }
@@ -105,9 +111,6 @@ export function connectRunnerLink(
     transport: (entry) => {
       if (live) send({ type: 'log', entry });
       else if (held && held.length < MAX_HELD_ENTRIES) held.push(entry);
-    },
-    send: (message) => {
-      if (live) send(message);
     },
   };
 }
@@ -131,20 +134,24 @@ interface SettleReport {
 }
 
 /**
- * Tells the runner when the screen has stopped changing: no page is sliding and
- * nothing on screen was logged for two frames. The frame loop runs only between
- * something happening and the report, so an idle app is left alone.
+ * Knows when the screen has stopped changing: no page is sliding and nothing on
+ * screen was logged for two frames. The runner asks, and is answered at once if
+ * the screen is already still, otherwise when it next is. The frame loop runs
+ * only between something happening and stillness, so an idle app is left alone.
  */
 export function createSettleWatch(io: {
   nextFrame: (callback: () => void) => void;
   now: () => number;
-  onSettled: (report: SettleReport) => void;
-}): { note: (entry: LogEntry) => void } {
+}): {
+  note: (entry: LogEntry) => void;
+  whenStill: (reply: (report: SettleReport) => void) => void;
+} {
   let sliding = 0;
   let slidingSince = 0;
   let changed = false;
   let stillFrames = 0;
   let looping = false;
+  let waiting: ((report: SettleReport) => void)[] = [];
 
   const frame = () => {
     const now = io.now();
@@ -159,7 +166,9 @@ export function createSettleWatch(io: {
     } else stillFrames += 1;
     if (sliding === 0 && (forced || stillFrames >= STILL_FRAMES)) {
       looping = false;
-      io.onSettled({ appClockMs: now, forced });
+      const asked = waiting;
+      waiting = [];
+      for (const reply of asked) reply({ appClockMs: now, forced });
       return;
     }
     io.nextFrame(frame);
@@ -178,6 +187,10 @@ export function createSettleWatch(io: {
       stillFrames = 0;
       io.nextFrame(frame);
     },
+    whenStill(reply) {
+      if (looping) waiting.push(reply);
+      else reply({ appClockMs: io.now(), forced: false });
+    },
   };
 }
 
@@ -194,16 +207,16 @@ function readRunnerNote(): string | null {
 if (IS_E2E_LOG_BUILD && Platform.OS !== 'web') {
   const note = parseRunnerNote(readRunnerNote());
   if (note) {
-    const link = connectRunnerLink(note, (url) => new WebSocket(url) as unknown as RunnerSocket, {
-      onMark: (step) => log.info('e2e.step', { step }),
-      readScreen: () => ({ appClockMs: logClockMs(), ...readScreen() }),
-    });
-    log.addTransport(link.transport);
     const settle = createSettleWatch({
       nextFrame: (callback) => requestAnimationFrame(callback),
       now: logClockMs,
-      onSettled: (report) => link.send({ type: 'settled', ...report }),
     });
+    const link = connectRunnerLink(note, (url) => new WebSocket(url) as unknown as RunnerSocket, {
+      onMark: (step) => log.info('e2e.step', { step }),
+      readScreen: () => ({ appClockMs: logClockMs(), ...readScreen() }),
+      whenStill: settle.whenStill,
+    });
+    log.addTransport(link.transport);
     log.addTransport(settle.note);
   }
 }

@@ -783,9 +783,16 @@ export function createLogger(options: LoggerOptions = {}): Logger {
 const MEASUREMENT_EVENTS: ReadonlySet<string> = new Set([
   'coco.call',
   'cache.store.write',
+  // A step mark, a touch, and each page's slide beginning or ending are single
+  // facts a test runner counts: two pages slide at once, and a step's two marks
+  // are a few milliseconds apart.
+  'e2e.step',
   'nav.transition',
+  'nav.transition.end',
+  'nav.transition.start',
   'screen.mount',
   'store.set',
+  'ui.touch',
 ]);
 
 function makeLogger(core: LoggerCore, context: Record<string, unknown>): Logger {

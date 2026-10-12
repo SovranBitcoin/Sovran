@@ -1,0 +1,189 @@
+import { describe, expect, test } from 'bun:test';
+import type { AppLink, AppLogEntry, AppScreen } from '../link/appLink';
+import { find, playStory, topPage } from './play';
+import { storySchema, type Story } from './story';
+
+type Element = AppScreen['elements'][number];
+const box = (fields: Partial<Element>): Element => ({
+  x: 0,
+  y: 0,
+  width: 100,
+  height: 50,
+  ...fields,
+});
+const screenOf = (...elements: Element[]): AppScreen => ({
+  appClockMs: 0,
+  width: 400,
+  height: 800,
+  elements,
+});
+
+/** An app that shows `screen`, and logs what a test tells it to. */
+function fakeApp(initial: AppScreen) {
+  const entries: AppLogEntry[] = [];
+  const watchers = new Set<() => void>();
+  const state = { screen: initial, taps: [] as [number, number][], clock: 0 };
+  const log = (event: string, params?: Record<string, unknown>) => {
+    const entry: AppLogEntry = { _t: (state.clock += 10), level: 'debug', event, params };
+    entries.push(entry);
+    for (const watcher of [...watchers]) watcher();
+    return entry;
+  };
+  const link: AppLink = {
+    url: 'ws://127.0.0.1:1',
+    entries,
+    connected: async () => ({ run: 'r', platform: 'ios', appClockMs: 0 }),
+    mark: async (step) => log('e2e.step', { step }),
+    still: async () => ({ appClockMs: state.clock, forced: false }),
+    screen: async () => state.screen,
+    waitFor: (matches, { timeoutMs, from = 0 }) =>
+      new Promise((resolve, reject) => {
+        let next = from;
+        const check = () => {
+          for (; next < entries.length; next++)
+            if (matches(entries[next])) {
+              clearTimeout(timer);
+              watchers.delete(check);
+              return resolve(entries[next]);
+            }
+        };
+        const timer = setTimeout(() => {
+          watchers.delete(check);
+          reject(new Error('timed out'));
+        }, timeoutMs);
+        watchers.add(check);
+        check();
+      }),
+    close() {},
+  };
+  return { link, state, log };
+}
+
+const story = (steps: unknown[]): Story =>
+  storySchema.parse({
+    id: 'send-ecash',
+    purpose: 'A person opens Send from the wallet home and sees the ways to pay.',
+    steps,
+  });
+
+describe('find', () => {
+  test('takes the last match, which is the one drawn on top', () => {
+    const screen = screenOf(
+      box({ id: 'close', page: 'WalletScreen', y: 10 }),
+      box({ id: 'close', page: 'SendScreen', y: 90 })
+    );
+
+    expect(find({ id: 'close' }, screen)?.page).toBe('SendScreen');
+  });
+
+  test('matches a label against the accessibility label or the text drawn', () => {
+    const screen = screenOf(box({ label: 'Send' }), box({ text: 'Create Ecash' }));
+
+    expect(find({ label: 'Send' }, screen)?.label).toBe('Send');
+    expect(find({ label: 'Create Ecash' }, screen)?.text).toBe('Create Ecash');
+  });
+
+  test('ignores an element that is laid out with no size', () => {
+    expect(find({ id: 'ghost' }, screenOf(box({ id: 'ghost', width: 0 })))).toBeNull();
+  });
+});
+
+test('topPage is the page of the last element laid out', () => {
+  expect(
+    topPage(screenOf(box({ page: 'WalletScreen' }), box({ page: 'SendScreen' }), box({})))
+  ).toBe('SendScreen');
+});
+
+describe('playStory', () => {
+  test('taps the centre of the control once and passes when what it expects is true', async () => {
+    const app = fakeApp(screenOf(box({ id: 'wallet-send', page: 'WalletScreen', x: 100, y: 600 })));
+    const device = {
+      tap: async (x: number, y: number) => {
+        app.state.taps.push([x, y]);
+        app.state.screen = screenOf(box({ id: 'send-method-createEcash', page: 'SendScreen' }));
+      },
+    };
+
+    const result = await playStory(
+      story([
+        {
+          name: 'open Send',
+          tap: { id: 'wallet-send' },
+          expect: [{ page: 'SendScreen' }, { visible: { id: 'send-method-createEcash' } }],
+        },
+      ]),
+      app.link,
+      device
+    );
+
+    expect(result.ok).toBe(true);
+    expect(app.state.taps).toEqual([[0.375, 0.78125]]);
+    expect(result.steps[0].entries.map((entry) => entry.params?.step)).toEqual([
+      '1-open Send:sent',
+    ]);
+  });
+
+  test('does not touch the screen when the control is missing or disabled', async () => {
+    const app = fakeApp(screenOf(box({ id: 'amount-next', disabled: true })));
+    const device = { tap: async () => void app.state.taps.push([0, 0]) };
+    const tapStep = (id: string) => ({ name: 'press it', tap: { id }, expect: [{ page: 'X' }] });
+
+    const disabled = await playStory(story([tapStep('amount-next')]), app.link, device);
+    const missing = await playStory(story([tapStep('nowhere')]), app.link, device);
+
+    expect(disabled.steps[0].failure).toBe('Cannot tap {"id":"amount-next"}: it is disabled');
+    expect(missing.steps[0].failure).toBe('Nothing to tap: {"id":"nowhere"} is not on screen');
+    expect(app.state.taps).toEqual([]);
+  });
+
+  test('waits for the app to log what the step expects, however long the mint takes', async () => {
+    const app = fakeApp(screenOf(box({ id: 'receive-copy', page: 'ReceiveScreen' })));
+    setTimeout(() => app.log('nostr.relay.resolved'), 20);
+    setTimeout(() => app.log('payment.receive.confirmed', { amount: 100 }), 60);
+
+    const result = await playStory(
+      story([
+        {
+          name: 'wait for the payment',
+          expect: [{ logged: 'payment.receive.confirmed', with: { amount: 100 } }],
+          withinMs: 2000,
+        },
+      ]),
+      app.link,
+      { tap: async () => {} }
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.steps[0].wallMs).toBeLessThan(1000);
+  });
+
+  test('fails at the deadline, saying what was wrong and what was on screen', async () => {
+    const app = fakeApp(screenOf(box({ id: 'wallet-send', page: 'WalletScreen' })));
+
+    const result = await playStory(
+      story([{ name: 'look for Send', expect: [{ page: 'SendScreen' }], withinMs: 100 }]),
+      app.link,
+      { tap: async () => {} }
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.steps[0].failure).toBe(
+      'the page on top is WalletScreen, not SendScreen. On screen: wallet-send'
+    );
+  });
+
+  test('stops at the first step that fails', async () => {
+    const app = fakeApp(screenOf(box({ id: 'wallet-send', page: 'WalletScreen' })));
+
+    const result = await playStory(
+      story([
+        { name: 'first', expect: [{ gone: { id: 'wallet-send' } }], withinMs: 100 },
+        { name: 'second', expect: [{ page: 'WalletScreen' }] },
+      ]),
+      app.link,
+      { tap: async () => {} }
+    );
+
+    expect(result.steps.map((step) => [step.name, step.ok])).toEqual([['first', false]]);
+  });
+});

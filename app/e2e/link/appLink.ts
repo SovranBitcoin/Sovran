@@ -74,10 +74,10 @@ export interface AppLink {
     options: { timeoutMs: number; from?: number; what: string }
   ): Promise<AppLogEntry>;
   /**
-   * The app's next report that its screen is still, counting only reports that
-   * arrived after `from` entries had (default: after everything received so far).
+   * Ask the app whether its screen is still. It answers at once if so, otherwise
+   * when it next is: no page sliding, nothing on screen logged for two frames.
    */
-  settled(options: { timeoutMs: number; from?: number }): Promise<AppSettled>;
+  still(timeoutMs: number): Promise<AppSettled>;
   /** Where the app's controls are now, from the app's own tree. */
   screen(timeoutMs?: number): Promise<AppScreen>;
   close(): void;
@@ -94,7 +94,7 @@ export function writeRunnerNote(containerDir: string, note: { url: string; run: 
 
 export function startAppLink(): AppLink {
   const entries: AppLogEntry[] = [];
-  const settles: (AppSettled & { after: number })[] = [];
+  const stills = new Map<number, AppSettled>();
   const screens = new Map<number, AppScreen>();
   let nextRequest = 1;
   const watchers = new Set<() => void>();
@@ -135,11 +135,14 @@ export function startAppLink(): AppLink {
           };
         } else if (message.type === 'log' && isEntry(message.entry)) {
           entries.push(message.entry);
-        } else if (message.type === 'settled' && typeof message.appClockMs === 'number') {
-          settles.push({
+        } else if (
+          message.type === 'still' &&
+          typeof message.id === 'number' &&
+          typeof message.appClockMs === 'number'
+        ) {
+          stills.set(message.id, {
             appClockMs: message.appClockMs,
             forced: message.forced === true,
-            after: entries.length,
           });
         } else if (
           message.type === 'elements' &&
@@ -213,21 +216,18 @@ export function startAppLink(): AppLink {
       });
     },
     waitFor,
-    settled({ timeoutMs, from = entries.length }) {
-      let next = settles.length;
-      // A report already here counts if it came after the entries asked about.
-      while (next > 0 && settles[next - 1].after >= from) next--;
+    still(timeoutMs) {
+      if (!app) return Promise.reject(new Error('Cannot ask the app: it is not connected'));
+      const id = nextRequest++;
+      app.send(JSON.stringify({ type: 'still', id }));
       return until(
         () => {
-          for (; next < settles.length; next++)
-            if (settles[next].after >= from) {
-              const { appClockMs, forced } = settles[next];
-              return { appClockMs, forced };
-            }
-          return null;
+          const answer = stills.get(id) ?? null;
+          if (answer) stills.delete(id);
+          return answer;
         },
         timeoutMs,
-        'the app to settle'
+        'the app to say its screen is still'
       );
     },
     screen(timeoutMs = 2000) {

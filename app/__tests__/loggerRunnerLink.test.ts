@@ -62,6 +62,7 @@ describe('parseRunnerNote', () => {
 const requests = (over: Partial<RunnerRequests> = {}): RunnerRequests => ({
   onMark: jest.fn(),
   readScreen: () => ({ elements: [] }),
+  whenStill: jest.fn(),
   ...over,
 });
 
@@ -118,6 +119,28 @@ describe('connectRunnerLink', () => {
     expect(JSON.parse(socket.sent.at(-1) ?? '')).toEqual({ type: 'elements', id: 7, ...screen });
   });
 
+  it('answers whether the screen is still when the app says it is', () => {
+    const socket = new FakeSocket();
+    let reply: ((report: { appClockMs: number; forced: boolean }) => void) | undefined;
+    connectRunnerLink(
+      { url: 'ws://127.0.0.1:1', run: 'r1' },
+      () => socket,
+      requests({ whenStill: (callback) => (reply = callback) })
+    );
+    socket.onopen?.();
+
+    socket.onmessage?.({ data: '{"type":"still","id":4}' });
+    expect(socket.messages().map((message) => message.type)).toEqual(['hello']);
+    reply?.({ appClockMs: 512, forced: false });
+
+    expect(JSON.parse(socket.sent.at(-1) ?? '')).toEqual({
+      type: 'still',
+      id: 4,
+      appClockMs: 512,
+      forced: false,
+    });
+  });
+
   it('stops sending once the runner has gone', () => {
     const socket = new FakeSocket();
     const link = connectRunnerLink(
@@ -138,16 +161,16 @@ describe('createSettleWatch', () => {
   /** Frames run only when the test says so. */
   function harness() {
     const frames: (() => void)[] = [];
-    const settled: { appClockMs: number; forced: boolean }[] = [];
+    const answers: { appClockMs: number; forced: boolean }[] = [];
     let clock = 0;
     const watch = createSettleWatch({
       nextFrame: (callback) => frames.push(callback),
       now: () => clock,
-      onSettled: (report) => settled.push(report),
     });
     return {
       watch,
-      settled,
+      answers,
+      ask: () => watch.whenStill((report) => answers.push(report)),
       framesWaiting: () => frames.length,
       frame(ms = 16) {
         clock += ms;
@@ -156,79 +179,100 @@ describe('createSettleWatch', () => {
     };
   }
 
-  it('reports once the screen has been still for two frames', () => {
-    const { watch, settled, frame } = harness();
+  it('answers at once when nothing is happening on screen', () => {
+    const { ask, answers, framesWaiting } = harness();
+
+    ask();
+
+    expect(answers).toEqual([{ appClockMs: 0, forced: false }]);
+    expect(framesWaiting()).toBe(0);
+  });
+
+  it('answers once the screen has been still for two frames', () => {
+    const { watch, ask, answers, frame } = harness();
 
     watch.note(entry('screen.mount'));
+    ask();
     frame();
-    expect(settled).toEqual([]);
+    expect(answers).toEqual([]);
     frame();
     frame();
 
-    expect(settled).toEqual([{ appClockMs: 48, forced: false }]);
+    expect(answers).toEqual([{ appClockMs: 48, forced: false }]);
   });
 
   it('starts counting again when something else happens on screen', () => {
-    const { watch, settled, frame } = harness();
+    const { watch, ask, answers, frame } = harness();
 
     watch.note(entry('screen.mount'));
+    ask();
     frame();
     frame();
     watch.note(entry('visual.layout.measure'));
     frame();
-    expect(settled).toEqual([]);
+    expect(answers).toEqual([]);
     frame();
     frame();
 
-    expect(settled).toEqual([{ appClockMs: 80, forced: false }]);
+    expect(answers).toEqual([{ appClockMs: 80, forced: false }]);
   });
 
-  it('does not report while a page is still sliding in', () => {
-    const { watch, settled, frame } = harness();
+  it('does not answer while a page is still sliding in', () => {
+    const { watch, ask, answers, frame } = harness();
 
     watch.note(entry('nav.transition.start'));
+    ask();
     for (let i = 0; i < 10; i++) frame();
-    expect(settled).toEqual([]);
+    expect(answers).toEqual([]);
 
     watch.note(entry('nav.transition.end'));
     frame();
     frame();
     frame();
 
-    expect(settled).toEqual([{ appClockMs: 208, forced: false }]);
+    expect(answers).toEqual([{ appClockMs: 208, forced: false }]);
   });
 
   it('gives up on a slide that never reports its end, and says it did', () => {
-    const { watch, settled, frame } = harness();
+    const { watch, ask, answers, frame } = harness();
 
     watch.note(entry('nav.transition.start'));
+    ask();
     frame(1000);
     frame(1000);
-    expect(settled).toEqual([]);
+    expect(answers).toEqual([]);
     frame(1000);
 
-    expect(settled).toEqual([{ appClockMs: 3000, forced: true }]);
+    expect(answers).toEqual([{ appClockMs: 3000, forced: true }]);
   });
 
   it('is not woken by background work', () => {
-    const { watch, settled, framesWaiting } = harness();
+    const { watch, ask, answers, framesWaiting } = harness();
 
     watch.note(entry('nostr.relay.resolved'));
     watch.note(entry('coco.manager.RequestRateLimiter.RequestRateLimiter.mint_request'));
     watch.note(entry('cache.store.write'));
+    ask();
 
     expect(framesWaiting()).toBe(0);
-    expect(settled).toEqual([]);
+    expect(answers).toEqual([{ appClockMs: 0, forced: false }]);
   });
 
-  it('runs no frame loop once it has reported', () => {
-    const { watch, frame, framesWaiting } = harness();
+  it('answers everyone who asked, once, and then runs no frame loop', () => {
+    const { watch, ask, answers, frame, framesWaiting } = harness();
 
     watch.note(entry('e2e.step'));
+    ask();
+    ask();
+    frame();
     frame();
     frame();
     frame();
 
+    expect(answers).toEqual([
+      { appClockMs: 48, forced: false },
+      { appClockMs: 48, forced: false },
+    ]);
     expect(framesWaiting()).toBe(0);
   });
 });

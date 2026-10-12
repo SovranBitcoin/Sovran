@@ -84,6 +84,7 @@
     "e2e:list": "bun e2e/cli.ts list",
     "e2e:dry-run": "bun e2e/cli.ts dry-run",
     "e2e:smoke": "bun e2e/cli.ts run --driver fake",
+    "e2e:story": "bun e2e/stories/cli.ts",
     "e2e:test": "bun test e2e/*.test.ts e2e/**/*.test.ts shared/lib/e2e/*.test.ts shared/lib/e2e/**/*.test.ts",
     "android": "expo run:android",
     "ios": "expo run:ios",
