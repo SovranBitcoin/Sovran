@@ -336,11 +336,11 @@ export function createDefaultScreenActionHandlers(
         }
 
         try {
-          const result = await ops.executeReceive(
+          const result = await ops.executeReceive({
             tokenString,
             mintUrl,
-            amount ?? 0,
-          );
+            amount: amount ?? 0,
+          });
 
           const setEntry = (ctx as EntryLike).setEntry as
             | ((e: EntryLike) => void)
@@ -416,7 +416,10 @@ export function createDefaultScreenActionHandlers(
                 scannedRawInput ??
                 getString(getMetadata(entry), "rawToken") ??
                 tokenString;
-              ops.linkTransaction(linkInput, realEntry.id);
+              ops.linkTransaction({
+                scannedInput: linkInput,
+                transactionId: realEntry.id,
+              });
             }
           } else if (!setEntry || !result.historyEntry) {
             logger.warn(

@@ -87,7 +87,7 @@ function receive(
 describe("createExecuteReceive", () => {
   it("returns the history row Coco saved when the receive finalizes", async () => {
     const { manager, saved } = receiveManager({ execute: "finalizes" });
-    const result = await receive(manager, async () => {})(TOKEN, MINT_URL, 1);
+    const result = await receive(manager, async () => {})({ tokenString: TOKEN, mintUrl: MINT_URL, amount: 1 });
 
     expect(result).toMatchObject({ status: "finalized" });
     expect(JSON.parse((result as { historyEntry: string }).historyEntry)).toEqual(saved);
@@ -97,7 +97,7 @@ describe("createExecuteReceive", () => {
     const { api, manager, prepared } = receiveManager();
     const verify = vi.fn().mockResolvedValue(undefined);
 
-    await expect(receive(manager, verify)(TOKEN, MINT_URL, 1)).resolves.toMatchObject({
+    await expect(receive(manager, verify)({ tokenString: TOKEN, mintUrl: MINT_URL, amount: 1 })).resolves.toMatchObject({
       status: "pending",
       operationId: "receive-op",
       pendingReason: "network",
@@ -114,7 +114,7 @@ describe("createExecuteReceive", () => {
     const verificationError = new Error("offline verification rejected");
     const verify = vi.fn().mockRejectedValue(verificationError);
 
-    await expect(receive(manager, verify)(TOKEN, MINT_URL, 1)).rejects.toBe(verificationError);
+    await expect(receive(manager, verify)({ tokenString: TOKEN, mintUrl: MINT_URL, amount: 1 })).rejects.toBe(verificationError);
     expect(verify).toHaveBeenCalledWith(manager, prepared);
   });
 
@@ -123,7 +123,7 @@ describe("createExecuteReceive", () => {
     const verificationError = new Error("offline verification rejected");
     const verify = vi.fn().mockRejectedValue(verificationError);
 
-    await expect(receive(manager, verify, () => true)(TOKEN, MINT_URL, 1)).rejects.toBe(
+    await expect(receive(manager, verify, () => true)({ tokenString: TOKEN, mintUrl: MINT_URL, amount: 1 })).rejects.toBe(
       verificationError,
     );
     expect(api.ops.receive.execute).not.toHaveBeenCalled();
@@ -135,7 +135,7 @@ describe("createExecuteReceive", () => {
     api.ops.receive.execute.mockRejectedValue(refused);
     api.ops.receive.get.mockResolvedValue({ id: "receive-op", state: "failed", mintUrl: MINT_URL });
 
-    await expect(receive(manager, async () => {})(TOKEN, MINT_URL, 1)).rejects.toBe(refused);
+    await expect(receive(manager, async () => {})({ tokenString: TOKEN, mintUrl: MINT_URL, amount: 1 })).rejects.toBe(refused);
   });
 
   it("says so when there is no wallet", async () => {
@@ -145,7 +145,7 @@ describe("createExecuteReceive", () => {
       pendingMessage: "",
       newLocalId: (prefix) => prefix,
     });
-    await expect(execute(TOKEN, MINT_URL, 1)).rejects.toThrow("Wallet manager is not available");
+    await expect(execute({ tokenString: TOKEN, mintUrl: MINT_URL, amount: 1 })).rejects.toThrow("Wallet manager is not available");
   });
 });
 
@@ -183,7 +183,7 @@ describe("createExecuteMintQuote", () => {
     const prepareMintQuote = vi.fn().mockResolvedValue(prepared);
     const execute = createExecuteMintQuote({ getManager: () => manager, prepareMintQuote });
 
-    const result = await execute(MINT_URL, 21, "sat", "onchain");
+    const result = await execute({ mintUrl: MINT_URL, amount: 21, unit: "sat", method: "onchain" });
 
     expect(prepareMintQuote).toHaveBeenCalledWith(manager, "onchain", MINT_URL, 21, "sat");
     expect(JSON.parse(result.historyEntry)).toMatchObject({ id: "mint:saved-id", quoteId: "quote-1" });
@@ -197,7 +197,7 @@ describe("createExecuteMintQuote", () => {
       prepareMintQuote: vi.fn().mockResolvedValue(prepared),
     });
 
-    const pending = execute(MINT_URL, 21, "sat");
+    const pending = execute({ mintUrl: MINT_URL, amount: 21, unit: "sat" });
     await vi.advanceTimersByTimeAsync(11_000);
 
     expect(JSON.parse((await pending).historyEntry)).toMatchObject({

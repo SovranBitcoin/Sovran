@@ -902,11 +902,14 @@ function executeSendOperation(
 
   return ResultAsync.fromThrowable(
     () =>
-      isLockedSend(options ?? {})
-        ? operation(data.mintUrl, data.amount, data.memo, options)
-        : data.memo
-          ? operation(data.mintUrl, data.amount, data.memo)
-          : operation(data.mintUrl, data.amount),
+      // Only what the send has is passed: no `memo` or lock field is present
+      // unless the send has one.
+      operation({
+        mintUrl: data.mintUrl,
+        amount: data.amount,
+        ...(data.memo ? { memo: data.memo } : {}),
+        ...(isLockedSend(options ?? {}) ? options : {}),
+      }),
     (cause) => {
       logger.warn('effects.sendOperation.threw', {
         path,
@@ -1186,12 +1189,12 @@ export function runMintQuoteEffect({
 
   return ResultAsync.fromThrowable(
     () =>
-      operations.executeMintQuote(
-        data.mintUrl,
-        data.amount,
-        data.unit,
-        data.method,
-      ),
+      operations.executeMintQuote({
+        mintUrl: data.mintUrl,
+        amount: data.amount,
+        unit: data.unit,
+        method: data.method,
+      }),
     (cause) => toMintQuoteEffectError(cause, data, locale),
   )()
     .andThen((result) => {
@@ -1332,14 +1335,15 @@ export function runConfirmMeltEffect({
   });
 
   return ResultAsync.fromThrowable(
-    // No 5th argument when no pre-created quote exists — legacy callers
-    // (and their call-shape assertions) keep the exact 4-argument form.
+    // No `quoteId` field when no pre-created quote exists.
     () =>
-      data.meltQuote
-        ? operation(data.mintUrl, data.meltTarget, data.amount, data.unit, {
-            quoteId: data.meltQuote.quoteId,
-          })
-        : operation(data.mintUrl, data.meltTarget, data.amount, data.unit),
+      operation({
+        mintUrl: data.mintUrl,
+        meltTarget: data.meltTarget,
+        amount: data.amount,
+        unit: data.unit,
+        ...(data.meltQuote ? { quoteId: data.meltQuote.quoteId } : {}),
+      }),
     (cause): ConfirmMeltEffectError => {
       logger.warn('effects.confirmMelt.threw', {
         ...mintUrlFields(data.mintUrl),
@@ -1398,7 +1402,13 @@ export function runMeltQuotePreviewEffect({
   });
 
   return ResultAsync.fromThrowable(
-    () => operation(data.mintUrl, data.meltTarget, data.amount, data.unit),
+    () =>
+      operation({
+        mintUrl: data.mintUrl,
+        meltTarget: data.meltTarget,
+        amount: data.amount,
+        unit: data.unit,
+      }),
     (cause): MeltQuotePreviewEffectError => {
       logger.warn('effects.meltQuotePreview.threw', {
         ...mintUrlFields(data.mintUrl),
@@ -1455,7 +1465,13 @@ export function runConfirmPaymentRequestEffect({
   });
 
   return ResultAsync.fromThrowable(
-    () => operation(data.mintUrl, data.paymentRequest, data.amount, data.unit),
+    () =>
+      operation({
+        mintUrl: data.mintUrl,
+        paymentRequest: data.paymentRequest,
+        amount: data.amount,
+        unit: data.unit,
+      }),
     (cause): ConfirmPaymentRequestEffectError => {
       logger.warn('effects.paymentRequest.threw', {
         ...mintUrlFields(data.mintUrl),
@@ -1718,7 +1734,11 @@ export function runNfcWriteBackEffect({
       try {
         logger.info('effects.nfcWriteBack.progress', { phase: 'creating' });
         onProgress?.({ phase: 'creating' });
-        nfcSendResult = await executeNfcSend(data.mintUrl, data.amount, data.unit);
+        nfcSendResult = await executeNfcSend({
+          mintUrl: data.mintUrl,
+          amount: data.amount,
+          unit: data.unit,
+        });
         logger.info('effects.nfcWriteBack.tokenCreated', {
           operationIdPresent: nfcSendResult.operationId.length > 0,
           ...summarizeHistoryEntry(nfcSendResult.historyEntry),

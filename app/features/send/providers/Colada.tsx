@@ -330,7 +330,7 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
       createColada({
         manager,
         captureSendDelivery: captureNearbyDelivery,
-        sendNostrDM: async (nprofile, message) => {
+        sendNostrDM: async ({ nprofile, message }) => {
           paymentLog.info('colada.adapter.send_nostr_dm.start', {
             hasPrivateKey: !!identity.getPrivateKey(),
             nprofileLength: nprofile.length,

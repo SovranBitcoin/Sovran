@@ -52,7 +52,7 @@ function getOrchestrator(): MeshRedeemOrchestrator {
   // must run with no screen mounted.
   const executeAutoRedeem: Parameters<
     typeof createMeshRedeemOrchestrator
-  >[0]['executeAutoRedeem'] = async (token, mintUrl, manager) => {
+  >[0]['executeAutoRedeem'] = async ({ tokenString: token, mintUrl, manager }) => {
     // Nut Drop is an offline transport even when internet happens to be
     // available at redemption time. Verify every proof locally before the
     // orchestrator can treat the queued bearer value as received.
@@ -69,7 +69,7 @@ function getOrchestrator(): MeshRedeemOrchestrator {
       getManager: () => manager,
     }).executeAutoRedeem;
     if (!executeAutoRedeemBase) throw new Error('colada executeAutoRedeem operation missing');
-    return executeAutoRedeemBase(token, mintUrl);
+    return executeAutoRedeemBase({ tokenString: token, mintUrl });
   };
 
   orchestrator = createMeshRedeemOrchestrator({

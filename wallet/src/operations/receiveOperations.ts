@@ -232,7 +232,7 @@ export function createExecuteReceive(
   deps: ReceiveDeps
 ): NonNullable<MachineOperations['executeReceive']> {
   const getOffline = deps.getOffline ?? (() => false);
-  return async (tokenString, mintUrl, _amount) => {
+  return async ({ tokenString, mintUrl, amount: _amount }) => {
     const manager = deps.getManager();
     if (!manager) {
       logger.error('payment.execute_receive.no_manager');
@@ -453,7 +453,7 @@ const MINT_QUOTE_PREPARE_TIMEOUT_MS = 10_000;
 export function createExecuteMintQuote(
   deps: MintQuoteDeps
 ): NonNullable<MachineOperations['executeMintQuote']> {
-  return async (mintUrl, amount, _unit, method = 'bolt11') => {
+  return async ({ mintUrl, amount, unit: _unit, method = 'bolt11' }) => {
     const manager = deps.getManager();
     if (!manager) {
       logger.error('payment.execute_mint_quote.no_manager');

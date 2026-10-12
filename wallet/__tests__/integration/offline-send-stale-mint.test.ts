@@ -140,7 +140,7 @@ describe("offline exact-match send with a dead network", () => {
     const manager = await createSeededManager(STALE_SEC());
     try {
       const operations = createDefaultOperations({ getManager: () => manager });
-      const result = await operations.executeOfflineSend!(MINT_URL, 36);
+      const result = await operations.executeOfflineSend!({ mintUrl: MINT_URL, amount: 36 });
 
       expect(tokenSecrets(result.historyEntry)).toEqual(["p-1-32", "p-2-4"]);
       expect(fetchSpy).not.toHaveBeenCalled();
@@ -155,7 +155,7 @@ describe("offline exact-match send with a dead network", () => {
       const operations = createDefaultOperations({ getManager: () => manager });
       // 35 is not a subset sum of 64 + 32 + 4.
       await expect(
-        operations.executeOfflineSend!(MINT_URL, 35),
+        operations.executeOfflineSend!({ mintUrl: MINT_URL, amount: 35 }),
       ).rejects.toThrow(
         "Offline send needs proofs that add up to exactly 35 sat",
       );
@@ -171,7 +171,7 @@ describe("offline exact-match send with a dead network", () => {
     try {
       const operations = createDefaultOperations({ getManager: () => manager });
       // 36 = 32 + 4: the refresh fails, and the held proofs are sent as they are.
-      await expect(operations.executeSend!(MINT_URL, 36)).resolves.toBeDefined();
+      await expect(operations.executeSend!({ mintUrl: MINT_URL, amount: 36 })).resolves.toBeDefined();
       expect(fetchSpy).toHaveBeenCalled();
     } finally {
       await manager.dispose();
@@ -183,8 +183,8 @@ describe("offline exact-match send with a dead network", () => {
     try {
       manager.setOffline(true);
       const operations = createDefaultOperations({ getManager: () => manager });
-      await expect(operations.executeSend!(MINT_URL, 36)).resolves.toBeDefined();
-      const failure = await operations.executeSend!(MINT_URL, 35).then(
+      await expect(operations.executeSend!({ mintUrl: MINT_URL, amount: 36 })).resolves.toBeDefined();
+      const failure = await operations.executeSend!({ mintUrl: MINT_URL, amount: 35 }).then(
         () => null,
         (error: unknown) => error,
       );
@@ -200,7 +200,7 @@ describe("offline exact-match send with a dead network", () => {
     const manager = await createSeededManager(STALE_SEC());
     try {
       const operations = createDefaultOperations({ getManager: () => manager });
-      const failure = await operations.executeSend!(MINT_URL, 35).then(
+      const failure = await operations.executeSend!({ mintUrl: MINT_URL, amount: 35 }).then(
         () => null,
         (error: unknown) => error,
       );
@@ -218,7 +218,7 @@ describe("offline exact-match send with a dead network", () => {
     const manager = await createSeededManager(STALE_SEC(), [512, 1, 32, 32, 8, 1, 4, 1, 256, 4, 8, 512]);
     try {
       const operations = createDefaultOperations({ getManager: () => manager });
-      const result = await operations.executeOfflineSend!(MINT_URL, 1097);
+      const result = await operations.executeOfflineSend!({ mintUrl: MINT_URL, amount: 1097 });
       expect(tokenSecrets(result.historyEntry)).toEqual([
         "p-0-512", "p-1-1", "p-11-512", "p-2-32", "p-3-32", "p-4-8",
       ]);
@@ -249,10 +249,7 @@ describe("offline exact-match send with a dead network", () => {
               amounts,
               target,
             ).exactMatch;
-            const cocoSent = await operations.executeOfflineSend!(
-              MINT_URL,
-              target,
-            ).then(
+            const cocoSent = await operations.executeOfflineSend!({ mintUrl: MINT_URL, amount: target }).then(
               () => true,
               () => false,
             );

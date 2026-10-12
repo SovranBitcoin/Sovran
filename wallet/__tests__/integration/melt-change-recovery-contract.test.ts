@@ -191,12 +191,7 @@ describe("Sovran -> coco NUT-08 lifecycle boundary", () => {
     } as unknown as Manager;
     const operations = createDefaultOperations({ getManager: () => manager });
 
-    await operations.executeMelt!(
-      MINT_URL,
-      "lnbc1meltchangecontract",
-      100,
-      "sat",
-    );
+    await operations.executeMelt!({ mintUrl: MINT_URL, meltTarget: "lnbc1meltchangecontract", amount: 100, unit: "sat" });
 
     expect(prepare).toHaveBeenCalledExactlyOnceWith({ quote: canonicalQuote });
     expect(execute).toHaveBeenCalledExactlyOnceWith(prepared.id);

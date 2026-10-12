@@ -12,13 +12,18 @@ const mockRequireOfflineTokenDleq = jest.fn();
 jest.mock('wallet', () => ({
   createMeshRedeemOrchestrator: jest.fn(
     (config: {
-      executeAutoRedeem: (
-        token: string,
-        mintUrl: string,
-        manager: unknown
-      ) => Promise<{ historyEntryId: string | null }>;
+      executeAutoRedeem: (request: {
+        tokenString: string;
+        mintUrl: string;
+        manager: unknown;
+      }) => Promise<{ historyEntryId: string | null }>;
     }) => ({
-      drain: () => config.executeAutoRedeem('cashu-test-token', MINT_URL, mockManager),
+      drain: () =>
+        config.executeAutoRedeem({
+          tokenString: 'cashu-test-token',
+          mintUrl: MINT_URL,
+          manager: mockManager,
+        }),
     })
   ),
   meshTokenDedupeKey: (token: string) => `hash:${token}`,
@@ -116,6 +121,9 @@ describe('Nut Drop DLEQ receive boundary', () => {
 
     await expect(drainNutDropRedeemQueue()).resolves.toBeUndefined();
     expect(mockRequireOfflineTokenDleq).not.toHaveBeenCalled();
-    expect(mockExecuteAutoRedeem).toHaveBeenCalledWith('cashu-test-token', MINT_URL);
+    expect(mockExecuteAutoRedeem).toHaveBeenCalledWith({
+      tokenString: 'cashu-test-token',
+      mintUrl: MINT_URL,
+    });
   });
 });

@@ -113,7 +113,7 @@ export interface RecipientProfile {
  * A melt quote created BEFORE the user confirms (BTC-05 quote-first). The
  * machine creates it when routing to the melt preview so the confirm screen
  * can show the mint's real `fee_reserve` and the amount+fee total; Pay then
- * executes against THIS quote (via `executeMelt`'s `options.quoteId`), so the
+ * executes against THIS quote (via `executeMelt`'s `quoteId`), so the
  * displayed fee is the charged fee. Preparing the operation (which reserves
  * proofs) still happens only at Pay time — an abandoned preview's quote
  * simply expires at the mint.
@@ -991,33 +991,31 @@ export type NotificationHandlerMap = {
 export interface MachineOperations {
   /** Update the active unit and make its cached context readable before resolving. */
   switchUnit?: (unit: string) => void | Promise<void>;
-  executeSend: (
-    mintUrl: string,
-    amount: number,
-    memo?: string,
-    options?: {
-      /** See `FlowContext.p2pkLockPubkey` — lock outputs to this pubkey via a mint swap. */
-      p2pkLockPubkey?: string;
-      /** See `FlowContext.p2pkLock` — the full NUT-11 terms to apply. */
-      p2pkLock?: P2pkLockSpec;
-    },
-  ) => Promise<{ historyEntry: string }>;
+  executeSend: (request: {
+    mintUrl: string;
+    amount: number;
+    memo?: string;
+    /** See `FlowContext.p2pkLockPubkey` — lock outputs to this pubkey via a mint swap. */
+    p2pkLockPubkey?: string;
+    /** See `FlowContext.p2pkLock` — the full NUT-11 terms to apply. */
+    p2pkLock?: P2pkLockSpec;
+  }) => Promise<{ historyEntry: string }>;
   /**
    * Execute a send using only local proofs (no mint contact).
    * Used as an automatic fallback when the mint is offline but exact-match
    * proofs exist. Returns the same shape as executeSend.
    */
-  executeOfflineSend?: (
-    mintUrl: string,
-    amount: number,
-    memo?: string,
-  ) => Promise<{ historyEntry: string }>;
-  executeMintQuote: (
-    mintUrl: string,
-    amount: number,
-    unit: string,
-    method?: MintQuoteMethod,
-  ) => Promise<{ historyEntry: string }>;
+  executeOfflineSend?: (request: {
+    mintUrl: string;
+    amount: number;
+    memo?: string;
+  }) => Promise<{ historyEntry: string }>;
+  executeMintQuote: (request: {
+    mintUrl: string;
+    amount: number;
+    unit: string;
+    method?: MintQuoteMethod;
+  }) => Promise<{ historyEntry: string }>;
   /**
    * Create a single-use incoming NUT-18 payment request (receive "as
    * Ecash"): the durable coco op claims the payload automatically via the
@@ -1062,42 +1060,42 @@ export interface MachineOperations {
    * preview screen via `confirmMelt()`. The machine routes to the result
    * handler on success or BIP321 fallback / error on failure.
    *
-   * When `options.quoteId` references a quote previously created via
+   * When `quoteId` references a quote previously created via
    * `quoteMelt` (BTC-05 quote-first), the implementation MUST execute
    * against that quote — it is the one whose fee the user approved.
    */
-  executeMelt?: (
-    mintUrl: string,
-    meltTarget: string,
-    amount: number,
-    unit: string,
-    options?: { quoteId?: string },
-  ) => Promise<{ historyEntry: string }>;
+  executeMelt?: (request: {
+    mintUrl: string;
+    meltTarget: string;
+    amount: number;
+    unit: string;
+    quoteId?: string;
+  }) => Promise<{ historyEntry: string }>;
   /**
    * Create a melt quote for display BEFORE the user confirms (BTC-05).
    * Called by the machine when routing to the melt preview (bolt11/lnurl/
    * bolt12 targets; onchain keeps its at-execution fee picker). The returned
    * summary feeds the confirm screen's amount/fee/total rows and is passed
-   * back to `executeMelt` via `options.quoteId`. No proofs are reserved by
+   * back to `executeMelt` as `quoteId`. No proofs are reserved by
    * this call — that happens in `ops.melt.prepare` at Pay time.
    */
-  quoteMelt?: (
-    mintUrl: string,
-    meltTarget: string,
-    amount: number,
-    unit: string,
-  ) => Promise<MeltQuotePreview>;
+  quoteMelt?: (request: {
+    mintUrl: string;
+    meltTarget: string;
+    amount: number;
+    unit: string;
+  }) => Promise<MeltQuotePreview>;
   /**
    * Execute a payment request send. Called when the user confirms from the
    * payment request screen via `confirmPaymentRequest()`. The machine routes
    * to the result handler on success or BIP321 fallback / error on failure.
    */
-  executePaymentRequest?: (
-    mintUrl: string,
-    paymentRequest: string,
-    amount: number,
-    unit: string,
-  ) => Promise<{
+  executePaymentRequest?: (request: {
+    mintUrl: string;
+    paymentRequest: string;
+    amount: number;
+    unit: string;
+  }) => Promise<{
     historyEntry: string;
     rolledBack?: boolean;
     errorMessage?: string;
@@ -1106,16 +1104,19 @@ export interface MachineOperations {
    * Link a scanned input string to a transaction ID for history provenance.
    * Fire-and-forget — called after successful melt/payment-request operations.
    */
-  linkTransaction?: (scannedInput: string, transactionId: string) => void;
+  linkTransaction?: (link: {
+    scannedInput: string;
+    transactionId: string;
+  }) => void;
   /**
    * Execute a send for NFC POS payment. Unlike `executeSend`, returns the
    * encoded V4 token (for NFC write-back) and the operationId (for rollback).
    */
-  executeNfcSend?: (
-    mintUrl: string,
-    amount: number,
-    unit?: string,
-  ) => Promise<{ token: string; historyEntry: string; operationId: string }>;
+  executeNfcSend?: (request: {
+    mintUrl: string;
+    amount: number;
+    unit?: string;
+  }) => Promise<{ token: string; historyEntry: string; operationId: string }>;
   /**
    * Roll back a pending send operation. Called when NFC write-back fails
    * after token creation to reclaim the ecash proofs.
@@ -1127,10 +1128,10 @@ export interface MachineOperations {
    * up front so an automatic mint choice never lands on a mint the send
    * will refuse. Answered from local keyset data; no network.
    */
-  paymentRequestPayabilityFrom?: (
-    mintUrl: string,
-    unit: string,
-  ) => Promise<{ payable: true } | { payable: false; reason: string }>;
+  paymentRequestPayabilityFrom?: (request: {
+    mintUrl: string;
+    unit: string;
+  }) => Promise<{ payable: true } | { payable: false; reason: string }>;
 
   // ── Screen action operations ────────────────────────────────────────
   // These are used by the built-in default screen action handlers.
@@ -1149,11 +1150,11 @@ export interface MachineOperations {
    * history entry, and returns it. Used by the receiveToken.redeem
    * screen action.
    */
-  executeReceive?: (
-    tokenString: string,
-    mintUrl: string,
-    amount: number,
-  ) => Promise<ReceiveExecuteResult>;
+  executeReceive?: (request: {
+    tokenString: string;
+    mintUrl: string;
+    amount: number;
+  }) => Promise<ReceiveExecuteResult>;
 
   /**
    * Background mesh auto-redeem: receive a token and resolve the REAL
@@ -1161,10 +1162,10 @@ export interface MachineOperations {
    * The history projection may still be flushing when receive completes.
    * Wire this into `createMeshRedeemOrchestrator`.
    */
-  executeAutoRedeem?: (
-    tokenString: string,
-    mintUrl: string,
-  ) => Promise<{ historyEntryId: string | null; historyEntry: string | null }>;
+  executeAutoRedeem?: (request: {
+    tokenString: string;
+    mintUrl: string;
+  }) => Promise<{ historyEntryId: string | null; historyEntry: string | null }>;
 
   /**
    * Roll back a melt operation. Called when the user cancels from the
@@ -1188,7 +1189,7 @@ export interface MachineOperations {
    * gift wrap, publish) — the package no longer ships its own to keep
    * NIP-17 / NIP-44 implementation a consumer concern.
    */
-  sendNostrDM?: (nprofile: string, message: string) => Promise<void>;
+  sendNostrDM?: (dm: { nprofile: string; message: string }) => Promise<void>;
 
   /**
    * The npub.cash address for a Nostr hex pubkey. When paying someone's own

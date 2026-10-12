@@ -55,7 +55,7 @@ export interface ImagePickerAdapter {
  * Relay pools, NDK, nostr-tools, and cache writes remain app concerns.
  */
 export interface NostrAdapter {
-  sendDirectMessage?: (nprofile: string, message: string) => Promise<void>;
+  sendDirectMessage?: (dm: { nprofile: string; message: string }) => Promise<void>;
   resolveProfile?: (
     pubkey: string,
     signal?: AbortSignal,

@@ -550,7 +550,7 @@ export interface DefaultOperationsConfig {
   getProofAmounts?: () => Record<string, number[]>;
   getPreferredMintUrl?: () => string | undefined;
   /** Required for Nostr payment request transport. Wallet supplies a NIP-17 publisher bound to the user's private key. */
-  sendNostrDM?: (nprofile: string, message: string) => Promise<void>;
+  sendNostrDM?: (dm: { nprofile: string; message: string }) => Promise<void>;
   /**
    * Bulk catalog fetcher for mint list items. Awaited inside `buildMintListItems`
    * before items are produced, so audit / KYM / operator-profile data flows
@@ -700,9 +700,9 @@ export function createDefaultOperations(
   >();
 
   return {
-    executeSend: async (mintUrl, amount, memo, options) => {
+    executeSend: async ({ mintUrl, amount, memo, p2pkLock, p2pkLockPubkey }) => {
       const mgr = requireManager();
-      const requestedLock = options?.p2pkLock ?? options?.p2pkLockPubkey;
+      const requestedLock = p2pkLock ?? p2pkLockPubkey;
       const lock = normalizeP2pkLock(requestedLock);
       if (requestedLock !== undefined && !lock) {
         throw new AuthoredError("Invalid P2PK lock terms for this send.");
@@ -803,7 +803,7 @@ export function createDefaultOperations(
       };
     },
 
-    executeOfflineSend: async (mintUrl, amount, memo) => {
+    executeOfflineSend: async ({ mintUrl, amount, memo }) => {
       const mgr = requireManager();
       logger.info("operations.executeOfflineSend.prepare", {
         ...mintUrlFields(mintUrl),
@@ -857,7 +857,7 @@ export function createDefaultOperations(
       };
     },
 
-    executeMintQuote: async (mintUrl, amount, _unit, method = "bolt11") => {
+    executeMintQuote: async ({ mintUrl, amount, unit: _unit, method = "bolt11" }) => {
       const mgr = requireManager();
       const unit = _unit || "sat";
       logger.info("operations.executeMintQuote.prepare", {
@@ -1213,7 +1213,7 @@ export function createDefaultOperations(
       logger.info("operations.trustMint.done", { ...mintUrlFields(mintUrl) });
     },
 
-    paymentRequestPayabilityFrom: async (mintUrl, unit) => {
+    paymentRequestPayabilityFrom: async ({ mintUrl, unit }) => {
       const mgr = requireManager();
       try {
         await assertPaymentRequestFeesSupported(mgr, mintUrl, unit);
@@ -1229,7 +1229,7 @@ export function createDefaultOperations(
       }
     },
 
-    executeNfcSend: async (mintUrl, amount, unit = "sat") => {
+    executeNfcSend: async ({ mintUrl, amount, unit = "sat" }) => {
       const mgr = requireManager();
       await assertPaymentRequestFeesSupported(mgr, mintUrl, unit);
       logger.info("operations.executeNfcSend.prepare", {
@@ -1347,7 +1347,7 @@ export function createDefaultOperations(
       return { state: operation.state };
     },
 
-    executeReceive: async (tokenString, mintUrl, _amount) => {
+    executeReceive: async ({ tokenString, mintUrl }) => {
       const mgr = requireManager();
       logger.info("operations.executeReceive.start", {
         ...mintUrlFields(mintUrl),
@@ -1420,7 +1420,7 @@ export function createDefaultOperations(
       return trusted;
     },
 
-    quoteMelt: async (mintUrl, meltTarget, amount, _unit) => {
+    quoteMelt: async ({ mintUrl, meltTarget, amount, unit: _unit }) => {
       const mgr = requireManager();
       const unit = _unit || "sat";
 
@@ -1502,7 +1502,7 @@ export function createDefaultOperations(
       };
     },
 
-    executeMelt: async (mintUrl, meltTarget, amount, _unit, options) => {
+    executeMelt: async ({ mintUrl, meltTarget, amount, unit: _unit, quoteId }) => {
       const mgr = requireManager();
       const unit = _unit || "sat";
 
@@ -1525,11 +1525,11 @@ export function createDefaultOperations(
       // as-is — the user approved its fee. Consumed on use; when absent
       // (quote creation failed at preview, or a legacy caller) a fresh quote
       // is created below as before.
-      const precreated = options?.quoteId
-        ? precreatedMeltQuotes.get(options.quoteId)
+      const precreated = quoteId
+        ? precreatedMeltQuotes.get(quoteId)
         : undefined;
-      if (options?.quoteId) {
-        precreatedMeltQuotes.delete(options.quoteId);
+      if (quoteId) {
+        precreatedMeltQuotes.delete(quoteId);
       }
 
       // BOLT-12 offer (`lno1…` or bitcoin:?lno=) — quote-first via coco's
@@ -1795,7 +1795,7 @@ export function createDefaultOperations(
       return result;
     },
 
-    executePaymentRequest: async (mintUrl, paymentRequest, amount, unit) => {
+    executePaymentRequest: async ({ mintUrl, paymentRequest, amount, unit }) => {
       const mgr = requireManager();
       logger.info("operations.executePaymentRequest.start", {
         ...mintUrlFields(mintUrl),
@@ -1919,7 +1919,10 @@ export function createDefaultOperations(
           if (mockFailEnabled("paymentRequest")) {
             throw new Error("Mock delivery failure (dev)");
           }
-          await sendNostrDM(nostrTransport.target, JSON.stringify(payload));
+          await sendNostrDM({
+            nprofile: nostrTransport.target,
+            message: JSON.stringify(payload),
+          });
           logger.info("operations.executePaymentRequest.nostr.sent", {
             operationId,
           });
@@ -2046,7 +2049,7 @@ export function createDefaultOperations(
 
     // Legacy mesh tokens use an operation-bound history projection. A concurrent
     // receive from the same mint must never steal this token's annotation.
-    executeAutoRedeem: async (tokenString, mintUrl) => {
+    executeAutoRedeem: async ({ tokenString, mintUrl }) => {
       const mgr = requireManager();
       if (
         normalizeMintUrl(getTokenMetadata(tokenString).mint) !==

@@ -81,11 +81,11 @@ export interface MeshRedeemOrchestratorConfig {
    * (null when it couldn't be resolved). Wire `operations.executeAutoRedeem`
    * here so redeems share the machine's receive semantics.
    */
-  executeAutoRedeem: (
-    tokenString: string,
-    mintUrl: string,
-    manager: Manager,
-  ) => Promise<{ historyEntryId: string | null }>;
+  executeAutoRedeem: (request: {
+    tokenString: string;
+    mintUrl: string;
+    manager: Manager;
+  }) => Promise<{ historyEntryId: string | null }>;
   /** NUT-13 restore settled? Defaults to true (no restore concept). */
   isRestoreSettled?: () => boolean;
   now?: () => number;
@@ -178,11 +178,11 @@ export function createMeshRedeemOrchestrator(
         config.queue.markStatus(tokenHash, "redeeming");
         config.onRedeeming?.(tokenHash, entry);
         try {
-          const { historyEntryId } = await config.executeAutoRedeem(
-            entry.token,
-            entry.mintUrl,
+          const { historyEntryId } = await config.executeAutoRedeem({
+            tokenString: entry.token,
+            mintUrl: entry.mintUrl,
             manager,
-          );
+          });
           if (config.getManager() !== manager) return;
           config.queue.markStatus(tokenHash, "redeemed");
           logger.info("transport.redeem.success", {

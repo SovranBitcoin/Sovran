@@ -137,7 +137,7 @@ export function createMockOperations(
 
   return {
     // executeSend: creates an ecash token and returns a history entry
-    executeSend: wrap('executeSend', async (mintUrl, _amount, memo) => ({
+    executeSend: wrap('executeSend', async ({ mintUrl, amount: _amount, memo }) => ({
       historyEntry: stubHistoryEntry({
         type: 'send',
         mintUrl,
@@ -146,7 +146,7 @@ export function createMockOperations(
     })),
 
     // executeOfflineSend: creates an ecash token from exact local proofs.
-    executeOfflineSend: wrap('executeOfflineSend', async (mintUrl, _amount, memo) => ({
+    executeOfflineSend: wrap('executeOfflineSend', async ({ mintUrl, amount: _amount, memo }) => ({
       historyEntry: stubHistoryEntry({
         type: 'send',
         mintUrl,
@@ -156,7 +156,7 @@ export function createMockOperations(
     })),
 
     // executeMintQuote: creates a Lightning invoice via the mint
-    executeMintQuote: wrap('executeMintQuote', async (_mintUrl, _amount, _unit) => ({
+    executeMintQuote: wrap('executeMintQuote', async ({ mintUrl: _mintUrl, amount: _amount, unit: _unit }) => ({
       historyEntry: stubHistoryEntry({ type: 'mint' }),
     })),
 
@@ -205,14 +205,14 @@ export function createMockOperations(
     buildMintReviewInfo: wrap('buildMintReviewInfo', undefined),
 
     // executeMelt: converts ecash to Lightning payment
-    executeMelt: wrap('executeMelt', async (_mintUrl, _meltTarget, _amount, _unit) => ({
+    executeMelt: wrap('executeMelt', async ({ mintUrl: _mintUrl, meltTarget: _meltTarget, amount: _amount, unit: _unit }) => ({
       historyEntry: stubHistoryEntry({ type: 'melt', state: 'PAID' }),
     })),
 
     // executePaymentRequest: sends ecash via HTTP transport
     executePaymentRequest: wrap(
       'executePaymentRequest',
-      async (_mintUrl, _paymentRequest, _amount, _unit) => ({
+      async ({ mintUrl: _mintUrl, paymentRequest: _paymentRequest, amount: _amount, unit: _unit }) => ({
         historyEntry: stubHistoryEntry({ type: 'send', state: 'pending' }),
       })
     ),
@@ -221,7 +221,7 @@ export function createMockOperations(
     linkTransaction: wrap('linkTransaction', () => {}),
 
     // executeNfcSend: creates an NFC-compatible token
-    executeNfcSend: wrap('executeNfcSend', async (_mintUrl, _amount) => ({
+    executeNfcSend: wrap('executeNfcSend', async ({ mintUrl: _mintUrl, amount: _amount }) => ({
       token: 'cashuBmock_nfc_token',
       historyEntry: stubHistoryEntry({ type: 'send' }),
       operationId: nextTxId(),
@@ -234,7 +234,7 @@ export function createMockOperations(
     // otherwise (fee-charging keysets are simulated via the override).
     paymentRequestPayabilityFrom: wrap(
       'paymentRequestPayabilityFrom',
-      async (_mintUrl, _unit) => ({ payable: true as const })
+      async ({ mintUrl: _mintUrl, unit: _unit }) => ({ payable: true as const })
     ),
 
     // checkSendStatus: checks if a send token has been redeemed
@@ -243,7 +243,7 @@ export function createMockOperations(
     })),
 
     // executeReceive: receives an ecash token
-    executeReceive: wrap('executeReceive', async (_tokenString, _mintUrl, _amount) => ({
+    executeReceive: wrap('executeReceive', async ({ tokenString: _tokenString, mintUrl: _mintUrl, amount: _amount }) => ({
       historyEntry: stubHistoryEntry({ type: 'receive' }),
     })),
 

@@ -132,7 +132,7 @@ describe("Sovran -> coco fee-selection boundary", () => {
     const manager = { ops: { send: { prepare } } } as unknown as Manager;
     const operations = createDefaultOperations({ getManager: () => manager });
 
-    await expect(operations.executeSend!(MINT_URL, 103)).rejects.toBe(
+    await expect(operations.executeSend!({ mintUrl: MINT_URL, amount: 103 })).rejects.toBe(
       stopAfterPrepare,
     );
 
@@ -161,7 +161,7 @@ describe("Sovran -> coco fee-selection boundary", () => {
     const operations = createDefaultOperations({ getManager: () => manager });
 
     await expect(
-      operations.executeMelt!(MINT_URL, "lnbc1feecontract", 100, "sat"),
+      operations.executeMelt!({ mintUrl: MINT_URL, meltTarget: "lnbc1feecontract", amount: 100, unit: "sat" }),
     ).rejects.toBe(stopAfterPrepare);
 
     expect(create).toHaveBeenCalledExactlyOnceWith({

@@ -966,7 +966,10 @@ export function createPaymentMachine(
 
         for (const link of effect.value.links) {
           if (link.type === "linkTransaction") {
-            operations.linkTransaction?.(link.input, link.transactionId);
+            operations.linkTransaction?.({
+              scannedInput: link.input,
+              transactionId: link.transactionId,
+            });
           }
         }
 
@@ -1086,7 +1089,10 @@ export function createPaymentMachine(
 
           for (const link of effect.value.links) {
             if (link.type === "linkTransaction") {
-              operations.linkTransaction?.(link.input, link.transactionId);
+              operations.linkTransaction?.({
+              scannedInput: link.input,
+              transactionId: link.transactionId,
+            });
             }
           }
 
@@ -1483,10 +1489,10 @@ export function createPaymentMachine(
             let refusal: string | undefined = [...nfcRefusedMints.values()].at(-1);
             for (const candidate of ranked) {
               const payability = operations?.paymentRequestPayabilityFrom
-                ? await operations.paymentRequestPayabilityFrom(
-                    candidate.mintUrl,
-                    flowCtx.unit,
-                  )
+                ? await operations.paymentRequestPayabilityFrom({
+                    mintUrl: candidate.mintUrl,
+                    unit: flowCtx.unit,
+                  })
                 : { payable: true as const };
               if (isStaleGeneration(sendGeneration, "nfc.payability")) return;
               if (payability.payable) {
@@ -1593,10 +1599,10 @@ export function createPaymentMachine(
               !nfcRefusedMints.has(data.mintUrl) &&
               !nfcPayableMints.has(data.mintUrl)
             ) {
-              const payability = await operations.paymentRequestPayabilityFrom(
-                data.mintUrl,
-                data.unit,
-              );
+              const payability = await operations.paymentRequestPayabilityFrom({
+                mintUrl: data.mintUrl,
+                unit: data.unit,
+              });
               if (isStaleGeneration(sendGeneration, "nfc.payability")) return;
               if (!payability.payable) {
                 nfcRefusedMints.set(data.mintUrl, payability.reason);
@@ -1650,7 +1656,10 @@ export function createPaymentMachine(
 
               for (const link of effect.value.links) {
                 if (link.type === "linkTransaction") {
-                  operations.linkTransaction?.(link.input, link.transactionId);
+                  operations.linkTransaction?.({
+              scannedInput: link.input,
+              transactionId: link.transactionId,
+            });
                 }
               }
 

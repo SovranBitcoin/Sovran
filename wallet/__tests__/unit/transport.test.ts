@@ -285,7 +285,7 @@ describe("createMeshRedeemOrchestrator", () => {
     const orchestrator = createMeshRedeemOrchestrator({
       getManager: fakeManager(),
       queue: queue.port,
-      executeAutoRedeem: async (token) => {
+      executeAutoRedeem: async ({ tokenString: token }) => {
         redeemed.push(token);
         return { historyEntryId: "hist1" };
       },
@@ -328,7 +328,7 @@ describe("createMeshRedeemOrchestrator", () => {
     const orchestrator = createMeshRedeemOrchestrator({
       getManager: fakeManager(),
       queue: queue.port,
-      executeAutoRedeem: async (token) => {
+      executeAutoRedeem: async ({ tokenString: token }) => {
         throw errors[token as keyof typeof errors] ?? new Error("unknown");
       },
     });

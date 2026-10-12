@@ -110,12 +110,7 @@ describe('runMintQuoteEffect', () => {
     expect(result.isOk()).toBe(true);
     if (result.isErr()) return;
 
-    expect(executeMintQuote).toHaveBeenCalledWith(
-      'https://mint.example',
-      123,
-      'sat',
-      undefined,
-    );
+    expect(executeMintQuote).toHaveBeenCalledWith({ mintUrl: 'https://mint.example', amount: 123, unit: 'sat' });
     expect(result.value).toMatchObject({
       kind: 'completed',
       step: 'mintQuoteCreated',
@@ -488,12 +483,7 @@ describe('runConfirmMeltEffect', () => {
     expect(result.isOk()).toBe(true);
     if (result.isErr()) return;
 
-    expect(executeMelt).toHaveBeenCalledWith(
-      'https://mint.example',
-      'lnurl1target',
-      250,
-      'sat',
-    );
+    expect(executeMelt).toHaveBeenCalledWith({ mintUrl: 'https://mint.example', meltTarget: 'lnurl1target', amount: 250, unit: 'sat' });
     expect(result.value).toMatchObject({
       kind: 'completed',
       step: 'navigateToMeltPreview',
@@ -594,12 +584,7 @@ describe('runConfirmPaymentRequestEffect', () => {
     expect(result.isOk()).toBe(true);
     if (result.isErr()) return;
 
-    expect(executePaymentRequest).toHaveBeenCalledWith(
-      'https://mint.example',
-      'creq1request',
-      250,
-      'sat',
-    );
+    expect(executePaymentRequest).toHaveBeenCalledWith({ mintUrl: 'https://mint.example', paymentRequest: 'creq1request', amount: 250, unit: 'sat' });
     expect(result.value).toMatchObject({
       kind: 'completed',
       step: 'navigateToPaymentRequest',
@@ -723,7 +708,7 @@ describe('runNfcWriteBackEffect', () => {
     expect(result.isOk()).toBe(true);
     if (result.isErr()) return;
 
-    expect(executeNfcSend).toHaveBeenCalledWith('https://mint.example', 250, 'sat');
+    expect(executeNfcSend).toHaveBeenCalledWith({ mintUrl: 'https://mint.example', amount: 250, unit: 'sat' });
     expect(writeToken).toHaveBeenCalledWith('cashuBnfc-token');
     expect(releaseSession).toHaveBeenCalledTimes(1);
     expect(onProgress).toHaveBeenNthCalledWith(1, { phase: 'creating' });
@@ -861,7 +846,7 @@ describe('runConfirmSendEffect', () => {
     expect(result.isOk()).toBe(true);
     if (result.isErr()) return;
 
-    expect(executeSend).toHaveBeenCalledWith('https://mint.example', 100);
+    expect(executeSend).toHaveBeenCalledWith({ mintUrl: 'https://mint.example', amount: 100 });
     expect(executeOfflineSend).not.toHaveBeenCalled();
     expect(result.value).toMatchObject({
       kind: 'completed',
@@ -909,7 +894,7 @@ describe('runConfirmSendEffect', () => {
     if (result.isErr()) return;
 
     expect(executeSend).not.toHaveBeenCalled();
-    expect(executeOfflineSend).toHaveBeenCalledWith('https://mint.example', 100);
+    expect(executeOfflineSend).toHaveBeenCalledWith({ mintUrl: 'https://mint.example', amount: 100 });
     expect(result.value).toMatchObject({ kind: 'completed', path: 'localFirst' });
   });
 
@@ -934,7 +919,7 @@ describe('runConfirmSendEffect', () => {
     expect(result.isOk()).toBe(true);
     if (result.isErr()) return;
 
-    expect(executeOfflineSend).toHaveBeenCalledWith('https://mint.example', 100);
+    expect(executeOfflineSend).toHaveBeenCalledWith({ mintUrl: 'https://mint.example', amount: 100 });
     expect(executeSend).not.toHaveBeenCalled();
     expect(result.value).toMatchObject({
       kind: 'completed',
@@ -1033,7 +1018,7 @@ describe('runConfirmSendEffect', () => {
     expect(result.isOk()).toBe(true);
     if (result.isErr()) return;
 
-    expect(executeOfflineSend).toHaveBeenCalledWith('https://mint.example', 96);
+    expect(executeOfflineSend).toHaveBeenCalledWith({ mintUrl: 'https://mint.example', amount: 96 });
     expect(result.value).toMatchObject({
       kind: 'completed',
       path: 'localFirst',

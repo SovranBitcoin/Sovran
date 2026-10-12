@@ -404,7 +404,7 @@ EXECUTE (melt* intent) / AMOUNT_ENTERED(destination=meltQuote)
    -> enterAmount? -> selectMint? (balance + method-aware) -> navigateToMeltPreview
         [quote-first: operations.quoteMelt creates the melt quote BEFORE the
          preview dispatches; its fee_reserve + quoted amount ride the step data]
-   -> CONFIRM_MELT -- in place --> operations.executeMelt(…, { quoteId })
+   -> CONFIRM_MELT -- in place --> operations.executeMelt({ …, quoteId })
         success: setStep('navigateToMeltPreview', {...data, historyEntry})  (step STAYS)
         failure: routeOperationFailure -> chooseFallbackOption | ALL_OPTIONS_DISABLED | stay
 ```

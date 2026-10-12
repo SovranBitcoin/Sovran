@@ -59,7 +59,7 @@ export interface ColadaConfig {
   annotationStore?: AnnotationStoreAdapter;
 
   captureSendDelivery?: DefaultOperationsConfig["captureSendDelivery"];
-  sendNostrDM?: (nprofile: string, message: string) => Promise<void>;
+  sendNostrDM?: (dm: { nprofile: string; message: string }) => Promise<void>;
 
   /**
    * Onchain melt fee picker (NUT-30 fee_options). Called BEFORE prepare (no

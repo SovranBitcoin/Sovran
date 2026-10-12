@@ -21,9 +21,9 @@ describe('send fallback — optional lock', () => {
     let calls = 0;
     const tm = createTestMachine({
       operations: {
-        executeSend: async (_mint: string, _amount: number, _memo?: string, options?: unknown) => {
+        executeSend: async ({ p2pkLockPubkey }: { p2pkLockPubkey?: string }) => {
           calls += 1;
-          if ((options as { p2pkLockPubkey?: string } | undefined)?.p2pkLockPubkey) {
+          if (p2pkLockPubkey) {
             throw new Error('Mint rejected the lock');
           }
           return { historyEntry: JSON.stringify({ id: 'send-1', type: 'send' }) };
