@@ -52,11 +52,28 @@ export const NaggAggregatesSchema = z
   .nullish()
   .transform((v): NaggAggregates => v ?? {});
 
+/**
+ * As `arrayOrEmpty`, for items that arrive from the network one by one: an
+ * item that does not parse is left out instead of failing the whole array. One
+ * malformed or oversized event must not cost the page it came on.
+ */
+function tolerantArrayOrEmpty<T extends z.ZodTypeAny>(value: T) {
+  return z
+    .array(z.unknown())
+    .nullish()
+    .transform((items): Array<z.infer<T>> =>
+      (items ?? []).flatMap((item) => {
+        const parsed = value.safeParse(item);
+        return parsed.success ? [parsed.data as z.infer<T>] : [];
+      }),
+    );
+}
+
 export const NaggEnvelopeSchema = z
   .object({
     order: arrayOrEmpty(z.string()),
     orderBy: z.enum(['created_at', 'rank']).catch('created_at'),
-    events: arrayOrEmpty(NaggFeedEventSchema),
+    events: tolerantArrayOrEmpty(NaggFeedEventSchema),
     aggregates: NaggAggregatesSchema,
     cursor: z.string().nullish(),
     hasMore: z.boolean().nullish(),

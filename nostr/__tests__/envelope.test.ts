@@ -672,3 +672,39 @@ describe('feed continuation capability', () => {
     expect(NaggEnvelopeSchema.safeParse({ hasMore: 'false' }).success).toBe(false);
   });
 });
+
+describe('events that arrive from the network are checked one by one', () => {
+  const good = {
+    id: 'a'.repeat(64),
+    kind: 1,
+    pubkey: 'b'.repeat(64),
+    content: 'hello',
+    tags: [['e', 'c'.repeat(64)]],
+    created_at: 1_700_000_000,
+  };
+  const ids = (events: unknown[]) => {
+    const parsed = NaggEnvelopeSchema.safeParse({ events });
+    expect(parsed.success).toBe(true);
+    return parsed.success ? parsed.data.events.map((event) => event.id) : [];
+  };
+
+  test('one event that does not parse does not cost the page it came on', () => {
+    expect(ids([good, { ...good, id: 'not-an-id' }, 'garbage', null])).toEqual([good.id]);
+  });
+
+  test.each([
+    ['an id that is not 64 lowercase hex characters', { id: 'A'.repeat(64) }],
+    ['a public key that is too short', { pubkey: 'b'.repeat(63) }],
+    ['content past the ceiling', { content: 'x'.repeat(1_000_001) }],
+    ['more tags than any real event carries', { tags: Array.from({ length: 20_001 }, () => ['t']) }],
+    ['a tag with too many elements', { tags: [Array.from({ length: 65 }, () => 'x')] }],
+    ['a tag element past the ceiling', { tags: [['imeta', 'x'.repeat(65_537)]] }],
+  ])('leaves out an event with %s', (_name, change) => {
+    expect(ids([{ ...good, ...change }, good])).toEqual([good.id]);
+  });
+
+  test('keeps a large but real event: a follow list of five thousand', () => {
+    const follows = Array.from({ length: 5_000 }, (_, i) => ['p', i.toString(16).padStart(64, '0')]);
+    expect(ids([{ ...good, kind: 3, tags: follows }])).toEqual([good.id]);
+  });
+});

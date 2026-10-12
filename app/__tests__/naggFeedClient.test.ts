@@ -41,10 +41,21 @@ const restResponse = (body: unknown) => ({
   json: async () => body,
 });
 
+// Ids and public keys as they are on the wire: 64 lowercase hex characters.
+const ROOT = '1'.repeat(64);
+const OWN = '2'.repeat(64);
+const OTHER = '3'.repeat(64);
+const N1 = '4'.repeat(64);
+const Q1 = '5'.repeat(64);
+const ALICE = 'a'.repeat(64);
+const BOB = 'b'.repeat(64);
+const CAROL = 'c'.repeat(64);
+const DAVE = 'd'.repeat(64);
+
 const note = (overrides: Record<string, unknown> = {}) => ({
-  id: 'root',
+  id: ROOT,
   kind: 1,
-  pubkey: 'alice',
+  pubkey: ALICE,
   content: 'hello',
   tags: [] as string[][],
   created_at: 100,
@@ -54,7 +65,7 @@ const note = (overrides: Record<string, unknown> = {}) => ({
 // A kind-0 profile event — v2 envelopes hydrate profiles as raw kind-0 events,
 // not a server-built `profiles` side map.
 const profileEvent = (pubkey: string, name: string) =>
-  note({ id: `k0-${pubkey}`, kind: 0, pubkey, content: JSON.stringify({ name }) });
+  note({ id: `f${pubkey.slice(1)}`, kind: 0, pubkey, content: JSON.stringify({ name }) });
 
 function loadClient() {
   const { createNaggFeedClient } = jest.requireActual<
@@ -99,9 +110,9 @@ describe('createNaggFeedClient (app-view REST)', () => {
   it('maps a generic feed page from GET /v1/nostr/feed', async () => {
     mockFetch.mockResolvedValueOnce(
       restResponse({
-        order: ['root'],
+        order: [ROOT],
         orderBy: 'created_at',
-        events: [note(), profileEvent('alice', 'Alice')],
+        events: [note(), profileEvent(ALICE, 'Alice')],
         aggregates: {},
         cursor: '100|1',
       })
@@ -114,7 +125,7 @@ describe('createNaggFeedClient (app-view REST)', () => {
     });
 
     expect(result.orderedFeedItems).toHaveLength(1);
-    expect(result.profilesMap.get('alice')).toEqual({ name: 'Alice' });
+    expect(result.profilesMap.get(ALICE)).toEqual({ name: 'Alice' });
     const url = lastUrl();
     expect(url).toContain('/v1/nostr/feed');
     expect(url).toContain('limit=12');
@@ -124,7 +135,7 @@ describe('createNaggFeedClient (app-view REST)', () => {
   it('routes a for-you spec to POST /v1/nostr/feed/ranked', async () => {
     mockFetch.mockResolvedValueOnce(
       restResponse({
-        order: ['root'],
+        order: [ROOT],
         orderBy: 'rank',
         events: [note()],
         aggregates: {},
@@ -146,15 +157,15 @@ describe('createNaggFeedClient (app-view REST)', () => {
   it('getUserFeed filters to the author root notes from /v1/nostr/feed/user', async () => {
     mockFetch.mockResolvedValueOnce(
       restResponse({
-        order: ['own', 'other'],
+        order: [OWN, OTHER],
         orderBy: 'created_at',
-        events: [note({ id: 'own', pubkey: 'bob' }), note({ id: 'other', pubkey: 'alice' })],
+        events: [note({ id: OWN, pubkey: BOB }), note({ id: OTHER, pubkey: ALICE })],
         aggregates: {},
         cursor: '100|2',
       })
     );
 
-    const result = await loadClient().getUserFeed({ pubkey: 'bob', limit: 50 });
+    const result = await loadClient().getUserFeed({ pubkey: BOB, limit: 50 });
 
     expect(lastUrl()).toContain('/v1/nostr/feed/user');
     expect(result.orderedFeedItems).toHaveLength(1);
@@ -168,9 +179,9 @@ describe('createNaggFeedClient (app-view REST)', () => {
       restResponse({
         order: [],
         orderBy: 'created_at',
-        events: [note({ id: 'n1', pubkey: 'carol' }), profileEvent('carol', 'Carol')],
+        events: [note({ id: N1, pubkey: CAROL }), profileEvent(CAROL, 'Carol')],
         aggregates: {},
-        entries: [{ id: 'n1', kind: 1, actor: 'carol' }],
+        entries: [{ id: N1, kind: 1, actor: CAROL }],
         hasNext: false,
       })
     );
@@ -180,16 +191,16 @@ describe('createNaggFeedClient (app-view REST)', () => {
     expect(lastUrl()).toContain('/v1/nostr/notifications');
     expect(result.notifications).toHaveLength(1);
     expect(result.notifications[0].reason).toBe('mention');
-    expect(result.profilesMap.get('carol')).toEqual({ name: 'Carol' });
+    expect(result.profilesMap.get(CAROL)).toEqual({ name: 'Carol' });
   });
 
   it('enrich fetches quoted events and profiles from the REST endpoints', async () => {
     mockFetch
       .mockResolvedValueOnce(
         restResponse({
-          order: ['q1'],
+          order: [Q1],
           orderBy: 'created_at',
-          events: [note({ id: 'q1' })],
+          events: [note({ id: Q1 })],
           aggregates: {},
         })
       )
@@ -197,18 +208,18 @@ describe('createNaggFeedClient (app-view REST)', () => {
         restResponse({
           order: [],
           orderBy: 'created_at',
-          events: [profileEvent('dave', 'Dave')],
+          events: [profileEvent(DAVE, 'Dave')],
           aggregates: {},
         })
       );
 
     const updates = await loadClient().enrich({
-      missingQuotedIds: ['q1'],
-      missingProfilePubkeys: ['dave'],
+      missingQuotedIds: [Q1],
+      missingProfilePubkeys: [DAVE],
     });
 
-    expect(updates.quotedEvents?.get('q1')).toMatchObject({ id: 'q1' });
-    expect(updates.profiles?.get('dave')).toEqual({ name: 'Dave' });
+    expect(updates.quotedEvents?.get(Q1)).toMatchObject({ id: Q1 });
+    expect(updates.profiles?.get(DAVE)).toEqual({ name: 'Dave' });
     const urls = mockFetch.mock.calls.map((call) => String(call[0]));
     expect(urls.some((u) => u.includes('/v1/nostr/events?'))).toBe(true);
     expect(urls.some((u) => u.includes('/v1/nostr/profiles?'))).toBe(true);
