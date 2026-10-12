@@ -298,3 +298,41 @@ describe("one socket per relay", () => {
     expect((await pending)._unsafeUnwrap()).toEqual([]);
   });
 });
+
+describe("a request the relay never answers, on a socket others are using", () => {
+  const connection = () =>
+    createRelayPoolConnection({
+      relays: ["wss://relay.example"],
+      WebSocketImpl: Socket,
+      settleMs: 0,
+    });
+
+  test("does not take a listener's socket away while the relay is still talking to it", async () => {
+    const pool = connection();
+    const onEvent = vi.fn();
+    pool.subscribe!([{ kinds: [1] }], onEvent);
+    const silent = pool.request([{ kinds: [0] }], { timeoutMs: 1_000 });
+    const socket = Socket.instances[0];
+    socket.onopen?.({});
+    socket.message(["EVENT", "sov-live-1", { id: "first", kind: 1 }]);
+
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect((await silent).isErr()).toBe(true);
+
+    // The socket is alive: it delivered an event while the request waited.
+    expect(socket.close).not.toHaveBeenCalled();
+    socket.message(["EVENT", "sov-live-1", { id: "second", kind: 1 }]);
+    expect(onEvent.mock.calls.map(([event]) => event.id)).toEqual(["first", "second"]);
+  });
+
+  test("still drops a socket that was silent for everyone", async () => {
+    const pool = connection();
+    pool.subscribe!([{ kinds: [1] }], vi.fn());
+    const silent = pool.request([{ kinds: [0] }], { timeoutMs: 1_000 });
+    const socket = Socket.instances[0];
+    socket.onopen?.({});
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect((await silent).isErr()).toBe(true);
+    expect(socket.close).toHaveBeenCalledTimes(1);
+  });
+});

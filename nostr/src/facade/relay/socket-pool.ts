@@ -51,7 +51,10 @@ export interface RelaySocketPool {
     filters: readonly unknown[],
     subscription: PooledSubscription,
   ): (() => void) | null;
-  /** Drop the socket carrying `subId` on `url`: it was asked and never answered. */
+  /**
+   * `subId` on `url` was asked and never answered. Drops its socket when the
+   * socket has been silent for everyone since; otherwise does nothing.
+   */
   discard(url: string, subId: string): void;
 }
 
@@ -59,7 +62,12 @@ interface PooledSocket {
   socket: WebSocketLike;
   open: boolean;
   dead: boolean;
-  subscriptions: Map<string, { filters: readonly unknown[]; handler: PooledSubscription }>;
+  subscriptions: Map<
+    string,
+    { filters: readonly unknown[]; handler: PooledSubscription; framesAtStart: number }
+  >;
+  /** Frames the socket has delivered, for anyone. A socket that still talks is not dead. */
+  frames: number;
   idleTimer: ReturnType<typeof setTimeout> | null;
 }
 
@@ -108,6 +116,7 @@ export function createRelaySocketPool(config: {
       open: false,
       dead: false,
       subscriptions: new Map(),
+      frames: 0,
       idleTimer: null,
     };
     socket.onopen = () => {
@@ -122,6 +131,7 @@ export function createRelaySocketPool(config: {
     };
     socket.onmessage = (event) => {
       if (pooled.dead) return;
+      pooled.frames += 1;
       const frame = parseWireFrame(event.data);
       if (!frame || typeof frame[1] !== 'string') return;
       const entry = pooled.subscriptions.get(frame[1]);
@@ -155,7 +165,11 @@ export function createRelaySocketPool(config: {
       if (!pooled) return null;
       if (pooled.idleTimer) clearTimeout(pooled.idleTimer);
       pooled.idleTimer = null;
-      pooled.subscriptions.set(subId, { filters, handler: subscription });
+      pooled.subscriptions.set(subId, {
+        filters,
+        handler: subscription,
+        framesAtStart: pooled.frames,
+      });
       if (pooled.open && sendWebSocket(pooled.socket, ['REQ', subId, ...filters]).isErr()) {
         // Told through `onClosed`, like any other loss of the socket, but not
         // before the caller has the return value.
@@ -180,7 +194,13 @@ export function createRelaySocketPool(config: {
     },
     discard(url, subId) {
       const pooled = socketsByUrl.get(url)?.find((each) => each.subscriptions.has(subId));
-      if (pooled) drop(url, pooled);
+      const entry = pooled?.subscriptions.get(subId);
+      if (!pooled || !entry) return;
+      // Dead means silent for everyone. A socket that delivered anything since
+      // this subscription began, to it or to another, is alive: the relay
+      // simply had no answer for this one, and a listener sharing the socket
+      // must not lose it.
+      if (pooled.frames === entry.framesAtStart) drop(url, pooled);
     },
   };
 }
