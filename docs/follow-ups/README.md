@@ -47,7 +47,6 @@ reports) keep their evidence, and link here for anything still open.
 | [F23](F23.md) | high | device | Run the headers suite on both platforms and reproduce the P2PK body text disappearing |
 | [F24](F24.md) | high | device | The NIP-46 pairing secret travels in navigation state; hold it in a runtime store |
 | [F25](F25.md) | medium | device | Seven send/receive routes pass a whole JSON Colada entry as a route param; pass an id |
-| [F26](F26.md) | medium | fix | Move receive, mint-quote and rebalance sequencing out of the app into wallet/ |
 | [F27](F27.md) | medium | fix | Payment-operations port and NIP-46 grant stores take look-alike positional strings |
 | [F28](F28.md) | medium | fix | Bitchat native calls pass private keys positionally; native events are not validated |
 | [F30](F30.md) | medium | decision | Persisted fields hold Nostr seconds under millisecond-style names; rename with migrations |

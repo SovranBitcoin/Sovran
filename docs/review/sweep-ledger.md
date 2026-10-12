@@ -758,8 +758,8 @@ confirmation of its members, it says so.
 
 - [wallet-logic-in-app] 5 and [payment-logic-in-app-layer] 6 — concentrated in `app/features/send/lib/sovranPaymentConfig.ts` (:133, :255, :405, :555), 0.78-0.94
   verdict: defect (pre-existing, already registered)
-  evidence: not newly diagnosed — **F26** already records exactly this: "Receive and mint-quote sequencing, and history reconciliation by polling, live in `app/features/send/lib/sovranPaymentConfig.ts` … Move them beside the `wallet/` operations they override." Both rules independently rediscovered the same file and the same lines, which is corroboration of F26 rather than a new finding.
-  action: none. F26 stands as written.
+  evidence: not newly diagnosed — a follow-up already recorded exactly this: "Receive and mint-quote sequencing, and history reconciliation by polling, live in `app/features/send/lib/sovranPaymentConfig.ts` … Move them beside the `wallet/` operations they override." Both rules independently rediscovered the same file and the same lines.
+  action: done on 2026-10-12. The sequencing moved to `wallet/src/operations/receiveOperations.ts` and the follow-up was closed.
 
 - 44 rules firing, largest clusters: `shared-value-dot-value` (32), `error-passed-on-lossily` (26), `data-mirrored-between-owners` (16), `clock-read-inside-freshness-helper` (15), `runonjs-added` (12), `test-mocks-owned-logic` (11), `restates-owned-values` (9), `route-param-not-identifier` (8)
   verdict: recorded, not verified

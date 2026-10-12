@@ -316,8 +316,10 @@ export {
 // re-preparation, reconciliation, error classification)
 export {
   classifyRebalanceError,
+  createChainSteps,
   createRebalanceEngine,
   createRebalanceLock,
+  insertStepsAfter,
   RebalanceMeltRolledBackError,
   RebalanceRoutesExhaustedError,
 } from "./rebalance";

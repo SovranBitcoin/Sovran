@@ -25,6 +25,11 @@ import { Metadata } from 'nostr-tools/kinds';
 import { getPublicKey } from 'nostr-tools/pure';
 
 import type { MachineOperations, NavigationCallbacks, RecipientProfile } from 'wallet';
+import { createExecuteMintQuote, createExecuteReceive } from 'wallet/operations';
+import { prepareBolt11MintQuote, prepareOnchainMintQuote } from '@/shared/lib/cashu/cocoOperations';
+import { requirePreparedOfflineReceiveDleq } from '@/shared/lib/cashu/offlineReceiveDleq';
+import { mintLocalId } from '@/shared/lib/id';
+import { RECEIVE_PENDING_TOAST_COPY } from '@/shared/lib/popup/paymentStatusCopy';
 import {
   createColada,
   createMempoolSpaceChainAdapter,
@@ -57,8 +62,6 @@ import { markPendingZapReceipt, peekPendingZap } from '@/shared/stores/runtime/p
 import { publishGiftWrappedDM } from '@/shared/lib/nostr/publishGiftWrappedDM';
 import { ingestResolvedProfiles } from '@/shared/lib/nostr/useEntityCache';
 import {
-  createSovranExecuteMintQuote,
-  createSovranExecuteReceive,
   createSovranHandlers,
   createSovranNotifications,
   createSovranScanSources,
@@ -526,14 +529,14 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
     void runDataMigrations();
   }, []);
 
-  // Override colada's default executeReceive and executeMintQuote so
-  // they always return entries with coco's REAL persisted history ids — never
-  // synthesized fallbacks (`redeemed-${Date.now()}`) or unverified operation
-  // ids. This guarantees the location stamp + scan-history link captured
-  // downstream are keyed to the same id `usePaginatedHistory` returns later,
-  // so reopening the transaction from the list resolves them correctly.
-  // See sovranPaymentConfig.createSovranExecuteReceive / createSovranExecuteMintQuote
-  // for the full rationale. Spreading instance.operations preserves all other defaults.
+  // Use the wallet's receive and mint-quote operations that follow Coco's own
+  // records (`wallet/src/operations/receiveOperations.ts`), so they always
+  // return entries with coco's REAL persisted history ids — never synthesized
+  // fallbacks or unverified operation ids. This guarantees the location stamp
+  // + scan-history link captured downstream are keyed to the same id
+  // `usePaginatedHistory` returns later, so reopening the transaction from the
+  // list resolves them correctly. Spreading instance.operations preserves all
+  // other defaults.
   const operationsOverride = useMemo<MachineOperations>(
     () =>
       ({
@@ -548,8 +551,20 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
             store.setActiveUnit(next as ActiveUnit);
           }
         },
-        executeReceive: createSovranExecuteReceive(getManager, getOffline),
-        executeMintQuote: createSovranExecuteMintQuote(getManager),
+        executeReceive: createExecuteReceive({
+          getManager,
+          getOffline,
+          verifyOfflineReceive: requirePreparedOfflineReceiveDleq,
+          pendingMessage: RECEIVE_PENDING_TOAST_COPY.subtitle,
+          newLocalId: mintLocalId,
+        }),
+        executeMintQuote: createExecuteMintQuote({
+          getManager,
+          prepareMintQuote: (manager, method, mintUrl, amount, unit) =>
+            method === 'onchain'
+              ? prepareOnchainMintQuote(manager, mintUrl, amount, unit)
+              : prepareBolt11MintQuote(manager, mintUrl, amount, unit),
+        }),
         // Stage 2 of recipient resolution: hex pubkey → Nostr kind-0 profile.
         // Stage 1 (NIP-05 → pubkey) is shipped by colada's default
         // operation set; this one has no default because NDK / cache wiring

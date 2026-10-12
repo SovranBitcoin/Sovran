@@ -30,6 +30,7 @@ import {
   RebalanceMeltRolledBackError,
   RebalanceRoutesExhaustedError,
 } from './errors';
+import { createChainSteps, insertStepsAfter } from './chain';
 import { defaultRebalanceClock } from './lock';
 import type {
   RebalanceEngineConfig,
@@ -102,6 +103,21 @@ export interface RebalanceEngine {
     report: { sink: Pick<RebalanceEventSink, 'legUpdated'>; warnLegId?: string },
     run: () => Promise<T>
   ): Promise<T>;
+  /**
+   * Send `step` through the mints of `chainPath` instead: one transfer per
+   * hop, placed after `step` in `steps`, run with the rest of `steps` while
+   * the intermediaries are trusted. `onRerouted` is told the hop transfers
+   * once they are trusted and before the first one starts.
+   */
+  routeThrough<T extends RebalanceTransfer>(
+    step: T,
+    chainPath: readonly string[],
+    steps: readonly T[],
+    options: RebalanceRunCallbacks & {
+      makeId: (label: string) => string;
+      onRerouted: (hops: T[]) => void;
+    }
+  ): Promise<RebalanceRunResult>;
 }
 
 export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceEngine {
@@ -951,5 +967,36 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
     }
   }
 
-  return { executeTransfer, runTransfers, withTemporaryTrust };
+  function routeThrough<T extends RebalanceTransfer>(
+    step: T,
+    chainPath: readonly string[],
+    steps: readonly T[],
+    options: RebalanceRunCallbacks & {
+      makeId: (label: string) => string;
+      onRerouted: (hops: T[]) => void;
+    }
+  ): Promise<RebalanceRunResult> {
+    // The original step stays in the list (the caller marks it skipped); one
+    // transfer per hop follows it.
+    const hops = createChainSteps({
+      baseStep: step,
+      chainPath,
+      chainId: options.makeId('chain'),
+      idPrefix: `reroute-${step.id}`,
+      makeId: options.makeId,
+    });
+    const rerouted = insertStepsAfter(steps, step.id, hops);
+    // Coco requires intermediaries to be trusted; the ones the user has not
+    // trusted are trusted only for this run.
+    return withTemporaryTrust(
+      chainPath,
+      { sink: options.sinkFor(step), warnLegId: hops[hops.length - 1]?.id },
+      async () => {
+        options.onRerouted(hops);
+        return runTransfers(rerouted, options);
+      }
+    );
+  }
+
+  return { executeTransfer, runTransfers, withTemporaryTrust, routeThrough };
 }

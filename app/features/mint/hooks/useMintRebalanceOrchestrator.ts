@@ -2,7 +2,13 @@ import { describeError } from '@/shared/lib/errors';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { GetInfoResponse } from '@cashu/cashu-ts';
 import { useManager } from '@cashu/coco-react';
-import { createRebalanceEngine, createRebalanceLock, type RebalanceTransferOutcome } from 'wallet';
+import {
+  createRebalanceEngine,
+  createRebalanceLock,
+  insertStepsAfter,
+  type RebalanceEngine,
+  type RebalanceTransferOutcome,
+} from 'wallet';
 
 import { extractDomain } from '@/shared/lib/url';
 import { mintLocalId } from '@/shared/lib/id';
@@ -19,9 +25,7 @@ import {
 } from '@/features/mint/components/rebalance';
 import {
   applyInsertedChainStates,
-  createChainSteps,
   createInitialStepStates,
-  insertStepsAfter,
   mergeStepState,
   resetFailedStepStates,
 } from '@/features/mint/lib/rebalanceRunState';
@@ -60,6 +64,10 @@ interface UseMintRebalanceOrchestratorResult {
   handleRouteThrough: (step: TransferStep) => Promise<void>;
   handleCancelRun: () => void;
 }
+
+type StartRun = (
+  callbacks: Parameters<RebalanceEngine['runTransfers']>[1]
+) => ReturnType<RebalanceEngine['runTransfers']>;
 
 /** Report a settled transfer on the unified Swap status toast. */
 function reportSwapLeg(step: TransferStep, outcome: RebalanceTransferOutcome) {
@@ -185,11 +193,16 @@ export function useMintRebalanceOrchestrator({
     [updateStepState, insertChainRows]
   );
 
+  /**
+   * Run one engine action to its end and report it. `start` is the action;
+   * `currentRunId` is read when the engine asks whether the run is still
+   * wanted, because a rerouted run only gets its id once its mints are trusted.
+   */
   const runSteps = useCallback(
-    async (steps: TransferStep[], runId: number) => {
+    async (start: StartRun, currentRunId: () => number) => {
       try {
-        const result = await engine.runTransfers(steps, {
-          isActive: () => isRunActive(runId),
+        const result = await start({
+          isActive: () => isRunActive(currentRunId()),
           isSettled: (stepId) => {
             const status = stepStatesRef.current[stepId]?.status;
             // Settling and payment-pending count: the money has left or may
@@ -229,7 +242,7 @@ export function useMintRebalanceOrchestrator({
         isRunningRef.current = false;
       }
     },
-    [engine, isRunActive, sinkFor]
+    [isRunActive, sinkFor]
   );
 
   const handleStart = useCallback(() => {
@@ -283,10 +296,13 @@ export function useMintRebalanceOrchestrator({
     // Run without awaiting to keep the UI responsive; the snapshot steps stay
     // stable while the live plan recomputes. `runSteps` already reported the
     // failure on the toast.
-    runSteps(snapshot.steps, runId).catch((error: unknown) => {
+    runSteps(
+      (callbacks) => engine.runTransfers(snapshot.steps, callbacks),
+      () => runId
+    ).catch((error: unknown) => {
       cashuLog.warn('mint.rebalance.run_failed', { runId, error });
     });
-  }, [computedPlan, runStatus, runSteps, unit]);
+  }, [computedPlan, runStatus, runSteps, unit, engine]);
 
   const handleRetry = useCallback(
     async (step: TransferStep) => {
@@ -337,8 +353,12 @@ export function useMintRebalanceOrchestrator({
     // Reset only failed steps to pending
     setStepStates((prev) => resetFailedStepStates(prev, runPlan.steps));
 
-    await runSteps(runPlan.steps, runId);
-  }, [runPlan, runStatus, runSteps]);
+    const steps = runPlan.steps;
+    await runSteps(
+      (callbacks) => engine.runTransfers(steps, callbacks),
+      () => runId
+    );
+  }, [runPlan, runStatus, runSteps, engine]);
 
   const handleRouteThrough = useCallback(
     async (step: TransferStep) => {
@@ -354,31 +374,27 @@ export function useMintRebalanceOrchestrator({
 
       isRunningRef.current = true;
 
-      // The original step stays visible (skipped); one row per hop follows it.
-      const rerouteSteps = createChainSteps({
-        baseStep: step,
-        chainPath,
-        chainId: mintLocalId('chain'),
-        idPrefix: `reroute-${step.id}`,
-        makeId: mintLocalId,
-      });
-      const nextSteps = insertStepsAfter(runPlan.steps, step.id, rerouteSteps);
-
-      // Coco requires intermediaries to be trusted; the engine trusts the
-      // ones the user has not, only for this run.
-      await engine.withTemporaryTrust(
-        chainPath,
-        { sink: sinkFor(step), warnLegId: rerouteSteps[rerouteSteps.length - 1]?.id },
-        async () => {
-          insertChainRows(step.id, rerouteSteps);
-          abortRef.current = false;
-          const runId = (runIdRef.current += 1);
-          setRunStatus('running');
-          await runSteps(nextSteps, runId);
-        }
+      // One engine action: it makes a step per hop, trusts the intermediaries
+      // for the run, and runs them. The original step stays visible (skipped)
+      // with one row per hop after it.
+      const steps = runPlan.steps;
+      let runId = runIdRef.current;
+      await runSteps(
+        (callbacks) =>
+          engine.routeThrough(step, chainPath, steps, {
+            ...callbacks,
+            makeId: mintLocalId,
+            onRerouted: (hops) => {
+              insertChainRows(step.id, hops);
+              abortRef.current = false;
+              runId = runIdRef.current += 1;
+              setRunStatus('running');
+            },
+          }),
+        () => runId
       );
     },
-    [runPlan, runStatus, runSteps, engine, sinkFor, insertChainRows]
+    [runPlan, runStatus, runSteps, engine, insertChainRows]
   );
 
   const handleCancelRun = useCallback(() => {

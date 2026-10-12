@@ -1,8 +1,9 @@
-import type {
-  RebalanceEventSink,
-  RebalanceLegStatus,
-  RebalanceLegUpdate,
-  RebalanceRoutingInfo,
+import {
+  createChainSteps,
+  type RebalanceEventSink,
+  type RebalanceLegStatus,
+  type RebalanceLegUpdate,
+  type RebalanceRoutingInfo,
 } from 'wallet';
 
 import {
@@ -10,10 +11,7 @@ import {
   type StepState,
   type TransferStep,
 } from '@/features/mint/components/rebalance';
-import {
-  createChainSteps,
-  formatCandidateRoutingDetail,
-} from '@/features/mint/lib/rebalanceRunState';
+import { formatCandidateRoutingDetail } from '@/features/mint/lib/rebalanceRunState';
 import { describeError } from '@/shared/lib/errors';
 import { mintLocalId } from '@/shared/lib/id';
 import { extractDomain } from '@/shared/lib/url';

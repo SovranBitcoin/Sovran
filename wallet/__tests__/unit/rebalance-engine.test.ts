@@ -7,6 +7,7 @@ import {
   ProofValidationError,
 } from '@cashu/coco-core';
 
+import { insertStepsAfter } from '../../src/rebalance/chain';
 import { createRebalanceEngine } from '../../src/rebalance/engine';
 import { RebalanceMeltRolledBackError, RebalanceRoutesExhaustedError } from '../../src/rebalance/errors';
 import { createRebalanceLock } from '../../src/rebalance/lock';
@@ -401,5 +402,90 @@ describe('rebalance engine — runs', () => {
     ).rejects.toThrow('boom');
     expect(wallet.port.trustMint).toHaveBeenCalledWith(MIDDLEMAN);
     expect(wallet.port.releaseTrust).toHaveBeenCalledWith([MIDDLEMAN]);
+  });
+});
+
+describe('rebalance engine — routing a transfer through chosen mints', () => {
+  const PATH = [SOURCE, MIDDLEMAN, DESTINATION];
+
+  function routeThrough(settled: Set<string> = new Set([STEP.id])) {
+    const harness = setup({
+      balances: { [SOURCE]: 1000, [MIDDLEMAN]: 1000 },
+      trusted: [SOURCE, DESTINATION],
+    });
+    const rerouted: RebalanceTransfer[][] = [];
+    const started: string[] = [];
+    const result = harness.engine.routeThrough(STEP, PATH, [STEP], {
+      isActive: () => true,
+      isSettled: (stepId) => settled.has(stepId),
+      sinkFor: () => harness.recorder.sink,
+      onTransferStart: (step) => started.push(step.id),
+      makeId: (label) => `id:${label}`,
+      onRerouted: (hops) => {
+        // Told once the intermediary is trusted and before anything is sent.
+        expect(harness.wallet.port.trustMint).toHaveBeenCalledWith(MIDDLEMAN);
+        expect(harness.wallet.port.prepareMelt).not.toHaveBeenCalled();
+        rerouted.push(hops);
+      },
+    });
+    return { ...harness, result, rerouted, started };
+  }
+
+  it('runs one transfer per hop, in order, and then gives the trust back', async () => {
+    const { result, rerouted, started, wallet } = routeThrough();
+    await expect(result).resolves.toEqual({ status: 'finished', anyFailed: false, anyPending: false });
+
+    // Swap history refers to legs by these ids.
+    expect(rerouted).toEqual([
+      [
+        {
+          ...STEP,
+          id: 'id:reroute-step-1-0',
+          fromMintUrl: SOURCE,
+          toMintUrl: MIDDLEMAN,
+          chainId: 'id:chain',
+          chainPath: PATH,
+          chainHopIndex: 0,
+        },
+        {
+          ...STEP,
+          id: 'id:reroute-step-1-1',
+          fromMintUrl: MIDDLEMAN,
+          toMintUrl: DESTINATION,
+          chainId: 'id:chain',
+          chainPath: PATH,
+          chainHopIndex: 1,
+        },
+      ],
+    ]);
+    expect(started).toEqual(['id:reroute-step-1-0', 'id:reroute-step-1-1']);
+    expect(wallet.port.executeMelt).toHaveBeenCalledTimes(2);
+    expect(wallet.port.releaseTrust).toHaveBeenCalledWith([MIDDLEMAN]);
+  });
+
+  it('gives the trust back when a hop throws', async () => {
+    const harness = setup({ trusted: [SOURCE, DESTINATION] });
+    await expect(
+      harness.engine.routeThrough(STEP, PATH, [STEP], {
+        isActive: () => true,
+        isSettled: () => false,
+        sinkFor: () => harness.recorder.sink,
+        makeId: (label) => `id:${label}`,
+        onRerouted: () => {
+          throw new Error('boom');
+        },
+      })
+    ).rejects.toThrow('boom');
+    expect(harness.wallet.port.releaseTrust).toHaveBeenCalledWith([MIDDLEMAN]);
+  });
+});
+
+describe('chain steps', () => {
+  it('puts inserted steps straight after the named step, and copies the list when it is absent', () => {
+    const a = { ...STEP, id: 'a' };
+    const b = { ...STEP, id: 'b' };
+    const hop = { ...STEP, id: 'hop' };
+    expect(insertStepsAfter([a, b], 'a', [hop]).map((step) => step.id)).toEqual(['a', 'hop', 'b']);
+    expect(insertStepsAfter([a, b], 'missing', [hop]).map((step) => step.id)).toEqual(['a', 'b']);
   });
 });

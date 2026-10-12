@@ -121,64 +121,6 @@ export function resetFailedStepStates(
   return next;
 }
 
-export function insertStepsAfter(
-  steps: readonly TransferStep[],
-  afterId: string,
-  toInsert: readonly TransferStep[]
-): TransferStep[] {
-  const index = steps.findIndex((step) => step.id === afterId);
-  if (index === -1) {
-    cashuLog.warn('mint.rebalance.run_state.insert_steps.missing_after', {
-      afterId,
-      originalCount: steps.length,
-      insertCount: toInsert.length,
-    });
-    return [...steps];
-  }
-  const next = [...steps.slice(0, index + 1), ...toInsert, ...steps.slice(index + 1)];
-  cashuLog.info('mint.rebalance.run_state.insert_steps.result', {
-    afterId,
-    originalCount: steps.length,
-    insertCount: toInsert.length,
-    nextCount: next.length,
-  });
-  return next;
-}
-
-export function createChainSteps({
-  baseStep,
-  chainPath,
-  chainId,
-  idPrefix,
-  makeId,
-}: {
-  baseStep: TransferStep;
-  chainPath: readonly string[];
-  chainId: string;
-  idPrefix: string;
-  makeId: (label: string) => string;
-}): TransferStep[] {
-  const steps: TransferStep[] = [];
-  for (let index = 0; index < chainPath.length - 1; index++) {
-    steps.push({
-      ...baseStep,
-      id: makeId(`${idPrefix}-${index}`),
-      fromMintUrl: chainPath[index],
-      toMintUrl: chainPath[index + 1],
-      chainId,
-      chainPath: [...chainPath],
-      chainHopIndex: index,
-    });
-  }
-  cashuLog.info('mint.rebalance.run_state.chain_steps.result', {
-    chainId,
-    pathLength: chainPath.length,
-    stepCount: steps.length,
-    idPrefix,
-  });
-  return steps;
-}
-
 export function applyInsertedChainStates(
   states: Record<string, StepState>,
   skippedOriginalStepId: string,
