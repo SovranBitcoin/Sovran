@@ -78,6 +78,26 @@ describe('page transition logging', () => {
     ]);
   });
 
+  it('says a page is on screen and empty while its content is deferred', () => {
+    const { rerender } = renderHook(
+      ({ ready }: { ready: boolean }) => useScreenPerf('SendScreen', ready, () => ({})),
+      { wrapper, initialProps: { ready: false } }
+    );
+    const pageEntries = () =>
+      debug.mock.calls.filter(([event]) => event === 'screen.shell' || event === 'screen.mount');
+
+    expect(pageEntries()).toEqual([['screen.shell', { screen: 'SendScreen' }]]);
+    rerender({ ready: true });
+
+    expect(pageEntries().map(([event]) => event)).toEqual(['screen.shell', 'screen.mount']);
+  });
+
+  it('does not call a page empty when its content is there from the first commit', () => {
+    renderHook(() => useScreenPerf('SendScreen', true, () => ({})), { wrapper });
+
+    expect(debug.mock.calls.filter(([event]) => event === 'screen.shell')).toEqual([]);
+  });
+
   it('stops listening when the page is gone', () => {
     const { unmount } = renderHook(() => useScreenPerf('SendScreen', true, () => ({})), {
       wrapper,

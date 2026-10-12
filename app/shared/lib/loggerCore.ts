@@ -791,6 +791,7 @@ const MEASUREMENT_EVENTS: ReadonlySet<string> = new Set([
   'nav.transition.end',
   'nav.transition.start',
   'screen.mount',
+  'screen.shell',
   'store.set',
   'ui.touch',
 ]);

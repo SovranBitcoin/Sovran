@@ -159,13 +159,14 @@ describe('connectRunnerLink', () => {
 
 describe('createSettleWatch', () => {
   /** Frames run only when the test says so. */
-  function harness() {
+  function harness(startsUnderSplash = false) {
     const frames: (() => void)[] = [];
     const answers: { appClockMs: number; forced: boolean }[] = [];
     let clock = 0;
     const watch = createSettleWatch({
       nextFrame: (callback) => frames.push(callback),
       now: () => clock,
+      startsUnderSplash,
     });
     return {
       watch,
@@ -233,6 +234,22 @@ describe('createSettleWatch', () => {
     expect(answers).toEqual([{ appClockMs: 208, forced: false }]);
   });
 
+  it('does not answer while a page has drawn its frame but not its content', () => {
+    const { watch, ask, answers, frame } = harness();
+
+    watch.note(entry('screen.shell'));
+    ask();
+    for (let i = 0; i < 10; i++) frame();
+    expect(answers).toEqual([]);
+
+    watch.note(entry('screen.mount'));
+    frame();
+    frame();
+    frame();
+
+    expect(answers).toEqual([{ appClockMs: 208, forced: false }]);
+  });
+
   it('gives up on a slide that never reports its end, and says it did', () => {
     const { watch, ask, answers, frame } = harness();
 
@@ -244,6 +261,32 @@ describe('createSettleWatch', () => {
     frame(1000);
 
     expect(answers).toEqual([{ appClockMs: 3000, forced: true }]);
+  });
+
+  it('does not answer while the splash still covers the app, however still it is', () => {
+    const { watch, ask, answers, frame } = harness(true);
+
+    ask();
+    for (let i = 0; i < 20; i++) frame();
+    expect(answers).toEqual([]);
+
+    watch.note(entry('splash.gone'));
+    frame();
+    frame();
+    frame();
+
+    expect(answers).toEqual([{ appClockMs: 368, forced: false }]);
+  });
+
+  it('gives up on a splash that never reports it has gone, and says it did', () => {
+    const { ask, answers, frame } = harness(true);
+
+    ask();
+    for (let i = 0; i < 14; i++) frame(1000);
+    expect(answers).toEqual([]);
+    frame(1000);
+
+    expect(answers).toEqual([{ appClockMs: 15000, forced: true }]);
   });
 
   it('is not woken by background work', () => {

@@ -121,33 +121,43 @@ export function connectRunnerLink(
  * cache writes go on for as long as the app runs and are not waited for.
  */
 const ON_SCREEN =
-  /^(e2e\.step|nav\.|screen\.|ui\.screen|ui\.touch|render\.|visual\.|machine\.|screenAction|payment\.step|toast\.)|\.shift\./;
+  /^(e2e\.step|splash\.gone|nav\.|screen\.|ui\.screen|ui\.touch|render\.|visual\.|machine\.|screenAction|payment\.step|toast\.)|\.shift\./;
 /** Frames with nothing happening on screen before the app calls itself settled. */
 const STILL_FRAMES = 2;
 /** A page whose slide never reports its end is taken to have stopped after this long. */
 const SLIDE_GIVE_UP_MS = 3000;
+/** A splash that never reports it has gone is taken to have gone after this long. */
+const SPLASH_GIVE_UP_MS = 15_000;
 
 interface SettleReport {
   appClockMs: number;
-  /** True when a slide was given up on rather than seen to end. */
+  /** True when a slide or the splash was given up on rather than seen to end. */
   forced: boolean;
 }
 
 /**
- * Knows when the screen has stopped changing: no page is sliding and nothing on
- * screen was logged for two frames. The runner asks, and is answered at once if
+ * Knows when the screen has stopped changing: the splash has gone, no page is
+ * sliding or still waiting for its content, and nothing on screen was logged
+ * for two frames. The runner asks, and is answered at once if
  * the screen is already still, otherwise when it next is. The frame loop runs
  * only between something happening and stillness, so an idle app is left alone.
  */
 export function createSettleWatch(io: {
   nextFrame: (callback: () => void) => void;
   now: () => number;
+  /** The app has just started and its splash still covers the screen. */
+  startsUnderSplash?: boolean;
 }): {
   note: (entry: LogEntry) => void;
   whenStill: (reply: (report: SettleReport) => void) => void;
 } {
+  let underSplash = io.startsUnderSplash === true;
+  const startedAt = io.now();
   let sliding = 0;
   let slidingSince = 0;
+  // Pages that have drawn their frame and not yet their content.
+  let empty = 0;
+  let emptySince = 0;
   let changed = false;
   let stillFrames = 0;
   let looping = false;
@@ -160,11 +170,19 @@ export function createSettleWatch(io: {
       sliding = 0;
       forced = true;
     }
+    if (empty > 0 && now - emptySince >= SLIDE_GIVE_UP_MS) {
+      empty = 0;
+      forced = true;
+    }
+    if (underSplash && now - startedAt >= SPLASH_GIVE_UP_MS) {
+      underSplash = false;
+      forced = true;
+    }
     if (changed) {
       changed = false;
       stillFrames = 0;
     } else stillFrames += 1;
-    if (sliding === 0 && (forced || stillFrames >= STILL_FRAMES)) {
+    if (!underSplash && sliding === 0 && empty === 0 && (forced || stillFrames >= STILL_FRAMES)) {
       looping = false;
       const asked = waiting;
       waiting = [];
@@ -177,6 +195,11 @@ export function createSettleWatch(io: {
   return {
     note(entry) {
       if (!ON_SCREEN.test(entry.event)) return;
+      if (entry.event === 'splash.gone') underSplash = false;
+      if (entry.event === 'screen.shell') {
+        empty += 1;
+        emptySince = io.now();
+      } else if (entry.event === 'screen.mount') empty = Math.max(0, empty - 1);
       if (entry.event === 'nav.transition.start') {
         sliding += 1;
         slidingSince = io.now();
@@ -188,8 +211,12 @@ export function createSettleWatch(io: {
       io.nextFrame(frame);
     },
     whenStill(reply) {
-      if (looping) waiting.push(reply);
-      else reply({ appClockMs: io.now(), forced: false });
+      if (!looping && !underSplash) return reply({ appClockMs: io.now(), forced: false });
+      waiting.push(reply);
+      if (looping) return;
+      looping = true;
+      stillFrames = 0;
+      io.nextFrame(frame);
     },
   };
 }
@@ -210,6 +237,7 @@ if (IS_E2E_LOG_BUILD && Platform.OS !== 'web') {
     const settle = createSettleWatch({
       nextFrame: (callback) => requestAnimationFrame(callback),
       now: logClockMs,
+      startsUnderSplash: true,
     });
     const link = connectRunnerLink(note, (url) => new WebSocket(url) as unknown as RunnerSocket, {
       onMark: (step) => log.info('e2e.step', { step }),

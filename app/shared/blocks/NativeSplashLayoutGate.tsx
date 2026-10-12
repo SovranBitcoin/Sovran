@@ -16,7 +16,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Icon from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { INVARIANT_WHITE, SPLASH_QR_BASE } from '@/shared/lib/brandColors';
-import { initLog, useInitMount } from '@/shared/lib/logger';
+import { initLog, log, useInitMount } from '@/shared/lib/logger';
 import { useInitializationState } from '@/shared/providers/InitializationProvider';
 import {
   getQRButtonAnchor,
@@ -357,6 +357,13 @@ export function NativeSplashLayoutGate({ children }: { children: React.ReactNode
   // Phase 3b — fading: same duration mirror, but the fade's target values
   // never depend on the anchor, so an anchor republish must NOT restart it.
   // The overlay is at opacity 0 when the timer fires, so unmount directly.
+  // The moment the app is first seen without anything over it: the end of
+  // start-up as a person experiences it, and what a test runner waits for
+  // before it treats what is underneath as on screen.
+  useEffect(() => {
+    if (phase === 'unmounted') log.info('splash.gone');
+  }, [phase]);
+
   useEffect(() => {
     if (phase !== 'fading') return;
     setBootSplashHandoff(true);

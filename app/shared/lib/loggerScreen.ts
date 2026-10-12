@@ -11,6 +11,8 @@
 //                   or out (`closing`); `.end` carries the animation's length.
 //                   The page is still moving between the first commit and
 //                   `.end`, which is what a test runner waits for.
+//   screen.shell    the page committed its frame while its content is still
+//                   deferred: it is on screen, and empty
 //   screen.mount    first render → first commit (`shell_ms`) and → the commit
 //                   that shows the deferred content (`content_ms`)
 //   render.why      which Screen input changed on each later commit, with the
@@ -103,12 +105,15 @@ function useScreenPerfLive(
   const [startedAt] = useState(monotonicNow);
   const shellMs = useRef<number | null>(null);
   const contentLogged = useRef(false);
+  // What the first commit shows: its frame alone, or its content as well.
+  const [emptyAtFirstCommit] = useState(!contentReady);
 
   useEffect(() => {
     // First commit only; `name` is in the deps for correctness, not to re-fire.
     if (shellMs.current !== null) return;
     const now = monotonicNow();
     shellMs.current = roundMs(now - startedAt);
+    if (emptyAtFirstCommit) log.debug('screen.shell', { screen: name });
     observeRouteChanges(routeChanges);
     const change = claimRouteChange(now);
     if (change) {
@@ -118,7 +123,7 @@ function useScreenPerfLive(
         duration_ms: roundMs(now - change.at),
       });
     }
-  }, [name, routeChanges, startedAt]);
+  }, [emptyAtFirstCommit, name, routeChanges, startedAt]);
 
   useEffect(() => {
     if (!contentReady || contentLogged.current) return;
