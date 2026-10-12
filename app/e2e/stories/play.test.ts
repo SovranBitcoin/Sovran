@@ -63,8 +63,10 @@ const story = (steps: unknown[]): Story =>
   storySchema.parse({
     id: 'send-ecash',
     purpose: 'A person opens Send from the wallet home and sees the ways to pay.',
+    startsFrom: 'fresh',
     steps,
   });
+const noSwipe = { swipe: async () => {} };
 
 describe('find', () => {
   test('takes the last match, which is the one drawn on top', () => {
@@ -98,6 +100,7 @@ describe('playStory', () => {
   test('taps the centre of the control once and passes when what it expects is true', async () => {
     const app = fakeApp(screenOf(box({ id: 'wallet-send', page: 'WalletScreen', x: 100, y: 600 })));
     const device = {
+      ...noSwipe,
       tap: async (x: number, y: number) => {
         app.state.taps.push([x, y]);
         app.state.screen = screenOf(box({ id: 'send-method-createEcash', page: 'SendScreen' }));
@@ -123,9 +126,75 @@ describe('playStory', () => {
     ]);
   });
 
+  test('taps where the step says when part of the control is covered', async () => {
+    const app = fakeApp(screenOf(box({ id: 'get-started', x: 100, y: 600 })));
+    const device = {
+      ...noSwipe,
+      tap: async (x: number, y: number) => void app.state.taps.push([x, y]),
+    };
+
+    await playStory(
+      story([
+        {
+          name: 'press the part that shows',
+          tap: { id: 'get-started' },
+          tapAt: [0.5, 1],
+          expect: [{ visible: { id: 'get-started' } }],
+        },
+      ]),
+      app.link,
+      device
+    );
+
+    const centre = 0.78125;
+    expect(app.state.taps[0][0]).toBe(0.375);
+    expect(app.state.taps[0][1]).toBeGreaterThan(centre);
+  });
+
+  test('drags a finger from the middle of an element in the direction asked', async () => {
+    const app = fakeApp(screenOf(box({ id: 'slides', x: 0, y: 0, width: 400, height: 800 })));
+    const swipes: [number, number][][] = [];
+    const device = {
+      tap: async () => {},
+      swipe: async (from: [number, number], to: [number, number]) => void swipes.push([from, to]),
+    };
+
+    await playStory(
+      story([
+        {
+          name: 'lift the slides',
+          swipe: { on: { id: 'slides' }, direction: 'up', distance: 0.25 },
+          expect: [{ visible: { id: 'slides' } }],
+        },
+      ]),
+      app.link,
+      device
+    );
+
+    expect(swipes).toEqual([
+      [
+        [0.5, 0.5],
+        [0.5, 0.25],
+      ],
+    ]);
+  });
+
+  test('a step that asks for a tap and a swipe is refused', () => {
+    expect(() =>
+      story([
+        {
+          name: 'both',
+          tap: { id: 'a' },
+          swipe: { on: { id: 'a' }, direction: 'up' },
+          expect: [{ page: 'X' }],
+        },
+      ])
+    ).toThrow(/a tap or a swipe, not both/);
+  });
+
   test('does not touch the screen when the control is missing or disabled', async () => {
     const app = fakeApp(screenOf(box({ id: 'amount-next', disabled: true })));
-    const device = { tap: async () => void app.state.taps.push([0, 0]) };
+    const device = { ...noSwipe, tap: async () => void app.state.taps.push([0, 0]) };
     const tapStep = (id: string) => ({ name: 'press it', tap: { id }, expect: [{ page: 'X' }] });
 
     const disabled = await playStory(story([tapStep('amount-next')]), app.link, device);
@@ -150,7 +219,7 @@ describe('playStory', () => {
         },
       ]),
       app.link,
-      { tap: async () => {} }
+      { ...noSwipe, tap: async () => {} }
     );
 
     expect(result.ok).toBe(true);
@@ -163,7 +232,7 @@ describe('playStory', () => {
     const result = await playStory(
       story([{ name: 'look for Send', expect: [{ page: 'SendScreen' }], withinMs: 100 }]),
       app.link,
-      { tap: async () => {} }
+      { ...noSwipe, tap: async () => {} }
     );
 
     expect(result.ok).toBe(false);
@@ -181,7 +250,7 @@ describe('playStory', () => {
         { name: 'second', expect: [{ page: 'WalletScreen' }] },
       ]),
       app.link,
-      { tap: async () => {} }
+      { ...noSwipe, tap: async () => {} }
     );
 
     expect(result.steps.map((step) => [step.name, step.ok])).toEqual([['first', false]]);

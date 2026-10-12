@@ -11,6 +11,9 @@ import type { Expectation, Step, Story } from './story';
 
 type Element = AppScreen['elements'][number];
 
+/** Which way the finger moves, as steps across and down the screen. */
+const SWIPES = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] } as const;
+
 /** The one thing a device does for a story: touch the glass. */
 /** Says when the picture on screen has stopped changing. */
 interface PixelWatch {
@@ -20,6 +23,8 @@ interface PixelWatch {
 export interface TouchDevice {
   /** A tap at a point given as fractions of the window's width and height. */
   tap(x: number, y: number): Promise<void>;
+  /** A finger dragged from one point to another and lifted, in the same fractions. */
+  swipe(from: [x: number, y: number], to: [x: number, y: number]): Promise<void>;
 }
 
 interface StepResult {
@@ -147,10 +152,27 @@ async function playStep(
       if (!target) return finish(`Nothing to tap: ${describeSelector(step.tap)} is not on screen`);
       if (target.disabled)
         return finish(`Cannot tap ${describeSelector(step.tap)}: it is disabled`);
+      const [across, down] = step.tapAt ?? [0.5, 0.5];
       await device.tap(
-        (target.x + target.width / 2) / screen.width,
-        (target.y + target.height / 2) / screen.height
+        (target.x + target.width * across) / screen.width,
+        (target.y + target.height * down) / screen.height
       );
+    }
+    if (step.swipe) {
+      const screen = await link.screen();
+      const target = find(step.swipe.on, screen);
+      if (!target)
+        return finish(`Nothing to swipe: ${describeSelector(step.swipe.on)} is not on screen`);
+      const from: [number, number] = [
+        (target.x + target.width / 2) / screen.width,
+        (target.y + target.height / 2) / screen.height,
+      ];
+      const [across, down] = SWIPES[step.swipe.direction];
+      const clamp = (fraction: number) => Math.min(0.98, Math.max(0.02, fraction));
+      await device.swipe(from, [
+        clamp(from[0] + across * step.swipe.distance),
+        clamp(from[1] + down * step.swipe.distance),
+      ]);
     }
     // A second mark, sent after the touch: the app treats a mark as something
     // happening on screen, so "still" is then judged from a moment by which it

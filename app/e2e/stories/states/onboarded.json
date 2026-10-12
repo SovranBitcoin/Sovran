@@ -1,0 +1,127 @@
+{
+  "id": "onboarded",
+  "purpose": "A person opens the app for the first time, accepts the Terms and Privacy Policy, starts, and arrives at an empty wallet.",
+  "startsFrom": "fresh",
+  "steps": [
+    {
+      "name": "the Terms are shown first",
+      "expect": [
+        {
+          "page": "LegalDocumentScreen"
+        },
+        {
+          "visible": {
+            "id": "terms-acceptance"
+          }
+        }
+      ],
+      "withinMs": 7000
+    },
+    {
+      "name": "agree to the Terms",
+      "tap": {
+        "id": "terms-acceptance"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "terms-continue"
+          }
+        }
+      ]
+    },
+    {
+      "name": "continue to Privacy",
+      "tap": {
+        "id": "terms-continue"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "privacy-acknowledgment"
+          }
+        },
+        {
+          "gone": {
+            "id": "terms-acceptance"
+          }
+        }
+      ]
+    },
+    {
+      "name": "acknowledge the Privacy Policy",
+      "tap": {
+        "id": "privacy-acknowledgment"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "privacy-confirm"
+          }
+        }
+      ]
+    },
+    {
+      "name": "confirm and leave the legal pages",
+      "tap": {
+        "id": "privacy-confirm"
+      },
+      "expect": [
+        {
+          "gone": {
+            "id": "privacy-confirm"
+          }
+        },
+        {
+          "gone": {
+            "id": "screen-legal-document"
+          }
+        }
+      ]
+    },
+    {
+      "name": "lift the slides to reach Get Started",
+      "swipe": {
+        "on": {
+          "id": "screen-onboarding"
+        },
+        "direction": "up",
+        "distance": 0.3
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "onboarding-get-started"
+          }
+        }
+      ]
+    },
+    {
+      "name": "get started",
+      "tap": {
+        "id": "onboarding-get-started"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-receive"
+          }
+        },
+        {
+          "visible": {
+            "id": "wallet-send"
+          }
+        },
+        {
+          "gone": {
+            "id": "screen-onboarding"
+          }
+        },
+        {
+          "logged": "gate.app.onboarding_complete"
+        }
+      ],
+      "withinMs": 10000
+    }
+  ]
+}

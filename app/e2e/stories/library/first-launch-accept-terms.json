@@ -1,6 +1,7 @@
 {
   "id": "first-launch-accept-terms",
   "purpose": "A person opening the app for the first time reads and accepts the Terms and then the Privacy Policy, and is taken on into setup.",
+  "startsFrom": "fresh",
   "steps": [
     {
       "name": "the Terms are shown first",
