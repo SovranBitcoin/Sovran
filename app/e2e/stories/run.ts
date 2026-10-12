@@ -6,13 +6,15 @@
  * Prepares one simulator, clones it per worker, and gives each worker the next
  * story as it finishes the last. Each story is its own process, so one story's
  * work never delays another's touches. Evidence goes to
- * e2e/artifacts/stories/<story id>/ (with `--repeat`, <story id>-<n>/).
+ * e2e/artifacts/stories/<story id>/ (with `--repeat`, <story id>-<n>/), and
+ * e2e/artifacts/stories/index.html shows the whole run.
  */
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runPool } from './pool';
+import { writeRunReport } from './runReport';
 import { prepareBase, removeWorkers, startWorkers } from './workers';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -83,6 +85,10 @@ if (holder && isRunning(holder)) {
   process.exit(2);
 }
 writeFileSync(lock, String(process.pid));
+// The folder holds one run: what an earlier run left would be reported as this one's.
+for (const left of readdirSync(outRoot)) {
+  if (left !== '.running') rmSync(join(outRoot, left), { recursive: true, force: true });
+}
 const cleanUp = () => {
   if (!flags.includes('--keep')) removeWorkers();
   rmSync(lock, { force: true });
@@ -118,7 +124,7 @@ try {
   console.log(
     `prepared simulator ${seconds(prepared - started)} s, workers cloned and booted ${seconds(booted - prepared)} s`
   );
-  console.log(`evidence: ${outRoot}`);
+  console.log(`report: ${writeRunReport(outRoot)}`);
 } finally {
   cleanUp();
 }

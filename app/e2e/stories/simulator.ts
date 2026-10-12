@@ -78,20 +78,25 @@ export function storySimulator(udid: string): StorySimulator {
     };
   };
   /**
-   * Stop one of the simulator's services and wait until it has gone. It is
-   * started again the next time something asks for it, and reads its files then.
+   * Stop one of the simulator's services and wait until that process has
+   * gone. It is started again the next time something asks for it, which for
+   * a busy service is at once, and reads its files then.
    */
   const stopService = async (label: string) => {
     const service = `user/${process.getuid?.() ?? 501}/${label}`;
+    const running = () => {
+      try {
+        return /\bpid = (\d+)/.exec(simctl('spawn', udid, 'launchctl', 'print', service))?.[1];
+      } catch {
+        // Not known to the simulator at all.
+        return undefined;
+      }
+    };
+    const stopping = running();
+    if (stopping === undefined) return;
     inSimulator('launchctl', 'kill', 'SIGTERM', service);
     for (let checks = 0; checks < 20; checks++) {
-      let running = false;
-      try {
-        running = /\bpid = \d+/.test(simctl('spawn', udid, 'launchctl', 'print', service));
-      } catch {
-        // Not known to the simulator at all: nothing to wait for.
-      }
-      if (!running) return;
+      if (running() !== stopping) return;
       await new Promise((resolve) => setTimeout(resolve, 20));
     }
     throw new Error(`The simulator's ${label} did not stop.`);
