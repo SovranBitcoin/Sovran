@@ -65,9 +65,11 @@ interface UseMintRebalanceOrchestratorResult {
   handleCancelRun: () => void;
 }
 
+type RunResult = Awaited<ReturnType<RebalanceEngine['runTransfers']>>;
 type StartRun = (
-  callbacks: Parameters<RebalanceEngine['runTransfers']>[1]
-) => ReturnType<RebalanceEngine['runTransfers']>;
+  callbacks: Parameters<RebalanceEngine['runTransfers']>[1],
+  report: (result: RunResult) => void
+) => Promise<RunResult>;
 
 /** Report a settled transfer on the unified Swap status toast. */
 function reportSwapLeg(step: TransferStep, outcome: RebalanceTransferOutcome) {
@@ -197,28 +199,18 @@ export function useMintRebalanceOrchestrator({
    * Run one engine action to its end and report it. `start` is the action;
    * `currentRunId` is read when the engine asks whether the run is still
    * wanted, because a rerouted run only gets its id once its mints are trusted.
+   * `start` may report the result itself before it returns: a rerouted run
+   * does, so the screen is not kept waiting while trust is given back.
    */
   const runSteps = useCallback(
     async (start: StartRun, currentRunId: () => number) => {
-      try {
-        const result = await start({
-          isActive: () => isRunActive(currentRunId()),
-          isSettled: (stepId) => {
-            const status = stepStatesRef.current[stepId]?.status;
-            // Settling and payment-pending count: the money has left or may
-            // still leave, so the step must never run again.
-            return (
-              status === 'done' ||
-              status === 'skipped' ||
-              status === 'settling' ||
-              status === 'paymentPending'
-            );
-          },
-          sinkFor,
-          // Flip the toast pip to "active" before the transfer starts.
-          onTransferStart: (step) => useSwapStatusStore.getState().setActiveLeg(step.id),
-          onTransferSettled: reportSwapLeg,
-        });
+      let reported = false;
+      // Reporting ends the run for the screen: the lock, the status, the swap
+      // history group and the toast.
+      const report = (result: RunResult) => {
+        if (reported) return;
+        reported = true;
+        isRunningRef.current = false;
         if (result.status === 'aborted') return;
 
         setRunStatus('finished');
@@ -233,6 +225,27 @@ export function useMintRebalanceOrchestrator({
           else if (result.anyPending) swapStatus.settleUnknown(PAYMENT_PENDING_DETAIL);
           else swapStatus.complete();
         }
+      };
+      const callbacks: Parameters<StartRun>[0] = {
+        isActive: () => isRunActive(currentRunId()),
+        isSettled: (stepId) => {
+          const status = stepStatesRef.current[stepId]?.status;
+          // Settling and payment-pending count: the money has left or may
+          // still leave, so the step must never run again.
+          return (
+            status === 'done' ||
+            status === 'skipped' ||
+            status === 'settling' ||
+            status === 'paymentPending'
+          );
+        },
+        sinkFor,
+        // Flip the toast pip to "active" before the transfer starts.
+        onTransferStart: (step) => useSwapStatusStore.getState().setActiveLeg(step.id),
+        onTransferSettled: reportSwapLeg,
+      };
+      try {
+        report(await start(callbacks, report));
       } catch (err) {
         if (useSwapStatusStore.getState().active) {
           useSwapStatusStore.getState().fail(describeError(err, 'cashu').text);
@@ -380,9 +393,10 @@ export function useMintRebalanceOrchestrator({
       const steps = runPlan.steps;
       let runId = runIdRef.current;
       await runSteps(
-        (callbacks) =>
+        (callbacks, report) =>
           engine.routeThrough(step, chainPath, steps, {
             ...callbacks,
+            onRunFinished: report,
             makeId: mintLocalId,
             onRerouted: (hops) => {
               insertChainRows(step.id, hops);

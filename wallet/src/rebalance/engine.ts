@@ -116,6 +116,12 @@ export interface RebalanceEngine {
     options: RebalanceRunCallbacks & {
       makeId: (label: string) => string;
       onRerouted: (hops: T[]) => void;
+      /**
+       * Told the result while the intermediaries are still trusted, before the
+       * trust is given back: giving it back can take a while, and the caller
+       * should not have to wait for it to show the run as over.
+       */
+      onRunFinished?: (result: RebalanceRunResult) => void;
     }
   ): Promise<RebalanceRunResult>;
 }
@@ -974,6 +980,12 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
     options: RebalanceRunCallbacks & {
       makeId: (label: string) => string;
       onRerouted: (hops: T[]) => void;
+      /**
+       * Told the result while the intermediaries are still trusted, before the
+       * trust is given back: giving it back can take a while, and the caller
+       * should not have to wait for it to show the run as over.
+       */
+      onRunFinished?: (result: RebalanceRunResult) => void;
     }
   ): Promise<RebalanceRunResult> {
     // The original step stays in the list (the caller marks it skipped); one
@@ -993,7 +1005,9 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
       { sink: options.sinkFor(step), warnLegId: hops[hops.length - 1]?.id },
       async () => {
         options.onRerouted(hops);
-        return runTransfers(rerouted, options);
+        const result = await runTransfers(rerouted, options);
+        options.onRunFinished?.(result);
+        return result;
       }
     );
   }

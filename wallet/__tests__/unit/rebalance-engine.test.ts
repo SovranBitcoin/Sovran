@@ -415,6 +415,7 @@ describe('rebalance engine — routing a transfer through chosen mints', () => {
     });
     const rerouted: RebalanceTransfer[][] = [];
     const started: string[] = [];
+    const finished: string[] = [];
     const result = harness.engine.routeThrough(STEP, PATH, [STEP], {
       isActive: () => true,
       isSettled: (stepId) => settled.has(stepId),
@@ -427,13 +428,20 @@ describe('rebalance engine — routing a transfer through chosen mints', () => {
         expect(harness.wallet.port.prepareMelt).not.toHaveBeenCalled();
         rerouted.push(hops);
       },
+      onRunFinished: (result) => {
+        // Told the result before the trust is given back.
+        expect(result.status).toBe('finished');
+        expect(harness.wallet.port.releaseTrust).not.toHaveBeenCalled();
+        finished.push(result.status);
+      },
     });
-    return { ...harness, result, rerouted, started };
+    return { ...harness, result, rerouted, started, finished };
   }
 
   it('runs one transfer per hop, in order, and then gives the trust back', async () => {
-    const { result, rerouted, started, wallet } = routeThrough();
+    const { result, rerouted, started, finished, wallet } = routeThrough();
     await expect(result).resolves.toEqual({ status: 'finished', anyFailed: false, anyPending: false });
+    expect(finished).toEqual(['finished']);
 
     // Swap history refers to legs by these ids.
     expect(rerouted).toEqual([
@@ -463,7 +471,7 @@ describe('rebalance engine — routing a transfer through chosen mints', () => {
     expect(wallet.port.releaseTrust).toHaveBeenCalledWith([MIDDLEMAN]);
   });
 
-  it('gives the trust back when a hop throws', async () => {
+  it('gives the trust back when the run throws', async () => {
     const harness = setup({ trusted: [SOURCE, DESTINATION] });
     await expect(
       harness.engine.routeThrough(STEP, PATH, [STEP], {
