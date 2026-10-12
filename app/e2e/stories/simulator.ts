@@ -25,7 +25,7 @@ const simctl = (...args: string[]) =>
     stdio: ['ignore', 'pipe', 'pipe'],
   }).trim();
 
-export interface StorySimulator extends TouchDevice {
+interface StorySimulator extends TouchDevice {
   /** Boot the simulator if it is not running, and put this build on it fresh. */
   installFresh(appPath: string): void;
   /** Start the app, telling it where its runner listens. */
