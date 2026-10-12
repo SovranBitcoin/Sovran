@@ -612,8 +612,11 @@ exports[`persisted schema drift feed-ignore-store schema matches the golden snap
           },
           "default": {},
           "propertyNames": {
-            "pattern": "^[0-9a-f]{64}$",
             "type": "string",
+          },
+          "tolerantKey": {
+            "input": {},
+            "output": {},
           },
           "type": "object",
         },
@@ -631,20 +634,12 @@ exports[`persisted schema drift feed-ignore-store schema matches the golden snap
           "type": "array",
         },
         "ignoredEventIds": {
-          "default": [],
-          "items": {
-            "pattern": "^[0-9a-f]{64}$",
-            "type": "string",
-          },
+          "items": {},
           "maxItems": 10000,
           "type": "array",
         },
         "ignoredPubkeys": {
-          "default": [],
-          "items": {
-            "pattern": "^[0-9a-f]{64}$",
-            "type": "string",
-          },
+          "items": {},
           "maxItems": 5000,
           "type": "array",
         },
@@ -657,10 +652,7 @@ exports[`persisted schema drift feed-ignore-store schema matches the golden snap
                   "minimum": 0,
                   "type": "integer",
                 },
-                "id": {
-                  "pattern": "^[0-9a-f]{64}$",
-                  "type": "string",
-                },
+                "id": {},
                 "privateTags": {
                   "items": {
                     "items": {
@@ -701,17 +693,7 @@ exports[`persisted schema drift feed-ignore-store schema matches the golden snap
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,
       "properties": {
-        "blockOverrides": {
-          "additionalProperties": {
-            "type": "boolean",
-          },
-          "default": {},
-          "propertyNames": {
-            "pattern": "^[0-9a-f]{64}$",
-            "type": "string",
-          },
-          "type": "object",
-        },
+        "blockOverrides": {},
         "dmFilterEnabled": {
           "default": false,
           "type": "boolean",
@@ -727,21 +709,9 @@ exports[`persisted schema drift feed-ignore-store schema matches the golden snap
         },
         "ignoredEventIds": {
           "default": [],
-          "items": {
-            "pattern": "^[0-9a-f]{64}$",
-            "type": "string",
-          },
-          "maxItems": 10000,
-          "type": "array",
         },
         "ignoredPubkeys": {
           "default": [],
-          "items": {
-            "pattern": "^[0-9a-f]{64}$",
-            "type": "string",
-          },
-          "maxItems": 5000,
-          "type": "array",
         },
         "muteList": {
           "anyOf": [
@@ -753,10 +723,7 @@ exports[`persisted schema drift feed-ignore-store schema matches the golden snap
                   "minimum": 0,
                   "type": "integer",
                 },
-                "id": {
-                  "pattern": "^[0-9a-f]{64}$",
-                  "type": "string",
-                },
+                "id": {},
                 "privateTags": {
                   "items": {
                     "items": {

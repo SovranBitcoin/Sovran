@@ -5,6 +5,8 @@ import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
 import { storeLog } from '@/shared/lib/logger';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
+import { tolerantArray, tolerantRecord } from '@/shared/lib/persist/tolerant';
+import { NostrEventIdSchema, NostrPubkeyHexSchema } from '@/shared/lib/protocolIds';
 import {
   isNewerMuteList,
   mutedValues,
@@ -70,19 +72,24 @@ function normalizeHexList(values: readonly string[], max: number): string[] {
   return Array.from(out);
 }
 
+// A saved list is never turned down for one bad entry: the entry is left out
+// and the rest of what the person muted and blocked is kept. Ids use the
+// app's shared hex schemas (`shared/lib/protocolIds.ts`).
 export const PersistedFeedIgnoreStore = z.object({
-  ignoredPubkeys: z.array(z.string().regex(HEX64_RE)).max(MAX_IGNORED_PUBKEYS).default([]),
-  ignoredEventIds: z.array(z.string().regex(HEX64_RE)).max(MAX_IGNORED_EVENT_IDS).default([]),
+  ignoredPubkeys: tolerantArray(NostrPubkeyHexSchema, MAX_IGNORED_PUBKEYS).default([]),
+  ignoredEventIds: tolerantArray(NostrEventIdSchema, MAX_IGNORED_EVENT_IDS).default([]),
+  // A copy of the published list. One that cannot be read is fetched again.
   muteList: z
     .object({
-      id: z.string().regex(HEX64_RE),
+      id: NostrEventIdSchema,
       createdAt: z.number().int().nonnegative(),
       tags: z.array(z.array(z.string())),
       privateTags: z.array(z.array(z.string())),
     })
     .nullable()
-    .default(null),
-  blockOverrides: z.record(z.string().regex(HEX64_RE), z.boolean()).default({}),
+    .default(null)
+    .catch(null),
+  blockOverrides: tolerantRecord(NostrPubkeyHexSchema, z.boolean()),
   dmFilterEnabled: z.boolean().default(false),
   dmFilterWords: z.array(z.string().max(100)).max(100).default([]),
 });
