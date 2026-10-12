@@ -1,6 +1,7 @@
 # An end-to-end test is one user story, run fast, with its evidence
 
-Status: accepted in direction on 2026-10-12; the driver is chosen by measurement (see "Open").
+Status: accepted on 2026-10-12. The owned native driver is kept; how many workers the Mac carries is still to be
+measured (see "Open").
 
 Replaces the running model of [the JSON native harness](../testing-json-native-adr.md). Its scenario schema, page
 registry, selectors, probes, custody rules and "no second test language" stand.
@@ -79,12 +80,16 @@ notice is a separate step marked for one platform; a branch on "if visible" is n
 **Budget.** 100 stories in 30 minutes on the owner's MacBook (M4 Pro, 24 GB). With four or five workers that is
 80 to 90 s per story; the aim is well under that, so that the tail does not decide the run.
 
+## The driver
+
+The owned native driver is kept, with the app's own report of being settled in place of its guesses from the
+accessibility tree. The owner first chose to measure it against Detox on four stories, then decided on the owned
+driver the same day. Detox states support up to React Native 0.84 and the app is on 0.85.3, and its Expo support
+is community-run; Maestro polls the screen and pauses on every step. Neither removes the need for the app to say
+when it is settled, which is where the time is.
+
 ## Open
 
-- **The driver.** Decided by building the same four stories (a tap on a static page, a long list scrolled, a
-  sheet opened and left, a receive confirmed by the mint) on the owned native driver and on Detox, and measuring
-  time, failures over repeated runs and video smoothness. Detox states support up to React Native 0.84 and the app
-  is on 0.85.3. The loser is deleted. Maestro was set aside: it polls the screen and pauses on every step.
 - **How many workers** this Mac carries with recording on, and how much disk a run needs. 17 GB was free when
   this was written, so cleaning up clones and bounding evidence are part of done.
 - Whether simulator frame timing is steady enough to hold a budget, or only to show a regression.
