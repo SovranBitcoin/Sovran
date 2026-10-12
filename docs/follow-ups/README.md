@@ -93,7 +93,7 @@ reports) keep their evidence, and link here for anything still open.
 | [F93](F93.md) | medium | decision | Decide how ecash leaves a mismatched account; run the identity check on devices |
 | [F95](F95.md) | low | fix | Recovery with an unreadable keychain accepts any phrase for imported accounts |
 | [F96](F96.md) | low | device | No native scenario for AccountMismatchScreen; the harness cannot plant a mismatched row |
-| [F97](F97.md) | medium | fix | A paid but unminted Lightning receive from 0.0.1 to 0.0.40 is recorded but never minted |
+| [F97](F97.md) | medium | device | A paid but unminted Lightning receive from 0.0.1 to 0.0.40 is recorded but never minted |
 | [F98](F98.md) | low | device | Claim redux-era ecash on a device against a real mint; add a prompt scenario and retry |
 | [F99](F99.md) | low | device | The first-launch Routstr load is fixed in tests but has not been seen on a device |
 | [F100](F100.md) | medium | device | An install left unstamped by 0.0.63 to 0.1.3 is still asked to restore, and the upgrade fix is unseen on a device |
