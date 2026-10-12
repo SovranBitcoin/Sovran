@@ -41,7 +41,6 @@ interface NostrKeysContextValue {
   isReady: boolean;
   isLoading: boolean;
   error: string | null;
-  refresh: () => Promise<void>;
   getKeysForAccount: (accountIndex: number) => Promise<NostrKeys | null>;
   getCashuMnemonicForAccount: (accountIndex: number) => Promise<string | null>;
 }
@@ -244,38 +243,6 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
     [deriveCashuMnemonic]
   );
 
-  const refresh = useCallback(async () => {
-    if (!mnemonic) return;
-
-    try {
-      setIsLoading(true);
-      setError(null);
-
-      // Clear cache and rederive default keys
-      cachedKeys.current.clear();
-      cachedCashuMnemonics.current.clear();
-      const defaultKeys = await deriveKeys(defaultAccountIndex);
-      const defaultCashuMnemonic = await deriveCashuMnemonic(defaultAccountIndex);
-      if (!mounted.current) return;
-      setKeys(defaultKeys);
-      setCashuMnemonic(defaultCashuMnemonic);
-
-      const refreshProfile = useProfileStore.getState().getActiveProfile();
-      CocoManager.setAccountIndex(defaultAccountIndex, refreshProfile?.source === 'imported');
-      if (defaultCashuMnemonic) {
-        CocoManager.setCashuMnemonic(defaultCashuMnemonic);
-      }
-
-      setIsReady(true);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to refresh keys';
-      setError(errorMessage);
-      log.error('nostr.keys.refresh_failed', { error: redactError(err) });
-    } finally {
-      setIsLoading(false);
-    }
-  }, [mnemonic, defaultAccountIndex, deriveKeys, deriveCashuMnemonic]);
-
   // Initialize default keys when mnemonic is available, or generate one if none exists
   useEffect(() => {
     if (mnemonicLoading || locked) return;
@@ -411,7 +378,6 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
       isReady,
       isLoading: isLoading || mnemonicLoading,
       error,
-      refresh,
       getKeysForAccount,
       getCashuMnemonicForAccount,
     }),
@@ -422,7 +388,6 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
       isLoading,
       mnemonicLoading,
       error,
-      refresh,
       getKeysForAccount,
       getCashuMnemonicForAccount,
     ]
