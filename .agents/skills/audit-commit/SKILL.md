@@ -55,6 +55,13 @@ is dropped and named under "not checked".
 | Saved data | Touches a store, key, database or migration: can an install on any older release still read what it wrote? (`persistence-release-safety` has the invariants.) |
 | Looks | Touches a screen: is it built from the parts its neighbours use? ([building screens](../../../docs/review/building-screens.md)) |
 
+The saved checks hold this repository's standing questions. List the ones for what the commit
+touches with `jevlint check '<family>-*' --dry-run` (families are in the `AGENTS.md` table) and
+hand each reviewer the matching question text: it says what is a concern and what is allowed.
+For a commit on money, keys or saved data, also run those checks and give the reviewer the
+returned source as the surrounding code to read. A check searches the working tree, not the
+sha, and returns evidence, never a finding.
+
 A finding is a trigger, the code path and the result, with `sha:path:line`, labelled
 **reproduced**, **read in the source** or **inferred**. What lint, types and the ratchets
 already catch is not a finding.

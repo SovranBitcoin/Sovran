@@ -80,8 +80,10 @@ For the candidate and for one revision per epoch, run:
 sh .agents/skills/persistence-release-safety/surface.sh <rev>
 ```
 
-It prints raw lines only. From them, and from reading the code they point at, rebuild
-`persistence-map.md`. It must cover, and say "none found, searched for X" where empty:
+It prints raw lines only. `jevlint check 'state-*'` adds the code behind each standing question
+about saved data (failed reads, rehydration, migrations, the names that locate data) as further
+leads; it is not a substitute for the surface. From both, and from reading the code they point
+at, rebuild `persistence-map.md`. It must cover, and say "none found, searched for X" where empty:
 
 - Persisted stores: name, storage key format (including any account or pubkey suffix),
   version, `migrate`, `partialize`, the schema that reads it, what happens on a failed read.

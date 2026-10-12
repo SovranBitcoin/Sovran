@@ -29,12 +29,16 @@ each with the evidence for it. Propose; the owner picks what gets made.
 
 1. **A check** (a lint rule, a test, a script in CI, a hook) when the mistake has a fixed
    shape. Before writing one, look for an existing check that is unwired or broken.
-2. **A pointer** in `AGENTS.md` when the knowledge exists but was not found.
-3. **A paragraph in the doc that owns the subject** when the knowledge was never written down.
-4. **A skill** only for a procedure with steps and an end, and only if no existing one fits.
+2. **A saved check** (`.jevlint/checks`, see [semantic checks](../../../docs/review/README.md))
+   when spotting the mistake means reading what the code does and it has happened more than
+   once. Sharpen an existing check before adding one.
+3. **A pointer** in `AGENTS.md` when the knowledge exists but was not found.
+4. **A paragraph in the doc that owns the subject** when the knowledge was never written down.
+5. **A skill** only for a procedure with steps and an end, and only if no existing one fits.
 
 Also look for what to remove: an instruction agents already follow without being told, a
-rule a check now enforces, a pointer to something that no longer exists. `AGENTS.md` is read
+rule a check now enforces, a saved check that returns nothing useful, a pointer to something
+that no longer exists. `AGENTS.md` is read
 at the start of every session, so every line in it costs something.
 
 ## 4. Report

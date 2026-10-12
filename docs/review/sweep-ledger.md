@@ -1,5 +1,8 @@
 # Hunch conformance sweep — ledger
 
+**Historical.** The reviewer this ledger records was replaced by the [semantic checks](README.md)
+on 2026-10-12. The verdicts below still stand.
+
 The durable record of the autonomous rule-conformance sweep. Procedure:
 [sweep-protocol.md](sweep-protocol.md). Read this first; it outlives any one
 session. Never delete a row.

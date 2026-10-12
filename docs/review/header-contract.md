@@ -42,8 +42,9 @@ Examples: Settings → Design system → Headers. Native scenario: `settings.hea
 Verify top, threshold, reverse scroll, long names, missing images, reduced motion,
 and large text on iOS and Android. Static gates do not establish native appearance.
 
-The deterministic glass-header gate owns forbidden opaque header options. Hunch
-reviews behavior across layout and scroll ownership, not the presence of an API.
+The deterministic glass-header gate owns forbidden opaque header options. The
+`ui-header-*` [checks](README.md) ask about behavior across layout and scroll ownership, not the
+presence of an API.
 
 
 Horizontal currency/month strips use `headerAppearance="gradient-tabs"`: one

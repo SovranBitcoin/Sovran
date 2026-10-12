@@ -18,7 +18,6 @@
     "*.lock",
     "**/vendor/",
     "**/BitChatVendor/",
-    "**/generated/",
-    "hunch.config.ts"
+    "**/generated/"
   ]
 }

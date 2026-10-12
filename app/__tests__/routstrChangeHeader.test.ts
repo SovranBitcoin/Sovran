@@ -4,6 +4,7 @@ import {
   topUpBalance,
   setRoutstrNodeBaseUrl,
 } from '@/shared/lib/routstr/api';
+import { settleRoutstrClient } from '@/shared/lib/routstr/sdk/client';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
 import { apiLog, aiLog } from '@/shared/lib/logger';
 
@@ -98,7 +99,11 @@ describe('Routstr response credentials', () => {
     wallet.sendToken.mockClear();
     wallet.receiveToken.mockClear();
   });
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(async () => {
+    // A failed paid request starts recovery sweeps that outlive the test.
+    await settleRoutstrClient();
+    jest.restoreAllMocks();
+  });
 
   it.each(operations)(
     '%s adopts change on both success and error before reading the body',

@@ -1,95 +1,72 @@
-# Semantic review policy
+# Semantic checks
 
-**Draft: migration parity is not verified yet.** The twelve explicit concerns alone are not an
-equivalent replacement for the previous policy. A subsequent audit found useful checks missing or narrowed:
-input validation and trust, security-sensitive randomness, mock isolation, safe consent/trust
-defaults, backup verification, mint trust, structured errors, synchronous profile isolation,
-non-retry signed-event mutation, subscription recovery, and UI/test correctness. Some exclusions
-also miss unit-only changes, persisted-write changes and status changes affecting re-entry guards.
+Some rules cannot be a lint rule or a test, because deciding them means reading what the code
+does: whether a failed read can lead to saved data being replaced, whether a retry can spend
+twice. Each of those is a saved question in `.jevlint/checks/<id>/CHECK.md`, run with
+[JevLint](https://github.com/Kelbie/hunch). A check does not judge. It returns the source that
+bears on its question, and whoever asked reads that source and decides.
 
-The 61 previous explicit rules' text and exceptions survive in contributor guidance. Compilation
-is now enabled for that document, the codebase-design and expo-router skills, and root `AGENTS.md`.
-Their generated questions are committed in `hunch.lock`; inspect its `notChecked` entries for
-guidance the compiler could not turn into per-hunk checks. Compilation is not proof of equivalent
-coverage. Before merging this migration, map every old rule to a tested semantic replacement, a
-verified deterministic check, or an explicitly justified retirement. The eight development
-fixtures do not prove parity.
+To understand code before changing it, ask `jg "<question>"`. The checks come after the change:
+run the families it touched and read what comes back to confirm nothing they guard was broken.
 
-Hunch's GitHub App already reviews this repository. Do not add a second Actions reviewer.
-PR policy and contracts come from the immutable base commit; edits here take effect after merge.
-This policy requires Hunch 0.13.1: it fixes compiled path matching and allows the larger
-per-hunk question budget. Use the verified local build until that version is published, and
-update the GitHub App before merging this policy. npm 0.13.0 does not support the new budget.
-
-Every in-scope source window receives all twelve explicit concerns with the shared contract.
-Applicable compiled questions are asked in a separate request; their path scopes are recorded in
-`hunch.lock`. The reviewed lock consolidates 111 compiler-generated questions into 72, grouping
-facets of the same source concern while preserving their exceptions. Inferred lexical gates were
-removed. Review also scoped Expo route-file checks to `app/app`, left literal testID presence
-to deterministic tooling, and resolved the legacy sent/delivered wording in favor of the shared
-contract: local sent state after the first relay OK is allowed. The largest effective policy is 72 questions for one file, within the configured limit
-of 128. Recompilation with `--force` can replace these reviewed edits; repeat the scope and budget
-audit before committing it. [Recorded scope and request-size simulation](compilation-2026-09-19.json) uses synthetic answers
-and establishes mechanical coverage only, not semantic accuracy.
-
-Native bridge code is included; upstream BitChatVendor trees, other declared
-generated/build/vendor paths and Hunch's built-in exclusions are outside scope. All former
-contributor conventions remain in [contributor-conventions.md](contributor-conventions.md).
-
-Per-domain conventions sit beside it, each rule reproduced against the installed
-package versions before it was accepted: [zod](conventions-zod.md),
-[React Native and Expo](conventions-react-native.md), [state, persistence and
-React](conventions-state.md), [TypeScript, errors and data handling](conventions-typescript.md)
-and [async, errors, network and tests](conventions-async-tests.md). Re-check a rule
-that names a dependency's behaviour when that dependency is upgraded.
-
-[contracts.md](contracts.md) defines domain meanings and allowed cases. Its source links are for
-human investigation, not automatic source expansion. Head-source context is bounded at 40 lines;
-callers, schemas and distant guards may still be absent. An `insufficient-context` response makes
-coverage partial and asks for investigation. Findings are advisory, never a blocking correctness
-certificate. Experimental localization remains off; narrow ranges have not been validated on
-independent Sovran defects.
-
-## Development evidence
-
-Eight paired synthetic diffs in `docs/review/fixtures/` cover plaintext secrets, uncertain payment
-outcomes, relay delivery claims and signed-event retries. The final live Jev evaluation on
-2026-09-19 returned each of four expected concerns and none on their four safe counterparts.
-All twelve explicit rules were asked on every fixture, before compiled guidance was restored.
-[Recorded output and hashes](evaluation-2026-09-19.json) identify that historical policy and
-fixtures; they do not validate the additional compiled questions.
-
-These are tuning data. Earlier iterations over-abstained on unchanged mechanisms and incorrectly
-applied payment/amount concerns to relay or status-only changes. Questions now state those
-boundaries explicitly. One initial negative fixture renamed a persistent seed key; it was replaced
-because that was not a valid known-safe example. There is no independent recall estimate, and
-the other eight concerns have no positive/negative coverage yet. Do not interpret the CLI's
-1.00 for rules with zero expected cases as evidence of accuracy. Maintain nonblocking severity
-and expand labels using reviewed real defects before raising enforcement.
-
-From this repository, using the verified CLI:
+## Run
 
 ```sh
-hunch compile --dry-run
-hunch compile --with codex --effort low
-hunch config
-hunch eval docs/review/fixtures --reporter json
-hunch check --base origin/main
+jevlint check --dry-run           # every question and its scope; free, no model requests
+jevlint check 'payments-*'        # one family
+jevlint check state-stale-owner   # one check
 ```
 
-`hunch compile` previously had nothing to read because `skills` was empty, `agentsMd` was false
-and no `docs` were selected. The selected sources above now make plain `hunch compile` work;
-commit the reviewed lock whenever these sources change.
+Each check is its own search over the code, a few minutes and around a million input tokens the
+first time, far less when repeated on unchanged code. Run the families the change touched, not
+all of them. JevLint needs `jg` installed and signed in (`jg auth`, done by the owner); if a
+check stops at sign-in, say it was not run rather than asking for a key.
 
-`hunch check --base origin/main` reviews branch changes. Use `hunch check --all --code` for all
-in-scope files, or add `--dry-run` first to inspect the scope without calling Jev. The 2026-09-19
-dry run found 4,460 chunks across 2,401 files. Budgets allow 5,000 hunks and 10,000 requests
-so these chunks fit even with separate explicit and compiled question batches.
-`app/codereview/analyze-structure/index.mjs` contains a literal NUL byte and is skipped by the
-binary-file check; it still needs manual review. An offline engine simulation also found one
-window of `app/assets/icons/index.tsx` exceeding the request context budget after questions and
-surrounding source were included. Treat that window as incomplete; do not call this full coverage. File counts do not establish model recall.
+| Family | Asks about | Read with |
+| --- | --- | --- |
+| `payments-*`, `money-*`, `wallet-*` | Uncertain outcomes, repeated spends, cancellation, request constraints, counters, amounts, units | [contracts](contracts.md) |
+| `state-*` | Saved data: failed reads, rehydration, migrations, stale owners, names that locate data | [contracts](contracts.md), [state conventions](conventions-state.md), the `persistence-release-safety` skill |
+| `account-*` | The account lock, flows that erase data, memory and mints that belong to one account | [account lifecycle](../architecture/account-lifecycle.md) |
+| `secrets-*`, `entropy-*` | Where key material goes and where it comes from | [contracts](contracts.md), [entropy](entropy.md) |
+| `nostr-*` | Retrying a signed event, claiming delivery | [contracts](contracts.md) |
+| `ui-*`, `perf-*`, `errors-*` | Headers, menus over modals, status notices, list re-renders, raw error text | [building screens](building-screens.md), [header contract](header-contract.md), [modal menus](modal-menu-contract.md) |
 
-The App caps runs at 240 seconds even though local whole-repository checks allow longer.
-Review every coverage notice; repeated incomplete results require better context or rule wording,
-not relabeling unknown outcomes as safe.
+## Read the result
+
+Each `# Check:` section repeats the question, then gives ranked files, source blocks and a
+`Status:` line. Read the source blocks with the question's allowed cases in mind; most of what
+comes back is correct code. A file listed without source is a lead to open. `completed` means
+the search finished, not that the code is right, and an empty result does not show a behaviour
+is absent. `incomplete` or `failed` means evidence is missing: report what came back and say so.
+A check searches the working tree, so an audit of an older commit reads that commit's code
+instead. A concern you verify is fixed in a commit or recorded in
+[follow-ups](../follow-ups/README.md).
+
+## Add or change a check
+
+Add one when a mistake needed judgement to spot and has happened more than once, or when a
+contract in these documents has no question asking about it. A rule with a fixed shape is a lint
+rule or a test instead.
+
+1. Create `.jevlint/checks/<family>-<name>/CHECK.md`. Open with one question starting "Where".
+2. Below it say what to find (the implementation, its guards, callers and tests), what counts
+   as a concern, and what is allowed. Name the owning modules. The text is sent as written and
+   links in it are not followed, so the contract goes in the question.
+3. To search less than the whole code, add `check.json` beside it: `{ "root": "app" }`.
+4. Run `jevlint check <id> --dry-run`, then the check itself, and read whether it returned the
+   code you had in mind. Sharpen the wording if it did not.
+
+`jevlint.json` lists what every check skips: documentation, marketing and release folders,
+assets, vendored and generated code.
+
+## Beside the checks
+
+[Contributor conventions](contributor-conventions.md) and their per-domain companions
+([zod](conventions-zod.md), [React Native and Expo](conventions-react-native.md), [state,
+persistence and React](conventions-state.md), [TypeScript](conventions-typescript.md), [async,
+errors, network and tests](conventions-async-tests.md)) are the rules people and agents follow
+while writing. [contracts.md](contracts.md) defines the domain meanings the checks rely on.
+
+The [sweep protocol](sweep-protocol.md), its [ledger](sweep-ledger.md), the fixtures in
+`fixtures/` and the two dated JSON records are the history of the reviewer these checks
+replaced. Their verdicts on individual findings still stand.

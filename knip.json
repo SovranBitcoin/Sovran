@@ -1,6 +1,6 @@
 {
   "$schema": "https://unpkg.com/knip@5/schema.json",
-  "ignore": ["site/**", "hunch.config.ts"],
+  "ignore": ["site/**"],
   "ignoreIssues": {
     "**/*.android.{ts,tsx}": ["files"],
     "**/*.ios.{ts,tsx}": ["files"],

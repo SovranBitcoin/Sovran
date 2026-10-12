@@ -11,7 +11,9 @@ list of commits.
 ## 1. Find out before asking
 
 Facts are yours to find; only choices go to the owner. Read the code the change touches and
-the page for that area in `AGENTS.md`. For wallet or protocol behaviour, read how the sibling
+the page for that area in `AGENTS.md`, starting with `jg "<question>"`. The questions in
+`.jevlint/checks` for that area say which contracts the change has to respect; the plan's last
+step runs them (`jevlint check '<family>-*'`) to confirm nothing else was broken. For wallet or protocol behaviour, read how the sibling
 projects listed there do it and what the spec says, so that a question arrives with the
 evidence.
 

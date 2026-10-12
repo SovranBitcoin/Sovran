@@ -9,8 +9,8 @@ pushes or destructive actions.
 
 ## How work runs here
 
-1. **Understand before changing.** Ask the code first: `jg "<question>"` for how or why
-   something works (one question at a time; if it hangs or reports incomplete, search
+1. **Understand before changing.** Start every task with `jg "<question>"`: how or why the
+   thing you will touch works (one question at a time; if it hangs or reports incomplete, search
    instead), plain search for an exact name, then the page for the area in the table below.
    When the change decides how the wallet treats a mint, a payment or another wallet, also
    read how the relevant ones of `../../coco`, `../../cashu-ts`, `../../cdk`, `../../nutshell`,
@@ -23,9 +23,10 @@ pushes or destructive actions.
    does it and extend that. Remove what your change replaces, in the same commit. A new
    abstraction is welcome when it makes the callers simpler; say what it lets you delete.
    Change only what the task names.
-4. **Prove it.** Run the checks below yourself. For anything on screen, look at it running,
-   beside its neighbours. Say exactly what was run and what was not; "fixed" means you saw it
-   work. Both platforms, or name the one that was not checked.
+4. **Prove it.** Run the checks below yourself, then the saved checks for the area you touched
+   (`jevlint check '<family>-*'`) to confirm nothing else they guard broke. For anything on
+   screen, look at it running, beside its neighbours. Say exactly what was run and what was not;
+   "fixed" means you saw it work. Both platforms, or name the one that was not checked.
 5. **Commit in small logical steps** as each one works, staging only its files. After each
    commit that changes behaviour, run the `audit-commit` skill on it and fix what it verifies
    in a new commit.
@@ -46,15 +47,15 @@ working in the same checkout: if the tree has changes you did not make, work in 
 
 ## Read before you change
 
-| Changing | Read | Then |
-| --- | --- | --- |
-| Anything | [Conventions](docs/review/contributor-conventions.md) for the area and its `conventions-*.md` companion; the ADRs in [app/docs/adr](app/docs/adr) whose titles name it | Record a significant decision as a new ADR |
-| A screen or component | [Building a screen](docs/review/building-screens.md) | `bun run check:styling`; look at it running |
-| A route, sheet or flow | [Navigation and routes](docs/protocols/navigation-and-routes.md) | Register the page for the native harness (below) |
-| Anything saved on the phone: a store, secure key, database, cache or migration | [Account lifecycle](docs/architecture/account-lifecycle.md) ("Adding state for an account", "Upgrading from an older release"); [state conventions](docs/review/conventions-state.md) | The `persistence-release-safety` skill, every time |
-| Payments, the wallet package, Coco | [Architecture overview](docs/architecture/overview.md); [contracts](docs/review/contracts.md) | Coco carries one patch, for offline send ([ADR 0017](app/docs/adr/0017-the-wallet-core-ships-unmodified.md)); turn a feature off before adding another. Before changing the Coco version: [wallet databases](app/__tests__/cocoDatabases/README.md) |
-| Wording people read | `copy/` and the `wallet` copy catalogue; [CLAIMS.md](CLAIMS.md) for public claims | `bun run copy:lint` |
-| A release | [release/README.md](release/README.md) | `persistence-release-safety`; the release fixture step in that README |
+| Changing | Read | Then | Checks |
+| --- | --- | --- | --- |
+| Anything | [Conventions](docs/review/contributor-conventions.md) for the area and its `conventions-*.md` companion; the ADRs in [app/docs/adr](app/docs/adr) whose titles name it | Record a significant decision as a new ADR | |
+| A screen or component | [Building a screen](docs/review/building-screens.md) | `bun run check:styling`; look at it running | `ui-*`, `perf-*`, `errors-*` |
+| A route, sheet or flow | [Navigation and routes](docs/protocols/navigation-and-routes.md) | Register the page for the native harness (below) | `ui-modal-menu-layering`, `secrets-in-navigation-state` |
+| Anything saved on the phone: a store, secure key, database, cache or migration | [Account lifecycle](docs/architecture/account-lifecycle.md) ("Adding state for an account", "Upgrading from an older release"); [state conventions](docs/review/conventions-state.md) | The `persistence-release-safety` skill, every time | `state-*`, `account-*` |
+| Payments, keys, Nostr signing, the wallet package, Coco | [Architecture overview](docs/architecture/overview.md); [contracts](docs/review/contracts.md); [entropy](docs/review/entropy.md) | Coco carries one patch, for offline send ([ADR 0017](app/docs/adr/0017-the-wallet-core-ships-unmodified.md)); turn a feature off before adding another. Before changing the Coco version: [wallet databases](app/__tests__/cocoDatabases/README.md) | `payments-*`, `money-*`, `wallet-*`, `secrets-*`, `entropy-*`, `nostr-*` |
+| Wording people read | `copy/` and the `wallet` copy catalogue; [CLAIMS.md](CLAIMS.md) for public claims | `bun run copy:lint` | `errors-*`, `nostr-delivery-claim` |
+| A release | [release/README.md](release/README.md) | `persistence-release-safety`; the release fixture step in that README | `state-*` |
 
 Do not rename a store, storage key, secure key or database, and do not rename, remove or
 tighten a saved field: an old install whose saved data no longer parses loses that whole store.
@@ -97,11 +98,11 @@ that imports it.
 | root | `bun run followups check` | The follow-up ledger and every reference to it |
 | `app/` | `bun run check:styling`, `bun run check:react-compiler` | Styling and compiler ratchets |
 | `app/` | `bun run e2e:validate` | Native test scenarios |
-| root | `hunch check --base origin/main` | Advisory semantic review ([docs/review](docs/review/README.md)); findings are leads to verify |
+| root | `jevlint check '<family>-*'` | After a change, the code each [saved check](docs/review/README.md) guards in the families it touched: read it to confirm nothing else broke. Evidence, not a verdict |
 
 A budget or suppression file records a known exception; raising one needs a reason and
-evidence. Generated files (`storeRegistryManifest.ts`, `hunch.lock`) are regenerated, not
-edited. For native, config, patch or import changes, build both Metro platform bundles. Never
+evidence. `storeRegistryManifest.ts` is generated: regenerate it, never edit it. For native,
+config, patch or import changes, build both Metro platform bundles. Never
 run a destructive or funded scenario against a real wallet.
 
 ## Native testability
@@ -123,8 +124,9 @@ trigger. Vendored code keeps its upstream revision, license and refresh command 
 ## Skills
 
 Skills live in `.agents/skills/` (`.claude/skills/` links to them). Rules about this codebase
-belong in the documents above or, when they have a fixed shape, in a lint rule or test; a
-local skill is for a procedure with steps and an end.
+belong in the documents above; with a fixed shape, in a lint rule or test; when deciding them
+means reading what the code does, in a saved check ([how](docs/review/README.md)). A local skill
+is for a procedure with steps and an end.
 
 **Load these when their moment comes:**
 

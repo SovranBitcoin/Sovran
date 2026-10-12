@@ -677,6 +677,19 @@ export function resetRoutstrClient(): void {
   recoveryTimers = [];
 }
 
+/**
+ * Cancel the scheduled recovery sweeps and wait for the sweeps and client
+ * builds already running. For a caller whose runtime is about to go away
+ * without an account being closed: a test file ending. A sweep left running
+ * imports the wallet adapter after Jest has torn the environment down, and a
+ * sweep left scheduled keeps the worker alive for up to ten minutes.
+ */
+export async function settleRoutstrClient(): Promise<void> {
+  for (const timer of recoveryTimers) clearTimeout(timer);
+  recoveryTimers = [];
+  await Promise.allSettled([...sweeps, ...buildingClients]);
+}
+
 async function shutdownRoutstrClient(): Promise<void> {
   // Disable scheduled admission before joining work already admitted for A.
   stopping = true;

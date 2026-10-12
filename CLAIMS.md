@@ -8,7 +8,7 @@ establish protocol constraints, not proof of deployed behavior. Mutable upstream
 documents and services need rechecking when a claim changes. No live store copy,
 mint balance, private data, or server logs were fetched for this review.
 
-Use alongside the code rules in [hunch.config.ts](hunch.config.ts) (including
+Use alongside the [contributor conventions](docs/review/contributor-conventions.md) (including
 `copy/honest` for microcopy), the
 [artwork guide](press/artwork/README.md) for rendered copy,
 [legal guide](docs/legal/README.md) for notices and [glossary](app/CONTEXT.md)
