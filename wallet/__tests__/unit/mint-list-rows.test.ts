@@ -98,6 +98,29 @@ describe('createMintRowRules', () => {
     });
   });
 
+  it('says who does not accept a mint: the recipient, or the payment request', () => {
+    const nearby = rulesFor({
+      destination: 'sendEcash',
+      amount: 100,
+      supportedMintUrls: [MINT1],
+    });
+    expect(nearby(MINT2, 500)).toMatchObject({
+      status: 'disabled',
+      reason: { code: 'NOT_IN_PAYMENT_REQUEST', message: 'Not accepted by the recipient' },
+    });
+
+    const request = rulesFor({
+      destination: 'paymentRequest',
+      amount: 100,
+      supportedMintUrls: [MINT1],
+      paymentRequest: 'creqA-anything',
+    });
+    expect(request(MINT2, 500)).toMatchObject({
+      status: 'disabled',
+      reason: { code: 'NOT_IN_PAYMENT_REQUEST', message: 'Not accepted by payment request' },
+    });
+  });
+
   it("lets the wallet's own picker pick either side: that is how the account is switched", () => {
     const rule = rulesFor({ scope: 'selected' });
 

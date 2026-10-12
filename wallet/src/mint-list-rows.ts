@@ -95,7 +95,11 @@ export function createMintRowRules({
     if (supportedSet && !supportedSet.has(mintUrl)) {
       return disabled({
         code: "NOT_IN_PAYMENT_REQUEST",
-        message: "Not accepted by payment request",
+        // The allow-list also comes from a nearby recipient, where there is
+        // no payment request to name.
+        message: data.paymentRequest
+          ? "Not accepted by payment request"
+          : "Not accepted by the recipient",
       });
     }
     if (candidate?.status === "disabled") {

@@ -57,7 +57,7 @@ reports) keep their evidence, and link here for anything still open.
 | [F32](F32.md) | low | fix | MintCurrencyTabs and SendScreen animate layout per frame; three other workarounds remain |
 | [F33](F33.md) | low | upstream | Melt-cancel matches Coco's error text because Coco has no typed rollback error |
 | [F34](F34.md) | low | upstream | Re-run the Hunch audit to completion and explain the findings for switched-off rules |
-| [F37](F37.md) | low | fix | A testnut Nut Drop is announced as real sats; allow-list copy names a payment request |
+| [F37](F37.md) | low | decision | A testnut Nut Drop is announced as real sats; allow-list copy names a payment request |
 | [F38](F38.md) | low | fix | Mint audit copy says swap success, rounding differs between screens, dead fields remain |
 | [F40](F40.md) | medium | decision | Decide what the mint picker shows before testnut verdicts have loaded |
 | [F42](F42.md) | high | device | Check the Routstr secure-vault migration on iOS and Android keychains |
