@@ -25,6 +25,7 @@ import { OperatorRunsSection } from '@/shared/blocks/OperatorRunsSection';
 import { CircleActionButton } from '@/shared/ui/composed/CircleActionButton';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { buildMintHistoryHref } from '@/shared/lib/nav/mintInfoRoutes';
+import { formatRate } from '@/shared/lib/number';
 import { withGlassHeaderItems } from '@/navigation/headerItems';
 import Icon from '@/assets/icons';
 import { MintIcon } from '@/shared/ui/composed/MintIcon';
@@ -187,7 +188,7 @@ function StatsGrid({
     {
       label: 'Success rate',
       description: 'Of mint and melt operations',
-      value: successRate !== undefined ? `${(successRate * 100).toFixed(1)}%` : UNKNOWN_STAT,
+      value: successRate !== undefined ? formatRate(successRate) : UNKNOWN_STAT,
       placeholder: '100%',
       accent: true,
     },

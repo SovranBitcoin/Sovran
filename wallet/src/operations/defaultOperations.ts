@@ -1780,9 +1780,9 @@ export function createDefaultOperations(
         ...asyncEnrichment,
       };
 
-      // `successRate` is a swap-based measurement and is never fabricated
-      // from the ops-based `auditScore`: an unknown rate stays unknown so the
-      // screen shows a placeholder, not a number that looks measured.
+      // No success rate is derived here from the ops-based `auditScore`: the
+      // app works one out from the audit counts it holds, and an unknown rate
+      // stays unknown so the screen shows a placeholder, not a made-up number.
       logger.info("operations.buildMintReviewInfo.done", {
         ...mintUrlFields(mintUrl),
         balance: result.balance,

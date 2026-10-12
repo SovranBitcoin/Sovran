@@ -539,10 +539,7 @@ export interface MintReviewInfo {
   reviewCount?: number;
   auditScore?: number;
   auditState?: string;
-  successRate?: number;
   avgTimeMs?: number;
-  swapSuccess?: number;
-  swapTotal?: number;
   totalMints?: number;
   totalMelts?: number;
   /** Follower count of the mint operator's Nostr identity (NUT-06 contact). */

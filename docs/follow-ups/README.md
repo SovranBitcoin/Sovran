@@ -58,7 +58,7 @@ reports) keep their evidence, and link here for anything still open.
 | [F33](F33.md) | low | upstream | Melt-cancel matches Coco's error text because Coco has no typed rollback error |
 | [F34](F34.md) | low | upstream | Re-run the Hunch audit to completion and explain the findings for switched-off rules |
 | [F37](F37.md) | low | decision | A testnut Nut Drop is announced as real sats; allow-list copy names a payment request |
-| [F38](F38.md) | low | fix | Mint audit copy says swap success, rounding differs between screens, dead fields remain |
+| [F38](F38.md) | low | upstream | Mint audit copy says swap success, rounding differs between screens, dead fields remain |
 | [F40](F40.md) | medium | decision | Decide what the mint picker shows before testnut verdicts have loaded |
 | [F42](F42.md) | high | device | Check the Routstr secure-vault migration on iOS and Android keychains |
 | [F43](F43.md) | medium | fix | Relay protocol opens a new WebSocket per request instead of one per relay |

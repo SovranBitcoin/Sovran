@@ -644,7 +644,8 @@ describe("buildMintReviewInfo — social enrichment", () => {
       contactReputation: 1,
     });
     expect(info.auditScore).toBe(3.5);
-    expect(info.successRate).toBeUndefined();
+    // No rate is made up from the score: the type no longer has one to fill.
+    expect(info).not.toHaveProperty("successRate");
   });
 
   it("skips the redundant review + profile fetches when the row already carries them", async () => {
