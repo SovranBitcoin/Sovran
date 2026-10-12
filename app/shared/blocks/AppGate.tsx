@@ -14,6 +14,7 @@ import {
   useWalletLifecycleHydrated,
 } from '@/shared/stores/global/walletLifecycleStore';
 import { SettingsRecoveryScreen } from '@/features/settings/screens/SettingsRecoveryScreen';
+import { showingPageInsteadOfWallet } from '@/shared/lib/qrButtonAnchor';
 
 initLog('Module', 'AppGate loaded');
 
@@ -108,6 +109,16 @@ interface AppGateProps {
 }
 
 /**
+ * Wraps a page the gate shows in place of the app. The boot splash waits for
+ * the wallet home's QR button to morph into; this tells it that button is not
+ * coming, so it uncovers the page instead of waiting out its fallback.
+ */
+function InsteadOfWallet({ children }: { children: React.ReactNode }) {
+  useEffect(() => showingPageInsteadOfWallet(), []);
+  return <>{children}</>;
+}
+
+/**
  * AppGate gates the app behind terms acceptance, onboarding, and key readiness.
  * Order: Terms → Reinstall detection → Onboarding carousel → Keys loading → App
  *
@@ -127,19 +138,31 @@ const AppGate: React.FC<AppGateProps> = ({ children }) => {
   const completeOnboarding = useSettingsStore((state) => state.completeOnboarding);
   const reinstallState = useReinstallDetection(hasSeenOnboarding);
   const hydration = useSettingsHydration((s) => s.status);
-  if (locked) return <KeyRecoveryScreen />;
-  if (error && !isReady) return <KeyRecoveryScreen locked={false} />;
+  if (locked)
+    return (
+      <InsteadOfWallet>
+        <KeyRecoveryScreen />
+      </InsteadOfWallet>
+    );
+  if (error && !isReady)
+    return (
+      <InsteadOfWallet>
+        <KeyRecoveryScreen locked={false} />
+      </InsteadOfWallet>
+    );
   if (hydration === 'loading') return null;
   if (hydration === 'error') {
     return (
-      <TermsAndConditionsScreen
-        onClose={acceptLegalDocuments}
-        settingsError
-        onRetry={() => {
-          useSettingsHydration.setState({ status: 'loading' });
-          void useSettingsStore.persist.rehydrate();
-        }}
-      />
+      <InsteadOfWallet>
+        <TermsAndConditionsScreen
+          onClose={acceptLegalDocuments}
+          settingsError
+          onRetry={() => {
+            useSettingsHydration.setState({ status: 'loading' });
+            void useSettingsStore.persist.rehydrate();
+          }}
+        />
+      </InsteadOfWallet>
     );
   }
 
@@ -147,12 +170,14 @@ const AppGate: React.FC<AppGateProps> = ({ children }) => {
     log.debug('gate.app.blocked', { reason: 'terms_not_accepted' });
     return (
       <Log name="AppGate">
-        <TermsAndConditionsScreen
-          onClose={() => {
-            log.info('gate.app.terms_accepted');
-            acceptLegalDocuments();
-          }}
-        />
+        <InsteadOfWallet>
+          <TermsAndConditionsScreen
+            onClose={() => {
+              log.info('gate.app.terms_accepted');
+              acceptLegalDocuments();
+            }}
+          />
+        </InsteadOfWallet>
       </Log>
     );
   }
@@ -174,12 +199,14 @@ const AppGate: React.FC<AppGateProps> = ({ children }) => {
       log.debug('gate.app.blocked', { reason: 'onboarding_not_seen' });
       return (
         <Log name="AppGate">
-          <OnboardingScreen
-            onComplete={() => {
-              log.info('gate.app.onboarding_complete');
-              completeOnboarding();
-            }}
-          />
+          <InsteadOfWallet>
+            <OnboardingScreen
+              onComplete={() => {
+                log.info('gate.app.onboarding_complete');
+                completeOnboarding();
+              }}
+            />
+          </InsteadOfWallet>
         </Log>
       );
     }
@@ -282,17 +309,19 @@ const RestoreGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   if (restoreStatus === 'pending' || restoreStatus === 'failed') {
     log.debug('gate.restore.blocked', { restoreStatus });
     return (
-      <SettingsRecoveryScreen
-        gateMode
-        onComplete={() => {
-          // Mark seedCreatedAt + restoreStatus complete so on next render
-          // RestoreGate falls through to children. The Continue button only
-          // appears in the `complete` state, which happens after recovery
-          // succeeds — so this is the user's confirmation to proceed.
-          useWalletLifecycleStore.getState().markSeedCreatedNow();
-          useWalletLifecycleStore.getState().markRestoreComplete();
-        }}
-      />
+      <InsteadOfWallet>
+        <SettingsRecoveryScreen
+          gateMode
+          onComplete={() => {
+            // Mark seedCreatedAt + restoreStatus complete so on next render
+            // RestoreGate falls through to children. The Continue button only
+            // appears in the `complete` state, which happens after recovery
+            // succeeds — so this is the user's confirmation to proceed.
+            useWalletLifecycleStore.getState().markSeedCreatedNow();
+            useWalletLifecycleStore.getState().markRestoreComplete();
+          }}
+        />
+      </InsteadOfWallet>
     );
   }
 

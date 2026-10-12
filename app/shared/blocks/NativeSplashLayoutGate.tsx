@@ -27,6 +27,7 @@ import {
   shouldFastForwardBootOverlay,
   subscribeQRButtonAnchor,
   subscribeWalletTabFocused,
+  usePageInsteadOfWallet,
   type QRButtonAnchor,
 } from '@/shared/lib/qrButtonAnchor';
 
@@ -45,8 +46,8 @@ const MORPH_TIMING = 'ease-out';
 // Generous wait for the QR anchor to publish. The morph overlay covers the
 // screen for the entire window, so the user sees a continuous splash — this
 // budget just bounds how long we hold before falling back to a plain fade
-// when the user lands on a non-wallet screen (e.g. onboarding) where no QR
-// button will ever publish. Sized to comfortably cover cold-start init on a
+// when the wallet home never arrives and nothing said so (the pages AppGate
+// shows in its place do say so, and fade at once). Sized to comfortably cover cold-start init on a
 // first launch (legacy migration + global migration + nostr + coco) plus
 // WalletScreen mount.
 const MORPH_FALLBACK_TIMEOUT_MS = 8000;
@@ -123,6 +124,7 @@ type SplashPhase = 'await_init' | 'await_anchor' | 'morphing' | 'fading' | 'unmo
 export function NativeSplashLayoutGate({ children }: { children: React.ReactNode }) {
   useInitMount('NativeSplashLayoutGate');
   const { isInitializing, hasFailedStage } = useInitializationState();
+  const pageInsteadOfWallet = usePageInsteadOfWallet();
   const splash = useSplashGeometry();
   const [surfaceTertiary] = useThemeColor(['surface-tertiary'] as const);
   const rootViewRef = useRef<View>(null);
@@ -193,6 +195,16 @@ export function NativeSplashLayoutGate({ children }: { children: React.ReactNode
     initLog('SplashMorph', 'a blocking stage failed — fading out');
     setPhase('fading');
   }, [phase, hasFailedStage]);
+
+  // The same for a page the app shows in place of the wallet home: Terms on a
+  // first launch, onboarding, key recovery, the restore prompt. On a first
+  // launch the Terms page was ready after two seconds and stayed behind the
+  // splash for nine.
+  useEffect(() => {
+    if (phase !== 'await_anchor' || !pageInsteadOfWallet) return;
+    initLog('SplashMorph', 'a page is shown in place of the wallet home — fading out');
+    setPhase('fading');
+  }, [phase, pageInsteadOfWallet]);
 
   // Phase 2 — await_anchor: wait for the QR button to publish a stable
   // anchor. We poll `measureInWindow` for `LAYOUT_SETTLE_DELAY_MS` ms because
