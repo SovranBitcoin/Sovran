@@ -1,0 +1,24 @@
+{
+  "packs": [
+    ".jevlint/checks"
+  ],
+  "exclude": [
+    "press/",
+    "site/",
+    "marketing/",
+    "docs/",
+    "release/",
+    "copy/",
+    "artifacts/",
+    "assets/",
+    "codereview/",
+    "patches/",
+    "*.md",
+    "*.json",
+    "*.lock",
+    "**/vendor/",
+    "**/BitChatVendor/",
+    "**/generated/",
+    "hunch.config.ts"
+  ]
+}

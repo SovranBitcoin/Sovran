@@ -15,6 +15,7 @@ let mockReusableQuote = false;
 let mockPaymentRequests: { state: string; singleUse: number }[] | undefined;
 let mockAttemptStates: string[] = [];
 let mockUnreadable = false;
+let mockNeverAnswers = false;
 let mockMissingWallet = false;
 let mockFileFailure = false;
 let mockSecureFailure = false;
@@ -54,6 +55,7 @@ jest.mock('expo-file-system/legacy', () => ({
 }));
 jest.mock('expo-sqlite', () => ({
   openDatabaseAsync: jest.fn(async () => {
+    if (mockNeverAnswers) return new Promise(() => undefined);
     if (mockUnreadable) throw new Error('cannot open');
     return {
       execAsync: jest.fn(async () => {}),
@@ -108,6 +110,7 @@ beforeEach(async () => {
   mockProofStates = [];
   mockPending = false;
   mockUnreadable = false;
+  mockNeverAnswers = false;
   mockMissingWallet = false;
   mockFileFailure = false;
   mockSecureFailure = false;
@@ -183,6 +186,20 @@ test.each(['balance', 'pending', 'unreadable', 'active', 'last'] as const)(
     expect(useProfileStore.getState().profiles.some((p) => p.accountIndex === 1)).toBe(true);
   }
 );
+
+test('a wallet database that never answers is refused instead of holding the removal', async () => {
+  mockNeverAnswers = true;
+  jest.useFakeTimers();
+  try {
+    const removal = remove();
+    await jest.advanceTimersByTimeAsync(10_001);
+    expect(await removal).toEqual({ kind: 'refused', reason: 'unreadable' });
+  } finally {
+    jest.useRealTimers();
+  }
+  expect(mockDeleted.size).toBe(0);
+  expect(useProfileStore.getState().profiles.some((p) => p.accountIndex === 1)).toBe(true);
+});
 
 test('missing wallet refuses rather than creating an empty database', async () => {
   mockMissingWallet = true;

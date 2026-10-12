@@ -20,6 +20,7 @@ import {
   type ProfileEntry,
 } from '@/shared/stores/global/profileStore';
 import type { RemovalPorts } from './removeProfile';
+import { TIMED_OUT, settleWithin } from './settleWithin';
 import { forgetWalletDatabases } from '@/shared/lib/cashu/walletDatabaseRecord';
 import {
   liveStores,
@@ -229,9 +230,21 @@ export async function deleteNostrCaches(accountIndexes: readonly number[]): Prom
   for (const index of accountIndexes) await deleteFiles(nostrName(index));
 }
 
+const INSPECTION_TIMEOUT_MS = 10_000;
+
+/**
+ * The inspection only reads, so unlike the deletions it can be given up on: a
+ * database that does not answer in time is reported unreadable, the removal is
+ * refused before anything is deleted, and the lock is released.
+ */
+async function inspectWalletWithin(profile: ProfileEntry): ReturnType<RemovalPorts['inspect']> {
+  const result = await settleWithin(inspectWallet(profile), INSPECTION_TIMEOUT_MS);
+  return result === TIMED_OUT ? 'unreadable' : result;
+}
+
 export const profileRemovalPorts: RemovalPorts = {
   inventory: () => useProfileStore.getState(),
-  inspect: inspectWallet,
+  inspect: inspectWalletWithin,
   prepare: async (profile) => {
     const secure = securePlans.get(profile.pubkey);
     if (!secure) throw new Error('Account secure deletion plan is unavailable');

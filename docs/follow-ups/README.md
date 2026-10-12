@@ -86,7 +86,6 @@ reports) keep their evidence, and link here for anything still open.
 | [F67](F67.md) | high | device | Check on devices that choosing a mint pops back to the same amount screen |
 | [F68](F68.md) | high | device | Check the calculator amount screen on funded phones; MAX as Lightning ignores fees |
 | [F72](F72.md) | low | fix | Nothing reads back :unreadable store copies; large stores need a stated policy |
-| [F75](F75.md) | low | fix | Profile removal reads the wallet database with no time limit before deleting |
 | [F76](F76.md) | medium | fix | During an in-process switch, background wallet work can read the next account's signer |
 | [F77](F77.md) | medium | device | Nostr cache database, restore subscription and Whitenoise are not closed on unmount |
 | [F79](F79.md) | low | test | No native scenario for StartupFailedScreen; the harness cannot make startup fail |
