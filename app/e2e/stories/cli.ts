@@ -1,10 +1,10 @@
 /* eslint-disable no-console -- CLI boundary */
 /**
  * Play one story on a simulator:
- *   bun e2e/stories/cli.ts <story.json> --udid <simulator> --app <Sovran.app>
+ *   bun e2e/stories/cli.ts <story.json> --udid <simulator> --app <Sovran.app> [--out <dir>]
  *
- * Leaves the story's video, a picture per step and a report under
- * e2e/artifacts/stories/<story id>/.
+ * Leaves the story's video, a picture per step and a report in `--out`, by
+ * default e2e/artifacts/stories/<story id>/.
  */
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -33,7 +33,8 @@ const LAST_FRAME_MS = 300;
 const story = storySchema.parse(JSON.parse(readFileSync(storyPath, 'utf8')));
 const simulator = storySimulator(udid);
 const link = startAppLink();
-const outDir = join(dirname(fileURLToPath(import.meta.url)), '../artifacts/stories', story.id);
+const outDir =
+  flag('out') ?? join(dirname(fileURLToPath(import.meta.url)), '../artifacts/stories', story.id);
 rmSync(outDir, { recursive: true, force: true });
 mkdirSync(outDir, { recursive: true });
 const rawVideo = join(outDir, 'raw.mp4');
