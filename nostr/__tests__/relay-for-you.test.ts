@@ -14,7 +14,9 @@ import {
 
 // --- event builders --------------------------------------------------------
 
-const hex = (seed: string): string => (seed + '0'.repeat(64)).slice(0, 64);
+// 64 lowercase hex characters, distinct per seed: the seed's own bytes, padded.
+const hex = (seed: string): string =>
+  (Buffer.from(seed).toString('hex') + '0'.repeat(64)).slice(0, 64);
 
 // Unique, hex-valid event ids — a counter so no two fixture events collide.
 let _seq = 0;

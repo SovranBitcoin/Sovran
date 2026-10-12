@@ -19,7 +19,7 @@ import { z } from 'zod';
 // own zod copy, and mixing the two breaks type emission.
 export const NaggOrderingSchema = z.object({
   orderBy: z.enum(['rank', 'created_at', 'arrival']),
-  elements: z.array(z.string()).max(5000),
+  elements: z.array(z.string().max(512)).max(5000),
 });
 
 /**
@@ -79,24 +79,44 @@ export const NaggNoteMetricsSchema = z.object({
   quoteCount: z.number().optional(),
 });
 
+// A kind-0 is user-authored: an oversized name or picture is a bad field, not
+// a bad profile, so each is dropped on its own (the caps match the identity
+// schema in `src/envelope.ts`).
 export const NaggProfileInfoSchema = z
   .object({
-    name: z.string(),
-    picture: z.string().optional(),
+    name: z.string().max(256).catch(''),
+    picture: z.string().max(2048).optional().catch(undefined),
   })
   .passthrough();
 
 // Service info / capability probe (GET /nostr/capabilities) — unchanged in v2.
+/**
+ * A list of short names (routes, capabilities) read one by one: a name that is
+ * not a string or is over `MAX_NAME` is left out, and nothing past `max` is
+ * read. The live service lists 17 routes and about 55 capabilities, the
+ * longest under 50 characters (measured 2026-10-12), so both ceilings are far
+ * above it; and a wrong ceiling here costs one name, never the response.
+ */
+const MAX_NAME = 256;
+const nameList = (max: number) =>
+  z
+    .array(z.unknown())
+    .transform((items) =>
+      items
+        .slice(0, max)
+        .filter((item): item is string => typeof item === 'string' && item.length <= MAX_NAME),
+    );
+
 export const AppViewCapabilitySchema = z.object({
-  version: z.string(),
-  routes: z.array(z.string()),
+  version: z.string().max(64),
+  routes: nameList(1024),
 });
 
 export const NaggServiceInfoSchema = z.object({
-  graphqlSchemaVersion: z.string(),
-  appViewVersion: z.string(),
-  capabilities: z.array(z.string()),
-  appViews: z.array(AppViewCapabilitySchema),
+  graphqlSchemaVersion: z.string().max(64),
+  appViewVersion: z.string().max(64),
+  capabilities: nameList(4096),
+  appViews: z.array(AppViewCapabilitySchema).max(64),
 });
 
 export type NaggServiceInfo = z.infer<typeof NaggServiceInfoSchema>;

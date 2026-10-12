@@ -1,4 +1,5 @@
 import type { NaggFeedEvent } from '../map/feed';
+import { NOSTR_EVENT_LIMITS, NostrHexId } from '../schemas';
 
 // ---------------------------------------------------------------------------
 // Shared raw-event coercion
@@ -18,10 +19,21 @@ export type RawWireEvent = {
   created_at?: number;
 };
 
-/** Coerce an untrusted wire event into a `NaggFeedEvent`, or null if it lacks an id, pubkey or numeric kind. */
+const isHexId = (value: unknown): value is string => NostrHexId.safeParse(value).success;
+
+/**
+ * Coerce an untrusted wire event into a `NaggFeedEvent`, or null if its id or
+ * pubkey is not 64 lowercase hex, its kind is not a number, or its content is
+ * over the event ceiling: the same refusals the nagg envelope makes
+ * (`NaggFeedEventSchema`), so a relay or a cache cannot hand over what the
+ * backend could not.
+ */
 export function toFeedEvent(raw: RawWireEvent): NaggFeedEvent | null {
-  if (typeof raw.id !== 'string' || typeof raw.pubkey !== 'string') return null;
+  if (!isHexId(raw.id) || !isHexId(raw.pubkey)) return null;
   if (typeof raw.kind !== 'number') return null;
+  if (typeof raw.content === 'string' && raw.content.length > NOSTR_EVENT_LIMITS.content) {
+    return null;
+  }
   return {
     id: raw.id,
     kind: raw.kind,
@@ -32,12 +44,17 @@ export function toFeedEvent(raw: RawWireEvent): NaggFeedEvent | null {
   };
 }
 
-/** Keep only well-formed `string[]` tags; drop anything malformed. */
+/** Keep only well-formed `string[]` tags within the event ceilings; drop anything else. */
 export function coerceTags(tags: unknown): string[][] {
   if (!Array.isArray(tags)) return [];
   const out: string[][] = [];
   for (const tag of tags) {
-    if (Array.isArray(tag) && tag.every((t) => typeof t === 'string')) {
+    if (out.length >= NOSTR_EVENT_LIMITS.tags) break;
+    if (
+      Array.isArray(tag) &&
+      tag.length <= NOSTR_EVENT_LIMITS.tagElements &&
+      tag.every((t) => typeof t === 'string' && t.length <= NOSTR_EVENT_LIMITS.tagElement)
+    ) {
       out.push(tag as string[]);
     }
   }

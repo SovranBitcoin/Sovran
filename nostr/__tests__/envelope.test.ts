@@ -722,3 +722,69 @@ describe('events that arrive from the network are checked one by one', () => {
     expect(ids([{ ...good, kind: 3, tags: follows }])).toEqual([good.id]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Bounds on what one response may carry: a field that does not fit costs that
+// field or that item, never the page.
+// ---------------------------------------------------------------------------
+
+describe('bounded envelope fields', () => {
+  test('an order element or a pubkey that cannot be one is left out; the rest stay', () => {
+    const envelope = NaggProfilesEnvelopeSchema.parse({
+      order: [NOTE_ID, 'x'.repeat(513), 7, ROOT_ID],
+      orderBy: 'rank',
+      events: [],
+      aggregates: {},
+      pubkeys: [PUBKEY, 'npub1notHex', PUBKEY.toUpperCase(), VIEWER],
+    });
+    expect(envelope.order).toEqual([NOTE_ID, ROOT_ID]);
+    expect(envelope.pubkeys).toEqual([PUBKEY, VIEWER]);
+  });
+
+  test('a cursor too long to be one is read as no cursor', () => {
+    const parse = (cursor: unknown) =>
+      NaggEnvelopeSchema.parse({ order: [], orderBy: 'created_at', events: [], aggregates: {}, cursor });
+    expect(parse('1700000000|20').cursor).toBe('1700000000|20');
+    expect(parse('c'.repeat(2049)).cursor).toBeNull();
+  });
+
+  test('counts are read one id at a time', () => {
+    const envelope = NaggEnvelopeSchema.parse({
+      order: [],
+      orderBy: 'created_at',
+      events: [],
+      aggregates: {
+        [NOTE_ID]: { k7_e: { count: 3 } },
+        [ROOT_ID]: { k7_e: { count: 'three' } },
+        ['i'.repeat(129)]: { k7_e: { count: 1 } },
+        [QUOTED_ID]: 'not counts',
+      },
+    });
+    expect(envelope.aggregates).toEqual({ [NOTE_ID]: { k7_e: { count: 3 } } });
+  });
+
+  test('a notification entry or actor without hex ids is left out; a bad target is read as none', () => {
+    const entry = { id: NOTE_ID, kind: 7, actor: ACTOR, target: ROOT_ID };
+    const envelope = NaggNotificationsEnvelopeSchema.parse({
+      order: [],
+      orderBy: 'created_at',
+      events: [],
+      aggregates: {},
+      entries: [
+        {
+          ...entry,
+          actors: [
+            { pubkey: ACTOR, eventId: NOTE_ID, createdAt: 5 },
+            { pubkey: 'not-a-key', eventId: NOTE_ID, createdAt: 6 },
+          ],
+        },
+        { ...entry, id: 'not-an-id' },
+        { ...entry, id: REPOST_ID, actor: 'npub1notHex' },
+        { ...entry, id: ORIGINAL_ID, target: 'naddr1notAnEventId' },
+      ],
+    });
+    expect(envelope.entries.map((each) => each.id)).toEqual([NOTE_ID, ORIGINAL_ID]);
+    expect(envelope.entries[0]?.actors).toEqual([{ pubkey: ACTOR, eventId: NOTE_ID, createdAt: 5 }]);
+    expect(envelope.entries[1]?.target).toBeUndefined();
+  });
+});

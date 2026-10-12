@@ -46,7 +46,7 @@ describe('getNoteStats through the facade', () => {
   test('relay floor answers counts; ids are pending until settled and land in the entity cache', async () => {
     const relay: RelayConnection = {
       request: (): Promise<Result<RawRelayEvent[], NaggError>> =>
-        Promise.resolve(ok([ev('r1', 7, N1, '+'), ev('r2', 7, N1, '+')])),
+        Promise.resolve(ok([ev('c1'.padEnd(64, '0'), 7, N1, '+'), ev('c2'.padEnd(64, '0'), 7, N1, '+')])),
     };
     const layer = createNostrDataLayer({ tiers: [createRelayTier({ connection: relay })] });
     const result = await layer.getNoteStats({ ids: [N1, N2] });
