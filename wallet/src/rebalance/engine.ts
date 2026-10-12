@@ -75,6 +75,8 @@ interface TransferRun {
 
 type ChainResult =
   | { status: 'complete'; finalHopLegId: string; finalReceipt: RebalanceMintReceipt }
+  /** A hop paid and its money has not been seen at the next mint. Nothing after it ran. */
+  | { status: 'settling'; finalHopLegId: string; arrivingAt: string }
   | { status: 'incomplete'; finalHopLegId?: string; error?: unknown };
 
 type HopResult =
@@ -337,6 +339,46 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
 
   // ── Temporary trust ───────────────────────────────────────────────────
 
+  // ── Money in flight ───────────────────────────────────────────────────
+  //
+  // A melt that settled has left its source; until the destination issues, the
+  // money is at neither mint. Whatever would spend it from the destination (the
+  // next hop of a chain, a later step of the plan) must wait: run now it finds
+  // the mint short, and is then failed, skipped or sent by another route, any
+  // of which ends with the first amount paid twice or sitting where nobody put
+  // it. Receipts are remembered by the mint they are arriving at and forgotten
+  // once seen to arrive.
+
+  const arriving = new Map<string, RebalanceMintReceipt[]>();
+
+  function noteArriving(receipt: RebalanceMintReceipt): void {
+    arriving.set(receipt.mintUrl, [...(arriving.get(receipt.mintUrl) ?? []), receipt]);
+  }
+
+  /** True while money is still on its way to `mintUrl`. */
+  async function stillArriving(mintUrl: string): Promise<boolean> {
+    const receipts = arriving.get(mintUrl);
+    if (!receipts) return false;
+    const waiting: RebalanceMintReceipt[] = [];
+    for (const receipt of receipts) {
+      let arrived = false;
+      try {
+        arrived = isCleanFinalization(await wallet.getMintOperation(receipt.id), receipt);
+      } catch (error) {
+        // Not known to have arrived is treated as not arrived.
+        log.warn('mint.rebalance.recipient_operation_read_failed', {
+          ...mintUrlFields(receipt.mintUrl),
+          operationId: receipt.id,
+          error,
+        });
+      }
+      if (!arrived) waiting.push(receipt);
+    }
+    if (waiting.length === 0) arriving.delete(mintUrl);
+    else arriving.set(mintUrl, waiting);
+    return waiting.length > 0;
+  }
+
   async function trustIntermediaries(chainPath: readonly string[]): Promise<string[]> {
     const temporarilyTrusted: string[] = [];
     for (const url of chainPath.slice(1, -1)) {
@@ -357,7 +399,11 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
     temporarilyTrusted: readonly string[],
     report: { sink: Pick<RebalanceEventSink, 'legUpdated'>; warnLegId?: string }
   ): Promise<void> {
-    const { stranded, untrustErrors } = await wallet.releaseTrust(temporarilyTrusted);
+    // A mint that money is still arriving at stays trusted. Untrusted now, it
+    // has no balance yet to be noticed by, and the money would then arrive at
+    // a mint the wallet no longer lists.
+    const releasable = temporarilyTrusted.filter((url) => !arriving.has(url));
+    const { stranded, untrustErrors } = await wallet.releaseTrust(releasable);
     for (const { url, error } of untrustErrors) {
       log.warn('mint.rebalance.untrust_failed', { ...mintUrlFields(url), error });
     }
@@ -559,8 +605,17 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
             run.isActive
           );
           if (!run.isActive()) return { status: 'incomplete', finalHopLegId };
-          // The next hop still runs: it fails on its own if the money is not there.
-          run.sink.legUpdated(legId, { status: arrived ? 'done' : 'settling', routing: null });
+          if (!arrived) {
+            // The hop paid and its money has not been seen at the next mint.
+            // The next hop would find that mint short and fail, and a failed
+            // chain is sent again by another route or a retry: this hop would
+            // be paid twice. The chain stops here, still settling.
+            run.sink.legUpdated(legId, { status: 'settling', routing: null });
+            noteArriving(hop.receipt);
+            debug({ event: 'chain_hop_settling', stepId: run.step.id, hopIndex: index });
+            return { status: 'settling', finalHopLegId: legId, arrivingAt: hop.receipt.mintUrl };
+          }
+          run.sink.legUpdated(legId, { status: 'done', routing: null });
         }
       }
       if (!finalReceipt || !finalHopLegId) return { status: 'incomplete', finalHopLegId };
@@ -591,7 +646,9 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
     run: TransferRun,
     noRouteError: unknown,
     transferAmount: number
-  ): Promise<{ finalHopLegId: string; finalReceipt: RebalanceMintReceipt } | 'aborted'> {
+  ): Promise<
+    { finalHopLegId: string; finalReceipt: RebalanceMintReceipt } | 'aborted' | 'settling'
+  > {
     const { step, sink } = run;
     const { id, fromMintUrl, toMintUrl } = step;
     debug({ event: 'no_route_auto_routing', stepId: id });
@@ -648,6 +705,8 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
         debug({ event: 'auto_route_chain_complete', stepId: id, candidateIdx: index });
         return result;
       }
+      // Money is on its way through this route: no other route is tried.
+      if (result.status === 'settling') return 'settling';
       if (result.error !== undefined) lastError = result.error;
       debug({
         event: 'candidate_route_failed_trying_next',
@@ -866,6 +925,10 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
         if (classifyRebalanceError(meltError) !== 'no_route') throw meltError;
         const routed = await routeThroughMiddlemen(run, meltError, transferAmount);
         if (routed === 'aborted') return { status: 'aborted' };
+        if (routed === 'settling') {
+          debug({ event: 'step_settling_mid_chain', stepId: id, amount: transferAmount });
+          return { status: 'settling' };
+        }
         finalHopLegId = routed.finalHopLegId;
         finalReceipt = routed.finalReceipt;
       }
@@ -886,6 +949,7 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
         // done either: the money has not been seen to arrive.
         log.warn('mint.rebalance.balance_timeout');
         sink.legUpdated(verifyingLegId, { status: 'settling', routing: null });
+        noteArriving(finalReceipt);
         debug({ event: 'step_settling', stepId: id, amount: transferAmount });
         return { status: 'settling' };
       }
@@ -944,6 +1008,14 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
         if (!callbacks.isActive()) return { status: 'aborted' };
         // Legs settled by an earlier run (e.g. a retry of failed legs only).
         if (callbacks.isSettled(step.id)) continue;
+        // A step that spends money still on its way to its source is left as
+        // it is: not run, not skipped, not failed. A later run takes it up
+        // once the money is in.
+        if (await stillArriving(step.fromMintUrl)) {
+          anyPending = true;
+          log.info('swap.leg.held', { stepId: step.id });
+          continue;
+        }
         callbacks.onTransferStart?.(step);
         const stepStart = clock.now();
         const outcome = await executeTransfer(step, {

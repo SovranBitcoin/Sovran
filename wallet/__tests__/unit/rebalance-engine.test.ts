@@ -497,3 +497,106 @@ describe('chain steps', () => {
     expect(insertStepsAfter([a, b], 'missing', [hop]).map((step) => step.id)).toEqual(['a', 'b']);
   });
 });
+
+describe('rebalance engine — money still on its way', () => {
+  const route: RebalanceRoute = {
+    path: [SOURCE, MIDDLEMAN, DESTINATION],
+    pathNames: ['Source', 'Middleman', 'Destination'],
+    source: 'local_history',
+  };
+  const balances = { [SOURCE]: 1000, [MIDDLEMAN]: 100, [DESTINATION]: 0 };
+  /** A melt that settles at the source while the destination has not issued yet. */
+  const paidNotIssued = async (id: string) => ({ id, state: 'finalized' });
+
+  it('stops a middleman chain at a hop whose money has not arrived, and pays nothing twice', async () => {
+    const second: RebalanceRoute = { ...route, source: 'graph' };
+    const { run, wallet, recorder } = setup({ balances, routes: [route, second] });
+    wallet.port.executeMelt
+      // The direct melt finds no route...
+      .mockRejectedValueOnce(new MintOperationError(20004, 'no_route'))
+      // ...and the first hop pays, but the middleman has not issued.
+      .mockImplementationOnce(paidNotIssued);
+
+    await expect(run()).resolves.toEqual({ status: 'settling' });
+
+    // The direct attempt and the one hop: no second hop from a mint that is
+    // short, and no second route sending the same amount again.
+    expect(wallet.port.executeMelt).toHaveBeenCalledTimes(2);
+    expect(recorder.statuses('step-1-hop-1-0').at(-1)).toBe('settling');
+    // The next hop is left as it was: not failed, not skipped.
+    expect(recorder.statuses('step-1-hop-1-1')).toEqual([]);
+    expect(recorder.events.some((event) => event.legId.startsWith('step-1-hop-2'))).toBe(false);
+    // The middleman the money is arriving at is not untrusted from under it.
+    expect(wallet.port.releaseTrust).toHaveBeenCalledWith([]);
+  });
+
+  it('holds a plan step that spends money still arriving at its source, then runs it once it is in', async () => {
+    const first: RebalanceTransfer = { ...STEP, id: 'to-middle', toMintUrl: MIDDLEMAN };
+    const second: RebalanceTransfer = {
+      ...STEP,
+      id: 'onward',
+      fromMintUrl: MIDDLEMAN,
+      toMintUrl: DESTINATION,
+    };
+    const { engine, wallet, recorder } = setup({
+      balances: { [SOURCE]: 1000, [MIDDLEMAN]: 0 },
+      trusted: [SOURCE, MIDDLEMAN, DESTINATION],
+    });
+    wallet.port.executeMelt.mockImplementationOnce(paidNotIssued);
+    const outcomes = new Map<string, string>();
+    const callbacks = {
+      isActive: () => true,
+      isSettled: (stepId: string) =>
+        ['done', 'settling', 'skipped'].includes(outcomes.get(stepId) ?? ''),
+      sinkFor: () => recorder.sink,
+      onTransferSettled: (step: RebalanceTransfer, outcome: { status: string }) =>
+        void outcomes.set(step.id, outcome.status),
+    };
+
+    await expect(engine.runTransfers([first, second], callbacks)).resolves.toEqual({
+      status: 'finished',
+      anyFailed: false,
+      anyPending: true,
+    });
+    expect(outcomes.get('to-middle')).toBe('settling');
+    // Not run, not skipped, not failed: nothing was reported for it at all.
+    expect(outcomes.has('onward')).toBe(false);
+    expect(recorder.statuses('onward')).toEqual([]);
+    expect(wallet.port.executeMelt).toHaveBeenCalledTimes(1);
+
+    // The middleman issues. A later run takes the held step up and sends it once.
+    wallet.payInvoice(wallet.invoiceByMelt.get('melt-1') ?? '');
+    wallet.port.balancesByMint.mockResolvedValue({ [SOURCE]: 900, [MIDDLEMAN]: 100 });
+    await expect(engine.runTransfers([first, second], callbacks)).resolves.toEqual({
+      status: 'finished',
+      anyFailed: false,
+      anyPending: false,
+    });
+    expect(outcomes.get('onward')).toBe('done');
+    expect(wallet.port.executeMelt).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps a manually routed middleman trusted while the first hop is still arriving', async () => {
+    const harness = setup({
+      balances: { [SOURCE]: 1000, [MIDDLEMAN]: 0 },
+      trusted: [SOURCE, DESTINATION],
+    });
+    harness.wallet.port.executeMelt.mockImplementationOnce(paidNotIssued);
+    const outcomes = new Map<string, string>();
+
+    const result = await harness.engine.routeThrough(STEP, route.path, [STEP], {
+      isActive: () => true,
+      isSettled: (stepId) => stepId === STEP.id || outcomes.has(stepId),
+      sinkFor: () => harness.recorder.sink,
+      onTransferSettled: (step, outcome) => void outcomes.set(step.id, outcome.status),
+      makeId: (label) => `id:${label}`,
+      onRerouted: () => {},
+    });
+
+    expect(result).toEqual({ status: 'finished', anyFailed: false, anyPending: true });
+    expect(outcomes.get('id:reroute-step-1-0')).toBe('settling');
+    expect(outcomes.has('id:reroute-step-1-1')).toBe(false);
+    expect(harness.wallet.port.executeMelt).toHaveBeenCalledTimes(1);
+    expect(harness.wallet.port.releaseTrust).toHaveBeenCalledWith([]);
+  });
+});
