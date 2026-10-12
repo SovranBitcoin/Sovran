@@ -135,6 +135,8 @@ export function NativeSplashLayoutGate({ children }: { children: React.ReactNode
   // Absolute deadline for the overlay's current cycle; armed on await_anchor
   // entry, consulted by the (restartable) morphing timer.
   const overlayDeadlineRef = useRef<number | null>(null);
+  // How the overlay left, for the log: shrinking into the QR button, or fading.
+  const leavingBy = useRef<'morph' | 'fade'>('fade');
   const [hasRootLaidOut, setHasRootLaidOut] = useState(false);
   // Window-relative offset of the splash overlay's parent View. The QRButton
   // publishes its anchor in window coords (pageX/pageY); to position the
@@ -303,6 +305,7 @@ export function NativeSplashLayoutGate({ children }: { children: React.ReactNode
   // docking into the button.
   useEffect(() => {
     if (phase !== 'morphing') return;
+    leavingBy.current = 'morph';
     setBootSplashHandoff(true);
     // Clamp the (restartable) completion timer to the overlay's absolute
     // deadline so anchor-republish restarts can't extend its life forever.
@@ -373,11 +376,12 @@ export function NativeSplashLayoutGate({ children }: { children: React.ReactNode
   // start-up as a person experiences it, and what a test runner waits for
   // before it treats what is underneath as on screen.
   useEffect(() => {
-    if (phase === 'unmounted') log.info('splash.gone');
+    if (phase === 'unmounted') log.info('splash.gone', { by: leavingBy.current });
   }, [phase]);
 
   useEffect(() => {
     if (phase !== 'fading') return;
+    leavingBy.current = 'fade';
     setBootSplashHandoff(true);
     const id = setTimeout(() => {
       setBootMorphCompleted(true);
