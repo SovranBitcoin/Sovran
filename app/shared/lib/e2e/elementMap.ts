@@ -44,6 +44,9 @@ interface FabricUIManager {
 
 const HOST_COMPONENT = 5;
 const HOST_TEXT = 6;
+const CONTEXT_PROVIDER = 10;
+/** The native view that holds a page header's buttons and title. */
+const HEADER_BAR = 'RNSScreenStackHeaderConfig';
 
 interface ElementInfo {
   /** `testID`. */
@@ -69,6 +72,8 @@ interface FiberCapture {
   measure: (fiber: Fiber) => Rect | null;
   /** Whether a renderer has reported to the hook yet. */
   hasRenderer?: () => boolean;
+  /** Height of the status bar area at the top of the window, in points. */
+  topInset?: () => number;
 }
 
 /**
@@ -106,6 +111,15 @@ export function installFiberRootCapture(target: Record<string, unknown>): FiberC
       return rect ? { x: rect[0], y: rect[1], width: rect[2], height: rect[3] } : null;
     },
     hasRenderer: () => reported,
+    topInset: () => {
+      try {
+        const safeArea =
+          require('react-native-safe-area-context') as typeof import('react-native-safe-area-context');
+        return safeArea.initialWindowMetrics?.insets.top ?? 0;
+      } catch {
+        return 0;
+      }
+    },
   };
 }
 
@@ -119,6 +133,24 @@ function pageNameOf(fiber: Fiber): string | undefined {
   return text((fiber.memoizedProps as { name?: unknown } | null)?.name);
 }
 
+/**
+ * Whether a fiber hands its subtree the navigation object of a page that is
+ * not in front: another tab, or a page with another pushed over it. Every
+ * navigator gives each of its pages one, whatever it is built on, so this needs
+ * to know nothing about tabs, stacks or drawers.
+ */
+function isPageNotInFront(fiber: Fiber): boolean {
+  if (fiber.tag !== CONTEXT_PROVIDER) return false;
+  const value = (fiber.memoizedProps as { value?: unknown } | null)?.value as
+    { isFocused?: unknown; navigate?: unknown } | null | undefined;
+  if (typeof value?.isFocused !== 'function' || typeof value.navigate !== 'function') return false;
+  try {
+    return (value.isFocused as () => boolean)() === false;
+  } catch {
+    return false;
+  }
+}
+
 /** Text nodes that are direct children of a host element, joined. */
 function ownText(fiber: Fiber): string | undefined {
   let joined = '';
@@ -130,24 +162,53 @@ function ownText(fiber: Fiber): string | undefined {
 
 /**
  * Every element a runner could name (it has a test id, a label or its own text),
- * in tree order, with the frame it is laid out at.
+ * in tree order, with the frame it is laid out at. Left out: pages that are not
+ * in front, and, when the window's size is given, anything laid out wholly
+ * outside it (a closed drawer, the far end of a list). A person can neither
+ * see nor touch those.
  */
-export function collectElements(capture: FiberCapture): ElementInfo[] {
+export function collectElements(
+  capture: FiberCapture,
+  window?: { width: number; height: number }
+): ElementInfo[] {
+  const outside = (rect: Rect) =>
+    window !== undefined &&
+    window.width > 0 &&
+    (rect.x + rect.width <= 0 ||
+      rect.y + rect.height <= 0 ||
+      rect.x >= window.width ||
+      rect.y >= window.height);
   const found: ElementInfo[] = [];
-  const visit = (start: Fiber, startPage: string | undefined) => {
+  const topInset = capture.topInset?.() ?? 0;
+  const visit = (start: Fiber) => {
     // Iterative: a screen's tree is deeper than a comfortable call stack.
-    const stack: [Fiber, string | undefined][] = [[start, startPage]];
+    // Carried down: the page a fiber is on, and the top of the header bar it is in.
+    const stack: [Fiber, string | undefined, number | undefined][] = [
+      [start, undefined, undefined],
+    ];
     for (let next = stack.pop(); next; next = stack.pop()) {
-      const [fiber, inherited] = next;
+      const [fiber, inherited, inheritedBar] = next;
       const page = pageNameOf(fiber) ?? inherited;
+      let barTop = inheritedBar;
+      if (fiber.tag === HOST_COMPONENT && fiber.type === HEADER_BAR) {
+        const bar = capture.measure(fiber);
+        if (bar && bar.height > 0) barTop = bar.y;
+      }
       if (fiber.tag === HOST_COMPONENT) {
         const props = (fiber.memoizedProps ?? {}) as Record<string, unknown>;
         const id = text(props.testID);
         const label = text(props.accessibilityLabel) ?? text(props['aria-label']);
         const own = ownText(fiber);
         if (id ?? label ?? own) {
-          const rect = capture.measure(fiber);
-          if (rect) {
+          const laidOut = capture.measure(fiber);
+          // The layout places a header bar above its page, which for a page drawn
+          // under its header is above the window. The bar is really just below
+          // the status bar; what is in it keeps its place within the bar.
+          const rect =
+            laidOut && barTop !== undefined
+              ? { ...laidOut, y: topInset + (laidOut.y - barTop) }
+              : laidOut;
+          if (rect && !outside(rect)) {
             const state = props.accessibilityState as { disabled?: unknown } | undefined;
             const value = text((props.accessibilityValue as { text?: unknown } | undefined)?.text);
             found.push({
@@ -166,11 +227,11 @@ export function collectElements(capture: FiberCapture): ElementInfo[] {
         }
       }
       // Sibling first, so the child is popped first and order stays the tree's.
-      if (fiber.sibling) stack.push([fiber.sibling, inherited]);
-      if (fiber.child) stack.push([fiber.child, page]);
+      if (fiber.sibling) stack.push([fiber.sibling, inherited, inheritedBar]);
+      if (fiber.child && !isPageNotInFront(fiber)) stack.push([fiber.child, page, barTop]);
     }
   };
-  for (const root of capture.roots) if (root.current) visit(root.current, undefined);
+  for (const root of capture.roots) if (root.current) visit(root.current);
   return found;
 }
 
@@ -208,9 +269,10 @@ export function readScreen(): {
       elements: [],
       source: IS_E2E_LOG_BUILD ? 'another hook was installed first' : 'off',
     };
+  const window = windowSize(capture);
   return {
-    ...windowSize(capture),
-    elements: collectElements(capture),
+    ...window,
+    elements: collectElements(capture, window),
     source: `renderer ${capture.hasRenderer?.() ? 'reported' : 'never reported'}, ${capture.roots.size} root(s)`,
   };
 }

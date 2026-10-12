@@ -33,6 +33,14 @@ function Screen() {
 const page = (name: string, children: TestFiber[]) =>
   fiber(0, { type: Screen, memoizedProps: { name } }, children);
 
+/** What a navigator hands each of its pages: its navigation object, which knows if it is in front. */
+const navigatorPage = (focused: boolean, children: TestFiber[]) =>
+  fiber(
+    10,
+    { memoizedProps: { value: { isFocused: () => focused, navigate: () => {} } } },
+    children
+  );
+
 const capturing = (root: TestFiber) => ({
   roots: new Set([{ current: root }]),
   measure: (node: TestFiber) => node.rect ?? null,
@@ -92,6 +100,91 @@ describe('collectElements', () => {
       ['WalletScreen', 'wallet-send'],
       ['SendScreen', 'paste'],
     ]);
+  });
+});
+
+describe('what a person cannot see or touch', () => {
+  const WINDOW = { width: 402, height: 874 };
+
+  it('leaves out a page that is not in front, such as another tab', () => {
+    const root = fiber(3, {}, [
+      navigatorPage(false, [page('feed', [view({ testID: 'header-profile-avatar' }, BOX)])]),
+      navigatorPage(true, [page('index', [view({ testID: 'header-profile-avatar' }, BOX)])]),
+    ]);
+
+    expect(collectElements(capturing(root), WINDOW).map((element) => element.page)).toEqual([
+      'index',
+    ]);
+  });
+
+  it('keeps a page inside a navigator that is itself in front', () => {
+    const root = fiber(3, {}, [
+      navigatorPage(true, [
+        navigatorPage(true, [page('index', [view({ testID: 'wallet-send' }, BOX)])]),
+        navigatorPage(false, [page('feed', [view({ testID: 'feed-list' }, BOX)])]),
+      ]),
+    ]);
+
+    expect(collectElements(capturing(root), WINDOW).map((element) => element.id)).toEqual([
+      'wallet-send',
+    ]);
+  });
+
+  it('leaves out what is laid out wholly outside the window, such as a closed drawer', () => {
+    const root = fiber(3, {}, [
+      view({ testID: 'drawer-menu-settings' }, { x: -320, y: 300, width: 300, height: 48 }),
+      view({ testID: 'below-the-fold' }, { x: 16, y: 874, width: 370, height: 56 }),
+      view({ testID: 'half-on-screen' }, { x: 16, y: 850, width: 370, height: 56 }),
+    ]);
+
+    expect(collectElements(capturing(root), WINDOW).map((element) => element.id)).toEqual([
+      'half-on-screen',
+    ]);
+  });
+
+  it('does not mistake some other context value for a page', () => {
+    const root = fiber(3, {}, [
+      fiber(10, { memoizedProps: { value: { isFocused: false } } }, [
+        view({ testID: 'wallet-send' }, BOX),
+      ]),
+    ]);
+
+    expect(collectElements(capturing(root), WINDOW)).toHaveLength(1);
+  });
+});
+
+describe('a control in a page header', () => {
+  const WINDOW = { width: 402, height: 874 };
+  const headerBar = (rect: TestFiber['rect'], children: TestFiber[]) =>
+    fiber(5, { type: 'RNSScreenStackHeaderConfig', memoizedProps: {}, rect }, children);
+
+  it('is placed just below the status bar when the layout puts its bar above the window', () => {
+    // A page drawn under its header: the layout says the 54-point bar ends where the window begins.
+    const root = fiber(3, {}, [
+      page('index', [
+        headerBar({ x: 0, y: -54, width: 402, height: 54 }, [
+          view({ testID: 'wallet-search-toggle' }, { x: 338, y: -49, width: 44, height: 44 }),
+        ]),
+        view({ testID: 'wallet-send' }, BOX),
+      ]),
+    ]);
+
+    const elements = collectElements({ ...capturing(root), topInset: () => 62 }, WINDOW);
+
+    expect(elements.map(({ id, x, y }) => ({ id, x, y }))).toEqual([
+      { id: 'wallet-search-toggle', x: 338, y: 67 },
+      { id: 'wallet-send', x: 16, y: 700 },
+    ]);
+  });
+
+  it('is left where it is when the layout already has its bar below the status bar', () => {
+    const root = fiber(3, {}, [
+      headerBar({ x: 0, y: 62, width: 402, height: 54 }, [
+        view({ testID: 'header-back' }, { x: 8, y: 67, width: 44, height: 44 }),
+      ]),
+    ]);
+
+    expect(collectElements({ ...capturing(root), topInset: () => 62 }, WINDOW)[0].y).toBe(67);
   });
 });
 
