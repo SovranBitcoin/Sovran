@@ -6,6 +6,11 @@
 // without instrumenting pages one by one. Keyed by the Screen's `name`:
 //
 //   nav.transition  route change dispatched → this Screen's first commit
+//   nav.transition.start / .end
+//                   the native stack began and finished animating this page in
+//                   or out (`closing`); `.end` carries the animation's length.
+//                   The page is still moving between the first commit and
+//                   `.end`, which is what a test runner waits for.
 //   screen.mount    first render → first commit (`shell_ms`) and → the commit
 //                   that shows the deferred content (`content_ms`)
 //   render.why      which Screen input changed on each later commit, with the
@@ -14,11 +19,20 @@
 // Kept off the public logger barrel on purpose: this file imports expo-router,
 // which the barrel's non-UI consumers must not load.
 
-import { useEffect, useRef, useState } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
 import { useNavigationContainerRef } from 'expo-router';
+import { NavigationContext } from 'expo-router/react-navigation';
 
 import { log, monotonicNow, SHOW_LOGS } from './loggerCore';
 import { useWhyDidRender } from './loggerRender';
+
+/** The part of a page's navigation object that reports its animation. */
+interface TransitionSource {
+  addListener(
+    type: 'transitionStart' | 'transitionEnd',
+    listener: (event: { data?: { closing?: boolean } }) => void
+  ): () => void;
+}
 
 interface RouteChangeSource {
   addListener(
@@ -115,6 +129,31 @@ function useScreenPerfLive(
       content_ms: roundMs(monotonicNow() - startedAt),
     });
   }, [contentReady, name, startedAt]);
+
+  // A Screen rendered outside a navigator (a test, a preview) has no page to
+  // animate; the cast narrows the navigator's event map to the two events read.
+  const page = useContext(NavigationContext) as unknown as TransitionSource | undefined;
+  useEffect(() => {
+    if (typeof page?.addListener !== 'function') return;
+    let movingSince: number | null = null;
+    const offStart = page.addListener('transitionStart', (event) => {
+      movingSince = monotonicNow();
+      log.debug('nav.transition.start', { screen: name, closing: event.data?.closing === true });
+    });
+    const offEnd = page.addListener('transitionEnd', (event) => {
+      const now = monotonicNow();
+      log.debug('nav.transition.end', {
+        screen: name,
+        closing: event.data?.closing === true,
+        duration_ms: movingSince === null ? null : roundMs(now - movingSince),
+      });
+      movingSince = null;
+    });
+    return () => {
+      offStart();
+      offEnd();
+    };
+  }, [name, page]);
 
   // Its own key: several pages already call `useWhyDidRender` under their
   // screen name, and sharing it would merge two different sets of inputs.
