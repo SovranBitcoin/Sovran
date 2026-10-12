@@ -1,0 +1,38 @@
+/**
+ * Shares stories out among workers (ADR 0033): each worker takes the next
+ * story as soon as it has finished the last, so a slow story holds up nothing
+ * but its own worker. Every story is played once; a failure is a result, not
+ * a reason to play it again.
+ */
+
+interface PoolResult<Story, Outcome> {
+  story: Story;
+  worker: string;
+  outcome: Outcome;
+  wallMs: number;
+}
+
+export async function runPool<Story, Outcome>(
+  stories: readonly Story[],
+  workers: readonly string[],
+  play: (story: Story, worker: string) => Promise<Outcome>
+): Promise<PoolResult<Story, Outcome>[]> {
+  const results: PoolResult<Story, Outcome>[] = [];
+  let next = 0;
+  await Promise.all(
+    workers.map(async (worker) => {
+      while (next < stories.length) {
+        const at = next++;
+        const started = performance.now();
+        const outcome = await play(stories[at], worker);
+        results[at] = {
+          story: stories[at],
+          worker,
+          outcome,
+          wallMs: Math.round(performance.now() - started),
+        };
+      }
+    })
+  );
+  return results;
+}
