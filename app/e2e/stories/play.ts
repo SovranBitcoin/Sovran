@@ -12,6 +12,11 @@ import type { Expectation, Step, Story } from './story';
 type Element = AppScreen['elements'][number];
 
 /** The one thing a device does for a story: touch the glass. */
+/** Says when the picture on screen has stopped changing; the recording does. */
+interface PixelWatch {
+  pixelsStill(): Promise<{ movedForMs: number; stillMoving: boolean }>;
+}
+
 export interface TouchDevice {
   /** A tap at a point given as fractions of the window's width and height. */
   tap(x: number, y: number): Promise<void>;
@@ -25,6 +30,12 @@ interface StepResult {
   endedAtAppMs: number;
   /** Wall time the step took. */
   wallMs: number;
+  /** Wall clock when the step was satisfied or gave up, for finding it in the video. */
+  endedAtWallMs: number;
+  /** How long the screen went on changing after the step's expectations held. */
+  screenMovedMs?: number;
+  /** True when the screen never stopped changing: something on it animates for ever. */
+  screenKeptMoving?: true;
   /** The entries the app logged during the step. */
   entries: AppLogEntry[];
   failure?: string;
@@ -104,21 +115,26 @@ async function playStep(
   step: Step,
   index: number,
   link: AppLink,
-  device: TouchDevice
+  device: TouchDevice,
+  pixels: PixelWatch | undefined
 ): Promise<StepResult> {
   const startedWall = performance.now();
   const label = `${index + 1}-${step.name}`;
   const mark = await link.mark(label);
   const from = link.entries.indexOf(mark) + 1;
   const deadline = startedWall + step.withinMs;
+  let motion: { movedForMs: number; stillMoving: boolean } | undefined;
   const finish = (failure?: string): StepResult => {
     const entries = link.entries.slice(from);
     return {
       name: step.name,
       ok: failure === undefined,
+      ...(motion ? { screenMovedMs: motion.movedForMs } : {}),
+      ...(motion?.stillMoving ? { screenKeptMoving: true as const } : {}),
       startedAtAppMs: mark._t,
       endedAtAppMs: entries.at(-1)?._t ?? mark._t,
       wallMs: Math.round(performance.now() - startedWall),
+      endedAtWallMs: Date.now(),
       entries,
       ...(failure === undefined ? {} : { failure }),
     };
@@ -148,7 +164,12 @@ async function playStep(
       const problems = step.expect
         .map((expectation) => unmet(expectation, screen, entries))
         .filter((problem): problem is string => problem !== null);
-      if (problems.length === 0) return finish();
+      if (problems.length === 0) {
+        // The app is still and says what was expected; the eye may not agree
+        // yet. An animation off the JavaScript thread shows only in the pixels.
+        motion = await pixels?.pixelsStill();
+        return finish();
+      }
       const left = deadline - performance.now();
       if (left <= 0)
         return finish(
@@ -176,11 +197,12 @@ async function playStep(
 export async function playStory(
   story: Story,
   link: AppLink,
-  device: TouchDevice
+  device: TouchDevice,
+  pixels?: PixelWatch
 ): Promise<StoryResult> {
   const steps: StepResult[] = [];
   for (const [index, step] of story.steps.entries()) {
-    const result = await playStep(step, index, link, device);
+    const result = await playStep(step, index, link, device, pixels);
     steps.push(result);
     if (!result.ok) break;
   }
