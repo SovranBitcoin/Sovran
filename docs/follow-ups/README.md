@@ -89,7 +89,7 @@ reports) keep their evidence, and link here for anything still open.
 | [F89](F89.md) | medium | decision | Split-bill records from 0.0.63 to 0.1.0 have no reader; import them or accept the loss |
 | [F90](F90.md) | medium | upstream | Report coco's restore counter-0 bug upstream; cover wallets already left at 0 |
 | [F91](F91.md) | medium | device | A wallet database for an unlisted account is never offered or deleted |
-| [F92](F92.md) | medium | fix | Profile removal and delete-all keep no durable record of the step they reached |
+| [F92](F92.md) | medium | decision | Profile removal and delete-all keep no durable record of the step they reached |
 | [F93](F93.md) | medium | decision | Decide how ecash leaves a mismatched account; run the identity check on devices |
 | [F95](F95.md) | low | fix | Recovery with an unreadable keychain accepts any phrase for imported accounts |
 | [F96](F96.md) | low | device | No native scenario for AccountMismatchScreen; the harness cannot plant a mismatched row |
