@@ -352,7 +352,17 @@ export async function ensureStandingPaymentRequest(
           : operation.singleUse
             ? "recorded_single_use"
             : "unit_mismatch";
-      logger.warn("creq.standing.recorded_discarded", { reason });
+      logger.warn("creq.standing.recorded_discarded", {
+        reason,
+        purpose: input.purpose ?? null,
+        requestedUnit: input.unit,
+        recordedUnit: operation?.unit ?? null,
+        requestedMintCount: input.mints.length,
+        recordedMintCount: Array.isArray(operation?.mints)
+          ? operation.mints.length
+          : null,
+        recordedMintsType: typeof operation?.mints,
+      });
     }
     return createStanding(manager, input, identityStore, key, reason);
   })().then((resolved) => {
