@@ -106,6 +106,6 @@ reports) keep their evidence, and link here for anything still open.
 | [F119](F119.md) | low | device | Switch and Connect has not been run on a phone since the pairing link moved to secure storage |
 | [F120](F120.md) | low | decision | Decide which protocol specification rules become saved checks |
 | [F122](F122.md) | low | fix | The app can publish an event its own reader then leaves out |
-| [F123](F123.md) | medium | fix | A wallet initialise or teardown that never settles blocks every later open |
+| [F123](F123.md) | medium | decision | A wallet initialise or teardown that never settles blocks every later open |
 
 <!-- list:end -->
