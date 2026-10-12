@@ -839,8 +839,11 @@ export function decorateEntry(
   const token = raw.token;
   if (token) {
     try {
+      // The mint review entry carries the token still encoded, as it was scanned.
       tokenString = new FormattedString(
-        getEncodedToken(token as Parameters<typeof getEncodedToken>[0]),
+        typeof token === "string"
+          ? token
+          : getEncodedToken(token as Parameters<typeof getEncodedToken>[0]),
         "middle",
         language,
       );
