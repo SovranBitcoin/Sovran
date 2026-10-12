@@ -555,6 +555,23 @@ describe('opening a wallet', () => {
     ).toMatchObject({ ok: true });
   });
 
+  it('opens an imported account that has recorded which phrase its wallet was made from', () => {
+    // This check has no phrase to compare with. It must not read that as a
+    // different phrase: it runs just before the wallet database is opened.
+    m.useProfileStore.getState().recordWalletPhraseFingerprint(importedPubkey, '1111222233334444');
+    expect(
+      m.useProfileStore.getState().profiles.find((p) => p.pubkey === importedPubkey)
+        ?.walletPhraseFingerprint
+    ).toBe('1111222233334444');
+    expect(
+      m.checkStagedCredentials({
+        accountIndex: importedIndex,
+        isImported: true,
+        signerKey: importedSecret,
+      })
+    ).toMatchObject({ ok: true });
+  });
+
   it('refuses a signer key staged for another account', () => {
     const result = m.checkStagedCredentials({
       accountIndex: 1,

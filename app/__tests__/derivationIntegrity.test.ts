@@ -433,6 +433,28 @@ describe("the phrase an imported account's wallet was made from", () => {
     expect(result.diagnosticCode).toContain('-RW-');
   });
 
+  it('checks nothing when the caller has no phrase to hand, so a wallet can still be opened', () => {
+    // The staged-credentials check runs with an empty hash just before a
+    // wallet database is opened. Read as a mismatch, it would stop every
+    // imported account that has a fingerprint from opening its wallet.
+    const result = checkAccountIntegrity({
+      ...recorded(ROOT),
+      phraseHash: '',
+      rootSeed: null,
+      expectedWalletSeed: null,
+      stored: {},
+      session: {
+        accountIndex: recorded(ROOT).row.accountIndex,
+        isImported: true,
+        signerKey: importedSecret,
+      },
+    });
+    expect(result.ok).toBe(true);
+    expect(
+      result.checks.find((check) => check.invariant === 'row.imported-wallet-phrase')
+    ).toMatchObject({ status: 'not-checked', reason: 'absent' });
+  });
+
   it('holds an account imported before this was recorded against nothing', () => {
     expect(statusOf(importedAccount(ROOT), 'row.imported-wallet-phrase')).toMatchObject({
       status: 'not-checked',

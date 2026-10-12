@@ -55,7 +55,9 @@ export interface ProfileEntry {
    * nothing else records which one. Without it, a recovery with a different
    * phrase would quietly give the account a different wallet. Kept here and
    * not in the keychain because it is needed exactly when the keychain cannot
-   * be read. It is 64 bits of a hash and reveals nothing of the phrase.
+   * be read. It is 64 bits of a hash, not the phrase. It does let someone who
+   * already holds most of the phrase confirm a guess, as the public key of
+   * any account made from the phrase already does.
    */
   walletPhraseFingerprint?: string;
 }

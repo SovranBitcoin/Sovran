@@ -110,7 +110,10 @@ export interface IntegrityRow {
 
 export interface AccountIntegrityInput {
   row: IntegrityRow;
-  /** `hashMnemonic` of the stored phrase: the caches are keyed to it. */
+  /**
+   * `hashMnemonic` of the stored phrase: the caches are keyed to it. Empty
+   * when the caller has no phrase, which checks nothing that needs it.
+   */
   phraseHash: string;
   /**
    * The same hash, for a wallet phrase. The wallet seed cache is keyed to the
@@ -343,8 +346,11 @@ export function checkAccountIntegrity(input: AccountIntegrityInput): AccountInte
   }
   // Needs no derivation and no keychain: it is what still stands when the
   // keychain cannot be read and a phrase has just been typed in.
+  // A caller that has no phrase to hand (the staged-credentials check) passes
+  // an empty hash: nothing to compare is not a mismatch.
   if (!imported) skip('row.imported-wallet-phrase', 'not-applicable');
-  else if (!row.walletPhraseFingerprint) skip('row.imported-wallet-phrase', 'absent');
+  else if (!row.walletPhraseFingerprint || !phraseHash)
+    skip('row.imported-wallet-phrase', 'absent');
   else {
     compare(
       'row.imported-wallet-phrase',
