@@ -81,7 +81,12 @@ function cleanWords(value: string): string[] {
     .split(/[_\-\s]+/)
     .filter((word) => word.length > 0)
     .slice(0, MAX_OPERATION_WORDS)
-    .map((word) => WORD_REWRITES[word.toLowerCase()] ?? word.toLowerCase());
+    .map((word) => {
+      const lower = word.toLowerCase();
+      // Own keys only: the words come from an app's event, and `constructor`
+      // or `toString` would otherwise read a function off Object.prototype.
+      return Object.hasOwn(WORD_REWRITES, lower) ? WORD_REWRITES[lower]! : lower;
+    });
 }
 
 function titleCase(text: string): string {

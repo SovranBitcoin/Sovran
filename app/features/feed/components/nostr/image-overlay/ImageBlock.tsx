@@ -88,7 +88,9 @@ export const ImageBlock = React.memo(function ImageBlock({
   overlayPost?: ImageOverlayPost | null;
 }) {
   const mediaSource = useMediaSource();
-  const localSource = mediaSource?.sources[url];
+  // Own keys only: `url` comes from a post.
+  const localSource =
+    mediaSource && Object.hasOwn(mediaSource.sources, url) ? mediaSource.sources[url] : undefined;
   const [foreground] = useThemeColor(['foreground'] as const);
   // Seed the reserved size from what we already know (a ratio learned from a
   // prior onLoad, else the post's imeta dim) so the image doesn't flash 16:9 and

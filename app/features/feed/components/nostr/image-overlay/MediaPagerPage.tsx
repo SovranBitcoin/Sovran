@@ -99,7 +99,9 @@ function MediaPageAnimated({
 
   // Presentation-only local copy (demo content); the original URL stays the identity.
   const mediaSource = useMediaSource();
-  const localSource = mediaSource?.sources[url];
+  // Own keys only: `url` comes from a post.
+  const localSource =
+    mediaSource && Object.hasOwn(mediaSource.sources, url) ? mediaSource.sources[url] : undefined;
 
   if (mediaType === 'video') {
     const isNearActive = Math.abs((pagerIndex ?? index) - activeIndex) <= 1;

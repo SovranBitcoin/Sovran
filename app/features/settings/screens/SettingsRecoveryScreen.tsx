@@ -357,7 +357,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
                     ...mintUrlLogFields(mintUrl),
                     keysetId: keyset.id,
                     unit,
-                    error: (error as Error)?.message,
+                    error: redactError(error),
                   });
                 }
               }
@@ -379,7 +379,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
           mintError = describeError(error, 'cashu').text;
           cashuLog.warn('recovery.mint.restore_threw', {
             ...mintUrlLogFields(mintUrl),
-            error: (error as Error)?.message,
+            error: redactError(error),
           });
         }
 
@@ -497,7 +497,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
             } catch (e) {
               cashuLog.warn('recovery.cleanup.untrust_failed', {
                 ...mintUrlLogFields(mint),
-                error: (e as Error)?.message,
+                error: redactError(e),
               });
             }
           })
@@ -523,7 +523,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
               cashuLog.warn('recovery.cleanup.delete_failed', {
                 operationId: op.id,
                 ...mintUrlLogFields(op.mintUrl),
-                error: (e as Error)?.message,
+                error: redactError(e),
               })
             );
           }
@@ -534,7 +534,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
         }
       } catch (cleanupErr) {
         cashuLog.warn('recovery.cleanup.failed', {
-          error: (cleanupErr as Error)?.message,
+          error: redactError(cleanupErr),
         });
       }
 
