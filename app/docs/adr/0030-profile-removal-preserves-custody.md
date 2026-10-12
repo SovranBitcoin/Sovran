@@ -11,12 +11,15 @@ a separate flow: the recovery phrase is the identity, and the existing Delete
 Account flow removes everything.
 
 Only an inactive profile may be removed, and at least one profile must remain.
-The user switches away before removing an active profile. The profile switcher's
-inactive row opens actions; removal uses the existing destructive action menu.
-Derived identity confirmation explains that it can be added again from the
-phrase. Imported identity removal requires a second, separate acknowledgement
-that its key is deleted from this device and cannot be recovered from the phrase.
-Shared wording lives in `copy/onboarding`.
+The user switches away before removing an active profile. Imported identity
+removal requires a second, separate acknowledgement that its key is deleted from
+this device and cannot be recovered from the phrase.
+
+As first built, the profile switcher's inactive row opened actions, removal used
+the destructive action menu, and the derived confirmation said the profile could
+be added again from the phrase. That entry point, its wording and the flow that
+took the lock were removed on 2026-10-12: the extra step when switching was
+unwanted, and the claim was untrue for any profile but the newest.
 
 ## Custody before deletion
 

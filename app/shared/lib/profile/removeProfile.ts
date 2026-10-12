@@ -4,7 +4,6 @@ type RemovalRefusal =
   | 'active'
   | 'last'
   | 'missing'
-  | 'busy'
   | 'balance'
   | 'pending'
   | 'unreadable'

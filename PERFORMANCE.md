@@ -52,7 +52,7 @@ release wrote.
 | DEP-9 (`jsdom`) | Evaluated by test: keep. Switching its three suites to the node environment fails the `SendScreen` people-search tests |
 | DEP-7 (`@react-native-menu/menu`) | Evaluated from the code: keep. It is the documented fallback in the two liquid-glass pills for when the local `liquid-glass-menu` module is not supported (`UnitSwitcherPill.liquid.tsx:84`) |
 | ACCT-1 to ACCT-9, ACCT-11 | Done **inside the opt-in switch**. Settings has a developer toggle, off by default; with it off a profile switch restarts exactly as before. ADR 0029 |
-| ACCT-10 | Done as single-profile removal, refused unless the wallet is provably empty. No separate sign-out. ADR 0030 |
+| ACCT-10 | Built as single-profile removal, refused unless the wallet is provably empty; taken out of the app on 2026-10-12 (F140), so the device runs of it listed below cannot be entered. No separate sign-out. ADR 0030 |
 
 ### Measured on the emulator
 

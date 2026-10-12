@@ -303,7 +303,7 @@ Rules:
 
 | Question                                                                | File                                                                         |
 | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| What happens on switch, add, recover, remove, delete?                   | `app/shared/lib/profile/profileSessionOrchestrator.ts`                       |
+| What happens on switch, add, recover, delete?                           | `app/shared/lib/profile/profileSessionOrchestrator.ts`                       |
 | The lock, the disk guard and the shared restart steps                   | `app/shared/lib/profile/profileTransition.ts`                                |
 | The in-process switch, step by step                                     | `app/shared/lib/profile/inProcessProfileSwitch.ts`                           |
 | What removal checks and deletes                                         | `app/shared/lib/profile/profileRemovalStorage.ts`                            |
