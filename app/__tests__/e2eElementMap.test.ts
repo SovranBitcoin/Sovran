@@ -188,6 +188,54 @@ describe('a control in a page header', () => {
   });
 });
 
+describe('a page presented as a sheet', () => {
+  const WINDOW = { width: 402, height: 874 };
+  const sheetPage = (children: TestFiber[]) =>
+    fiber(
+      5,
+      {
+        type: 'RNSModalScreen',
+        memoizedProps: {},
+        rect: { x: 0, y: 0, width: 402, height: 802 },
+      },
+      children
+    );
+
+  it('places its controls where the sheet is, 72 points down a window it does not fill', () => {
+    const root = fiber(3, {}, [
+      sheetPage([
+        fiber(
+          5,
+          {
+            type: 'RNSScreenStackHeaderConfig',
+            memoizedProps: {},
+            rect: { x: 0, y: -54, width: 402, height: 54 },
+          },
+          [view({ testID: 'mint-add-search-toggle' }, { x: 338, y: -54, width: 44, height: 44 })]
+        ),
+        view({ testID: 'mint-currency-tab-ALL' }, { x: 16, y: 70, width: 88, height: 48 }),
+      ]),
+    ]);
+
+    const elements = collectElements({ ...capturing(root), topInset: () => 62 }, WINDOW);
+
+    expect(elements.map(({ id, y }) => ({ id, y }))).toEqual([
+      { id: 'mint-add-search-toggle', y: 72 },
+      { id: 'mint-currency-tab-ALL', y: 142 },
+    ]);
+  });
+
+  it('leaves a full-height page, and a short page that is not a sheet, where they are', () => {
+    const tabPage = fiber(
+      5,
+      { type: 'RNSScreen', memoizedProps: {}, rect: { x: 0, y: 0, width: 402, height: 791 } },
+      [view({ testID: 'wallet-send' }, BOX)]
+    );
+
+    expect(collectElements(capturing(fiber(3, {}, [tabPage])), WINDOW)[0].y).toBe(700);
+  });
+});
+
 describe('windowSize', () => {
   it("is the frame of the app's outermost view", () => {
     const root = fiber(3, {}, [

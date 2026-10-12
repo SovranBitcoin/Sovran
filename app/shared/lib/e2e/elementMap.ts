@@ -47,6 +47,9 @@ const HOST_TEXT = 6;
 const CONTEXT_PROVIDER = 10;
 /** The native view that holds a page header's buttons and title. */
 const HEADER_BAR = 'RNSScreenStackHeaderConfig';
+/** The native views of one page of a navigator: pushed, and presented over the others. */
+const PAGE_VIEW = 'RNSScreen';
+const PRESENTED_PAGE_VIEW = 'RNSModalScreen';
 
 interface ElementInfo {
   /** `testID`. */
@@ -182,17 +185,35 @@ export function collectElements(
   const topInset = capture.topInset?.() ?? 0;
   const visit = (start: Fiber) => {
     // Iterative: a screen's tree is deeper than a comfortable call stack.
-    // Carried down: the page a fiber is on, and the top of the header bar it is in.
-    const stack: [Fiber, string | undefined, number | undefined][] = [
-      [start, undefined, undefined],
+    // Carried down: the page a fiber is on, the top of the header bar it is in,
+    // and how far down the window the sheet it is on begins.
+    const stack: [Fiber, string | undefined, number | undefined, number][] = [
+      [start, undefined, undefined, 0],
     ];
     for (let next = stack.pop(); next; next = stack.pop()) {
-      const [fiber, inherited, inheritedBar] = next;
+      const [fiber, inherited, inheritedBar, inheritedSheet] = next;
       const page = pageNameOf(fiber) ?? inherited;
       let barTop = inheritedBar;
+      let sheetTop = inheritedSheet;
       if (fiber.tag === HOST_COMPONENT && fiber.type === HEADER_BAR) {
         const bar = capture.measure(fiber);
         if (bar && bar.height > 0) barTop = bar.y;
+      }
+      if (
+        fiber.tag === HOST_COMPONENT &&
+        (fiber.type === PAGE_VIEW || fiber.type === PRESENTED_PAGE_VIEW) &&
+        window
+      ) {
+        // A page presented as a sheet is laid out from its own top, and sits at
+        // the bottom of the window with the page beneath showing above it.
+        const presented = (fiber.memoizedProps as { stackPresentation?: unknown } | null)
+          ?.stackPresentation;
+        const sheet = capture.measure(fiber);
+        const isPresented =
+          fiber.type === PRESENTED_PAGE_VIEW ||
+          (typeof presented === 'string' && /modal|sheet/i.test(presented));
+        if (sheet && isPresented && sheet.height > 0 && sheet.height < window.height)
+          sheetTop = window.height - sheet.height;
       }
       if (fiber.tag === HOST_COMPONENT) {
         const props = (fiber.memoizedProps ?? {}) as Record<string, unknown>;
@@ -204,10 +225,12 @@ export function collectElements(
           // The layout places a header bar above its page, which for a page drawn
           // under its header is above the window. The bar is really just below
           // the status bar; what is in it keeps its place within the bar.
-          const rect =
-            laidOut && barTop !== undefined
-              ? { ...laidOut, y: topInset + (laidOut.y - barTop) }
-              : laidOut;
+          // On a sheet the bar is at the sheet's top instead.
+          const rect = !laidOut
+            ? null
+            : barTop !== undefined
+              ? { ...laidOut, y: (sheetTop || topInset) + (laidOut.y - barTop) }
+              : { ...laidOut, y: laidOut.y + sheetTop };
           if (rect && !outside(rect)) {
             const state = props.accessibilityState as { disabled?: unknown } | undefined;
             const value = text((props.accessibilityValue as { text?: unknown } | undefined)?.text);
@@ -227,8 +250,9 @@ export function collectElements(
         }
       }
       // Sibling first, so the child is popped first and order stays the tree's.
-      if (fiber.sibling) stack.push([fiber.sibling, inherited, inheritedBar]);
-      if (fiber.child && !isPageNotInFront(fiber)) stack.push([fiber.child, page, barTop]);
+      if (fiber.sibling) stack.push([fiber.sibling, inherited, inheritedBar, inheritedSheet]);
+      if (fiber.child && !isPageNotInFront(fiber))
+        stack.push([fiber.child, page, barTop, sheetTop]);
     }
   };
   for (const root of capture.roots) if (root.current) visit(root.current);
