@@ -7,6 +7,11 @@
  * resolves a native build whose Expo fingerprint matches the current source:
  * a matching stamped build is reused, anything else is rebuilt locally. The
  * stamp is recorded on every promoted screenshot.
+ *
+ * The same steps build the end-to-end test app (`--bundled`): the Release
+ * configuration, with its JavaScript inside it and logging left on, so it
+ * launches without a bundler (ADR 0033). Its JavaScript is part of the
+ * artifact, so it is current only for the commit it was built from.
  */
 import { execFileSync, spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -38,9 +43,13 @@ const BUNDLE_ID = 'com.sovranbitcoin.dev';
 // they are outputs of the fingerprinted inputs, never inputs themselves.
 const GENERATED_NATIVE_DIRS = ['ios/**', 'android/**'];
 
+/** `dev` loads its JavaScript from a bundler; `bundled` carries it. */
+export type BuildKind = 'dev' | 'bundled';
+
 export type NativeBuildStamp = NativeBuildSummary & {
   version: 1;
   platform: Platform;
+  kind?: BuildKind;
   appVariant: 'development';
   gitDirty: boolean;
   bundleId: string;
@@ -109,11 +118,14 @@ export async function nativeFingerprint(platform: Platform): Promise<string> {
   return output;
 }
 
-const stampPath = (platform: Platform) => join(NATIVE_BUILDS, platform, 'build.json');
+const buildDir = (platform: Platform, kind: BuildKind) =>
+  join(NATIVE_BUILDS, kind === 'bundled' ? `${platform}-bundled` : platform);
+const stampPath = (platform: Platform, kind: BuildKind) =>
+  join(buildDir(platform, kind), 'build.json');
 
-function readStamp(platform: Platform): NativeBuildStamp | undefined {
+function readStamp(platform: Platform, kind: BuildKind = 'dev'): NativeBuildStamp | undefined {
   try {
-    const stamp = JSON.parse(readFileSync(stampPath(platform), 'utf8')) as NativeBuildStamp;
+    const stamp = JSON.parse(readFileSync(stampPath(platform, kind), 'utf8')) as NativeBuildStamp;
     return stamp.version === 1 && stamp.platform === platform ? stamp : undefined;
   } catch {
     return undefined;
@@ -173,7 +185,7 @@ function step(
 }
 
 function writeStamp(stamp: NativeBuildStamp) {
-  const path = stampPath(stamp.platform);
+  const path = stampPath(stamp.platform, stamp.kind ?? 'dev');
   writeFileSync(`${path}.tmp`, `${JSON.stringify(stamp, null, 2)}\n`);
   renameSync(`${path}.tmp`, path);
 }
@@ -184,8 +196,8 @@ function plistValue(app: string, key: string) {
   }).trim();
 }
 
-function retainIosApp(out: string) {
-  const products = join(out, 'DerivedData/Build/Products/Debug-iphonesimulator');
+function retainIosApp(out: string, configuration: 'Debug' | 'Release') {
+  const products = join(out, `DerivedData/Build/Products/${configuration}-iphonesimulator`);
   const app = existsSync(products)
     ? readdirSync(products).find((name) => name.endsWith('.app'))
     : undefined;
@@ -198,12 +210,13 @@ function retainIosApp(out: string) {
   return retained;
 }
 
-function iosStamp(artifact: string, fingerprint: string): NativeBuildStamp {
+function iosStamp(artifact: string, fingerprint: string, kind: BuildKind): NativeBuildStamp {
   const bundleId = plistValue(artifact, 'CFBundleIdentifier');
   if (bundleId !== BUNDLE_ID) throw new Error(`Built ${bundleId}, expected ${BUNDLE_ID}`);
   return {
     version: 1,
     platform: 'ios',
+    ...(kind === 'bundled' ? { kind } : {}),
     appVariant: 'development',
     fingerprint,
     appVersion: plistValue(artifact, 'CFBundleShortVersionString'),
@@ -217,12 +230,19 @@ function iosStamp(artifact: string, fingerprint: string): NativeBuildStamp {
   };
 }
 
-async function buildIos(fingerprint: string): Promise<NativeBuildStamp> {
-  const out = join(NATIVE_BUILDS, 'ios');
+async function buildIos(fingerprint: string, kind: BuildKind): Promise<NativeBuildStamp> {
+  const out = buildDir('ios', kind);
   mkdirSync(out, { recursive: true });
   const log = join(out, 'build.log');
   writeFileSync(log, '');
-  const env = { ...process.env, CI: '1', APP_VARIANT: 'development' };
+  const configuration = kind === 'bundled' ? 'Release' : 'Debug';
+  const env = {
+    ...process.env,
+    CI: '1',
+    APP_VARIANT: 'development',
+    // Read when Xcode bundles the JavaScript: the test app keeps its log.
+    ...(kind === 'bundled' ? { EXPO_PUBLIC_E2E_LOGS: '1' } : {}),
+  };
   if (git(['ls-files', '--', 'app/ios']).length)
     throw new Error('Refusing to clean tracked iOS sources');
   await step(
@@ -237,7 +257,7 @@ async function buildIos(fingerprint: string): Promise<NativeBuildStamp> {
   if (!workspace) throw new Error('expo prebuild produced no .xcworkspace');
   const scheme = workspace.replace(/\.xcworkspace$/, '');
   await step(
-    'xcodebuild (Debug, iOS Simulator)',
+    `xcodebuild (${configuration}, iOS Simulator)`,
     'xcodebuild',
     [
       '-workspace',
@@ -245,7 +265,7 @@ async function buildIos(fingerprint: string): Promise<NativeBuildStamp> {
       '-scheme',
       scheme,
       '-configuration',
-      'Debug',
+      configuration,
       '-sdk',
       'iphonesimulator',
       '-destination',
@@ -262,7 +282,7 @@ async function buildIos(fingerprint: string): Promise<NativeBuildStamp> {
     env,
     log
   );
-  return iosStamp(retainIosApp(out), fingerprint);
+  return iosStamp(retainIosApp(out, configuration), fingerprint, kind);
 }
 
 function apkBadging(apk: string) {
@@ -362,18 +382,32 @@ async function buildAndroid(fingerprint: string): Promise<NativeBuildStamp> {
   };
 }
 
+/** The JavaScript inside a bundled build is the tree it was built from, so it
+ *  stands only for a clean tree at that same commit. */
+export function bundledJavaScriptIsCurrent(
+  stamp: Pick<NativeBuildStamp, 'gitSha' | 'gitDirty'>,
+  head = git(['rev-parse', 'HEAD']),
+  dirty = git(['status', '--porcelain']).length > 0
+): boolean {
+  return !stamp.gitDirty && !dirty && stamp.gitSha === head;
+}
+
 /** Reuse a stamped build whose fingerprint matches current source, else rebuild. */
 export async function ensureNativeBuild(
   platform: Platform,
-  policy: RebuildPolicy = 'auto'
+  policy: RebuildPolicy = 'auto',
+  kind: BuildKind = 'dev'
 ): Promise<NativeBuildStamp> {
+  if (kind === 'bundled' && platform !== 'ios')
+    throw new Error('The bundled test build exists for iOS only so far');
   const fingerprint = await nativeFingerprint(platform);
-  const stamp = readStamp(platform);
+  const stamp = readStamp(platform, kind);
   const current =
     stamp?.fingerprint === fingerprint &&
     existsSync(stamp.artifact) &&
     Boolean(stamp.artifactSha256) &&
-    nativeArtifactHash(stamp.artifact) === stamp.artifactSha256;
+    nativeArtifactHash(stamp.artifact) === stamp.artifactSha256 &&
+    (kind === 'dev' || bundledJavaScriptIsCurrent(stamp));
   if (current && policy !== 'force') {
     console.log(
       `${platform}: reusing native build ${stamp.appVersion} (${stamp.buildNumber}) from ${stamp.builtAt}`
@@ -387,7 +421,8 @@ export async function ensureNativeBuild(
   console.log(
     `${platform}: ${stamp ? 'native inputs changed' : 'no stamped native build'}; building locally (this takes a while)`
   );
-  const built = platform === 'ios' ? await buildIos(fingerprint) : await buildAndroid(fingerprint);
+  const built =
+    platform === 'ios' ? await buildIos(fingerprint, kind) : await buildAndroid(fingerprint);
   // Source must not change under the build, or the stamp would lie.
   if ((await nativeFingerprint(platform)) !== fingerprint)
     throw new Error(`${platform}: native inputs changed during the build; rerun once edits settle`);
@@ -398,12 +433,16 @@ export async function ensureNativeBuild(
 
 if (import.meta.main) {
   try {
-    const [platform, flag] = process.argv.slice(2);
+    const [platform, ...flags] = process.argv.slice(2);
+    const kind: BuildKind = flags.includes('--bundled') ? 'bundled' : 'dev';
+    const [flag] = flags.filter((value) => value !== '--bundled');
     if (platform !== 'ios' && platform !== 'android')
-      throw new Error('Usage: bun app/e2e/press/native-build.ts ios|android [--force|--status]');
+      throw new Error(
+        'Usage: bun app/e2e/press/native-build.ts ios|android [--bundled] [--force|--status]'
+      );
     if (flag === '--status') {
       const fingerprint = await nativeFingerprint(platform);
-      const stamp = readStamp(platform);
+      const stamp = readStamp(platform, kind);
       console.log(
         JSON.stringify(
           {
@@ -412,7 +451,8 @@ if (import.meta.main) {
             current:
               stamp?.fingerprint === fingerprint &&
               Boolean(stamp?.artifactSha256) &&
-              nativeArtifactHash(stamp!.artifact) === stamp!.artifactSha256,
+              nativeArtifactHash(stamp!.artifact) === stamp!.artifactSha256 &&
+              (kind === 'dev' || bundledJavaScriptIsCurrent(stamp!)),
           },
           null,
           2
@@ -420,7 +460,7 @@ if (import.meta.main) {
       );
     } else {
       if (flag !== undefined && flag !== '--force') throw new Error('Choose --force or --status');
-      const stamp = await ensureNativeBuild(platform, flag === '--force' ? 'force' : 'auto');
+      const stamp = await ensureNativeBuild(platform, flag === '--force' ? 'force' : 'auto', kind);
       console.log(JSON.stringify(stamp, null, 2));
     }
   } catch (error) {
