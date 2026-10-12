@@ -421,6 +421,13 @@ function logFeedPageResult(
  * newest-first, derive the next-page `until` cursor, and lift the hydration side
  * maps into the result Maps.
  */
+/** Seconds at which a page ends by its own entries, or 0 when it does not say. */
+function pageEndSeconds(endCursor: unknown): number {
+  if (typeof endCursor !== 'object' || endCursor === null) return 0;
+  const { createdAt } = endCursor as { createdAt?: unknown };
+  return typeof createdAt === 'number' ? createdAt : 0;
+}
+
 function notificationsResultFromPage(page: NaggNotificationsPage): FeedNotificationsResult {
   const notifications = page.notifications.nodes
     .map((node) => {
@@ -450,10 +457,12 @@ function notificationsResultFromPage(page: NaggNotificationsPage): FeedNotificat
     metricsMap: new Map(Object.entries(page.metrics)) as Map<string, NoteMetrics>,
     profilesMap: new Map(Object.entries(page.profiles)) as Map<string, ProfileInfo>,
     quotedEventsMap: new Map(Object.entries(page.quoted)) as Map<string, FeedEvent>,
+    // A page with entries and no readable event still ends somewhere: the
+    // next page starts from the page's own end, not from the beginning.
     paginationUntil:
       notifications.length > 0
         ? Math.min(...notifications.map((notification) => notification.event.created_at))
-        : 0,
+        : pageEndSeconds(page.notifications.pageInfo?.endCursor),
     hasNextPage: page.notifications.pageInfo?.hasNextPage ?? false,
   };
 }

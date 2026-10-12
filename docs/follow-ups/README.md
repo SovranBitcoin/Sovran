@@ -105,7 +105,6 @@ reports) keep their evidence, and link here for anything still open.
 | [F113](F113.md) | high | decision | A store with one bad saved field runs on defaults for every field, and nothing says so |
 | [F119](F119.md) | low | device | Switch and Connect has not been run on a phone since the pairing link moved to secure storage |
 | [F120](F120.md) | low | decision | Decide which protocol specification rules become saved checks |
-| [F121](F121.md) | medium | fix | A notifications page whose events were all left out ends paging for that tier |
 | [F122](F122.md) | low | fix | The app can publish an event its own reader then leaves out |
 | [F123](F123.md) | medium | fix | A wallet initialise or teardown that never settles blocks every later open |
 

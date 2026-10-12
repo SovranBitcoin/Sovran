@@ -781,6 +781,11 @@ export type NaggNotificationNode = {
 export type NaggNotificationsPage = {
   notifications: {
     nodes: NaggNotificationNode[];
+    /**
+     * `endCursor` is where the page ends by the envelope's own entries, as
+     * `{ createdAt, id }`, whether or not their events could be read. A page
+     * all of whose events were left out still says where the next one starts.
+     */
     pageInfo?: { endCursor?: unknown; hasNextPage?: boolean };
   };
   metrics: Record<string, NaggNoteMetrics>;
@@ -801,9 +806,14 @@ export function notificationsPageFromEnvelope(
   const byId = envelopeEventsById(envelope);
   const nodes: NaggNotificationNode[] = [];
   const metricIds = new Set<string>();
+  // Entries arrive newest first; the last one with a known time ends the page.
+  let endCursor: { createdAt: number; id: string } | undefined;
 
   for (const entry of envelope.entries) {
     const event = byId.get(entry.id);
+    // An entry whose event was left out is still dated by its newest actor.
+    const createdAt = event?.created_at ?? entry.actors[0]?.createdAt;
+    if (typeof createdAt === 'number') endCursor = { createdAt, id: entry.id };
     if (!event) continue;
     const reason = deriveNotificationReason(entry, event);
     if (!reason) continue;
@@ -829,7 +839,7 @@ export function notificationsPageFromEnvelope(
   return {
     notifications: {
       nodes,
-      pageInfo: { hasNextPage: envelope.hasNext },
+      pageInfo: { hasNextPage: envelope.hasNext, ...(endCursor ? { endCursor } : {}) },
     },
     metrics: noteMetricsMapFromAggregates(envelope.aggregates, metricIds),
     profiles: profileInfoMapFromEnvelope(envelope),

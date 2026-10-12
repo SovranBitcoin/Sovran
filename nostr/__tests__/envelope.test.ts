@@ -25,6 +25,7 @@ import {
   orderedEnvelopeEvents,
 } from '../src/envelope';
 import { bundleFromDmEnvelope } from '../src/facade/dm';
+import { bundleFromNotifications } from '../src/facade/notifications';
 import { searchHitsFromEnvelope } from '../src/facade/search';
 import { bundleFromFeedPage, statsFromMetrics } from '../src/facade/feed';
 
@@ -786,5 +787,53 @@ describe('bounded envelope fields', () => {
     expect(envelope.entries.map((each) => each.id)).toEqual([NOTE_ID, ORIGINAL_ID]);
     expect(envelope.entries[0]?.actors).toEqual([{ pubkey: ACTOR, eventId: NOTE_ID, createdAt: 5 }]);
     expect(envelope.entries[1]?.target).toBeUndefined();
+  });
+});
+
+describe('a notifications page whose events were all left out', () => {
+  const entry = (id: string, createdAt: number) => ({
+    id,
+    kind: 7,
+    actor: ACTOR,
+    target: ROOT_ID,
+    actors: [{ pubkey: ACTOR, eventId: id, createdAt }],
+  });
+  const envelope = (hasNext: boolean) =>
+    NaggNotificationsEnvelopeSchema.parse({
+      order: [],
+      orderBy: 'created_at',
+      // Both triggering events are malformed and left out by the parse.
+      events: [event(NOTE_ID, { pubkey: 'not-a-key' }), event(REPOST_ID, { pubkey: 'not-a-key' })],
+      aggregates: {},
+      entries: [entry(NOTE_ID, 200), entry(REPOST_ID, 100)],
+      hasNext,
+    });
+
+  test('still says where the page ends, so the next page is asked for', () => {
+    const page = notificationsPageFromEnvelope(envelope(true));
+    expect(page.notifications.nodes).toEqual([]);
+    expect(page.notifications.pageInfo).toEqual({
+      hasNextPage: true,
+      endCursor: { createdAt: 100, id: REPOST_ID },
+    });
+    expect(bundleFromNotifications(page, true).cursor).toEqual({ createdAt: 100, id: REPOST_ID });
+  });
+
+  test('ends paging when the backend says there is no more', () => {
+    expect(bundleFromNotifications(notificationsPageFromEnvelope(envelope(false)), true).cursor).toBeNull();
+  });
+
+  test('a page with readable events still ends at its last row', () => {
+    const page = notificationsPageFromEnvelope(
+      NaggNotificationsEnvelopeSchema.parse({
+        order: [],
+        orderBy: 'created_at',
+        events: [event(NOTE_ID, { kind: 7, tags: [['e', ROOT_ID], ['p', VIEWER]], created_at: 150 })],
+        aggregates: {},
+        entries: [entry(NOTE_ID, 150)],
+        hasNext: true,
+      }),
+    );
+    expect(bundleFromNotifications(page, true).cursor).toEqual({ createdAt: 150, id: NOTE_ID });
   });
 });

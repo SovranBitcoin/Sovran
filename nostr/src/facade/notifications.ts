@@ -106,6 +106,13 @@ export function notificationKey(node: NotificationItem): string {
   return `${node.reason}:${target}`;
 }
 
+/** The page's own end, when the source says where it is. */
+function pageEnd(endCursor: unknown): NostrCursor {
+  if (typeof endCursor !== 'object' || endCursor === null) return null;
+  const { createdAt, id } = endCursor as { createdAt?: unknown; id?: unknown };
+  return typeof createdAt === 'number' && typeof id === 'string' ? { createdAt, id } : null;
+}
+
 export function bundleFromNotifications(source: NotificationsSource, grouped: boolean): NotificationsBundle {
   const itemsById = new Map<string, NotificationItem>();
   const elements: string[] = [];
@@ -119,9 +126,14 @@ export function bundleFromNotifications(source: NotificationsSource, grouped: bo
 
   const lastKey = elements[elements.length - 1];
   const lastNode = lastKey ? itemsById.get(lastKey) : undefined;
+  // A page can hold entries and no rows: every triggering event was left out
+  // as malformed. A null cursor would mark the tier exhausted and its older
+  // notifications would never be asked for, so the page's own end is used.
   const cursor: NostrCursor = lastNode
     ? { createdAt: lastNode.event.created_at, id: lastNode.event.id }
-    : null;
+    : source.notifications.pageInfo?.hasNextPage
+      ? pageEnd(source.notifications.pageInfo.endCursor)
+      : null;
 
   return {
     itemsById,
