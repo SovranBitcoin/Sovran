@@ -152,6 +152,7 @@ test("copy package is private and dependency-free with explicit source exports",
   assert.equal(pkg.devDependencies, undefined);
   assert.deepEqual(pkg.exports, {
     "./onboarding": "./src/onboarding.ts",
+    "./prompts": "./src/prompts.ts",
     "./legal": "./legal/documents.json",
     "./site": "./src/site.ts",
     "./claims": "./claims.json",
