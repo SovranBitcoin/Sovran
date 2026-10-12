@@ -1,6 +1,7 @@
 import { isLegacyMockProfile } from '@/shared/stores/runtime/legacyMockProfiles';
 import { createNaggClient, setNostrLogger, facade, type NostrLogger } from 'nostr';
 
+import { registerAccountScoped } from '@/shared/lib/account/accountRegistry';
 import { log } from '@/shared/lib/logger';
 import { getNostrTierConfig } from '@/shared/lib/nostr/nostrTierConfig';
 import { registerNostrDataLayer } from '@/shared/lib/nostr/dataLayerRegistry';
@@ -26,9 +27,13 @@ const WRITE_BEHIND_DEBOUNCE_MS = 5_000;
 // refetch. (Previously each call built a fresh facade with a fresh cache, so the
 // cache never accumulated across reads.)
 //
-// On identity switch the active pubkey changes, so the memo misses and the old
-// profile-scoped cache is cleared and replaced — one account never serves
-// another's cached data (ADR-0002). Tier toggles (Settings → Network) likewise
+// On an account switch the layer is disposed through the account registry while
+// the old account still owns its storage: its pending profile snapshot is
+// written there, its listener is removed and its cache is cleared. A rebuild
+// that finds a different pubkey (the first account being created, or a layer
+// built again after the dispose) drops the old snapshot instead of writing it,
+// because the profile-scoped mirror is by then the new account's. One account
+// never serves or stores another's cached data (ADR-0002). Tier toggles (Settings → Network) likewise
 // rebuild, so a disabled tier drops out of the nagg → Primal → relay chain.
 // ---------------------------------------------------------------------------
 
@@ -82,8 +87,12 @@ type LayerMemo = {
   layer: facade.NostrDataLayer;
   configKey: string;
   pubkey: string | undefined;
-  /** Tears down the profile-cache write-behind subscription on rebuild/switch. */
-  teardownPersistence: () => void;
+  /**
+   * Removes the profile-cache write-behind listener. `write` saves a pending
+   * snapshot first; `drop` discards it, for when the mirror is no longer this
+   * layer's account's.
+   */
+  teardownPersistence: (pending: 'write' | 'drop') => void;
 };
 
 let memo: LayerMemo | null = null;
@@ -114,9 +123,9 @@ function seedPersistedProfiles(layer: facade.NostrDataLayer): void {
  * Mirror the entity cache's profile snapshot to durable storage (write-behind,
  * debounced) so the boot-seed above has data next launch. The entity cache is
  * the single owner; this store is purely its persistent tail. Returns a
- * teardown that cancels the subscription + any pending flush.
+ * teardown that removes the listener and writes or drops a pending snapshot.
  */
-function startProfilePersistence(layer: facade.NostrDataLayer): () => void {
+function startProfilePersistence(layer: facade.NostrDataLayer): LayerMemo['teardownPersistence'] {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const flush = () => {
     timer = undefined;
@@ -132,15 +141,13 @@ function startProfilePersistence(layer: facade.NostrDataLayer): () => void {
     if (timer) return; // a flush is already scheduled
     timer = setTimeout(flush, WRITE_BEHIND_DEBOUNCE_MS);
   });
-  return () => {
-    // Flush any debounced write before tearing down (e.g. on profile switch /
-    // tier rebuild) so records the cache already observed aren't dropped with
-    // the pending timer.
-    if (timer) {
-      clearTimeout(timer);
-      flush();
-    }
+  return (pending) => {
     unsub();
+    if (!timer) return;
+    clearTimeout(timer);
+    timer = undefined;
+    // Records the cache already observed are not lost with the pending timer.
+    if (pending === 'write') flush();
   };
 }
 
@@ -184,11 +191,12 @@ export function buildNostrDataLayer(): facade.NostrDataLayer | null {
 
   if (memo && memo.configKey === configKey && memo.pubkey === pubkey) return memo.layer;
 
-  // Rebuild (identity switch or tier-toggle change): tear down the prior
-  // write-behind, and on an identity switch drop the prior profile's cache.
+  // A tier toggle keeps the account, so its pending snapshot is saved. A
+  // different pubkey means the mirror now belongs to someone else.
   if (memo) {
-    memo.teardownPersistence();
-    if (memo.pubkey !== pubkey) {
+    const sameAccount = memo.pubkey === pubkey;
+    memo.teardownPersistence(sameAccount ? 'write' : 'drop');
+    if (!sameAccount) {
       memo.layer.cache.clear();
       log.info('nostr.facade.profile_switch_cleared');
     }
@@ -206,3 +214,16 @@ export function buildNostrDataLayer(): facade.NostrDataLayer | null {
   registerNostrDataLayer(layer);
   return layer;
 }
+
+// Runs in the account switch while the old account still owns profile storage.
+registerAccountScoped(
+  'nostr.data-layer',
+  () => {
+    if (!memo) return;
+    memo.teardownPersistence('write');
+    memo.layer.cache.clear();
+    memo = null;
+    registerNostrDataLayer(null);
+  },
+  () => memo === null
+);

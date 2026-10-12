@@ -38,7 +38,6 @@ reports) keep their evidence, and link here for anything still open.
 | [F07](F07.md) | medium | decision | Add app-wide translation: one locale service with Lingui catalogs |
 | [F09](F09.md) | medium | upstream | apiClient loosens the shared profile schemas locally; reconcile with the schemas package |
 | [F12](F12.md) | medium | upstream | vendor-marmot-ts.sh tolerates a missing source and records no revision or license |
-| [F13](F13.md) | medium | investigation | Check that a Nostr data layer rebuild leaves no old listener or late profile write |
 | [F14](F14.md) | low | device | Move remaining StyleSheet.create and inline styles through the styling ratchet |
 | [F15](F15.md) | low | decision | Record image asset sources and licenses; shorten the 1 s image fade on dense rows |
 | [F16](F16.md) | low | device | Run accessibility, reduced-motion and release-mode performance scenarios on devices |
