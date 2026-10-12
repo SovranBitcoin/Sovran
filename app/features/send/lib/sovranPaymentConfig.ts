@@ -1274,8 +1274,9 @@ export function createSovranHandlers({
       );
     },
 
-    // The token waiting on this review stays in the machine's step data. The
-    // mint's page reads none of it, and a route param is no place for ecash.
+    // The token waiting on this review stays on the receive page underneath,
+    // which redeems it when Redeem is pressed again. The mint's page reads none
+    // of it, so it is not copied onto this route.
     reviewMint: ({ mintUrl, mintInfo }) => {
       const entry = {
         ...(mintInfo ?? {}),
