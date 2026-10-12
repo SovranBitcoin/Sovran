@@ -45,7 +45,7 @@ interface FabricUIManager {
 const HOST_COMPONENT = 5;
 const HOST_TEXT = 6;
 
-export interface ElementInfo {
+interface ElementInfo {
   /** `testID`. */
   id?: string;
   /** Accessibility label. */

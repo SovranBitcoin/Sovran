@@ -32,7 +32,7 @@ export interface AppSettled {
 }
 
 /** A control as the app reports it: laid-out frame in points, tree order. */
-export interface AppElement {
+interface AppElement {
   id?: string;
   label?: string;
   value?: string;

@@ -30,7 +30,7 @@ const RunnerNoteSchema = z.object({
   url: z.string().regex(/^ws:\/\/(127\.0\.0\.1|localhost|10\.0\.2\.2):\d{2,5}$/),
   run: z.string().min(1).max(120),
 });
-export type RunnerNote = z.infer<typeof RunnerNoteSchema>;
+type RunnerNote = z.infer<typeof RunnerNoteSchema>;
 
 const RequestSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('mark'), step: z.string().min(1).max(200) }),
@@ -124,7 +124,7 @@ const STILL_FRAMES = 2;
 /** A page whose slide never reports its end is taken to have stopped after this long. */
 const SLIDE_GIVE_UP_MS = 3000;
 
-export interface SettleReport {
+interface SettleReport {
   appClockMs: number;
   /** True when a slide was given up on rather than seen to end. */
   forced: boolean;

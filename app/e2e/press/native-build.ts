@@ -33,7 +33,8 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
-import { join } from 'node:path';
+import { createRequire } from 'node:module';
+import { dirname, join } from 'node:path';
 import { ROOT, type Platform } from './plan';
 import type { NativeBuildSummary } from './promote';
 import { resolveAndroidSdkRoot } from '../drivers/android/adb';
@@ -400,6 +401,13 @@ export function bundledJavaScriptIsCurrent(
  * the Hermes compiler. The app is signed again because its contents changed;
  * the entitlements SecureStore needs are kept.
  */
+/** The Hermes compiler React Native itself depends on and Xcode's bundling phase runs. */
+function hermesCompiler(): string {
+  const fromReactNative = createRequire(require.resolve('react-native/package.json'));
+  const packageJson = fromReactNative.resolve(['hermes-compiler', 'package.json'].join('/'));
+  return join(dirname(packageJson), 'hermesc/osx-bin/hermesc');
+}
+
 async function refreshBundledJavaScript(stamp: NativeBuildStamp): Promise<NativeBuildStamp> {
   const out = buildDir('ios', 'bundled');
   const log = join(out, 'build.log');
@@ -431,7 +439,7 @@ async function refreshBundledJavaScript(stamp: NativeBuildStamp): Promise<Native
     );
     await step(
       'hermesc',
-      require.resolve('hermes-compiler/hermesc/osx-bin/hermesc'),
+      hermesCompiler(),
       ['-emit-binary', '-O', '-out', join(stamp.artifact, 'main.jsbundle'), plain],
       APP_DIR,
       env,
