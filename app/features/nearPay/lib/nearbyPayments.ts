@@ -364,7 +364,7 @@ function sendWithBluetoothAck(
       () => finish(new Error('Bluetooth acknowledgement timed out')),
       12_000
     );
-    void sendBLEPrivateMessage(peerID, content, nickname, messageID).catch((error) =>
+    void sendBLEPrivateMessage({ peerID, content, nickname, messageID }).catch((error) =>
       finish(error instanceof Error ? error : new Error('Bluetooth delivery failed'))
     );
   });

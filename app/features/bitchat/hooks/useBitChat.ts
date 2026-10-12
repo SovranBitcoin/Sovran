@@ -182,7 +182,7 @@ export function useBitChat(
     // start.
     if (!profileScope || !identityMaterial) return;
 
-    startBLE(nickname, profileScope, identityMaterial)
+    startBLE({ nickname, profileScope, identityMaterial })
       .then(() => {
         const state = getBLEState();
         bitchatLog.info('bitchat.hook.ble_started', { state });
@@ -270,7 +270,7 @@ export function useBitChat(
     bitchatLog.info('bitchat.hook.ble_dm_setup', { peerID: dmPeerID });
 
     // Reuse the mesh if it's already running (no-op); otherwise start it.
-    startBLE(nickname, profileScope, identityMaterial)
+    startBLE({ nickname, profileScope, identityMaterial })
       .then(() => setIsConnected(true))
       .catch((err) => {
         bitchatLog.error('bitchat.hook.ble_start_failed', {
@@ -510,7 +510,12 @@ export function useBitChat(
 
           try {
             const startedAt = Date.now();
-            const returnedID = await sendBLEPrivateMessage(dmPeerID, content, nickname, messageID);
+            const returnedID = await sendBLEPrivateMessage({
+              peerID: dmPeerID,
+              content,
+              nickname,
+              messageID,
+            });
             // Diagnostic: confirms the native AsyncFunction returned cleanly
             // (mesh started, peerID valid, dispatch enqueued). Useful for
             // distinguishing "native send rejected" from "native sent but no

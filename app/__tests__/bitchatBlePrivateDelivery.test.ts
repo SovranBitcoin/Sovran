@@ -51,11 +51,11 @@ describe('BitChat BLE private delivery', () => {
       resolveFirst = resolve;
     });
     const sendBLEPrivateMessage = jest
-      .fn<Promise<string>, [string, string, string, string]>()
+      .fn<Promise<string>, Parameters<typeof import('bitchat-module').sendBLEPrivateMessage>>()
       .mockImplementationOnce(() => firstSend)
       .mockResolvedValueOnce('message-2');
     const startBLE = jest
-      .fn<Promise<void>, [string, string, BitchatBLEIdentityMaterial]>()
+      .fn<Promise<void>, Parameters<typeof import('bitchat-module').startBLE>>()
       .mockResolvedValue(undefined);
     const startBLEPrivateChat = jest.fn<Promise<void>, [string]>().mockResolvedValue(undefined);
     const sleep = jest.fn<Promise<void>, [number]>().mockResolvedValue(undefined);
@@ -80,32 +80,34 @@ describe('BitChat BLE private delivery', () => {
 
     await new Promise<void>((resolve) => setImmediate(resolve));
     expect(sendBLEPrivateMessage).toHaveBeenCalledTimes(1);
-    expect(sendBLEPrivateMessage).toHaveBeenNthCalledWith(
-      1,
-      'peer-a',
-      'abc',
-      'sender',
-      'message-1'
-    );
+    expect(sendBLEPrivateMessage).toHaveBeenNthCalledWith(1, {
+      peerID: 'peer-a',
+      content: 'abc',
+      nickname: 'sender',
+      messageID: 'message-1',
+    });
 
     resolveFirst?.('message-1');
     await delivery;
 
     expect(sendBLEPrivateMessage).toHaveBeenCalledTimes(2);
-    expect(sendBLEPrivateMessage).toHaveBeenNthCalledWith(
-      2,
-      'peer-a',
-      'def',
-      'sender',
-      'message-2'
-    );
-    expect(startBLE).toHaveBeenCalledWith('sender', 'profile-a', IDENTITY_MATERIAL);
+    expect(sendBLEPrivateMessage).toHaveBeenNthCalledWith(2, {
+      peerID: 'peer-a',
+      content: 'def',
+      nickname: 'sender',
+      messageID: 'message-2',
+    });
+    expect(startBLE).toHaveBeenCalledWith({
+      nickname: 'sender',
+      profileScope: 'profile-a',
+      identityMaterial: IDENTITY_MATERIAL,
+    });
     expect(startBLEPrivateChat).toHaveBeenCalledWith('peer-a');
   });
 
   it('fails safely before native calls when profile scope is missing', async () => {
     const startBLE = jest
-      .fn<Promise<void>, [string, string, BitchatBLEIdentityMaterial]>()
+      .fn<Promise<void>, Parameters<typeof import('bitchat-module').startBLE>>()
       .mockResolvedValue(undefined);
 
     await expect(
@@ -124,7 +126,7 @@ describe('BitChat BLE private delivery', () => {
 
   it('fails safely before native calls when identity material is missing', async () => {
     const startBLE = jest
-      .fn<Promise<void>, [string, string, BitchatBLEIdentityMaterial]>()
+      .fn<Promise<void>, Parameters<typeof import('bitchat-module').startBLE>>()
       .mockResolvedValue(undefined);
 
     await expect(

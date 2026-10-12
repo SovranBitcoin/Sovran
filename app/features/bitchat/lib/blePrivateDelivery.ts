@@ -128,7 +128,7 @@ function prepareBLEPrivateSend({
     createMessageId,
     async open() {
       const startupAt = now();
-      await startBLEFn(effectiveNickname, profileScope, identityMaterial);
+      await startBLEFn({ nickname: effectiveNickname, profileScope, identityMaterial });
       const startupMs = now() - startupAt;
 
       const handshakeAt = now();
@@ -142,7 +142,12 @@ function prepareBLEPrivateSend({
       return { startupMs, handshakeMs, ...(handshakeError ? { handshakeError } : {}) };
     },
     send: (content: string, messageId: string) =>
-      sendPrivateMessageFn(peerID, content, effectiveNickname, messageId),
+      sendPrivateMessageFn({
+        peerID,
+        content,
+        nickname: effectiveNickname,
+        messageID: messageId,
+      }),
   };
 }
 

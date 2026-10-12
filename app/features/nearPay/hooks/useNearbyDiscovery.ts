@@ -223,12 +223,15 @@ export function useNearbyDiscovery(): void {
           now
         );
         sent.set(peer.peerID, { at: now, creq: input.creq, fingerprint });
-        void sendBLEPrivateMessage(peer.peerID, message, nickname, `cap-${ourPeerID}-${now}`).catch(
-          (error) => {
-            sent.delete(peer.peerID);
-            report(error);
-          }
-        );
+        void sendBLEPrivateMessage({
+          peerID: peer.peerID,
+          content: message,
+          nickname,
+          messageID: `cap-${ourPeerID}-${now}`,
+        }).catch((error) => {
+          sent.delete(peer.peerID);
+          report(error);
+        });
       }
       // Bound hostile discovery churn as well as work per tick.
       for (const [id, cap] of capabilities)
@@ -251,7 +254,12 @@ export function useNearbyDiscovery(): void {
     });
     const start = () => {
       if (!current() || AppState.currentState !== 'active') return;
-      void startBLE(nickname || 'sovran', profileScope, identityMaterial, null)
+      void startBLE({
+        nickname: nickname || 'sovran',
+        profileScope,
+        identityMaterial,
+        creq: null,
+      })
         .then(refresh)
         .catch(report);
     };

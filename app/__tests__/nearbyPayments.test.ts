@@ -153,7 +153,7 @@ beforeEach(() => {
   };
   mockActive = { id: 'session-a', recipient: mockPeer };
   mockNostr.mockResolvedValue(undefined);
-  mockBle.mockImplementation(async (_peer, _content, _name, id: string) => {
+  mockBle.mockImplementation(async ({ messageID: id }: { messageID: string }) => {
     mockListener?.({ messageID: id, status: 'delivered' });
   });
 });
@@ -171,7 +171,7 @@ it('recovers an operation-bound intent and sends identical NUT-18 bytes over bot
   mockManager = manager();
   mockActive = { id: 'new-session', recipient: { ...mockPeer, peerID: 'other-peer' } };
   await nearbyPayments(mockManager).drain(new Uint8Array(32).fill(1), identity, 'Alice');
-  const bleContent = mockBle.mock.calls[0][1];
+  const bleContent = mockBle.mock.calls[0][0].content;
   const nostrContent = mockNostr.mock.calls[0][0].event.content;
   expect(bleContent).toBe(NEARBY_PAYMENT_PREFIX + nostrContent);
   expect(JSON.parse(nostrContent)).toMatchObject({
@@ -180,7 +180,7 @@ it('recovers an operation-bound intent and sends identical NUT-18 bytes over bot
     unit: 'sat',
     proofs: [{ amount: 1, secret: 'test-secret' }],
   });
-  expect(mockBle.mock.calls[0][0]).toBe('peer-a');
+  expect(mockBle.mock.calls[0][0].peerID).toBe('peer-a');
   expect(mockComplete).not.toHaveBeenCalled();
 });
 
