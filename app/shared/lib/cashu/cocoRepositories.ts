@@ -127,7 +127,24 @@ interface SovranCocoRepositoriesOptions {
    * key). Empty set → keyring passes through untouched.
    */
   ephemeralKeyringPubkeys?: ReadonlySet<string>;
+  /**
+   * Save `counter` for the keyset unless a higher one is already saved, in ONE
+   * statement on the database's root connection. Without it the wrapper reads
+   * the counter and then writes it, and a transaction (which runs on its own
+   * connection and its own queue) can commit a higher value between the two,
+   * which the write would then lower. See `raiseCounterStatement`.
+   */
+  raiseCounter?: (mintUrl: string, keysetId: string, counter: number) => Promise<void>;
 }
+
+/**
+ * The statement behind `raiseCounter`, for Coco's counter table. It names
+ * Coco's table and columns, so `__tests__/cocoCounterRaise.test.ts` runs it
+ * against a wallet database written by the shipped Coco adapter.
+ */
+export const raiseCounterStatement = `INSERT INTO coco_cashu_counters (mintUrl, keysetId, counter)
+       VALUES (?, ?, ?)
+       ON CONFLICT(mintUrl, keysetId) DO UPDATE SET counter = MAX(counter, excluded.counter)`;
 
 function overlayRepositoryScope(
   scope: RepositoryTransactionScope,
@@ -191,7 +208,9 @@ function createCounterWriteQueue(): (key: string, task: CounterTask) => Promise<
 function wrapCounterRepository(
   repository: CounterRepository,
   proofs: ProofRepository,
-  enqueue: (key: string, task: CounterTask) => Promise<void>
+  enqueue: (key: string, task: CounterTask) => Promise<void>,
+  /** Root connection only. Inside a transaction nothing else can write between a read and a write. */
+  raise?: SovranCocoRepositoriesOptions['raiseCounter']
 ): CounterRepository {
   return {
     getCounter: async (mintUrl, keysetId) => {
@@ -205,6 +224,11 @@ function wrapCounterRepository(
       // the answer is whatever the queued task finds or leaves saved.
       let counter = 1;
       await enqueue(`${mintUrl}\u0000${keysetId}`, async () => {
+        if (raise) {
+          await raise(mintUrl, keysetId, 1);
+          counter = (await repository.getCounter(mintUrl, keysetId))?.counter ?? 1;
+          return;
+        }
         const current = await repository.getCounter(mintUrl, keysetId);
         if (current && current.counter >= 1) {
           counter = current.counter;
@@ -218,6 +242,12 @@ function wrapCounterRepository(
     setCounter: async (mintUrl, keysetId, requested) => {
       const counter = Math.max(requested, 1);
       await enqueue(`${mintUrl}\u0000${keysetId}`, async () => {
+        if (raise) {
+          // One statement: whatever is saved when it runs, the larger stays.
+          await raise(mintUrl, keysetId, counter);
+          cashuLog.debug('cashu.repository.counter.write_raised', { keysetId, requested, counter });
+          return;
+        }
         const current = await repository.getCounter(mintUrl, keysetId);
         if (current && current.counter >= counter) {
           cashuLog.debug('cashu.repository.counter.write_skipped', {
@@ -260,7 +290,8 @@ export function createSovranCocoRepositories(
   const counter = wrapCounterRepository(
     repositories.counterRepository,
     repositories.proofRepository,
-    enqueueCounterWrite
+    enqueueCounterWrite,
+    options.raiseCounter
   );
 
   return {

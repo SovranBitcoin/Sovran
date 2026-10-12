@@ -104,7 +104,6 @@ reports) keep their evidence, and link here for anything still open.
 | [F112](F112.md) | medium | device | A wallet from 0.0.61 or earlier has no keysets after upgrading until its mint answers |
 | [F113](F113.md) | high | decision | A store with one bad saved field runs on defaults for every field, and nothing says so |
 | [F116](F116.md) | medium | fix | A swap step that depends on money still settling is retried or skipped as if it had not been sent |
-| [F118](F118.md) | medium | fix | The wallet counter guard reads then writes; one statement would close the window a transaction can use |
 | [F119](F119.md) | low | device | Switch and Connect has not been run on a phone since the pairing link moved to secure storage |
 | [F120](F120.md) | low | decision | Decide which protocol specification rules become saved checks |
 | [F121](F121.md) | medium | fix | A notifications page whose events were all left out ends paging for that tier |

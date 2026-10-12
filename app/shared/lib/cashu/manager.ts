@@ -16,7 +16,7 @@ import {
   ExpoSqliteRepositories,
   type ExpoSqliteRepositoriesOptions,
 } from '@cashu/coco-expo-sqlite';
-import { createSovranCocoRepositories } from './cocoRepositories';
+import { createSovranCocoRepositories, raiseCounterStatement } from './cocoRepositories';
 import {
   askForRestoreIfWalletDatabaseLost,
   recordWalletDatabaseCreated,
@@ -802,7 +802,12 @@ export class CocoManager {
         });
         const repositories = createSovranCocoRepositories(
           new ExpoSqliteRepositories({ database }),
-          { ephemeralKeyringPubkeys }
+          {
+            ephemeralKeyringPubkeys,
+            raiseCounter: async (mintUrl, keysetId, counter) => {
+              await db.runAsync(raiseCounterStatement, [mintUrl, keysetId, counter]);
+            },
+          }
         );
         // Decided here, while the database is still empty: once the migrations
         // below have run, a wallet that was lost looks like any other.
