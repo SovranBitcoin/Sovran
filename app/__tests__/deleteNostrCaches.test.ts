@@ -14,7 +14,8 @@ jest.mock('expo-file-system/legacy', () => ({
   documentDirectory: 'file:///docs/',
   readDirectoryAsync: jest.fn(),
   deleteAsync: jest.fn(async (path: string) => void mockDeleted.push(path)),
-  getInfoAsync: jest.fn(async () => ({ exists: false })),
+  // The SQLite directory exists; no file in it is reported as left behind.
+  getInfoAsync: jest.fn(async (path: string) => ({ exists: path.endsWith('SQLite/') })),
 }));
 jest.mock('expo-sqlite', () => ({ openDatabaseAsync: jest.fn() }));
 jest.mock('expo-secure-store', () => ({
@@ -61,10 +62,10 @@ it('deletes the caches of listed accounts and of any other account found on disk
   expect(databases().sort()).toEqual(['nostr', 'nostr-1', 'nostr-4', 'nostr-9']);
 });
 
-it('still deletes the listed caches when the directory cannot be read', async () => {
-  jest.mocked(FileSystem.readDirectoryAsync).mockRejectedValueOnce(new Error('no such directory'));
+it('deletes the listed caches and then reports a directory it could not list', async () => {
+  jest.mocked(FileSystem.readDirectoryAsync).mockRejectedValueOnce(new Error('permission denied'));
 
-  await deleteNostrCaches([0, 3]);
+  await expect(deleteNostrCaches([0, 3])).rejects.toThrow('Nostr caches could not be listed');
 
   expect(databases().sort()).toEqual(['nostr', 'nostr-3']);
 });

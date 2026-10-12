@@ -465,19 +465,18 @@ export class CocoManager {
    * database itself, a journal beside it, or a pre-v2 backup of it.
    */
   private static async walletDatabasesOnDisk(): Promise<string[]> {
-    try {
-      const files = await FileSystem.readDirectoryAsync(`${FileSystem.documentDirectory}SQLite/`);
-      const names = new Set<string>();
-      for (const file of files) {
-        const name = /^(coco(?:-\d+)?\.db)(?:$|[-.])/.exec(file)?.[1];
-        if (name) names.add(name);
-      }
-      return [...names];
-    } catch (error) {
-      // No directory yet means no databases. The listed ones are still deleted.
-      cashuLog.debug('cashu.manager.db_directory_unread', { error: redactError(error) });
-      return [];
+    const directory = `${FileSystem.documentDirectory}SQLite/`;
+    // No directory yet means no databases. A directory that is there and
+    // cannot be listed is different: what it holds is unknown, and a wipe that
+    // went on would report success over databases it never saw.
+    if (!(await FileSystem.getInfoAsync(directory)).exists) return [];
+    const files = await FileSystem.readDirectoryAsync(directory);
+    const names = new Set<string>();
+    for (const file of files) {
+      const name = /^(coco(?:-\d+)?\.db)(?:$|[-.])/.exec(file)?.[1];
+      if (name) names.add(name);
     }
+    return [...names];
   }
 
   /** File-system paths for a coco database and its pre-v2 backup set. */
@@ -1813,10 +1812,21 @@ export class CocoManager {
       // Delete-all means every wallet database on the phone. One can outlive
       // its account's row in the list (a removal that was interrupted, a list
       // that lost an entry), so the directory is read as well as the list.
-      for (const dbName of await this.walletDatabasesOnDisk()) dbNames.add(dbName);
+      // The listed ones are deleted whatever happens to the listing; a listing
+      // that fails is thrown after them, so the wipe is reported incomplete.
+      let unlisted: string[] = [];
+      let listingError: unknown = null;
+      try {
+        unlisted = await this.walletDatabasesOnDisk();
+      } catch (error) {
+        listingError = error;
+        cashuLog.error('cashu.manager.db_directory_unreadable', { error: redactError(error) });
+      }
+      for (const dbName of unlisted) dbNames.add(dbName);
       for (const dbName of dbNames) {
         await this.deleteDatabase(dbName);
       }
+      if (listingError) throw new Error('Wallet databases could not be listed');
 
       this.clearSensitiveRuntimeState();
       cashuLog.info('cashu.manager.reset_done');

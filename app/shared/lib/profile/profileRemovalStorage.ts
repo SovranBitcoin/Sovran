@@ -230,25 +230,30 @@ export async function deleteNostrCaches(accountIndexes: readonly number[]): Prom
   const names = new Set(accountIndexes.map(nostrName));
   // Every cache on the phone, not only those of listed accounts: one can
   // outlive its account's row in the list, and the next identity made at that
-  // index would open it.
-  for (const name of await nostrCachesOnDisk()) names.add(name);
+  // index would open it. The listed ones are deleted whatever happens to the
+  // listing; a listing that fails is thrown after them.
+  let listingError: unknown = null;
+  try {
+    for (const name of await nostrCachesOnDisk()) names.add(name);
+  } catch (error) {
+    listingError = error;
+  }
   for (const name of names) await deleteFiles(name);
+  if (listingError) throw new Error('Nostr caches could not be listed');
 }
 
 /** The Nostr cache databases that have any file in the SQLite directory. */
 async function nostrCachesOnDisk(): Promise<string[]> {
-  try {
-    const files = await FileSystem.readDirectoryAsync(pathFor(''));
-    const names = new Set<string>();
-    for (const file of files) {
-      const name = /^(nostr(?:-\d+)?)(?:-journal|-wal|-shm)?$/.exec(file)?.[1];
-      if (name) names.add(name);
-    }
-    return [...names];
-  } catch {
-    // No directory yet means no databases. The listed ones are still deleted.
-    return [];
+  // No directory yet means no databases. One that is there and cannot be
+  // listed throws: the caller must not take that for "nothing left".
+  if (!(await FileSystem.getInfoAsync(pathFor(''))).exists) return [];
+  const files = await FileSystem.readDirectoryAsync(pathFor(''));
+  const names = new Set<string>();
+  for (const file of files) {
+    const name = /^(nostr(?:-\d+)?)(?:-journal|-wal|-shm)?$/.exec(file)?.[1];
+    if (name) names.add(name);
   }
+  return [...names];
 }
 
 const INSPECTION_TIMEOUT_MS = 10_000;
