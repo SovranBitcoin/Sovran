@@ -8,7 +8,7 @@
  * uses switched off, which leaves about 50 processes and under 1 GB, and it
  * boots in 3 s instead of 20. Clones inherit the installed app.
  */
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { simctl } from './simctl';
 
@@ -177,13 +177,21 @@ function wanted(appPath: string): string {
   return JSON.stringify({ artifact, runtime: RUNTIME, device: DEVICE_TYPE, off: UNUSED_SERVICES });
 }
 
+/** Where a simulator keeps its launch settings: outside its own folder, and left behind when it is deleted. */
+const launchFolder = (udid: string) => `/private/var/tmp/com.apple.CoreSimulator.SimDevice.${udid}`;
+
+function remove(udid: string): void {
+  simctl('delete', udid);
+  rmSync(launchFolder(udid), { recursive: true, force: true });
+}
+
 /**
  * Switch the unused services off for a simulator that is shut down. The
  * simulator keeps this list outside its own folder, so a clone does not
  * inherit it and each one is given its own.
  */
 function switchOffUnusedServices(udid: string): void {
-  const dir = `/private/var/tmp/com.apple.CoreSimulator.SimDevice.${udid}`;
+  const dir = launchFolder(udid);
   mkdirSync(dir, { recursive: true });
   const entries = UNUSED_SERVICES.map(
     (service) => `\t<key>com.apple.${service}</key>\n\t<true/>`
@@ -207,7 +215,7 @@ export function prepareBase(appPath: string): string {
       if (existing.state !== 'Shutdown') simctl('shutdown', existing.udid);
       return existing.udid;
     }
-    simctl('delete', existing.udid);
+    remove(existing.udid);
   }
   const udid = simctl('create', BASE_NAME, DEVICE_TYPE, RUNTIME);
   switchOffUnusedServices(udid);
@@ -224,7 +232,7 @@ export function prepareBase(appPath: string): string {
 /** Remove every worker simulator, from this run or one that was interrupted. */
 export function removeWorkers(): void {
   for (const device of devices()) {
-    if (device.name.startsWith(WORKER_PREFIX)) simctl('delete', device.udid);
+    if (device.name.startsWith(WORKER_PREFIX)) remove(device.udid);
   }
 }
 

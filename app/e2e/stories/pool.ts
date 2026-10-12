@@ -2,7 +2,8 @@
  * Shares stories out among workers (ADR 0033): each worker takes the next
  * story as soon as it has finished the last, so a slow story holds up nothing
  * but its own worker. Every story is played once; a failure is a result, not
- * a reason to play it again.
+ * a reason to play it again. `play` reports failure in what it resolves to: if
+ * it rejects, the run ends there without the stories still being played.
  */
 
 interface PoolResult<Story, Outcome> {

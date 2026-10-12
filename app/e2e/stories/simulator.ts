@@ -6,12 +6,13 @@
  */
 import { readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { createInterface } from 'node:readline';
 import { fileURLToPath } from 'node:url';
 import { resolveServeSimNativeAddon } from '../drivers/simulator-session';
 import { writeRunnerNote } from '../link/appLink';
+import { keepScreenWatcher, type ScreenFrames } from './screenWatcher';
 import { simctl } from './simctl';
 import type { TouchDevice } from './play';
 
@@ -25,15 +26,6 @@ interface Native {
   SimHID: new (udid: string) => {
     touch(type: string, x: number, y: number, width: number, height: number, edge: number): void;
   };
-}
-
-/** What is asked of the process that watches the screen. */
-interface ScreenFrames {
-  /** Save what is on screen now as a JPEG; false when there was no frame to save. */
-  picture(file: string): Promise<boolean>;
-  /** How many times the watching process died and was started again. */
-  restarts(): number;
-  stop(): void;
 }
 
 interface StorySimulator extends TouchDevice {
@@ -58,6 +50,8 @@ export function storySimulator(udid: string): StorySimulator {
     startFresh(appPath) {
       simctl('bootstatus', udid, '-b');
       this.terminate();
+      // A story whose runner died leaves its recorder behind, still attached to this screen.
+      spawnSync('pkill', ['-f', `simctl io ${udid} recordVideo`]);
       let data: string;
       try {
         data = simctl('get_app_container', udid, BUNDLE_ID, 'data');
@@ -102,55 +96,22 @@ export function storySimulator(udid: string): StorySimulator {
   };
 }
 
-/** How long a picture may take: the watcher answers in milliseconds unless it has just been restarted. */
-const PICTURE_WITHIN_MS = 1500;
-
 function watchScreenFrames(udid: string, addon: string, onChange: () => void): ScreenFrames {
   const script = fileURLToPath(new URL('./screenFrames.ts', import.meta.url));
-  const launch = () =>
-    spawn(process.execPath, [script, udid, addon], { stdio: ['pipe', 'pipe', 'ignore'] });
-  let stopped = false;
-  let restarts = 0;
-  let child: ReturnType<typeof launch>;
-  /** Pictures asked for and not yet answered, oldest first. */
-  let waiting: ((saved: boolean) => void)[] = [];
-  const start = () => {
-    child = launch();
-    createInterface({ input: child.stdout }).on('line', (line) => {
-      if (line === 'c') onChange();
-      else waiting.shift()?.(line === 'w');
-    });
-    child.stdin.on('error', () => undefined);
-    child.once('exit', () => {
-      if (stopped) return;
-      // It died mid-story. Whatever it was asked is lost, and the screen may have moved unseen.
-      for (const answer of waiting) answer(false);
-      waiting = [];
-      onChange();
-      restarts += 1;
-      start();
-    });
-  };
-  start();
-  const ask = (file: string) =>
-    new Promise<boolean>((resolve) => {
-      waiting.push(resolve);
-      child.stdin.write(`${file}\n`);
-    });
-  return {
-    async picture(file) {
-      const deadline = performance.now() + PICTURE_WITHIN_MS;
-      // A watcher that has just started has no frame for a few hundred milliseconds.
-      while (performance.now() < deadline) {
-        if (await ask(file)) return true;
-        await new Promise((resolve) => setTimeout(resolve, 30));
-      }
-      return false;
+  return keepScreenWatcher({
+    onChange,
+    launch: () => {
+      const child = spawn(process.execPath, [script, udid, addon], {
+        stdio: ['pipe', 'pipe', 'ignore'],
+      });
+      child.stdin.on('error', () => undefined);
+      return {
+        onLine: (listener) => void createInterface({ input: child.stdout }).on('line', listener),
+        onExit: (listener) => void child.once('exit', listener),
+        write: (line) => void child.stdin.write(line),
+        kill: () => void child.kill('SIGKILL'),
+        end: () => child.stdin.end(),
+      };
     },
-    restarts: () => restarts,
-    stop() {
-      stopped = true;
-      child.stdin.end();
-    },
-  };
+  });
 }

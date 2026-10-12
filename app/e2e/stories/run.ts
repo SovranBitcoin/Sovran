@@ -9,7 +9,7 @@
  * e2e/artifacts/stories/<story id>/ (with `--repeat`, <story id>-<n>/).
  */
 import { spawn } from 'node:child_process';
-import { readdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runPool } from './pool';
@@ -42,6 +42,15 @@ const plays: Play[] = Array.from({ length: repeat }, (_, round) =>
   }))
 ).flat();
 
+function isRunning(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function playOne(play: Play, udid: string): Promise<{ ok: boolean; output: string }> {
   return new Promise((resolve) => {
     const child = spawn(
@@ -56,13 +65,40 @@ function playOne(play: Play, udid: string): Promise<{ ok: boolean; output: strin
   });
 }
 
+if (!Number.isInteger(workerCount) || workerCount < 1 || !Number.isInteger(repeat) || repeat < 1) {
+  console.error('--workers and --repeat take a whole number, 1 or more.');
+  process.exit(2);
+}
+if (plays.length === 0) {
+  console.error(`No stories in ${storiesDir}.`);
+  process.exit(2);
+}
+
+// One run at a time: a second would delete the first's simulators as it started.
+const lock = join(outRoot, '.running');
+mkdirSync(outRoot, { recursive: true });
+const holder = existsSync(lock) ? Number(readFileSync(lock, 'utf8')) : undefined;
+if (holder && isRunning(holder)) {
+  console.error(`Another run is in progress (process ${holder}).`);
+  process.exit(2);
+}
+writeFileSync(lock, String(process.pid));
+const cleanUp = () => {
+  if (!flags.includes('--keep')) removeWorkers();
+  rmSync(lock, { force: true });
+};
+process.on('SIGINT', () => {
+  cleanUp();
+  process.exit(130);
+});
+
 const started = performance.now();
-const base = prepareBase(appPath);
-const prepared = performance.now();
-const workers = startWorkers(base, workerCount);
-const booted = performance.now();
 let failed = 0;
 try {
+  const base = prepareBase(appPath);
+  const prepared = performance.now();
+  const workers = startWorkers(base, workerCount);
+  const booted = performance.now();
   const results = await runPool(plays, workers, playOne);
   const played = performance.now();
   const seconds = (ms: number) => (ms / 1000).toFixed(1);
@@ -84,6 +120,6 @@ try {
   );
   console.log(`evidence: ${outRoot}`);
 } finally {
-  if (!flags.includes('--keep')) removeWorkers();
+  cleanUp();
 }
 process.exit(failed === 0 ? 0 : 1);

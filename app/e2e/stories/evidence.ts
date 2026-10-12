@@ -33,11 +33,10 @@ export function recordSimulator(udid: string, file: string): Promise<Recording> 
     );
     const exited = new Promise<void>((done) => child.once('exit', () => done()));
     let said = '';
-    const failed = setTimeout(
-      () =>
-        reject(new Error(`The simulator did not start recording: ${said.trim() || 'no output'}`)),
-      10_000
-    );
+    const failed = setTimeout(() => {
+      child.kill('SIGKILL');
+      reject(new Error(`The simulator did not start recording: ${said.trim() || 'no output'}`));
+    }, 10_000);
     child.once('error', reject);
     child.stderr.on('data', (chunk: Buffer) => {
       said += chunk.toString();

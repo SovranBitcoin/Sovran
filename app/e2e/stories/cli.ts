@@ -46,15 +46,18 @@ const spentOn = (what: string) => {
   spent[what] = Math.round(now - lap);
   lap = now;
 };
+let recording: Awaited<ReturnType<typeof recordSimulator>> | undefined;
+let frames: ReturnType<typeof simulator.watchScreen> | undefined;
 try {
   simulator.startFresh(appPath);
   spentOn('freshStart');
-  const recording = await recordSimulator(udid, rawVideo);
+  recording = await recordSimulator(udid, rawVideo);
   const screen = createScreenWatch({
     now: () => performance.now(),
     wait: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
   });
-  const frames = simulator.watchScreen(screen.changed);
+  const watching = simulator.watchScreen(screen.changed);
+  frames = watching;
   spentOn('recordingStart');
   simulator.launch({ url: link.url, run: story.id });
   spentOn('launch');
@@ -63,24 +66,28 @@ try {
   const pictures: (string | undefined)[] = [];
   const result = await playStory(story, link, simulator, screen, async (index, step) => {
     const file = `${pictureName(index, step.name)}.jpg`;
-    if (await frames.picture(join(outDir, file))) pictures[index] = file;
+    if (await watching.picture(join(outDir, file))) pictures[index] = file;
   });
   spentOn('steps');
   // Let the last change be drawn and recorded before the recording ends.
   await link.still(3000).catch(() => undefined);
   await new Promise((resolve) => setTimeout(resolve, LAST_FRAME_MS));
-  frames.stop();
+  watching.stop();
   await recording.stop();
   spentOn('recordingEnd');
   await keepVideo(rawVideo, outDir);
   rmSync(rawVideo, { force: true });
   spentOn('video');
+  // A story whose screen could not be watched proved nothing about what was on it.
+  const unwatched = watching.failure();
+  const ok = result.ok && !unwatched;
   writeFileSync(
     join(outDir, 'report.json'),
-    `${JSON.stringify({ id: story.id, purpose: story.purpose, ok: result.ok, video: 'story.mp4', spentMs: spent, screenWatcherRestarts: frames.restarts(), steps: result.steps.map((step, index) => ({ ...step, picture: pictures[index] })) }, null, 2)}\n`
+    `${JSON.stringify({ id: story.id, purpose: story.purpose, ok, ...(unwatched ? { failure: unwatched } : {}), video: 'story.mp4', spentMs: spent, screenWatcherRestarts: watching.restarts(), steps: result.steps.map((step, index) => ({ ...step, picture: pictures[index] })) }, null, 2)}\n`
   );
 
-  console.log(`${result.ok ? 'PASS' : 'FAIL'}  ${story.id}: ${story.purpose}`);
+  console.log(`${ok ? 'PASS' : 'FAIL'}  ${story.id}: ${story.purpose}`);
+  if (unwatched) console.log(`  ${unwatched}`);
   for (const [index, step] of result.steps.entries()) {
     const shown = step.entries
       .filter((entry) => /^(screen\.mount|nav\.transition\.end)$/.test(entry.event))
@@ -104,8 +111,11 @@ try {
       .join(', ')
   );
   console.log(`evidence: ${outDir}`);
-  process.exitCode = result.ok ? 0 : 1;
+  process.exitCode = ok ? 0 : 1;
 } finally {
+  // Reached with these still running only when the story threw part-way.
+  frames?.stop();
+  await recording?.stop();
   simulator.terminate();
   link.close();
 }

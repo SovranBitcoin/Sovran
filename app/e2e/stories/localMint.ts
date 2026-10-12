@@ -76,7 +76,7 @@ export async function startLocalMint(dir: string, port: number): Promise<LocalMi
   while (performance.now() < deadline) {
     if (mint.exitCode !== null) throw new Error(`The local mint stopped as it started (${url}).`);
     // eslint-disable-next-line no-restricted-globals -- the runner's own mint on loopback, outside the app
-    const answered = await fetch(`${url}/v1/info`)
+    const answered = await fetch(`${url}/v1/info`, { signal: AbortSignal.timeout(500) })
       .then((response) => response.json() as Promise<{ description?: string }>)
       .catch(() => null); // Not listening yet.
     if (answered?.description?.includes(instance)) return { url, stop };
