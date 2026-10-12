@@ -40,8 +40,8 @@ reports) keep their evidence, and link here for anything still open.
 | [F10](F10.md) | medium | fix | imageCache prefetch has no queue cap or caller cancellation |
 | [F12](F12.md) | medium | upstream | vendor-marmot-ts.sh tolerates a missing source and records no revision or license |
 | [F13](F13.md) | medium | investigation | Check that a Nostr data layer rebuild leaves no old listener or late profile write |
-| [F14](F14.md) | low | fix | Move remaining StyleSheet.create and inline styles through the styling ratchet |
-| [F15](F15.md) | low | fix | Record image asset sources and licenses; shorten the 1 s image fade on dense rows |
+| [F14](F14.md) | low | device | Move remaining StyleSheet.create and inline styles through the styling ratchet |
+| [F15](F15.md) | low | decision | Record image asset sources and licenses; shorten the 1 s image fade on dense rows |
 | [F16](F16.md) | low | device | Run accessibility, reduced-motion and release-mode performance scenarios on devices |
 | [F19](F19.md) | low | fix | Rename overloaded payment, profile, key and time names, one cluster at a time |
 | [F20](F20.md) | low | upstream | Cleanup measurements skip wallet/src and nostr/src and pass with no detector output |
@@ -54,7 +54,7 @@ reports) keep their evidence, and link here for anything still open.
 | [F28](F28.md) | medium | fix | Bitchat native calls pass private keys positionally; native events are not validated |
 | [F30](F30.md) | medium | decision | Persisted fields hold Nostr seconds under millisecond-style names; rename with migrations |
 | [F31](F31.md) | medium | fix | Nagg event schemas need per-item tolerance, then hex ids and size caps |
-| [F32](F32.md) | low | fix | MintCurrencyTabs and SendScreen animate layout per frame; three other workarounds remain |
+| [F32](F32.md) | low | device | MintCurrencyTabs and SendScreen animate layout per frame; three other workarounds remain |
 | [F33](F33.md) | low | upstream | Melt-cancel matches Coco's error text because Coco has no typed rollback error |
 | [F37](F37.md) | low | decision | A testnut Nut Drop is announced as real sats; allow-list copy names a payment request |
 | [F38](F38.md) | low | upstream | Mint audit copy says swap success, rounding differs between screens, dead fields remain |
@@ -78,19 +78,19 @@ reports) keep their evidence, and link here for anything still open.
 | [F59](F59.md) | medium | device | Run the NIP-05 verified identity scenarios on iOS and Android |
 | [F60](F60.md) | high | device | Send message ecash between two funded wallets on devices and see the review row |
 | [F62](F62.md) | high | decision | The redeem queue stores whole bearer tokens in plain AsyncStorage; move them to a vault |
-| [F63](F63.md) | medium | fix | 25 uses still import the library Button; the shared one lacks toggle, icon and toast forms |
+| [F63](F63.md) | medium | device | 25 uses still import the library Button; the shared one lacks toggle, icon and toast forms |
 | [F64](F64.md) | medium | fix | Payment timeline cannot say why a mint has not credited or tell unreachable from slow |
 | [F65](F65.md) | medium | device | Open the Details modal on both platforms and add a scenario that enters it |
 | [F66](F66.md) | medium | device | Screenshot the restored wallet home on iPhone and Android, at 320pt and large text |
 | [F67](F67.md) | high | device | Check on devices that choosing a mint pops back to the same amount screen |
 | [F68](F68.md) | high | device | Check the calculator amount screen on funded phones; MAX as Lightning ignores fees |
-| [F72](F72.md) | low | fix | Nothing reads back :unreadable store copies; large stores need a stated policy |
+| [F72](F72.md) | low | decision | Nothing reads back :unreadable store copies; large stores need a stated policy |
 | [F76](F76.md) | medium | fix | During an in-process switch, background wallet work can read the next account's signer |
 | [F77](F77.md) | medium | device | Nostr cache database, restore subscription and Whitenoise are not closed on unmount |
 | [F79](F79.md) | low | device | No native scenario for StartupFailedScreen; the harness cannot make startup fail |
-| [F80](F80.md) | low | fix | Removing a profile can strand a payment sent to it that this device has not received |
-| [F81](F81.md) | low | fix | Release builds do not report Android storage pressure; two stores can still grow large |
-| [F82](F82.md) | low | fix | Closing an open sheet on account hold remounts the outgoing account's screens |
+| [F80](F80.md) | low | decision | Removing a profile can strand a payment sent to it that this device has not received |
+| [F81](F81.md) | low | decision | Release builds do not report Android storage pressure; two stores can still grow large |
+| [F82](F82.md) | low | device | Closing an open sheet on account hold remounts the outgoing account's screens |
 | [F83](F83.md) | low | decision | Deletion steps of delete-all and profile removal wait with no time limit |
 | [F87](F87.md) | low | fix | A leftover bare-key store is kept but not merged once the account has its own copy |
 | [F88](F88.md) | low | fix | A schema-rejected routstr-store silently stops saving for the session |
