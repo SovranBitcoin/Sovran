@@ -195,9 +195,14 @@ const LEVEL_CONSOLE_METHOD: Record<LogLevel, 'debug' | 'info' | 'warn' | 'error'
 
 const IS_DEV = typeof __DEV__ !== 'undefined' ? __DEV__ : process.env.NODE_ENV !== 'production';
 
-// Master switch: dev-only. Production builds short-circuit at the top of
-// `emit` and skip the JS-thread heartbeat side-effect entirely.
-export const SHOW_LOGS = IS_DEV;
+/** Set when the end-to-end test build is bundled. That build has no bundler to
+ *  print to, and its runner reads the app's log, so logging stays on in it. */
+export const IS_E2E_LOG_BUILD = process.env.EXPO_PUBLIC_E2E_LOGS === '1';
+
+// Master switch: development builds and the end-to-end test build. Store builds
+// short-circuit at the top of `emit` and skip the JS-thread heartbeat
+// side-effect entirely.
+export const SHOW_LOGS = IS_DEV || IS_E2E_LOG_BUILD;
 
 // ─── Monotonic Clock ────────────────────────────────────────────────────────
 //
@@ -737,7 +742,7 @@ function flushSuppressedDedup(core: LoggerCore): void {
 
 export function createLogger(options: LoggerOptions = {}): Logger {
   const {
-    level = IS_DEV ? 'debug' : 'warn',
+    level = SHOW_LOGS ? 'debug' : 'warn',
     context = {},
     maxStringLength = 120,
     maxArrayItems = 5,

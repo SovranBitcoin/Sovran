@@ -9,11 +9,14 @@
  * existing `bun run log-doctor` workflow.
  *
  * Design:
- * - Dev-only. Gated on `SHOW_LOGS` (the logger master switch is `__DEV__`); the
- *   whole module is inert in production builds and on web.
- * - Opt-in. Writing is gated on a runtime flag driven by the persisted
- *   `fileLoggingEnabled` setting (see settingsStore). The transport is always
- *   registered but no-ops until enabled, so toggling needs no re-init.
+ * - Never in a store build. Gated on `SHOW_LOGS`; the whole module is inert in
+ *   production builds and on web.
+ * - Opt-in in a development build. Writing is gated on a runtime flag driven by
+ *   the persisted `fileLoggingEnabled` setting (see settingsStore). The
+ *   transport is always registered but no-ops until enabled, so toggling needs
+ *   no re-init.
+ * - Always on in the end-to-end test build, from the first entry, because the
+ *   file is how its runner reads the app.
  * - Batched. Entries queue in memory and flush on a short interval / size
  *   threshold via the synchronous `expo-file-system` append API, keeping disk
  *   I/O off the hot logging path.
@@ -26,7 +29,7 @@
  */
 import { Platform } from 'react-native';
 
-import { log, SHOW_LOGS, type LogEntry } from './loggerCore';
+import { IS_E2E_LOG_BUILD, log, SHOW_LOGS, type LogEntry } from './loggerCore';
 
 // Lazy handle to the new (sync) expo-file-system API. Typed loosely to avoid a
 // hard import in production bundles where the module is never exercised.
@@ -156,8 +159,11 @@ const fileTransport = (entry: LogEntry): void => {
  * persisted `fileLoggingEnabled` setting (toggle + hydration). No-op in
  * production / on web. Registers the transport lazily on first enable.
  */
-export function applyFileLogging(next: boolean): void {
+export function applyFileLogging(requested: boolean): void {
   if (!SHOW_LOGS) return;
+  // The test build's file is the runner's only view of the app, so the saved
+  // setting cannot turn it off.
+  const next = requested || IS_E2E_LOG_BUILD;
   if (next && !registered) {
     log.addTransport(fileTransport);
     registered = true;
@@ -249,3 +255,5 @@ export function clearLogFile(): void {
     // Best-effort cleanup.
   }
 }
+
+if (IS_E2E_LOG_BUILD) applyFileLogging(true);
