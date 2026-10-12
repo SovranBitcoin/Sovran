@@ -352,21 +352,40 @@ describe('background start-up and a teardown', () => {
     expect(privates().npcAccount).toBeNull();
   });
 
-  it('counts as running until every start has ended, whichever ends first', async () => {
-    const first = parkedWallet();
+  it('counts as running until every start for the open wallet has ended, whichever ends first', async () => {
+    const wallet = parkedWallet();
+    const finishFirst = wallet.finishPlugins;
     const one = CocoManager.enableNpcSyncAndProcessor().catch(() => undefined);
     await tick();
-    const second = parkedWallet();
+    // A second start for the same wallet, parked on its own promise.
+    let finishSecond!: () => void;
+    wallet.wallet.initPlugins.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finishSecond = resolve;
+        })
+    );
     const two = CocoManager.enableNpcSyncAndProcessor().catch(() => undefined);
     await tick();
 
-    // The abandoned first start ends; the second is still going.
-    first.finishPlugins();
+    finishFirst();
     await one;
     expect(CocoManager.getCleanupReadiness().backgroundRunning).toBe(true);
 
-    second.finishPlugins();
+    finishSecond();
     await two;
+    expect(CocoManager.getCleanupReadiness().backgroundRunning).toBe(false);
+  });
+
+  it('does not count work left behind for a wallet that is no longer the open one', async () => {
+    // Its teardown stopped waiting and the next account's wallet is open. The
+    // old start may never end; the new wallet is still free to be switched.
+    parkedWallet();
+    void CocoManager.enableNpcSyncAndProcessor().catch(() => undefined);
+    await tick();
+    expect(CocoManager.getCleanupReadiness().backgroundRunning).toBe(true);
+
+    privates().instance = { next: 'wallet' };
     expect(CocoManager.getCleanupReadiness().backgroundRunning).toBe(false);
   });
 });

@@ -382,7 +382,13 @@ export class CocoManager {
    * start would be cleared by an abandoned start finishing while a newer one
    * was still going.
    */
-  private static pendingBackground = new Set<Promise<void>>();
+  private static pendingBackground = new Set<{ wallet: Manager | null; settled: Promise<void> }>();
+  /** Background start-up still running for the wallet that is open now. */
+  private static backgroundOfOpenWallet(): Promise<void>[] {
+    return [...this.pendingBackground]
+      .filter((entry) => entry.wallet === this.instance)
+      .map((entry) => entry.settled);
+  }
   /** Tracks an in-flight cleanup() call so initialize() can await it before proceeding. */
   private static pendingCleanup: Promise<void> | null = null;
   private static cleanupFailed = false;
@@ -992,13 +998,20 @@ export class CocoManager {
 
   /** Run a background start so that `cleanup` can wait for it to end. */
   private static runBackground(start: () => Promise<void>): Promise<void> {
+    // Filed under the wallet it was started for. Work left behind by a
+    // teardown that stopped waiting belongs to a wallet that is gone: it must
+    // not make the next wallet look busy for as long as it takes to end.
+    const wallet = this.instance;
     const work = start();
-    const settled = work.then(
-      () => undefined,
-      () => undefined
-    );
-    this.pendingBackground.add(settled);
-    void settled.then(() => this.pendingBackground.delete(settled));
+    const entry = {
+      wallet,
+      settled: work.then(
+        () => undefined,
+        () => undefined
+      ),
+    };
+    this.pendingBackground.add(entry);
+    void entry.settled.then(() => this.pendingBackground.delete(entry));
     return work;
   }
 
@@ -1330,7 +1343,7 @@ export class CocoManager {
       hasInstance: this.instance !== null,
       initInFlight: this.pendingInit !== null,
       cleanupInFlight: this.pendingCleanup !== null,
-      backgroundRunning: this.pendingBackground.size > 0,
+      backgroundRunning: this.backgroundOfOpenWallet().length > 0,
     };
     return {
       ...parts,
@@ -1380,12 +1393,10 @@ export class CocoManager {
       // has not ended by then is no longer waited for, and what it does next
       // is refused where it would read the active account
       // (`getOrCreateNpcAccount`).
-      if (this.pendingBackground.size > 0) {
+      const running = this.backgroundOfOpenWallet();
+      if (running.length > 0) {
         cashuLog.info('cashu.manager.cleanup_wait_background');
-        const drained = await settleWithin(
-          Promise.all([...this.pendingBackground]),
-          BACKGROUND_DRAIN_MS
-        );
+        const drained = await settleWithin(Promise.all(running), BACKGROUND_DRAIN_MS);
         if (drained === TIMED_OUT) cashuLog.warn('cashu.manager.cleanup_background_not_drained');
       }
       await this.disarmForegroundGate();
