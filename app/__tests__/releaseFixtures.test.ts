@@ -83,7 +83,11 @@ jest.mock('@/shared/lib/loggerFile', () => ({
 
 // ── One launch ───────────────────────────────────────────────────────────────
 
-type Disk = { asyncStorage: Record<string, string>; secureStore: Record<string, string> };
+type Disk = {
+  asyncStorage: Record<string, string>;
+  secureStore: Record<string, string>;
+  files: Record<string, string>;
+};
 
 interface Launch {
   /** Stores whose saved data could not be read. */
@@ -111,6 +115,7 @@ const REJECTION =
 const snapshot = (): Disk => ({
   asyncStorage: Object.fromEntries([...mockAsync].sort()),
   secureStore: Object.fromEntries([...mockSecure].sort()),
+  files: Object.fromEntries([...mockFiles].sort()),
 });
 
 /** A disk with each JSON value parsed: the order of an object's keys is not data. */
@@ -125,7 +130,11 @@ function contents(disk: Disk): Record<string, Record<string, unknown>> {
         }
       })
     );
-  return { asyncStorage: parsed(disk.asyncStorage), secureStore: parsed(disk.secureStore) };
+  return {
+    asyncStorage: parsed(disk.asyncStorage),
+    secureStore: parsed(disk.secureStore),
+    files: parsed(disk.files),
+  };
 }
 
 /** Saves are not awaited by zustand; every double here settles on microtasks. */
@@ -564,14 +573,34 @@ const WRITE_DISK = process.env.WRITE_UPGRADED_DISK;
       jest.spyOn(console, method).mockImplementation(() => {})
     );
     install(fixture);
-    let last: Launch | undefined;
+    const launches: Launch[] = [];
     try {
-      for (let n = 0; n < 3; n++) last = await launch(fixture);
+      for (let n = 0; n < 3; n++) launches.push(await launch(fixture));
     } finally {
       quieted.forEach((spy) => spy.mockRestore());
     }
-    if (!last) throw new Error('No launch finished');
-    expect(last.rejections).toEqual([]);
+    // The disk is only worth keeping if the upgrade that made it lost nothing:
+    // the same things the fixture's own run checks, on every launch.
+    const gaps = new Set(fixture.knownGaps.map((known) => known.what));
+    const accounts = Object.fromEntries(
+      fixture.survives.accounts.map((a) => [a.accountIndex, a.pubkey])
+    );
+    for (const each of launches) {
+      expect(each.rejections).toEqual([]);
+      expect(each.unreadStores).toEqual([]);
+      expect(each.secureStoreState).toBe('available');
+      expect(each.openedPubkeys).toEqual(accounts);
+      expect(each.disk.secureStore.user_mnemonic).toBe(fixture.survives.phrase);
+      expect(
+        each.defaultedRows.filter((row) => ![...gaps].some((what) => row.startsWith(`${what} `)))
+      ).toEqual([]);
+      for (const fact of fixture.survives.facts) {
+        if (!gaps.has(fact.what))
+          expect([fact.what, each.facts[fact.what]]).toEqual([fact.what, fact.equals]);
+      }
+    }
+    expect(contents(launches[2].disk)).toEqual(contents(launches[1].disk));
+    const last = launches[2];
     // Rows are written parsed so they can be read; `install` turns them back
     // into the same text. Anything that is not a JSON object stays as it was.
     const readable = (value: string): unknown => {
@@ -587,7 +616,7 @@ const WRITE_DISK = process.env.WRITE_UPGRADED_DISK;
         Object.entries(last.disk.asyncStorage).map(([key, value]) => [key, readable(value)])
       ),
       secureStore: last.disk.secureStore,
-      files: Object.fromEntries([...mockFiles].sort()),
+      files: last.disk.files,
     };
     const file = join(__dirname, 'releaseFixtures', `${to}.upgraded.json`);
     writeFileSync(file, `${JSON.stringify(disk, null, 2)}\n`);

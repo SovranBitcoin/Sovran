@@ -138,6 +138,7 @@ export const fixture: ReleaseFixture = {
     // shared/stores/profile/vertexBudgetStore.ts: schema. Made per account on
     // demand, so no store reads it at startup; it must be left as it is.
     [accountKey('vertex-budget-store', A0)]: VERTEX_BUDGET,
+    [accountKey('vertex-budget-store', A1)]: zustandRow(1, { day: '2026-10-02', used: 1 }),
   },
   secureStore: upgraded.secureStore,
   files: upgraded.files,
@@ -258,6 +259,7 @@ export const fixture: ReleaseFixture = {
     keptAsyncStorage: [
       ...previous.survives.keptAsyncStorage,
       accountKey('vertex-budget-store', A0),
+      accountKey('vertex-budget-store', A1),
     ],
   },
   defaultRows: ['mint-changes-cache', 'mint-discover-cache', 'own-profile-stats-cache'],

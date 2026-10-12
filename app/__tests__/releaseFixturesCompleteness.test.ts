@@ -72,7 +72,7 @@ interface SurfaceStore {
   /** Fetched again when missing: a query cache, or a store that names itself a cache. */
   cache: boolean;
   version: number | undefined;
-  /** What the store saves before anyone has used it, as JSON text. */
+  /** What the store saves before anyone has used it, as `canonical` text. */
   defaults: string | undefined;
 }
 
@@ -98,7 +98,7 @@ function currentSurface(): SurfaceStore[] {
         version: registered?.version,
         defaults:
           project && registered?.store
-            ? JSON.stringify(project(registered.store.getInitialState()))
+            ? canonical(JSON.parse(JSON.stringify(project(registered.store.getInitialState()))))
             : undefined,
       };
     })
@@ -107,6 +107,18 @@ function currentSurface(): SurfaceStore[] {
 
 const isZustandRow = (value: unknown): value is { state: unknown; version: number } =>
   typeof value === 'object' && value !== null && 'state' in value && 'version' in value;
+
+/** JSON with object keys in order: the order a row's fields were written in is not data. */
+function canonical(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
+  if (value && typeof value === 'object') {
+    return `{${Object.entries(value)
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+      .map(([key, entry]) => `${JSON.stringify(key)}:${canonical(entry)}`)
+      .join(',')}}`;
+  }
+  return JSON.stringify(value) ?? 'null';
+}
 
 describe('every epoch has a fixture', () => {
   it('lists each fixture file once, in epoch order', () => {
@@ -205,7 +217,7 @@ describe(`the newest fixture (${newest.epoch}) describes this build`, () => {
     return (
       rows.length > 0 &&
       rows.every((row) => {
-        const state = JSON.stringify(row.state);
+        const state = canonical(row.state);
         return store.defaults === undefined ? state === '{}' : state === store.defaults;
       })
     );
@@ -215,7 +227,11 @@ describe(`the newest fixture (${newest.epoch}) describes this build`, () => {
     const problems: string[] = [];
     for (const store of surface) {
       const rows = rowsOf(store);
-      if (rows.length === 0) problems.push(`${store.name}: no row under ${keyOf(store)}`);
+      const file = newest.files?.[cacheFilePath(store.name)];
+      // The active account's own row, as well as a row somewhere.
+      if (!isZustandRow(newest.asyncStorage[keyOf(store)]) && !(file && !store.perAccount)) {
+        problems.push(`${store.name}: no row under ${keyOf(store)}`);
+      }
       for (const row of rows) {
         if (store.version !== undefined && row.version !== store.version) {
           problems.push(
