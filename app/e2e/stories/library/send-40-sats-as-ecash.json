@@ -1,0 +1,100 @@
+{
+  "id": "send-40-sats-as-ecash",
+  "purpose": "A person holding 100 sats makes 40 of them into an ecash token to hand to someone, and the wallet shows the token ready to copy.",
+  "startsFrom": "receive-100-sats-on-testnut",
+  "steps": [
+    {
+      "name": "the wallet opens with 100 sats",
+      "expect": [
+        {
+          "visible": {
+            "label": "Balance, 100 tBTC"
+          }
+        },
+        {
+          "logged": "splash.gone"
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "open Send",
+      "tap": {
+        "id": "wallet-send"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "send-method-createEcash"
+          }
+        }
+      ]
+    },
+    {
+      "name": "create ecash",
+      "tap": {
+        "id": "send-method-createEcash"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "keypad-key-4"
+          }
+        }
+      ]
+    },
+    {
+      "name": "press 4",
+      "tap": {
+        "id": "keypad-key-4"
+      },
+      "expect": [
+        {
+          "visible": {
+            "label": "Amount 4 sat"
+          }
+        }
+      ]
+    },
+    {
+      "name": "press 0",
+      "tap": {
+        "id": "keypad-key-0"
+      },
+      "expect": [
+        {
+          "visible": {
+            "label": "Amount 40 sat"
+          }
+        }
+      ]
+    },
+    {
+      "name": "create the ecash",
+      "tap": {
+        "id": "amount-next"
+      },
+      "expect": [
+        {
+          "page": "SendTokenScreen"
+        },
+        {
+          "visible": {
+            "id": "send-token-copy"
+          }
+        },
+        {
+          "visible": {
+            "id": "payment-info-token-data"
+          }
+        },
+        {
+          "visible": {
+            "label": "Outgoing 40 sat transaction, pending"
+          }
+        }
+      ],
+      "withinMs": 20000
+    }
+  ]
+}

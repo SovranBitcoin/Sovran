@@ -66,7 +66,7 @@ const story = (steps: unknown[]): Story =>
     startsFrom: 'fresh',
     steps,
   });
-const noSwipe = { swipe: async () => {} };
+const noSwipe = { swipe: async () => {}, type: async () => {} };
 
 describe('find', () => {
   test('takes the last match, which is the one drawn on top', () => {
@@ -155,6 +155,7 @@ describe('playStory', () => {
     const app = fakeApp(screenOf(box({ id: 'slides', x: 0, y: 0, width: 400, height: 800 })));
     const swipes: [number, number][][] = [];
     const device = {
+      ...noSwipe,
       tap: async () => {},
       swipe: async (from: [number, number], to: [number, number]) => void swipes.push([from, to]),
     };
@@ -189,7 +190,37 @@ describe('playStory', () => {
           expect: [{ page: 'X' }],
         },
       ])
-    ).toThrow(/a tap or a swipe, not both/);
+    ).toThrow(/a tap, a swipe or typing, not two of them/);
+  });
+
+  test('taps a control iOS drew itself, found by its label, when the app does not have it', async () => {
+    const app = fakeApp(screenOf(box({ id: 'wallet-unit-switcher' })));
+    const asked: string[] = [];
+    const device = {
+      ...noSwipe,
+      tap: async (x: number, y: number) => void app.state.taps.push([x, y]),
+      findSystemControl: async (label: string) => {
+        asked.push(label);
+        return { x: 0.2, y: 0.3, width: 0.4, height: 0.1 };
+      },
+    };
+
+    const result = await playStory(
+      story([
+        {
+          name: 'pick the account',
+          tap: { label: 'Test Bitcoin account' },
+          expect: [{ visible: { id: 'wallet-unit-switcher' } }],
+        },
+      ]),
+      app.link,
+      device
+    );
+
+    expect(result.ok).toBe(true);
+    expect(asked).toEqual(['Test Bitcoin account']);
+    expect(app.state.taps[0][0]).toBeCloseTo(0.4);
+    expect(app.state.taps[0][1]).toBeCloseTo(0.35);
   });
 
   test('does not touch the screen when the control is missing or disabled', async () => {

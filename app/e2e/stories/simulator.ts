@@ -13,6 +13,7 @@ import { resolveServeSimNativeAddon } from '../drivers/simulator-session';
 import { writeRunnerNote } from '../link/appLink';
 import { emptyAppFolders, hasState, restoreState, saveState, type StatePlaces } from './savedState';
 import { keepScreenWatcher, type ScreenFrames } from './screenWatcher';
+import { keyPresses, SHIFT_KEY } from './keys';
 import { simctl } from './simctl';
 import type { TouchDevice } from './play';
 
@@ -26,13 +27,28 @@ const SETTINGS_SERVICE = 'com.apple.cfprefsd.xpc.daemon';
 /** A swipe takes a quarter of a second: quick enough to be a swipe, slow enough to be followed. */
 const SWIPE_FRAMES = 15;
 const FRAME_MS = 16;
+/**
+ * How long a key is held, and the gap before the next. At 12 ms the second of
+ * two identical letters was sometimes lost ("htps://"); 30 ms has not lost one.
+ */
+const KEY_HOLD_MS = 30;
 /** How long a finger rests for a tap. Shorter than a long press, longer than a frame. */
 const TAP_HOLD_MS = 40;
 
 interface Native {
   SimHID: new (udid: string) => {
     touch(type: string, x: number, y: number, width: number, height: number, edge: number): void;
+    key(type: string, usage: number): void;
   };
+  /** The simulator's accessibility tree, as JSON. */
+  axDescribe(udid: string): Promise<string>;
+}
+
+/** An element of the simulator's accessibility tree. */
+interface SystemElement {
+  AXLabel?: string | null;
+  frame: { x: number; y: number; width: number; height: number };
+  children?: SystemElement[];
 }
 
 interface StorySimulator extends TouchDevice {
@@ -147,6 +163,32 @@ export function storySimulator(udid: string): StorySimulator {
     },
     watchScreen(onChange) {
       return watchScreenFrames(udid, addon, onChange);
+    },
+    async findSystemControl(label) {
+      const [window] = JSON.parse(await native.axDescribe(udid)) as SystemElement[];
+      if (!window) return null;
+      const queue = [window];
+      for (let element = queue.shift(); element; element = queue.shift()) {
+        if (element !== window && element.AXLabel === label && element.frame.width > 0)
+          return {
+            x: element.frame.x / window.frame.width,
+            y: element.frame.y / window.frame.height,
+            width: element.frame.width / window.frame.width,
+            height: element.frame.height / window.frame.height,
+          };
+        queue.push(...(element.children ?? []));
+      }
+      return null;
+    },
+    async type(text) {
+      for (const { usage, shift } of keyPresses(text)) {
+        if (shift) hid.key('down', SHIFT_KEY);
+        hid.key('down', usage);
+        await new Promise((resolve) => setTimeout(resolve, KEY_HOLD_MS));
+        hid.key('up', usage);
+        if (shift) hid.key('up', SHIFT_KEY);
+        await new Promise((resolve) => setTimeout(resolve, KEY_HOLD_MS));
+      }
     },
     async swipe(from, to) {
       // A finger moving at a steady pace, a point every frame, then lifted where it stopped.

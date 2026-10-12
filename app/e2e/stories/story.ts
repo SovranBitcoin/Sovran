@@ -49,11 +49,26 @@ const stepSchema = z
         distance: z.number().min(0.05).max(0.9).default(0.3),
       })
       .optional(),
+    /**
+     * Type on the keyboard. `into` is tapped first to put the cursor there;
+     * without it the text goes wherever the cursor already is. `enter` presses
+     * Return afterwards.
+     */
+    type: z
+      .strictObject({
+        into: selectorSchema.optional(),
+        text: z.string().min(1).max(500),
+        enter: z.boolean().default(false),
+      })
+      .optional(),
     expect: z.array(expectationSchema).min(1),
     /** How long the expectations may take. Only a step that waits on a mint or a relay needs more. */
     withinMs: z.number().int().min(100).max(60_000).default(5000),
   })
-  .refine((step) => !(step.tap && step.swipe), 'A step does one thing: a tap or a swipe, not both.')
+  .refine(
+    (step) => [step.tap, step.swipe, step.type].filter(Boolean).length <= 1,
+    'A step does one thing: a tap, a swipe or typing, not two of them.'
+  )
   .refine(
     (step) => !step.tapAt || step.tap,
     '`tapAt` says where in the tapped element; it needs `tap`.'

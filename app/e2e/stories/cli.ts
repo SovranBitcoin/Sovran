@@ -10,14 +10,14 @@
  * Leaves the story's video, a picture per step and a report in `--out`, by
  * default e2e/artifacts/stories/<story id>/.
  */
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { startAppLink } from '../link/appLink';
 import { createScreenWatch, keepVideo, pictureName, recordSimulator } from './evidence';
 import { playStory, topPage } from './play';
 import { storySimulator } from './simulator';
-import { reachState } from './states';
+import { madeFrom, reachState } from './states';
 import { storySchema, type Story } from './story';
 
 const args = process.argv.slice(2);
@@ -109,13 +109,16 @@ const play = async (story: Story, outDir: string, look: boolean): Promise<boolea
           (entry) =>
             `${entry.params?.screen}${entry.event === 'screen.mount' ? ' mounted' : ` slid ${entry.params?.duration_ms} ms`}`
         );
+      const busy = step.appUnresponsiveMs
+        ? `, app unresponsive for ${step.appUnresponsiveMs} ms`
+        : '';
       const moved = step.screenKeptMoving
         ? ', screen never stopped moving'
         : step.screenMovedMs
           ? `, screen moved for ${step.screenMovedMs} ms after`
           : '';
       console.log(
-        `  ${step.ok ? 'ok  ' : 'FAIL'} ${index + 1}. ${step.name}  ${step.wallMs} ms${moved}${shown.length ? `  (${shown.join(', ')})` : ''}`
+        `  ${step.ok ? 'ok  ' : 'FAIL'} ${index + 1}. ${step.name}  ${step.wallMs} ms${moved}${busy}${shown.length ? `  (${shown.join(', ')})` : ''}`
       );
       if (step.failure) console.log(`       ${step.failure}`);
     }
@@ -124,7 +127,7 @@ const play = async (story: Story, outDir: string, look: boolean): Promise<boolea
       for (const element of lookedAt.elements) {
         if (!element.id && !element.label) continue;
         console.log(
-          `  ${element.page ?? ''}  ${element.id ?? '-'}  ${JSON.stringify(element.label ?? element.text ?? '')}${element.disabled ? '  disabled' : ''}`
+          `  ${element.page ?? ''}  ${element.id ?? '-'}  ${JSON.stringify((element.label ?? element.text ?? '').slice(0, 70))}${element.disabled ? '  disabled' : ''}  at ${Math.round(element.x)},${Math.round(element.y)} ${Math.round(element.width)}×${Math.round(element.height)}`
         );
       }
     }
@@ -139,23 +142,43 @@ const play = async (story: Story, outDir: string, look: boolean): Promise<boolea
   }
 };
 
-const story = storyPath
-  ? storySchema.parse(JSON.parse(readFileSync(storyPath, 'utf8')))
-  : undefined;
+const storyText = storyPath ? readFileSync(storyPath, 'utf8') : undefined;
+const story = storyText ? storySchema.parse(JSON.parse(storyText)) : undefined;
+const stateEvidence = (id: string) => join(STORIES_OUT, `state-${id}-${udid.slice(0, 8)}`);
 let ok = false;
 try {
-  // A state this simulator lacks is built by playing its story, with evidence of its own.
-  await reachState(onlyState ?? story?.startsFrom ?? '', {
+  const actions = {
     hasState: simulator.hasState,
-    startFrom: (state) => simulator.startFrom(appPath, state),
-    play: (builder) =>
-      play(builder, join(STORIES_OUT, `state-${builder.id}-${udid.slice(0, 8)}`), false),
-    saveState: (name, madeFrom) => simulator.saveState(name, madeFrom),
-  });
-  spentOn('startState');
-  ok = story
-    ? await play(story, flag('out') ?? join(STORIES_OUT, story.id), flags.includes('--look'))
-    : true;
+    startFrom: (state: string) => simulator.startFrom(appPath, state),
+    // A state this simulator lacks is built by playing its story, with evidence of its own.
+    play: (builder: Story) => play(builder, stateEvidence(builder.id), false),
+    saveState: (name: string, from: string) => simulator.saveState(name, from),
+  };
+  if (!story || !storyText) {
+    await reachState(onlyState ?? '', actions);
+    ok = true;
+  } else {
+    const outDir = flag('out') ?? join(STORIES_OUT, story.id);
+    const endsIn = madeFrom(story, storyText);
+    if (simulator.hasState(story.id, endsIn) && existsSync(stateEvidence(story.id))) {
+      // Already played on this simulator, as the start of another story. Playing
+      // it again would take the wallet back in time, and a mint refuses secrets
+      // it has seen; what it left then is this story's result.
+      rmSync(outDir, { recursive: true, force: true });
+      cpSync(stateEvidence(story.id), outDir, { recursive: true });
+      ok = (JSON.parse(readFileSync(join(outDir, 'report.json'), 'utf8')) as { ok: boolean }).ok;
+      console.log(
+        `${ok ? 'PASS' : 'FAIL'}  ${story.id}: played earlier on this simulator as the start of another story`
+      );
+    } else {
+      await reachState(story.startsFrom, actions);
+      spentOn('startState');
+      ok = await play(story, outDir, flags.includes('--look'));
+      // Where it ended is kept, so a story that starts from here does not play this one again.
+      if (ok) await simulator.saveState(story.id, endsIn);
+      spentOn('saveState');
+    }
+  }
   console.log(
     Object.entries(spent)
       .map(([what, ms]) => `${what} ${ms} ms`)

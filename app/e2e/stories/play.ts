@@ -11,6 +11,10 @@ import type { Expectation, Step, Story } from './story';
 
 type Element = AppScreen['elements'][number];
 
+/** The app is given at least this long to answer, however little of the step is left. */
+const ANSWER_WITHIN_MS = 2000;
+/** An answer slower than this means touches were not being handled either. */
+const SLOW_ANSWER_MS = 250;
 /** Which way the finger moves, as steps across and down the screen. */
 const SWIPES = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] } as const;
 
@@ -25,6 +29,15 @@ export interface TouchDevice {
   tap(x: number, y: number): Promise<void>;
   /** A finger dragged from one point to another and lifted, in the same fractions. */
   swipe(from: [x: number, y: number], to: [x: number, y: number]): Promise<void>;
+  /** Text typed on the keyboard, a key at a time. */
+  type(text: string): Promise<void>;
+  /**
+   * Where a control iOS itself drew is, by its label, as fractions of the
+   * window; null when there is none.
+   */
+  findSystemControl?(
+    label: string
+  ): Promise<{ x: number; y: number; width: number; height: number } | null>;
 }
 
 interface StepResult {
@@ -41,6 +54,8 @@ interface StepResult {
   screenMovedMs?: number;
   /** True when the screen never stopped changing: something on it animates for ever. */
   screenKeptMoving?: true;
+  /** The longest the app took to answer the runner, when long enough that a person would feel it. */
+  appUnresponsiveMs?: number;
   /** The entries the app logged during the step. */
   entries: AppLogEntry[];
   failure?: string;
@@ -129,6 +144,18 @@ async function playStep(
   const from = link.entries.indexOf(mark) + 1;
   const deadline = startedWall + step.withinMs;
   let motion: { movedForMs: number; stillMoving: boolean } | undefined;
+  // The app answers from its JavaScript thread, so a slow answer is that thread
+  // busy with something else. It is given until the step's deadline, and the
+  // longest it kept the runner waiting is reported.
+  let slowestAnswerMs = 0;
+  const readScreen = async () => {
+    const asked = performance.now();
+    try {
+      return await link.screen(Math.max(ANSWER_WITHIN_MS, deadline - asked));
+    } finally {
+      slowestAnswerMs = Math.max(slowestAnswerMs, Math.round(performance.now() - asked));
+    }
+  };
   const finish = (failure?: string): StepResult => {
     const entries = link.entries.slice(from);
     return {
@@ -136,6 +163,7 @@ async function playStep(
       ok: failure === undefined,
       ...(motion ? { screenMovedMs: motion.movedForMs } : {}),
       ...(motion?.stillMoving ? { screenKeptMoving: true as const } : {}),
+      ...(slowestAnswerMs >= SLOW_ANSWER_MS ? { appUnresponsiveMs: slowestAnswerMs } : {}),
       startedAtAppMs: mark._t,
       endedAtAppMs: entries.at(-1)?._t ?? mark._t,
       wallMs: Math.round(performance.now() - startedWall),
@@ -147,19 +175,27 @@ async function playStep(
 
   try {
     if (step.tap) {
-      const screen = await link.screen();
-      const target = find(step.tap, screen);
-      if (!target) return finish(`Nothing to tap: ${describeSelector(step.tap)} is not on screen`);
-      if (target.disabled)
+      const screen = await readScreen();
+      const inApp = find(step.tap, screen);
+      // What iOS draws itself (a menu, an alert) is not in the app's map; the
+      // simulator knows it by its label, at most of a second per look.
+      const outside =
+        !inApp && 'label' in step.tap ? await device.findSystemControl?.(step.tap.label) : null;
+      if (!inApp && !outside)
+        return finish(`Nothing to tap: ${describeSelector(step.tap)} is not on screen`);
+      if (inApp?.disabled)
         return finish(`Cannot tap ${describeSelector(step.tap)}: it is disabled`);
       const [across, down] = step.tapAt ?? [0.5, 0.5];
-      await device.tap(
-        (target.x + target.width * across) / screen.width,
-        (target.y + target.height * down) / screen.height
-      );
+      if (inApp)
+        await device.tap(
+          (inApp.x + inApp.width * across) / screen.width,
+          (inApp.y + inApp.height * down) / screen.height
+        );
+      else if (outside)
+        await device.tap(outside.x + outside.width * across, outside.y + outside.height * down);
     }
     if (step.swipe) {
-      const screen = await link.screen();
+      const screen = await readScreen();
       const target = find(step.swipe.on, screen);
       if (!target)
         return finish(`Nothing to swipe: ${describeSelector(step.swipe.on)} is not on screen`);
@@ -174,6 +210,24 @@ async function playStep(
         clamp(from[1] + down * step.swipe.distance),
       ]);
     }
+    if (step.type) {
+      if (step.type.into) {
+        const screen = await readScreen();
+        const target = find(step.type.into, screen);
+        if (!target)
+          return finish(
+            `Nothing to type into: ${describeSelector(step.type.into)} is not on screen`
+          );
+        await device.tap(
+          (target.x + target.width / 2) / screen.width,
+          (target.y + target.height / 2) / screen.height
+        );
+        // The field has to take the cursor before the first key arrives.
+        await link.mark(`${label}:focused`);
+        await link.still(Math.max(1, deadline - performance.now()) + STILL_GRACE_MS);
+      }
+      await device.type(step.type.enter ? `${step.type.text}\n` : step.type.text);
+    }
     // A second mark, sent after the touch: the app treats a mark as something
     // happening on screen, so "still" is then judged from a moment by which it
     // certainly had the touch.
@@ -181,7 +235,7 @@ async function playStep(
 
     for (;;) {
       await link.still(Math.max(1, deadline - performance.now()) + STILL_GRACE_MS);
-      const screen = await link.screen();
+      const screen = await readScreen();
       const entries = link.entries.slice(from);
       const problems = step.expect
         .map((expectation) => unmet(expectation, screen, entries))

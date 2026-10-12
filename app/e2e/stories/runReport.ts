@@ -18,6 +18,7 @@ interface ReportedStep {
   wallMs: number;
   screenMovedMs?: number;
   screenKeptMoving?: true;
+  appUnresponsiveMs?: number;
   picture?: string;
   failure?: string;
   entries: ReportedEntry[];
@@ -60,7 +61,7 @@ function stepCard(folder: string, step: ReportedStep, index: number): string {
   const logged = trouble(step);
   return `<figure class="${step.ok ? '' : 'failed'}">
 ${step.picture ? `<a href="${escape(folder)}/${escape(step.picture)}"><img loading="lazy" src="${escape(folder)}/${escape(step.picture)}" alt=""></a>` : '<div class="nopicture">no picture</div>'}
-<figcaption><b>${index + 1}. ${escape(step.name)}</b><br>${step.wallMs} ms${moved ? ` · ${moved}` : ''}
+<figcaption><b>${index + 1}. ${escape(step.name)}</b><br>${step.wallMs} ms${moved ? ` · ${moved}` : ''}${step.appUnresponsiveMs ? `<p class="slow">app unresponsive for ${step.appUnresponsiveMs} ms</p>` : ''}
 ${step.failure ? `<p class="why">${escape(step.failure)}</p>` : ''}${logged ? `<ul>${logged}</ul>` : ''}</figcaption>
 </figure>`;
 }
@@ -94,7 +95,7 @@ section { border-top: 1px solid #333; padding: 16px 0; }
 .verdict { font-size: 12px; padding: 2px 6px; border-radius: 4px; background: #1d3b24; color: #7ee08f; }
 .failed > h2 .verdict { background: #4a1d1d; color: #ff8a8a; }
 .purpose { margin: 6px 0 2px; max-width: 80ch; } .facts { margin: 0 0 10px; color: #999; }
-.why { color: #ff8a8a; margin: 4px 0; }
+.why { color: #ff8a8a; margin: 4px 0; } .slow { color: #d7a64a; margin: 2px 0; }
 .row { display: flex; gap: 10px; overflow-x: auto; align-items: flex-start; }
 video, img, .nopicture { height: 420px; border-radius: 10px; background: #000; flex: none; }
 video { aspect-ratio: 9 / 19.5; }

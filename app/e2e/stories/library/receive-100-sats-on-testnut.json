@@ -1,0 +1,149 @@
+{
+  "id": "receive-100-sats-on-testnut",
+  "purpose": "A person asks for 100 sats over Lightning from the public test mint, the mint pays the invoice, and the wallet says the sats were added.",
+  "startsFrom": "testnut-mint",
+  "steps": [
+    {
+      "name": "the wallet opens on the test mint",
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-selected-mint:testnut.cashu.space"
+          }
+        },
+        {
+          "visible": {
+            "id": "wallet-receive"
+          }
+        },
+        {
+          "logged": "splash.gone"
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "open Receive",
+      "tap": {
+        "id": "wallet-receive"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "receive-method-fixedAmount"
+          }
+        }
+      ]
+    },
+    {
+      "name": "ask for a fixed amount",
+      "tap": {
+        "id": "receive-method-fixedAmount"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "keypad-key-1"
+          }
+        }
+      ]
+    },
+    {
+      "name": "press 1",
+      "tap": {
+        "id": "keypad-key-1"
+      },
+      "expect": [
+        {
+          "visible": {
+            "label": "Amount 1 sat"
+          }
+        }
+      ]
+    },
+    {
+      "name": "press 00",
+      "tap": {
+        "id": "keypad-key-double-zero"
+      },
+      "expect": [
+        {
+          "visible": {
+            "label": "Amount 100 sat"
+          }
+        }
+      ]
+    },
+    {
+      "name": "press Next",
+      "tap": {
+        "id": "amount-next"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "amount-next-menu-lightning"
+          }
+        }
+      ]
+    },
+    {
+      "name": "choose Lightning",
+      "tap": {
+        "id": "amount-next-menu-lightning"
+      },
+      "expect": [
+        {
+          "page": "LightningReceiveScreen"
+        },
+        {
+          "logged": "coco.operations.mint.quote_created"
+        },
+        {
+          "visible": {
+            "id": "lightning-receive-copy"
+          }
+        }
+      ],
+      "withinMs": 15000
+    },
+    {
+      "name": "the invoice is paid and the sats arrive",
+      "expect": [
+        {
+          "logged": "hook.payment_status.mint_quote_redeemed"
+        },
+        {
+          "visible": {
+            "label": "Payment received"
+          }
+        }
+      ],
+      "withinMs": 30000
+    },
+    {
+      "name": "put off the backup reminder",
+      "tap": {
+        "id": "cta-secondary"
+      },
+      "expect": [
+        {
+          "gone": {
+            "id": "cta-secondary"
+          }
+        },
+        {
+          "visible": {
+            "id": "lightning-receive-details"
+          }
+        },
+        {
+          "visible": {
+            "label": "Added to wallet"
+          }
+        }
+      ],
+      "withinMs": 8000
+    }
+  ]
+}
