@@ -18,17 +18,21 @@ import {
   notifyNearbyNeedsConnection,
 } from '../lib/startNearPaySend';
 
-/** Destination-first entry shared by Send and the nearby list. */
-export function useStartNearbySend() {
+/**
+ * Destination-first entry shared by Send and the nearby list. `screenUnit` is
+ * the unit the calling screen has pinned for its payment flow, when it pins
+ * one: that is the unit the send would use, whatever the account shows.
+ */
+export function useStartNearbySend(screenUnit?: string) {
   const walletContext = useWalletContext();
-  // No unit pin. A nearby send only starts when the active unit is sat (the
+  // No unit pin. A nearby send only starts when the unit in force is sat (the
   // check below), and then the machine's own unit is already sat. Pinning for
   // as long as this hook is mounted put sat over the Send screen's unit for
   // every other flow started from it.
   const machine = usePaymentFlowMachine({ walletContext });
   const { isOffline } = useOfflineStatus();
   return async (peer: BLEPeer, beforeStart?: () => void) => {
-    if (toRealUnit(useMintStore.getState().activeUnit) !== 'sat')
+    if (toRealUnit(screenUnit ?? useMintStore.getState().activeUnit) !== 'sat')
       return notifyNutDropNeedsBitcoinAccount();
     const plan = planNearPaySend({ peer, ourMints: accountMintUrls(walletContext), isOffline });
     const name = peerDisplayName(peer);

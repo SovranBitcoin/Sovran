@@ -95,3 +95,15 @@ it('starts nothing in another unit, so there is no flow that needed the pin', as
   expect(mockStartSendEcash).not.toHaveBeenCalled();
   expect(mockNeedsBitcoinAccount).toHaveBeenCalledTimes(1);
 });
+
+it('goes by the unit the calling screen pinned, not the one the account shows', async () => {
+  // Send opened for dollars while the account shows sat: the flow would run in dollars.
+  mockActiveUnit = 'sat';
+  const { result } = renderHook(() => useStartNearbySend('usd'));
+
+  await result.current(peer);
+
+  expect(mockStartSendEcash).not.toHaveBeenCalled();
+  expect(mockNeedsBitcoinAccount).toHaveBeenCalledTimes(1);
+  expect(mockBindings[0]).not.toHaveProperty('unit');
+});

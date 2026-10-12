@@ -135,7 +135,7 @@ export function SendScreen({ unit }: { unit: string }) {
   // ── Nearby Nut Drop peers (passive BLE discovery) ────────────────────────
   const freshPeers = useFreshNearbyPeers();
   useRememberPeers(freshPeers);
-  const startNearbySend = useStartNearbySend();
+  const startNearbySend = useStartNearbySend(unit);
 
   // Live peers already show in the "Nearby" tier, so exclude them from the
   // People results (search hits + recents) below.
