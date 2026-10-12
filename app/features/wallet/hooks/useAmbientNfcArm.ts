@@ -115,7 +115,11 @@ export function useAmbientNfcArm(machine: AmbientNfcMachine): void {
         if (!(await isNfcSupported())) return;
         walletLog.info('wallet.nfc.ambient_arm_start');
         while (active) {
-          if (!(await isNfcEnabled())) {
+          const enabled = await isNfcEnabled();
+          // The screen lost focus or the app left the foreground while that
+          // was asked: this loop is over, and must not start a scan.
+          if (!active) break;
+          if (!enabled) {
             useNfcTapStore.getState().setArmed(false);
             await delay(DISABLED_RECHECK_MS);
             continue;

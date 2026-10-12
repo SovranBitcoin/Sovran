@@ -20,7 +20,7 @@
 
 import React, { useCallback, useState } from 'react';
 import * as Clipboard from 'expo-clipboard';
-import { useForegroundFocusEffect } from '@/shared/hooks/useForegroundFocusEffect';
+import { useFocusEffect } from 'expo-router';
 import { Button as HerouiButton, ListGroup, Separator } from 'heroui-native';
 import { Button } from '@/shared/ui/primitives/Button';
 import QRCode from 'react-native-qrcode-svg';
@@ -110,7 +110,11 @@ export function ShareSignerScreen(): React.ReactElement {
   // `connect` is answered without a cold start. `regenerate` re-keys on
   // `keys?.pubkey` (explicit useCallback above), so the focus effect re-runs
   // when keys finish deriving — the keys-arrived-while-focused path.
-  useForegroundFocusEffect(
+  //
+  // Screen focus only, not the app's foreground: the link is usually pasted
+  // into another app on this phone, and leaving for it must neither stop the
+  // service that answers nor replace the link being pasted.
+  useFocusEffect(
     useCallback(() => {
       useNip46RequestsStore.getState().setServiceHotRequested(true);
       regenerate(false);
