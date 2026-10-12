@@ -80,6 +80,16 @@ it('drops the old account’s pending snapshot when a rebuild finds another acco
   expect(mockPersistOwnerSnapshot).not.toHaveBeenCalled();
 });
 
+it('writes nothing when its timer fires after the account changed and nothing rebuilt it', () => {
+  // A layer built again between the switch's dispose and its account flip.
+  const layer = buildNostrDataLayer();
+  seeContact(layer, 'Seen by A');
+
+  mockPubkey = ACCOUNT_B;
+  jest.advanceTimersByTime(60_000);
+  expect(mockPersistOwnerSnapshot).not.toHaveBeenCalled();
+});
+
 it('saves the pending snapshot when only the tiers change', () => {
   const old = buildNostrDataLayer();
   seeContact(old, 'Seen by A');

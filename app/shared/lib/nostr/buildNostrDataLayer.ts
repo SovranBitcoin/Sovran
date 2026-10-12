@@ -124,11 +124,19 @@ function seedPersistedProfiles(layer: facade.NostrDataLayer): void {
  * debounced) so the boot-seed above has data next launch. The entity cache is
  * the single owner; this store is purely its persistent tail. Returns a
  * teardown that removes the listener and writes or drops a pending snapshot.
+ *
+ * The mirror is whichever account is active, so a snapshot is only written
+ * while that is still `owner`: a layer built again during an account switch
+ * can have its timer fire after the next account's mirror has loaded.
  */
-function startProfilePersistence(layer: facade.NostrDataLayer): LayerMemo['teardownPersistence'] {
+function startProfilePersistence(
+  layer: facade.NostrDataLayer,
+  owner: string | undefined
+): LayerMemo['teardownPersistence'] {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const flush = () => {
     timer = undefined;
+    if (activeViewerPubkey() !== owner) return;
     const records: Record<string, NostrProfileMetadata> = {};
     for (const record of layer.cache.profiles.values()) {
       const mapped = cachedProfileToMetadata(record);
@@ -206,7 +214,7 @@ export function buildNostrDataLayer(): facade.NostrDataLayer | null {
   if (layer) {
     seedOwnProfile(layer);
     seedPersistedProfiles(layer);
-    const teardownPersistence = startProfilePersistence(layer);
+    const teardownPersistence = startProfilePersistence(layer, pubkey);
     memo = { layer, configKey, pubkey, teardownPersistence };
   } else {
     memo = null;
