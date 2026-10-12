@@ -58,6 +58,7 @@ import { cashuLog, initLog, initPhase, redactError, mintUrlLogFields } from '../
 import { withCallTiming } from '../loggerCallTiming';
 import { resolveOutputDataCreator } from './outputDataCreator';
 import { drainSqlite } from './drainSqlite';
+import { TIMED_OUT, settleWithin } from '@/shared/lib/profile/settleWithin';
 import { logCocoVersions, reportCocoApiFailure, reportCocoIssue } from './cocoFeedback';
 import {
   createP2PKImportPlugin,
@@ -356,6 +357,9 @@ class NsecSigner implements Signer {
 /** How long delete-all waits for a wallet that is still opening. */
 const RESET_INIT_WAIT_MS = 10_000;
 
+/** How long a teardown waits for background start-up to end before going on without it. */
+const BACKGROUND_DRAIN_MS = 15_000;
+
 /**
  * Coco Manager singleton for managing Cashu operations
  */
@@ -367,6 +371,11 @@ export class CocoManager {
   private static pendingInit: Promise<Manager> | null = null;
   /** True while enableSafeWatchers / recovery / default mint init are running. */
   private static isBackgroundRunning = false;
+  /**
+   * Background start-up still running. It works on the wallet and the identity
+   * it was started for, so a teardown waits for it before taking either away.
+   */
+  private static pendingBackground = new Set<Promise<void>>();
   /** Tracks an in-flight cleanup() call so initialize() can await it before proceeding. */
   private static pendingCleanup: Promise<void> | null = null;
   private static cleanupFailed = false;
@@ -951,7 +960,23 @@ export class CocoManager {
    * before NUT-13 wallet restore has completed — does not start any operation
    * that uses the deterministic counter.
    */
-  static async enableSafeWatchers(): Promise<void> {
+  static enableSafeWatchers(): Promise<void> {
+    return this.runBackground(() => this.startSafeWatchers());
+  }
+
+  /** Run a background start so that `cleanup` can wait for it to end. */
+  private static runBackground(start: () => Promise<void>): Promise<void> {
+    const work = start();
+    const settled = work.then(
+      () => undefined,
+      () => undefined
+    );
+    this.pendingBackground.add(settled);
+    void settled.then(() => this.pendingBackground.delete(settled));
+    return work;
+  }
+
+  private static async startSafeWatchers(): Promise<void> {
     if (!this.instance) {
       cashuLog.warn('cashu.manager.safe_watchers.no_instance');
       throw new Error('Manager not initialized. Call initialize() first.');
@@ -1030,7 +1055,11 @@ export class CocoManager {
    * triggering an `outputs already signed` rejection that retries forever
    * (see walletLifecycleStore + AppGate's RestoreGate).
    */
-  static async enableNpcSyncAndProcessor(): Promise<void> {
+  static enableNpcSyncAndProcessor(): Promise<void> {
+    return this.runBackground(() => this.startNpcSyncAndProcessor());
+  }
+
+  private static async startNpcSyncAndProcessor(): Promise<void> {
     const manager = this.instance;
     if (!manager) {
       cashuLog.warn('cashu.manager.npc_sync_and_processor.no_instance');
@@ -1056,7 +1085,7 @@ export class CocoManager {
           });
         }
         await manager.initPlugins();
-        npcAccount = await this.getOrCreateNpcAccount();
+        npcAccount = await this.getOrCreateNpcAccount(manager);
         initLog('CocoManager', 'plugins initialized');
         cashuLog.info('cashu.manager.plugins_initialized', {
           hasNpcPlugin: true,
@@ -1319,6 +1348,21 @@ export class CocoManager {
         cashuLog.info('cashu.manager.cleanup_wait_init');
         await this.pendingInit.catch(() => undefined);
       }
+      // Background start-up that began just before this teardown (an account
+      // switch checks readiness and then waits for its disk guard) is still
+      // using this wallet and the identity it started with. Let it end first,
+      // so none of it runs on into the next account. It is bounded: work that
+      // has not ended by then is no longer waited for, and what it does next
+      // is refused where it would read the active account
+      // (`getOrCreateNpcAccount`).
+      if (this.pendingBackground.size > 0) {
+        cashuLog.info('cashu.manager.cleanup_wait_background');
+        const drained = await settleWithin(
+          Promise.all([...this.pendingBackground]),
+          BACKGROUND_DRAIN_MS
+        );
+        if (drained === TIMED_OUT) cashuLog.warn('cashu.manager.cleanup_background_not_drained');
+      }
       await this.disarmForegroundGate();
       if (!this.instance) {
         this.clearSensitiveRuntimeState(stagedAtStart);
@@ -1428,16 +1472,28 @@ export class CocoManager {
     return this.npcPlugin;
   }
 
-  private static async getOrCreateNpcAccount(): Promise<NPCAccountApi | null> {
+  /**
+   * `manager` is the wallet this account is for. The signer and the pubkey are
+   * read from whichever account is active, after awaits: if the wallet has
+   * been closed or replaced meanwhile they may be the next account's, and
+   * nothing is created.
+   */
+  private static async getOrCreateNpcAccount(manager: Manager): Promise<NPCAccountApi | null> {
     if (this.npcAccount) return this.npcAccount;
-    if (!this.npcPlugin) return null;
+    const npcPlugin = this.npcPlugin;
+    if (!npcPlugin) return null;
+    const walletChanged = () => {
+      if (this.instance === manager) return false;
+      cashuLog.warn('cashu.manager.npc_account_skipped_wallet_changed');
+      return true;
+    };
 
     const nsecSigner = await initPhase('CocoManager.getSigner', () =>
       this.getCurrentProfileSigner()
     );
     initLog('CocoManager', `signer created: ${!!nsecSigner}`);
 
-    if (!nsecSigner) return null;
+    if (!nsecSigner || walletChanged()) return null;
 
     // NpcSigner is `(t: EventTemplate) => Promise<SignedEvent>` from
     // npubcash-sdk; the underlying NsecSigner.signEvent is the same shape
@@ -1455,8 +1511,9 @@ export class CocoManager {
       cashuLog.warn('cashu.manager.npc_skip_no_pubkey');
       return null;
     }
+    if (walletChanged()) return null;
 
-    this.npcAccount = await this.npcPlugin.addAccount({
+    this.npcAccount = await npcPlugin.addAccount({
       id: activePubkey,
       signer: signerFunction,
       baseUrl: NPC_BASE_URL,

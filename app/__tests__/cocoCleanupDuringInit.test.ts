@@ -1,5 +1,6 @@
 import * as FileSystem from 'expo-file-system/legacy';
 import * as SQLite from 'expo-sqlite';
+import { AppState } from 'react-native';
 import { createCashuSeedGetter } from 'wallet';
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { createSovranCocoRepositories } from '@/shared/lib/cashu/cocoRepositories';
@@ -244,4 +245,93 @@ it('reports a delete-all that could not remove a wallet database', async () => {
 
   // Reporting success here would clear the keys and leave the proofs on disk.
   await expect(CocoManager.completeReset([0])).rejects.toThrow('permission denied');
+});
+
+/**
+ * An account switch checks that nothing is running in the background and then
+ * waits for its disk guard. Background start-up that begins in that gap used
+ * to run on after the switch, holding the old wallet while reading the signer
+ * and the pubkey of whichever account was active by then.
+ */
+describe('background start-up and a teardown', () => {
+  type Privates = {
+    instance: unknown;
+    npcPlugin: { addAccount: jest.Mock } | null;
+    npcAccount: unknown;
+    npcPluginRegistered: boolean;
+    getCurrentProfileSigner: () => Promise<unknown>;
+  };
+  const privates = () => CocoManager as unknown as Privates;
+
+  /** A wallet whose plugin start-up is parked until `finishPlugins` is called. */
+  function parkedWallet() {
+    let finishPlugins!: () => void;
+    const wallet = {
+      use: jest.fn(),
+      initPlugins: jest.fn(
+        () =>
+          new Promise<void>((resolve) => {
+            finishPlugins = resolve;
+          })
+      ),
+    };
+    privates().instance = wallet;
+    privates().npcAccount = null;
+    privates().npcPluginRegistered = false;
+    privates().npcPlugin = { addAccount: jest.fn() };
+    // The start-up ends by listening for the app leaving the foreground.
+    jest
+      .spyOn(AppState, 'addEventListener')
+      .mockReturnValue({ remove: jest.fn() } as unknown as ReturnType<
+        typeof AppState.addEventListener
+      >);
+    return { wallet, finishPlugins: () => finishPlugins() };
+  }
+
+  afterEach(() => {
+    privates().instance = null;
+    privates().npcPlugin = null;
+    privates().npcAccount = null;
+    jest.restoreAllMocks();
+  });
+
+  it('is waited for by a teardown that starts while it is running', async () => {
+    const { finishPlugins } = parkedWallet();
+    const background = CocoManager.enableNpcSyncAndProcessor().catch(() => undefined);
+    await tick();
+
+    let cleaned = false;
+    const cleanup = CocoManager.cleanup().then(() => {
+      cleaned = true;
+    });
+    await tick();
+    // The wallet is still in use by the background start-up.
+    expect(cleaned).toBe(false);
+    expect(privates().instance).not.toBeNull();
+
+    finishPlugins();
+    await background;
+    await cleanup;
+    expect(cleaned).toBe(true);
+    expect(privates().instance).toBeNull();
+  });
+
+  it('creates no account for another wallet when the wallet changed under it', async () => {
+    const { finishPlugins } = parkedWallet();
+    const signer = jest
+      .spyOn(privates(), 'getCurrentProfileSigner')
+      .mockResolvedValue({ signEvent: jest.fn() });
+    const addAccount = privates().npcPlugin!.addAccount;
+    const background = CocoManager.enableNpcSyncAndProcessor().catch(() => undefined);
+    await tick();
+
+    // The teardown gave up waiting, the account flipped, and another wallet is open.
+    privates().instance = { other: 'wallet' };
+    finishPlugins();
+    await background;
+
+    expect(signer).toHaveBeenCalled();
+    expect(addAccount).not.toHaveBeenCalled();
+    expect(privates().npcAccount).toBeNull();
+  });
 });
