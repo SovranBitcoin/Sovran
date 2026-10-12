@@ -7,6 +7,11 @@ The durable record of the autonomous rule-conformance sweep. Procedure:
 [sweep-protocol.md](sweep-protocol.md). Read this first; it outlives any one
 session. Never delete a row.
 
+Read against the code on 2026-10-12: findings that were left without an entry and are still true are now
+follow-ups F125 (no kind 10050 list published), F126 (controls without a `testID`), F127 (small type and import
+findings), F128 (amount schemas that accept fractions), F129 (replaceable-event tie-break) and F130 (findings
+that were counted and never read). Rows that name another follow-up are tracked there.
+
 Branch: `feat/receive-nut-drop`.
 
 ## Domain queue

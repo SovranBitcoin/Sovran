@@ -1,7 +1,10 @@
 # Performance register
 
 Open performance, visual-stability and account-switching issues, each written so it can be picked up
-on its own. Nothing here is fixed yet. Compiled 2026-10-09 from a read-only survey of the tree, then
+on its own. Much of it has since been fixed, and the Status table says what; an audit against the code on
+2026-10-12 found 33 statements below that no longer hold and are still to be removed. What is still open
+is tracked in the follow-ups: F131 (fixes), F132 (measured or noticed and never explained), F133 (needs a
+device) and F134 (waiting on a nagg deploy), with F16, F92 and F111 for the rest. Compiled 2026-10-09 from a read-only survey of the tree, then
 audited the same day by two independent reviewers (Codex on VIS and ACCT, Claude on OBS, CALC and
 DEP). Their corrections are merged; where a reviewer's finding was not re-read it says so.
 

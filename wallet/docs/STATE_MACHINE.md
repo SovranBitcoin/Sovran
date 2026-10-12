@@ -1082,6 +1082,8 @@ during verification and the invariant rests on source review.
 
 ## 11. Cross-flow expectations and known gaps
 
+Which of the gaps below to build is follow-up F135, which also lists the four that the code has since closed.
+
 This section records intended payment-flow behavior and how the shipped code
 currently meets it. Each item tags a status: `shipped` (code already does this),
 `partial`, or `gap`. `Current:` describes verified shipped behavior with a source

@@ -1,5 +1,8 @@
 # Sovran test implementation roadmap
 
+Unchecked boxes are open work. Those that need only Jest or Vitest are follow-up F137; those that need a phone or
+emulator are F138. A box with an entry of its own names it.
+
 This is the durable worklist behind `testing-strategy.md`. It combines the
 Cashu reference-wallet gap survey, the whole-app robustness audit, the
 state-machine audit, component snapshots, and deterministic device testing.
@@ -286,7 +289,7 @@ balance`. It ended on the wallet, swept the app to zero, reconciled cocod
       leg is called reliable without its own device proof.
 - [x] Onboarding scenario + named `Welcome to Sovran` checkpoint passed on an
       owned ephemeral simulator and reached a proven final wallet state.
-- [ ] Traverse and assert every onboarding carousel slide.
+- [x] Traverse and assert every onboarding carousel slide. (covered 2026-10-12: `app/e2e/scenarios/onboarding-fresh.json`)
 - [x] Implement the explicit ordinary-simulator instance-group contract. The
       `full` suite places `recovery.reinstall` after `onboarding.fresh` with
       `newInstance: false`; focused recovery selection retains that onboarding
@@ -390,19 +393,19 @@ balance`. It ended on the wallet, swept the app to zero, reconciled cocod
       still summed internally, and short v2 ids require a full keyset-id lookup.
       Sovran rejects the exposed unsafe boundaries; retain DLEQ in future token
       re-encoding coverage when the dependency exposes the needed codec surface.
-- [ ] Unified payment-string matrix: Cashu, bolt11/12, LN address, LNURL,
+- [x] Unified payment-string matrix: Cashu, bolt11/12, LN address, LNURL,
       creqA/CREQB1, BIP-321, pubkey, mint URL, wrapper/separator stripping, and
-      per-screen supported-type allowlist.
-- [ ] BIP-321 resolution: `creq > lightning > onchain`, uppercase query keys,
-      required-parameter failure, and explicit unsupported-rail messages.
+      per-screen supported-type allowlist. (covered 2026-10-12: `wallet/__tests__/unit/parse.test.ts`)
+- [x] BIP-321 resolution: `creq > lightning > onchain`, uppercase query keys,
+      required-parameter failure, and explicit unsupported-rail messages. (covered 2026-10-12: `wallet/__tests__/unit/parse.test.ts`, `app/__tests__/bip321RailSelection.test.ts`)
 - [ ] LNURL/LN-address pure matrix: bech32, schemes, onion http, well-known
       endpoint, and metadata identifier extraction.
 - [ ] Mint URL identity: trailing slash, host case, default port, path-case
       significance, idempotence, token equality, and payment-request mint matching.
 - [ ] Multi-mint balance: multiple keysets per mint, empty mint zero, global
       rollup, and decoded-token distribution by normalized URL.
-- [ ] Mint capability routing: NUT-04 vs NUT-05, method+unit match, no-method
-      behavior, and no-capable-mint reason codes.
+- [x] Mint capability routing: NUT-04 vs NUT-05, method+unit match, no-method
+      behavior, and no-capable-mint reason codes. (covered 2026-10-12: `wallet/__tests__/unit/mint-capabilities.test.ts`)
 - [ ] Trusted-mint warning branch for string/object lists and empty input.
 - [x] NUT-18 `creqA` CBOR round-trip, transport/unit/mints, and embedded NUT-10
       P2PK/HTLC lock preservation.
@@ -410,8 +413,8 @@ balance`. It ended on the wallet, swept the app to zero, reconciled cocod
       malformed-tag, short-amount, and NUT-18/NUT-26 dispatch tests.
 - [ ] Upgrade cashu-ts before claiming NUT-26 embedded NUT-10 lock safety: 4.5.1
       encodes the lock but drops it during CREQB1 decode.
-- [ ] P2PK condition construction/filtering/sigflag, signature dedupe, SIG_ALL,
-      multisig/refund/locktime/impossible thresholds, and malformed-condition parse.
+- [x] P2PK condition construction/filtering/sigflag, signature dedupe, SIG_ALL,
+      multisig/refund/locktime/impossible thresholds, and malformed-condition parse. (covered 2026-10-12: `wallet/__tests__/unit/spending-conditions.test.ts`, `p2pk-lock.test.ts`)
 - [ ] HTLC preimage/hash/refund matrix only when Sovran ships HTLC ecash.
 
 ## 3. Colada state machine and money-flow contracts
@@ -483,15 +486,15 @@ balance`. It ended on the wallet, swept the app to zero, reconciled cocod
 - [x] App currency formatting: cents vs sats, display modes, unknown units, and
       generated integer-sat no-decimal invariant.
 - [ ] Balance breakdown garbage/object amount NaN safety.
-- [ ] Least-strict mint amount-bound reason and randomized envelope property.
-- [ ] Fiat resolver/suggestions, minor-unit integer round-trip, send-all, and
-      offline composability bounds.
-- [ ] Unit conversions and safe-sat conversion edge matrix.
+- [x] Least-strict mint amount-bound reason and randomized envelope property. (covered 2026-10-12: `wallet/__tests__/unit/mint-capabilities.test.ts`)
+- [x] Fiat resolver/suggestions, minor-unit integer round-trip, send-all, and
+      offline composability bounds. (covered 2026-10-12: `wallet/__tests__/unit/amount-actions.test.ts`, `suggestions.test.ts`)
+- [x] Unit conversions and safe-sat conversion edge matrix. (covered 2026-10-12: `wallet/__tests__/unit/guards.test.ts`, `amount.test.ts`, `offline.test.ts`)
 - [ ] Amountless invoice and paid amount zero finalization.
 - [ ] Custom Cashu unit, signed sat prefix, keypad leading-zero/pluralization,
       URL display truncation, and bolt11 msat-to-sat/time-left formatting.
-- [ ] Timeline-array approval snapshots for every rail/state; avoid full-screen
-      snapshots whose noise obscures the contract.
+- [x] Timeline-array approval snapshots for every rail/state; avoid full-screen
+      snapshots whose noise obscures the contract. (covered 2026-10-12: `app/__tests__/historyEntryTimelineBuild.test.ts`)
 
 ## 7. Async hooks, polling, and concurrency
 
@@ -505,7 +508,7 @@ balance`. It ended on the wallet, swept the app to zero, reconciled cocod
       and disabled-tier exclusion.
 - [ ] Mempool address summary overlapping refresh count, abort vs real error,
       cache/loading distinction, and interval bypass.
-- [ ] Nostr profile bounded retry/backoff and per-pubkey attempt lifetime.
+- [x] Nostr profile bounded retry/backoff and per-pubkey attempt lifetime. (covered 2026-10-12: `app/__tests__/useNostrProfileMetadataResolving.test.tsx`)
 - [ ] Relay health, swap listener edges, rollback timer, mint-info stale write,
       version-check abort, and deferred-mount cancellation.
 - [ ] Offline invoice poller: network-error cooldown, normal unpaid polling,
@@ -518,12 +521,12 @@ balance`. It ended on the wallet, swept the app to zero, reconciled cocod
       demux, kind-0 parsing, repost alias resolution, and NIP-10 root/reason rules.
 - [ ] Feed content parser ordering/overlap/media/query/invalid-note/size guard;
       normalize/reference-id/url helpers.
-- [ ] Ranking intent: exact engagement metrics/weights/transforms/kind limits,
-      follower score injection, and viewer boost.
+- [x] Ranking intent: exact engagement metrics/weights/transforms/kind limits,
+      follower score injection, and viewer boost. (covered 2026-10-12: `nostr/__tests__/recipes.test.ts`, `app/__tests__/facadeThreadAdapter.test.ts`)
 - [x] Owned Blossom deletion state sequence, ambiguous failure HEAD recovery,
       present/unknown failure, and sign-failure no-probe.
-- [ ] Blossom upload signing, response, timeout/retry, abort, preflight, and media
-      descriptor merge.
+- [x] Blossom upload signing, response, timeout/retry, abort, preflight, and media
+      descriptor merge. (covered 2026-10-12: `app/__tests__/blossomClientUpload.test.ts`, `uploadMediaBlocks.test.ts`)
 - [ ] Routstr retry/model-rejection status classification, affordability fail-open,
       deficit rounding, display name, and outgoing `max_tokens` request body.
       The September 24 review added single-mint affordability, scope-change,
@@ -542,7 +545,7 @@ balance`. It ended on the wallet, swept the app to zero, reconciled cocod
       and BLE hex ids.
 - [ ] APDU offset/status/response/error mapping and token-writer AID/NDEF select,
       cancel passthrough, and generic error wrapping.
-- [ ] Nut Drop auto-redeem P2PK gate and missing-mint/own/null-key branches.
+- [x] Nut Drop auto-redeem P2PK gate and missing-mint/own/null-key branches. (covered 2026-10-12: `wallet/__tests__/unit/transport.test.ts`)
 - [ ] BLE UTF-8 chunk boundary/newline reconstruction, geohash vectors, embedded
       token extraction, creq diagnostics, and peer identity/avatar precedence.
 - [ ] neverthrow boundaries for safe hostname, JSON parse, and external URL open.
