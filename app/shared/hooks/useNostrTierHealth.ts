@@ -14,7 +14,7 @@
  * id drops any late result so it can't update state after the screen is gone.
  */
 import { useCallback, useRef, useState } from 'react';
-import { useFocusEffect } from 'expo-router';
+import { useForegroundFocusEffect } from '@/shared/hooks/useForegroundFocusEffect';
 
 import type { RelayHealth } from '@/shared/hooks/useRelayHealth';
 import { log } from '@/shared/lib/logger';
@@ -132,7 +132,7 @@ export function useNostrTierHealth(relayMap: Record<string, RelayHealth>): Nostr
     [naggEnabled, naggUrl, primalEnabled, primalUrls, primalUrlKey]
   );
 
-  useFocusEffect(
+  useForegroundFocusEffect(
     useCallback(() => {
       runProbes('focus');
       const interval = setInterval(() => runProbes('interval'), POLL_INTERVAL_MS);

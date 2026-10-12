@@ -23,7 +23,7 @@
  */
 
 import React, { useCallback, useState } from 'react';
-import { useFocusEffect } from 'expo-router';
+import { useForegroundFocusEffect } from '@/shared/hooks/useForegroundFocusEffect';
 import { Button } from '@/shared/ui/primitives/Button';
 import Animated, { FadeOut, LinearTransition } from 'react-native-reanimated';
 
@@ -219,7 +219,7 @@ export function SignerRequestsScreen(): React.ReactElement {
   // 1s ticker, focused-only: drives the countdowns and the local "hide at
   // expiry" filter (the engine sweep deletes for real within 10s).
   const [now, setNow] = useState(() => Date.now());
-  useFocusEffect(
+  useForegroundFocusEffect(
     useCallback(() => {
       setNow(Date.now());
       const timer = setInterval(() => setNow(Date.now()), TICK_MS);

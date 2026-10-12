@@ -31,6 +31,14 @@ jest.mock('expo-router', () => {
     },
   };
 });
+// The focus half of the hook is what this file exercises; the foreground half
+// has its own test. Run it as the focus effect mocked above.
+jest.mock('@/shared/hooks/useForegroundFocusEffect', () => ({
+  useForegroundFocusEffect: (effect: () => void | (() => void)) =>
+    jest
+      .requireMock<{ useFocusEffect: (effect: () => void | (() => void)) => void }>('expo-router')
+      .useFocusEffect(effect),
+}));
 
 jest.mock('@/shared/lib/nostr/nostrTierConfig', () => ({
   useNostrTierConfig: jest.fn(),
