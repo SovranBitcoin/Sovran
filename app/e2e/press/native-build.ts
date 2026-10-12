@@ -11,7 +11,9 @@
  * The same steps build the end-to-end test app (`--bundled`): the Release
  * configuration, with its JavaScript inside it and logging left on, so it
  * launches without a bundler (ADR 0033). Its JavaScript is part of the
- * artifact, so it is current only for the commit it was built from.
+ * artifact, so it is current only for the commit it was built from. When only
+ * JavaScript has changed, the native part is kept and the bundle inside the
+ * app is replaced, which takes under a minute instead of a full build.
  */
 import { execFileSync, spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -392,6 +394,69 @@ export function bundledJavaScriptIsCurrent(
   return !stamp.gitDirty && !dirty && stamp.gitSha === head;
 }
 
+/**
+ * Replace the JavaScript inside a bundled build whose native part still matches,
+ * with the two commands Xcode's bundling phase runs: Metro's embed export, then
+ * the Hermes compiler. The app is signed again because its contents changed;
+ * the entitlements SecureStore needs are kept.
+ */
+async function refreshBundledJavaScript(stamp: NativeBuildStamp): Promise<NativeBuildStamp> {
+  const out = buildDir('ios', 'bundled');
+  const log = join(out, 'build.log');
+  const plain = join(out, 'main.js');
+  const env = { ...process.env, CI: '1', APP_VARIANT: 'development', EXPO_PUBLIC_E2E_LOGS: '1' };
+  try {
+    await step(
+      'expo export:embed (ios)',
+      'node',
+      [
+        require.resolve('expo/bin/cli'),
+        'export:embed',
+        '--entry-file',
+        join(APP_DIR, 'index.js'),
+        '--platform',
+        'ios',
+        '--dev',
+        'false',
+        '--minify',
+        'false',
+        '--bundle-output',
+        plain,
+        '--assets-dest',
+        stamp.artifact,
+      ],
+      APP_DIR,
+      env,
+      log
+    );
+    await step(
+      'hermesc',
+      require.resolve('hermes-compiler/hermesc/osx-bin/hermesc'),
+      ['-emit-binary', '-O', '-out', join(stamp.artifact, 'main.jsbundle'), plain],
+      APP_DIR,
+      env,
+      log
+    );
+  } finally {
+    rmSync(plain, { force: true });
+  }
+  await step(
+    'codesign',
+    'codesign',
+    ['--force', '--sign', '-', '--preserve-metadata=entitlements', stamp.artifact],
+    APP_DIR,
+    env,
+    log
+  );
+  return {
+    ...stamp,
+    gitSha: git(['rev-parse', 'HEAD']),
+    gitDirty: git(['status', '--porcelain']).length > 0,
+    builtAt: new Date().toISOString(),
+    artifactSha256: nativeArtifactHash(stamp.artifact),
+  };
+}
+
 /** Reuse a stamped build whose fingerprint matches current source, else rebuild. */
 export async function ensureNativeBuild(
   platform: Platform,
@@ -402,17 +467,23 @@ export async function ensureNativeBuild(
     throw new Error('The bundled test build exists for iOS only so far');
   const fingerprint = await nativeFingerprint(platform);
   const stamp = readStamp(platform, kind);
-  const current =
+  const nativeCurrent =
     stamp?.fingerprint === fingerprint &&
     existsSync(stamp.artifact) &&
     Boolean(stamp.artifactSha256) &&
-    nativeArtifactHash(stamp.artifact) === stamp.artifactSha256 &&
-    (kind === 'dev' || bundledJavaScriptIsCurrent(stamp));
+    nativeArtifactHash(stamp.artifact) === stamp.artifactSha256;
+  const current = nativeCurrent && (kind === 'dev' || bundledJavaScriptIsCurrent(stamp));
   if (current && policy !== 'force') {
     console.log(
       `${platform}: reusing native build ${stamp.appVersion} (${stamp.buildNumber}) from ${stamp.builtAt}`
     );
     return stamp;
+  }
+  if (nativeCurrent && kind === 'bundled' && policy !== 'force') {
+    console.log(`${platform}: native part unchanged; replacing the JavaScript inside the build`);
+    const refreshed = await refreshBundledJavaScript(stamp);
+    writeStamp(refreshed);
+    return refreshed;
   }
   if (policy === 'never')
     throw new Error(
