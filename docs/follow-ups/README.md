@@ -122,6 +122,6 @@ reports) keep their evidence, and link here for anything still open.
 | [F139](F139.md) | medium | device | A held swap step cannot be resumed from the screen, and swap history shows an unfinished chain as complete |
 | [F140](F140.md) | medium | decision | Removing one profile is not offered: its account number can be handed out again, and the wording does not say what goes |
 | [F141](F141.md) | medium | investigation | Create Ecash takes 1.0 s online and 2.5 s offline from Next to the token; a second of it is screens recomputing |
-| [F142](F142.md) | high | decision | Each app start adds two nearby standing payment requests and none is ever closed |
+| [F142](F142.md) | high | fix | Each app start adds two nearby standing payment requests and none is ever closed |
 
 <!-- list:end -->
