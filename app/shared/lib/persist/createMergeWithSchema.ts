@@ -26,7 +26,7 @@ export function createMergeWithSchema<TPartial>(
   return <TFull>(persisted: unknown, current: TFull): TFull => {
     if (!persisted || typeof persisted !== 'object') return current;
     const r = schema.safeParse(persisted);
-    if (r.success) return { ...current, ...r.data } as TFull;
+    if (r.success) return withFields(current, r.data);
 
     log.warn(`store.${name}.merge_rejected`, {
       issues: loggableIssues({
@@ -55,8 +55,14 @@ export function createMergeWithSchema<TPartial>(
     const again = schema.safeParse(withoutBadFields);
     if (dropped.length === 0 || !again.success) return current;
     log.warn(`store.${name}.merge_kept_fields`, { dropped });
-    return { ...current, ...again.data } as TFull;
+    return withFields(current, again.data);
   };
+}
+
+/** The store as it is, with the validated fields laid over it. Actions are kept. */
+function withFields<TFull>(current: TFull, fields: unknown): TFull {
+  const merged = { ...current, ...(fields as object) };
+  return merged;
 }
 
 interface MergeWithSchemaOptions {

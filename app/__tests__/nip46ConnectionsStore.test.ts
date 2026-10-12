@@ -442,28 +442,24 @@ describe('per-peer decrypt grants', () => {
   });
 
   it('lowercases the peer key on write', () => {
-    useNip46ConnectionsStore
-      .getState()
-      .setPeerDecryptGrant({
-        clientPubkey: client,
-        peerPubkey: peerX.toUpperCase(),
-        method: 'nip44_decrypt',
-        peerIsSelf: false,
-      });
+    useNip46ConnectionsStore.getState().setPeerDecryptGrant({
+      clientPubkey: client,
+      peerPubkey: peerX.toUpperCase(),
+      method: 'nip44_decrypt',
+      peerIsSelf: false,
+    });
     expect(useNip46ConnectionsStore.getState().apps[client].peerDecryptGrants[peerX]).toBeDefined();
   });
 
   it('refuses a grant asserting peerIsSelf', () => {
     // Deliberately illegal at the type level — pins the runtime guard.
-    const hostileAttestation = { peerIsSelf: true };
-    const result = useNip46ConnectionsStore
-      .getState()
-      .setPeerDecryptGrant({
-        clientPubkey: client,
-        peerPubkey: peerX,
-        method: 'nip44_decrypt',
-        ...hostileAttestation,
-      } as never);
+    const hostileGrant = {
+      clientPubkey: client,
+      peerPubkey: peerX,
+      method: 'nip44_decrypt',
+      peerIsSelf: true,
+    };
+    const result = useNip46ConnectionsStore.getState().setPeerDecryptGrant(hostileGrant as never);
     expect(result._unsafeUnwrapErr()).toBe('self_decrypt_forbidden');
   });
 

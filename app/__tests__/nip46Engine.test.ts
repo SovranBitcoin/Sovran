@@ -816,14 +816,12 @@ describe('nostrconnect pairing', () => {
 
     it('active match: adopts config, deletes the old record, revokes its session grants', async () => {
       seedPreviousPrimal();
-      useNip46RequestsStore
-        .getState()
-        .grantSession({
-          clientPubkey: OLD_CLIENT,
-          grantKey: 'nip44_decrypt',
-          peerPubkey: 'e'.repeat(64),
-          peerIsSelf: false,
-        });
+      useNip46RequestsStore.getState().grantSession({
+        clientPubkey: OLD_CLIENT,
+        grantKey: 'nip44_decrypt',
+        peerPubkey: 'e'.repeat(64),
+        peerIsSelf: false,
+      });
       const { engine, sent } = makeEngine();
       const parsed = reconnectUri();
       engine.startNostrconnectPairing(parsed);
