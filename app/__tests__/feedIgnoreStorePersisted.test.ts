@@ -61,8 +61,13 @@ it('keeps the lists when the copy of the published mute list cannot be read', ()
   expect(parsed.blockOverrides).toEqual({ [A]: true });
 });
 
-it('still reads an id an earlier build could have saved in upper case', () => {
-  expect(
-    PersistedFeedIgnoreStore.parse({ ignoredPubkeys: [A.toUpperCase()] }).ignoredPubkeys
-  ).toEqual([A.toUpperCase()]);
+it('reads an id saved in upper case as the lowercase id every lookup uses', () => {
+  const parsed = PersistedFeedIgnoreStore.parse({
+    ignoredPubkeys: [A.toUpperCase()],
+    ignoredEventIds: [NOTE.toUpperCase()],
+    blockOverrides: { [B.toUpperCase()]: true },
+  });
+  expect(parsed.ignoredPubkeys).toEqual([A]);
+  expect(parsed.ignoredEventIds).toEqual([NOTE]);
+  expect(parsed.blockOverrides).toEqual({ [B]: true });
 });

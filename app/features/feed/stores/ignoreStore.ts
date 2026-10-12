@@ -74,14 +74,20 @@ function normalizeHexList(values: readonly string[], max: number): string[] {
 
 // A saved list is never turned down for one bad entry: the entry is left out
 // and the rest of what the person muted and blocked is kept. Ids use the
-// app's shared hex schemas (`shared/lib/protocolIds.ts`).
+// app's shared hex schemas (`shared/lib/protocolIds.ts`), which read either
+// case; every lookup in this store is by lowercase id, so ids are lowered as
+// they are read.
+const lower = (id: string) => id.toLowerCase();
+const SavedPubkey = NostrPubkeyHexSchema.transform(lower);
+const SavedEventId = NostrEventIdSchema.transform(lower);
+
 export const PersistedFeedIgnoreStore = z.object({
-  ignoredPubkeys: tolerantArray(NostrPubkeyHexSchema, MAX_IGNORED_PUBKEYS).default([]),
-  ignoredEventIds: tolerantArray(NostrEventIdSchema, MAX_IGNORED_EVENT_IDS).default([]),
+  ignoredPubkeys: tolerantArray(SavedPubkey, MAX_IGNORED_PUBKEYS).default([]),
+  ignoredEventIds: tolerantArray(SavedEventId, MAX_IGNORED_EVENT_IDS).default([]),
   // A copy of the published list. One that cannot be read is fetched again.
   muteList: z
     .object({
-      id: NostrEventIdSchema,
+      id: SavedEventId,
       createdAt: z.number().int().nonnegative(),
       tags: z.array(z.array(z.string())),
       privateTags: z.array(z.array(z.string())),
@@ -89,7 +95,7 @@ export const PersistedFeedIgnoreStore = z.object({
     .nullable()
     .default(null)
     .catch(null),
-  blockOverrides: tolerantRecord(NostrPubkeyHexSchema, z.boolean()),
+  blockOverrides: tolerantRecord(SavedPubkey, z.boolean()),
   dmFilterEnabled: z.boolean().default(false),
   dmFilterWords: z.array(z.string().max(100)).max(100).default([]),
 });
