@@ -12,7 +12,7 @@ import type { Expectation, Step, Story } from './story';
 type Element = AppScreen['elements'][number];
 
 /** The one thing a device does for a story: touch the glass. */
-/** Says when the picture on screen has stopped changing; the recording does. */
+/** Says when the picture on screen has stopped changing. */
 interface PixelWatch {
   pixelsStill(): Promise<{ movedForMs: number; stillMoving: boolean }>;
 }
@@ -198,12 +198,15 @@ export async function playStory(
   story: Story,
   link: AppLink,
   device: TouchDevice,
-  pixels?: PixelWatch
+  pixels?: PixelWatch,
+  /** Called as each step ends, pass or fail; the next begins when it resolves. */
+  afterStep?: (index: number, step: StepResult) => Promise<void>
 ): Promise<StoryResult> {
   const steps: StepResult[] = [];
   for (const [index, step] of story.steps.entries()) {
     const result = await playStep(step, index, link, device, pixels);
     steps.push(result);
+    await afterStep?.(index, result);
     if (!result.ok) break;
   }
   return { id: story.id, ok: steps.every((step) => step.ok), steps };
