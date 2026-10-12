@@ -34,9 +34,12 @@ real app, wallet and mint: "send 40 sat as ecash and see it leave the balance". 
 sentence and has one outcome. Rules about amounts, parsing, error classes and state machines stay in the unit and
 package tests; a story does not re-enumerate them. About 100 stories cover the app.
 
-**A story stands alone.** It names the state it starts from (a fixture: fresh install, onboarded and empty,
-funded with 100 sat on one mint, two profiles) and reaches it by seeding, not by tapping through earlier flows.
-No story depends on another having run. Onboarding is itself a few stories, not the first minute of every one.
+**A story stands alone.** It names the state it starts from (fresh install, onboarded and empty, funded with
+100 sat on one mint, two profiles) and reaches it by having that state copied into place, not by tapping through
+earlier flows. A state is where a story in `e2e/stories/states/` ends: it is played once on a simulator and what
+it leaves is saved there, the app's files together with the simulator's keychain, which holds the seed. Nothing
+in the app is changed or told a seed for this. No story depends on another having run in the same run. Onboarding
+is itself a few stories, not the first minute of every one.
 
 **Every action is issued once.** No step repeats a tap, swipe or text entry. A step names what it does and what
 must be true afterwards; if that does not come true before its deadline the story fails and says what the app was
@@ -52,7 +55,8 @@ duration. A wait with no event behind it is a defect in the harness.
 overlays, no timing overrides. Structured logging stays on in that build behind its own switch, since it is
 otherwise a development-only feature.
 
-**Workers and state.** A run prepares one simulator with the build installed and clones it for each worker;
+**Workers and state.** Each worker builds its own states, so workers hold different wallets and cannot receive
+each other's messages. A run prepares one simulator with the build installed and clones it for each worker;
 Android boots read-only instances of one warmed emulator image. The prepared simulator has the background
 services no story uses switched off, which is what lets several fit in memory. Between stories a worker ends the
 app, restores the story's fixture and launches again; it does not reinstall. Each worker has its own wallet seeds, its own
@@ -117,6 +121,8 @@ minutes, well inside the budget; the budget's risk is now the length of the mone
   0.06 s. `simctl` is called directly: through `xcrun` every call costs 0.7 s.
 - The local mint starts in 0.15 s and marks an invoice paid in about 20 ms.
 - Evidence for one 12 s story is about 7 MB (5.6 MB of video, a 340 KB picture per step).
+- Starting from a saved state takes about 1.4 s. A story that opens an already set-up wallet is 3 s of steps and
+  7.6 to 9.5 s end to end; the first such story on a worker also builds the state, once, in about 12 s more.
 
 ## Open
 
