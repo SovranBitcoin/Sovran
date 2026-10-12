@@ -35,7 +35,7 @@ reports) keep their evidence, and link here for anything still open.
 | --- | --- | --- | --- |
 | [F02](F02.md) | high | decision | Private message plaintext is stored unencrypted at three sites; stop it and erase old data |
 | [F04](F04.md) | high | decision | Raw exception text reaches user-facing surfaces across the app |
-| [F07](F07.md) | medium | fix | Add app-wide translation: one locale service with Lingui catalogs |
+| [F07](F07.md) | medium | decision | Add app-wide translation: one locale service with Lingui catalogs |
 | [F09](F09.md) | medium | fix | apiClient loosens the shared profile schemas locally; reconcile with the schemas package |
 | [F10](F10.md) | medium | fix | imageCache prefetch has no queue cap or caller cancellation |
 | [F12](F12.md) | medium | upstream | vendor-marmot-ts.sh tolerates a missing source and records no revision or license |
@@ -52,11 +52,11 @@ reports) keep their evidence, and link here for anything still open.
 | [F26](F26.md) | medium | fix | Move receive, mint-quote and rebalance sequencing out of the app into wallet/ |
 | [F27](F27.md) | medium | fix | Payment-operations port and NIP-46 grant stores take look-alike positional strings |
 | [F28](F28.md) | medium | fix | Bitchat native calls pass private keys positionally; native events are not validated |
-| [F30](F30.md) | medium | fix | Persisted fields hold Nostr seconds under millisecond-style names; rename with migrations |
+| [F30](F30.md) | medium | decision | Persisted fields hold Nostr seconds under millisecond-style names; rename with migrations |
 | [F31](F31.md) | medium | fix | Nagg event schemas need per-item tolerance, then hex ids and size caps |
 | [F32](F32.md) | low | fix | MintCurrencyTabs and SendScreen animate layout per frame; three other workarounds remain |
 | [F33](F33.md) | low | upstream | Melt-cancel matches Coco's error text because Coco has no typed rollback error |
-| [F34](F34.md) | low | investigation | Re-run the Hunch audit to completion and explain the findings for switched-off rules |
+| [F34](F34.md) | low | upstream | Re-run the Hunch audit to completion and explain the findings for switched-off rules |
 | [F37](F37.md) | low | fix | A testnut Nut Drop is announced as real sats; allow-list copy names a payment request |
 | [F38](F38.md) | low | fix | Mint audit copy says swap success, rounding differs between screens, dead fields remain |
 | [F40](F40.md) | medium | decision | Decide what the mint picker shows before testnut verdicts have loaded |
@@ -88,11 +88,11 @@ reports) keep their evidence, and link here for anything still open.
 | [F72](F72.md) | low | fix | Nothing reads back :unreadable store copies; large stores need a stated policy |
 | [F76](F76.md) | medium | fix | During an in-process switch, background wallet work can read the next account's signer |
 | [F77](F77.md) | medium | device | Nostr cache database, restore subscription and Whitenoise are not closed on unmount |
-| [F79](F79.md) | low | test | No native scenario for StartupFailedScreen; the harness cannot make startup fail |
+| [F79](F79.md) | low | device | No native scenario for StartupFailedScreen; the harness cannot make startup fail |
 | [F80](F80.md) | low | fix | Removing a profile can strand a payment sent to it that this device has not received |
 | [F81](F81.md) | low | fix | Release builds do not report Android storage pressure; two stores can still grow large |
 | [F82](F82.md) | low | fix | Closing an open sheet on account hold remounts the outgoing account's screens |
-| [F83](F83.md) | low | fix | Deletion steps of delete-all and profile removal wait with no time limit |
+| [F83](F83.md) | low | decision | Deletion steps of delete-all and profile removal wait with no time limit |
 | [F87](F87.md) | low | fix | A leftover bare-key store is kept but not merged once the account has its own copy |
 | [F88](F88.md) | low | fix | A schema-rejected routstr-store silently stops saving for the session |
 | [F89](F89.md) | medium | decision | Split-bill records from 0.0.63 to 0.1.0 have no reader; import them or accept the loss |
@@ -101,7 +101,7 @@ reports) keep their evidence, and link here for anything still open.
 | [F92](F92.md) | medium | fix | Profile removal and delete-all keep no durable record of the step they reached |
 | [F93](F93.md) | medium | decision | Decide how ecash leaves a mismatched account; run the identity check on devices |
 | [F95](F95.md) | low | fix | Recovery with an unreadable keychain accepts any phrase for imported accounts |
-| [F96](F96.md) | low | test | No native scenario for AccountMismatchScreen; the harness cannot plant a mismatched row |
+| [F96](F96.md) | low | device | No native scenario for AccountMismatchScreen; the harness cannot plant a mismatched row |
 | [F97](F97.md) | medium | fix | A paid but unminted Lightning receive from 0.0.1 to 0.0.40 is recorded but never minted |
 | [F98](F98.md) | low | device | Claim redux-era ecash on a device against a real mint; add a prompt scenario and retry |
 | [F99](F99.md) | low | device | The first-launch Routstr load is fixed in tests but has not been seen on a device |
