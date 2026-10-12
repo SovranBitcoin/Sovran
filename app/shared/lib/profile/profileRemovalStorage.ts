@@ -227,7 +227,28 @@ async function deleteFiles(name: string): Promise<void> {
  * the cache is still open then, and unlinking the file does not need it closed.
  */
 export async function deleteNostrCaches(accountIndexes: readonly number[]): Promise<void> {
-  for (const index of accountIndexes) await deleteFiles(nostrName(index));
+  const names = new Set(accountIndexes.map(nostrName));
+  // Every cache on the phone, not only those of listed accounts: one can
+  // outlive its account's row in the list, and the next identity made at that
+  // index would open it.
+  for (const name of await nostrCachesOnDisk()) names.add(name);
+  for (const name of names) await deleteFiles(name);
+}
+
+/** The Nostr cache databases that have any file in the SQLite directory. */
+async function nostrCachesOnDisk(): Promise<string[]> {
+  try {
+    const files = await FileSystem.readDirectoryAsync(pathFor(''));
+    const names = new Set<string>();
+    for (const file of files) {
+      const name = /^(nostr(?:-\d+)?)(?:-journal|-wal|-shm)?$/.exec(file)?.[1];
+      if (name) names.add(name);
+    }
+    return [...names];
+  } catch {
+    // No directory yet means no databases. The listed ones are still deleted.
+    return [];
+  }
 }
 
 const INSPECTION_TIMEOUT_MS = 10_000;

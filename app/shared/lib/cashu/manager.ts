@@ -453,6 +453,26 @@ export class CocoManager {
     return accountIndex === 0 ? 'coco.db' : `coco-${accountIndex}.db`;
   }
 
+  /**
+   * The wallet databases that have any file in the SQLite directory: the
+   * database itself, a journal beside it, or a pre-v2 backup of it.
+   */
+  private static async walletDatabasesOnDisk(): Promise<string[]> {
+    try {
+      const files = await FileSystem.readDirectoryAsync(`${FileSystem.documentDirectory}SQLite/`);
+      const names = new Set<string>();
+      for (const file of files) {
+        const name = /^(coco(?:-\d+)?\.db)(?:$|[-.])/.exec(file)?.[1];
+        if (name) names.add(name);
+      }
+      return [...names];
+    } catch (error) {
+      // No directory yet means no databases. The listed ones are still deleted.
+      cashuLog.debug('cashu.manager.db_directory_unread', { error: redactError(error) });
+      return [];
+    }
+  }
+
   /** File-system paths for a coco database and its pre-v2 backup set. */
   private static getDbPaths(dbName: string) {
     const dbPath = `${FileSystem.documentDirectory}SQLite/${dbName}`;
@@ -1777,6 +1797,10 @@ export class CocoManager {
       for (const i of accountIndexes) {
         dbNames.add(this.dbNameFor(i));
       }
+      // Delete-all means every wallet database on the phone. One can outlive
+      // its account's row in the list (a removal that was interrupted, a list
+      // that lost an entry), so the directory is read as well as the list.
+      for (const dbName of await this.walletDatabasesOnDisk()) dbNames.add(dbName);
       for (const dbName of dbNames) {
         await this.deleteDatabase(dbName);
       }

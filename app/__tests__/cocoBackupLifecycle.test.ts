@@ -12,6 +12,7 @@ jest.mock('expo-file-system/legacy', () => ({
   deleteAsync: jest.fn().mockResolvedValue(undefined),
   copyAsync: jest.fn().mockResolvedValue(undefined),
   getInfoAsync: jest.fn().mockResolvedValue({ exists: false }),
+  readDirectoryAsync: jest.fn().mockResolvedValue([]),
 }));
 
 jest.mock('expo-sharing', () => ({
@@ -79,5 +80,42 @@ describe('CocoManager pre-v2 backup lifecycle', () => {
         'file:///docs/SQLite/coco-2.db.pre-v2-shm',
       ])
     );
+  });
+
+  it('completeReset deletes every wallet database on the phone, listed or not', async () => {
+    jest.mocked(SQLite.deleteDatabaseAsync).mockClear();
+    // Account 7 has only a journal left; account 9 only a pre-v2 backup; and
+    // neither is in the account list any more.
+    jest
+      .mocked(FileSystem.readDirectoryAsync)
+      .mockResolvedValueOnce([
+        'coco.db',
+        'coco-7.db-wal',
+        'coco-9.db.pre-v2',
+        'coco-export.db',
+        'cocoa.db',
+        'nostr',
+        'other.db',
+      ]);
+
+    await CocoManager.completeReset([0]);
+
+    expect(FileSystem.readDirectoryAsync).toHaveBeenCalledWith('file:///docs/SQLite/');
+    const deleted = jest.mocked(SQLite.deleteDatabaseAsync).mock.calls.map(([name]) => name);
+    expect(deleted.sort()).toEqual(['coco-7.db', 'coco-9.db', 'coco.db']);
+    const paths = jest.mocked(FileSystem.deleteAsync).mock.calls.map(([path]) => path);
+    expect(paths).toEqual(expect.arrayContaining(['file:///docs/SQLite/coco-9.db.pre-v2']));
+  });
+
+  it('completeReset still deletes the listed databases when the directory cannot be read', async () => {
+    jest.mocked(SQLite.deleteDatabaseAsync).mockClear();
+    jest
+      .mocked(FileSystem.readDirectoryAsync)
+      .mockRejectedValueOnce(new Error('no such directory'));
+
+    await CocoManager.completeReset([0, 2]);
+
+    const deleted = jest.mocked(SQLite.deleteDatabaseAsync).mock.calls.map(([name]) => name);
+    expect(deleted.sort()).toEqual(['coco-2.db', 'coco.db']);
   });
 });
