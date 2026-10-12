@@ -85,7 +85,7 @@ reports) keep their evidence, and link here for anything still open.
 | [F82](F82.md) | low | device | Closing an open sheet on account hold remounts the outgoing account's screens |
 | [F83](F83.md) | low | decision | Deletion steps of delete-all and profile removal wait with no time limit |
 | [F87](F87.md) | low | fix | A leftover bare-key store is kept but not merged once the account has its own copy |
-| [F88](F88.md) | low | fix | A schema-rejected routstr-store silently stops saving for the session |
+| [F88](F88.md) | low | device | A schema-rejected routstr-store silently stops saving for the session |
 | [F89](F89.md) | medium | decision | Split-bill records from 0.0.63 to 0.1.0 have no reader; import them or accept the loss |
 | [F90](F90.md) | medium | upstream | Report coco's restore counter-0 bug upstream; cover wallets already left at 0 |
 | [F91](F91.md) | medium | device | A wallet database for an unlisted account is never offered or deleted |
