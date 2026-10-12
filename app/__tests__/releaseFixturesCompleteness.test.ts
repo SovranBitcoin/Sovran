@@ -19,7 +19,7 @@
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { ACCOUNTS, PHRASE, PHRASE_HASH, accountKey } from './releaseFixtures/format';
+import { ACCOUNTS, PHRASE, PHRASE_HASH, accountKey, cacheFilePath } from './releaseFixtures/format';
 import { NOT_YET_AUTHORED, RELEASE_FIXTURES } from './releaseFixtures';
 
 jest.mock('@react-native-async-storage/async-storage', () => {
@@ -66,8 +66,18 @@ function storeBuildVersions(): string[] {
   return [...new Set(rows.slice(1).map((row) => row.split('\t')[column]))];
 }
 
+interface SurfaceStore {
+  name: string;
+  perAccount: boolean;
+  /** Fetched again when missing: a query cache, or a store that names itself a cache. */
+  cache: boolean;
+  version: number | undefined;
+  /** What the store saves before anyone has used it, as JSON text. */
+  defaults: string | undefined;
+}
+
 /** Every persisted store this build declares, with the version it writes. */
-function currentSurface(): { name: string; perAccount: boolean; version: number | undefined }[] {
+function currentSurface(): SurfaceStore[] {
   const { storeRegistryManifest } =
     require('@/shared/lib/persist/storeRegistryManifest') as typeof import('@/shared/lib/persist/storeRegistryManifest');
   const declared = storeRegistryManifest.filter((entry) => entry.persisted);
@@ -77,12 +87,21 @@ function currentSurface(): { name: string; perAccount: boolean; version: number 
   const { persistRegistry } =
     require('@/shared/lib/persist/persistConfig') as typeof import('@/shared/lib/persist/persistConfig');
   return declared
-    .map((entry) => ({
-      name: entry.name,
-      perAccount: entry.profileStorage,
+    .map((entry) => {
       // A store made per owner on demand registers nothing until it is made.
-      version: persistRegistry.find((registered) => registered.name === entry.name)?.version,
-    }))
+      const registered = persistRegistry.find((each) => each.name === entry.name);
+      const project = registered?.partialize as ((state: unknown) => unknown) | undefined;
+      return {
+        name: entry.name,
+        perAccount: entry.profileStorage,
+        cache: entry.queryCache || entry.name.endsWith('-cache'),
+        version: registered?.version,
+        defaults:
+          project && registered?.store
+            ? JSON.stringify(project(registered.store.getInitialState()))
+            : undefined,
+      };
+    })
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
@@ -91,7 +110,7 @@ const isZustandRow = (value: unknown): value is { state: unknown; version: numbe
 
 describe('every epoch has a fixture', () => {
   it('lists each fixture file once, in epoch order', () => {
-    const files = readdirSync(FIXTURE_DIR).filter((file) => /^E\d+/.test(file));
+    const files = readdirSync(FIXTURE_DIR).filter((file) => /^E\d+.*\.ts$/.test(file));
     expect(files).toHaveLength(RELEASE_FIXTURES.length);
     const order = RELEASE_FIXTURES.map((fixture) => epochNumber(fixture.epoch));
     expect(order).toEqual([...order].sort((a, b) => a - b));
@@ -170,21 +189,73 @@ describe(`the newest fixture (${newest.epoch}) describes this build`, () => {
   const keyOf = (store: { name: string; perAccount: boolean }) =>
     store.perAccount && active ? accountKey(store.name, active.pubkey) : store.name;
 
+  /** The store's saved rows: one per account that has one, or its one row or cache file. */
+  const rowsOf = (store: SurfaceStore) => {
+    const file = newest.files?.[cacheFilePath(store.name)];
+    const rows: unknown[] = store.perAccount
+      ? newest.survives.accounts.map(
+          (account) => newest.asyncStorage[accountKey(store.name, account.pubkey)]
+        )
+      : [newest.asyncStorage[store.name] ?? (file ? (JSON.parse(file) as unknown) : undefined)];
+    return rows.filter(isZustandRow);
+  };
+  /** Stores that hold, for every account, what a phone that never used them holds. */
+  const unused = surface.filter((store) => {
+    const rows = rowsOf(store);
+    return (
+      rows.length > 0 &&
+      rows.every((row) => {
+        const state = JSON.stringify(row.state);
+        return store.defaults === undefined ? state === '{}' : state === store.defaults;
+      })
+    );
+  });
+
   it('has a row for every persisted store, at the version this build writes', () => {
     const problems: string[] = [];
     for (const store of surface) {
-      const row = newest.asyncStorage[keyOf(store)];
-      if (!isZustandRow(row)) {
-        problems.push(`${store.name}: no row under ${keyOf(store)}`);
-      } else if (store.version !== undefined && row.version !== store.version) {
-        problems.push(
-          `${store.name}: the fixture holds version ${row.version}, this build writes ${store.version}`
-        );
+      const rows = rowsOf(store);
+      if (rows.length === 0) problems.push(`${store.name}: no row under ${keyOf(store)}`);
+      for (const row of rows) {
+        if (store.version !== undefined && row.version !== store.version) {
+          problems.push(
+            `${store.name}: the fixture holds version ${row.version}, this build writes ${store.version}`
+          );
+        }
       }
     }
     // The durable surface moved. If the newest fixture's release has not
     // shipped, update it; if it has, this is a new epoch and needs its own.
     expect({ problems, how: HOW }).toEqual({ problems: [], how: HOW });
+  });
+
+  it('holds something a person would miss in every store that is not a cache', () => {
+    const problems: string[] = [];
+    for (const store of unused) {
+      const reason = newest.defaultRowReasons?.[store.name] ?? '';
+      if (!store.cache && reason.length < 20) {
+        problems.push(
+          `${store.name}: its row holds only the defaults. Give it a value and a fact, or say why not in defaultRowReasons`
+        );
+      }
+    }
+    // A new store arrives here: the skeleton gives it its defaults, and the
+    // upgrade of the fixture before it gives it nothing at all.
+    expect({ problems, how: HOW }).toEqual({ problems: [], how: HOW });
+    // The runner skips the stores named here, so the list is exactly these.
+    expect([...newest.defaultRows].sort()).toEqual(unused.map((store) => store.name).sort());
+  });
+
+  it('reads back, or keeps untouched, every store that holds something', () => {
+    const unusedNames = new Set(unused.map((store) => store.name));
+    const checked = new Set([
+      ...newest.survives.facts.map((fact) => fact.store),
+      ...newest.survives.keptAsyncStorage.map((key) => key.split(':profile:')[0]),
+    ]);
+    const unchecked = surface
+      .map((store) => store.name)
+      .filter((name) => !unusedNames.has(name) && !checked.has(name));
+    expect({ unchecked, how: HOW }).toEqual({ unchecked: [], how: HOW });
   });
 
   it('has no row for a store this build does not have, unless it says the row is kept', () => {
@@ -300,6 +371,7 @@ ${rows.join('\n')}
     keptSecureStore: ['user_mnemonic'],
   },
   defaultRows: ${JSON.stringify(defaults)},
+  defaultRowReasons: {},
   knownGaps: [],
 };
 `

@@ -31,9 +31,10 @@ function canonical(value: unknown): string {
 
 /** What the release left on the phone: nothing about how the runner checks it. */
 function storedDataHash(fixture: ReleaseFixture): string {
-  const { asyncStorage, secureStore, sqliteDatabases } = fixture;
+  const { asyncStorage, secureStore, sqliteDatabases, files } = fixture;
+  // Fixtures pinned before a fixture could hold files have none, and hash as they did.
   return createHash('sha256')
-    .update(canonical({ asyncStorage, secureStore, sqliteDatabases }))
+    .update(canonical({ asyncStorage, secureStore, sqliteDatabases, ...(files ? { files } : {}) }))
     .digest('hex');
 }
 

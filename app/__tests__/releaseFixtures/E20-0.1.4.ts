@@ -1,27 +1,83 @@
-import { ACCOUNTS, PHRASE, PHRASE_HASH, accountKey, zustandRow } from './format';
+import { fixture as previous } from './E19-0.1.2';
+import upgraded from './E20-0.1.4.upgraded.json';
+import { ACCOUNTS, accountKey, zustandRow } from './format';
 import type { ReleaseFixture } from './format';
 
 const A0 = ACCOUNTS[0].pubkey;
 const A1 = ACCOUNTS[1].pubkey;
 const MINT = 'https://mint.example/Bitcoin';
-const SCAN = {
-  id: 'scan-1',
-  raw: 'lightning:lnbc1fixture',
-  type: 'lightning',
-  source: 'qr',
-  scannedAt: 1_760_000_000_000,
-  transactionId: 'tx-1',
+const TESTNUT = 'https://testnut.cashu.space';
+
+const disk: Readonly<Record<string, unknown>> = upgraded.asyncStorage;
+
+/** A row of the upgraded disk with the fields 0.1.4 adds given values. */
+function withState(key: string, added: object): { state: object; version: number } {
+  const row = disk[key] as { state: object; version: number };
+  return zustandRow(row.version, { ...row.state, ...added });
+}
+
+const LAST_KNOWN_VERSION = { version: '0.1.5', minVersion: '0.1.2', fetchedAt: 1_790_000_000_000 };
+const PROVIDER = {
+  baseUrl: 'https://node.example',
+  name: 'Fixture node',
+  pubkey: 'c'.repeat(64),
+  followers: 12,
+  followersSource: 'graph',
+  modelCount: 3,
+  encryptedModelCount: 1,
+  minMessageSats: 2,
+  mints: [MINT],
+  status: 'online',
+  latencyMs: 180,
+};
+const LAST_MESSAGE = { protocol: 'nip17', atSeconds: 1_789_900_000, isOwn: true };
+const OLD_QUOTE = {
+  mintUrl: MINT,
+  amount: 21,
+  unit: 'sat',
+  status: 'nothing-to-claim',
+  attempts: 1,
+  nextAttemptAt: 0,
+};
+const OWN_PROFILE = {
+  content: { name: 'Fixture', about: 'Written by the release fixture.' },
+  createdAt: 1_789_000_000,
+  eventId: 'e'.repeat(64),
+};
+const VERTEX_BUDGET = zustandRow(1, { day: '2026-10-01', used: 3 });
+/**
+ * Signer activity older than 30 days is dropped on load, so a dated entry
+ * would age out of this test. This one is from a phone whose clock was set to
+ * 2100: the entry is read back for as long as the test is run.
+ */
+const SIGNER_ACTIVITY = {
+  id: 'activity-4102444800000-1',
+  clientPubkey: 'd'.repeat(64),
+  method: 'sign_event',
+  kind: 1,
+  verdict: 'auto_approved_grant',
+  summary: { headline: 'Posted a note', line: 'gm from the fixture', refPubkey: A0 },
+  contentPreview: 'gm from the fixture',
+  eventId: 'f'.repeat(64),
+  at: 4_102_444_800_000,
 };
 
+/** What 0.1.2 held that this build is known not to keep; those facts stay with E19. */
+const notKept = new Set(previous.knownGaps.map((gap) => gap.what));
+
 /**
- * E20: 0.1.4, the release candidate. Written by `bun run release-fixture:new`
- * from the store registry of the working tree (5651d4720 and later); set
- * `commit` to the release commit when it is cut.
+ * E20: 0.1.4, the release candidate. Set `commit` to the release commit when
+ * it is cut.
  *
- * Rows named in `defaultRows` hold the store's defaults. The rest were given
- * values by hand. Still to do before 0.1.4 is cut: a Routstr key in its secure
- * vault (`shared/lib/persist/secureVault.ts`), and sample rows for the stores
- * 0.1.4 adds.
+ * The disk is `E20-0.1.4.upgraded.json`: what this build's own persist and
+ * SecureStore code left after starting three times over the 0.1.2 fixture,
+ * with every account opened. That gives each store 0.1.2 had its 0.1.4 row,
+ * the Routstr key its secure vault and the BTCMap cache its file. Regenerate
+ * it with `WRITE_UPGRADED_DISK=E19-0.1.2:E20-0.1.4 bun run release-fixture:upgrade`
+ * while 0.1.4 is unreleased, never after.
+ *
+ * Written here by hand, from the stores at this commit: the fields 0.1.4 adds
+ * to a store 0.1.2 had, and a row for each store 0.1.4 adds.
  */
 export const fixture: ReleaseFixture = {
   epoch: 'E20',
@@ -30,294 +86,180 @@ export const fixture: ReleaseFixture = {
   surface:
     'Routstr version 3 and its secure vault; BTCMap in a cache file; unreadable blobs kept aside; new stores',
   asyncStorage: {
-    'profile-store': zustandRow(2, {
-      activeAccountIndex: 0,
-      profiles: [
-        { accountIndex: 0, pubkey: A0, addedAt: 1 },
-        { accountIndex: 1, pubkey: A1, addedAt: 2 },
-      ],
+    ...disk,
+    // shared/stores/global/settingsStore.ts: PersistedSettings
+    'settings-store': withState('settings-store', {
+      lastKnownAppVersion: LAST_KNOWN_VERSION,
+      vertexCreditsEnabled: false,
+      primalHostsDisabled: ['wss://cache2.primal.net/v1'],
     }),
-    [accountKey('mint-store', A1)]: zustandRow(2, {
-      selectedMint: 'https://second.mint.example',
-      activeUnit: 'sat',
-      standingQuotes: {},
-      receiveMintByMethod: {},
-      creqP2pkLock: false,
-      creqExcludedMints: {},
+    // shared/stores/global/pricelistStore.ts: serverUpdatedAt
+    'pricelist-store': withState('pricelist-store', { serverUpdatedAt: 1_789_199_340 }),
+    // shared/stores/global/walletLifecycleStore.ts: recoveryPhraseVerified*
+    'wallet-lifecycle': withState('wallet-lifecycle', {
+      recoveryPhraseVerifiedAt: 1_789_000_000_000,
+      recoveryPhraseVerifiedRevision: 1,
     }),
+    // shared/stores/profile/aiProviderDirectoryStore.ts: PersistedAiProviderDirectory
     [accountKey('ai-provider-directory-store', A0)]: zustandRow(1, {
-      providers: [],
-      fetchedAt: null,
+      providers: [PROVIDER],
+      fetchedAt: 1_789_950_000_000,
     }),
-    [accountKey('bitchat-dm-messages-store', A0)]: zustandRow(1, { byPeer: {} }),
-    'btcmap-store': zustandRow(1, { placesCache: null, placeDetailsCache: {} }),
-    'cta-store': zustandRow(1, { dismissed: {} }),
-    [accountKey('data-migration-store', A0)]: zustandRow(1, { level: 0 }),
-    [accountKey('dm-last-message-store', A0)]: zustandRow(1, { byPeer: {} }),
-    [accountKey('feed-ignore-store', A0)]: zustandRow(1, {
-      ignoredPubkeys: [],
-      ignoredEventIds: [],
-      muteList: null,
-      blockOverrides: {},
-      dmFilterEnabled: false,
-      dmFilterWords: [],
-    }),
-    'legacy-ecash-store': zustandRow(1, { groups: {}, quotes: {}, rowRemoved: null }),
-    'mempool-address-cache': zustandRow(1, { byAddress: {} }),
-    'mint-changes-cache': zustandRow(1, { byKey: {} }),
-    'mint-discover-cache': zustandRow(1, { byKey: {} }),
-    [accountKey('mint-distribution-store', A0)]: zustandRow(1, { distributions: {} }),
-    'mint-metadata-store': zustandRow(1, { byMintUrl: {}, legacyMigrated: false }),
-    [accountKey('mint-store', A0)]: zustandRow(2, {
-      selectedMint: MINT,
-      activeUnit: 'sat',
-      standingQuotes: {},
-      receiveMintByMethod: {},
-      creqP2pkLock: false,
-      creqExcludedMints: {},
-    }),
-    'mint-testnut-store': zustandRow(1, { byMintUrl: {} }),
-    [accountKey('nip46-activity-store', A0)]: zustandRow(1, { entries: [] }),
-    [accountKey('nip46-connections-store', A0)]: zustandRow(1, { apps: {} }),
-    [accountKey('nostr-media-server-store', A0)]: zustandRow(1, {
-      server: 'https://blossom.primal.net',
-    }),
-    [accountKey('nostr-metadata-cache', A0)]: zustandRow(1, { byPubkey: {} }),
-    [accountKey('nostr-relay-list-store', A0)]: zustandRow(1, {
-      entries: [],
-      updatedAt: 0,
-      hasPublished: false,
-      source: 'default',
-    }),
-    [accountKey('nostr-social-store', A0)]: zustandRow(2, {
-      contactsTags: [],
-      contactsContent: '',
-      contactsUpdatedAt: 0,
-      followingPubkeys: {},
-      engagementByEventId: {},
-      deletedRepostOriginalIds: {},
-      deletedNoteIds: {},
-      optimisticFollowsByPubkey: {},
-      optimisticLikesByEventId: {},
-      optimisticRepostsByEventId: {},
-      optimisticZapsByEventId: {},
-      zappedByEventId: {},
-    }),
-    [accountKey('notification-policy-store', A0)]: zustandRow(1, {
-      policy: 'RELAXED',
-      replyScope: 'DIRECT',
-    }),
-    [accountKey('npc-mint-store', A0)]: zustandRow(2, {}),
-    [accountKey('nut-drop-redeem-queue', A0)]: zustandRow(1, { byTokenHash: {} }),
-    [accountKey('own-content-store', A0)]: zustandRow(1, { byId: {} }),
-    [accountKey('own-profile-metadata-store', A0)]: zustandRow(1, { latest: null, history: {} }),
-    'own-profile-stats-cache': zustandRow(1, { byKey: {} }),
-    [accountKey('owned-media-store', A0)]: zustandRow(1, { byBlob: {} }),
-    'pricelist-store': zustandRow(1, { pricelist: null, lastUpdated: null, serverUpdatedAt: null }),
-    [accountKey('recent-people-store', A0)]: zustandRow(1, { entries: [] }),
-    'relay-metadata-store': zustandRow(1, { byRelayUrl: {} }),
-    [accountKey('routstr-store', A0)]: zustandRow(3, {
-      apiKey: null,
-      authMode: 'bearer',
-      serverLineupAt: null,
-      balance: null,
-      selectedModel: null,
-      sessions: [],
-      currentSessionId: null,
-      lastKnownLineup: null,
-      nodeBaseUrl: null,
-      legacyAccounts: {},
-      providerClaims: {},
-      providerSeenAt: {},
-      userNodeBaseUrl: null,
-      pendingPayments: {},
-      confirmSpend: true,
-      curatedModels: null,
-    }),
-    [accountKey('scan-history-store', A0)]: zustandRow(1, { entries: [SCAN] }),
-    [accountKey('search-history-store', A0)]: zustandRow(1, { recentSearches: {} }),
-    [accountKey('send-reachability-store', A0)]: zustandRow(1, { byTransactionId: {} }),
-    'settings-store': zustandRow(4, {
-      lastKnownAppVersion: null,
-      language: 'en',
-      displayBtc: 3,
-      displayCurrency: 'gbp',
-      experimental: false,
-      mockMode: false,
-      mockOffline: false,
-      mockFailSend: false,
-      mockFailMelt: false,
-      mockFailPaymentRequest: false,
-      whitenoiseEnabled: false,
-      inProcessProfileSwitch: false,
-      mockNoGlass: false,
-      layoutGuides: false,
-      showTouches: false,
-      termsAccepted: { termsAccepted: true, date: '2026-10-01' },
-      legalAcceptance: null,
-      hasSeenOnboarding: true,
-      quickAccessP2PK: false,
-      regenerateP2PKOnReceive: true,
-      sendLocationEnabled: false,
-      fileLoggingEnabled: false,
-      minTransferThreshold: 5,
-      middlemanRouting: {
-        maxHops: 2,
-        maxFee: 5,
-        minSuccessRate: 0.9,
-        requireLastOk: true,
-        trustMode: 'trusted_only',
+    // shared/stores/global/ctaStore.ts: the schema in its persist options
+    'cta-store': zustandRow(1, {
+      dismissed: {
+        'backup-recovery-phrase': { at: 1_789_100_000_000, revision: 1 },
+        'claim-old-ecash:snooze': { at: 1_789_200_000_000, revision: 1, version: '0.1.4' },
       },
-      vertexCreditsEnabled: true,
-      naggTierEnabled: true,
-      primalTierEnabled: true,
-      relayTierEnabled: true,
-      primalHostsDisabled: [],
     }),
-    [accountKey('swap-transactions-store', A0)]: zustandRow(1, { groups: {}, quoteIdToGroup: {} }),
-    [accountKey('theme-store', A0)]: zustandRow(2, {
-      activeAlbumSlug: null,
-      unitWallpapers: {},
-      mode: 'dark',
+    // shared/stores/profile/dmLastMessageStore.ts: PersistedDmLastMessageStore
+    [accountKey('dm-last-message-store', A0)]: zustandRow(1, { byPeer: { [A1]: LAST_MESSAGE } }),
+    // shared/stores/global/legacyEcashStore.ts: PersistedLegacyEcash;
+    // wallet/src/legacy-ecash/records.ts: LegacyQuoteRecordSchema
+    'legacy-ecash-store': zustandRow(1, {
+      groups: {},
+      quotes: { ['4f'.repeat(32)]: OLD_QUOTE },
+      rowRemoved: null,
     }),
-    [accountKey('transaction-annotation-store', A0)]: zustandRow(1, { annotations: {} }),
-    [accountKey('transaction-distribution-store', A0)]: zustandRow(1, { distributions: {} }),
-    [accountKey('transaction-location-store', A0)]: zustandRow(1, { locations: {} }),
-    [accountKey('vertex-budget-store', A0)]: zustandRow(1, {}),
-    'wallet-lifecycle': zustandRow(1, {
-      seedCreatedAt: 1_760_000_000_000,
-      recoveryPhraseVerifiedAt: null,
-      recoveryPhraseVerifiedRevision: null,
-      restoreStatus: 'complete',
-      lastRestoreAt: null,
-      lastRestoreError: null,
+    // shared/stores/global/mintTestnutStore.ts: PersistedMintTestnutStore
+    'mint-testnut-store': zustandRow(1, {
+      byMintUrl: {
+        [TESTNUT]: { testnut: true, probedAt: 1_789_300_000_000, checkedAt: 1_789_300_000_000 },
+        [MINT]: { testnut: false, checkedAt: 1_789_300_000_001 },
+      },
     }),
-    'wallpaper-store': zustandRow(1, {
-      catalog: [],
-      albums: [],
-      catalogLastFetched: 0,
-      downloaded: {},
+    // shared/stores/profile/ownProfileMetadataStore.ts: the schema in its persist options
+    [accountKey('own-profile-metadata-store', A0)]: zustandRow(1, {
+      latest: OWN_PROFILE,
+      history: { name: [{ value: 'An earlier name', createdAt: 1_788_000_000 }] },
     }),
+    // features/nostrSigner/data/nip46ActivityStore.ts: as 0.1.2 wrote it (E19)
+    [accountKey('nip46-activity-store', A0)]: zustandRow(1, { entries: [SIGNER_ACTIVITY] }),
+    // shared/stores/profile/vertexBudgetStore.ts: schema. Made per account on
+    // demand, so no store reads it at startup; it must be left as it is.
+    [accountKey('vertex-budget-store', A0)]: VERTEX_BUDGET,
   },
-  secureStore: {
-    user_mnemonic: PHRASE,
-    derived_keys_0: JSON.stringify({
-      npub: ACCOUNTS[0].npub,
-      nsec: ACCOUNTS[0].nsec,
-      pubkey: A0,
-      privateKeyHex: ACCOUNTS[0].privateKeyHex,
-      mnemonicHash: PHRASE_HASH,
-    }),
-    cashu_mnemonic_0: JSON.stringify({
-      value: ACCOUNTS[0].cashuMnemonic,
-      mnemonicHash: PHRASE_HASH,
-    }),
-  },
-  sqliteDatabases: ['coco.db', 'coco-1.db', 'nostr', 'nostr-1'],
+  secureStore: upgraded.secureStore,
+  files: upgraded.files,
+  sqliteDatabases: previous.sqliteDatabases,
   survives: {
-    phrase: PHRASE,
-    activeAccountIndex: 0,
-    accounts: [
-      { accountIndex: 0, pubkey: A0 },
-      { accountIndex: 1, pubkey: A1 },
-    ],
+    ...previous.survives,
     facts: [
+      ...previous.survives.facts.filter((fact) => !notKept.has(fact.what)),
       {
-        what: 'the accepted terms',
+        what: 'the newest version it was told of',
         store: 'settings-store',
-        path: ['termsAccepted', 'termsAccepted'],
-        equals: true,
+        path: ['lastKnownAppVersion'],
+        equals: LAST_KNOWN_VERSION,
       },
       {
-        what: 'that onboarding was seen',
+        what: 'that reputation lookups were turned off',
         store: 'settings-store',
-        path: ['hasSeenOnboarding'],
-        equals: true,
+        path: ['vertexCreditsEnabled'],
+        equals: false,
       },
       {
-        what: 'the display currency',
+        what: 'the cache host that was turned off',
         store: 'settings-store',
-        path: ['displayCurrency'],
-        equals: 'gbp',
+        path: ['primalHostsDisabled'],
+        equals: ['wss://cache2.primal.net/v1'],
       },
       {
-        what: 'that the wallet was restored',
+        what: 'when the server last priced bitcoin',
+        store: 'pricelist-store',
+        path: ['serverUpdatedAt'],
+        equals: 1_789_199_340,
+      },
+      {
+        what: 'when the phrase was checked',
         store: 'wallet-lifecycle',
-        path: ['restoreStatus'],
-        equals: 'complete',
+        path: ['recoveryPhraseVerifiedAt'],
+        equals: 1_789_000_000_000,
       },
       {
-        what: 'when the phrase was made',
+        what: 'which backup flow checked the phrase',
         store: 'wallet-lifecycle',
-        path: ['seedCreatedAt'],
-        equals: 1_760_000_000_000,
+        path: ['recoveryPhraseVerifiedRevision'],
+        equals: 1,
       },
       {
-        what: 'the selected mint of account 0',
-        store: 'mint-store',
+        what: 'the AI provider list of account 0',
+        store: 'ai-provider-directory-store',
         accountIndex: 0,
-        path: ['selectedMint'],
-        equals: MINT,
+        path: ['providers', 0],
+        equals: PROVIDER,
       },
       {
-        what: 'the selected mint of account 1',
-        store: 'mint-store',
-        accountIndex: 1,
-        path: ['selectedMint'],
-        equals: 'https://second.mint.example',
+        what: 'when the AI provider list of account 0 was read',
+        store: 'ai-provider-directory-store',
+        accountIndex: 0,
+        path: ['fetchedAt'],
+        equals: 1_789_950_000_000,
       },
       {
-        what: 'the scan of account 0',
-        store: 'scan-history-store',
+        what: 'that the backup reminder was dismissed',
+        store: 'cta-store',
+        path: ['dismissed', 'backup-recovery-phrase'],
+        equals: { at: 1_789_100_000_000, revision: 1 },
+      },
+      {
+        what: 'that the old ecash reminder was put off',
+        store: 'cta-store',
+        path: ['dismissed', 'claim-old-ecash:snooze'],
+        equals: { at: 1_789_200_000_000, revision: 1, version: '0.1.4' },
+      },
+      {
+        what: 'the last message with a contact of account 0',
+        store: 'dm-last-message-store',
+        accountIndex: 0,
+        path: ['byPeer', A1],
+        equals: LAST_MESSAGE,
+      },
+      {
+        what: 'the record of an old Lightning receive that was looked at',
+        store: 'legacy-ecash-store',
+        path: ['quotes', '4f'.repeat(32)],
+        equals: OLD_QUOTE,
+      },
+      {
+        what: 'that a mint was found to be a test mint',
+        store: 'mint-testnut-store',
+        path: ['byMintUrl', TESTNUT, 'testnut'],
+        equals: true,
+      },
+      {
+        what: 'that a mint was found not to be a test mint',
+        store: 'mint-testnut-store',
+        path: ['byMintUrl', MINT],
+        equals: { testnut: false, checkedAt: 1_789_300_000_001 },
+      },
+      {
+        what: 'what a signer app did for account 0',
+        store: 'nip46-activity-store',
         accountIndex: 0,
         path: ['entries', 0],
-        equals: SCAN,
+        equals: SIGNER_ACTIVITY,
+      },
+      {
+        what: 'the published profile of account 0',
+        store: 'own-profile-metadata-store',
+        accountIndex: 0,
+        path: ['latest'],
+        equals: OWN_PROFILE,
+      },
+      {
+        what: 'an earlier name of account 0',
+        store: 'own-profile-metadata-store',
+        accountIndex: 0,
+        path: ['history', 'name', 0, 'value'],
+        equals: 'An earlier name',
       },
     ],
-    keptAsyncStorage: [],
-    keptSecureStore: ['user_mnemonic'],
+    keptAsyncStorage: [
+      ...previous.survives.keptAsyncStorage,
+      accountKey('vertex-budget-store', A0),
+    ],
   },
-  defaultRows: [
-    'ai-provider-directory-store',
-    'bitchat-dm-messages-store',
-    'btcmap-store',
-    'cta-store',
-    'data-migration-store',
-    'dm-last-message-store',
-    'feed-ignore-store',
-    'legacy-ecash-store',
-    'mempool-address-cache',
-    'mint-changes-cache',
-    'mint-discover-cache',
-    'mint-distribution-store',
-    'mint-metadata-store',
-    'mint-testnut-store',
-    'nip46-activity-store',
-    'nip46-connections-store',
-    'nostr-media-server-store',
-    'nostr-metadata-cache',
-    'nostr-relay-list-store',
-    'nostr-social-store',
-    'notification-policy-store',
-    'npc-mint-store',
-    'nut-drop-redeem-queue',
-    'own-content-store',
-    'own-profile-metadata-store',
-    'own-profile-stats-cache',
-    'owned-media-store',
-    'pricelist-store',
-    'recent-people-store',
-    'relay-metadata-store',
-    'routstr-store',
-    'search-history-store',
-    'send-reachability-store',
-    'swap-transactions-store',
-    'theme-store',
-    'transaction-annotation-store',
-    'transaction-distribution-store',
-    'transaction-location-store',
-    'vertex-budget-store',
-    'wallpaper-store',
-  ],
+  defaultRows: ['mint-changes-cache', 'mint-discover-cache', 'own-profile-stats-cache'],
   knownGaps: [],
 };

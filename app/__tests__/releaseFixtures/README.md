@@ -11,7 +11,9 @@ disk of a used install of that epoch, as data. Two tests read them:
 - `../releaseFixturesCompleteness.test.ts` checks that there is a fixture for every epoch in
   `docs/architecture/persistence/persistence-map.md`, that every version in `store-builds.tsv`
   and the version in `app.json` is claimed by a fixture, and that the newest fixture has a row
-  for every persisted store at the version this tree writes.
+  for every persisted store at the version this tree writes. In the newest fixture every store
+  that is not a cache must hold something, with a fact that reads it back, or give its reason in
+  `defaultRowReasons`: a store added since fails here until it has both.
 
 This is the skipped-epoch upgrade: any release straight to this build. It does not open the
 SQLite databases, render anything, or touch a real keychain; those need a device.
@@ -38,10 +40,17 @@ A release needs a new fixture when it changes what is on disk: a store added, re
 or re-versioned, a SecureStore key, a database name. Otherwise add its version to the newest
 fixture's `versions` and stop.
 
-1. `cd app && WRITE_RELEASE_FIXTURE=E21 bun run release-fixture:new` writes `E21-<version>.ts` from the store
-   registry: every persisted store at its current version, holding its defaults.
-2. Give the stores a user would miss real values, add a fact for each, and remove them from
-   `defaultRows`. Set `commit` and `surface`.
+1. `cd app && WRITE_UPGRADED_DISK=E20-0.1.4:E21-<version> bun run release-fixture:upgrade` starts this
+   build three times over the newest fixture and writes what is then on disk to
+   `E21-<version>.upgraded.json`: every row, secure value and cache file as this build's own
+   code wrote it. Run it only while the release is unreleased; afterwards the file is frozen.
+   Two runs differ only in the times the upgrade itself records.
+2. Write `E21-<version>.ts` on that file, as `E20-0.1.4.ts` is written on its own: spread the
+   upgraded disk, then by hand, from the stores at the release commit, give each field the
+   release adds a value and each store it adds a row, with a fact for each. Carry the facts of
+   the fixture before it. Set `commit` and `surface`.
+   (`WRITE_RELEASE_FIXTURE=E21 bun run release-fixture:new` still writes a skeleton holding
+   every store's defaults, for an epoch that cannot be reached by upgrading the one before.)
 3. Import the file in `index.ts`, and add the epoch's row to the table in `persistence-map.md`.
 4. Run both tests:
 

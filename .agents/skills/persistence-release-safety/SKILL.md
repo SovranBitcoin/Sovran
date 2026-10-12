@@ -129,8 +129,10 @@ persisted store, the keys of every account and an account switch. Start here:
    A version or an epoch added in phases 1 and 2 shows up here.
 2. For each one named, add or extend a fixture as
    `app/__tests__/releaseFixtures/README.md` describes. The candidate's own fixture is
-   written from its store registry with `WRITE_RELEASE_FIXTURE=E<n> bun run release-fixture:new`
-   (in `app/`); every older one is written by hand from the old source.
+   built on the disk the candidate leaves after upgrading the fixture before it
+   (`WRITE_UPGRADED_DISK=<from>:<to> bun run release-fixture:upgrade`, in `app/`), with a value
+   and a fact added by hand for everything the release adds; every older one is written by
+   hand from the old source.
 3. Run `releaseFixtures.test.ts`. A fixture that fails is a finding for phase 6. A loss that
    stays open is recorded in that fixture's `knownGaps` with its follow-up id; nothing else
    may be changed to get green.

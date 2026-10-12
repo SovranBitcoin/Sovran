@@ -17,14 +17,14 @@
  * What Jest cannot do is left to a device: opening the SQLite databases,
  * rendering, and the native keychain. See `releaseFixtures/README.md`.
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { HDKey } from '@scure/bip32';
 import * as bip39 from '@scure/bip39';
 import { bytesToHex } from '@noble/hashes/utils.js';
 
-import { ACCOUNTS, NAMED_CHECKS, PHRASE } from './releaseFixtures/format';
+import { ACCOUNTS, NAMED_CHECKS, PHRASE, cacheFilePath } from './releaseFixtures/format';
 import type { ReleaseFixture, SurvivingFact } from './releaseFixtures/format';
 import { RELEASE_FIXTURES } from './releaseFixtures';
 
@@ -166,7 +166,23 @@ function rowsReadFor(
           ...(account.accountIndex === 0 ? [store.name] : []),
         ]
       : [store.name];
-  return keys.filter((key) => key in fixture.asyncStorage);
+  const rows = keys.filter((key) => key in fixture.asyncStorage);
+  if (store.scope !== 'profile' && fixture.files && cacheFilePath(store.name) in fixture.files) {
+    rows.push(cacheFilePath(store.name));
+  }
+  return rows;
+}
+
+/** The saved state under one fixture key or file path, as JSON text. */
+function savedState(fixture: ReleaseFixture, key: string): string | undefined {
+  const value = fixture.asyncStorage[key] ?? fixture.files?.[key];
+  try {
+    const row: unknown = typeof value === 'string' ? JSON.parse(value) : value;
+    if (typeof row !== 'object' || row === null || !('state' in row)) return undefined;
+    return JSON.stringify(row.state);
+  } catch {
+    return undefined;
+  }
 }
 
 /**
@@ -291,10 +307,13 @@ async function launch(fixture: ReleaseFixture): Promise<Launch> {
     for (const entry of persisted) {
       if (entry.scope === 'profile' || accountIndex === activeAccountIndex) {
         if (fixture.defaultRows.includes(entry.name)) continue;
-        if (rowsReadFor(fixture, entry, account).length === 0) continue;
+        const rows = rowsReadFor(fixture, entry, account);
+        if (rows.length === 0) continue;
         const project = entry.partialize as (state: unknown) => unknown;
         const now = JSON.stringify(project(entry.store.getState()));
-        if (now === JSON.stringify(project(entry.store.getInitialState()))) {
+        const defaults = JSON.stringify(project(entry.store.getInitialState()));
+        // A row that held exactly the defaults had nothing to lose.
+        if (now === defaults && !rows.every((key) => savedState(fixture, key) === defaults)) {
           defaultedRows.push(`${entry.name} (account ${accountIndex})`);
         }
       }
@@ -351,6 +370,7 @@ function install(fixture: ReleaseFixture): void {
     mockAsync.set(key, typeof value === 'string' ? value : JSON.stringify(value));
   }
   for (const [key, value] of Object.entries(fixture.secureStore)) mockSecure.set(key, value);
+  for (const [path, value] of Object.entries(fixture.files ?? {})) mockFiles.set(path, value);
 }
 
 // ── The fixed identity ───────────────────────────────────────────────────────
@@ -522,3 +542,55 @@ describe.each(
     });
   }
 });
+
+// ── The disk an upgrade leaves ───────────────────────────────────────────────
+
+/**
+ * `WRITE_UPGRADED_DISK=E19-0.1.2:E20-0.1.4 bun run release-fixture:upgrade`
+ * starts this build three times over the first fixture and writes what is then
+ * on disk to `releaseFixtures/<second>.upgraded.json`. The fixture of the
+ * release being prepared is built on that file, so its rows are the ones this
+ * build's own persist and SecureStore code wrote, not a copy of a schema.
+ */
+const WRITE_DISK = process.env.WRITE_UPGRADED_DISK;
+
+(WRITE_DISK ? it : it.skip)(
+  'writes the disk this build leaves after upgrading a fixture',
+  async () => {
+    const [from, to] = (WRITE_DISK ?? '').split(':');
+    expect(to).toMatch(/^E\d+-[\d.]+$/);
+    const { fixture } = require(`./releaseFixtures/${from}`) as { fixture: ReleaseFixture };
+    const quieted = (['log', 'info', 'debug', 'warn', 'error'] as const).map((method) =>
+      jest.spyOn(console, method).mockImplementation(() => {})
+    );
+    install(fixture);
+    let last: Launch | undefined;
+    try {
+      for (let n = 0; n < 3; n++) last = await launch(fixture);
+    } finally {
+      quieted.forEach((spy) => spy.mockRestore());
+    }
+    if (!last) throw new Error('No launch finished');
+    expect(last.rejections).toEqual([]);
+    // Rows are written parsed so they can be read; `install` turns them back
+    // into the same text. Anything that is not a JSON object stays as it was.
+    const readable = (value: string): unknown => {
+      try {
+        const parsed: unknown = JSON.parse(value);
+        return typeof parsed === 'object' && parsed !== null ? parsed : value;
+      } catch {
+        return value;
+      }
+    };
+    const disk = {
+      asyncStorage: Object.fromEntries(
+        Object.entries(last.disk.asyncStorage).map(([key, value]) => [key, readable(value)])
+      ),
+      secureStore: last.disk.secureStore,
+      files: Object.fromEntries([...mockFiles].sort()),
+    };
+    const file = join(__dirname, 'releaseFixtures', `${to}.upgraded.json`);
+    writeFileSync(file, `${JSON.stringify(disk, null, 2)}\n`);
+  },
+  120_000
+);

@@ -48,6 +48,11 @@ export interface ReleaseFixture {
   asyncStorage: Readonly<Record<string, unknown>>;
   /** SecureStore as the install left it. */
   secureStore: Readonly<Record<string, string>>;
+  /**
+   * Files in the cache or document directory, by path. A store that keeps its
+   * state in a file (`shared/lib/persist/fileCacheStorage.ts`) has its row here.
+   */
+  files?: Readonly<Record<string, string>>;
   /** SQLite database files that exist. Jest cannot open them; the runner checks the names only. */
   sqliteDatabases: readonly string[];
   survives: {
@@ -76,6 +81,11 @@ export interface ReleaseFixture {
    * current app reads must come back holding something.
    */
   defaultRows: readonly string[];
+  /**
+   * Why a store that is not a cache is in `defaultRows`. The newest fixture
+   * needs one for each (`../releaseFixturesCompleteness.test.ts`).
+   */
+  defaultRowReasons?: Readonly<Record<string, string>>;
   knownGaps: readonly KnownGap[];
 }
 
@@ -143,6 +153,11 @@ export const IMPORTED = {
 /** A zustand `persist` row. Stores written before a store declared a version carry 0. */
 export function zustandRow(version: number, state: object): { state: object; version: number } {
   return { state, version };
+}
+
+/** Where a store that keeps its state in a cache file keeps it. */
+export function cacheFilePath(store: string): string {
+  return `cache/store-${store}.json`;
 }
 
 /** The current key of one account's copy of a per-account store. */

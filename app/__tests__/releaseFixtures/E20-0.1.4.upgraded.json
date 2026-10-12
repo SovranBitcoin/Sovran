@@ -1,0 +1,1397 @@
+{
+  "asyncStorage": {
+    "ai-provider-directory-store:profile:17162c921dc4d2518f9a101db33695df1afb56ab82f5ff3e5da6eec3ca5cd917": {
+      "state": {
+        "providers": [],
+        "fetchedAt": null
+      },
+      "version": 1
+    },
+    "ai-provider-directory-store:profile:7e7e9c42a91bfef19fa929e5fda1b72e0ebc1a4c1141673e2794234d86addf4e": {
+      "state": {
+        "providers": [],
+        "fetchedAt": null
+      },
+      "version": 1
+    },
+    "ai-provider-directory-store:profile:d977a6cf0f831dc4720780b5f51460eaf6dca08e32d1f6e89b60344d63af4e04": {
+      "state": {
+        "providers": [],
+        "fetchedAt": null
+      },
+      "version": 1
+    },
+    "bitchat-dm-messages-store:profile:17162c921dc4d2518f9a101db33695df1afb56ab82f5ff3e5da6eec3ca5cd917": {
+      "state": {
+        "byPeer": {
+          "a1b2c3d4e5f60718": [
+            {
+              "id": "ble-msg-1",
+              "content": "are you at the meetup?",
+              "sender": "anon4821",
+              "senderId": "a1b2c3d4e5f60718",
+              "timestamp": 1789113600000,
+              "isPrivate": true,
+              "isOwn": false
+            },
+            {
+              "id": "ble-msg-2",
+              "content": "by the door",
+              "sender": "fixture zero",
+              "senderId": "0f1e2d3c4b5a6978",
+              "timestamp": 1789113630000,
+              "isPrivate": true,
+              "isOwn": true,
+              "deliveryStatus": "delivered"
+            }
+          ]
+        }
+      },
+      "version": 1
+    },
+    "bitchat-dm-messages-store:profile:7e7e9c42a91bfef19fa929e5fda1b72e0ebc1a4c1141673e2794234d86addf4e": {
+      "state": {
+        "byPeer": {}
+      },
+      "version": 1
+    },
+    "bitchat-dm-messages-store:profile:d977a6cf0f831dc4720780b5f51460eaf6dca08e32d1f6e89b60344d63af4e04": {
+      "state": {
+        "byPeer": {}
+      },
+      "version": 1
+    },
+    "cta-store": {
+      "state": {
+        "dismissed": {}
+      },
+      "version": 1
+    },
+    "data-migration-store:profile:17162c921dc4d2518f9a101db33695df1afb56ab82f5ff3e5da6eec3ca5cd917": {
+      "state": {
+        "level": 1
+      },
+      "version": 1
+    },
+    "data-migration-store:profile:7e7e9c42a91bfef19fa929e5fda1b72e0ebc1a4c1141673e2794234d86addf4e": {
+      "state": {
+        "level": 1
+      },
+      "version": 1
+    },
+    "data-migration-store:profile:d977a6cf0f831dc4720780b5f51460eaf6dca08e32d1f6e89b60344d63af4e04": {
+      "state": {
+        "level": 1
+      },
+      "version": 1
+    },
+    "dm-last-message-store:profile:17162c921dc4d2518f9a101db33695df1afb56ab82f5ff3e5da6eec3ca5cd917": {
+      "state": {
+        "byPeer": {}
+      },
+      "version": 1
+    },
+    "dm-last-message-store:profile:7e7e9c42a91bfef19fa929e5fda1b72e0ebc1a4c1141673e2794234d86addf4e": {
+      "state": {
+        "byPeer": {}
+      },
+      "version": 1
+    },
+    "dm-last-message-store:profile:d977a6cf0f831dc4720780b5f51460eaf6dca08e32d1f6e89b60344d63af4e04": {
+      "state": {
+        "byPeer": {}
+      },
+      "version": 1
+    },
+    "feed-ignore-store:profile:17162c921dc4d2518f9a101db33695df1afb56ab82f5ff3e5da6eec3ca5cd917": {
+      "state": {
+        "ignoredPubkeys": [
+          "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"
+        ],
+        "ignoredEventIds": [
+          "1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e"
+        ],
+        "muteList": {
+          "id": "e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4",
+          "createdAt": 1788595200,
+          "tags": [
+            [
+              "p",
+              "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"
+            ]
+          ],
+          "privateTags": [
+            [
+              "word",
+              "airdrop"
+            ]
+          ]
+        },
+        "blockOverrides": {
+          "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd": true
+        },
+        "dmFilterEnabled": true,
+        "dmFilterWords": [
+          "airdrop",
+          "giveaway"
+        ]
+      },
+      "version": 1
+    },
+    "feed-ignore-store:profile:7e7e9c42a91bfef19fa929e5fda1b72e0ebc1a4c1141673e2794234d86addf4e": {
+      "state": {
+        "ignoredPubkeys": [],
+        "ignoredEventIds": [],
+        "muteList": null,
+        "blockOverrides": {},
+        "dmFilterEnabled": false,
+        "dmFilterWords": []
+      },
+      "version": 1
+    },
+    "feed-ignore-store:profile:d977a6cf0f831dc4720780b5f51460eaf6dca08e32d1f6e89b60344d63af4e04": {
+      "state": {
+        "ignoredPubkeys": [],
+        "ignoredEventIds": [],
+        "muteList": null,
+        "blockOverrides": {},
+        "dmFilterEnabled": false,
+        "dmFilterWords": []
+      },
+      "version": 1
+    },
+    "global-migrations-completed": [
+      "adopt-leftover-bare-stores-v1",
+      "index-to-pubkey-keys-v2",
+      "legacy-global-theme-to-profile-v1",
+      "wallet-lifecycle-stamp-existing-users-v1"
+    ],
+    "legacy-ecash-store": {
+      "state": {
+        "groups": {},
+        "quotes": {},
+        "rowRemoved": null
+      },
+      "version": 1
+    },
+    "mempool-address-cache": {
+      "state": {
+        "byAddress": {
+          "bc1qfixtureaddress0000000000000000000000000": {
+            "stats": {
+              "address": "bc1qfixtureaddress0000000000000000000000000",
+              "chain_stats": {
+                "tx_count": 1,
+                "funded_txo_count": 1,
+                "funded_txo_sum": 25000,
+                "spent_txo_count": 0,
+                "spent_txo_sum": 0
+              },
+              "mempool_stats": {
+                "tx_count": 0,
+                "funded_txo_count": 0,
+                "funded_txo_sum": 0,
+                "spent_txo_count": 0,
+                "spent_txo_sum": 0
+              }
+            },
+            "fetchedAt": 1788854400000
+          }
+        }
+      },
+      "version": 1
+    },
+    "mint-changes-cache": {
+      "state": {
+        "byKey": {}
+      },
+      "version": 1
+    },
+    "mint-discover-cache": {
+      "state": {
+        "byKey": {}
+      },
+      "version": 1
+    },
+    "mint-distribution-store:profile:17162c921dc4d2518f9a101db33695df1afb56ab82f5ff3e5da6eec3ca5cd917": {
+      "state": {
+        "distributions": {
+          "sat": {
+            "https://mint.minibits.cash/Bitcoin": 7000,
+            "https://mint.coinos.io": 3000
+          }
+        }
+      },
+      "version": 1
+    },
+    "mint-distribution-store:profile:7e7e9c42a91bfef19fa929e5fda1b72e0ebc1a4c1141673e2794234d86addf4e": {
+      "state": {
+        "distributions": {}
+      },
+      "version": 1
+    },
+    "mint-distribution-store:profile:d977a6cf0f831dc4720780b5f51460eaf6dca08e32d1f6e89b60344d63af4e04": {
+      "state": {
+        "distributions": {}
+      },
+      "version": 1
+    },
+    "mint-metadata-store": {
+      "state": {
+        "byMintUrl": {
+          "https://mint.minibits.cash/Bitcoin": {
+            "nuts": {
+              "4": {
+                "methods": [
+                  {
+                    "method": "bolt11",
+                    "unit": "sat"
+                  }
+                ],
+                "disabled": false
+              }
+            },
+            "displayName": "Minibits",
+            "iconUrl": "https://mint.minibits.cash/icon.png",
+            "description": "Fixture description of a mint",
+            "supportedUnits": [
+              "sat"
+            ],
+            "identityAt": 1789113600000,
+            "averageScore": 4.6,
+            "reviewCount": 31,
+            "favouriteCount": 12,
+            "reviewsAt": 1789113600000,
+            "auditScore": 0.98,
+            "auditState": "OK",
+            "nMints": 120,
+            "nMelts": 118,
+            "nErrors": 2,
+            "auditAt": 1789113600000,
+            "contactFollowers": 4,
+            "contactReputation": 0.8,
+            "socialAt": 1789113600000
+          },
+          "https://mint.coinos.io": {
+            "displayName": "Coinos",
+            "supportedUnits": [
+              "sat"
+            ],
+            "identityAt": 1788508800000
+          }
+        },
+        "legacyMigrated": true
+      },
+      "version": 1
+    },
+    "mint-store:profile:17162c921dc4d2518f9a101db33695df1afb56ab82f5ff3e5da6eec3ca5cd917": {
+      "state": {
+        "selectedMint": "https://mint.minibits.cash/Bitcoin",
+        "activeUnit": "usd",
+        "standingQuotes": {
+          "https://mint.minibits.cash/Bitcoin|sat|bolt12": "standing-quote-fixture-1"
+        },
+        "receiveMintByMethod": {
+          "bolt12": "https://mint.minibits.cash/Bitcoin"
+        },
+        "creqP2pkLock": true,
+        "creqExcludedMints": {
+          "https://21mint.me": true
+        }
+      },
+      "version": 2
+    },
+    "mint-store:profile:7e7e9c42a91bfef19fa929e5fda1b72e0ebc1a4c1141673e2794234d86addf4e": {
+      "state": {
+        "selectedMint": "https://21mint.me",
+        "activeUnit": "eur",
+        "standingQuotes": {},
+        "receiveMintByMethod": {},
+        "creqP2pkLock": false,
+        "creqExcludedMints": {}
+      },
+      "version": 2
+    },
+    "mint-store:profile:d977a6cf0f831dc4720780b5f51460eaf6dca08e32d1f6e89b60344d63af4e04": {
+      "state": {
+        "selectedMint": "https://mint.coinos.io",
+        "activeUnit": "sat",
+        "standingQuotes": {},
+        "receiveMintByMethod": {},
+        "creqP2pkLock": false,
+        "creqExcludedMints": {}
+      },
+      "version": 2
+    },
+    "mint-testnut-store": {
+      "state": {
+        "byMintUrl": {}
+      },
+      "version": 1
+    },
+    "nip04-cache-neg:v1:17162c921dc4d2518f9a101db33695df1afb56ab82f5ff3e5da6eec3ca5cd917": {
+      "4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b": 1788681600000
+    },
+    "nip04-cache:v1:17162c921dc4d2518f9a101db33695df1afb56ab82f5ff3e5da6eec3ca5cd917": {
+      "4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a": {
+        "value": "see you at the meetup",
+        "cachedAt": 1788681600000
+      }
+    },
+    "nip46-activity-store:profile:17162c921dc4d2518f9a101db33695df1afb56ab82f5ff3e5da6eec3ca5cd917": {
+      "state": {
+        "entries": []
+      },
+      "version": 1
+    },
+    "nip46-activity-store:profile:7e7e9c42a91bfef19fa929e5fda1b72e0ebc1a4c1141673e2794234d86addf4e": {
+      "state": {
+        "entries": []
+      },
+      "version": 1
+    },
+    "nip46-activity-store:profile:d977a6cf0f831dc4720780b5f51460eaf6dca08e32d1f6e89b60344d63af4e04": {
+      "state": {
+        "entries": []
+      },
+      "version": 1
+    },
+    "nip46-connections-store:profile:17162c921dc4d2518f9a101db33695df1afb56ab82f5ff3e5da6eec3ca5cd917": {
+      "state": {
+        "apps": {
+          "5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a": {
+            "clientPubkey": "5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
+            "name": "Fixture Client",
+            "url": "https://client.example",
+            "relays": [
+              "wss://relay.damus.io"
+            ],
+            "origin": "nostrconnect",
+            "status": "active",
+            "mode": "standard",
+            "encryption": "nip44",
+            "pairedAt": 1788163200000,
+            "lastUsedAt": 1789027200000,
+            "requestCount": 14,
+            "deniedCount": 1,
+            "grants": {
+              "sign_event:1": {
+                "verdict": "always",
+                "origin": "pairing",
+                "createdAt": 1788163200000,
+                "lastUsedAt": 1789027200000,
+                "useCount": 9
+              },
+              "sign_event:7": {
+                "verdict": "deny",
+                "origin": "prompt",
+                "createdAt": 1788249600000,
+                "useCount": 1
+              }
+            },
+            "peerDecryptGrants": {
+              "abababababababababababababababababababababababababababababababab": {
+                "methods": [
+                  "nip44_decrypt"
+                ],
+                "createdAt": 1788336000000,
+                "useCount": 2
+              }
+            },
+            "previousClientPubkeys": []
+          }
+        }
+      },
+      "version": 1
+    },
+    "nip46-connections-store:profile:7e7e9c42a91bfef19fa929e5fda1b72e0ebc1a4c1141673e2794234d86addf4e": {
+      "state": {
+        "apps": {}
+      },
+      "version": 1
+    },
+    "nip46-connections-store:profile:d977a6cf0f831dc4720780b5f51460eaf6dca08e32d1f6e89b60344d63af4e04": {
+      "state": {
+        "apps": {}
+      },
+      "version": 1
+    },
+    "nostr-media-server-store:profile:17162c921dc4d2518f9a101db33695df1afb56ab82f5ff3e5da6eec3ca5cd917": {
+      "state": {
+        "server": "https://nostr.build"
+      },
+      "version": 1
+    },
+    "nostr-media-server-store:profile:7e7e9c42a91bfef19fa929e5fda1b72e0ebc1a4c1141673e2794234d86addf4e": {
+      "state": {
+        "server": "https://blossom.primal.net"
+      },
+      "version": 1
+    },
+    "nostr-media-server-store:profile:d977a6cf0f831dc4720780b5f51460eaf6dca08e32d1f6e89b60344d63af4e04": {
+      "state": {
+        "server": "https://blossom.primal.net"
+      },
+      "version": 1
+    },
+    "nostr-metadata-cache:profile:17162c921dc4d2518f9a101db33695df1afb56ab82f5ff3e5da6eec3ca5cd917": {
+      "state": {
+        "byPubkey": {
+          "abababababababababababababababababababababababababababababababab": {
+            "displayName": "Fixture Friend",
+            "name": "friend",
+            "picture": "https://m.primal.net/fixture-friend.png",
+            "nip05": "friend@example.com",
+            "lud16": "friend@example.com",
+            "about": "A friend of the fixture",
+            "fetchedAt": 1789027200000
+          }
+        }
+      },
+      "version": 1
+    },
+    "nostr-metadata-cache:profile:7e7e9c42a91bfef19fa929e5fda1b72e0ebc1a4c1141673e2794234d86addf4e": {
+      "state": {
+        "byPubkey": {}
+      },
+      "version": 1
+    },
+    "nostr-metadata-cache:profile:d977a6cf0f831dc4720780b5f51460eaf6dca08e32d1f6e89b60344d63af4e04": {
+      "state": {
+        "byPubkey": {}
+      },
+      "version": 1
+    },
+    "nostr-relay-list-store:profile:17162c921dc4d2518f9a101db33695df1afb56ab82f5ff3e5da6eec3ca5cd917": {
+      "state": {
+        "entries": [
+          {
+            "url": "wss://relay.damus.io",
+            "read": true,
+            "write": true
+          },
+          {
+            "url": "wss://nos.lol",
+            "read": true,
+            "write": false
+          }
+        ],
+        "updatedAt": 1787990400,
+        "hasPublished": true,
+        "source": "relay"
+      },
+      "version": 1
+    },
+    "nostr-relay-list-store:profile:7e7e9c42a91bfef19fa929e5fda1b72e0ebc1a4c1141673e2794234d86addf4e": {
+      "state": {
+        "entries": [],
+        "updatedAt": 0,
+        "hasPublished": false,
+        "source": "default"
+      },
+      "version": 1
+    },
+    "nostr-relay-list-store:profile:d977a6cf0f831dc4720780b5f51460eaf6dca08e32d1f6e89b60344d63af4e04": {
+      "state": {
+        "entries": [
+          {
+            "url": "wss://relay.primal.net",
+            "read": true,
+            "write": true
+          }
+        ],
+        "updatedAt": 0,
+        "hasPublished": false,
+        "source": "local"
+      },
+      "version": 1
+    },
+    "nostr-social-store:profile:17162c921dc4d2518f9a101db33695df1afb56ab82f5ff3e5da6eec3ca5cd917": {
+      "state": {
+        "contactsTags": [
+          [
+            "p",
+            "abababababababababababababababababababababababababababababababab"
+          ],
+          [
+            "p",
+            "d977a6cf0f831dc4720780b5f51460eaf6dca08e32d1f6e89b60344d63af4e04",
+            "wss://relay.damus.io",
+            "second"
+          ]
+        ],
+        "contactsContent": "",
+        "contactsUpdatedAt": 1788681600,
+        "followingPubkeys": {
+          "abababababababababababababababababababababababababababababababab": true,
+          "d977a6cf0f831dc4720780b5f51460eaf6dca08e32d1f6e89b60344d63af4e04": true
+        },
+        "engagementByEventId": {
+          "e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1": {
+            "liked": {
+              "ownEventId": "e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3"
+            },
+            "replied": {},
+            "updatedAt": 1788681600
+          }
+        },
+        "deletedRepostOriginalIds": {
+          "d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1": 1786608000000
+        },
+        "deletedNoteIds": {
+          "d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2": 1786521600000
+        },
+        "optimisticFollowsByPubkey": {},
+        "optimisticLikesByEventId": {},
+        "optimisticRepostsByEventId": {},
+        "optimisticZapsByEventId": {},
+        "zappedByEventId": {
+          "e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1": {
+            "totalSats": 210,
+            "updatedAt": 1788681600000
+          }
+        }
+      },
+      "version": 2
+    },
+    "nostr-social-store:profile:7e7e9c42a91bfef19fa929e5fda1b72e0ebc1a4c1141673e2794234d86addf4e": {
+      "state": {
+        "contactsTags": [
+          [
+            "p",
+            "abababababababababababababababababababababababababababababababab"
+          ]
+        ],
+        "contactsContent": "",
+        "contactsUpdatedAt": 1789027200,
+        "followingPubkeys": {
+          "abababababababababababababababababababababababababababababababab": true
+        },
+        "engagementByEventId": {},
+        "deletedRepostOriginalIds": {},
+        "deletedNoteIds": {},
+        "optimisticFollowsByPubkey": {},
+        "optimisticLikesByEventId": {},
+        "optimisticRepostsByEventId": {},
+        "optimisticZapsByEventId": {},
+        "zappedByEventId": {}
+      },
+      "version": 2
+    },
+    "nostr-social-store:profile:d977a6cf0f831dc4720780b5f51460eaf6dca08e32d1f6e89b60344d63af4e04": {
+      "state": {
+        "contactsTags": [
+          [
+            "p",
+            "17162c921dc4d2518f9a101db33695df1afb56ab82f5ff3e5da6eec3ca5cd917"
+          ]
+        ],
+        "contactsContent": "",
+        "contactsUpdatedAt": 1789027200,
+        "followingPubkeys": {
+          "17162c921dc4d2518f9a101db33695df1afb56ab82f5ff3e5da6eec3ca5cd917": true
+        },
+        "engagementByEventId": {},
+        "deletedRepostOriginalIds": {},
+        "deletedNoteIds": {},
+        "optimisticFollowsByPubkey": {},
+        "optimisticLikesByEventId": {},
+        "optimisticRepostsByEventId": {},
+        "optimisticZapsByEventId": {},
+        "zappedByEventId": {}
+      },
+      "version": 2
+    },
+    "notification-policy-store:profile:17162c921dc4d2518f9a101db33695df1afb56ab82f5ff3e5da6eec3ca5cd917": {
+      "state": {
+        "policy": "STRICT",
+        "replyScope": "THREAD"
+      },
+      "version": 1
+    },
+    "notification-policy-store:profile:7e7e9c42a91bfef19fa929e5fda1b72e0ebc1a4c1141673e2794234d86addf4e": {
+      "state": {
+        "policy": "RELAXED",
+        "replyScope": "DIRECT"
+      },
+      "version": 1
+    },
+    "notification-policy-store:profile:d977a6cf0f831dc4720780b5f51460eaf6dca08e32d1f6e89b60344d63af4e04": {
+      "state": {
+        "policy": "FOLLOWS",
+        "replyScope": "DIRECT"
+      },
+      "version": 1
+    },
+    "npc-mint-store:profile:17162c921dc4d2518f9a101db33695df1afb56ab82f5ff3e5da6eec3ca5cd917": {
+      "state": {
+        "mintUrl": "https://mint.minibits.cash/Bitcoin"
+      },
+      "version": 2
+    },
+    "npc-mint-store:profile:7e7e9c42a91bfef19fa929e5fda1b72e0ebc1a4c1141673e2794234d86addf4e": {
+      "state": {},
+      "version": 2
+    },
+    "npc-mint-store:profile:d977a6cf0f831dc4720780b5f51460eaf6dca08e32d1f6e89b60344d63af4e04": {
+      "state": {},
+      "version": 2
+    },
+    "npc_since:profile:17162c921dc4d2518f9a101db33695df1afb56ab82f5ff3e5da6eec3ca5cd917": "1789113600",
+    "npc_since:profile:d977a6cf0f831dc4720780b5f51460eaf6dca08e32d1f6e89b60344d63af4e04": "1789027200",
+    "nut-drop-redeem-queue:profile:17162c921dc4d2518f9a101db33695df1afb56ab82f5ff3e5da6eec3ca5cd917": {
+      "state": {
+        "byTokenHash": {
+          "a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7": {
+            "token": "cashuBfixturenutdroptoken",
+            "mintUrl": "https://21mint.me",
+            "amount": 21,
+            "unit": "sat",
+            "status": "untrusted-mint",
+            "attempts": 1,
+            "nextAttemptAt": 1789113600000,
+            "receivedAt": 1789113600000,
+            "senderPeerID": "a1b2c3d4e5f60718"
+          }
+        }
+      },
+      "version": 1
+    },
+    "nut-drop-redeem-queue:profile:7e7e9c42a91bfef19fa929e5fda1b72e0ebc1a4c1141673e2794234d86addf4e": {
+      "state": {
+        "byTokenHash": {}
+      },
+      "version": 1
+    },
+    "nut-drop-redeem-queue:profile:d977a6cf0f831dc4720780b5f51460eaf6dca08e32d1f6e89b60344d63af4e04": {
+      "state": {
+        "byTokenHash": {}
+      },
+      "version": 1
+    },
+    "own-content-store:profile:17162c921dc4d2518f9a101db33695df1afb56ab82f5ff3e5da6eec3ca5cd917": {
+      "state": {
+        "byId": {
+          "e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2": {
+            "event": {
+              "id": "e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2",
+              "kind": 1,
+              "pubkey": "17162c921dc4d2518f9a101db33695df1afb56ab82f5ff3e5da6eec3ca5cd917",
+              "content": "gm from the fixture",
+              "tags": [
+                [
+                  "t",
+                  "gm"
+                ]
+              ],
+              "created_at": 1788854400
+            },
+            "authorPubkey": "17162c921dc4d2518f9a101db33695df1afb56ab82f5ff3e5da6eec3ca5cd917",
+            "status": "confirmed",
+            "updatedAt": 1788854400000
+          }
+        }
+      },
+      "version": 1
+    },
+    "own-content-store:profile:7e7e9c42a91bfef19fa929e5fda1b72e0ebc1a4c1141673e2794234d86addf4e": {
+      "state": {
+        "byId": {}
+      },
+      "version": 1
+    },
+    "own-content-store:profile:d977a6cf0f831dc4720780b5f51460eaf6dca08e32d1f6e89b60344d63af4e04": {
+      "state": {
+        "byId": {}
+      },
+      "version": 1
+    },
+    "own-profile-metadata-store:profile:17162c921dc4d2518f9a101db33695df1afb56ab82f5ff3e5da6eec3ca5cd917": {
+      "state": {
+        "latest": null,
+        "history": {}
+      },
+      "version": 1
+    },
+    "own-profile-metadata-store:profile:7e7e9c42a91bfef19fa929e5fda1b72e0ebc1a4c1141673e2794234d86addf4e": {
+      "state": {
+        "latest": null,
+        "history": {}
+      },
+      "version": 1
+    },
+    "own-profile-metadata-store:profile:d977a6cf0f831dc4720780b5f51460eaf6dca08e32d1f6e89b60344d63af4e04": {
+      "state": {
+        "latest": null,
+        "history": {}
+      },
+      "version": 1
+    },
+    "own-profile-stats-cache": {
+      "state": {
+        "byKey": {}
+      },
+      "version": 1
+    },
+    "owned-media-store:profile:17162c921dc4d2518f9a101db33695df1afb56ab82f5ff3e5da6eec3ca5cd917": {
+      "state": {
+        "byBlob": {
+          "blossom.primal.net|b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1": {
+            "sha256": "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+            "url": "https://blossom.primal.net/b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1.jpg",
+            "host": "blossom.primal.net",
+            "mimeType": "image/jpeg",
+            "sourceNoteIds": [
+              "e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2"
+            ],
+            "firstSeen": 1788854400000,
+            "lastSeen": 1788854400000,
+            "deleteState": "live"
+          }
+        }
+      },
+      "version": 1
+    },
+    "owned-media-store:profile:7e7e9c42a91bfef19fa929e5fda1b72e0ebc1a4c1141673e2794234d86addf4e": {
+      "state": {
+        "byBlob": {}
+      },
+      "version": 1
+    },
+    "owned-media-store:profile:d977a6cf0f831dc4720780b5f51460eaf6dca08e32d1f6e89b60344d63af4e04": {
+      "state": {
+        "byBlob": {}
+      },
+      "version": 1
+    },
+    "persist:SOVRAN": {
+      "settings": "{\"settings\":{\"lang\":\"en\",\"theme\":\"dark\",\"display_btc\":3,\"passcode\":\"\",\"experimental\":false,\"termsAccepted\":null}}",
+      "cashu": "{\"profiles\":[{\"mints\":[],\"proofs\":{},\"counters\":{},\"keysets\":{},\"transactions\":[]}],\"audits\":{},\"info\":{},\"keys\":{},\"keysets\":{},\"allocation\":{}}",
+      "nostr": "{\"currentProfile\":{\"id\":0},\"profiles\":[{\"id\":0,\"mnemonic\":\"\",\"pubkey\":\"\",\"profile\":{\"created_at\":0,\"profileEvent\":\"\",\"name\":\"\",\"picture\":\"\",\"image\":\"\"},\"npub\":\"\",\"nsec\":\"\",\"mints\":[],\"picture\":\"\",\"root\":{\"xpub\":\"\",\"xpriv\":\"\"},\"nut13\":\"\"}],\"messages\":{\"loaded_messages\":[]},\"follows\":{},\"contacts\":[]}",
+      "_persist": "{\"version\":251,\"rehydrated\":true}"
+    },
+    "pricelist-store": {
+      "state": {
+        "pricelist": {
+          "usd": {
+            "btc": 64250.5
+          },
+          "eur": {
+            "btc": 59010.25
+          },
+          "gbp": {
+            "btc": 50880
+          }
+        },
+        "lastUpdated": 1789199400000,
+        "serverUpdatedAt": null
+      },
+      "version": 1
+    },
+    "profile-store": {
+      "state": {
+        "activeAccountIndex": 1,
+        "profiles": [
+          {
+            "accountIndex": 0,
+            "pubkey": "17162c921dc4d2518f9a101db33695df1afb56ab82f5ff3e5da6eec3ca5cd917",
+            "addedAt": 1782288000000,
+            "cachedBalanceSats": 2100,
+            "cachedDisplayName": "fixture zero",
+            "cachedPicture": "https://m.primal.net/fixture-zero.png"
+          },
+          {
+            "accountIndex": 1,
+            "pubkey": "d977a6cf0f831dc4720780b5f51460eaf6dca08e32d1f6e89b60344d63af4e04",
+            "addedAt": 1782547200000,
+            "cachedBalanceSats": 64
+          },
+          {
+            "accountIndex": 112058190,
+            "pubkey": "7e7e9c42a91bfef19fa929e5fda1b72e0ebc1a4c1141673e2794234d86addf4e",
+            "addedAt": 1784880000000,
+            "cachedBalanceSats": 0,
+            "source": "imported",
+            "externalChain": 1
+          }
+        ]
+      },
+      "version": 2
+    },
+    "recent-people-store:profile:17162c921dc4d2518f9a101db33695df1afb56ab82f5ff3e5da6eec3ca5cd917": {
+      "state": {
+        "entries": [
+          {
+            "pubkey": "abababababababababababababababababababababababababababababababab",
+            "firstOpenedAt": 1788422400000,
+            "lastOpenedAt": 1789027200000,
+            "reason": "search",
+            "displayName": "Fixture Friend"
+          }
+        ]
+      },
+      "version": 1
+    },
+    "recent-people-store:profile:7e7e9c42a91bfef19fa929e5fda1b72e0ebc1a4c1141673e2794234d86addf4e": {
+      "state": {
+        "entries": []
+      },
+      "version": 1
+    },
+    "recent-people-store:profile:d977a6cf0f831dc4720780b5f51460eaf6dca08e32d1f6e89b60344d63af4e04": {
+      "state": {
+        "entries": []
+      },
+      "version": 1
+    },
+    "relay-metadata-store": {
+      "state": {
+        "byRelayUrl": {
+          "wss://relay.damus.io": {
+            "info": {
+              "name": "damus.io",
+              "description": "Fixture relay description",
+              "pubkey": null,
+              "contact": null,
+              "software": "git+https://github.com/hoytech/strfry.git",
+              "version": "1.0.4",
+              "supported_nips": [
+                1,
+                2,
+                4,
+                9,
+                11,
+                40,
+                42,
+                70
+              ]
+            },
+            "fetchedAt": 1789113600000
+          },
+          "wss://relay.offline.example": {
+            "failedAt": 1789113600000
+          }
+        }
+      },
+      "version": 1
+    },
+    "routstr-store:profile:17162c921dc4d2518f9a101db33695df1afb56ab82f5ff3e5da6eec3ca5cd917": {
+      "state": {
+        "apiKey": null,
+        "authMode": "bearer",
+        "serverLineupAt": null,
+        "balance": 41500,
+        "selectedModel": "openai/gpt-4o-mini",
+        "sessions": [
+          {
+            "id": "1788768000000",
+            "title": "How do blinded signatures work?",
+            "createdAt": 1788768000000,
+            "messages": [
+              {
+                "id": "1788768000001",
+                "role": "user",
+                "content": "How do blinded signatures work?",
+                "timestamp": 1788768000001,
+                "parentId": null
+              },
+              {
+                "id": "1788768000002",
+                "role": "assistant",
+                "content": "The mint signs a value it cannot see, and the wallet unblinds the result.",
+                "timestamp": 1788768000002,
+                "parentId": "1788768000001",
+                "thinkingDurationSec": 2.5,
+                "reasoningContent": "Explain blinding, signing, unblinding.",
+                "costSats": 3,
+                "pending": false
+              }
+            ],
+            "activeChildren": {
+              "1788768000001": "1788768000002"
+            }
+          }
+        ],
+        "currentSessionId": "1788768000000",
+        "lastKnownLineup": null,
+        "nodeBaseUrl": null,
+        "legacyAccounts": {},
+        "providerClaims": {},
+        "providerSeenAt": {},
+        "userNodeBaseUrl": null,
+        "pendingPayments": {},
+        "confirmSpend": true,
+        "curatedModels": null
+      },
+      "version": 3
+    },
+    "routstr-store:profile:7e7e9c42a91bfef19fa929e5fda1b72e0ebc1a4c1141673e2794234d86addf4e": {
+      "state": {
+        "apiKey": null,
+        "authMode": "bearer",
+        "serverLineupAt": null,
+        "balance": null,
+        "selectedModel": null,
+        "sessions": [],
+        "currentSessionId": null,
+        "lastKnownLineup": null,
+        "nodeBaseUrl": null,
+        "legacyAccounts": {},
+        "providerClaims": {},
+        "providerSeenAt": {},
+        "userNodeBaseUrl": null,
+        "pendingPayments": {},
+        "confirmSpend": true,
+        "curatedModels": null
+      },
+      "version": 3
+    },
+    "routstr-store:profile:d977a6cf0f831dc4720780b5f51460eaf6dca08e32d1f6e89b60344d63af4e04": {
+      "state": {
+        "apiKey": null,
+        "authMode": "bearer",
+        "serverLineupAt": null,
+        "balance": 9000,
+        "selectedModel": null,
+        "sessions": [
+          {
+            "id": "1789113600000",
+            "title": "New Session",
+            "createdAt": 1789113600000,
+            "messages": [
+              {
+                "id": "1789113600001",
+                "role": "user",
+                "content": "Summarise NUT-13 in one line.",
+                "timestamp": 1789113600001,
+                "parentId": null
+              }
+            ]
+          }
+        ],
+        "currentSessionId": "1789113600000",
+        "lastKnownLineup": null,
+        "nodeBaseUrl": "https://ai.fixture-node.example",
+        "legacyAccounts": {},
+        "providerClaims": {},
+        "providerSeenAt": {},
+        "userNodeBaseUrl": null,
+        "pendingPayments": {},
+        "confirmSpend": true,
+        "curatedModels": null
+      },
+      "version": 3
+    },
+    "scan-history-store:profile:17162c921dc4d2518f9a101db33695df1afb56ab82f5ff3e5da6eec3ca5cd917": {
+      "state": {
+        "entries": [
+          {
+            "id": "scan-1788940800000-4",
+            "raw": "lnbc210n1pfixturezeroexamplezzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz",
+            "type": "lightning",
+            "source": "qr",
+            "inputType": "bolt11",
+            "scannedAt": 1788940800000,
+            "transactionId": "send-op-7c1f"
+          },
+          {
+            "id": "scan-1787472000000-2",
+            "raw": "nostr:npub19x5wwkwmxmd68h5m65zgua0mlrd93ptpz8487pdp27rrprfxvxzqrjhkrz",
+            "type": "npub",
+            "source": "paste",
+            "scannedAt": 1787472000000
+          }
+        ]
+      },
+      "version": 1
+    },
+    "scan-history-store:profile:7e7e9c42a91bfef19fa929e5fda1b72e0ebc1a4c1141673e2794234d86addf4e": {
+      "state": {
+        "entries": [
+          {
+            "id": "scan-1789027200000-3",
+            "raw": "cashuBfixtureimportedexampletoken",
+            "type": "ecash",
+            "source": "nfc",
+            "container": "ndef-text",
+            "optionKinds": [
+              "receive"
+            ],
+            "scannedAt": 1789027200000
+          }
+        ]
+      },
+      "version": 1
+    },
+    "scan-history-store:profile:d977a6cf0f831dc4720780b5f51460eaf6dca08e32d1f6e89b60344d63af4e04": {
+      "state": {
+        "entries": [
+          {
+            "id": "scan-1789113600000-9",
+            "raw": "https://mint.coinos.io",
+            "type": "mint",
+            "source": "deeplink",
+            "inputType": "mint-url",
+            "scannedAt": 1789113600000
+          }
+        ]
+      },
+      "version": 1
+    },
+    "search-history-store:profile:17162c921dc4d2518f9a101db33695df1afb56ab82f5ff3e5da6eec3ca5cd917": {
+      "state": {
+        "recentSearches": {
+          "contacts": [
+            {
+              "query": "fixture friend",
+              "timestamp": 1789027200000,
+              "context": "contacts"
+            },
+            {
+              "query": "jack",
+              "timestamp": 1788422400000,
+              "context": "contacts"
+            }
+          ]
+        }
+      },
+      "version": 1
+    },
+    "search-history-store:profile:7e7e9c42a91bfef19fa929e5fda1b72e0ebc1a4c1141673e2794234d86addf4e": {
+      "state": {
+        "recentSearches": {}
+      },
+      "version": 1
+    },
+    "search-history-store:profile:d977a6cf0f831dc4720780b5f51460eaf6dca08e32d1f6e89b60344d63af4e04": {
+      "state": {
+        "recentSearches": {}
+      },
+      "version": 1
+    },
+    "send-reachability-store:profile:17162c921dc4d2518f9a101db33695df1afb56ab82f5ff3e5da6eec3ca5cd917": {
+      "state": {
+        "byTransactionId": {
+          "send-op-7c1f": {
+            "status": "mint-reachable",
+            "mintUrl": "https://mint.minibits.cash/Bitcoin",
+            "updatedAt": 1788940800000
+          }
+        }
+      },
+      "version": 1
+    },
+    "send-reachability-store:profile:7e7e9c42a91bfef19fa929e5fda1b72e0ebc1a4c1141673e2794234d86addf4e": {
+      "state": {
+        "byTransactionId": {}
+      },
+      "version": 1
+    },
+    "send-reachability-store:profile:d977a6cf0f831dc4720780b5f51460eaf6dca08e32d1f6e89b60344d63af4e04": {
+      "state": {
+        "byTransactionId": {}
+      },
+      "version": 1
+    },
+    "settings-store": {
+      "state": {
+        "lastKnownAppVersion": null,
+        "language": "en",
+        "displayBtc": 2,
+        "displayCurrency": "eur",
+        "experimental": false,
+        "mockMode": false,
+        "mockOffline": false,
+        "mockFailSend": false,
+        "mockFailMelt": false,
+        "mockFailPaymentRequest": false,
+        "whitenoiseEnabled": false,
+        "inProcessProfileSwitch": false,
+        "mockNoGlass": false,
+        "layoutGuides": false,
+        "showTouches": false,
+        "termsAccepted": {
+          "termsAccepted": true,
+          "date": "2026-06-24T08:00:00.000Z"
+        },
+        "legalAcceptance": {
+          "termsRevision": "7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a",
+          "privacyRevision": "7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b",
+          "acceptedAt": "2026-08-23T08:00:00.000Z"
+        },
+        "hasSeenOnboarding": true,
+        "quickAccessP2PK": true,
+        "regenerateP2PKOnReceive": false,
+        "sendLocationEnabled": true,
+        "fileLoggingEnabled": false,
+        "minTransferThreshold": 21,
+        "middlemanRouting": {
+          "maxHops": 3,
+          "maxFee": 8,
+          "minSuccessRate": 0.95,
+          "requireLastOk": true,
+          "trustMode": "allow_untrusted"
+        },
+        "vertexCreditsEnabled": true,
+        "naggTierEnabled": true,
+        "primalTierEnabled": true,
+        "relayTierEnabled": true,
+        "primalHostsDisabled": []
+      },
+      "version": 4
+    },
+    "swap-transactions-store:profile:17162c921dc4d2518f9a101db33695df1afb56ab82f5ff3e5da6eec3ca5cd917": {
+      "state": {
+        "groups": {
+          "swap-1788422400000-1": {
+            "id": "swap-1788422400000-1",
+            "unit": "sat",
+            "createdAt": 1788422400000,
+            "title": "Rebalance",
+            "state": "finished",
+            "legs": [
+              {
+                "id": "leg-1788422400000-2",
+                "fromMintUrl": "https://mint.minibits.cash/Bitcoin",
+                "toMintUrl": "https://mint.coinos.io",
+                "amount": 500,
+                "mintQuoteId": "mint-quote-fixture-1",
+                "meltQuoteId": "melt-quote-fixture-1",
+                "meltOperationId": "melt-op-fixture-1",
+                "localStatus": "done"
+              }
+            ]
+          }
+        },
+        "quoteIdToGroup": {
+          "mint-quote-fixture-1": {
+            "groupId": "swap-1788422400000-1",
+            "legId": "leg-1788422400000-2",
+            "kind": "mint"
+          },
+          "melt-quote-fixture-1": {
+            "groupId": "swap-1788422400000-1",
+            "legId": "leg-1788422400000-2",
+            "kind": "melt"
+          }
+        }
+      },
+      "version": 1
+    },
+    "swap-transactions-store:profile:7e7e9c42a91bfef19fa929e5fda1b72e0ebc1a4c1141673e2794234d86addf4e": {
+      "state": {
+        "groups": {},
+        "quoteIdToGroup": {}
+      },
+      "version": 1
+    },
+    "swap-transactions-store:profile:d977a6cf0f831dc4720780b5f51460eaf6dca08e32d1f6e89b60344d63af4e04": {
+      "state": {
+        "groups": {},
+        "quoteIdToGroup": {}
+      },
+      "version": 1
+    },
+    "theme-store:profile:17162c921dc4d2518f9a101db33695df1afb56ab82f5ff3e5da6eec3ca5cd917": {
+      "state": {
+        "activeAlbumSlug": "northern-lights",
+        "unitWallpapers": {
+          "sat": "aurora-01"
+        },
+        "mode": "light"
+      },
+      "version": 2
+    },
+    "theme-store:profile:7e7e9c42a91bfef19fa929e5fda1b72e0ebc1a4c1141673e2794234d86addf4e": {
+      "state": {
+        "activeAlbumSlug": null,
+        "unitWallpapers": {},
+        "mode": "light"
+      },
+      "version": 2
+    },
+    "theme-store:profile:d977a6cf0f831dc4720780b5f51460eaf6dca08e32d1f6e89b60344d63af4e04": {
+      "state": {
+        "activeAlbumSlug": null,
+        "unitWallpapers": {
+          "sat": "sunset"
+        },
+        "mode": "dark"
+      },
+      "version": 2
+    },
+    "transaction-annotation-store:profile:17162c921dc4d2518f9a101db33695df1afb56ab82f5ff3e5da6eec3ca5cd917": {
+      "state": {
+        "annotations": {
+          "history-entry-41": {
+            "distributionSource": "share",
+            "note": "coffee with the fixture"
+          }
+        }
+      },
+      "version": 1
+    },
+    "transaction-annotation-store:profile:7e7e9c42a91bfef19fa929e5fda1b72e0ebc1a4c1141673e2794234d86addf4e": {
+      "state": {
+        "annotations": {}
+      },
+      "version": 1
+    },
+    "transaction-annotation-store:profile:d977a6cf0f831dc4720780b5f51460eaf6dca08e32d1f6e89b60344d63af4e04": {
+      "state": {
+        "annotations": {}
+      },
+      "version": 1
+    },
+    "transaction-distribution-store:profile:17162c921dc4d2518f9a101db33695df1afb56ab82f5ff3e5da6eec3ca5cd917": {
+      "state": {
+        "distributions": {
+          "history-entry-41": {
+            "source": "share",
+            "recordedAt": 1788940800000
+          }
+        }
+      },
+      "version": 1
+    },
+    "transaction-distribution-store:profile:7e7e9c42a91bfef19fa929e5fda1b72e0ebc1a4c1141673e2794234d86addf4e": {
+      "state": {
+        "distributions": {}
+      },
+      "version": 1
+    },
+    "transaction-distribution-store:profile:d977a6cf0f831dc4720780b5f51460eaf6dca08e32d1f6e89b60344d63af4e04": {
+      "state": {
+        "distributions": {}
+      },
+      "version": 1
+    },
+    "transaction-location-store:profile:17162c921dc4d2518f9a101db33695df1afb56ab82f5ff3e5da6eec3ca5cd917": {
+      "state": {
+        "locations": {
+          "history-entry-41": {
+            "latitude": 51.5072,
+            "longitude": -0.1276,
+            "createdAt": 1788940800000
+          }
+        }
+      },
+      "version": 1
+    },
+    "transaction-location-store:profile:7e7e9c42a91bfef19fa929e5fda1b72e0ebc1a4c1141673e2794234d86addf4e": {
+      "state": {
+        "locations": {}
+      },
+      "version": 1
+    },
+    "transaction-location-store:profile:d977a6cf0f831dc4720780b5f51460eaf6dca08e32d1f6e89b60344d63af4e04": {
+      "state": {
+        "locations": {}
+      },
+      "version": 1
+    },
+    "wallet-lifecycle": {
+      "state": {
+        "seedCreatedAt": 1782288000000,
+        "recoveryPhraseVerifiedAt": null,
+        "recoveryPhraseVerifiedRevision": null,
+        "restoreStatus": "not-needed",
+        "lastRestoreAt": null,
+        "lastRestoreError": null
+      },
+      "version": 1
+    },
+    "wallpaper-store": {
+      "state": {
+        "catalog": [
+          {
+            "themeName": "aurora-01",
+            "blossomUrl": "https://blossom.primal.net/f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2.png",
+            "albumSlug": "northern-lights",
+            "eventId": "f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1",
+            "displayName": "Aurora",
+            "thumbUrl": "https://blossom.primal.net/f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3.png",
+            "sha256": "f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2",
+            "fileSize": 482133,
+            "dimensions": "1290x2796",
+            "palette": {
+              "0": "#ffffff",
+              "50": "#f2fbf9",
+              "100": "#d9f3ee",
+              "200": "#b2e6dc",
+              "300": "#84d3c6",
+              "400": "#52b9aa",
+              "500": "#1f9d8b",
+              "600": "#177e70",
+              "700": "#13655a",
+              "800": "#0f4f47",
+              "900": "#0b2b27",
+              "950": "#061a18"
+            },
+            "dominantColors": [
+              {
+                "hex": "#1f9d8b",
+                "hue": 171,
+                "saturation": 67,
+                "lightness": 37
+              }
+            ],
+            "gradientColors": [
+              {
+                "hex": "#0b2b27",
+                "position": "dark",
+                "hsb": {
+                  "hue": 173,
+                  "saturation": 74,
+                  "brightness": 17
+                }
+              }
+            ],
+            "createdAt": 1784016000
+          }
+        ],
+        "albums": [
+          {
+            "slug": "northern-lights",
+            "topic": "Nature",
+            "displayName": "Northern Lights",
+            "description": "",
+            "sortOrder": 0,
+            "coverThemeName": "aurora-01",
+            "author": null
+          }
+        ],
+        "catalogLastFetched": 1789113600000,
+        "downloaded": {}
+      },
+      "version": 1
+    }
+  },
+  "secureStore": {
+    "cashu_mnemonic_0": "{\"value\":\"bitter session sketch page tissue silent purity mix begin series arrow various pigeon destroy woman judge agree marine seek crush change alone liar tortoise\",\"mnemonicHash\":\"7f56506406dc6faf\"}",
+    "cashu_mnemonic_1": "{\"value\":\"omit minute century number region device breeze trophy enter phrase item harsh shove garbage embark audit law turtle scene lift segment renew sister useful\",\"mnemonicHash\":\"7f56506406dc6faf\"}",
+    "cashu_mnemonic_112058190": "{\"value\":\"mouse solar clarify divide eager jungle what roof imitate process sponsor allow situate hockey month cactus street under diary okay error predict method must\",\"mnemonicHash\":\"7f56506406dc6faf\"}",
+    "cashu_seed_0": "{\"hex\":\"1a1721f6118d4acf240ed1674d9f26ab3f504fe2ea9c95741f98b344eacb18421d87ad400927a43369409638272adccd538a96632c1d0858c471ba01183886f0\",\"mnemonicHash\":\"7f56506406dc6faf\"}",
+    "cashu_seed_1": "{\"hex\":\"0e5512c019e7448d8bf2f0a4997aee1625986937c3e0360fe09dc2c6c9056690114245bcc1085a8741ad068b9549543ea740e8725674f4bff099f38ede95145f\",\"mnemonicHash\":\"7f56506406dc6faf\"}",
+    "cashu_seed_112058190": "{\"hex\":\"734e9edbc939708db98deb5741ea03dd0a4e39018b0464573c8a9f81eac8fb0b5d25d86ba8d4476e0c117848bbbeeda4f608c7ff6c02dbaefbf9ebdbbef6bb3a\",\"mnemonicHash\":\"7f56506406dc6faf\"}",
+    "derived_keys_0": "{\"npub\":\"npub1zutzeysacnf9rru6zqwmxd54mud0k44tst6l70ja5mhv8jjumytsd2x7nu\",\"nsec\":\"nsec10allq0gjx7fddtzef0ax00mdps9t2kmtrldkyjfs8l5xruwvh2dq0lhhkp\",\"pubkey\":\"17162c921dc4d2518f9a101db33695df1afb56ab82f5ff3e5da6eec3ca5cd917\",\"privateKeyHex\":\"7f7ff03d123792d6ac594bfa67bf6d0c0ab55b6b1fdb6249303fe861f1ccba9a\",\"mnemonicHash\":\"7f56506406dc6faf\"}",
+    "derived_keys_1": "{\"npub\":\"npub1m9m6dnc0svwugus8sz6l29rqatmdegywxtgld6ymvq6y6ca0fczq88tsjr\",\"nsec\":\"nsec1x7gvyw2q7c4jxa2pzhhhputwv0x236gptffjhz5fz9cuekkulygqd26n5g\",\"pubkey\":\"d977a6cf0f831dc4720780b5f51460eaf6dca08e32d1f6e89b60344d63af4e04\",\"privateKeyHex\":\"3790c23940f62b23754115ef70f16e63cca8e9015a532b8a891171ccdadcf910\",\"mnemonicHash\":\"7f56506406dc6faf\"}",
+    "imported_nsec_7e7e9c42a91bfef19fa929e5fda1b72e0ebc1a4c1141673e2794234d86addf4e": "nsec1vl029mgpspedva04g90vltkh6fvh240zqtv9k0t9af8935ke9laqsnlfe5",
+    "migrations_complete_0": "true",
+    "migrations_complete_1": "true",
+    "migrations_complete_112058190": "true",
+    "routstr_v1_17162c921dc4d2518f9a101db33695df1afb56ab82f5ff3e5da6eec3ca5cd917_ed0844f2cab52eb0befb249dc0ab29a0c21cdb0cdf8aec82797bf2ca0d74b404_0_0": "{\"apiKey\":\"sk-9191919191919191919191919191919191919191919191919191919191919191\",\"legacyAccounts\":{},\"pendingPayments\":{}}",
+    "routstr_v1_17162c921dc4d2518f9a101db33695df1afb56ab82f5ff3e5da6eec3ca5cd917_ed0844f2cab52eb0befb249dc0ab29a0c21cdb0cdf8aec82797bf2ca0d74b404_1_0": "{\"apiKey\":\"sk-9191919191919191919191919191919191919191919191919191919191919191\",\"legacyAccounts\":{\"https://api.routstr.com\":{\"apiKey\":\"sk-9191919191919191919191919191919191919191919191919191919191919191\",\"nodeBaseUrl\":\"https://api.routstr.com\",\"lastKnownBalanceMsats\":41500,\"archivedAt\":1791767389095,\"reclaimedAt\":null}},\"pendingPayments\":{}}",
+    "routstr_v1_17162c921dc4d2518f9a101db33695df1afb56ab82f5ff3e5da6eec3ca5cd917_ed0844f2cab52eb0befb249dc0ab29a0c21cdb0cdf8aec82797bf2ca0d74b404_manifest": "{\"version\":1,\"generation\":1,\"slots\":[1,1],\"digest\":\"fdb2d9d49e844e5d48124266d70a14b998ef89973d881e7f1617ac55f584ccad\"}",
+    "routstr_v1_7e7e9c42a91bfef19fa929e5fda1b72e0ebc1a4c1141673e2794234d86addf4e_ed0844f2cab52eb0befb249dc0ab29a0c21cdb0cdf8aec82797bf2ca0d74b404_0_0": "{\"apiKey\":null,\"legacyAccounts\":{},\"pendingPayments\":{}}",
+    "routstr_v1_7e7e9c42a91bfef19fa929e5fda1b72e0ebc1a4c1141673e2794234d86addf4e_ed0844f2cab52eb0befb249dc0ab29a0c21cdb0cdf8aec82797bf2ca0d74b404_manifest": "{\"version\":1,\"generation\":0,\"slots\":[1,0],\"digest\":\"71a1e4e7082617499600258237193c8f6db46d97ed905200d6ae59be2780179f\"}",
+    "routstr_v1_d977a6cf0f831dc4720780b5f51460eaf6dca08e32d1f6e89b60344d63af4e04_ed0844f2cab52eb0befb249dc0ab29a0c21cdb0cdf8aec82797bf2ca0d74b404_0_0": "{\"apiKey\":\"sk-9292929292929292929292929292929292929292929292929292929292929292\",\"legacyAccounts\":{},\"pendingPayments\":{}}",
+    "routstr_v1_d977a6cf0f831dc4720780b5f51460eaf6dca08e32d1f6e89b60344d63af4e04_ed0844f2cab52eb0befb249dc0ab29a0c21cdb0cdf8aec82797bf2ca0d74b404_1_0": "{\"apiKey\":\"sk-9292929292929292929292929292929292929292929292929292929292929292\",\"legacyAccounts\":{\"https://ai.fixture-node.example\":{\"apiKey\":\"sk-9292929292929292929292929292929292929292929292929292929292929292\",\"nodeBaseUrl\":\"https://ai.fixture-node.example\",\"lastKnownBalanceMsats\":9000,\"archivedAt\":1791767388979,\"reclaimedAt\":null}},\"pendingPayments\":{}}",
+    "routstr_v1_d977a6cf0f831dc4720780b5f51460eaf6dca08e32d1f6e89b60344d63af4e04_ed0844f2cab52eb0befb249dc0ab29a0c21cdb0cdf8aec82797bf2ca0d74b404_manifest": "{\"version\":1,\"generation\":1,\"slots\":[1,1],\"digest\":\"73b25f18bed36c93ff72dc3e16952e937be99df3479b31499e91523551a2fa5c\"}",
+    "secure_key_index": "[\"user_mnemonic\",\"derived_keys_0\",\"cashu_mnemonic_0\",\"migrations_complete_0\",\"cashu_seed_0\",\"derived_keys_1\",\"cashu_mnemonic_1\",\"migrations_complete_1\",\"cashu_seed_1\",\"imported_nsec_7e7e9c42a91bfef19fa929e5fda1b72e0ebc1a4c1141673e2794234d86addf4e\",\"cashu_mnemonic_112058190\",\"migrations_complete_112058190\",\"cashu_seed_112058190\",\"routstr_v1_d977a6cf0f831dc4720780b5f51460eaf6dca08e32d1f6e89b60344d63af4e04_ed0844f2cab52eb0befb249dc0ab29a0c21cdb0cdf8aec82797bf2ca0d74b404_manifest\",\"routstr_v1_17162c921dc4d2518f9a101db33695df1afb56ab82f5ff3e5da6eec3ca5cd917_ed0844f2cab52eb0befb249dc0ab29a0c21cdb0cdf8aec82797bf2ca0d74b404_manifest\",\"routstr_v1_7e7e9c42a91bfef19fa929e5fda1b72e0ebc1a4c1141673e2794234d86addf4e_ed0844f2cab52eb0befb249dc0ab29a0c21cdb0cdf8aec82797bf2ca0d74b404_manifest\"]",
+    "user_mnemonic": "leader monkey parrot ring guide accident before fence cannon height naive bean"
+  },
+  "files": {
+    "cache/store-btcmap-store.json": "{\"state\":{\"placesCache\":{\"data\":[{\"id\":4242,\"lat\":51.5072,\"lon\":-0.1276,\"icon\":\"local_cafe\"},{\"id\":4243,\"lat\":48.8566,\"lon\":2.3522,\"icon\":\"restaurant\"}],\"timestamp\":1789027200000},\"placeDetailsCache\":{\"4242\":{\"data\":{\"id\":4242,\"name\":\"Fixture Coffee\",\"address\":\"1 Example Street\"},\"timestamp\":1789027200000}}},\"version\":1}"
+  }
+}
