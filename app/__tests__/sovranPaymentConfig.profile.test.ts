@@ -489,6 +489,24 @@ describe('createSovranHandlers profile routing', () => {
     });
   });
 
+  it('opens an unknown mint for review without putting the waiting token on the route', async () => {
+    // @ts-expect-error reviewMint only reads no machine methods.
+    const machine: PaymentMachine = { getContext: jest.fn(() => ({})) };
+    const handlers = createSovranHandlers({ machine, getManager: () => null });
+
+    await handlers.reviewMint?.({
+      mintUrl: 'https://mint.example',
+      token: 'cashuBsynthetic-token-waiting-for-the-mint-to-be-trusted',
+    });
+
+    expect(mockNavigate).toHaveBeenCalledWith({
+      pathname: '/(mint-flow)/info',
+      params: {
+        mintInfoEntry: JSON.stringify({ mintUrl: 'https://mint.example', fromAccepter: true }),
+      },
+    });
+  });
+
   it('carries a P2PK lock marker into the amount route without logging the key', async () => {
     // @ts-expect-error enterAmount only reads no machine methods.
     const machine: PaymentMachine = { getContext: jest.fn(() => ({})) };

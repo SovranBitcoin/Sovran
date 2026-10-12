@@ -1274,12 +1274,13 @@ export function createSovranHandlers({
       );
     },
 
-    reviewMint: ({ mintUrl, token, mintInfo }) => {
+    // The token waiting on this review stays in the machine's step data. The
+    // mint's page reads none of it, and a route param is no place for ecash.
+    reviewMint: ({ mintUrl, mintInfo }) => {
       const entry = {
         ...(mintInfo ?? {}),
         mintUrl,
         fromAccepter: true,
-        token,
       };
       router.navigate({
         pathname: '/(mint-flow)/info',
