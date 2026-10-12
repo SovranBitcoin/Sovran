@@ -136,16 +136,18 @@ interface Nip46RequestsActions {
   clear: () => void;
   /**
    * Session-scoped opt-in auto-approve for critical peer≠self decrypts,
-   * scoped to ONE conversation partner; lives until the engine stops. The
-   * guard forces the caller to assert the peer is not the user —
-   * decrypt-to-self (NIP-60 wallet payloads) must always prompt.
+   * scoped to ONE conversation partner; lives until the engine stops.
+   * `peerIsSelf: false` forces the caller to assert the peer is not the user —
+   * decrypt-to-self (NIP-60 wallet payloads) must always prompt. Named
+   * fields: the app's key and the peer's key are both hex strings and must
+   * not be swapped.
    */
-  grantSession: (
-    clientPubkey: string,
-    grantKey: SessionGrantKey,
-    peerPubkey: string,
-    guard: { peerIsSelf: false }
-  ) => Result<void, SessionGrantError>;
+  grantSession: (grant: {
+    clientPubkey: string;
+    grantKey: SessionGrantKey;
+    peerPubkey: string;
+    peerIsSelf: false;
+  }) => Result<void, SessionGrantError>;
   hasSessionGrant: (clientPubkey: string, grantKey: GrantKey, peerPubkey: string) => boolean;
   /**
    * Revoke session grants for an app — all of them, one method's, or (via
@@ -235,11 +237,11 @@ export const useNip46RequestsStore = create<Nip46RequestsStore>({
     set({ pending: [], throttledApps: {}, sessionGrants: [], sessionAllows: [] });
   },
 
-  grantSession: (clientPubkey, grantKey, peerPubkey, guard) => {
+  grantSession: ({ clientPubkey, grantKey, peerPubkey, peerIsSelf }) => {
     // Runtime re-checks of the compile-time contracts — a JS caller (or a
     // cast) must not be able to mint a self-decrypt or signing session grant
     // or an unscoped peer.
-    if (guard.peerIsSelf !== false) return err('self_decrypt_forbidden');
+    if (peerIsSelf !== false) return err('self_decrypt_forbidden');
     if (!SESSION_GRANTABLE_KEYS.includes(grantKey)) return err('not_session_grantable');
     if (!isNostrPubkeyHex(peerPubkey)) return err('invalid_peer');
     const peer = peerPubkey.toLowerCase();

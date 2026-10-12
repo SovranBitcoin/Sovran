@@ -81,7 +81,12 @@ export function SignerAppPersonScreen(): React.ReactElement {
     }
     let failed = 0;
     for (const method of ['nip04_decrypt', 'nip44_decrypt'] as const) {
-      const result = setPeerDecryptGrant(clientPubkey, peer, method, { peerIsSelf: false });
+      const result = setPeerDecryptGrant({
+        clientPubkey,
+        peerPubkey: peer,
+        method,
+        peerIsSelf: false,
+      });
       if (result.isErr()) failed += 1;
     }
     if (failed > 0) {

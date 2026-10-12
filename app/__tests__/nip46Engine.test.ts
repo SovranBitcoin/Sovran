@@ -803,7 +803,10 @@ describe('nostrconnect pairing', () => {
       ).toBe(true);
       expect(store.setGrant(OLD_CLIENT, 'sign_event:1', 'always').isOk()).toBe(true);
       expect(
-        store.setPeerDecryptGrant(OLD_CLIENT, 'e'.repeat(64), 'nip44_decrypt', {
+        store.setPeerDecryptGrant({
+          clientPubkey: OLD_CLIENT,
+          peerPubkey: 'e'.repeat(64),
+          method: 'nip44_decrypt',
           peerIsSelf: false,
         }).isOk
       ).toBeDefined();
@@ -815,7 +818,12 @@ describe('nostrconnect pairing', () => {
       seedPreviousPrimal();
       useNip46RequestsStore
         .getState()
-        .grantSession(OLD_CLIENT, 'nip44_decrypt', 'e'.repeat(64), { peerIsSelf: false });
+        .grantSession({
+          clientPubkey: OLD_CLIENT,
+          grantKey: 'nip44_decrypt',
+          peerPubkey: 'e'.repeat(64),
+          peerIsSelf: false,
+        });
       const { engine, sent } = makeEngine();
       const parsed = reconnectUri();
       engine.startNostrconnectPairing(parsed);

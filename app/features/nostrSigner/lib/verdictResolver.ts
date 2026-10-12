@@ -194,12 +194,12 @@ export function resolveVerdict(
           // critical and unrepresentable as 'always').
           const peerPubkey = request.params[0]?.toLowerCase();
           if (peerPubkey !== undefined) {
-            const written = connections().setPeerDecryptGrant(
+            const written = connections().setPeerDecryptGrant({
               clientPubkey,
               peerPubkey,
-              request.method as DecryptMethod,
-              { peerIsSelf: false }
-            );
+              method: request.method as DecryptMethod,
+              peerIsSelf: false,
+            });
             if (written.isErr()) {
               nostrLog.warn('nostr.signer.engine_peer_grant_rejected', { cause: written.error });
             }
@@ -233,12 +233,12 @@ export function resolveVerdict(
           // stops. The decrypt peer is params[0] (classification-time read).
           const peerPubkey = request.params[0]?.toLowerCase();
           if (peerPubkey !== undefined) {
-            const granted = requests().grantSession(
+            const granted = requests().grantSession({
               clientPubkey,
-              request.method as DecryptMethod,
+              grantKey: request.method as DecryptMethod,
               peerPubkey,
-              { peerIsSelf: false }
-            );
+              peerIsSelf: false,
+            });
             if (granted.isErr()) {
               nostrLog.warn('nostr.signer.engine_session_grant_rejected', {
                 cause: granted.error,
