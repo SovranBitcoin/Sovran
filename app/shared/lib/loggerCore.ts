@@ -216,9 +216,11 @@ export const monotonicNow: () => number =
 
 const _t0 = monotonicNow();
 const LOG_SESSION_ID = `${Date.now().toString(36)}-${Math.round(_t0).toString(36)}`;
-function now(): number {
+/** Milliseconds since the logger loaded: the clock every entry's `_t` is on. */
+export function logClockMs(): number {
   return Math.round((monotonicNow() - _t0) * 100) / 100;
 }
+const now = logClockMs;
 
 // ─── Expo Device Info (lazy-loaded) ──────────────────────────────────────────
 

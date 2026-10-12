@@ -15,7 +15,7 @@
 import { Platform } from 'react-native';
 import { z } from 'zod';
 
-import { IS_E2E_LOG_BUILD, log, monotonicNow, type LogEntry } from './loggerCore';
+import { IS_E2E_LOG_BUILD, log, logClockMs, type LogEntry } from './loggerCore';
 
 const NOTE_DIR = 'e2e';
 const NOTE_FILE = 'runner.json';
@@ -67,7 +67,7 @@ export function connectRunnerLink(
 
   socket.onopen = () => {
     live = true;
-    send({ type: 'hello', run: note.run, platform: Platform.OS, appClockMs: monotonicNow() });
+    send({ type: 'hello', run: note.run, platform: Platform.OS, appClockMs: logClockMs() });
     for (const entry of held ?? []) send({ type: 'log', entry });
     held = null;
   };
@@ -186,7 +186,7 @@ if (IS_E2E_LOG_BUILD && Platform.OS !== 'web') {
     log.addTransport(link.transport);
     const settle = createSettleWatch({
       nextFrame: (callback) => requestAnimationFrame(callback),
-      now: monotonicNow,
+      now: logClockMs,
       onSettled: (report) => link.send({ type: 'settled', ...report }),
     });
     log.addTransport(settle.note);
