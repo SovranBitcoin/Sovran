@@ -1,7 +1,7 @@
 # An end-to-end test is one user story, run fast, with its evidence
 
-Status: accepted on 2026-10-12. The owned native driver is kept; how many workers the Mac carries is still to be
-measured (see "Open").
+Status: accepted on 2026-10-12. The owned native driver is kept. Worker counts were measured the same day (see
+"Measured").
 
 Replaces the running model of [the JSON native harness](../testing-json-native-adr.md). Its scenario schema, page
 registry, selectors, probes, custody rules and "no second test language" stand.
@@ -53,8 +53,9 @@ overlays, no timing overrides. Structured logging stays on in that build behind 
 otherwise a development-only feature.
 
 **Workers and state.** A run prepares one simulator with the build installed and clones it for each worker;
-Android boots read-only instances of one warmed emulator image. Between stories a worker ends the app, restores
-the story's fixture and launches again; it does not reinstall. Each worker has its own wallet seeds, its own
+Android boots read-only instances of one warmed emulator image. The prepared simulator has the background
+services no story uses switched off, which is what lets several fit in memory. Between stories a worker ends the
+app, restores the story's fixture and launches again; it does not reinstall. Each worker has its own wallet seeds, its own
 ports, its own output folder named by run, worker and story, and its own mint.
 
 **Two mints.** The everyday run pays through a private mint started on the Mac for each worker, so a payment
@@ -62,10 +63,14 @@ confirms at once, nothing depends on the network, and workers cannot disturb eac
 runs against the public test mint to prove the real path, with its 3 to 5 s waits. No story uses real funds; the
 funded custody lane stays separate and off by default.
 
-**Evidence is recorded, not staged.** Each story has one continuous video, started before launch. Animations
-stay on, so the video is what a person would see and the smoothness and shift measurements mean something. The
-picture for each step is cut from the video at the step's timestamp after the story ends, so capture never pauses
-the app. The app's log is streamed with the run, story and step on every entry.
+**Evidence is recorded, not staged.** Each story has one continuous video, started before launch and kept as
+recorded: full size, a frame for every one the screen drew. Animations stay on, so the video is what a person
+would see and the smoothness and shift measurements mean something. The picture for each step is the frame on the
+simulator's screen at the moment the step was satisfied, handed over by the simulator as it draws, so capture
+never pauses the app. (Cutting pictures from the video by timestamp was tried first and withdrawn: with several
+simulators running the recording is written seconds late, and pictures came from the wrong moment.) The same
+stream of frames says when the picture has stopped changing, which the app cannot say for an animation that runs
+off its JavaScript thread. The app's log is streamed with the run, story and step on every entry.
 
 **The runner judges more than the outcome.** For each step the report carries the page mount and transition
 times, layout shifts, dropped frames where measured, and every warning and error, and compares them with budgets.
@@ -88,11 +93,36 @@ driver the same day. Detox states support up to React Native 0.84 and the app is
 is community-run; Maestro polls the screen and pauses on every step. Neither removes the need for the app to say
 when it is settled, which is where the time is.
 
+## Measured
+
+On the owner's MacBook (M4 Pro, 24 GB) on 2026-10-12, with the first story (first launch, accept Terms and
+Privacy; five steps), iPhone 17 Pro simulators on iOS 26.1, video and pictures on:
+
+| Workers | Plays | Passed | Wall time per story |
+| --- | --- | --- | --- |
+| 1 | 4 | 4 | 15.3 s |
+| 2 | 10 | 10 | 8.5 s |
+| 4 | 16 | 16 | 4.6 s |
+| 6 | 36 | 36 | 2.9 s |
+
+Those were taken while a first launch still spent nine seconds under the splash. With that fixed the same story
+takes 12 s on its own worker, and four workers finish one every 2.8 s. A hundred stories of that length are a few
+minutes, well inside the budget; the budget's risk is now the length of the money stories, not the machinery.
+
+- A stock simulator runs about 270 processes and holds 5 GB. With the unused services off it runs about 60, holds
+  1 GB and boots in 4 s instead of 20. Six stock simulators exhausted memory and then the disk; six trimmed ones
+  fit, though memory is tight beside the owner's other applications. Four is the comfortable default.
+- Where a 12 s story's time goes: resetting the app in place 0.6 s (reinstalling took 6.1 s), starting the
+  recording 0.3 s, launch to the app answering 1.4 s, the steps, ending the recording 0.4 s, keeping the video
+  0.06 s. `simctl` is called directly: through `xcrun` every call costs 0.7 s.
+- The local mint starts in 0.15 s and marks an invoice paid in about 20 ms.
+- Evidence for one 12 s story is about 7 MB (5.6 MB of video, a 340 KB picture per step).
+
 ## Open
 
-- **How many workers** this Mac carries with recording on, and how much disk a run needs. 17 GB was free when
-  this was written, so cleaning up clones and bounding evidence are part of done.
 - Whether simulator frame timing is steady enough to hold a budget, or only to show a regression.
+- The screen capture in the simulator's native addon faults about once in fifteen stories. It runs in its own
+  process, which is restarted, so a story survives it; a newer release of the addon has not been tried.
 
 ## Consequences
 
