@@ -8,11 +8,10 @@
  * says so, and the splash uncovers it at once.
  */
 import { act, render, screen } from '@testing-library/react-native';
-import { useEffect } from 'react';
 
 import { NativeSplashLayoutGate } from '@/shared/blocks/NativeSplashLayoutGate';
 import { log } from '@/shared/lib/logger';
-import { showingPageInsteadOfWallet } from '@/shared/lib/qrButtonAnchor';
+import { useShownInsteadOfWallet } from '@/shared/lib/qrButtonAnchor';
 
 jest.mock('expo-splash-screen', () => ({ hideAsync: jest.fn(async () => true) }));
 jest.mock('expo-linear-gradient', () => ({ LinearGradient: () => null }));
@@ -26,7 +25,7 @@ jest.mock('react-native-web/dist/exports/Image', () => {
 });
 
 function GatePage() {
-  useEffect(() => showingPageInsteadOfWallet(), []);
+  useShownInsteadOfWallet();
   return null;
 }
 

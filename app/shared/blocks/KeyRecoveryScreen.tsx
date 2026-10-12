@@ -3,6 +3,7 @@ import { deleteAllProfiles } from '@/shared/lib/profile/profileSessionOrchestrat
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 import { retrieveMnemonic } from '@/shared/lib/nostr/secureStorage';
+import { useShownInsteadOfWallet } from '@/shared/lib/qrButtonAnchor';
 import { restartApp } from '@/shared/lib/profile/appRestart';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { Screen } from '@/shared/ui/composed/Screen';
@@ -51,6 +52,8 @@ export function confirmStartFresh(onDelete: () => void | Promise<void>): void {
 
 /** Also rendered at the key-provider boundary: downstream providers need usable keys. */
 export function KeyRecoveryScreen({ locked = true }: { locked?: boolean }) {
+  // Shown in place of the app, so the boot splash must not wait for the wallet home.
+  useShownInsteadOfWallet();
   const [failed, setFailed] = useState(false);
   const [retryFailed, setRetryFailed] = useState(false);
   const retrying = useRef(false);

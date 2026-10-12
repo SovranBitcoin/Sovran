@@ -14,7 +14,7 @@ import {
   useWalletLifecycleHydrated,
 } from '@/shared/stores/global/walletLifecycleStore';
 import { SettingsRecoveryScreen } from '@/features/settings/screens/SettingsRecoveryScreen';
-import { showingPageInsteadOfWallet } from '@/shared/lib/qrButtonAnchor';
+import { useShownInsteadOfWallet } from '@/shared/lib/qrButtonAnchor';
 
 initLog('Module', 'AppGate loaded');
 
@@ -114,7 +114,7 @@ interface AppGateProps {
  * coming, so it uncovers the page instead of waiting out its fallback.
  */
 function InsteadOfWallet({ children }: { children: React.ReactNode }) {
-  useEffect(() => showingPageInsteadOfWallet(), []);
+  useShownInsteadOfWallet();
   return <>{children}</>;
 }
 
@@ -138,18 +138,8 @@ const AppGate: React.FC<AppGateProps> = ({ children }) => {
   const completeOnboarding = useSettingsStore((state) => state.completeOnboarding);
   const reinstallState = useReinstallDetection(hasSeenOnboarding);
   const hydration = useSettingsHydration((s) => s.status);
-  if (locked)
-    return (
-      <InsteadOfWallet>
-        <KeyRecoveryScreen />
-      </InsteadOfWallet>
-    );
-  if (error && !isReady)
-    return (
-      <InsteadOfWallet>
-        <KeyRecoveryScreen locked={false} />
-      </InsteadOfWallet>
-    );
+  if (locked) return <KeyRecoveryScreen />;
+  if (error && !isReady) return <KeyRecoveryScreen locked={false} />;
   if (hydration === 'loading') return null;
   if (hydration === 'error') {
     return (

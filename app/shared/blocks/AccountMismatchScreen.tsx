@@ -7,6 +7,7 @@ import { legalDocuments } from '@/shared/lib/legal/legalDocuments';
 import { dismissIntegrityFailure } from '@/shared/lib/nostr/accountIntegrity';
 import type { AccountIntegrityResult } from '@/shared/lib/nostr/derivationIntegrity';
 import { openMnemonicRecovery } from '@/shared/lib/profile/keyRecovery';
+import { useShownInsteadOfWallet } from '@/shared/lib/qrButtonAnchor';
 import { switchToExistingProfile } from '@/shared/lib/profile/profileSessionOrchestrator';
 import { useProfileStore, type ProfileEntry } from '@/shared/stores/global/profileStore';
 import { Screen } from '@/shared/ui/composed/Screen';
@@ -44,6 +45,8 @@ export function AccountMismatchScreen({
   const [copied, setCopied] = useState(false);
   const [switchFailed, setSwitchFailed] = useState(false);
   const [switching, setSwitching] = useState(false);
+  // A stopped account is shown in place of the app, so the boot splash must not wait for the wallet home.
+  useShownInsteadOfWallet(stopped);
   const code = failure.diagnosticCode ?? '';
 
   if (showRecovery) return <SettingsProfileRecoveryScreen onBack={() => setShowRecovery(false)} />;

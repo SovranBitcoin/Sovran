@@ -5,7 +5,7 @@
     {
       "name": "the Terms are shown first",
       "expect": [{ "page": "LegalDocumentScreen" }, { "visible": { "id": "terms-acceptance" } }],
-      "withinMs": 15000
+      "withinMs": 7000
     },
     {
       "name": "agree to the Terms",

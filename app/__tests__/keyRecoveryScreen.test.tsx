@@ -6,6 +6,7 @@ import { KeyRecoveryScreen } from '@/shared/blocks/KeyRecoveryScreen';
 import { useSecureStoreState } from '@/shared/stores/runtime/secureStoreState';
 import { restartApp } from '@/shared/lib/profile/appRestart';
 import { openMnemonicRecovery, openNsecRecovery } from '@/shared/lib/profile/keyRecovery';
+import { usePageInsteadOfWallet } from '@/shared/lib/qrButtonAnchor';
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 let mockSource = 'derived';
@@ -118,3 +119,26 @@ it.each(['derived', 'imported'])(
     expect(source === 'derived' ? openNsecRecovery : openMnemonicRecovery).not.toHaveBeenCalled();
   }
 );
+
+// The boot splash waits for the wallet home unless told a page stands in its place.
+it('says it is shown in place of the app for as long as it is up', async () => {
+  let said = false;
+  const Probe = () => {
+    said = usePageInsteadOfWallet();
+    return null;
+  };
+  await act(async () => {
+    tree = TestRenderer.create(
+      <>
+        <KeyRecoveryScreen />
+        <Probe />
+      </>
+    );
+  });
+  expect(said).toBe(true);
+
+  await act(async () => {
+    tree.update(<Probe />);
+  });
+  expect(said).toBe(false);
+});
