@@ -154,6 +154,9 @@
           "visible": {
             "id": "design-system-flow-send"
           }
+        },
+        {
+          "logged": "ui.touch"
         }
       ],
       "withinMs": 10000
@@ -182,6 +185,11 @@
           "visible": {
             "id": "design-system-variations-row"
           }
+        },
+        {
+          "visible": {
+            "id": "design-system-prompts-row"
+          }
         }
       ],
       "withinMs": 10000
@@ -209,6 +217,11 @@
         {
           "visible": {
             "id": "design-system-prompts-row"
+          }
+        },
+        {
+          "visible": {
+            "id": "design-system-flow-send"
           }
         }
       ],
@@ -241,6 +254,11 @@
         },
         {
           "logged": "ui.touch"
+        },
+        {
+          "visible": {
+            "id": "design-system-flow-receive"
+          }
         }
       ],
       "withinMs": 10000
@@ -272,6 +290,11 @@
         },
         {
           "logged": "ui.touch"
+        },
+        {
+          "visible": {
+            "id": "design-system-flow-transactions"
+          }
         }
       ],
       "withinMs": 10000

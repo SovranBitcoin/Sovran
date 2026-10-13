@@ -154,6 +154,9 @@
           "visible": {
             "id": "design-system-flow-send"
           }
+        },
+        {
+          "logged": "ui.touch"
         }
       ],
       "withinMs": 10000
@@ -204,6 +207,11 @@
           "visible": {
             "id": "design-system-family-headers"
           }
+        },
+        {
+          "visible": {
+            "id": "design-system-family-foundations"
+          }
         }
       ],
       "withinMs": 10000
@@ -231,6 +239,11 @@
         {
           "visible": {
             "id": "design-system-family-foundations"
+          }
+        },
+        {
+          "visible": {
+            "id": "design-system-family-loading-indicator"
           }
         }
       ],
@@ -260,6 +273,11 @@
           "visible": {
             "id": "design-system-family-loading-indicator"
           }
+        },
+        {
+          "visible": {
+            "id": "design-system-family-wallet-controls"
+          }
         }
       ],
       "withinMs": 10000
@@ -287,6 +305,11 @@
         {
           "visible": {
             "id": "design-system-family-wallet-controls"
+          }
+        },
+        {
+          "visible": {
+            "id": "design-system-family-segmented-progress"
           }
         }
       ],
@@ -316,6 +339,11 @@
           "visible": {
             "id": "design-system-family-segmented-progress"
           }
+        },
+        {
+          "visible": {
+            "id": "design-system-family-timeline"
+          }
         }
       ],
       "withinMs": 10000
@@ -343,6 +371,11 @@
         {
           "visible": {
             "id": "design-system-family-timeline"
+          }
+        },
+        {
+          "visible": {
+            "id": "design-system-family-empty-states"
           }
         }
       ],
