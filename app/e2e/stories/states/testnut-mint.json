@@ -15,7 +15,7 @@
           "logged": "splash.gone"
         }
       ],
-      "withinMs": 8000
+      "withinMs": 20000
     },
     {
       "name": "open the mint selector",

@@ -126,7 +126,7 @@
           "id": "settings-terms-row"
         },
         "direction": "up",
-        "distance": 0.5
+        "distance": 0.8
       },
       "expect": [
         {

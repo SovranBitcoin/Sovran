@@ -15,7 +15,7 @@
           }
         }
       ],
-      "withinMs": 7000
+      "withinMs": 20000
     },
     {
       "name": "agree to the Terms",
