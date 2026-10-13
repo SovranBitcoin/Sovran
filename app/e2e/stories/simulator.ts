@@ -33,7 +33,7 @@ const LIFT_AGAIN_AFTER_MS = 30;
  * How long a key is held, and the gap before the next. At 12 ms the second of
  * two identical letters was sometimes lost ("htps://"); 30 ms has not lost one.
  */
-const KEY_HOLD_MS = 30;
+const KEY_HOLD_MS = 40;
 /** How long a finger rests for a tap. Shorter than a long press, longer than a frame. */
 const TAP_HOLD_MS = 40;
 

@@ -136,7 +136,7 @@
       ]
     },
     {
-      "name": "choose the test mint",
+      "name": "choose the test mint, and let the wallet settle on an account",
       "tap": {
         "id": "contact-row:mint:https://testnut.cashu.space"
       },
@@ -155,8 +155,15 @@
           "gone": {
             "id": "screen-mint-list"
           }
+        },
+        {
+          "logged": "store.mint.set_active_unit",
+          "with": {
+            "to": "tusd"
+          }
         }
-      ]
+      ],
+      "withinMs": 10000
     },
     {
       "name": "swipe the balance across to the test bitcoin account",
