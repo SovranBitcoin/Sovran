@@ -11,6 +11,8 @@ import type { Expectation, Step, Story } from './story';
 
 type Element = AppScreen['elements'][number];
 
+/** A control that is about to be tapped and is not there is looked for again for this long. */
+const APPEARS_WITHIN_MS = 2500;
 /** A touch that was taken shows, in the app's log or on the screen, within this long. */
 const TOUCH_SHOWS_WITHIN_MS = 700;
 /**
@@ -220,8 +222,19 @@ async function playStep(
       // A page that began to slide after the last step ended is still moving
       // under the finger; a tap then lands on nothing, or on what was there before.
       await pixels?.pixelsStill();
-      const screen = await readScreen();
-      const inApp = find(step.tap, screen);
+      let screen = await readScreen();
+      let inApp = find(step.tap, screen);
+      // A control can be out of the app's tree for a moment while its page
+      // draws again. Looking again touches nothing; it is only "not there"
+      // once a short while has passed without it.
+      for (
+        const lookedFrom = performance.now();
+        !inApp && !('label' in step.tap) && performance.now() - lookedFrom < APPEARS_WITHIN_MS;
+      ) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        screen = await readScreen();
+        inApp = find(step.tap, screen);
+      }
       // What iOS draws itself (a menu, an alert) is not in the app's map; the
       // simulator knows it by its label, at most of a second per look.
       type Placed = { x: number; y: number; width: number; height: number } | null;

@@ -1,0 +1,59 @@
+{
+  "id": "a-bitcoin-address-is-recognised",
+  "purpose": "A person types a bitcoin address into Send and the wallet offers to send on-chain.",
+  "startsFrom": "onboarded",
+  "steps": [
+    {
+      "name": "the wallet opens",
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-send"
+          }
+        },
+        {
+          "logged": "splash.gone"
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "open Send",
+      "tap": {
+        "id": "wallet-send"
+      },
+      "expect": [
+        {
+          "page": "SendScreen"
+        },
+        {
+          "visible": {
+            "id": "send-method-createEcash"
+          }
+        }
+      ]
+    },
+    {
+      "name": "type a bitcoin address",
+      "type": {
+        "into": {
+          "id": "send-destination-input"
+        },
+        "text": "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "send-detected-onchain"
+          }
+        },
+        {
+          "visible": {
+            "label": "Send onchain"
+          }
+        }
+      ],
+      "withinMs": 20000
+    }
+  ]
+}

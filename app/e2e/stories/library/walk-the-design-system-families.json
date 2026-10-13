@@ -1,0 +1,363 @@
+{
+  "id": "walk-the-design-system-families",
+  "purpose": "A person opens each family of components in the design system in turn and comes back to the list.",
+  "startsFrom": "onboarded",
+  "steps": [
+    {
+      "name": "the wallet opens",
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-send"
+          }
+        },
+        {
+          "logged": "splash.gone"
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "open the drawer",
+      "tap": {
+        "id": "header-profile-avatar"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "drawer-menu-settings"
+          }
+        }
+      ]
+    },
+    {
+      "name": "open Settings",
+      "tap": {
+        "id": "drawer-menu-settings"
+      },
+      "expect": [
+        {
+          "page": "SettingsScreen"
+        },
+        {
+          "visible": {
+            "id": "settings-profile-row"
+          }
+        }
+      ]
+    },
+    {
+      "name": "scroll down to the end",
+      "swipe": {
+        "on": {
+          "id": "settings-network-row"
+        },
+        "direction": "up",
+        "distance": 0.45
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "settings-version-row"
+          }
+        }
+      ]
+    },
+    {
+      "name": "press the version, once",
+      "tap": {
+        "id": "settings-version-row"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "settings-terms-row"
+          }
+        }
+      ]
+    },
+    {
+      "name": "press the version, twice",
+      "tap": {
+        "id": "settings-version-row"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "settings-terms-row"
+          }
+        }
+      ]
+    },
+    {
+      "name": "press the version, three times",
+      "tap": {
+        "id": "settings-version-row"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "settings-terms-row"
+          }
+        }
+      ]
+    },
+    {
+      "name": "scroll to the developer rows",
+      "swipe": {
+        "on": {
+          "id": "settings-terms-row"
+        },
+        "direction": "up",
+        "distance": 0.5
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "settings-design-system-row"
+          }
+        }
+      ]
+    },
+    {
+      "name": "open the design system",
+      "tap": {
+        "id": "settings-design-system-row"
+      },
+      "expect": [
+        {
+          "page": "SettingsDesignSystemScreen"
+        },
+        {
+          "visible": {
+            "id": "design-system-screens-row"
+          }
+        },
+        {
+          "visible": {
+            "id": "design-system-flow-send"
+          }
+        }
+      ],
+      "withinMs": 10000
+    },
+    {
+      "name": "scroll the design system",
+      "swipe": {
+        "on": {
+          "id": "design-system-flow-send"
+        },
+        "direction": "up",
+        "distance": 0.38
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "design-system-family-headers"
+          }
+        },
+        {
+          "visible": {
+            "id": "design-system-family-timeline"
+          }
+        }
+      ]
+    },
+    {
+      "name": "open headers",
+      "tap": {
+        "id": "design-system-family-headers"
+      },
+      "expect": [
+        {
+          "gone": {
+            "id": "design-system-family-headers"
+          }
+        }
+      ],
+      "withinMs": 10000
+    },
+    {
+      "name": "back from headers",
+      "tap": {
+        "id": "flow-header-back"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "design-system-family-headers"
+          }
+        }
+      ],
+      "withinMs": 10000
+    },
+    {
+      "name": "open foundations",
+      "tap": {
+        "id": "design-system-family-foundations"
+      },
+      "expect": [
+        {
+          "gone": {
+            "id": "design-system-family-foundations"
+          }
+        }
+      ],
+      "withinMs": 10000
+    },
+    {
+      "name": "back from foundations",
+      "tap": {
+        "id": "flow-header-back"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "design-system-family-foundations"
+          }
+        }
+      ],
+      "withinMs": 10000
+    },
+    {
+      "name": "open loading indicator",
+      "tap": {
+        "id": "design-system-family-loading-indicator"
+      },
+      "expect": [
+        {
+          "gone": {
+            "id": "design-system-family-loading-indicator"
+          }
+        }
+      ],
+      "withinMs": 10000
+    },
+    {
+      "name": "back from loading indicator",
+      "tap": {
+        "id": "flow-header-back"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "design-system-family-loading-indicator"
+          }
+        }
+      ],
+      "withinMs": 10000
+    },
+    {
+      "name": "open wallet controls",
+      "tap": {
+        "id": "design-system-family-wallet-controls"
+      },
+      "expect": [
+        {
+          "gone": {
+            "id": "design-system-family-wallet-controls"
+          }
+        }
+      ],
+      "withinMs": 10000
+    },
+    {
+      "name": "back from wallet controls",
+      "tap": {
+        "id": "flow-header-back"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "design-system-family-wallet-controls"
+          }
+        }
+      ],
+      "withinMs": 10000
+    },
+    {
+      "name": "open segmented progress",
+      "tap": {
+        "id": "design-system-family-segmented-progress"
+      },
+      "expect": [
+        {
+          "gone": {
+            "id": "design-system-family-segmented-progress"
+          }
+        }
+      ],
+      "withinMs": 10000
+    },
+    {
+      "name": "back from segmented progress",
+      "tap": {
+        "id": "flow-header-back"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "design-system-family-segmented-progress"
+          }
+        }
+      ],
+      "withinMs": 10000
+    },
+    {
+      "name": "open timeline",
+      "tap": {
+        "id": "design-system-family-timeline"
+      },
+      "expect": [
+        {
+          "gone": {
+            "id": "design-system-family-timeline"
+          }
+        }
+      ],
+      "withinMs": 10000
+    },
+    {
+      "name": "back from timeline",
+      "tap": {
+        "id": "flow-header-back"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "design-system-family-timeline"
+          }
+        }
+      ],
+      "withinMs": 10000
+    },
+    {
+      "name": "open empty states",
+      "tap": {
+        "id": "design-system-family-empty-states"
+      },
+      "expect": [
+        {
+          "gone": {
+            "id": "design-system-family-empty-states"
+          }
+        }
+      ],
+      "withinMs": 10000
+    },
+    {
+      "name": "back from empty states",
+      "tap": {
+        "id": "flow-header-back"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "design-system-family-empty-states"
+          }
+        }
+      ],
+      "withinMs": 10000
+    }
+  ]
+}

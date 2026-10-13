@@ -1,0 +1,101 @@
+{
+  "id": "pick-the-notes-to-send",
+  "purpose": "A person about to send ecash opens Pick notes, sees the notes their wallet holds, chooses a 16 sat one, and the amount becomes 16 sats.",
+  "startsFrom": "copy-a-token-and-redeem-it",
+  "steps": [
+    {
+      "name": "the wallet opens",
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-send"
+          }
+        },
+        {
+          "logged": "splash.gone"
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "open Send",
+      "tap": {
+        "id": "wallet-send"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "send-method-createEcash"
+          }
+        }
+      ]
+    },
+    {
+      "name": "create ecash",
+      "tap": {
+        "id": "send-method-createEcash"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "keypad-key-5"
+          }
+        }
+      ]
+    },
+    {
+      "name": "open Pick notes",
+      "tap": {
+        "id": "amount-pick-notes"
+      },
+      "expect": [
+        {
+          "page": "NotePickerScreen"
+        },
+        {
+          "visible": {
+            "id": "note-add-button-16"
+          }
+        },
+        {
+          "visible": {
+            "id": "note-picker-use"
+          }
+        }
+      ],
+      "withinMs": 10000
+    },
+    {
+      "name": "add a 16 sat note",
+      "tap": {
+        "id": "note-add-button-16"
+      },
+      "expect": [
+        {
+          "visible": {
+            "label": "1 of 6 notes"
+          }
+        }
+      ]
+    },
+    {
+      "name": "use that amount",
+      "tap": {
+        "id": "note-picker-use"
+      },
+      "expect": [
+        {
+          "visible": {
+            "label": "Amount 16 sat"
+          }
+        },
+        {
+          "gone": {
+            "id": "note-picker-use"
+          }
+        }
+      ],
+      "withinMs": 10000
+    }
+  ]
+}
