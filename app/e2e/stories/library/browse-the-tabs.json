@@ -33,7 +33,8 @@
             "id": "wallet-send"
           }
         }
-      ]
+      ],
+      "withinMs": 10000
     },
     {
       "name": "go to contacts",

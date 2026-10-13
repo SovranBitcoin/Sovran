@@ -28,6 +28,7 @@ const SETTINGS_SERVICE = 'com.apple.cfprefsd.xpc.daemon';
 const SWIPE_FRAMES = 15;
 const FRAME_MS = 16;
 const SWIPE_REST_MS = 120;
+const LIFT_AGAIN_AFTER_MS = 30;
 /**
  * How long a key is held, and the gap before the next. At 12 ms the second of
  * two identical letters was sometimes lost ("htps://"); 30 ms has not lost one.
@@ -87,6 +88,17 @@ export function storySimulator(udid: string): StorySimulator {
   const addon = resolveServeSimNativeAddon();
   const native = createRequire(import.meta.url)(addon) as Native;
   const hid = new native.SimHID(udid);
+  /**
+   * Lift the finger, and say so again a moment later. With four simulators
+   * running, the lift was once lost: the app saw the touch begin on a tab and
+   * never end, and the tab bar sat there half pressed. Lifting a finger that
+   * is already up does nothing.
+   */
+  const lift = async (x: number, y: number) => {
+    hid.touch('end', x, y, 1, 1, 0);
+    await new Promise((resolve) => setTimeout(resolve, LIFT_AGAIN_AFTER_MS));
+    hid.touch('end', x, y, 1, 1, 0);
+  };
   /** Run one of `simctl`'s own commands on this simulator; false when it fails. */
   const inSimulatorTool = (command: string, ...rest: string[]) => {
     try {
@@ -190,7 +202,15 @@ export function storySimulator(udid: string): StorySimulator {
       return watchScreenFrames(udid, addon, onChange);
     },
     async systemControls() {
-      const [window] = JSON.parse(await native.axDescribe(udid)) as SystemElement[];
+      let described: string;
+      try {
+        described = await native.axDescribe(udid);
+      } catch {
+        // Just after a simulator boots, iOS can answer that no app is in front
+        // while one plainly is. Nothing is known yet; the caller looks again.
+        return [];
+      }
+      const [window] = JSON.parse(described) as SystemElement[];
       if (!window) return [];
       const found: SystemControl[] = [];
       const queue = [...(window.children ?? [])];
@@ -243,13 +263,13 @@ export function storySimulator(udid: string): StorySimulator {
       // The finger rests before it lifts, so the page stops where it was dragged
       // to instead of coasting on, and the next tap is not spent stopping it.
       await new Promise((resolve) => setTimeout(resolve, SWIPE_REST_MS));
-      hid.touch('end', to[0], to[1], 1, 1, 0);
+      await lift(to[0], to[1]);
     },
     async tap(x, y) {
       // The addon scales by the size it is given; fractions in, so a unit square.
       hid.touch('begin', x, y, 1, 1, 0);
       await new Promise((resolve) => setTimeout(resolve, TAP_HOLD_MS));
-      hid.touch('end', x, y, 1, 1, 0);
+      await lift(x, y);
     },
   };
 }
