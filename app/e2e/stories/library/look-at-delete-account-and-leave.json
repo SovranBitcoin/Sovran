@@ -47,13 +47,30 @@
       ]
     },
     {
-      "name": "scroll down to the end",
+      "name": "scroll down",
       "swipe": {
         "on": {
           "id": "settings-network-row"
         },
         "direction": "up",
         "distance": 0.6
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "settings-terms-row"
+          }
+        }
+      ]
+    },
+    {
+      "name": "scroll to the very end",
+      "swipe": {
+        "on": {
+          "id": "settings-terms-row"
+        },
+        "direction": "up",
+        "distance": 0.3
       },
       "expect": [
         {

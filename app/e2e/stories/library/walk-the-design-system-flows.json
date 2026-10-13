@@ -47,13 +47,30 @@
       ]
     },
     {
-      "name": "scroll down to the end",
+      "name": "scroll down",
       "swipe": {
         "on": {
           "id": "settings-network-row"
         },
         "direction": "up",
         "distance": 0.6
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "settings-terms-row"
+          }
+        }
+      ]
+    },
+    {
+      "name": "scroll to the very end",
+      "swipe": {
+        "on": {
+          "id": "settings-terms-row"
+        },
+        "direction": "up",
+        "distance": 0.3
       },
       "expect": [
         {
@@ -221,6 +238,9 @@
           "visible": {
             "id": "design-system-flow-send"
           }
+        },
+        {
+          "logged": "ui.touch"
         }
       ],
       "withinMs": 10000
@@ -249,6 +269,9 @@
           "visible": {
             "id": "design-system-flow-receive"
           }
+        },
+        {
+          "logged": "ui.touch"
         }
       ],
       "withinMs": 10000
@@ -277,6 +300,9 @@
           "visible": {
             "id": "design-system-flow-transactions"
           }
+        },
+        {
+          "logged": "ui.touch"
         }
       ],
       "withinMs": 10000
