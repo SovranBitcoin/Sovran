@@ -1,0 +1,150 @@
+{
+  "id": "the-person-i-pay-pays-me-back",
+  "purpose": "A person pays 5 sats of ecash to someone by their public key, who then sends 16 sats back by message, and the wallet takes it in: 111 sats.",
+  "startsFrom": "receive-100-sats-on-the-private-mint",
+  "steps": [
+    {
+      "name": "the wallet opens with 100 sats",
+      "expect": [
+        {
+          "visible": {
+            "label": "Balance, 100 BTC"
+          }
+        },
+        {
+          "logged": "splash.gone"
+        }
+      ],
+      "withinMs": 20000
+    },
+    {
+      "name": "open Send",
+      "tap": {
+        "id": "wallet-send"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "send-destination-input"
+          }
+        }
+      ]
+    },
+    {
+      "name": "type their public key",
+      "type": {
+        "into": {
+          "id": "send-destination-input"
+        },
+        "text": "{{person}}"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "send-detected-person"
+          }
+        }
+      ],
+      "withinMs": 30000
+    },
+    {
+      "name": "choose to pay them",
+      "tap": {
+        "id": "send-detected-person"
+      },
+      "expect": [
+        {
+          "page": "AmountFlowScreen"
+        },
+        {
+          "visible": {
+            "id": "keypad-key-5"
+          }
+        }
+      ],
+      "withinMs": 15000
+    },
+    {
+      "name": "press 5",
+      "tap": {
+        "id": "keypad-key-5"
+      },
+      "expect": [
+        {
+          "visible": {
+            "label": "Amount 5 sat"
+          }
+        }
+      ]
+    },
+    {
+      "name": "press Next",
+      "tap": {
+        "id": "amount-next"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "amount-next-menu-ecash"
+          }
+        }
+      ],
+      "withinMs": 10000
+    },
+    {
+      "name": "choose ecash, and be asked about locking it",
+      "tap": {
+        "id": "amount-next-menu-ecash"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "send-lock-off"
+          }
+        },
+        {
+          "visible": {
+            "id": "send-lock-forever"
+          }
+        }
+      ],
+      "withinMs": 10000
+    },
+    {
+      "name": "do not lock it, and it is sent to them",
+      "tap": {
+        "id": "send-lock-off"
+      },
+      "expect": [
+        {
+          "logged": "contact_send.delivery.sent"
+        },
+        {
+          "visible": {
+            "id": "wallet-send"
+          }
+        }
+      ],
+      "withinMs": 40000
+    },
+    {
+      "name": "they send 16 sats back, and the wallet takes it in",
+      "handed": {
+        "paidBack": {
+          "sats": 16
+        }
+      },
+      "expect": [
+        {
+          "logged": "payment.dm_ecash.queued"
+        },
+        {
+          "visible": {
+            "label": "Balance, 111 BTC"
+          }
+        }
+      ],
+      "withinMs": 120000
+    }
+  ]
+}

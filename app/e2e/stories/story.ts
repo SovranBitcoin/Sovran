@@ -60,12 +60,19 @@ const stepSchema = z
      * `lockTo` names one (which may be something remembered).
      */
     handed: z
-      .strictObject({
-        token: z.strictObject({
-          sats: z.number().int().min(1).max(100_000),
-          lockTo: z.string().min(1).optional(),
+      .union([
+        z.strictObject({
+          token: z.strictObject({
+            sats: z.number().int().min(1).max(100_000),
+            lockTo: z.string().min(1).optional(),
+          }),
         }),
-      })
+        // The other person (`{{person}}`), once the story has paid them, pays
+        // this many sats back by message, as the app itself sends ecash to a person.
+        z.strictObject({
+          paidBack: z.strictObject({ sats: z.number().int().min(1).max(100_000) }),
+        }),
+      ])
       .optional(),
     /**
      * Open a link, as tapping one in another app would: `cashu:`, `lightning:`,

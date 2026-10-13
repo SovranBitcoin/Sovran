@@ -24,6 +24,7 @@ import {
   startPrivateMints,
 } from './privateMint';
 import { tokenFromMint } from './secondWallet';
+import { makePerson } from './person';
 import { storySimulator } from './simulator';
 import { madeFrom, reachState } from './states';
 import { storySchema, type Story } from './story';
@@ -66,7 +67,12 @@ const spentOn = (what: string) => {
  * Play a story from the state the app is in now, leaving its video, a picture
  * of every step and a report in `outDir`. Returns whether it passed.
  */
-const play = async (story: Story, outDir: string, look: boolean): Promise<boolean> => {
+const play = async (
+  story: Story,
+  outDir: string,
+  look: boolean,
+  person: ReturnType<typeof makePerson>
+): Promise<boolean> => {
   rmSync(outDir, { recursive: true, force: true });
   mkdirSync(outDir, { recursive: true });
   const rawVideo = join(outDir, 'raw.mp4');
@@ -97,16 +103,15 @@ const play = async (story: Story, outDir: string, look: boolean): Promise<boolea
         if (await watching.picture(join(outDir, file))) pictures[index] = file;
       },
       // Whoever hands the person ecash holds it on the simulator's first mint.
-      async ({ token }) => {
+      async (what): Promise<Record<string, string>> => {
         const [mint] = privateMintAddresses(udid);
-        return {
-          token: await tokenFromMint(
-            `http://127.0.0.1:${mint.port}`,
-            mint.url,
-            token.sats,
-            token.lockTo
-          ),
-        };
+        const token = (sats: number, lockTo?: string) =>
+          tokenFromMint(`http://127.0.0.1:${mint.port}`, mint.url, sats, lockTo);
+        if ('token' in what) return { token: await token(what.token.sats, what.token.lockTo) };
+        // Who paid them is read from the message that reached them; they answer it.
+        const { from } = await person.received(60_000);
+        await person.send(from, await token(what.paidBack.sats));
+        return {};
       }
     );
     spentOn('steps');
@@ -189,17 +194,20 @@ const play = async (story: Story, outDir: string, look: boolean): Promise<boolea
  * the folder can be saved or put back again.
  */
 const playWithMint = async (story: Story, outDir: string, look: boolean) => {
-  // A story that neither names a mint of its own nor starts from one waits on none.
+  // Someone else for the story to pay, with a key made for this play alone.
+  const person = makePerson();
   const usesMint = /\{\{mint|"handed"/.test(JSON.stringify(story));
-  if (!usesMint && !holdsPrivateMints(simulator.mintFolder())) {
-    return play(await withGiven(story), outDir, look);
-  }
-  const stopMint = await startPrivateMints(udid, simulator.mintFolder());
+  // A story that neither names a mint of its own nor starts from one waits on none.
+  const stopMint =
+    usesMint || holdsPrivateMints(simulator.mintFolder())
+      ? await startPrivateMints(udid, simulator.mintFolder())
+      : () => {};
   try {
     const [mint, mint2] = privateMintAddresses(udid);
-    const ready = await withGiven(story, { mint: mint.url, mint2: mint2.url });
-    return await play(ready, outDir, look);
+    const ready = await withGiven(story, { mint: mint.url, mint2: mint2.url, person: person.npub });
+    return await play(ready, outDir, look, person);
   } finally {
+    person.leave();
     stopMint();
   }
 };

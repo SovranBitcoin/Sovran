@@ -332,10 +332,12 @@ async function playStep(
     }
     if (step.handed) {
       if (!hand) return finish('Nothing here can hand the person anything.');
-      const lockTo = step.handed.token.lockTo;
-      const made = await hand({
-        token: { sats: step.handed.token.sats, ...(lockTo ? { lockTo: recall(lockTo) } : {}) },
-      });
+      const lockTo = 'token' in step.handed ? step.handed.token.lockTo : undefined;
+      const made = await hand(
+        'token' in step.handed && lockTo
+          ? { token: { sats: step.handed.token.sats, lockTo: recall(lockTo) } }
+          : step.handed
+      );
       for (const [name, value] of Object.entries(made)) remembered.set(name, value);
     }
     if (step.open) {
