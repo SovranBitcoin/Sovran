@@ -151,10 +151,10 @@ export const storySchema = z.strictObject({
           sats: z.number().int().min(1),
           /**
            * What a pretend mint that pays it reports: the payment `pending`
-           * and never settling. Only a `local` invoice can say so, and only
+           * and never settling, or `failed` after the mint took it. Only a `local` invoice can say so, and only
            * the run's own mints listen.
            */
-          paying: z.literal('pending').optional(),
+          paying: z.enum(['pending', 'failed']).optional(),
         })
         .optional(),
     })

@@ -1,0 +1,160 @@
+{
+  "id": "a-lightning-payment-the-mint-could-not-make",
+  "purpose": "A person pays a Lightning invoice, the mint takes the payment and then reports that it failed, and the wallet gives the sats back.",
+  "startsFrom": "receive-100-sats-on-the-private-mint",
+  "given": {
+    "invoice": {
+      "mint": "local",
+      "sats": 10,
+      "paying": "failed"
+    }
+  },
+  "steps": [
+    {
+      "name": "the wallet opens with 100 sats",
+      "expect": [
+        {
+          "visible": {
+            "label": "Balance, 100 BTC"
+          }
+        },
+        {
+          "logged": "splash.gone"
+        }
+      ],
+      "withinMs": 20000
+    },
+    {
+      "name": "open Send",
+      "tap": {
+        "id": "wallet-send"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "send-destination-input"
+          }
+        }
+      ]
+    },
+    {
+      "name": "enter the invoice",
+      "type": {
+        "into": {
+          "id": "send-destination-input"
+        },
+        "text": "{{invoice}}"
+      },
+      "expect": [
+        {
+          "visible": {
+            "label": "Pay 10 sats"
+          }
+        }
+      ],
+      "withinMs": 90000
+    },
+    {
+      "name": "choose to pay it",
+      "tap": {
+        "id": "send-detected-lightningInvoice"
+      },
+      "expect": [
+        {
+          "page": "LightningSendScreen"
+        },
+        {
+          "visible": {
+            "id": "melt-pay"
+          }
+        }
+      ],
+      "withinMs": 15000
+    },
+    {
+      "name": "pay, and the mint reports it failed",
+      "tap": {
+        "id": "melt-pay"
+      },
+      "expect": [
+        {
+          "logged": "hook.payment_status.melt_failed"
+        },
+        {
+          "logged": "coco.manager.MeltOperationService.melt_operation_rolled_back"
+        },
+        {
+          "visible": {
+            "label": "Outgoing 10 sat transaction, rolledBack"
+          }
+        },
+        {
+          "gone": {
+            "id": "melt-pay"
+          }
+        },
+        {
+          "logged": "ui.touch"
+        }
+      ],
+      "withinMs": 30000
+    },
+    {
+      "name": "the notice over the header goes",
+      "expect": [
+        {
+          "gone": {
+            "id": "payment-status-toast"
+          }
+        },
+        {
+          "visible": {
+            "id": "melt-details"
+          }
+        }
+      ],
+      "withinMs": 20000
+    },
+    {
+      "name": "go back to Send",
+      "tap": {
+        "id": "flow-header-back"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "send-destination-input"
+          }
+        },
+        {
+          "gone": {
+            "id": "melt-details"
+          }
+        },
+        {
+          "logged": "ui.touch"
+        }
+      ],
+      "withinMs": 10000
+    },
+    {
+      "name": "close Send, and the 100 sats are still there",
+      "tap": {
+        "id": "flow-header-close"
+      },
+      "expect": [
+        {
+          "visible": {
+            "label": "Balance, 100 BTC"
+          }
+        },
+        {
+          "gone": {
+            "id": "send-destination-input"
+          }
+        }
+      ],
+      "withinMs": 10000
+    }
+  ]
+}

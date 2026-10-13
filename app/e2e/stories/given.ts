@@ -23,7 +23,11 @@ interface MintQuote {
  * what a story about paying needs. (The public test mint marks its own
  * invoices paid at once, so paying one of those is refused as already paid.)
  */
-async function invoiceFrom(mint: string, sats: number, paying?: 'pending'): Promise<string> {
+async function invoiceFrom(
+  mint: string,
+  sats: number,
+  paying?: 'pending' | 'failed'
+): Promise<string> {
   if (mint !== LOCAL) return invoiceFromMint(mint, sats);
   const dir = mkdtempSync(join(tmpdir(), 'sovran-e2e-invoice-'));
   // A port of this process's own, so runners side by side do not collide.
@@ -40,14 +44,14 @@ async function invoiceFrom(mint: string, sats: number, paying?: 'pending'): Prom
  * What the pretend Lightning of `cdk-mintd` reads from an invoice's
  * description when asked to pay it: the outcome to report.
  */
-const PAYING = {
-  pending: JSON.stringify({
-    pay_invoice_state: 'PENDING',
-    check_payment_state: 'PENDING',
+const reports = (state: string) =>
+  JSON.stringify({
+    pay_invoice_state: state,
+    check_payment_state: state,
     pay_err: false,
     check_err: false,
-  }),
-};
+  });
+const PAYING = { pending: reports('PENDING'), failed: reports('FAILED') };
 
 async function invoiceFromMint(mint: string, sats: number, description?: string): Promise<string> {
   // eslint-disable-next-line no-restricted-globals -- the runner asking a test mint, outside the app
@@ -72,7 +76,11 @@ async function invoiceFromMint(mint: string, sats: number, description?: string)
 export async function withGiven(
   story: Story,
   known: Record<string, string> = {},
-  fetchInvoice: (mint: string, sats: number, paying?: 'pending') => Promise<string> = invoiceFrom
+  fetchInvoice: (
+    mint: string,
+    sats: number,
+    paying?: 'pending' | 'failed'
+  ) => Promise<string> = invoiceFrom
 ): Promise<Story> {
   const given: Record<string, string> = { ...known };
   if (story.given?.invoice)
