@@ -82,6 +82,9 @@
           "visible": {
             "id": "drawer-profile-switcher-open"
           }
+        },
+        {
+          "logged": "ui.touch"
         }
       ],
       "withinMs": 10000
