@@ -1,0 +1,139 @@
+{
+  "id": "send-on-chain-from-the-private-mint",
+  "purpose": "Someone pays a Bitcoin address from their ecash, and the wallet says the payment was sent.",
+  "startsFrom": "receive-100-sats-on-the-private-mint",
+  "steps": [
+    {
+      "name": "the wallet opens with 100 sats",
+      "expect": [
+        {
+          "visible": {
+            "label": "Balance, 100 BTC"
+          }
+        },
+        {
+          "logged": "splash.gone"
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "open Send",
+      "tap": {
+        "id": "wallet-send"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "send-destination-input"
+          }
+        }
+      ]
+    },
+    {
+      "name": "type a bitcoin address",
+      "type": {
+        "into": {
+          "id": "send-destination-input"
+        },
+        "text": "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "send-detected-onchain"
+          }
+        }
+      ],
+      "withinMs": 20000
+    },
+    {
+      "name": "choose on-chain",
+      "tap": {
+        "id": "send-detected-onchain"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "keypad-key-2"
+          }
+        }
+      ],
+      "withinMs": 15000
+    },
+    {
+      "name": "press 2",
+      "tap": {
+        "id": "keypad-key-2"
+      },
+      "expect": [
+        {
+          "visible": {
+            "label": "Amount 2 sat"
+          }
+        }
+      ]
+    },
+    {
+      "name": "press 1",
+      "tap": {
+        "id": "keypad-key-1"
+      },
+      "expect": [
+        {
+          "visible": {
+            "label": "Amount 21 sat"
+          }
+        }
+      ]
+    },
+    {
+      "name": "press Next",
+      "tap": {
+        "id": "amount-next"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "amount-next-menu-onchain"
+          }
+        }
+      ],
+      "withinMs": 15000
+    },
+    {
+      "name": "choose on-chain",
+      "tap": {
+        "id": "amount-next-menu-onchain"
+      },
+      "expect": [
+        {
+          "page": "OnchainSendScreen"
+        },
+        {
+          "visible": {
+            "id": "onchain-send-pay"
+          }
+        }
+      ],
+      "withinMs": 20000
+    },
+    {
+      "name": "pay, and the wallet says it was sent",
+      "tap": {
+        "id": "onchain-send-pay"
+      },
+      "expect": [
+        {
+          "logged": "hook.payment_status.melt_finalized"
+        },
+        {
+          "visible": {
+            "id": "payment-status-melt-confirmed"
+          }
+        }
+      ],
+      "withinMs": 40000
+    }
+  ]
+}

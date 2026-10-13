@@ -1,0 +1,150 @@
+{
+  "id": "private-mint",
+  "purpose": "A person with an empty wallet adds the mint this run started for them, by typing its address, and chooses it as the mint their wallet uses.",
+  "startsFrom": "onboarded",
+  "steps": [
+    {
+      "name": "the wallet opens",
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-mint-selector"
+          }
+        },
+        {
+          "logged": "splash.gone"
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "open the mint selector",
+      "tap": {
+        "id": "wallet-mint-selector"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "mint-select-add"
+          }
+        },
+        {
+          "page": "MintListScreen"
+        }
+      ]
+    },
+    {
+      "name": "add a mint",
+      "tap": {
+        "id": "mint-select-add"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "mint-add-search-toggle"
+          }
+        }
+      ]
+    },
+    {
+      "name": "open search",
+      "tap": {
+        "id": "mint-add-search-toggle"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "mint-add-search-input"
+          }
+        }
+      ]
+    },
+    {
+      "name": "type the private mint's address",
+      "type": {
+        "into": {
+          "id": "mint-add-search-input"
+        },
+        "text": "{{mint}}"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "contact-row:mint:{{mint}}"
+          }
+        }
+      ],
+      "withinMs": 15000
+    },
+    {
+      "name": "pick the mint",
+      "tap": {
+        "id": "contact-row:mint:{{mint}}"
+      },
+      "expect": [
+        {
+          "visible": {
+            "label": "Add (1)"
+          }
+        }
+      ]
+    },
+    {
+      "name": "add it",
+      "tap": {
+        "id": "mint-add-confirm"
+      },
+      "expect": [
+        {
+          "logged": "mint.add.item.added"
+        },
+        {
+          "logged": "mint.add.restore.success"
+        }
+      ],
+      "withinMs": 30000
+    },
+    {
+      "name": "go back to the mints",
+      "tap": {
+        "id": "mint-import-done"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "mint-currency-tab-ALL"
+          }
+        },
+        {
+          "gone": {
+            "id": "mint-import-done"
+          }
+        }
+      ]
+    },
+    {
+      "name": "choose the private mint",
+      "tap": {
+        "id": "contact-row:mint:{{mint}}"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-receive"
+          }
+        },
+        {
+          "gone": {
+            "id": "screen-mint-list"
+          }
+        },
+        {
+          "visible": {
+            "id": "wallet-selected-mint:localhost"
+          }
+        }
+      ],
+      "withinMs": 10000
+    }
+  ]
+}

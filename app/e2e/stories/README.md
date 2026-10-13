@@ -15,25 +15,25 @@ can be another's start. `--look` lists what is on screen when a story ends, whic
 
 ## What has a story
 
-| The app's pages (`app/app`) | Stories |
-| --- | --- |
-| First launch, Terms, Privacy, onboarding | `first-launch-accept-terms`, `states/onboarded`, `open-an-empty-wallet` |
-| Wallet home, account switch, More menu | `browse-the-tabs`, `search-from-the-wallet`, `open-history-from-more`, `states/testnut-mint` |
-| Receive: hub, amount, Lightning, on-chain, payment request, QR, token, scanner | `receive-100-sats-on-testnut`, `ask-for-an-onchain-payment`, `ask-for-ecash-with-a-payment-request`, `show-a-code-to-get-paid`, `copy-a-token-and-redeem-it`, `open-the-scanner` |
-| Send: hub, amount, token, Lightning | `send-40-sats-as-ecash`, `pay-a-lightning-invoice`, `an-invoice-already-paid-is-refused`, `take-back-unclaimed-ecash`, `sending-with-no-money-is-refused`, `a-bitcoin-address-is-recognised`, `start-an-onchain-send`, `pick-the-notes-to-send`, `the-lock-question-when-paying-a-person` |
-| Nut Drop | `open-nut-drop`, `look-for-people-nearby` |
-| Transactions, filters, details | `see-the-payments-in-history`, `filter-the-history` |
-| Mints: list, add, info, reviews, updates, split, rebalance plan | `states/testnut-mint`, `read-about-the-test-mint`, `read-the-reviews-of-a-mint`, `see-how-a-mint-has-changed`, `see-the-balance-split`, `see-the-rebalance-plan` |
-| Map | `find-bitcoin-near-me` |
-| Theme and wallpaper | `preview-the-theme`, `browse-the-wallpaper-gallery`, `apply-a-wallpaper` |
-| Profiles | `add-a-second-profile`, `switch-back-to-the-first-profile`, `start-editing-a-profile-and-leave` |
-| Backup and recovery | `write-down-the-recovery-words`, `back-up-the-wallet-and-pass-the-check`, `find-where-the-recovery-phrase-is-kept`, `look-at-recover-wallet-and-cancel`, `start-a-wallet-recovery`, `recover-a-wallet-from-its-mints` |
-| Settings | `open-settings-and-read-the-terms`, `make-notifications-strict`, `see-where-the-feed-comes-from`, `look-at-swap-routing`, `see-the-keys-ecash-can-be-locked-to`, `look-at-moderation`, `look-at-my-media`, `look-at-delete-account-and-leave`, `delete-the-account-and-start-again` |
-| Developer rows | `turn-on-mock-mode`, `the-app-says-when-it-is-offline`, `look-at-the-storage-inventory`, `open-the-design-system`, `preview-screens-in-the-design-system`, `walk-the-design-system-families`, `walk-the-rest-of-the-design-system`, `walk-the-design-system-flows`, `open-the-sample-mint-and-map-flows` |
-| Feed, composer, a post's thread | `draft-a-post-and-discard-it`, `open-a-posts-thread` (from the design system's sample posts) |
-| Contacts, groups, a person's profile, sharing | `look-at-a-contact`, `look-at-groups`, `show-a-contacts-public-key` |
-| Notifications | `read-the-notification-tabs`, `read-the-app-notifications` |
-| Remote Login | `open-remote-login`, `share-remote-login`, `look-at-remote-login-activity` |
+| The app's pages (`app/app`)                                                    | Stories                                                                                                                                                                                                                                                                                                                          |
+| ------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| First launch, Terms, Privacy, onboarding                                       | `first-launch-accept-terms`, `states/onboarded`, `open-an-empty-wallet`                                                                                                                                                                                                                                                          |
+| Wallet home, account switch, More menu                                         | `browse-the-tabs`, `search-from-the-wallet`, `open-history-from-more`, `states/testnut-mint`                                                                                                                                                                                                                                     |
+| Receive: hub, amount, Lightning, on-chain, payment request, QR, token, scanner | `receive-100-sats-on-testnut`, `receive-100-sats-on-the-private-mint`, `ask-for-an-onchain-payment`, `ask-for-ecash-with-a-payment-request`, `show-a-code-to-get-paid`, `copy-a-token-and-redeem-it`, `open-the-scanner`                                                                                                         |
+| Send: hub, amount, token, Lightning, on-chain                                  | `send-40-sats-as-ecash`, `pay-a-lightning-invoice`, `an-invoice-already-paid-is-refused`, `take-back-unclaimed-ecash`, `sending-with-no-money-is-refused`, `a-bitcoin-address-is-recognised`, `start-an-onchain-send`, `send-on-chain-from-the-private-mint`, `pick-the-notes-to-send`, `the-lock-question-when-paying-a-person` |
+| Nut Drop                                                                       | `open-nut-drop`, `look-for-people-nearby`                                                                                                                                                                                                                                                                                        |
+| Transactions, filters, details                                                 | `see-the-payments-in-history`, `filter-the-history`                                                                                                                                                                                                                                                                              |
+| Mints: list, add, info, reviews, updates, split, rebalance, swap               | `states/testnut-mint`, `states/private-mint`, `move-money-between-two-mints`, `read-about-the-test-mint`, `read-the-reviews-of-a-mint`, `see-how-a-mint-has-changed`, `see-the-balance-split`, `see-the-rebalance-plan`                                                                                                          |
+| Map                                                                            | `find-bitcoin-near-me`                                                                                                                                                                                                                                                                                                           |
+| Theme and wallpaper                                                            | `preview-the-theme`, `browse-the-wallpaper-gallery`, `apply-a-wallpaper`                                                                                                                                                                                                                                                         |
+| Profiles                                                                       | `add-a-second-profile`, `switch-back-to-the-first-profile`, `start-editing-a-profile-and-leave`                                                                                                                                                                                                                                  |
+| Backup and recovery                                                            | `write-down-the-recovery-words`, `back-up-the-wallet-and-pass-the-check`, `find-where-the-recovery-phrase-is-kept`, `look-at-recover-wallet-and-cancel`, `start-a-wallet-recovery`, `recover-a-wallet-from-its-mints`                                                                                                            |
+| Settings                                                                       | `open-settings-and-read-the-terms`, `make-notifications-strict`, `see-where-the-feed-comes-from`, `look-at-swap-routing`, `see-the-keys-ecash-can-be-locked-to`, `look-at-moderation`, `look-at-my-media`, `look-at-delete-account-and-leave`, `delete-the-account-and-start-again`                                              |
+| Developer rows                                                                 | `turn-on-mock-mode`, `the-app-says-when-it-is-offline`, `look-at-the-storage-inventory`, `open-the-design-system`, `preview-screens-in-the-design-system`, `walk-the-design-system-families`, `walk-the-rest-of-the-design-system`, `walk-the-design-system-flows`, `open-the-sample-mint-and-map-flows`                         |
+| Feed, composer, a post's thread                                                | `draft-a-post-and-discard-it`, `open-a-posts-thread` (from the design system's sample posts)                                                                                                                                                                                                                                     |
+| Contacts, groups, a person's profile, sharing                                  | `look-at-a-contact`, `look-at-groups`, `show-a-contacts-public-key`                                                                                                                                                                                                                                                              |
+| Notifications                                                                  | `read-the-notification-tabs`, `read-the-app-notifications`                                                                                                                                                                                                                                                                       |
+| Remote Login                                                                   | `open-remote-login`, `share-remote-login`, `look-at-remote-login-activity`                                                                                                                                                                                                                                                       |
 
 ## What has none, and why
 
@@ -44,8 +44,8 @@ can be another's start. `--look` lists what is on screen when a story ends, whic
 - **Sending to a person past the lock question**: it would send a message to a real person's key.
 - **Publishing**: posting, following, saving a profile, reviewing a mint. A story must not publish to public relays.
 - **Rotating the Remote Login secret**: not done.
-- **On-chain send past the amount, swaps between mints, a locked token made and redeemed**: each needs money on a
-  mint the run controls, and on two mints for a swap.
+- **A locked token made and redeemed**: locking to a person sends them a message; locking to a key of the wallet's
+  own has not been tried.
 - **A person's stories, a thread from the live feed**: which posts and whose stories are there changes from run
   to run. The thread page is played from the design system's sample posts instead.
 - **A place on the map**: the markers are drawn by the map, not by the app.
@@ -54,10 +54,21 @@ can be another's start. `--look` lists what is on screen when a story ends, whic
   Lightning payment went through as usual; the toggles do not reach real payments. The failures that have stories
   are real ones: an invoice already paid, and no money.
 
-## Money stories form one line
+## A mint of the run's own
+
+`{{mint}}` and `{{mint2}}` in a story are two mints the runner starts on the Mac for that simulator
+(`privateMint.ts`): `cdk-mintd` with pretend Lightning, behind TLS with a certificate the simulator is told to
+trust, because the app accepts a mint only at an `https` address. An invoice is paid the moment it is made, and an
+on-chain payment is "sent" at once. The mints' databases are saved and put back with the wallet's state, so a
+story that starts from `states/private-mint` or `receive-100-sats-on-the-private-mint` can be played again and
+again and any number of stories can start from the same moment. They run only for a story that names them or
+starts from a state that holds them. Needs `cdk-mintd`, `socat` and `openssl` on the Mac.
+
+## Money stories on the public test mint form one line
 
 Against the public test mint a wallet must never be put back to an earlier moment and spent from again: the mint
 has already signed those secrets (F146). So `receive-100-sats-on-testnut` → `send-40-sats-as-ecash` →
 `pay-a-lightning-invoice` → `an-invoice-already-paid-is-refused` → `take-back-unclaimed-ecash` →
 `copy-a-token-and-redeem-it` each start where the last ended, one worker plays the line in order, and each worker
-makes its own wallet. A new money story goes on the end of the line. F149 has what would lift this.
+makes its own wallet. That line stays as proof against a mint nobody here runs. A new money story starts from
+`receive-100-sats-on-the-private-mint` instead, where none of this applies.

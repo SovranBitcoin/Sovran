@@ -10,11 +10,11 @@ registry, selectors, probes, custody rules and "no second test language" stand.
 
 Measured from the 476 runs recorded between 11 and 28 September 2026:
 
-| | iPhone simulator | Android emulator |
-| --- | --- | --- |
-| Median time for one test | 193 s | 381 s |
-| Runs with a failure | 97 of 212 | 69 of 157 |
-| Tests that both passed and failed | 21 of 33 | 18 of 34 |
+|                                   | iPhone simulator | Android emulator |
+| --------------------------------- | ---------------- | ---------------- |
+| Median time for one test          | 193 s            | 381 s            |
+| Runs with a failure               | 97 of 212        | 69 of 157        |
+| Tests that both passed and failed | 21 of 33         | 18 of 34         |
 
 Only about 33 of the 166 scenarios ever ran on a device, none of them one that moves money. The owner walks
 releases by hand because the suite cannot be trusted or waited for. The time does not go to the app:
@@ -65,7 +65,10 @@ ports, its own output folder named by run, worker and story, and its own mint.
 **Two mints.** The everyday run pays through a private mint started on the Mac for each worker, so a payment
 confirms at once, nothing depends on the network, and workers cannot disturb each other. A small set of stories
 runs against the public test mint to prove the real path, with its 3 to 5 s waits. No story uses real funds; the
-funded custody lane stays separate and off by default.
+funded custody lane stays separate and off by default. The private mint sits behind TLS with a certificate of the run's
+own that each simulator is told to trust, since the app accepts a mint only at an `https` address, and its
+database is saved and put back with the wallet's state, so a wallet can be returned to any saved moment and spent
+from again.
 
 **Evidence is recorded, not staged.** Each story has one continuous video, started before launch and kept as
 recorded: full size, a frame for every one the screen drew. Animations stay on, so the video is what a person
@@ -103,11 +106,11 @@ On the owner's MacBook (M4 Pro, 24 GB) on 2026-10-12, with the first story (firs
 Privacy; five steps), iPhone 17 Pro simulators on iOS 26.1, video and pictures on:
 
 | Workers | Plays | Passed | Wall time per story |
-| --- | --- | --- | --- |
-| 1 | 4 | 4 | 15.3 s |
-| 2 | 10 | 10 | 8.5 s |
-| 4 | 16 | 16 | 4.6 s |
-| 6 | 36 | 36 | 2.9 s |
+| ------- | ----- | ------ | ------------------- |
+| 1       | 4     | 4      | 15.3 s              |
+| 2       | 10    | 10     | 8.5 s               |
+| 4       | 16    | 16     | 4.6 s               |
+| 6       | 36    | 36     | 2.9 s               |
 
 Those were taken while a first launch still spent nine seconds under the splash. With that fixed the same story
 takes 12 s on its own worker, and four workers finish one every 2.8 s. A hundred stories of that length are a few

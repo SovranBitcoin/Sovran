@@ -129,6 +129,6 @@ reports) keep their evidence, and link here for anything still open.
 | [F146](F146.md) | high | investigation | A paid invoice is never added when the wallet's counters are behind what the mint has signed |
 | [F147](F147.md) | medium | investigation | Adding a mint leaves the app unresponsive for about three seconds |
 | [F148](F148.md) | low | investigation | Choosing the test mint switches the wallet to its USD account a moment after its bitcoin one |
-| [F149](F149.md) | medium | fix | End-to-end money stories need a mint of their own, and three driver gaps closed |
+| [F149](F149.md) | medium | fix | End-to-end stories: the public-mint money line, and the driver gaps still open |
 
 <!-- list:end -->
