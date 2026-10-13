@@ -39,9 +39,8 @@ can be another's start. `--look` lists what is on screen when a story ends, whic
 
 - **NFC**: a simulator has no NFC, and Send does not offer it there.
 - **Scanning a real code, photos, the flashlight**: a simulator has no camera picture to scan; the scanner page opens.
-- **AI pages**: the default build leaves them out.
-- **Chat pages (direct messages, Bitchat, White Noise, geohash chat)**: the default build leaves them out. Paying
-  a person by message and being paid back has a story.
+- **Bitchat, White Noise and geohash chat**: they need another phone nearby or another app; the Nostr chat and the
+  AI tab have stories in `full/` (below). Asking the AI something costs sats a new wallet does not have.
 - **Publishing**: posting, following, saving a profile, reviewing a mint. A story must not publish to public relays.
 - **Rotating the Remote Login secret**: not done.
 - **Locking ecash the person sends**: locking to a person sends them a message. Ecash locked to the wallet's own
@@ -84,6 +83,23 @@ reached them and send ecash back the same way. This is the one place a story rea
 message between two keys nobody else has, which the owner allowed on 2026-10-13. The message they send expires
 from the relays after a minute, because a wallet put back to a saved moment reads its messages again and would
 take the ecash in twice; the story is named to be played last among those that start from the same moment.
+
+## The full edition
+
+The default build leaves out the chat pages and the AI tab (ADR 0021). `full/` holds the stories about them, played
+on a second test build that differs only in its JavaScript:
+
+```sh
+bun app/e2e/press/native-build.ts ios --bundled --edition full   # e2e/artifacts/native-builds/ios-bundled-full
+bun run e2e:stories:full
+```
+
+| Pages                                                       | Stories                                                                                           |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| Finding a person by key, the message menu, a Nostr chat     | `write-to-a-person-and-read-their-answer` (the other person is the runner; F153 is what it found) |
+| AI tab: models, conversations, providers, a provider's page | `look-at-the-ai-models-and-conversations`, `look-at-the-ai-providers`                             |
+
+A step with `handed: { "reply": { "text": "…" } }` has the other person answer what the story wrote to them.
 
 ## Money stories on the public test mint form one line
 
