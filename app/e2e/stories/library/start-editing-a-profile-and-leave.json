@@ -1,0 +1,113 @@
+{
+  "id": "start-editing-a-profile-and-leave",
+  "purpose": "A person opens Edit profile, types a name, and goes back without saving it.",
+  "startsFrom": "onboarded",
+  "steps": [
+    {
+      "name": "the wallet opens",
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-send"
+          }
+        },
+        {
+          "logged": "splash.gone"
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "open the drawer",
+      "tap": {
+        "id": "header-profile-avatar"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "drawer-menu-settings"
+          }
+        }
+      ]
+    },
+    {
+      "name": "open Settings",
+      "tap": {
+        "id": "drawer-menu-settings"
+      },
+      "expect": [
+        {
+          "page": "SettingsScreen"
+        },
+        {
+          "visible": {
+            "id": "settings-profile-row"
+          }
+        }
+      ]
+    },
+    {
+      "name": "open Profile and keys",
+      "tap": {
+        "id": "settings-profile-row"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "settings-profile-edit"
+          }
+        }
+      ]
+    },
+    {
+      "name": "edit the profile",
+      "tap": {
+        "id": "settings-profile-edit"
+      },
+      "expect": [
+        {
+          "page": "SettingsEditProfileScreen"
+        },
+        {
+          "visible": {
+            "id": "edit-profile-name"
+          }
+        },
+        {
+          "visible": {
+            "id": "edit-profile-save"
+          }
+        }
+      ]
+    },
+    {
+      "name": "type a name",
+      "type": {
+        "into": {
+          "id": "edit-profile-name"
+        },
+        "text": "Test Person"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "edit-profile-save"
+          }
+        }
+      ]
+    },
+    {
+      "name": "go back without saving",
+      "tap": {
+        "id": "flow-header-back"
+      },
+      "expect": [
+        {
+          "gone": {
+            "id": "edit-profile-name"
+          }
+        }
+      ]
+    }
+  ]
+}

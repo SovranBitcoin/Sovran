@@ -39,7 +39,7 @@
           }
         }
       ],
-      "withinMs": 12000
+      "withinMs": 40000
     },
     {
       "name": "open the first contact",

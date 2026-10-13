@@ -1,0 +1,51 @@
+{
+  "id": "open-the-scanner",
+  "purpose": "A person who has allowed the camera opens the scanner from the wallet and sees the ways to bring in a code: the camera, the clipboard and a photo.",
+  "startsFrom": "onboarded",
+  "allow": ["camera"],
+  "steps": [
+    {
+      "name": "the wallet opens",
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-send"
+          }
+        },
+        {
+          "logged": "splash.gone"
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "open the scanner",
+      "tap": {
+        "id": "qr-scan-button"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "screen-camera"
+          }
+        },
+        {
+          "visible": {
+            "id": "camera-paste"
+          }
+        },
+        {
+          "visible": {
+            "id": "camera-gallery"
+          }
+        },
+        {
+          "visible": {
+            "id": "camera-flashlight"
+          }
+        }
+      ],
+      "withinMs": 10000
+    }
+  ]
+}

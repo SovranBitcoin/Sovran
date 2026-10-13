@@ -1,0 +1,391 @@
+{
+  "id": "back-up-the-wallet-and-pass-the-check",
+  "purpose": "A person backs up their wallet: they are shown their twelve recovery words, then pick each one in turn to prove they wrote them down, and are told the backup is done.",
+  "startsFrom": "onboarded",
+  "steps": [
+    {
+      "name": "the wallet opens",
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-send"
+          }
+        },
+        {
+          "logged": "splash.gone"
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "open the drawer",
+      "tap": {
+        "id": "header-profile-avatar"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "drawer-menu-settings"
+          }
+        }
+      ]
+    },
+    {
+      "name": "open Settings",
+      "tap": {
+        "id": "drawer-menu-settings"
+      },
+      "expect": [
+        {
+          "page": "SettingsScreen"
+        },
+        {
+          "visible": {
+            "id": "settings-profile-row"
+          }
+        }
+      ]
+    },
+    {
+      "name": "open Profile and keys",
+      "tap": {
+        "id": "settings-profile-row"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "settings-backup-row"
+          }
+        }
+      ]
+    },
+    {
+      "name": "start the backup",
+      "tap": {
+        "id": "settings-backup-row"
+      },
+      "expect": [
+        {
+          "page": "BackupIntroScreen"
+        },
+        {
+          "visible": {
+            "id": "backup-show-words"
+          }
+        }
+      ]
+    },
+    {
+      "name": "show the words",
+      "tap": {
+        "id": "backup-show-words"
+      },
+      "expect": [
+        {
+          "page": "BackupWordsScreen"
+        },
+        {
+          "visible": {
+            "id": "backup-word-1"
+          }
+        },
+        {
+          "visible": {
+            "id": "backup-word-12"
+          }
+        },
+        {
+          "visible": {
+            "id": "backup-written"
+          }
+        }
+      ],
+      "remember": [
+        {
+          "as": "word1",
+          "from": {
+            "id": "backup-word-1"
+          },
+          "after": ", "
+        },
+        {
+          "as": "word2",
+          "from": {
+            "id": "backup-word-2"
+          },
+          "after": ", "
+        },
+        {
+          "as": "word3",
+          "from": {
+            "id": "backup-word-3"
+          },
+          "after": ", "
+        },
+        {
+          "as": "word4",
+          "from": {
+            "id": "backup-word-4"
+          },
+          "after": ", "
+        },
+        {
+          "as": "word5",
+          "from": {
+            "id": "backup-word-5"
+          },
+          "after": ", "
+        },
+        {
+          "as": "word6",
+          "from": {
+            "id": "backup-word-6"
+          },
+          "after": ", "
+        },
+        {
+          "as": "word7",
+          "from": {
+            "id": "backup-word-7"
+          },
+          "after": ", "
+        },
+        {
+          "as": "word8",
+          "from": {
+            "id": "backup-word-8"
+          },
+          "after": ", "
+        },
+        {
+          "as": "word9",
+          "from": {
+            "id": "backup-word-9"
+          },
+          "after": ", "
+        },
+        {
+          "as": "word10",
+          "from": {
+            "id": "backup-word-10"
+          },
+          "after": ", "
+        },
+        {
+          "as": "word11",
+          "from": {
+            "id": "backup-word-11"
+          },
+          "after": ", "
+        },
+        {
+          "as": "word12",
+          "from": {
+            "id": "backup-word-12"
+          },
+          "after": ", "
+        }
+      ]
+    },
+    {
+      "name": "say they are written down",
+      "tap": {
+        "id": "backup-written"
+      },
+      "expect": [
+        {
+          "gone": {
+            "id": "backup-written"
+          }
+        },
+        {
+          "visible": {
+            "id": "backup-choice-0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "pick word 1",
+      "tap": {
+        "labelEnds": ", {{word1}}"
+      },
+      "expect": [
+        {
+          "visible": {
+            "label": "2 of 12"
+          }
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "pick word 2",
+      "tap": {
+        "labelEnds": ", {{word2}}"
+      },
+      "expect": [
+        {
+          "visible": {
+            "label": "3 of 12"
+          }
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "pick word 3",
+      "tap": {
+        "labelEnds": ", {{word3}}"
+      },
+      "expect": [
+        {
+          "visible": {
+            "label": "4 of 12"
+          }
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "pick word 4",
+      "tap": {
+        "labelEnds": ", {{word4}}"
+      },
+      "expect": [
+        {
+          "visible": {
+            "label": "5 of 12"
+          }
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "pick word 5",
+      "tap": {
+        "labelEnds": ", {{word5}}"
+      },
+      "expect": [
+        {
+          "visible": {
+            "label": "6 of 12"
+          }
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "pick word 6",
+      "tap": {
+        "labelEnds": ", {{word6}}"
+      },
+      "expect": [
+        {
+          "visible": {
+            "label": "7 of 12"
+          }
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "pick word 7",
+      "tap": {
+        "labelEnds": ", {{word7}}"
+      },
+      "expect": [
+        {
+          "visible": {
+            "label": "8 of 12"
+          }
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "pick word 8",
+      "tap": {
+        "labelEnds": ", {{word8}}"
+      },
+      "expect": [
+        {
+          "visible": {
+            "label": "9 of 12"
+          }
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "pick word 9",
+      "tap": {
+        "labelEnds": ", {{word9}}"
+      },
+      "expect": [
+        {
+          "visible": {
+            "label": "10 of 12"
+          }
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "pick word 10",
+      "tap": {
+        "labelEnds": ", {{word10}}"
+      },
+      "expect": [
+        {
+          "visible": {
+            "label": "11 of 12"
+          }
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "pick word 11",
+      "tap": {
+        "labelEnds": ", {{word11}}"
+      },
+      "expect": [
+        {
+          "visible": {
+            "label": "12 of 12"
+          }
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "pick word 12",
+      "tap": {
+        "labelEnds": ", {{word12}}"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "backup-done-button"
+          }
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "finish",
+      "tap": {
+        "id": "backup-done-button"
+      },
+      "expect": [
+        {
+          "gone": {
+            "id": "backup-done-button"
+          }
+        }
+      ],
+      "withinMs": 10000
+    }
+  ]
+}

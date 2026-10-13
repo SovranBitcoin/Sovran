@@ -1,0 +1,71 @@
+{
+  "id": "browse-the-wallpaper-gallery",
+  "purpose": "A person opens the theme preview, goes on to the wallpaper gallery, and comes back.",
+  "startsFrom": "onboarded",
+  "steps": [
+    {
+      "name": "the wallet opens",
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-send"
+          }
+        },
+        {
+          "logged": "splash.gone"
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "open Theme",
+      "tap": {
+        "id": "wallet-theme"
+      },
+      "expect": [
+        {
+          "page": "ThemePreviewScreen"
+        },
+        {
+          "visible": {
+            "id": "theme-preview-theme-button"
+          }
+        }
+      ]
+    },
+    {
+      "name": "open the gallery",
+      "tap": {
+        "id": "theme-preview-theme-button"
+      },
+      "expect": [
+        {
+          "page": "GalleryScreen"
+        },
+        {
+          "visible": {
+            "id": "album-card-colors"
+          }
+        }
+      ]
+    },
+    {
+      "name": "go back to the preview",
+      "tap": {
+        "id": "flow-header-back"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "theme-preview-theme-button"
+          }
+        },
+        {
+          "gone": {
+            "id": "album-card-colors"
+          }
+        }
+      ]
+    }
+  ]
+}

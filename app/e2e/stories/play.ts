@@ -11,6 +11,14 @@ import type { Expectation, Step, Story } from './story';
 
 type Element = AppScreen['elements'][number];
 
+/** A touch that was taken shows, in the app's log or on the screen, within this long. */
+const TOUCH_SHOWS_WITHIN_MS = 700;
+/**
+ * Looking for what iOS drew is given this long however short the step: one look
+ * takes a second or more with several simulators running, and the first can
+ * come back empty.
+ */
+const SYSTEM_LOOK_WITHIN_MS = 15_000;
 /** The app is given at least this long to answer, however little of the step is left. */
 const ANSWER_WITHIN_MS = 2000;
 /** An answer slower than this means touches were not being handled either. */
@@ -34,6 +42,8 @@ interface PixelWatch {
     stillForMs?: number,
     giveUpAfterMs?: number
   ): Promise<{ movedForMs: number; stillMoving: boolean }>;
+  /** Whether the picture has changed at all since a moment of `performance.now()`. */
+  changedSince?(moment: number): boolean;
 }
 
 export interface TouchDevice {
@@ -66,6 +76,8 @@ interface StepResult {
   screenMovedMs?: number;
   /** True when the screen never stopped changing: something on it animates for ever. */
   screenKeptMoving?: true;
+  /** True when the first touch reached nothing (no touch seen, no pixel changed) and was made again. */
+  touchMadeAgain?: true;
   /** The longest the app took to answer the runner, when long enough that a person would feel it. */
   appUnresponsiveMs?: number;
   /** The entries the app logged during the step. */
@@ -79,7 +91,12 @@ interface StoryResult {
   steps: StepResult[];
 }
 
-function matches(selector: Selector, element: Element): boolean {
+/** A selector, or the one a tap may also use: a label by its ending. */
+type TapSelector = Selector | { labelEnds: string };
+
+function matches(selector: TapSelector, element: Element): boolean {
+  if ('labelEnds' in selector)
+    return (element.label ?? element.text)?.endsWith(selector.labelEnds) === true;
   if ('id' in selector) return element.id === selector.id;
   if ('idPrefix' in selector) return element.id?.startsWith(selector.idPrefix) === true;
   return element.label === selector.label || element.text === selector.label;
@@ -90,7 +107,7 @@ function matches(selector: Selector, element: Element): boolean {
  * page pushed later is drawn over the ones before it. `matchIndex` picks among
  * the matches on that same page instead.
  */
-export function find(selector: Selector, screen: AppScreen): Element | null {
+export function find(selector: TapSelector, screen: AppScreen): Element | null {
   const all = screen.elements.filter(
     (element) => matches(selector, element) && element.width > 0 && element.height > 0
   );
@@ -111,7 +128,7 @@ export function topPage(screen: AppScreen): string | null {
   return null;
 }
 
-const describeSelector = (selector: Selector) => JSON.stringify(selector);
+const describeSelector = (selector: TapSelector) => JSON.stringify(selector);
 
 /** Null when the expectation holds, otherwise what is wrong. */
 function unmet(expectation: Expectation, screen: AppScreen, entries: AppLogEntry[]): string | null {
@@ -144,18 +161,30 @@ function unmet(expectation: Expectation, screen: AppScreen, entries: AppLogEntry
 const STILL_GRACE_MS = 3500;
 
 async function playStep(
-  step: Step,
+  written: Step,
   index: number,
   link: AppLink,
   device: TouchDevice,
-  pixels: PixelWatch | undefined
+  pixels: PixelWatch | undefined,
+  /** What earlier steps remembered; this one may use it, and add to it. */
+  remembered: Map<string, string>
 ): Promise<StepResult> {
+  const recall = (text: string) =>
+    text.replace(/\{\{(\w+)\}\}/g, (mark, name: string) => remembered.get(name) ?? mark);
+  const step: Step = !written.tap
+    ? written
+    : 'labelEnds' in written.tap
+      ? { ...written, tap: { labelEnds: recall(written.tap.labelEnds) } }
+      : 'label' in written.tap
+        ? { ...written, tap: { label: recall(written.tap.label) } }
+        : written;
   const startedWall = performance.now();
   const label = `${index + 1}-${step.name}`;
   const mark = await link.mark(label);
   const from = link.entries.indexOf(mark) + 1;
   const deadline = startedWall + step.withinMs;
   let motion: { movedForMs: number; stillMoving: boolean } | undefined;
+  let touchNotTaken = false;
   // The app answers from its JavaScript thread, so a slow answer is that thread
   // busy with something else. It is given until the step's deadline, and the
   // longest it kept the runner waiting is reported.
@@ -176,6 +205,7 @@ async function playStep(
       ...(motion ? { screenMovedMs: motion.movedForMs } : {}),
       ...(motion?.stillMoving ? { screenKeptMoving: true as const } : {}),
       ...(slowestAnswerMs >= SLOW_ANSWER_MS ? { appUnresponsiveMs: slowestAnswerMs } : {}),
+      ...(touchNotTaken ? { touchMadeAgain: true as const } : {}),
       startedAtAppMs: mark._t,
       endedAtAppMs: entries.at(-1)?._t ?? mark._t,
       wallMs: Math.round(performance.now() - startedWall),
@@ -206,7 +236,7 @@ async function playStep(
           outside = await device.findSystemControl(step.tap.label);
         } while (
           (!outside || !before || before.x !== outside.x || before.y !== outside.y) &&
-          performance.now() < deadline
+          performance.now() < Math.max(deadline, startedWall + SYSTEM_LOOK_WITHIN_MS)
         );
       }
       if (!inApp && !outside)
@@ -214,13 +244,31 @@ async function playStep(
       if (inApp?.disabled)
         return finish(`Cannot tap ${describeSelector(step.tap)}: it is disabled`);
       const [across, down] = step.tapAt ?? [0.5, 0.5];
-      if (inApp)
-        await device.tap(
-          (inApp.x + inApp.width * across) / screen.width,
-          (inApp.y + inApp.height * down) / screen.height
-        );
-      else if (outside)
-        await device.tap(outside.x + outside.width * across, outside.y + outside.height * down);
+      const at: [number, number] = inApp
+        ? [
+            (inApp.x + inApp.width * across) / screen.width,
+            (inApp.y + inApp.height * down) / screen.height,
+          ]
+        : outside
+          ? [outside.x + outside.width * across, outside.y + outside.height * down]
+          : [0, 0];
+      const touchedAt = performance.now();
+      await device.tap(...at);
+      // A touch can be lost outright: a sheet that has only just opened takes
+      // none for a moment, however still it looks. If the app saw no touch and
+      // not one pixel changed, nothing was done, and the touch is made again.
+      // This is not trying an action twice: the first did not happen.
+      if (pixels?.changedSince) {
+        const taken = () =>
+          link.entries.slice(from).some((entry) => entry.event === 'ui.touch') ||
+          pixels.changedSince?.(touchedAt) === true;
+        while (!taken() && performance.now() - touchedAt < TOUCH_SHOWS_WITHIN_MS)
+          await new Promise((resolve) => setTimeout(resolve, 20));
+        if (!taken()) {
+          touchNotTaken = true;
+          await device.tap(...at);
+        }
+      }
     }
     if (step.swipe) {
       const screen = await readScreen();
@@ -274,6 +322,15 @@ async function playStep(
         motion = step.swipe
           ? await pixels?.pixelsStill(STILL_AFTER_SWIPE_MS, SWIPE_SETTLES_WITHIN_MS)
           : await pixels?.pixelsStill();
+        for (const { as, from: source, after } of step.remember ?? []) {
+          const seen = find(source, screen);
+          const said = seen?.label ?? seen?.text;
+          if (said === undefined)
+            return finish(
+              `Nothing to remember as ${as}: ${describeSelector(source)} is not on screen`
+            );
+          remembered.set(as, after ? said.slice(said.lastIndexOf(after) + after.length) : said);
+        }
         return finish();
       }
       const left = deadline - performance.now();
@@ -309,8 +366,9 @@ export async function playStory(
   afterStep?: (index: number, step: StepResult) => Promise<void>
 ): Promise<StoryResult> {
   const steps: StepResult[] = [];
+  const remembered = new Map<string, string>();
   for (const [index, step] of story.steps.entries()) {
-    const result = await playStep(step, index, link, device, pixels);
+    const result = await playStep(step, index, link, device, pixels, remembered);
     steps.push(result);
     await afterStep?.(index, result);
     if (!result.ok) break;

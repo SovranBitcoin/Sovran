@@ -1,0 +1,128 @@
+{
+  "id": "look-at-the-storage-inventory",
+  "purpose": "A person turns on the developer rows and opens the storage inventory, which lists what the app has saved and offers its log file.",
+  "startsFrom": "onboarded",
+  "steps": [
+    {
+      "name": "the wallet opens",
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-send"
+          }
+        },
+        {
+          "logged": "splash.gone"
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "open the drawer",
+      "tap": {
+        "id": "header-profile-avatar"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "drawer-menu-settings"
+          }
+        }
+      ]
+    },
+    {
+      "name": "open Settings",
+      "tap": {
+        "id": "drawer-menu-settings"
+      },
+      "expect": [
+        {
+          "page": "SettingsScreen"
+        },
+        {
+          "visible": {
+            "id": "settings-profile-row"
+          }
+        }
+      ]
+    },
+    {
+      "name": "scroll down to the end",
+      "swipe": {
+        "on": {
+          "id": "settings-network-row"
+        },
+        "direction": "up",
+        "distance": 0.45
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "settings-version-row"
+          }
+        }
+      ]
+    },
+    {
+      "name": "press the version, once",
+      "tap": {
+        "id": "settings-version-row"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "settings-terms-row"
+          }
+        }
+      ]
+    },
+    {
+      "name": "press the version, twice",
+      "tap": {
+        "id": "settings-version-row"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "settings-terms-row"
+          }
+        }
+      ]
+    },
+    {
+      "name": "press the version, three times",
+      "tap": {
+        "id": "settings-version-row"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "settings-terms-row"
+          }
+        }
+      ]
+    },
+    {
+      "name": "open the storage inventory",
+      "tap": {
+        "id": "settings-storage-row"
+      },
+      "expect": [
+        {
+          "page": "SettingsStorageScreen"
+        },
+        {
+          "visible": {
+            "id": "settings-storage-refresh"
+          }
+        },
+        {
+          "visible": {
+            "id": "settings-storage-export-log-file"
+          }
+        }
+      ],
+      "withinMs": 10000
+    }
+  ]
+}

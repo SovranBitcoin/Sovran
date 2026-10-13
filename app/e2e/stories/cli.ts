@@ -114,13 +114,14 @@ const play = async (story: Story, outDir: string, look: boolean): Promise<boolea
       const busy = step.appUnresponsiveMs
         ? `, app unresponsive for ${step.appUnresponsiveMs} ms`
         : '';
+      const again = step.touchMadeAgain ? ', first touch not taken' : '';
       const moved = step.screenKeptMoving
         ? ', screen never stopped moving'
         : step.screenMovedMs
           ? `, screen moved for ${step.screenMovedMs} ms after`
           : '';
       console.log(
-        `  ${step.ok ? 'ok  ' : 'FAIL'} ${index + 1}. ${step.name}  ${step.wallMs} ms${moved}${busy}${shown.length ? `  (${shown.join(', ')})` : ''}`
+        `  ${step.ok ? 'ok  ' : 'FAIL'} ${index + 1}. ${step.name}  ${step.wallMs} ms${moved}${busy}${again}${shown.length ? `  (${shown.join(', ')})` : ''}`
       );
       if (step.failure) console.log(`       ${step.failure}`);
     }
@@ -186,6 +187,7 @@ try {
       );
     } else {
       await reachState(story.startsFrom, actions);
+      for (const service of story.allow ?? []) simulator.allow(service);
       spentOn('startState');
       ok = await play(await withGiven(story), outDir, flags.includes('--look'));
       // Where it ended is kept, so a story that starts from here does not play this one again.

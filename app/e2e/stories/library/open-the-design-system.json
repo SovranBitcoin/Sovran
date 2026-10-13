@@ -1,0 +1,145 @@
+{
+  "id": "open-the-design-system",
+  "purpose": "A person turns on the developer rows and opens the design system, which lists the screens, variations, prompts and flows to preview.",
+  "startsFrom": "onboarded",
+  "steps": [
+    {
+      "name": "the wallet opens",
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-send"
+          }
+        },
+        {
+          "logged": "splash.gone"
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "open the drawer",
+      "tap": {
+        "id": "header-profile-avatar"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "drawer-menu-settings"
+          }
+        }
+      ]
+    },
+    {
+      "name": "open Settings",
+      "tap": {
+        "id": "drawer-menu-settings"
+      },
+      "expect": [
+        {
+          "page": "SettingsScreen"
+        },
+        {
+          "visible": {
+            "id": "settings-profile-row"
+          }
+        }
+      ]
+    },
+    {
+      "name": "scroll down to the end",
+      "swipe": {
+        "on": {
+          "id": "settings-network-row"
+        },
+        "direction": "up",
+        "distance": 0.45
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "settings-version-row"
+          }
+        }
+      ]
+    },
+    {
+      "name": "press the version, once",
+      "tap": {
+        "id": "settings-version-row"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "settings-terms-row"
+          }
+        }
+      ]
+    },
+    {
+      "name": "press the version, twice",
+      "tap": {
+        "id": "settings-version-row"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "settings-terms-row"
+          }
+        }
+      ]
+    },
+    {
+      "name": "press the version, three times",
+      "tap": {
+        "id": "settings-version-row"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "settings-terms-row"
+          }
+        }
+      ]
+    },
+    {
+      "name": "scroll to the developer rows",
+      "swipe": {
+        "on": {
+          "id": "settings-terms-row"
+        },
+        "direction": "up",
+        "distance": 0.5
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "settings-design-system-row"
+          }
+        }
+      ]
+    },
+    {
+      "name": "open the design system",
+      "tap": {
+        "id": "settings-design-system-row"
+      },
+      "expect": [
+        {
+          "page": "SettingsDesignSystemScreen"
+        },
+        {
+          "visible": {
+            "id": "design-system-screens-row"
+          }
+        },
+        {
+          "visible": {
+            "id": "design-system-flow-send"
+          }
+        }
+      ],
+      "withinMs": 10000
+    }
+  ]
+}

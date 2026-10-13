@@ -29,8 +29,25 @@ const stepSchema = z
   .strictObject({
     /** What the person does, in a few words; names the step in the report. */
     name: z.string().min(1).max(80),
-    /** Tap this element: its centre, unless `tapAt` says where. */
-    tap: selectorSchema.optional(),
+    /**
+     * Tap this element: its centre, unless `tapAt` says where. `labelEnds` picks
+     * the element whose label ends with the text, for a choice whose position is
+     * not known in advance; either may use something remembered, as `{{name}}`.
+     */
+    tap: z.union([selectorSchema, z.strictObject({ labelEnds: z.string().min(1) })]).optional(),
+    /**
+     * Keep something read off the screen once the step is satisfied, for a later
+     * step to use: the label of an element, or what follows `after` in it.
+     */
+    remember: z
+      .array(
+        z.strictObject({
+          as: z.string().regex(/^\w+$/),
+          from: selectorSchema,
+          after: z.string().min(1).optional(),
+        })
+      )
+      .optional(),
     /**
      * Where in the element to tap, as fractions of its width and height from its
      * top left. For a control that something else partly covers, where a person
@@ -85,6 +102,12 @@ export const storySchema = z.strictObject({
    * state is copied into place; nothing is tapped through to reach it.
    */
   startsFrom: z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/),
+  /**
+   * What the person has already said yes to when iOS asked. Everything else
+   * iOS would ask about is answered "no" before the story starts, so no
+   * question from iOS is ever left on screen taking the touches.
+   */
+  allow: z.array(z.enum(['camera', 'location'])).optional(),
   /**
    * What the story is handed from outside the app, fetched fresh each time it
    * is played, and used as `{{name}}` in text it types. `invoice`: a Lightning

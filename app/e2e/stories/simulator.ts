@@ -73,6 +73,8 @@ interface StorySimulator extends TouchDevice {
    * installing takes six seconds.
    */
   startFrom(appPath: string, state: string): Promise<void>;
+  /** Answer "yes" ahead of time to what iOS would ask before the app may use this. The app must be stopped. */
+  allow(service: 'camera' | 'location'): void;
   /** Whether a state of this name, made this way, is saved on this simulator. */
   hasState(name: string, madeFrom: string): boolean;
   /** Stop the app and save the state it is in under a name. */
@@ -180,6 +182,9 @@ export function storySimulator(udid: string): StorySimulator {
       restoreState(places(), state);
       // The settings service would go on answering with what the last story saved.
       await stopService(SETTINGS_SERVICE);
+    },
+    allow(service) {
+      inSimulatorTool('privacy', 'grant', service, BUNDLE_ID);
     },
     hasState: (name, madeFrom) => hasState(places(), name, madeFrom),
     async saveState(name, madeFrom) {

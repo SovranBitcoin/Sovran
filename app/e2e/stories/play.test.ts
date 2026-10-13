@@ -224,6 +224,107 @@ describe('playStory', () => {
     expect(app.state.taps[0][1]).toBeCloseTo(0.35);
   });
 
+  test('remembers what a step read off the screen and taps the choice that ends with it', async () => {
+    const app = fakeApp(screenOf(box({ id: 'backup-word-1', label: 'Word 1, extra' })));
+    const device = {
+      ...noSwipe,
+      tap: async (x: number, y: number) => {
+        app.state.taps.push([x, y]);
+        // The check: choices in an order nobody knows beforehand.
+        app.state.screen = screenOf(
+          box({ id: 'backup-choice-0', label: 'Option 1, fun', y: 100 }),
+          box({ id: 'backup-choice-1', label: 'Option 2, extra', y: 200 })
+        );
+      },
+    };
+
+    const result = await playStory(
+      story([
+        {
+          name: 'read the first word',
+          expect: [{ visible: { id: 'backup-word-1' } }],
+          remember: [{ as: 'word1', from: { id: 'backup-word-1' }, after: ', ' }],
+        },
+        {
+          name: 'say they are written',
+          tap: { id: 'backup-word-1' },
+          expect: [{ visible: { id: 'backup-choice-0' } }],
+        },
+        {
+          name: 'pick the first word',
+          tap: { labelEnds: ', {{word1}}' },
+          expect: [{ visible: { id: 'backup-choice-1' } }],
+        },
+      ]),
+      app.link,
+      device
+    );
+
+    expect(result.ok).toBe(true);
+    // The second tap landed on "Option 2, extra", 200 down, not on "Option 1, fun".
+    expect(app.state.taps[1][1]).toBeCloseTo((200 + 25) / 800);
+  });
+
+  test('a touch that reached nothing is made again, once', async () => {
+    const app = fakeApp(screenOf(box({ id: 'receive-method-paste' })));
+    let touches = 0;
+    const device = {
+      ...noSwipe,
+      tap: async () => {
+        touches += 1;
+        // The first lands on a sheet that is not taking touches yet.
+        if (touches === 2) app.state.screen = screenOf(box({ id: 'receive-token-redeem' }));
+      },
+    };
+    const pixels = {
+      pixelsStill: async () => ({ movedForMs: 0, stillMoving: false }),
+      changedSince: () => touches >= 2,
+    };
+
+    const result = await playStory(
+      story([
+        {
+          name: 'paste',
+          tap: { id: 'receive-method-paste' },
+          expect: [{ visible: { id: 'receive-token-redeem' } }],
+        },
+      ]),
+      app.link,
+      device,
+      pixels
+    );
+
+    expect(result.ok).toBe(true);
+    expect(touches).toBe(2);
+    expect(result.steps[0].touchMadeAgain).toBe(true);
+  });
+
+  test('a touch that changed the screen is not made again', async () => {
+    const app = fakeApp(screenOf(box({ id: 'wallet-more' })));
+    let touches = 0;
+    const device = { ...noSwipe, tap: async () => void (touches += 1) };
+    const pixels = {
+      pixelsStill: async () => ({ movedForMs: 0, stillMoving: false }),
+      // A menu iOS draws: the app logs no touch, but the screen changes.
+      changedSince: () => touches >= 1,
+    };
+
+    await playStory(
+      story([
+        {
+          name: 'open More',
+          tap: { id: 'wallet-more' },
+          expect: [{ visible: { id: 'wallet-more' } }],
+        },
+      ]),
+      app.link,
+      device,
+      pixels
+    );
+
+    expect(touches).toBe(1);
+  });
+
   test('does not touch the screen when the control is missing or disabled', async () => {
     const app = fakeApp(screenOf(box({ id: 'amount-next', disabled: true })));
     const device = { ...noSwipe, tap: async () => void app.state.taps.push([0, 0]) };

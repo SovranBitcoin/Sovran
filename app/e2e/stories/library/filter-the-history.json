@@ -1,0 +1,103 @@
+{
+  "id": "filter-the-history",
+  "purpose": "A person opens the filters on their history, asks for Lightning payments only, and goes back to the list.",
+  "startsFrom": "onboarded",
+  "steps": [
+    {
+      "name": "the wallet opens",
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-send"
+          }
+        },
+        {
+          "logged": "splash.gone"
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "open More",
+      "tap": {
+        "id": "wallet-more"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-more"
+          }
+        }
+      ]
+    },
+    {
+      "name": "choose History",
+      "tap": {
+        "label": "History, Every payment in and out"
+      },
+      "expect": [
+        {
+          "page": "TransactionsScreen"
+        },
+        {
+          "visible": {
+            "id": "transactions-filter-open"
+          }
+        }
+      ],
+      "withinMs": 10000
+    },
+    {
+      "name": "open the filters",
+      "tap": {
+        "id": "transactions-filter-open"
+      },
+      "expect": [
+        {
+          "page": "FiltersScreen"
+        },
+        {
+          "visible": {
+            "id": "filter-type-lightning"
+          }
+        },
+        {
+          "visible": {
+            "id": "filter-currency-sat"
+          }
+        }
+      ]
+    },
+    {
+      "name": "ask for Lightning only",
+      "tap": {
+        "id": "filter-type-lightning"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "filter-type-lightning"
+          }
+        }
+      ]
+    },
+    {
+      "name": "close the filters",
+      "tap": {
+        "id": "flow-header-close"
+      },
+      "expect": [
+        {
+          "gone": {
+            "id": "filter-type-lightning"
+          }
+        },
+        {
+          "visible": {
+            "id": "transactions-filter-open"
+          }
+        }
+      ]
+    }
+  ]
+}

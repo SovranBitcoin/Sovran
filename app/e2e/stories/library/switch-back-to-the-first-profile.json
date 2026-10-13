@@ -1,0 +1,76 @@
+{
+  "id": "switch-back-to-the-first-profile",
+  "purpose": "A person with two profiles switches from the second back to the first, and lands in that wallet.",
+  "startsFrom": "add-a-second-profile",
+  "steps": [
+    {
+      "name": "the wallet opens",
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-send"
+          }
+        },
+        {
+          "logged": "splash.gone"
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "open the drawer",
+      "tap": {
+        "id": "header-profile-avatar"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "drawer-menu-settings"
+          }
+        }
+      ]
+    },
+    {
+      "name": "open the profile switcher",
+      "tap": {
+        "id": "drawer-profile-switcher-open"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "profile-row-0"
+          }
+        },
+        {
+          "visible": {
+            "id": "profile-row-1"
+          }
+        }
+      ]
+    },
+    {
+      "name": "choose the first profile",
+      "tap": {
+        "id": "profile-row-0"
+      },
+      "expect": [
+        {
+          "gone": {
+            "id": "profile-row-0"
+          }
+        },
+        {
+          "visible": {
+            "id": "wallet-send"
+          }
+        },
+        {
+          "visible": {
+            "id": "header-profile-avatar"
+          }
+        }
+      ],
+      "withinMs": 45000
+    }
+  ]
+}
