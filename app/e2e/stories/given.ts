@@ -23,25 +23,38 @@ interface MintQuote {
  * what a story about paying needs. (The public test mint marks its own
  * invoices paid at once, so paying one of those is refused as already paid.)
  */
-async function invoiceFrom(mint: string, sats: number): Promise<string> {
+async function invoiceFrom(mint: string, sats: number, paying?: 'pending'): Promise<string> {
   if (mint !== LOCAL) return invoiceFromMint(mint, sats);
   const dir = mkdtempSync(join(tmpdir(), 'sovran-e2e-invoice-'));
   // A port of this process's own, so runners side by side do not collide.
   const local = await startLocalMint(dir, 20_000 + (process.pid % 20_000));
   try {
-    return await invoiceFromMint(local.url, sats);
+    return await invoiceFromMint(local.url, sats, paying && PAYING[paying]);
   } finally {
     local.stop();
     rmSync(dir, { recursive: true, force: true });
   }
 }
 
-async function invoiceFromMint(mint: string, sats: number): Promise<string> {
+/**
+ * What the pretend Lightning of `cdk-mintd` reads from an invoice's
+ * description when asked to pay it: the outcome to report.
+ */
+const PAYING = {
+  pending: JSON.stringify({
+    pay_invoice_state: 'PENDING',
+    check_payment_state: 'PENDING',
+    pay_err: false,
+    check_err: false,
+  }),
+};
+
+async function invoiceFromMint(mint: string, sats: number, description?: string): Promise<string> {
   // eslint-disable-next-line no-restricted-globals -- the runner asking a test mint, outside the app
   const answered = await fetch(`${mint.replace(/\/$/, '')}/v1/mint/quote/bolt11`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ amount: sats, unit: 'sat' }),
+    body: JSON.stringify({ amount: sats, unit: 'sat', ...(description ? { description } : {}) }),
     signal: AbortSignal.timeout(15_000),
   });
   const quote = (await answered.json()) as MintQuote;
@@ -59,11 +72,15 @@ async function invoiceFromMint(mint: string, sats: number): Promise<string> {
 export async function withGiven(
   story: Story,
   known: Record<string, string> = {},
-  fetchInvoice: (mint: string, sats: number) => Promise<string> = invoiceFrom
+  fetchInvoice: (mint: string, sats: number, paying?: 'pending') => Promise<string> = invoiceFrom
 ): Promise<Story> {
   const given: Record<string, string> = { ...known };
   if (story.given?.invoice)
-    given.invoice = await fetchInvoice(story.given.invoice.mint, story.given.invoice.sats);
+    given.invoice = await fetchInvoice(
+      story.given.invoice.mint,
+      story.given.invoice.sats,
+      story.given.invoice.paying
+    );
   const fill = (value: unknown): unknown => {
     if (typeof value === 'string')
       return value.replace(/\{\{(\w+)\}\}/g, (mark, name: string) => {

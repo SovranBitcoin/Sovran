@@ -149,6 +149,12 @@ export const storySchema = z.strictObject({
         .strictObject({
           mint: z.union([z.literal('local'), z.url()]),
           sats: z.number().int().min(1),
+          /**
+           * What a pretend mint that pays it reports: the payment `pending`
+           * and never settling. Only a `local` invoice can say so, and only
+           * the run's own mints listen.
+           */
+          paying: z.literal('pending').optional(),
         })
         .optional(),
     })

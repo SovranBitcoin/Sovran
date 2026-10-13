@@ -1,0 +1,93 @@
+{
+  "id": "open-a-posts-author-from-the-feed",
+  "purpose": "A person opens the feed, presses the picture of whoever wrote a post, sees that person's profile with their public key, and goes back.",
+  "startsFrom": "onboarded",
+  "steps": [
+    {
+      "name": "the wallet opens",
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-send"
+          }
+        },
+        {
+          "logged": "splash.gone"
+        }
+      ],
+      "withinMs": 20000
+    },
+    {
+      "name": "go to the feed",
+      "tap": {
+        "label": "Feed"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "screen-feed"
+          }
+        },
+        {
+          "gone": {
+            "id": "wallet-send"
+          }
+        }
+      ],
+      "withinMs": 20000
+    },
+    {
+      "name": "wait for a post from the network",
+      "expect": [
+        {
+          "visible": {
+            "id": "post-comment"
+          }
+        }
+      ],
+      "withinMs": 40000
+    },
+    {
+      "name": "open whoever wrote it",
+      "tap": {
+        "idPrefix": "post-avatar-",
+        "matchIndex": 0
+      },
+      "expect": [
+        {
+          "page": "UserProfileScreen"
+        },
+        {
+          "visible": {
+            "id": "user-profile:other"
+          }
+        },
+        {
+          "visible": {
+            "id": "profile-info-npub"
+          }
+        }
+      ],
+      "withinMs": 20000
+    },
+    {
+      "name": "close the profile",
+      "tap": {
+        "id": "flow-header-close"
+      },
+      "expect": [
+        {
+          "gone": {
+            "id": "profile-info-npub"
+          }
+        },
+        {
+          "visible": {
+            "id": "composer-open"
+          }
+        }
+      ],
+      "withinMs": 10000
+    }
+  ]
+}
