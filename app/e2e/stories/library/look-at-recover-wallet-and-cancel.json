@@ -1,0 +1,95 @@
+{
+  "id": "look-at-recover-wallet-and-cancel",
+  "purpose": "A person opens Recover wallet in Settings, sees which mints would be searched and the swipe that starts it, and cancels without recovering.",
+  "startsFrom": "onboarded",
+  "steps": [
+    {
+      "name": "the wallet opens",
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-send"
+          }
+        },
+        {
+          "logged": "splash.gone"
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "open the drawer",
+      "tap": {
+        "id": "header-profile-avatar"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "drawer-menu-settings"
+          }
+        }
+      ]
+    },
+    {
+      "name": "open Settings",
+      "tap": {
+        "id": "drawer-menu-settings"
+      },
+      "expect": [
+        {
+          "page": "SettingsScreen"
+        },
+        {
+          "visible": {
+            "id": "settings-profile-row"
+          }
+        }
+      ]
+    },
+    {
+      "name": "open Recover wallet",
+      "tap": {
+        "id": "settings-recovery-row"
+      },
+      "expect": [
+        {
+          "page": "SettingsRecoveryScreen"
+        },
+        {
+          "visible": {
+            "id": "slide-to-confirm"
+          }
+        },
+        {
+          "visible": {
+            "id": "recovery-search-all-toggle"
+          }
+        },
+        {
+          "visible": {
+            "id": "recovery-cancel"
+          }
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "cancel",
+      "tap": {
+        "id": "recovery-cancel"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "settings-recovery-row"
+          }
+        },
+        {
+          "gone": {
+            "id": "slide-to-confirm"
+          }
+        }
+      ]
+    }
+  ]
+}

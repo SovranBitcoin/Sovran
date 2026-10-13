@@ -1,0 +1,102 @@
+{
+  "id": "look-at-moderation",
+  "purpose": "A person scrolls to Moderation in Settings and sees who they have blocked and the word filter for messages, then goes back.",
+  "startsFrom": "onboarded",
+  "steps": [
+    {
+      "name": "the wallet opens",
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-send"
+          }
+        },
+        {
+          "logged": "splash.gone"
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "open the drawer",
+      "tap": {
+        "id": "header-profile-avatar"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "drawer-menu-settings"
+          }
+        }
+      ]
+    },
+    {
+      "name": "open Settings",
+      "tap": {
+        "id": "drawer-menu-settings"
+      },
+      "expect": [
+        {
+          "page": "SettingsScreen"
+        },
+        {
+          "visible": {
+            "id": "settings-profile-row"
+          }
+        }
+      ]
+    },
+    {
+      "name": "scroll down to the end",
+      "swipe": {
+        "on": {
+          "id": "settings-network-row"
+        },
+        "direction": "up",
+        "distance": 0.45
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "settings-version-row"
+          }
+        }
+      ]
+    },
+    {
+      "name": "open Moderation",
+      "tap": {
+        "id": "settings-moderation-row"
+      },
+      "expect": [
+        {
+          "page": "SettingsModerationScreen"
+        },
+        {
+          "visible": {
+            "id": "moderation-filter-toggle"
+          }
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "go back to Settings",
+      "tap": {
+        "id": "flow-header-back"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "settings-moderation-row"
+          }
+        },
+        {
+          "gone": {
+            "id": "moderation-filter-toggle"
+          }
+        }
+      ]
+    }
+  ]
+}
