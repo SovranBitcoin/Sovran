@@ -1,0 +1,80 @@
+{
+  "id": "read-about-the-test-mint",
+  "purpose": "A person opens the page about the mint their wallet uses, to see who runs it and what it supports, and closes it.",
+  "startsFrom": "testnut-mint",
+  "steps": [
+    {
+      "name": "the wallet opens on the test mint",
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-selected-mint:testnut.cashu.space"
+          }
+        },
+        {
+          "logged": "splash.gone"
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "open the mint list",
+      "tap": {
+        "id": "wallet-mint-selector"
+      },
+      "expect": [
+        {
+          "page": "MintListScreen"
+        },
+        {
+          "visible": {
+            "id": "mint-currency-tab-TSAT"
+          }
+        }
+      ]
+    },
+    {
+      "name": "show the test mints",
+      "tap": {
+        "id": "mint-currency-tab-TSAT"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "mint-inspect:https://testnut.cashu.space"
+          }
+        }
+      ]
+    },
+    {
+      "name": "open the mint's page",
+      "tap": {
+        "id": "mint-inspect:https://testnut.cashu.space"
+      },
+      "expect": [
+        {
+          "page": "MintInfoScreen"
+        },
+        {
+          "visible": {
+            "id": "mint-info-close"
+          }
+        }
+      ],
+      "withinMs": 10000
+    },
+    {
+      "name": "close it",
+      "tap": {
+        "id": "mint-info-close"
+      },
+      "expect": [
+        {
+          "gone": {
+            "id": "mint-info-close"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,55 @@
+{
+  "id": "preview-the-theme",
+  "purpose": "A person opens the theme preview from the wallet to see how their accounts look, and closes it.",
+  "startsFrom": "onboarded",
+  "steps": [
+    {
+      "name": "the wallet opens",
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-send"
+          }
+        },
+        {
+          "logged": "splash.gone"
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "open Theme",
+      "tap": {
+        "id": "wallet-theme"
+      },
+      "expect": [
+        {
+          "page": "ThemePreviewScreen"
+        },
+        {
+          "visible": {
+            "id": "theme-preview-theme-button"
+          }
+        }
+      ]
+    },
+    {
+      "name": "close it",
+      "tap": {
+        "id": "flow-header-close"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-send"
+          }
+        },
+        {
+          "gone": {
+            "id": "theme-preview-theme-button"
+          }
+        }
+      ]
+    }
+  ]
+}

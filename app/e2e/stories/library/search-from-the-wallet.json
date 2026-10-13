@@ -1,0 +1,78 @@
+{
+  "id": "search-from-the-wallet",
+  "purpose": "A person opens search from the wallet, types a word, and closes search again.",
+  "startsFrom": "onboarded",
+  "steps": [
+    {
+      "name": "the wallet opens",
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-send"
+          }
+        },
+        {
+          "logged": "splash.gone"
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "open search",
+      "tap": {
+        "id": "wallet-search-toggle"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-search-input"
+          }
+        },
+        {
+          "visible": {
+            "id": "search-scope-mints"
+          }
+        }
+      ]
+    },
+    {
+      "name": "type a word",
+      "type": {
+        "into": {
+          "id": "wallet-search-input"
+        },
+        "text": "bitcoin"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-search-input"
+          }
+        },
+        {
+          "visible": {
+            "label": "Close search"
+          }
+        }
+      ]
+    },
+    {
+      "name": "close search",
+      "tap": {
+        "id": "wallet-search-toggle"
+      },
+      "expect": [
+        {
+          "gone": {
+            "id": "wallet-search-input"
+          }
+        },
+        {
+          "visible": {
+            "id": "wallet-send"
+          }
+        }
+      ]
+    }
+  ]
+}

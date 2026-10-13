@@ -1,0 +1,55 @@
+{
+  "id": "see-the-balance-split",
+  "purpose": "A person opens the balance split from the wallet to see how their money is spread across mints, and closes it.",
+  "startsFrom": "onboarded",
+  "steps": [
+    {
+      "name": "the wallet opens",
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-send"
+          }
+        },
+        {
+          "logged": "splash.gone"
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "open Split",
+      "tap": {
+        "id": "wallet-split"
+      },
+      "expect": [
+        {
+          "page": "MintDistributionScreen"
+        },
+        {
+          "visible": {
+            "id": "mint-distribution-next"
+          }
+        }
+      ]
+    },
+    {
+      "name": "close it",
+      "tap": {
+        "id": "flow-header-close"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-send"
+          }
+        },
+        {
+          "gone": {
+            "id": "mint-distribution-next"
+          }
+        }
+      ]
+    }
+  ]
+}

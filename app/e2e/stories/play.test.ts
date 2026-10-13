@@ -218,7 +218,8 @@ describe('playStory', () => {
     );
 
     expect(result.ok).toBe(true);
-    expect(asked).toEqual(['Test Bitcoin account']);
+    // Looked for until two looks agree on where it is: a menu moves as it opens.
+    expect(asked).toEqual(['Test Bitcoin account', 'Test Bitcoin account']);
     expect(app.state.taps[0][0]).toBeCloseTo(0.4);
     expect(app.state.taps[0][1]).toBeCloseTo(0.35);
   });

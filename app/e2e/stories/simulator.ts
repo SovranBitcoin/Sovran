@@ -27,6 +27,7 @@ const SETTINGS_SERVICE = 'com.apple.cfprefsd.xpc.daemon';
 /** A swipe takes a quarter of a second: quick enough to be a swipe, slow enough to be followed. */
 const SWIPE_FRAMES = 15;
 const FRAME_MS = 16;
+const SWIPE_REST_MS = 120;
 /**
  * How long a key is held, and the gap before the next. At 12 ms the second of
  * two identical letters was sometimes lost ("htps://"); 30 ms has not lost one.
@@ -51,7 +52,18 @@ interface SystemElement {
   children?: SystemElement[];
 }
 
+/** Something the simulator's accessibility tree names, placed in fractions of the window. */
+interface SystemControl {
+  label: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 interface StorySimulator extends TouchDevice {
+  /** Everything on screen that has a label, as iOS itself sees it: about 0.8 s. */
+  systemControls(): Promise<SystemControl[]>;
   /**
    * Stop the app and put it in the state a story starts from. `fresh` is as if
    * it had never been opened: its files, its settings and the keychain, which
@@ -75,6 +87,15 @@ export function storySimulator(udid: string): StorySimulator {
   const addon = resolveServeSimNativeAddon();
   const native = createRequire(import.meta.url)(addon) as Native;
   const hid = new native.SimHID(udid);
+  /** Run one of `simctl`'s own commands on this simulator; false when it fails. */
+  const inSimulatorTool = (command: string, ...rest: string[]) => {
+    try {
+      simctl(command, udid, ...rest);
+      return true;
+    } catch {
+      return false;
+    }
+  };
   /** Run a program inside the simulator; false when it fails. */
   const inSimulator = (...command: string[]) => {
     try {
@@ -123,6 +144,10 @@ export function storySimulator(udid: string): StorySimulator {
       this.terminate();
       // A story whose runner died leaves its recorder behind, still attached to this screen.
       spawnSync('pkill', ['-f', `simctl io ${udid} recordVideo`]);
+      // The wallet home asks for the phone's location a few seconds after it
+      // opens, and iOS's question then takes every touch. Answered "no" ahead of
+      // time, so a story meets the same page whenever it gets there.
+      inSimulatorTool('privacy', 'revoke', 'location', BUNDLE_ID);
       let installed = true;
       try {
         simctl('get_app_container', udid, BUNDLE_ID, 'data');
@@ -164,21 +189,31 @@ export function storySimulator(udid: string): StorySimulator {
     watchScreen(onChange) {
       return watchScreenFrames(udid, addon, onChange);
     },
-    async findSystemControl(label) {
+    async systemControls() {
       const [window] = JSON.parse(await native.axDescribe(udid)) as SystemElement[];
-      if (!window) return null;
-      const queue = [window];
+      if (!window) return [];
+      const found: SystemControl[] = [];
+      const queue = [...(window.children ?? [])];
       for (let element = queue.shift(); element; element = queue.shift()) {
-        if (element !== window && element.AXLabel === label && element.frame.width > 0)
-          return {
+        // Only what is inside the window: a closed drawer's "Feed" lies off its
+        // left edge, and was found before the tab bar's.
+        const centreX = (element.frame.x + element.frame.width / 2) / window.frame.width;
+        const centreY = (element.frame.y + element.frame.height / 2) / window.frame.height;
+        const inWindow = centreX > 0 && centreX < 1 && centreY > 0 && centreY < 1;
+        if (element.AXLabel && inWindow && element.frame.width > 0 && element.frame.height > 0)
+          found.push({
+            label: element.AXLabel,
             x: element.frame.x / window.frame.width,
             y: element.frame.y / window.frame.height,
             width: element.frame.width / window.frame.width,
             height: element.frame.height / window.frame.height,
-          };
+          });
         queue.push(...(element.children ?? []));
       }
-      return null;
+      return found;
+    },
+    async findSystemControl(label) {
+      return (await this.systemControls()).find((control) => control.label === label) ?? null;
     },
     async type(text) {
       for (const { usage, shift } of keyPresses(text)) {
@@ -205,6 +240,9 @@ export function storySimulator(udid: string): StorySimulator {
           0
         );
       }
+      // The finger rests before it lifts, so the page stops where it was dragged
+      // to instead of coasting on, and the next tap is not spent stopping it.
+      await new Promise((resolve) => setTimeout(resolve, SWIPE_REST_MS));
       hid.touch('end', to[0], to[1], 1, 1, 0);
     },
     async tap(x, y) {

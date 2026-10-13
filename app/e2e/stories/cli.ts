@@ -83,6 +83,7 @@ const play = async (story: Story, outDir: string, look: boolean): Promise<boolea
     });
     spentOn('steps');
     const lookedAt = look ? await link.screen().catch(() => undefined) : undefined;
+    const systemSees = look ? await simulator.systemControls().catch(() => []) : [];
     // Let the last change be drawn and recorded before the recording ends.
     await link.still(3000).catch(() => undefined);
     await new Promise((resolve) => setTimeout(resolve, LAST_FRAME_MS));
@@ -130,6 +131,17 @@ const play = async (story: Story, outDir: string, look: boolean): Promise<boolea
           `  ${element.page ?? ''}  ${element.id ?? '-'}  ${JSON.stringify((element.label ?? element.text ?? '').slice(0, 70))}${element.disabled ? '  disabled' : ''}  at ${Math.round(element.x)},${Math.round(element.y)} ${Math.round(element.width)}×${Math.round(element.height)}`
         );
       }
+    }
+    if (lookedAt) {
+      // What only iOS knows about: its own menus, alerts, tab bar and keyboard.
+      const known = new Set(lookedAt.elements.flatMap((element) => [element.label, element.text]));
+      const extra = [...new Set(systemSees.map((control) => control.label))].filter(
+        (label) => !known.has(label)
+      );
+      if (extra.length)
+        console.log(
+          `drawn by iOS: ${extra.map((label) => JSON.stringify(label.slice(0, 40))).join(', ')}`
+        );
     }
     console.log(`evidence: ${outDir}`);
     return ok;

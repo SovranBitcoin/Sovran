@@ -159,33 +159,19 @@
       ]
     },
     {
-      "name": "open the account switcher",
-      "tap": {
-        "id": "wallet-unit-switcher"
+      "name": "swipe the balance across to the test bitcoin account",
+      "swipe": {
+        "on": {
+          "id": "wallet-balance-toggle-tusd"
+        },
+        "direction": "right",
+        "distance": 0.5
       },
       "expect": [
         {
-          "visible": {
-            "id": "wallet-unit-switcher"
-          }
-        }
-      ]
-    },
-    {
-      "name": "choose the test bitcoin account",
-      "tap": {
-        "label": "Test Bitcoin account"
-      },
-      "expect": [
-        {
-          "logged": "wallet.unit.menu_selected",
+          "logged": "store.mint.set_active_unit",
           "with": {
             "to": "tsat"
-          }
-        },
-        {
-          "visible": {
-            "label": "Balance, 0 tBTC"
           }
         }
       ]

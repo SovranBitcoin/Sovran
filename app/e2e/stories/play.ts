@@ -15,13 +15,25 @@ type Element = AppScreen['elements'][number];
 const ANSWER_WITHIN_MS = 2000;
 /** An answer slower than this means touches were not being handled either. */
 const SLOW_ANSWER_MS = 250;
+/**
+ * After a swipe the picture must be unchanged for this long. A list that has
+ * been dragged past its end springs back with a tail the eye cannot see, and
+ * until it ends iOS spends the next tap on stopping the list.
+ */
+const STILL_AFTER_SWIPE_MS = 400;
+/** A list springing back on a busy machine was seen still moving after 900 ms; it is given this long. */
+const SWIPE_SETTLES_WITHIN_MS = 3000;
 /** Which way the finger moves, as steps across and down the screen. */
 const SWIPES = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] } as const;
 
 /** The one thing a device does for a story: touch the glass. */
 /** Says when the picture on screen has stopped changing. */
 interface PixelWatch {
-  pixelsStill(): Promise<{ movedForMs: number; stillMoving: boolean }>;
+  /** `stillForMs`: how long the picture must not change; the watch's own default when left out. */
+  pixelsStill(
+    stillForMs?: number,
+    giveUpAfterMs?: number
+  ): Promise<{ movedForMs: number; stillMoving: boolean }>;
 }
 
 export interface TouchDevice {
@@ -175,12 +187,28 @@ async function playStep(
 
   try {
     if (step.tap) {
+      // A page that began to slide after the last step ended is still moving
+      // under the finger; a tap then lands on nothing, or on what was there before.
+      await pixels?.pixelsStill();
       const screen = await readScreen();
       const inApp = find(step.tap, screen);
       // What iOS draws itself (a menu, an alert) is not in the app's map; the
       // simulator knows it by its label, at most of a second per look.
-      const outside =
-        !inApp && 'label' in step.tap ? await device.findSystemControl?.(step.tap.label) : null;
+      type Placed = { x: number; y: number; width: number; height: number } | null;
+      let outside = null as Placed;
+      if (!inApp && 'label' in step.tap && device.findSystemControl) {
+        // A menu iOS is still opening is not there on the first look. This is the
+        // one place the runner looks again: nothing has been touched yet.
+        // It is also still moving as it opens: it is tapped once two looks agree on where it is.
+        let before = null as Placed;
+        do {
+          before = outside;
+          outside = await device.findSystemControl(step.tap.label);
+        } while (
+          (!outside || !before || before.x !== outside.x || before.y !== outside.y) &&
+          performance.now() < deadline
+        );
+      }
       if (!inApp && !outside)
         return finish(`Nothing to tap: ${describeSelector(step.tap)} is not on screen`);
       if (inApp?.disabled)
@@ -243,7 +271,9 @@ async function playStep(
       if (problems.length === 0) {
         // The app is still and says what was expected; the eye may not agree
         // yet. An animation off the JavaScript thread shows only in the pixels.
-        motion = await pixels?.pixelsStill();
+        motion = step.swipe
+          ? await pixels?.pixelsStill(STILL_AFTER_SWIPE_MS, SWIPE_SETTLES_WITHIN_MS)
+          : await pixels?.pixelsStill();
         return finish();
       }
       const left = deadline - performance.now();
