@@ -43,6 +43,9 @@
           "visible": {
             "id": "near-pay-peers"
           }
+        },
+        {
+          "logged": "ui.touch"
         }
       ],
       "withinMs": 10000

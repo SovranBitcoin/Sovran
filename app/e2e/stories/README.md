@@ -20,17 +20,17 @@ can be another's start. `--look` lists what is on screen when a story ends, whic
 | First launch, Terms, Privacy, onboarding | `first-launch-accept-terms`, `states/onboarded`, `open-an-empty-wallet` |
 | Wallet home, account switch, More menu | `browse-the-tabs`, `search-from-the-wallet`, `open-history-from-more`, `states/testnut-mint` |
 | Receive: hub, amount, Lightning, on-chain, payment request, QR, token, scanner | `receive-100-sats-on-testnut`, `ask-for-an-onchain-payment`, `ask-for-ecash-with-a-payment-request`, `show-a-code-to-get-paid`, `copy-a-token-and-redeem-it`, `open-the-scanner` |
-| Send: hub, amount, token, Lightning | `send-40-sats-as-ecash`, `pay-a-lightning-invoice`, `an-invoice-already-paid-is-refused`, `take-back-unclaimed-ecash`, `sending-with-no-money-is-refused`, `a-bitcoin-address-is-recognised`, `pick-the-notes-to-send` |
+| Send: hub, amount, token, Lightning | `send-40-sats-as-ecash`, `pay-a-lightning-invoice`, `an-invoice-already-paid-is-refused`, `take-back-unclaimed-ecash`, `sending-with-no-money-is-refused`, `a-bitcoin-address-is-recognised`, `start-an-onchain-send`, `pick-the-notes-to-send`, `the-lock-question-when-paying-a-person` |
 | Nut Drop | `open-nut-drop`, `look-for-people-nearby` |
 | Transactions, filters, details | `see-the-payments-in-history`, `filter-the-history` |
 | Mints: list, add, info, reviews, updates, split, rebalance plan | `states/testnut-mint`, `read-about-the-test-mint`, `read-the-reviews-of-a-mint`, `see-how-a-mint-has-changed`, `see-the-balance-split`, `see-the-rebalance-plan` |
 | Map | `find-bitcoin-near-me` |
 | Theme and wallpaper | `preview-the-theme`, `browse-the-wallpaper-gallery`, `apply-a-wallpaper` |
 | Profiles | `add-a-second-profile`, `switch-back-to-the-first-profile`, `start-editing-a-profile-and-leave` |
-| Backup and recovery | `write-down-the-recovery-words`, `back-up-the-wallet-and-pass-the-check`, `find-where-the-recovery-phrase-is-kept`, `look-at-recover-wallet-and-cancel`, `start-a-wallet-recovery` |
-| Settings | `open-settings-and-read-the-terms`, `make-notifications-strict`, `see-where-the-feed-comes-from`, `look-at-swap-routing`, `see-the-keys-ecash-can-be-locked-to`, `look-at-moderation`, `look-at-my-media`, `look-at-delete-account-and-leave` |
-| Developer rows | `turn-on-mock-mode`, `the-app-says-when-it-is-offline`, `look-at-the-storage-inventory`, `open-the-design-system`, `preview-screens-in-the-design-system`, `walk-the-design-system-families`, `walk-the-design-system-flows` |
-| Feed, composer | `draft-a-post-and-discard-it` |
+| Backup and recovery | `write-down-the-recovery-words`, `back-up-the-wallet-and-pass-the-check`, `find-where-the-recovery-phrase-is-kept`, `look-at-recover-wallet-and-cancel`, `start-a-wallet-recovery`, `recover-a-wallet-from-its-mints` |
+| Settings | `open-settings-and-read-the-terms`, `make-notifications-strict`, `see-where-the-feed-comes-from`, `look-at-swap-routing`, `see-the-keys-ecash-can-be-locked-to`, `look-at-moderation`, `look-at-my-media`, `look-at-delete-account-and-leave`, `delete-the-account-and-start-again` |
+| Developer rows | `turn-on-mock-mode`, `the-app-says-when-it-is-offline`, `look-at-the-storage-inventory`, `open-the-design-system`, `preview-screens-in-the-design-system`, `walk-the-design-system-families`, `walk-the-rest-of-the-design-system`, `walk-the-design-system-flows`, `open-the-sample-mint-and-map-flows` |
+| Feed, composer, a post's thread | `draft-a-post-and-discard-it`, `open-a-posts-thread` (from the design system's sample posts) |
 | Contacts, groups, a person's profile, sharing | `look-at-a-contact`, `look-at-groups`, `show-a-contacts-public-key` |
 | Notifications | `read-the-notification-tabs`, `read-the-app-notifications` |
 | Remote Login | `open-remote-login`, `share-remote-login`, `look-at-remote-login-activity` |
@@ -41,19 +41,18 @@ can be another's start. `--look` lists what is on screen when a story ends, whic
 - **Scanning a real code, photos, the flashlight**: a simulator has no camera picture to scan; the scanner page opens.
 - **AI pages**: the default build leaves them out.
 - **Messages (direct, Bitchat, White Noise, geohash chat)**: they need a second wallet to talk to.
-- **Paying a person**: with no contacts that take payments, Send lists nobody; in Mock Mode it lists pretend people,
-  and tapping one did nothing when tried.
+- **Sending to a person past the lock question**: it would send a message to a real person's key.
 - **Publishing**: posting, following, saving a profile, reviewing a mint. A story must not publish to public relays.
-- **Deleting an account, rotating the Remote Login secret**: opened where there is a page, never confirmed.
-- **A recovery run to its end**: it searches four real mints and takes minutes; the story sees it start.
-- **On-chain send beyond recognising the address, swaps between mints, locked ecash**: each needs money on a mint
-  the run controls, and on two mints for a swap.
-- **A person's stories, a post's thread**: which posts and whose stories are there changes from run to run, and
-  the feed's posts have no control that opens the thread by id.
+- **Rotating the Remote Login secret**: not done.
+- **On-chain send past the amount, swaps between mints, a locked token made and redeemed**: each needs money on a
+  mint the run controls, and on two mints for a swap.
+- **A person's stories, a thread from the live feed**: which posts and whose stories are there changes from run
+  to run. The thread page is played from the design system's sample posts instead.
 - **A place on the map**: the markers are drawn by the map, not by the app.
-- **Three design-system families at or below the fold, and the add-a-mint sample flow**: not written yet.
-- **Android**: the driver is for the iPhone simulator only.
-- **Failure toggles**: "Mock Fail Send" did not make a real send fail when tried; "Mock Fail Melt" was not tried.
+- **Android, and a phone**: the driver is for the iPhone simulator only.
+- **Making a real payment fail on purpose**: with "Mock Fail Send" or "Mock Fail Melt" on, a real send and a real
+  Lightning payment went through as usual; the toggles do not reach real payments. The failures that have stories
+  are real ones: an invoice already paid, and no money.
 
 ## Money stories form one line
 

@@ -1,0 +1,268 @@
+{
+  "id": "walk-the-rest-of-the-design-system",
+  "purpose": "A person scrolls to the end of the design system and opens the last component families in turn.",
+  "startsFrom": "onboarded",
+  "steps": [
+    {
+      "name": "the wallet opens",
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-send"
+          }
+        },
+        {
+          "logged": "splash.gone"
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "open the drawer",
+      "tap": {
+        "id": "header-profile-avatar"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "drawer-menu-settings"
+          }
+        }
+      ]
+    },
+    {
+      "name": "open Settings",
+      "tap": {
+        "id": "drawer-menu-settings"
+      },
+      "expect": [
+        {
+          "page": "SettingsScreen"
+        },
+        {
+          "visible": {
+            "id": "settings-profile-row"
+          }
+        }
+      ]
+    },
+    {
+      "name": "scroll down to the end",
+      "swipe": {
+        "on": {
+          "id": "settings-network-row"
+        },
+        "direction": "up",
+        "distance": 0.6
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "settings-version-row"
+          }
+        }
+      ]
+    },
+    {
+      "name": "press the version, once",
+      "tap": {
+        "id": "settings-version-row"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "settings-terms-row"
+          }
+        }
+      ]
+    },
+    {
+      "name": "press the version, twice",
+      "tap": {
+        "id": "settings-version-row"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "settings-terms-row"
+          }
+        }
+      ]
+    },
+    {
+      "name": "press the version, three times",
+      "tap": {
+        "id": "settings-version-row"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "settings-terms-row"
+          }
+        }
+      ]
+    },
+    {
+      "name": "scroll to the developer rows",
+      "swipe": {
+        "on": {
+          "id": "settings-terms-row"
+        },
+        "direction": "up",
+        "distance": 0.5
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "settings-design-system-row"
+          }
+        }
+      ]
+    },
+    {
+      "name": "open the design system",
+      "tap": {
+        "id": "settings-design-system-row"
+      },
+      "expect": [
+        {
+          "page": "SettingsDesignSystemScreen"
+        },
+        {
+          "visible": {
+            "id": "design-system-screens-row"
+          }
+        },
+        {
+          "visible": {
+            "id": "design-system-flow-send"
+          }
+        }
+      ],
+      "withinMs": 10000
+    },
+    {
+      "name": "scroll",
+      "swipe": {
+        "on": {
+          "id": "design-system-flow-send"
+        },
+        "direction": "up",
+        "distance": 0.38
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "design-system-family-headers"
+          }
+        }
+      ]
+    },
+    {
+      "name": "scroll again",
+      "swipe": {
+        "on": {
+          "id": "screen-settings-design-system"
+        },
+        "direction": "up",
+        "distance": 0.5
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "design-system-family-fake-posts"
+          }
+        },
+        {
+          "visible": {
+            "id": "design-system-family-fade-reveal-stress"
+          }
+        }
+      ]
+    },
+    {
+      "name": "open skeleton crossfade",
+      "tap": {
+        "id": "design-system-family-skeleton-crossfade"
+      },
+      "expect": [
+        {
+          "gone": {
+            "id": "design-system-family-skeleton-crossfade"
+          }
+        }
+      ],
+      "withinMs": 10000
+    },
+    {
+      "name": "back from skeleton crossfade",
+      "tap": {
+        "id": "flow-header-back"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "design-system-family-skeleton-crossfade"
+          }
+        }
+      ],
+      "withinMs": 10000
+    },
+    {
+      "name": "open fade reveal stress",
+      "tap": {
+        "id": "design-system-family-fade-reveal-stress"
+      },
+      "expect": [
+        {
+          "gone": {
+            "id": "design-system-family-fade-reveal-stress"
+          }
+        }
+      ],
+      "withinMs": 10000
+    },
+    {
+      "name": "back from fade reveal stress",
+      "tap": {
+        "id": "flow-header-back"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "design-system-family-fade-reveal-stress"
+          }
+        }
+      ],
+      "withinMs": 10000
+    },
+    {
+      "name": "open fake posts",
+      "tap": {
+        "id": "design-system-family-fake-posts"
+      },
+      "expect": [
+        {
+          "gone": {
+            "id": "design-system-family-fake-posts"
+          }
+        }
+      ],
+      "withinMs": 10000
+    },
+    {
+      "name": "back from fake posts",
+      "tap": {
+        "id": "flow-header-back"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "design-system-family-fake-posts"
+          }
+        }
+      ],
+      "withinMs": 10000
+    }
+  ]
+}

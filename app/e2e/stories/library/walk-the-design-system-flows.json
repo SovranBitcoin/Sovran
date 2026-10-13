@@ -53,7 +53,7 @@
           "id": "settings-network-row"
         },
         "direction": "up",
-        "distance": 0.45
+        "distance": 0.6
       },
       "expect": [
         {

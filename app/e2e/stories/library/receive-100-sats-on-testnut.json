@@ -45,6 +45,9 @@
           "visible": {
             "id": "keypad-key-1"
           }
+        },
+        {
+          "logged": "ui.touch"
         }
       ]
     },

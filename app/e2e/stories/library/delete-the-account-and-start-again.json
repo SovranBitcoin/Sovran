@@ -1,0 +1,134 @@
+{
+  "id": "delete-the-account-and-start-again",
+  "purpose": "A person deletes their account from Settings by swiping to confirm, and the app starts again at the Terms as if newly installed. Only ever played on a simulator's throwaway wallet.",
+  "startsFrom": "onboarded",
+  "steps": [
+    {
+      "name": "the wallet opens",
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-send"
+          }
+        },
+        {
+          "logged": "splash.gone"
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "open the drawer",
+      "tap": {
+        "id": "header-profile-avatar"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "drawer-menu-settings"
+          }
+        }
+      ]
+    },
+    {
+      "name": "open Settings",
+      "tap": {
+        "id": "drawer-menu-settings"
+      },
+      "expect": [
+        {
+          "page": "SettingsScreen"
+        },
+        {
+          "visible": {
+            "id": "settings-profile-row"
+          }
+        }
+      ]
+    },
+    {
+      "name": "scroll down to the end",
+      "swipe": {
+        "on": {
+          "id": "settings-network-row"
+        },
+        "direction": "up",
+        "distance": 0.6
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "settings-version-row"
+          }
+        }
+      ]
+    },
+    {
+      "name": "open Delete account",
+      "tap": {
+        "id": "settings-delete-row"
+      },
+      "expect": [
+        {
+          "page": "DeleteScreen"
+        },
+        {
+          "visible": {
+            "id": "screen-delete"
+          }
+        }
+      ],
+      "withinMs": 10000
+    },
+    {
+      "name": "scroll to the end",
+      "swipe": {
+        "on": {
+          "id": "screen-delete"
+        },
+        "direction": "up",
+        "distance": 0.6
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "settings-delete-slider"
+          }
+        },
+        {
+          "visible": {
+            "id": "settings-delete-cancel"
+          }
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "swipe to delete",
+      "swipe": {
+        "on": {
+          "id": "settings-delete-slider"
+        },
+        "direction": "right",
+        "distance": 0.85,
+        "from": [0.08, 0.5]
+      },
+      "expect": [
+        {
+          "gone": {
+            "id": "settings-delete-slider"
+          }
+        },
+        {
+          "visible": {
+            "id": "terms-acceptance"
+          }
+        },
+        {
+          "page": "LegalDocumentScreen"
+        }
+      ],
+      "withinMs": 60000
+    }
+  ]
+}

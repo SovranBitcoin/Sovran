@@ -1,0 +1,228 @@
+{
+  "id": "open-the-sample-mint-and-map-flows",
+  "purpose": "A person opens the design system's sample flow for adding a mint and its sample of the bitcoin map, and closes each.",
+  "startsFrom": "onboarded",
+  "steps": [
+    {
+      "name": "the wallet opens",
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-send"
+          }
+        },
+        {
+          "logged": "splash.gone"
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "open the drawer",
+      "tap": {
+        "id": "header-profile-avatar"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "drawer-menu-settings"
+          }
+        }
+      ]
+    },
+    {
+      "name": "open Settings",
+      "tap": {
+        "id": "drawer-menu-settings"
+      },
+      "expect": [
+        {
+          "page": "SettingsScreen"
+        },
+        {
+          "visible": {
+            "id": "settings-profile-row"
+          }
+        }
+      ]
+    },
+    {
+      "name": "scroll down to the end",
+      "swipe": {
+        "on": {
+          "id": "settings-network-row"
+        },
+        "direction": "up",
+        "distance": 0.6
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "settings-version-row"
+          }
+        }
+      ]
+    },
+    {
+      "name": "press the version, once",
+      "tap": {
+        "id": "settings-version-row"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "settings-terms-row"
+          }
+        }
+      ]
+    },
+    {
+      "name": "press the version, twice",
+      "tap": {
+        "id": "settings-version-row"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "settings-terms-row"
+          }
+        }
+      ]
+    },
+    {
+      "name": "press the version, three times",
+      "tap": {
+        "id": "settings-version-row"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "settings-terms-row"
+          }
+        }
+      ]
+    },
+    {
+      "name": "scroll to the developer rows",
+      "swipe": {
+        "on": {
+          "id": "settings-terms-row"
+        },
+        "direction": "up",
+        "distance": 0.5
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "settings-design-system-row"
+          }
+        }
+      ]
+    },
+    {
+      "name": "open the design system",
+      "tap": {
+        "id": "settings-design-system-row"
+      },
+      "expect": [
+        {
+          "page": "SettingsDesignSystemScreen"
+        },
+        {
+          "visible": {
+            "id": "design-system-screens-row"
+          }
+        },
+        {
+          "visible": {
+            "id": "design-system-flow-send"
+          }
+        }
+      ],
+      "withinMs": 10000
+    },
+    {
+      "name": "scroll a little",
+      "swipe": {
+        "on": {
+          "id": "design-system-flow-send"
+        },
+        "direction": "up",
+        "distance": 0.2
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "design-system-flow-add-mint"
+          }
+        },
+        {
+          "visible": {
+            "id": "design-system-flow-map"
+          }
+        }
+      ]
+    },
+    {
+      "name": "open the add-a-mint flow",
+      "tap": {
+        "id": "design-system-flow-add-mint"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "screen-mint-add"
+          }
+        }
+      ],
+      "withinMs": 10000
+    },
+    {
+      "name": "close it",
+      "tap": {
+        "id": "flow-header-close"
+      },
+      "expect": [
+        {
+          "gone": {
+            "id": "screen-mint-add"
+          }
+        },
+        {
+          "visible": {
+            "id": "design-system-flow-map"
+          }
+        }
+      ],
+      "withinMs": 10000
+    },
+    {
+      "name": "open the map flow",
+      "tap": {
+        "id": "design-system-flow-map"
+      },
+      "expect": [
+        {
+          "gone": {
+            "id": "design-system-flow-map"
+          }
+        }
+      ],
+      "withinMs": 15000
+    },
+    {
+      "name": "close the map",
+      "tap": {
+        "id": "flow-header-close"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "design-system-flow-map"
+          }
+        }
+      ],
+      "withinMs": 10000
+    }
+  ]
+}

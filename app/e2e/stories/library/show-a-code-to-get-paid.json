@@ -43,6 +43,9 @@
           "visible": {
             "id": "receive-copy"
           }
+        },
+        {
+          "logged": "ui.touch"
         }
       ],
       "withinMs": 10000

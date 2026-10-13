@@ -217,6 +217,25 @@ async function playStep(
     };
   };
 
+  /**
+   * Find a control the step is about to act on. One that is out of the app's
+   * tree for a moment, while its page draws again, is looked for again for a
+   * short while; looking touches nothing.
+   */
+  const lookFor = async (selector: TapSelector) => {
+    let screen = await readScreen();
+    let found = find(selector, screen);
+    for (
+      const lookedFrom = performance.now();
+      !found && performance.now() - lookedFrom < APPEARS_WITHIN_MS;
+    ) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      screen = await readScreen();
+      found = find(selector, screen);
+    }
+    return { screen, found };
+  };
+
   try {
     if (step.tap) {
       // A page that began to slide after the last step ended is still moving
@@ -290,13 +309,13 @@ async function playStep(
       }
     }
     if (step.swipe) {
-      const screen = await readScreen();
-      const target = find(step.swipe.on, screen);
+      const { screen, found: target } = await lookFor(step.swipe.on);
       if (!target)
         return finish(`Nothing to swipe: ${describeSelector(step.swipe.on)} is not on screen`);
+      const [startAcross, startDown] = step.swipe.from ?? [0.5, 0.5];
       const from: [number, number] = [
-        (target.x + target.width / 2) / screen.width,
-        (target.y + target.height / 2) / screen.height,
+        (target.x + target.width * startAcross) / screen.width,
+        (target.y + target.height * startDown) / screen.height,
       ];
       const [across, down] = SWIPES[step.swipe.direction];
       const clamp = (fraction: number) => Math.min(0.98, Math.max(0.02, fraction));
@@ -307,8 +326,7 @@ async function playStep(
     }
     if (step.type) {
       if (step.type.into) {
-        const screen = await readScreen();
-        const target = find(step.type.into, screen);
+        const { screen, found: target } = await lookFor(step.type.into);
         if (!target)
           return finish(
             `Nothing to type into: ${describeSelector(step.type.into)} is not on screen`

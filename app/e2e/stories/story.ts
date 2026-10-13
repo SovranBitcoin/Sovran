@@ -64,6 +64,11 @@ const stepSchema = z
         on: selectorSchema,
         direction: z.enum(['up', 'down', 'left', 'right']),
         distance: z.number().min(0.05).max(0.9).default(0.3),
+        /**
+         * Where in the element the finger goes down, as fractions of its width
+         * and height: its centre unless said. A slider is dragged from its handle.
+         */
+        from: z.tuple([z.number().min(0).max(1), z.number().min(0).max(1)]).optional(),
       })
       .optional(),
     /**
@@ -80,7 +85,7 @@ const stepSchema = z
       .optional(),
     expect: z.array(expectationSchema).min(1),
     /** How long the expectations may take. Only a step that waits on a mint or a relay needs more. */
-    withinMs: z.number().int().min(100).max(60_000).default(5000),
+    withinMs: z.number().int().min(100).max(300_000).default(5000),
   })
   .refine(
     (step) => [step.tap, step.swipe, step.type].filter(Boolean).length <= 1,
