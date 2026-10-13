@@ -19,7 +19,7 @@ can be another's start. `--look` lists what is on screen when a story ends, whic
 | ------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | First launch, Terms, Privacy, onboarding                                       | `first-launch-accept-terms`, `states/onboarded`, `open-an-empty-wallet`                                                                                                                                                                                                                                                          |
 | Wallet home, account switch, More menu                                         | `browse-the-tabs`, `search-from-the-wallet`, `open-history-from-more`, `states/testnut-mint`                                                                                                                                                                                                                                     |
-| Receive: hub, amount, Lightning, on-chain, payment request, QR, token, scanner | `receive-100-sats-on-testnut`, `receive-100-sats-on-the-private-mint`, `ask-for-an-onchain-payment`, `ask-for-ecash-with-a-payment-request`, `show-a-code-to-get-paid`, `copy-a-token-and-redeem-it`, `open-the-scanner`                                                                                                         |
+| Receive: hub, amount, Lightning, on-chain, payment request, QR, token, scanner | `receive-100-sats-on-testnut`, `receive-100-sats-on-the-private-mint`, `ask-for-an-onchain-payment`, `ask-for-ecash-with-a-payment-request`, `show-a-code-to-get-paid`, `copy-a-token-and-redeem-it`, `redeem-ecash-from-a-link`, `redeem-ecash-locked-to-my-key`, `open-the-scanner`                                            |
 | Send: hub, amount, token, Lightning, on-chain                                  | `send-40-sats-as-ecash`, `pay-a-lightning-invoice`, `an-invoice-already-paid-is-refused`, `take-back-unclaimed-ecash`, `sending-with-no-money-is-refused`, `a-bitcoin-address-is-recognised`, `start-an-onchain-send`, `send-on-chain-from-the-private-mint`, `pick-the-notes-to-send`, `the-lock-question-when-paying-a-person` |
 | Nut Drop                                                                       | `open-nut-drop`, `look-for-people-nearby`                                                                                                                                                                                                                                                                                        |
 | Transactions, filters, details                                                 | `see-the-payments-in-history`, `filter-the-history`                                                                                                                                                                                                                                                                              |
@@ -44,8 +44,11 @@ can be another's start. `--look` lists what is on screen when a story ends, whic
 - **Sending to a person past the lock question**: it would send a message to a real person's key.
 - **Publishing**: posting, following, saving a profile, reviewing a mint. A story must not publish to public relays.
 - **Rotating the Remote Login secret**: not done.
-- **A locked token made and redeemed**: locking to a person sends them a message; locking to a key of the wallet's
-  own has not been tried.
+- **Locking ecash the person sends**: locking to a person sends them a message. Ecash locked to the wallet's own
+  key and handed to it has a story.
+- **`lightning:` and `bitcoin:` links from outside the app**: they land on the page-not-found page (F151).
+- **A link opened over an open Settings page**: redeeming then can hang the app (F150), so the stories close
+  Settings first.
 - **A person's stories, a thread from the live feed**: which posts and whose stories are there changes from run
   to run. The thread page is played from the design system's sample posts instead.
 - **A place on the map**: the markers are drawn by the map, not by the app.
@@ -63,6 +66,14 @@ on-chain payment is "sent" at once. The mints' databases are saved and put back 
 story that starts from `states/private-mint` or `receive-100-sats-on-the-private-mint` can be played again and
 again and any number of stories can start from the same moment. They run only for a story that names them or
 starts from a state that holds them. Needs `cdk-mintd`, `socat` and `openssl` on the Mac.
+
+## A second wallet, and links
+
+A step with `handed: { "token": { "sats": 32 } }` is handed ecash as it begins: the runner acts as a second
+wallet on the simulator's first mint (`secondWallet.ts`) and the step uses it as `{{token}}`. `lockTo` locks it to
+a public key, which may be one remembered off the screen (`remember` with `idAfter` keeps what follows a prefix in
+a row's id). `open` opens a link as another app would, and answers iOS's "Open in Sovran?" for the person.
+Nothing is published and no other phone is needed.
 
 ## Money stories on the public test mint form one line
 
