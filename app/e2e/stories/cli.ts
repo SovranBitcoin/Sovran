@@ -17,6 +17,12 @@ import { startAppLink } from '../link/appLink';
 import { createScreenWatch, keepVideo, pictureName, recordSimulator } from './evidence';
 import { withGiven } from './given';
 import { playStory, topPage } from './play';
+import {
+  ensureCertificates,
+  holdsPrivateMints,
+  privateMintAddresses,
+  startPrivateMints,
+} from './privateMint';
 import { storySimulator } from './simulator';
 import { madeFrom, reachState } from './states';
 import { storySchema, type Story } from './story';
@@ -43,6 +49,8 @@ if ((!storyPath && !onlyState) || !udid || !appPath) {
 const LAST_FRAME_MS = 300;
 const STORIES_OUT = join(dirname(fileURLToPath(import.meta.url)), '../artifacts/stories');
 
+// Made before the simulator is told to trust them.
+ensureCertificates();
 const simulator = storySimulator(udid);
 /** Where the run's time went, in milliseconds, by what the runner was doing. */
 const spent: Record<string, number> = { runnerStart: Math.round(performance.now()) };
@@ -156,6 +164,26 @@ const play = async (story: Story, outDir: string, look: boolean): Promise<boolea
   }
 };
 
+/**
+ * Play a story with the simulator's own mints running (`{{mint}}`, `{{mint2}}`):
+ * started from where their folder was left (put back with the wallet's state), and stopped afterwards so
+ * the folder can be saved or put back again.
+ */
+const playWithMint = async (story: Story, outDir: string, look: boolean) => {
+  // A story that neither names a mint of its own nor starts from one waits on none.
+  if (!JSON.stringify(story).includes('{{mint') && !holdsPrivateMints(simulator.mintFolder())) {
+    return play(await withGiven(story), outDir, look);
+  }
+  const stopMint = await startPrivateMints(udid, simulator.mintFolder());
+  try {
+    const [mint, mint2] = privateMintAddresses(udid);
+    const ready = await withGiven(story, { mint: mint.url, mint2: mint2.url });
+    return await play(ready, outDir, look);
+  } finally {
+    stopMint();
+  }
+};
+
 const storyText = storyPath ? readFileSync(storyPath, 'utf8') : undefined;
 const story = storyText ? storySchema.parse(JSON.parse(storyText)) : undefined;
 const stateEvidence = (id: string) => join(STORIES_OUT, `state-${id}-${udid.slice(0, 8)}`);
@@ -165,8 +193,7 @@ try {
     hasState: simulator.hasState,
     startFrom: (state: string) => simulator.startFrom(appPath, state),
     // A state this simulator lacks is built by playing its story, with evidence of its own.
-    play: async (builder: Story) =>
-      play(await withGiven(builder), stateEvidence(builder.id), false),
+    play: (builder: Story) => playWithMint(builder, stateEvidence(builder.id), false),
     saveState: (name: string, from: string) => simulator.saveState(name, from),
   };
   if (!story || !storyText) {
@@ -189,7 +216,7 @@ try {
       await reachState(story.startsFrom, actions);
       for (const service of story.allow ?? []) simulator.allow(service);
       spentOn('startState');
-      ok = await play(await withGiven(story), outDir, flags.includes('--look'));
+      ok = await playWithMint(story, outDir, flags.includes('--look'));
       // Where it ended is kept, so a story that starts from here does not play this one again.
       if (ok) await simulator.saveState(story.id, endsIn);
       spentOn('saveState');

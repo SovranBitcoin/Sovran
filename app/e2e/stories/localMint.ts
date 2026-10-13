@@ -9,7 +9,7 @@
  */
 import { spawn, spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 /** Not a wallet anyone holds: the BIP39 test vector for all-zero entropy. */
@@ -17,9 +17,9 @@ const TEST_MNEMONIC =
   'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';
 const MNEMONIC_VARIABLE = 'SOVRAN_E2E_MINT_MNEMONIC';
 
-function mintConfig(port: number, instance: string): string {
+function mintConfig(port: number, instance: string, publicUrl: string): string {
   return `[info]
-url = "http://127.0.0.1:${port}/"
+url = "${publicUrl}/"
 listen_host = "127.0.0.1"
 listen_port = ${port}
 mnemonic = "env:${MNEMONIC_VARIABLE}"
@@ -48,27 +48,42 @@ interface LocalMint {
   stop(): void;
 }
 
+const DATABASE = 'cdk-mintd.sqlite';
+
 /**
- * Start a mint that listens on `port` and keeps its database in `dir`, which
- * is emptied first. Resolves once the mint answers.
+ * Start a mint that listens on `port` and keeps its database in `dir`.
+ * Resolves once the mint answers.
+ *
+ * `keep`: carry on from the database already in `dir`, when there is one,
+ * instead of starting empty. That is how a mint is put back to the moment a
+ * wallet's saved state was taken: its folder is copied back, and it is started
+ * from it. `publicUrl` is the address the mint tells wallets it has, when that
+ * is not the one it listens on.
  */
-export async function startLocalMint(dir: string, port: number): Promise<LocalMint> {
-  rmSync(dir, { recursive: true, force: true });
-  mkdirSync(dir, { recursive: true });
-  const config = join(dir, 'mint.toml');
+export async function startLocalMint(
+  dir: string,
+  port: number,
+  options: { keep?: boolean; publicUrl?: string } = {}
+): Promise<LocalMint> {
+  const url = `http://127.0.0.1:${port}`;
+  const env = { ...process.env, [MNEMONIC_VARIABLE]: TEST_MNEMONIC };
+  const carryOn = options.keep === true && existsSync(join(dir, DATABASE));
   // Another process may already answer on this port; only this instance's answer counts.
   const instance = randomUUID();
-  writeFileSync(config, mintConfig(port, instance));
-  const env = { ...process.env, [MNEMONIC_VARIABLE]: TEST_MNEMONIC };
-  const init = spawnSync('cdk-mintd', ['-w', dir, 'config', 'init', '--file', config], {
-    env,
-    encoding: 'utf8',
-  });
-  if (init.status !== 0) {
-    throw new Error(`The local mint refused its settings: ${init.stderr || init.stdout}`);
+  if (!carryOn) {
+    rmSync(dir, { recursive: true, force: true });
+    mkdirSync(dir, { recursive: true });
+    const config = join(dir, 'mint.toml');
+    writeFileSync(config, mintConfig(port, instance, options.publicUrl ?? url));
+    const init = spawnSync('cdk-mintd', ['-w', dir, 'config', 'init', '--file', config], {
+      env,
+      encoding: 'utf8',
+    });
+    if (init.status !== 0) {
+      throw new Error(`The local mint refused its settings: ${init.stderr || init.stdout}`);
+    }
   }
   const mint = spawn('cdk-mintd', ['-w', dir], { env, stdio: 'ignore' });
-  const url = `http://127.0.0.1:${port}`;
   const stop = () => {
     mint.kill();
   };
@@ -79,7 +94,8 @@ export async function startLocalMint(dir: string, port: number): Promise<LocalMi
     const answered = await fetch(`${url}/v1/info`, { signal: AbortSignal.timeout(500) })
       .then((response) => response.json() as Promise<{ description?: string }>)
       .catch(() => null); // Not listening yet.
-    if (answered?.description?.includes(instance)) return { url, stop };
+    // A mint carried on from a saved folder has the name it was first given.
+    if (answered && (carryOn || answered.description?.includes(instance))) return { url, stop };
     if (answered) {
       stop();
       throw new Error(`Something else is already the local mint at ${url}.`);

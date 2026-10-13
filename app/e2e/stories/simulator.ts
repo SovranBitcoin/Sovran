@@ -4,6 +4,7 @@
  * frames go through the simulator's own input and display, by the same native
  * addon the earlier driver used.
  */
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
@@ -14,6 +15,7 @@ import { writeRunnerNote } from '../link/appLink';
 import { emptyAppFolders, hasState, restoreState, saveState, type StatePlaces } from './savedState';
 import { keepScreenWatcher, type ScreenFrames } from './screenWatcher';
 import { keyPresses, SHIFT_KEY } from './keys';
+import { AUTHORITY } from './privateMint';
 import { simctl } from './simctl';
 import type { TouchDevice } from './play';
 
@@ -22,6 +24,8 @@ const BUNDLE_ID = 'com.sovranbitcoin.dev';
 export const FRESH = 'fresh';
 /** Saved states live inside the simulator's own folder, so a clone carries them. */
 const STATES_FOLDER = 'sovran-e2e-states';
+/** The simulator's own mint keeps its database beside the saved states. */
+const MINT_FOLDER = 'sovran-e2e-mint';
 const KEYCHAIN_SERVICE = 'com.apple.securityd';
 const SETTINGS_SERVICE = 'com.apple.cfprefsd.xpc.daemon';
 /** A swipe takes a quarter of a second: quick enough to be a swipe, slow enough to be followed. */
@@ -75,6 +79,8 @@ interface StorySimulator extends TouchDevice {
   startFrom(appPath: string, state: string): Promise<void>;
   /** Answer "yes" ahead of time to what iOS would ask before the app may use this. The app must be stopped. */
   allow(service: 'camera' | 'location'): void;
+  /** The folder this simulator's own mint keeps its database in. */
+  mintFolder(): string;
   /** Whether a state of this name, made this way, is saved on this simulator. */
   hasState(name: string, madeFrom: string): boolean;
   /** Stop the app and save the state it is in under a name. */
@@ -126,6 +132,7 @@ export function storySimulator(udid: string): StorySimulator {
       appData,
       keychains: join(deviceData, 'Library/Keychains'),
       store: join(deviceData, STATES_FOLDER),
+      mint: join(deviceData, MINT_FOLDER),
     };
   };
   /**
@@ -171,8 +178,10 @@ export function storySimulator(udid: string): StorySimulator {
         installed = false;
         simctl('install', udid, appPath);
       }
+      // The run's own certificate authority, so the simulator's mint is a mint iOS will talk to.
+      if (existsSync(AUTHORITY)) inSimulatorTool('keychain', 'add-root-cert', AUTHORITY);
       if (state === FRESH) {
-        if (installed) emptyAppFolders(places().appData);
+        if (installed) emptyAppFolders(places().appData, places().mint);
         // Settings are held by a system service, not only by the files just removed.
         inSimulator('defaults', 'delete', BUNDLE_ID);
         simctl('keychain', udid, 'reset');
@@ -186,6 +195,7 @@ export function storySimulator(udid: string): StorySimulator {
     allow(service) {
       inSimulatorTool('privacy', 'grant', service, BUNDLE_ID);
     },
+    mintFolder: () => places().mint,
     hasState: (name, madeFrom) => hasState(places(), name, madeFrom),
     async saveState(name, madeFrom) {
       this.terminate();

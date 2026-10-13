@@ -19,6 +19,7 @@ beforeEach(() => {
     appData: join(root, 'app'),
     keychains: join(root, 'keychains'),
     store: join(root, 'states'),
+    mint: join(root, 'mint'),
   };
   // A wallet that has finished onboarding, with its seed in the keychain.
   write('app/Documents/SQLite/wallet.db', 'onboarded wallet');
@@ -70,6 +71,18 @@ describe('a saved state of the app', () => {
 
     expect(read('app/Documents/e2e/runner.json')).toBeNull();
     expect(read('app/Documents/sovran-logs/log.txt')).toBeNull();
+  });
+
+  test("puts the simulator's own mint back to the same moment as the wallet", () => {
+    write('mint/cdk-mintd.sqlite', 'mint knows of 100 sats issued');
+    saveState(places, 'funded', 'v1');
+
+    write('mint/cdk-mintd.sqlite', 'mint knows of 100 issued and 40 spent');
+    restoreState(places, 'funded');
+    expect(read('mint/cdk-mintd.sqlite')).toBe('mint knows of 100 sats issued');
+
+    emptyAppFolders(places.appData, places.mint);
+    expect(read('mint/cdk-mintd.sqlite')).toBeNull();
   });
 
   test('is only used when it was made the same way', () => {

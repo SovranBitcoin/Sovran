@@ -37,6 +37,8 @@ export interface StatePlaces {
   keychains: string;
   /** Where this simulator's saved states are kept. */
   store: string;
+  /** The folder of this simulator's own mint, saved and put back with the wallet. */
+  mint: string;
 }
 
 function emptyFolder(folder: string): void {
@@ -45,9 +47,10 @@ function emptyFolder(folder: string): void {
     rmSync(join(folder, entry), { recursive: true, force: true });
 }
 
-/** Remove everything the app has written. */
-export function emptyAppFolders(appData: string): void {
+/** Remove everything the app has written, and the simulator's own mint with it. */
+export function emptyAppFolders(appData: string, mint?: string): void {
   for (const folder of APP_FOLDERS) emptyFolder(join(appData, folder));
+  if (mint) rmSync(mint, { recursive: true, force: true });
 }
 
 /**
@@ -75,6 +78,7 @@ export function saveState(places: StatePlaces, name: string, madeFrom: string): 
     if (KEYCHAIN_FILE.test(file))
       cpSync(join(places.keychains, file), join(saved, 'keychain', file));
   }
+  if (existsSync(places.mint)) cpSync(places.mint, join(saved, 'mint'), { recursive: true });
   // Written last: a state without it was interrupted and is not used.
   writeFileSync(join(saved, MADE_FROM), madeFrom);
 }
@@ -91,4 +95,8 @@ export function restoreState(places: StatePlaces, name: string): void {
   }
   for (const file of readdirSync(join(saved, 'keychain')))
     cpSync(join(saved, 'keychain', file), join(places.keychains, file));
+  // The mint goes back to the same moment: a wallet whose mint remembers a later one is refused.
+  rmSync(places.mint, { recursive: true, force: true });
+  if (existsSync(join(saved, 'mint')))
+    cpSync(join(saved, 'mint'), places.mint, { recursive: true });
 }

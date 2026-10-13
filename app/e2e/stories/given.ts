@@ -50,23 +50,30 @@ async function invoiceFromMint(mint: string, sats: number): Promise<string> {
   return quote.request;
 }
 
-/** The story with everything it was given put in place of its `{{name}}` marks. */
+/**
+ * The story with everything it was given put in place of its `{{name}}` marks,
+ * wherever they are written: text to type, the id of a row, a label. `known`
+ * is what the runner already has for it, such as the address of the
+ * simulator's own mint (`{{mint}}`).
+ */
 export async function withGiven(
   story: Story,
+  known: Record<string, string> = {},
   fetchInvoice: (mint: string, sats: number) => Promise<string> = invoiceFrom
 ): Promise<Story> {
-  const given: Record<string, string> = {};
+  const given: Record<string, string> = { ...known };
   if (story.given?.invoice)
     given.invoice = await fetchInvoice(story.given.invoice.mint, story.given.invoice.sats);
-  return {
-    ...story,
-    steps: story.steps.map((step) => {
-      if (!step.type) return step;
-      const text = step.type.text.replace(/\{\{(\w+)\}\}/g, (mark, name: string) => {
-        if (!(name in given)) throw new Error(`The story types ${mark} but was given no ${name}.`);
-        return given[name];
+  const fill = (value: unknown): unknown => {
+    if (typeof value === 'string')
+      return value.replace(/\{\{(\w+)\}\}/g, (mark, name: string) => {
+        // Left as written: a later step may fill it from what an earlier one remembered.
+        return name in given ? given[name] : mark;
       });
-      return { ...step, type: { ...step.type, text } };
-    }),
+    if (Array.isArray(value)) return value.map(fill);
+    if (value && typeof value === 'object')
+      return Object.fromEntries(Object.entries(value).map(([key, each]) => [key, fill(each)]));
+    return value;
   };
+  return { ...story, steps: fill(story.steps) as Story['steps'] };
 }

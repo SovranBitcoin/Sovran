@@ -15,6 +15,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { lanes } from './lanes';
 import { runPool } from './pool';
+import { ensureCertificates } from './privateMint';
 import { writeRunReport } from './runReport';
 import { prepareBase, removeWorkers, startWorkers } from './workers';
 
@@ -108,6 +109,8 @@ process.on('SIGINT', () => {
 const started = performance.now();
 let failed = 0;
 try {
+  // Made once here: every worker's story would otherwise make them at the same moment.
+  ensureCertificates();
   const base = prepareBase(appPath);
   const prepared = performance.now();
   const workers = startWorkers(base, workerCount);
