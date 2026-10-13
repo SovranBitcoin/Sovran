@@ -13,6 +13,7 @@ import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { lanes } from './lanes';
 import { runPool } from './pool';
 import { writeRunReport } from './runReport';
 import { prepareBase, removeWorkers, startWorkers } from './workers';
@@ -30,6 +31,8 @@ const appPath = flag('app') ?? join(HERE, '../artifacts/native-builds/ios-bundle
 const outRoot = join(HERE, '../artifacts/stories');
 
 interface Play {
+  id: string;
+  startsFrom: string;
   file: string;
   out: string;
 }
@@ -39,6 +42,10 @@ const files = readdirSync(storiesDir)
   .toSorted();
 const plays: Play[] = Array.from({ length: repeat }, (_, round) =>
   files.map((name) => ({
+    ...(JSON.parse(readFileSync(join(storiesDir, name), 'utf8')) as {
+      id: string;
+      startsFrom: string;
+    }),
     file: join(storiesDir, name),
     out: join(outRoot, repeat === 1 ? name.slice(0, -5) : `${name.slice(0, -5)}-${round + 1}`),
   }))
@@ -105,7 +112,22 @@ try {
   const prepared = performance.now();
   const workers = startWorkers(base, workerCount);
   const booted = performance.now();
-  const results = await runPool(plays, workers, playOne);
+  // A worker takes a whole lane: stories that follow from one another, in order.
+  const played_ = await runPool(lanes(plays), workers, async (lane, worker) => {
+    const outcomes: {
+      story: Play;
+      worker: string;
+      outcome: { ok: boolean; output: string };
+      wallMs: number;
+    }[] = [];
+    for (const story of lane) {
+      const began = performance.now();
+      const outcome = await playOne(story, worker);
+      outcomes.push({ story, worker, outcome, wallMs: Math.round(performance.now() - began) });
+    }
+    return outcomes;
+  });
+  const results = played_.flatMap((lane) => lane.outcome);
   const played = performance.now();
   const seconds = (ms: number) => (ms / 1000).toFixed(1);
   for (const result of results) {

@@ -1,0 +1,83 @@
+{
+  "id": "take-back-unclaimed-ecash",
+  "purpose": "A person who made a 40 sat ecash token that nobody claimed cancels it, and the wallet takes the sats back and marks the send cancelled.",
+  "startsFrom": "an-invoice-already-paid-is-refused",
+  "steps": [
+    {
+      "name": "the wallet opens with the send still pending",
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-send"
+          }
+        },
+        {
+          "visible": {
+            "idPrefix": "transaction-send-"
+          }
+        },
+        {
+          "logged": "splash.gone"
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "open the pending ecash",
+      "tap": {
+        "idPrefix": "transaction-send-send"
+      },
+      "expect": [
+        {
+          "page": "SendTokenScreen"
+        },
+        {
+          "visible": {
+            "id": "more-button"
+          }
+        },
+        {
+          "visible": {
+            "label": "Outgoing 40 sat transaction, pending"
+          }
+        }
+      ],
+      "withinMs": 10000
+    },
+    {
+      "name": "open More",
+      "tap": {
+        "id": "more-button"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "send-token-cancel-transaction"
+          }
+        }
+      ]
+    },
+    {
+      "name": "cancel the transaction",
+      "tap": {
+        "id": "send-token-cancel-transaction"
+      },
+      "expect": [
+        {
+          "logged": "operations.rollbackSend.done"
+        },
+        {
+          "visible": {
+            "label": "Outgoing 40 sat transaction, rolledBack"
+          }
+        },
+        {
+          "gone": {
+            "id": "send-token-copy"
+          }
+        }
+      ],
+      "withinMs": 20000
+    }
+  ]
+}

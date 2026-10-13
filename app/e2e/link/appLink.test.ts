@@ -163,6 +163,22 @@ describe('the runner end of the app link', () => {
       'Waited 40 ms for the app to connect. The app is not connected'
     );
   });
+
+  test('a question asked while the app is restarting is answered by the app that comes back', async () => {
+    link = startAppLink();
+    const first = await connectApp(link.url);
+    await link.connected(1000);
+    // Adding a profile restarts the app: the connection goes, and a new one comes.
+    first.close();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    const asked = link.screen(2000);
+    const marked = link.mark('4-create a new profile:sent', 2000);
+    socket = await connectApp(link.url);
+
+    expect((await asked).elements[0].id).toBe('wallet-send');
+    expect((await marked).params?.step).toBe('4-create a new profile:sent');
+  });
 });
 
 test('the note tells the app where to connect', () => {

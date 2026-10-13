@@ -100,6 +100,15 @@ export function startAppLink(): AppLink {
   const watchers = new Set<() => void>();
   let hello: AppHello | null = null;
   let app: { send(data: string): unknown } | null = null;
+  // What the app has been asked and has not answered. The app starts again
+  // within a story when a person adds or switches profile; it connects anew,
+  // and whatever it was asked before is asked of it again.
+  const unanswered = new Map<string, string>();
+  const ask = (key: string, request: object) => {
+    const payload = JSON.stringify(request);
+    unanswered.set(key, payload);
+    app?.send(payload);
+  };
   const changed = () => {
     for (const watcher of [...watchers]) watcher();
   };
@@ -113,9 +122,11 @@ export function startAppLink(): AppLink {
     websocket: {
       open(socket) {
         app = socket;
+        for (const payload of unanswered.values()) socket.send(payload);
       },
-      close() {
-        app = null;
+      close(socket) {
+        // The old connection can close after the restarted app's new one has opened.
+        if (app === socket) app = null;
       },
       message(_socket, data) {
         if (typeof data !== 'string') return;
@@ -135,11 +146,14 @@ export function startAppLink(): AppLink {
           };
         } else if (message.type === 'log' && isEntry(message.entry)) {
           entries.push(message.entry);
+          if (message.entry.event === 'e2e.step')
+            unanswered.delete(`mark:${String(message.entry.params?.step)}`);
         } else if (
           message.type === 'still' &&
           typeof message.id === 'number' &&
           typeof message.appClockMs === 'number'
         ) {
+          unanswered.delete(`still:${message.id}`);
           stills.set(message.id, {
             appClockMs: message.appClockMs,
             forced: message.forced === true,
@@ -149,6 +163,7 @@ export function startAppLink(): AppLink {
           typeof message.id === 'number' &&
           Array.isArray(message.elements)
         ) {
+          unanswered.delete(`elements:${message.id}`);
           screens.set(message.id, {
             appClockMs: Number(message.appClockMs),
             width: Number(message.width),
@@ -207,8 +222,7 @@ export function startAppLink(): AppLink {
     connected: (timeoutMs) => until(() => hello, timeoutMs, 'the app to connect'),
     mark(step, timeoutMs = 5000) {
       const from = entries.length;
-      if (!app) return Promise.reject(new Error(`Cannot mark ${step}: the app is not connected`));
-      app.send(JSON.stringify({ type: 'mark', step }));
+      ask(`mark:${step}`, { type: 'mark', step });
       return waitFor((entry) => entry.event === 'e2e.step' && entry.params?.step === step, {
         timeoutMs,
         from,
@@ -217,9 +231,8 @@ export function startAppLink(): AppLink {
     },
     waitFor,
     still(timeoutMs) {
-      if (!app) return Promise.reject(new Error('Cannot ask the app: it is not connected'));
       const id = nextRequest++;
-      app.send(JSON.stringify({ type: 'still', id }));
+      ask(`still:${id}`, { type: 'still', id });
       return until(
         () => {
           const answer = stills.get(id) ?? null;
@@ -231,10 +244,8 @@ export function startAppLink(): AppLink {
       );
     },
     screen(timeoutMs = 2000) {
-      if (!app)
-        return Promise.reject(new Error('Cannot read the screen: the app is not connected'));
       const id = nextRequest++;
-      app.send(JSON.stringify({ type: 'elements', id }));
+      ask(`elements:${id}`, { type: 'elements', id });
       return until(
         () => {
           const screen = screens.get(id) ?? null;

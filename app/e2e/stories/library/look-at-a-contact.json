@@ -1,0 +1,86 @@
+{
+  "id": "look-at-a-contact",
+  "purpose": "A person opens Contacts, sees who is listed, opens one of them and sees their profile with Follow and Send Money, then closes it.",
+  "startsFrom": "onboarded",
+  "steps": [
+    {
+      "name": "the wallet opens",
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-send"
+          }
+        },
+        {
+          "logged": "splash.gone"
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "go to contacts",
+      "tap": {
+        "label": "Contacts"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "screen-contacts"
+          }
+        },
+        {
+          "visible": {
+            "id": "underline-tab-Groups"
+          }
+        },
+        {
+          "visible": {
+            "idPrefix": "contact-row:nostr:"
+          }
+        }
+      ],
+      "withinMs": 12000
+    },
+    {
+      "name": "open the first contact",
+      "tap": {
+        "idPrefix": "contact-row:nostr:",
+        "matchIndex": 0
+      },
+      "expect": [
+        {
+          "page": "UserProfileScreen"
+        },
+        {
+          "visible": {
+            "id": "profile-follow-button"
+          }
+        },
+        {
+          "visible": {
+            "id": "profile-send-money"
+          }
+        }
+      ],
+      "withinMs": 10000
+    },
+    {
+      "name": "close the profile",
+      "tap": {
+        "id": "flow-header-close"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "underline-tab-Groups"
+          }
+        },
+        {
+          "gone": {
+            "id": "profile-follow-button"
+          }
+        }
+      ]
+    }
+  ]
+}

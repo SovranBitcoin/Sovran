@@ -57,7 +57,7 @@ const stepSchema = z
     type: z
       .strictObject({
         into: selectorSchema.optional(),
-        text: z.string().min(1).max(500),
+        text: z.string().min(1).max(1500),
         enter: z.boolean().default(false),
       })
       .optional(),
@@ -85,6 +85,22 @@ export const storySchema = z.strictObject({
    * state is copied into place; nothing is tapped through to reach it.
    */
   startsFrom: z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/),
+  /**
+   * What the story is handed from outside the app, fetched fresh each time it
+   * is played, and used as `{{name}}` in text it types. `invoice`: a Lightning
+   * invoice for this many sats, asked of this mint, or of a private mint on
+   * this machine (`local`) when the invoice must be one nobody has paid.
+   */
+  given: z
+    .strictObject({
+      invoice: z
+        .strictObject({
+          mint: z.union([z.literal('local'), z.url()]),
+          sats: z.number().int().min(1),
+        })
+        .optional(),
+    })
+    .optional(),
   steps: z.array(stepSchema).min(1),
 });
 export type Story = z.infer<typeof storySchema>;

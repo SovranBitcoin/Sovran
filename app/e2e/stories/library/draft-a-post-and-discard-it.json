@@ -1,0 +1,92 @@
+{
+  "id": "draft-a-post-and-discard-it",
+  "purpose": "A person opens the feed, starts a new post, types a few words and cancels without publishing anything.",
+  "startsFrom": "onboarded",
+  "steps": [
+    {
+      "name": "the wallet opens",
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-send"
+          }
+        },
+        {
+          "logged": "splash.gone"
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "go to the feed",
+      "tap": {
+        "label": "Feed"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "screen-feed"
+          }
+        },
+        {
+          "visible": {
+            "id": "composer-open"
+          }
+        }
+      ],
+      "withinMs": 12000
+    },
+    {
+      "name": "start a post",
+      "tap": {
+        "id": "composer-open"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "composer-input"
+          }
+        },
+        {
+          "visible": {
+            "id": "composer-cancel"
+          }
+        }
+      ]
+    },
+    {
+      "name": "type a few words",
+      "type": {
+        "into": {
+          "id": "composer-input"
+        },
+        "text": "testing the composer"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "composer-publish"
+          }
+        }
+      ]
+    },
+    {
+      "name": "cancel",
+      "tap": {
+        "id": "composer-cancel"
+      },
+      "expect": [
+        {
+          "gone": {
+            "id": "composer-input"
+          }
+        },
+        {
+          "visible": {
+            "id": "composer-open"
+          }
+        }
+      ]
+    }
+  ]
+}

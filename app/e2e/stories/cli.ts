@@ -15,6 +15,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { startAppLink } from '../link/appLink';
 import { createScreenWatch, keepVideo, pictureName, recordSimulator } from './evidence';
+import { withGiven } from './given';
 import { playStory, topPage } from './play';
 import { storySimulator } from './simulator';
 import { madeFrom, reachState } from './states';
@@ -163,7 +164,8 @@ try {
     hasState: simulator.hasState,
     startFrom: (state: string) => simulator.startFrom(appPath, state),
     // A state this simulator lacks is built by playing its story, with evidence of its own.
-    play: (builder: Story) => play(builder, stateEvidence(builder.id), false),
+    play: async (builder: Story) =>
+      play(await withGiven(builder), stateEvidence(builder.id), false),
     saveState: (name: string, from: string) => simulator.saveState(name, from),
   };
   if (!story || !storyText) {
@@ -185,7 +187,7 @@ try {
     } else {
       await reachState(story.startsFrom, actions);
       spentOn('startState');
-      ok = await play(story, outDir, flags.includes('--look'));
+      ok = await play(await withGiven(story), outDir, flags.includes('--look'));
       // Where it ended is kept, so a story that starts from here does not play this one again.
       if (ok) await simulator.saveState(story.id, endsIn);
       spentOn('saveState');

@@ -160,6 +160,8 @@ export function storySimulator(udid: string): StorySimulator {
       // opens, and iOS's question then takes every touch. Answered "no" ahead of
       // time, so a story meets the same page whenever it gets there.
       inSimulatorTool('privacy', 'revoke', 'location', BUNDLE_ID);
+      // The same for the camera, which the scan button asks for.
+      inSimulatorTool('privacy', 'revoke', 'camera', BUNDLE_ID);
       let installed = true;
       try {
         simctl('get_app_container', udid, BUNDLE_ID, 'data');
