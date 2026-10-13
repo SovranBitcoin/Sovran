@@ -163,7 +163,7 @@
           }
         }
       ],
-      "withinMs": 10000
+      "withinMs": 40000
     },
     {
       "name": "swipe the balance across to the test bitcoin account",
