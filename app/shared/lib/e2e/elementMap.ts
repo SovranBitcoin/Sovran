@@ -47,6 +47,15 @@ const HOST_TEXT = 6;
 const CONTEXT_PROVIDER = 10;
 /** The native view that holds a page header's buttons and title. */
 const HEADER_BAR = 'RNSScreenStackHeaderConfig';
+/**
+ * A header bar's buttons sit a little below where the bar is taken to begin: by
+ * nothing on a full-screen page, and by about 15 points on a page drawn as a
+ * card or a sheet (measured from pictures: 78 against 62, and 87 against 72).
+ * Placing every bar 8 points lower keeps a tap on a 44-point button well
+ * inside it in all three; without it a card's Back was tapped at its top edge
+ * and missed.
+ */
+const BAR_SITS_LOWER = 8;
 /** The native views of one page of a navigator: pushed, and presented over the others. */
 const PAGE_VIEW = 'RNSScreen';
 const PRESENTED_PAGE_VIEW = 'RNSModalScreen';
@@ -229,7 +238,7 @@ export function collectElements(
           const rect = !laidOut
             ? null
             : barTop !== undefined
-              ? { ...laidOut, y: (sheetTop || topInset) + (laidOut.y - barTop) }
+              ? { ...laidOut, y: (sheetTop || topInset) + BAR_SITS_LOWER + (laidOut.y - barTop) }
               : { ...laidOut, y: laidOut.y + sheetTop };
           if (rect && !outside(rect)) {
             const state = props.accessibilityState as { disabled?: unknown } | undefined;

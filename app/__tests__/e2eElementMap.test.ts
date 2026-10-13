@@ -172,7 +172,7 @@ describe('a control in a page header', () => {
     const elements = collectElements({ ...capturing(root), topInset: () => 62 }, WINDOW);
 
     expect(elements.map(({ id, x, y }) => ({ id, x, y }))).toEqual([
-      { id: 'wallet-search-toggle', x: 338, y: 67 },
+      { id: 'wallet-search-toggle', x: 338, y: 75 },
       { id: 'wallet-send', x: 16, y: 700 },
     ]);
   });
@@ -184,7 +184,7 @@ describe('a control in a page header', () => {
       ]),
     ]);
 
-    expect(collectElements({ ...capturing(root), topInset: () => 62 }, WINDOW)[0].y).toBe(67);
+    expect(collectElements({ ...capturing(root), topInset: () => 62 }, WINDOW)[0].y).toBe(75);
   });
 });
 
@@ -220,7 +220,7 @@ describe('a page presented as a sheet', () => {
     const elements = collectElements({ ...capturing(root), topInset: () => 62 }, WINDOW);
 
     expect(elements.map(({ id, y }) => ({ id, y }))).toEqual([
-      { id: 'mint-add-search-toggle', y: 72 },
+      { id: 'mint-add-search-toggle', y: 80 },
       { id: 'mint-currency-tab-ALL', y: 142 },
     ]);
   });
