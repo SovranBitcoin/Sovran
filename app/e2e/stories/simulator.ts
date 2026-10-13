@@ -16,7 +16,7 @@ import { emptyAppFolders, hasState, restoreState, saveState, type StatePlaces } 
 import { keepScreenWatcher, type ScreenFrames } from './screenWatcher';
 import { keyPresses, SHIFT_KEY } from './keys';
 import { AUTHORITY } from './privateMint';
-import { simctl } from './simctl';
+import { SIMCTL, simctl } from './simctl';
 import type { TouchDevice } from './play';
 
 const BUNDLE_ID = 'com.sovranbitcoin.dev';
@@ -251,6 +251,27 @@ export function storySimulator(udid: string): StorySimulator {
     },
     async findSystemControl(label) {
       return (await this.systemControls()).find((control) => control.label === label) ?? null;
+    },
+    async open(url) {
+      // Not waited for: the command returns only once iOS's question is answered.
+      spawn(SIMCTL[0], [...SIMCTL.slice(1), 'openurl', udid, url], {
+        stdio: 'ignore',
+      });
+      // iOS asks before handing a link to an app; the person says Open. The
+      // question takes no touch while it is still appearing, so Open is
+      // pressed until the question has gone.
+      const asked = performance.now();
+      let pressed = false;
+      while (performance.now() - asked < 10_000) {
+        const yes = (await this.systemControls().catch(() => [])).find(
+          (control) => control.label === 'Open'
+        );
+        if (yes) {
+          await this.tap(yes.x + yes.width / 2, yes.y + yes.height / 2);
+          pressed = true;
+        } else if (pressed) return;
+        await new Promise((resolve) => setTimeout(resolve, 300));
+      }
     },
     async type(text) {
       for (const { usage, shift } of keyPresses(text)) {

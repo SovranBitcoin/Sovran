@@ -48,6 +48,9 @@ interface PixelWatch {
   changedSince?(moment: number): boolean;
 }
 
+/** Makes what a step says the person is handed (`handed`), by the name a later step uses it under. */
+type Hand = (what: NonNullable<Step['handed']>) => Promise<Record<string, string>>;
+
 export interface TouchDevice {
   /** A tap at a point given as fractions of the window's width and height. */
   tap(x: number, y: number): Promise<void>;
@@ -55,6 +58,8 @@ export interface TouchDevice {
   swipe(from: [x: number, y: number], to: [x: number, y: number]): Promise<void>;
   /** Text typed on the keyboard, a key at a time. */
   type(text: string): Promise<void>;
+  /** A link opened as another app would open it. */
+  open?(url: string): Promise<void>;
   /**
    * Where a control iOS itself drew is, by its label, as fractions of the
    * window; null when there is none.
@@ -169,7 +174,8 @@ async function playStep(
   device: TouchDevice,
   pixels: PixelWatch | undefined,
   /** What earlier steps remembered; this one may use it, and add to it. */
-  remembered: Map<string, string>
+  remembered: Map<string, string>,
+  hand?: Hand
 ): Promise<StepResult> {
   const recall = (text: string) =>
     text.replace(/\{\{(\w+)\}\}/g, (mark, name: string) => remembered.get(name) ?? mark);
@@ -324,6 +330,19 @@ async function playStep(
         clamp(from[1] + down * step.swipe.distance),
       ]);
     }
+    if (step.handed) {
+      if (!hand) return finish('Nothing here can hand the person anything.');
+      const lockTo = step.handed.token.lockTo;
+      const made = await hand({
+        token: { sats: step.handed.token.sats, ...(lockTo ? { lockTo: recall(lockTo) } : {}) },
+      });
+      for (const [name, value] of Object.entries(made)) remembered.set(name, value);
+    }
+    if (step.open) {
+      if (!device.open) return finish('This device cannot open a link.');
+      await pixels?.pixelsStill();
+      await device.open(recall(step.open));
+    }
     if (step.type) {
       if (step.type.into) {
         const { screen, found: target } = await lookFor(step.type.into);
@@ -359,7 +378,17 @@ async function playStep(
         motion = step.swipe
           ? await pixels?.pixelsStill(STILL_AFTER_SWIPE_MS, SWIPE_SETTLES_WITHIN_MS)
           : await pixels?.pixelsStill();
-        for (const { as, from: source, after } of step.remember ?? []) {
+        for (const kept of step.remember ?? []) {
+          if ('idAfter' in kept) {
+            const row = screen.elements.find((element) => element.id?.startsWith(kept.idAfter));
+            if (!row?.id)
+              return finish(
+                `Nothing to remember as ${kept.as}: no id on screen starts with ${kept.idAfter}`
+              );
+            remembered.set(kept.as, row.id.slice(kept.idAfter.length));
+            continue;
+          }
+          const { as, from: source, after } = kept;
           const seen = find(source, screen);
           const said = seen?.label ?? seen?.text;
           if (said === undefined)
@@ -400,12 +429,14 @@ export async function playStory(
   device: TouchDevice,
   pixels?: PixelWatch,
   /** Called as each step ends, pass or fail; the next begins when it resolves. */
-  afterStep?: (index: number, step: StepResult) => Promise<void>
+  afterStep?: (index: number, step: StepResult) => Promise<void>,
+  /** Makes what a step says the person is handed, returning it by the name a later step uses. */
+  hand?: Hand
 ): Promise<StoryResult> {
   const steps: StepResult[] = [];
   const remembered = new Map<string, string>();
   for (const [index, step] of story.steps.entries()) {
-    const result = await playStep(step, index, link, device, pixels, remembered);
+    const result = await playStep(step, index, link, device, pixels, remembered, hand);
     steps.push(result);
     await afterStep?.(index, result);
     if (!result.ok) break;

@@ -41,13 +41,37 @@ const stepSchema = z
      */
     remember: z
       .array(
-        z.strictObject({
-          as: z.string().regex(/^\w+$/),
-          from: selectorSchema,
-          after: z.string().min(1).optional(),
-        })
+        z.union([
+          z.strictObject({
+            as: z.string().regex(/^\w+$/),
+            from: selectorSchema,
+            after: z.string().min(1).optional(),
+          }),
+          // What follows this in the id of the first element whose id starts with it:
+          // for something the page shows only as part of a row's id, such as a key.
+          z.strictObject({ as: z.string().regex(/^\w+$/), idAfter: z.string().min(1) }),
+        ])
       )
       .optional(),
+    /**
+     * Someone else hands the person something as the step begins, made by the
+     * runner acting as a second wallet on the simulator's own mint. `token`:
+     * ecash for this many sats, as `{{token}}`, locked to a public key if
+     * `lockTo` names one (which may be something remembered).
+     */
+    handed: z
+      .strictObject({
+        token: z.strictObject({
+          sats: z.number().int().min(1).max(100_000),
+          lockTo: z.string().min(1).optional(),
+        }),
+      })
+      .optional(),
+    /**
+     * Open a link, as tapping one in another app would: `cashu:`, `lightning:`,
+     * `bitcoin:`. May use something handed or remembered, as `{{name}}`.
+     */
+    open: z.string().min(3).max(8000).optional(),
     /**
      * Where in the element to tap, as fractions of its width and height from its
      * top left. For a control that something else partly covers, where a person
@@ -88,8 +112,8 @@ const stepSchema = z
     withinMs: z.number().int().min(100).max(300_000).default(5000),
   })
   .refine(
-    (step) => [step.tap, step.swipe, step.type].filter(Boolean).length <= 1,
-    'A step does one thing: a tap, a swipe or typing, not two of them.'
+    (step) => [step.tap, step.swipe, step.type, step.open].filter(Boolean).length <= 1,
+    'A step does one thing: a tap, a swipe, typing or opening a link, not two of them.'
   )
   .refine(
     (step) => !step.tapAt || step.tap,

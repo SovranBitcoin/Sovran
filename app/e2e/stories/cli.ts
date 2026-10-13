@@ -23,6 +23,7 @@ import {
   privateMintAddresses,
   startPrivateMints,
 } from './privateMint';
+import { tokenFromMint } from './secondWallet';
 import { storySimulator } from './simulator';
 import { madeFrom, reachState } from './states';
 import { storySchema, type Story } from './story';
@@ -86,10 +87,28 @@ const play = async (story: Story, outDir: string, look: boolean): Promise<boolea
     await link.connected(20_000);
     spentOn('appConnected');
     const pictures: (string | undefined)[] = [];
-    const result = await playStory(story, link, simulator, screen, async (index, step) => {
-      const file = `${pictureName(index, step.name)}.jpg`;
-      if (await watching.picture(join(outDir, file))) pictures[index] = file;
-    });
+    const result = await playStory(
+      story,
+      link,
+      simulator,
+      screen,
+      async (index, step) => {
+        const file = `${pictureName(index, step.name)}.jpg`;
+        if (await watching.picture(join(outDir, file))) pictures[index] = file;
+      },
+      // Whoever hands the person ecash holds it on the simulator's first mint.
+      async ({ token }) => {
+        const [mint] = privateMintAddresses(udid);
+        return {
+          token: await tokenFromMint(
+            `http://127.0.0.1:${mint.port}`,
+            mint.url,
+            token.sats,
+            token.lockTo
+          ),
+        };
+      }
+    );
     spentOn('steps');
     const lookedAt = look ? await link.screen().catch(() => undefined) : undefined;
     const systemSees = look ? await simulator.systemControls().catch(() => []) : [];
@@ -171,7 +190,8 @@ const play = async (story: Story, outDir: string, look: boolean): Promise<boolea
  */
 const playWithMint = async (story: Story, outDir: string, look: boolean) => {
   // A story that neither names a mint of its own nor starts from one waits on none.
-  if (!JSON.stringify(story).includes('{{mint') && !holdsPrivateMints(simulator.mintFolder())) {
+  const usesMint = /\{\{mint|"handed"/.test(JSON.stringify(story));
+  if (!usesMint && !holdsPrivateMints(simulator.mintFolder())) {
     return play(await withGiven(story), outDir, look);
   }
   const stopMint = await startPrivateMints(udid, simulator.mintFolder());

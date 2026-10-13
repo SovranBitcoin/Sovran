@@ -190,7 +190,7 @@ describe('playStory', () => {
           expect: [{ page: 'X' }],
         },
       ])
-    ).toThrow(/a tap, a swipe or typing, not two of them/);
+    ).toThrow(/A step does one thing/);
   });
 
   test('taps a control iOS drew itself, found by its label, when the app does not have it', async () => {
@@ -263,6 +263,62 @@ describe('playStory', () => {
     expect(result.ok).toBe(true);
     // The second tap landed on "Option 2, extra", 200 down, not on "Option 1, fun".
     expect(app.state.taps[1][1]).toBeCloseTo((200 + 25) / 800);
+  });
+
+  test('a key read from a row is what handed ecash is locked to, and the link opened carries the token', async () => {
+    const app = fakeApp(screenOf(box({ id: 'keyring-key-copy-02ab', label: 'Copy key' })));
+    const opened: string[] = [];
+    const asked: unknown[] = [];
+    const device = {
+      ...noSwipe,
+      tap: async () => {},
+      open: async (url: string) => void opened.push(url),
+    };
+
+    const result = await playStory(
+      story([
+        {
+          name: 'read the key',
+          expect: [{ visible: { id: 'keyring-key-copy-02ab' } }],
+          remember: [{ as: 'myKey', idAfter: 'keyring-key-copy-' }],
+        },
+        {
+          name: 'open a link someone sent',
+          handed: { token: { sats: 16, lockTo: '{{myKey}}' } },
+          open: 'cashu:{{token}}',
+          expect: [{ visible: { id: 'keyring-key-copy-02ab' } }],
+        },
+      ]),
+      app.link,
+      device,
+      undefined,
+      undefined,
+      async (what) => {
+        asked.push(what);
+        return { token: 'cashuBabc' };
+      }
+    );
+
+    expect(result.ok).toBe(true);
+    expect(asked).toEqual([{ token: { sats: 16, lockTo: '02ab' } }]);
+    expect(opened).toEqual(['cashu:cashuBabc']);
+  });
+
+  test('a step that hands something fails where nothing can make it', async () => {
+    const app = fakeApp(screenOf(box({ id: 'wallet-send' })));
+    const result = await playStory(
+      story([
+        {
+          name: 'open a link someone sent',
+          handed: { token: { sats: 16 } },
+          open: 'cashu:{{token}}',
+          expect: [{ visible: { id: 'wallet-send' } }],
+        },
+      ]),
+      app.link,
+      { ...noSwipe, tap: async () => {}, open: async () => {} }
+    );
+    expect(result.steps[0].failure).toMatch(/hand/);
   });
 
   test('a touch that reached nothing is made again, once', async () => {
