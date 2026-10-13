@@ -15,12 +15,13 @@ import {
   type RunnerSocket,
 } from '@/shared/lib/loggerRunnerLink';
 
-const entry = (event: string): LogEntry => ({
+const entry = (event: string, params?: Record<string, unknown>): LogEntry => ({
   ts: '2026-10-12T18:00:00.000Z',
   _t: 1,
   level: 'debug',
   event,
   src: { file: 'test', func: 'test', line: 1 },
+  ...(params ? { params } : {}),
 });
 
 class FakeSocket implements RunnerSocket {
@@ -192,7 +193,7 @@ describe('createSettleWatch', () => {
   it('answers once the screen has been still for two frames', () => {
     const { watch, ask, answers, frame } = harness();
 
-    watch.note(entry('screen.mount'));
+    watch.note(entry('toast.show'));
     ask();
     frame();
     expect(answers).toEqual([]);
@@ -205,7 +206,7 @@ describe('createSettleWatch', () => {
   it('starts counting again when something else happens on screen', () => {
     const { watch, ask, answers, frame } = harness();
 
-    watch.note(entry('screen.mount'));
+    watch.note(entry('toast.show'));
     ask();
     frame();
     frame();
@@ -242,12 +243,90 @@ describe('createSettleWatch', () => {
     for (let i = 0; i < 10; i++) frame();
     expect(answers).toEqual([]);
 
+    watch.note(entry('nav.transition.start'));
     watch.note(entry('screen.mount'));
+    watch.note(entry('nav.transition.end'));
     frame();
     frame();
     frame();
 
     expect(answers).toEqual([{ appClockMs: 208, forced: false }]);
+  });
+
+  it('is not still from the moment a page change is asked for until its slide has ended', () => {
+    const { watch, ask, answers, frame } = harness();
+
+    // On a busy machine the slide begins well after the request and the new page's render.
+    watch.note(entry('nav.action', { action: 'NAVIGATE' }));
+    watch.note(entry('screen.mount'));
+    ask();
+    for (let i = 0; i < 20; i++) frame();
+    expect(answers).toEqual([]);
+
+    watch.note(entry('nav.transition.start'));
+    for (let i = 0; i < 20; i++) frame();
+    expect(answers).toEqual([]);
+
+    watch.note(entry('nav.transition.end'));
+    frame();
+    frame();
+    frame();
+    expect(answers).toHaveLength(1);
+  });
+
+  it('gives a page that has just appeared time to start sliding, when no request was announced', () => {
+    const { watch, ask, answers, frame } = harness();
+
+    watch.note(entry('screen.mount'));
+    ask();
+    // 176 ms passed before the slide began, on a busy machine.
+    for (let i = 0; i < 11; i++) frame();
+    expect(answers).toEqual([]);
+    watch.note(entry('nav.transition.start'));
+    for (let i = 0; i < 30; i++) frame();
+    expect(answers).toEqual([]);
+
+    watch.note(entry('nav.transition.end'));
+    frame();
+    frame();
+    frame();
+    expect(answers).toHaveLength(1);
+  });
+
+  it('answers a second after a page appears in place, such as a tab', () => {
+    const { watch, ask, answers, frame } = harness();
+
+    watch.note(entry('screen.mount'));
+    ask();
+    for (let i = 0; i < 62; i++) frame();
+    expect(answers).toEqual([]);
+    for (let i = 0; i < 2; i++) frame();
+
+    expect(answers).toEqual([{ appClockMs: 1008, forced: false }]);
+  });
+
+  it('stops waiting for a slide that a page change never starts', () => {
+    const { watch, ask, answers, frame } = harness();
+
+    watch.note(entry('nav.action', { action: 'NAVIGATE' }));
+    ask();
+    for (let i = 0; i < 61; i++) frame();
+    expect(answers).toEqual([]);
+    for (let i = 0; i < 3; i++) frame();
+
+    expect(answers).toEqual([{ appClockMs: 1008, forced: false }]);
+  });
+
+  it('does not wait for a slide when the request moves no page, such as switching tabs', () => {
+    const { watch, ask, answers, frame } = harness();
+
+    watch.note(entry('nav.action', { action: 'JUMP_TO' }));
+    ask();
+    frame();
+    frame();
+    frame();
+
+    expect(answers).toHaveLength(1);
   });
 
   it('gives up on a slide that never reports its end, and says it did', () => {

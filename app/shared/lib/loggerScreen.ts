@@ -76,6 +76,10 @@ function observeRouteChanges(source: RouteChangeSource | null | undefined): void
   observing = true;
   source.addListener('__unsafe_action__', (event) => {
     const { action, noop } = event.data;
+    // Said at the moment it is asked for: a page is about to move, before any
+    // page has rendered or any slide begun. The end-to-end runner's "is the
+    // screen still" counts from here.
+    if (!noop) log.debug('nav.action', { action: action.type });
     if (noop || NO_DESTINATION_ACTIONS.has(action.type)) return;
     pendingRouteChange = { at: monotonicNow(), action: action.type };
   });

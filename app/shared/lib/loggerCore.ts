@@ -787,6 +787,7 @@ const MEASUREMENT_EVENTS: ReadonlySet<string> = new Set([
   // facts a test runner counts: two pages slide at once, and a step's two marks
   // are a few milliseconds apart.
   'e2e.step',
+  'nav.action',
   'nav.transition',
   'nav.transition.end',
   'nav.transition.start',

@@ -126,6 +126,31 @@ const ON_SCREEN =
 const STILL_FRAMES = 2;
 /** A page whose slide never reports its end is taken to have stopped after this long. */
 const SLIDE_GIVE_UP_MS = 3000;
+/**
+ * How long a page is given to start moving after the app was asked to change
+ * page. The request comes first, then the new page renders, then the native
+ * slide begins; on a busy machine the gap was long enough for the screen to be
+ * called still, and the next tap landed on a page still sliding in.
+ */
+const SLIDE_MAY_START_MS = 1000;
+/**
+ * The same allowance for a page that has just appeared, for the page changes
+ * that are not announced as requests. Measured: a page was in the tree 176 ms
+ * before its slide began, with four simulators running.
+ */
+const PAGE_MAY_SLIDE_MS = 1000;
+/** A page that appears this soon after a slide began is part of that slide. */
+const SLIDE_RECENT_MS = 1500;
+/** Requests that move no page: they change what a page shows, or switch tabs in place. */
+const NO_SLIDE_ACTIONS: ReadonlySet<unknown> = new Set([
+  'SET_PARAMS',
+  'REPLACE_PARAMS',
+  'PRELOAD',
+  'JUMP_TO',
+  'OPEN_DRAWER',
+  'CLOSE_DRAWER',
+  'TOGGLE_DRAWER',
+]);
 /** A splash that never reports it has gone is taken to have gone after this long. */
 const SPLASH_GIVE_UP_MS = 15_000;
 
@@ -158,6 +183,9 @@ export function createSettleWatch(io: {
   // Pages that have drawn their frame and not yet their content.
   let empty = 0;
   let emptySince = 0;
+  // Until when a page change that was asked for, or a page that has appeared, may yet start to slide.
+  let mayYetSlideUntil = 0;
+  let lastSlideStartedAt = Number.NEGATIVE_INFINITY;
   let changed = false;
   let stillFrames = 0;
   let looping = false;
@@ -182,7 +210,14 @@ export function createSettleWatch(io: {
       changed = false;
       stillFrames = 0;
     } else stillFrames += 1;
-    if (!underSplash && sliding === 0 && empty === 0 && (forced || stillFrames >= STILL_FRAMES)) {
+    const mayYetSlide = now < mayYetSlideUntil;
+    if (
+      !underSplash &&
+      !mayYetSlide &&
+      sliding === 0 &&
+      empty === 0 &&
+      (forced || stillFrames >= STILL_FRAMES)
+    ) {
       looping = false;
       const asked = waiting;
       waiting = [];
@@ -200,9 +235,18 @@ export function createSettleWatch(io: {
         empty += 1;
         emptySince = io.now();
       } else if (entry.event === 'screen.mount') empty = Math.max(0, empty - 1);
+      if (entry.event === 'nav.action' && !NO_SLIDE_ACTIONS.has(entry.params?.action))
+        mayYetSlideUntil = io.now() + SLIDE_MAY_START_MS;
+      if (
+        (entry.event === 'screen.shell' || entry.event === 'screen.mount') &&
+        io.now() - lastSlideStartedAt > SLIDE_RECENT_MS
+      )
+        mayYetSlideUntil = Math.max(mayYetSlideUntil, io.now() + PAGE_MAY_SLIDE_MS);
       if (entry.event === 'nav.transition.start') {
         sliding += 1;
         slidingSince = io.now();
+        lastSlideStartedAt = slidingSince;
+        mayYetSlideUntil = 0;
       } else if (entry.event === 'nav.transition.end') sliding = Math.max(0, sliding - 1);
       changed = true;
       if (looping) return;
