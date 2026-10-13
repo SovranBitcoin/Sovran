@@ -72,6 +72,8 @@ const stepSchema = z
         z.strictObject({
           paidBack: z.strictObject({ sats: z.number().int().min(1).max(100_000) }),
         }),
+        // The other person, once the story has written to them, writes this back.
+        z.strictObject({ reply: z.strictObject({ text: z.string().min(1).max(200) }) }),
       ])
       .optional(),
     /**

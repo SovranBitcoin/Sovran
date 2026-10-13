@@ -20,6 +20,7 @@ import { createHash } from 'node:crypto';
 import {
   closeSync,
   copyFileSync,
+  cpSync,
   createWriteStream,
   existsSync,
   mkdirSync,
@@ -408,11 +409,24 @@ function hermesCompiler(): string {
   return join(dirname(packageJson), 'hermesc/osx-bin/hermesc');
 }
 
-async function refreshBundledJavaScript(stamp: NativeBuildStamp): Promise<NativeBuildStamp> {
-  const out = buildDir('ios', 'bundled');
+async function refreshBundledJavaScript(
+  stamp: NativeBuildStamp,
+  other?: { out: string; edition: string }
+): Promise<NativeBuildStamp> {
+  const out = other?.out ?? buildDir('ios', 'bundled');
   const log = join(out, 'build.log');
   const plain = join(out, 'main.js');
-  const env = { ...process.env, CI: '1', APP_VARIANT: 'development', EXPO_PUBLIC_E2E_LOGS: '1' };
+  // Metro's cache does not know which edition a file was transformed for: the
+  // default edition's cached copy would be used again. Another edition keeps its own.
+  const cache = other ? join(out, 'metro-cache') : undefined;
+  if (cache) mkdirSync(cache, { recursive: true });
+  const env = {
+    ...process.env,
+    CI: '1',
+    APP_VARIANT: 'development',
+    EXPO_PUBLIC_E2E_LOGS: '1',
+    ...(other ? { EXPO_PUBLIC_SOVRAN_EDITION: other.edition, TMPDIR: cache } : {}),
+  };
   try {
     await step(
       'expo export:embed (ios)',
@@ -447,6 +461,7 @@ async function refreshBundledJavaScript(stamp: NativeBuildStamp): Promise<Native
     );
   } finally {
     rmSync(plain, { force: true });
+    if (cache) rmSync(cache, { recursive: true, force: true });
   }
   await step(
     'codesign',
@@ -463,6 +478,24 @@ async function refreshBundledJavaScript(stamp: NativeBuildStamp): Promise<Native
     builtAt: new Date().toISOString(),
     artifactSha256: nativeArtifactHash(stamp.artifact),
   };
+}
+
+/**
+ * The bundled iOS test build with another edition's JavaScript in it
+ * (ADR 0021): a copy beside it, `ios-bundled-<edition>`, for the stories about
+ * pages the default edition leaves out. The native part is the same app.
+ */
+async function bundledEdition(edition: string): Promise<NativeBuildStamp> {
+  const stamp = readStamp('ios', 'bundled');
+  if (!stamp) throw new Error('Build the bundled test build first: native-build.ts ios --bundled');
+  const out = join(NATIVE_BUILDS, `ios-bundled-${edition}`);
+  const artifact = join(out, 'Sovran.app');
+  rmSync(out, { recursive: true, force: true });
+  mkdirSync(out, { recursive: true });
+  cpSync(stamp.artifact, artifact, { recursive: true });
+  const made = await refreshBundledJavaScript({ ...stamp, artifact }, { out, edition });
+  writeFileSync(join(out, 'build.json'), `${JSON.stringify({ ...made, edition }, null, 2)}\n`);
+  return made;
 }
 
 /** Reuse a stamped build whose fingerprint matches current source, else rebuild. */
@@ -514,12 +547,21 @@ if (import.meta.main) {
   try {
     const [platform, ...flags] = process.argv.slice(2);
     const kind: BuildKind = flags.includes('--bundled') ? 'bundled' : 'dev';
-    const [flag] = flags.filter((value) => value !== '--bundled');
+    const editionAt = flags.indexOf('--edition');
+    const edition = editionAt === -1 ? undefined : flags[editionAt + 1];
+    const [flag] = flags.filter(
+      (value, index) => value !== '--bundled' && index !== editionAt && index !== editionAt + 1
+    );
     if (platform !== 'ios' && platform !== 'android')
       throw new Error(
-        'Usage: bun app/e2e/press/native-build.ts ios|android [--bundled] [--force|--status]'
+        'Usage: bun app/e2e/press/native-build.ts ios|android [--bundled [--edition full]] [--force|--status]'
       );
-    if (flag === '--status') {
+    if (edition !== undefined) {
+      if (platform !== 'ios' || kind !== 'bundled' || flag !== undefined)
+        throw new Error('--edition goes with `ios --bundled` and nothing else');
+      await ensureNativeBuild('ios', 'auto', 'bundled');
+      console.log(JSON.stringify(await bundledEdition(edition), null, 2));
+    } else if (flag === '--status') {
       const fingerprint = await nativeFingerprint(platform);
       const stamp = readStamp(platform, kind);
       console.log(

@@ -86,6 +86,7 @@
     "e2e:smoke": "bun e2e/cli.ts run --driver fake",
     "e2e:story": "bun e2e/stories/cli.ts",
     "e2e:stories": "bun e2e/stories/run.ts",
+    "e2e:stories:full": "bun e2e/stories/run.ts --app e2e/artifacts/native-builds/ios-bundled-full/Sovran.app --stories e2e/stories/full",
     "e2e:test": "bun test e2e/*.test.ts e2e/**/*.test.ts shared/lib/e2e/*.test.ts shared/lib/e2e/**/*.test.ts",
     "android": "expo run:android",
     "ios": "expo run:ios",

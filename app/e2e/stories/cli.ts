@@ -108,9 +108,12 @@ const play = async (
         const token = (sats: number, lockTo?: string) =>
           tokenFromMint(`http://127.0.0.1:${mint.port}`, mint.url, sats, lockTo);
         if ('token' in what) return { token: await token(what.token.sats, what.token.lockTo) };
-        // Who paid them is read from the message that reached them; they answer it.
+        // Who wrote to them is read from the message that reached them; they answer it.
         const { from } = await person.received(60_000);
-        await person.send(from, await token(what.paidBack.sats));
+        await person.send(
+          from,
+          'reply' in what ? what.reply.text : await token(what.paidBack.sats)
+        );
         return {};
       }
     );
