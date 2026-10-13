@@ -14,6 +14,7 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { connect } from 'node:net';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { startLocalMint } from './localMint';
@@ -27,9 +28,24 @@ function openssl(...args: string[]): void {
   if (made.status !== 0) throw new Error(`openssl ${args[0]} failed: ${made.stderr}`);
 }
 
-/** Make the authority and the mint's certificate for `localhost`, once. */
+/** Whether a certificate and its key are both there, with at least a month left. */
+function stillGood(name: string): boolean {
+  if (!existsSync(join(TLS_DIR, `${name}.pem`)) || !existsSync(join(TLS_DIR, `${name}.key`)))
+    return false;
+  const month = String(30 * 24 * 3600);
+  return (
+    spawnSync('openssl', ['x509', '-checkend', month, '-noout', '-in', `${name}.pem`], {
+      cwd: TLS_DIR,
+    }).status === 0
+  );
+}
+
+/**
+ * Make the authority and the mint's certificate for `localhost`, once, and
+ * again when either is missing or within a month of running out.
+ */
 export function ensureCertificates(): void {
-  if (existsSync(AUTHORITY) && existsSync(join(TLS_DIR, 'leaf.pem'))) return;
+  if (stillGood('ca') && stillGood('leaf')) return;
   mkdirSync(TLS_DIR, { recursive: true });
   openssl(
     ...['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', 'ca.key', '-out', 'ca.pem'],
@@ -73,32 +89,91 @@ export function holdsPrivateMints(dir: string): boolean {
 }
 
 /**
+ * End whatever still listens on a simulator's mint ports: a mint or its TLS
+ * front left by a play that was killed before it could stop them. Left alone,
+ * it would answer in place of the mint just put back, from a later moment.
+ */
+function endLeftOverMints(ports: number[]): void {
+  for (const port of ports) {
+    const listening = spawnSync('lsof', ['-ti', `tcp:${port}`, '-sTCP:LISTEN'], {
+      encoding: 'utf8',
+    });
+    for (const pid of listening.stdout.split('\n').filter(Boolean)) {
+      const name = spawnSync('ps', ['-o', 'comm=', '-p', pid], { encoding: 'utf8' }).stdout;
+      if (/cdk-mintd|socat/.test(name)) spawnSync('kill', ['-9', pid]);
+    }
+  }
+}
+
+/** Resolves once something accepts a connection on `port`; rejects if `gone()` first, or after 5 s. */
+async function listening(port: number, gone: () => string | undefined): Promise<void> {
+  const deadline = performance.now() + 5000;
+  while (performance.now() < deadline) {
+    const why = gone();
+    if (why) throw new Error(why);
+    const open = await new Promise<boolean>((resolve) => {
+      const socket = connect({ host: '127.0.0.1', port });
+      socket.once('connect', () => {
+        socket.destroy();
+        resolve(true);
+      });
+      socket.once('error', () => resolve(false));
+    });
+    if (open) return;
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+  throw new Error(`Nothing answered with TLS on port ${port} within 5 s.`);
+}
+
+async function startOne(
+  dir: string,
+  { url, port, tlsPort }: { url: string; port: number; tlsPort: number }
+): Promise<() => void> {
+  const mint = await startLocalMint(dir, port, { keep: true, publicUrl: url });
+  const tls = spawn(
+    'socat',
+    [
+      `OPENSSL-LISTEN:${tlsPort},bind=127.0.0.1,cert=${join(TLS_DIR, 'leaf.pem')},key=${join(TLS_DIR, 'leaf.key')},verify=0,fork,reuseaddr`,
+      `TCP:127.0.0.1:${port}`,
+    ],
+    { stdio: 'ignore' }
+  );
+  let failed: string | undefined;
+  tls.once('error', (error) => (failed = `socat could not be started: ${error.message}`));
+  const stop = () => {
+    tls.kill();
+    mint.stop();
+  };
+  try {
+    await listening(tlsPort, () =>
+      tls.exitCode === null ? failed : `socat stopped as it started (port ${tlsPort}).`
+    );
+  } catch (error) {
+    stop();
+    throw error;
+  }
+  return stop;
+}
+
+/**
  * Start a simulator's mints, each from the database in its folder under `dir`
- * (empty when there is none), with TLS in front. The returned function stops them.
+ * (empty when there is none), with TLS in front. The returned function stops
+ * them. If either cannot start, neither is left running.
  */
 export async function startPrivateMints(udid: string, dir: string): Promise<() => void> {
   ensureCertificates();
-  const stops = await Promise.all(
-    privateMintAddresses(udid).map(async ({ url, port, tlsPort }, index) => {
-      const mint = await startLocalMint(join(dir, MINTS[index]), port, {
-        keep: true,
-        publicUrl: url,
-      });
-      const tls = spawn(
-        'socat',
-        [
-          `OPENSSL-LISTEN:${tlsPort},cert=${join(TLS_DIR, 'leaf.pem')},key=${join(TLS_DIR, 'leaf.key')},verify=0,fork,reuseaddr`,
-          `TCP:127.0.0.1:${port}`,
-        ],
-        { stdio: 'ignore' }
-      );
-      return () => {
-        tls.kill();
-        mint.stop();
-      };
-    })
+  const addresses = privateMintAddresses(udid);
+  endLeftOverMints(addresses.flatMap(({ port, tlsPort }) => [port, tlsPort]));
+  const started = await Promise.allSettled(
+    addresses.map((address, index) => startOne(join(dir, MINTS[index]), address))
   );
-  return () => {
-    for (const stop of stops) stop();
+  const stop = () => {
+    for (const one of started) if (one.status === 'fulfilled') one.value();
   };
+  const refused = started.find((one) => one.status === 'rejected');
+  if (refused) {
+    stop();
+    throw refused.reason;
+  }
+  return stop;
 }
