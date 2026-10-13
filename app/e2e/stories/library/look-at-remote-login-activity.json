@@ -1,0 +1,83 @@
+{
+  "id": "look-at-remote-login-activity",
+  "purpose": "A person opens the activity of Remote Login and sees the filters for what other apps asked their key to do.",
+  "startsFrom": "onboarded",
+  "steps": [
+    {
+      "name": "the wallet opens",
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-send"
+          }
+        },
+        {
+          "logged": "splash.gone"
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "open the drawer",
+      "tap": {
+        "id": "header-profile-avatar"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "drawer-menu-settings"
+          }
+        }
+      ]
+    },
+    {
+      "name": "open Remote Login",
+      "tap": {
+        "id": "drawer-menu-remote-login"
+      },
+      "expect": [
+        {
+          "page": "SignerHubScreen"
+        },
+        {
+          "visible": {
+            "id": "signer-hub-scan-row"
+          }
+        },
+        {
+          "visible": {
+            "id": "signer-hub-paste-row"
+          }
+        },
+        {
+          "visible": {
+            "id": "signer-hub-share-row"
+          }
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "open Activity",
+      "tap": {
+        "id": "signer-hub-activity-row"
+      },
+      "expect": [
+        {
+          "page": "SignerActivityScreen"
+        },
+        {
+          "visible": {
+            "id": "signer-activity-filter-all"
+          }
+        },
+        {
+          "visible": {
+            "id": "signer-activity-filter-denied"
+          }
+        }
+      ],
+      "withinMs": 10000
+    }
+  ]
+}

@@ -1,0 +1,89 @@
+{
+  "id": "apply-a-wallpaper",
+  "purpose": "A person picks the Colors album in the wallpaper gallery, is shown the preview with Apply and Cancel, and applies it.",
+  "startsFrom": "onboarded",
+  "steps": [
+    {
+      "name": "the wallet opens",
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-send"
+          }
+        },
+        {
+          "logged": "splash.gone"
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "open Theme",
+      "tap": {
+        "id": "wallet-theme"
+      },
+      "expect": [
+        {
+          "page": "ThemePreviewScreen"
+        },
+        {
+          "visible": {
+            "id": "theme-preview-theme-button"
+          }
+        }
+      ]
+    },
+    {
+      "name": "open the gallery",
+      "tap": {
+        "id": "theme-preview-theme-button"
+      },
+      "expect": [
+        {
+          "page": "GalleryScreen"
+        },
+        {
+          "visible": {
+            "id": "album-card-colors"
+          }
+        }
+      ]
+    },
+    {
+      "name": "pick the Colors album",
+      "tap": {
+        "id": "album-card-colors"
+      },
+      "expect": [
+        {
+          "page": "ThemePreviewScreen"
+        },
+        {
+          "visible": {
+            "id": "theme-apply"
+          }
+        },
+        {
+          "visible": {
+            "id": "theme-cancel"
+          }
+        }
+      ],
+      "withinMs": 10000
+    },
+    {
+      "name": "apply it",
+      "tap": {
+        "id": "theme-apply"
+      },
+      "expect": [
+        {
+          "gone": {
+            "id": "theme-apply"
+          }
+        }
+      ],
+      "withinMs": 10000
+    }
+  ]
+}

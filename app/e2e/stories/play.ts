@@ -259,9 +259,15 @@ async function playStep(
       // not one pixel changed, nothing was done, and the touch is made again.
       // This is not trying an action twice: the first did not happen.
       if (pixels?.changedSince) {
+        // A step that expects the app to log the touch has said the control is the
+        // app's own, so the log alone decides: a page that never holds still (a
+        // sheet with something animating on it) makes the pixels useless here.
+        const appLogsIt = step.expect.some(
+          (expectation) => 'logged' in expectation && expectation.logged === 'ui.touch'
+        );
         const taken = () =>
           link.entries.slice(from).some((entry) => entry.event === 'ui.touch') ||
-          pixels.changedSince?.(touchedAt) === true;
+          (!appLogsIt && pixels.changedSince?.(touchedAt) === true);
         while (!taken() && performance.now() - touchedAt < TOUCH_SHOWS_WITHIN_MS)
           await new Promise((resolve) => setTimeout(resolve, 20));
         if (!taken()) {

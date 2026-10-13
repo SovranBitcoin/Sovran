@@ -204,6 +204,9 @@
           "visible": {
             "label": "Incoming 20 sat transaction, prepared"
           }
+        },
+        {
+          "logged": "ui.touch"
         }
       ],
       "withinMs": 15000
