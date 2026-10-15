@@ -926,15 +926,7 @@ export async function withAndroidEmulatorSession<T>(
       onLifecycle,
       ...(options.onSeedExport ? { onSeedExport: options.onSeedExport } : {}),
       ...(options.fundedAssets ? { fundedAssets: options.fundedAssets } : {}),
-      // Android AX polls are uiautomator dumps (~1-3s each) and every step
-      // carries a screenshot bracket, so fixture legs run several times
-      // slower than on iOS. The 20s iOS slide pacing lets the onboarding
-      // carousel finish all four slides before flow.onboard reaches its
-      // slide-1 wait (the carousel does not loop) — park slides for 3
-      // minutes so the first slide is still on screen whenever the leg
-      // arrives; taps advance slides regardless.
       extraEnv: {
-        EXPO_PUBLIC_E2E_ONBOARDING_SLIDE_MS: '180000',
         // UIAutomator evidence between taps is slower than iOS. Keep the
         // dev-mode triple-tap reachable without changing production timing.
         EXPO_PUBLIC_E2E_TRIPLE_TAP_WINDOW_MS: '180000',

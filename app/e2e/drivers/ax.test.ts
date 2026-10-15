@@ -213,9 +213,9 @@ describe('classifyObservedState', () => {
   });
 
   it('recognizes onboarding before stale wallet controls', () => {
-    expect(
-      classifyObservedState(snap([...walletElements, el({ label: 'Welcome to Sovran' })]))
-    ).toBe('onboarding');
+    expect(classifyObservedState(snap([...walletElements, el({ id: 'onboarding-next' })]))).toBe(
+      'onboarding'
+    );
   });
 });
 

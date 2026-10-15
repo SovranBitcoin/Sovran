@@ -21,8 +21,8 @@ export const onboardingCopy = {
         "Choose issuers you trust and keep backups. Use only amounts you can afford to lose.",
     },
   },
-  welcome: "Welcome to Sovran",
-  tagline: "Payments and conversations, together.",
+  next: "Next",
+  back: "Back",
   getStarted: "Get Started",
   recoveryPhrase: "I have a recovery phrase",
 } as const;

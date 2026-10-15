@@ -80,15 +80,42 @@
       ]
     },
     {
-      "name": "lift the slides to reach Get Started",
-      "swipe": {
-        "on": {
-          "id": "screen-onboarding"
-        },
-        "direction": "up",
-        "distance": 0.3
+      "name": "go on to the profile card",
+      "tap": {
+        "id": "onboarding-next"
       },
       "expect": [
+        {
+          "visible": {
+            "label": "Carry your profile with you"
+          }
+        }
+      ]
+    },
+    {
+      "name": "go on to the privacy card",
+      "tap": {
+        "id": "onboarding-next"
+      },
+      "expect": [
+        {
+          "visible": {
+            "label": "Understand your privacy"
+          }
+        }
+      ]
+    },
+    {
+      "name": "go on to the last card",
+      "tap": {
+        "id": "onboarding-next"
+      },
+      "expect": [
+        {
+          "visible": {
+            "label": "Start small"
+          }
+        },
         {
           "visible": {
             "id": "onboarding-get-started"

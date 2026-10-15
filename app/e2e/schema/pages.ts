@@ -18,8 +18,7 @@ export const CANONICAL_PAGES = [
   'splash', // boot splash before the Terms gate on a fresh install
   'terms', // Terms & Conditions gate
   'privacy', // Privacy review step
-  'onboarding-carousel', // the four intro slides (occurrences 1-4)
-  'welcome', // "Welcome to Sovran" + Get Started reveal
+  'onboarding-carousel', // the four intro cards (occurrences 1-4)
   // shell
   'wallet', // wallet home (WalletScreen)
   'drawer', // profile drawer (drawer-profile-name)

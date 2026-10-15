@@ -6,10 +6,12 @@
   "steps": [
     {"use":"flow.fresh-install"},
     {"action":"waitFor","selector":{"label":"Small payments on your phone"},"timeoutMs":60000},
-    {"action":"tapUntil","sequence":[{"tap":{"label":"Small payments on your phone"}}],"until":{"label":"Carry your profile with you"},"attempts":4,"settleMs":6000},
-    {"action":"tapUntil","sequence":[{"tap":{"label":"Carry your profile with you"}}],"until":{"label":"Understand your privacy"},"attempts":4,"settleMs":6000},
-    {"action":"tapUntil","sequence":[{"tap":{"label":"Understand your privacy"}}],"until":{"label":"Start small"},"attempts":4,"settleMs":6000},
-    {"action":"tapUntil","sequence":[{"swipe":{"dir":"up"}}],"until":{"label":"Welcome to Sovran"},"attempts":4,"settleMs":3000},
+    {"action":"tap","selector":{"id":"onboarding-next"}},
+    {"action":"waitFor","selector":{"label":"Carry your profile with you"},"timeoutMs":30000},
+    {"action":"tap","selector":{"id":"onboarding-next"}},
+    {"action":"waitFor","selector":{"label":"Understand your privacy"},"timeoutMs":30000},
+    {"action":"tap","selector":{"id":"onboarding-next"}},
+    {"action":"waitFor","selector":{"label":"Start small"},"timeoutMs":30000},
     {"action":"tapUntil","sequence":[{"tap":{"label":"Get Started"}}],"until":{"label":"No History"},"attempts":4,"settleMs":8000}
   ]
 }

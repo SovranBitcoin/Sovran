@@ -300,15 +300,6 @@
     "inline-style": 5,
     "stack-layout-props": 1
   },
-  "features/onboarding/components/OnboardingPagination.tsx": {
-    "inline-style": 1
-  },
-  "features/onboarding/components/OnboardingScreen.tsx": {
-    "inline-style": 7
-  },
-  "features/onboarding/components/OnboardingSlideItem.tsx": {
-    "inline-style": 3
-  },
   "features/onboarding/screens/ClaimUsernameScreen.tsx": {
     "stylesheet-create": 1,
     "inline-style": 21,

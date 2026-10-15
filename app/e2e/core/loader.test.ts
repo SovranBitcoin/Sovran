@@ -35,39 +35,6 @@ describe('loadE2E over the real tree', () => {
     }
   });
 
-  it('retries the onboarding welcome reveal until the gesture visibly lands', () => {
-    const revealWelcome = {
-      action: 'tapUntil' as const,
-      sequence: [{ swipe: { dir: 'up' as const } }],
-      until: { label: 'Welcome to Sovran' },
-      attempts: 4,
-      settleMs: 3_000,
-    };
-
-    expect(loaded.fixtures.get('flow.onboard')!.steps).toContainEqual(revealWelcome);
-    for (const id of [
-      'onboarding.fresh',
-      'onboarding.relaunch-interrupt',
-      'onboarding.terms-gate',
-      'onboarding.offline',
-    ]) {
-      const scenario = loaded.scenarios.get(id)!;
-      expect(scenario.steps).toContainEqual(revealWelcome);
-      const confirmed = scenario.steps.findIndex(
-        (step) =>
-          step.action === 'tap' &&
-          'label' in step.selector &&
-          step.selector.label === 'Confirm and continue'
-      );
-      expect(confirmed).toBeGreaterThan(-1);
-      // Legal documents can scroll normally; carousel transitions require observed retry.
-      expect(scenario.steps.slice(confirmed + 1)).not.toContainEqual({
-        action: 'swipe',
-        dir: 'up',
-      });
-    }
-  });
-
   it('proves developer-mode unlock with the on-screen toast container, not an off-screen row', () => {
     for (const id of [
       'settings.design-system.showcase',
@@ -1808,7 +1775,7 @@ describe('loadE2E over the real tree', () => {
     expect(p.availability).toBe('ready');
     expect(p.steps[0]).toMatchObject({ phase: 'test', action: 'launch' }); // onboarding owns its launch
     const shots = p.steps.filter((s) => s.phase === 'test' && s.action === 'screenshot');
-    // splash, both legal documents, four carousel slides, and the welcome checkpoint
+    // splash, both legal documents and the four intro cards
     expect(shots.map((s) => s.step.action === 'screenshot' && s.step.name)).toEqual([
       'splash',
       'terms',
@@ -1817,18 +1784,12 @@ describe('loadE2E over the real tree', () => {
       'onboarding-carousel',
       'onboarding-carousel',
       'onboarding-carousel',
-      'welcome',
     ]);
     expect(p.endState).toBe('wallet');
   });
 
-  it('retries every onboarding carousel transition until the destination slide is visible', () => {
+  it('turns every onboarding card with Next until the following card is visible', () => {
     const { cashu, nostr, privacy, start } = onboardingCopy.slides;
-    const transitions = [
-      [cashu.title, nostr.title],
-      [nostr.title, privacy.title],
-      [privacy.title, start.title],
-    ] as const;
     const authoredJourneys = [
       ['flow.onboard', loaded.fixtures.get('flow.onboard')!.steps],
       ['onboarding.fresh', loaded.scenarios.get('onboarding.fresh')!.steps],
@@ -1846,15 +1807,12 @@ describe('loadE2E over the real tree', () => {
         selector: { label: cashu.title },
         timeoutMs: 60_000,
       });
-      for (const [from, to] of transitions) {
+      for (const next of [nostr.title, privacy.title, start.title]) {
         expect(steps, owner).toContainEqual({
-          action: 'tapUntil',
-          sequence: [{ tap: { label: from } }],
-          until: { label: to },
-          attempts: 4,
-          settleMs: 6_000,
+          action: 'waitFor',
+          selector: { label: next },
+          timeoutMs: 30_000,
         });
-        expect(steps, owner).not.toContainEqual({ action: 'tap', selector: { label: from } });
       }
     }
   });

@@ -290,7 +290,6 @@ describe('owned host configuration', () => {
     expect(environment).toEqual({
       KEEP_ME: 'yes',
       NODE_OPTIONS: '--dns-result-order=ipv4first',
-      EXPO_PUBLIC_E2E_ONBOARDING_SLIDE_MS: '180000',
       EXPO_PUBLIC_E2E_TOAST_DISMISS_MS: '8000',
       EXPO_PUBLIC_E2E_TRIPLE_TAP_WINDOW_MS: '180000',
       EXPO_PUBLIC_E2E_STATE_MIRROR: '1',

@@ -1,48 +1,41 @@
-import { ActionMenuHost } from '@/shared/blocks/popup/ActionMenuHost';
-import { Button } from '@/shared/ui/primitives/Button';
-import { openMnemonicRecovery } from '@/shared/lib/profile/keyRecovery';
-import React, { useCallback, useRef, useState } from 'react';
-import { View, useWindowDimensions } from 'react-native';
-import { Pressable } from '@/shared/ui/primitives/Pressable';
-import { PressableFeedback } from 'heroui-native';
+import { useEffect, useState } from 'react';
+import { BackHandler } from 'react-native';
+import Animated, {
+  FadeIn,
+  FadeInLeft,
+  FadeInRight,
+  useReducedMotion,
+} from 'react-native-reanimated';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { scheduleOnRN } from 'react-native-worklets';
 import { onboardingCopy } from 'copy/onboarding';
 
-import Animated, {
-  Extrapolation,
-  interpolate,
-  useAnimatedScrollHandler,
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-  withTiming,
-} from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-// FlatList here is only the ref type for OnboardingInnerCarousel's RNGH
-// pager (see the exemption there); Gesture/GestureDetector are the real use.
-// ast-grep-ignore: flatlist-outside-list-seam-tsx
-import { FlatList, Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { LinearGradient } from 'expo-linear-gradient';
-import { scheduleOnRN } from 'react-native-worklets';
-
-import Icon from 'assets/icons';
-import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { ActionMenuHost } from '@/shared/blocks/popup/ActionMenuHost';
+import { openMnemonicRecovery } from '@/shared/lib/profile/keyRecovery';
+import { log } from '@/shared/lib/logger';
+import { duration } from '@/shared/styles/tokens';
+import { ScreenScrollView } from '@/shared/ui/composed/ScreenScrollView';
+import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
+import { Screen } from '@/shared/ui/composed/Screen';
+import { Button } from '@/shared/ui/primitives/Button';
 import { Text } from '@/shared/ui/primitives/Text';
-import { log, useLifecycleLogger, Log } from '@/shared/lib/logger';
-import OnboardingInnerCarousel from './OnboardingInnerCarousel';
-import { OnboardingSlide } from './types';
+import { HStack } from '@/shared/ui/primitives/View/HStack';
+import { View } from '@/shared/ui/primitives/View/View';
 
-/**
- * Distance in pixels to translate carousel upward when fully expanded.
- * Reveals the welcome text + "Get Started" button below the carousel.
- */
-const TOP_CAROUSEL_OFFSET = 230;
-/** Minimum swipe distance (px) to trigger expand/collapse transition */
-const SWIPE_UP_THRESHOLD = 20;
-/** The e2e harness cannot screenshot inside the 3s auto-advance window (its
- * per-step evidence capture alone costs ~1s), so its owned Metro slows the
- * slides via env; taps still advance them. Unset outside e2e dev sessions. */
-const E2E_SLIDE_MS = __DEV__ ? Number(process.env.EXPO_PUBLIC_E2E_ONBOARDING_SLIDE_MS) : NaN;
-const SLIDE_DURATION_MS = Number.isFinite(E2E_SLIDE_MS) && E2E_SLIDE_MS > 0 ? E2E_SLIDE_MS : 3000;
+import { OnboardingIllustration } from './OnboardingIllustration';
+
+const CARDS = [
+  { ...onboardingCopy.slides.cashu, illustration: 'cashu' },
+  { ...onboardingCopy.slides.nostr, illustration: 'nostr' },
+  { ...onboardingCopy.slides.privacy, illustration: 'privacy' },
+  { ...onboardingCopy.slides.start, illustration: 'start' },
+] as const;
+
+const LAST = CARDS.length - 1;
+
+type EntryAnimation = ReturnType<typeof FadeInRight.duration>;
+/** A horizontal drag this far, mostly sideways, turns the card. */
+const SWIPE_PX = 48;
 
 type OnboardingScreenProps = {
   onComplete: () => void;
@@ -54,223 +47,133 @@ type OnboardingScreenProps = {
 };
 
 /**
- * The slide list's ref and its scroll helper.
- *
- * The ref lives here because the tap gesture hands `scrollToIndex` to
- * `scheduleOnRN` while it is being BUILT during render, and React Compiler
- * reads passing a ref-closing callback to a function in render as a
- * render-time ref access — enough to skip the whole onboarding screen.
+ * The introduction: one card at a time, moved on only by the person. Next
+ * becomes Get Started on the last card; a sideways swipe and Android back
+ * turn the cards too. Nothing advances by itself and no control is hidden.
  */
-function useSlideScroll() {
-  const ref = useRef<FlatList<OnboardingSlide>>(null);
-  const scrollToIndex = useCallback((index: number) => {
-    ref.current?.scrollToIndex({ index, animated: true });
-  }, []);
-  return { ref, scrollToIndex };
-}
+export default function OnboardingScreen({ onComplete, onRecoveryPhrase }: OnboardingScreenProps) {
+  const reducedMotion = useReducedMotion();
+  const [index, setIndex] = useState(0);
+  const [direction, setDirection] = useState<'forward' | 'back'>('forward');
 
-const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete, onRecoveryPhrase }) => {
-  useLifecycleLogger('OnboardingScreen');
-  const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
+  const turn = (to: number) => {
+    if (to < 0 || to > LAST) return;
+    setDirection(to > index ? 'forward' : 'back');
+    setIndex(to);
+    log.info('onboarding.slide.change', { slideIndex: to });
+  };
 
-  const insets = useSafeAreaInsets();
-  const { width: screenWidth } = useWindowDimensions();
+  useEffect(() => {
+    if (index === 0) return;
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      setDirection('back');
+      setIndex(index - 1);
+      return true;
+    });
+    return () => subscription.remove();
+  }, [index]);
 
-  const [background, foreground, muted, orange300, purple300, blue300, shade300] = useThemeColor([
-    'background',
-    'foreground',
-    'muted',
-    'orange-300',
-    'purple-300',
-    'blue-300',
-    'shade-300',
-  ] as const);
-
-  const slides: OnboardingSlide[] = [
-    {
-      bgColor: orange300,
-      durationMs: SLIDE_DURATION_MS,
-      ...onboardingCopy.slides.cashu,
-      icon: 'mdi:bitcoin',
-    },
-    {
-      bgColor: purple300,
-      durationMs: SLIDE_DURATION_MS,
-      ...onboardingCopy.slides.nostr,
-      icon: 'mdi:broadcast',
-    },
-    {
-      bgColor: blue300,
-      durationMs: SLIDE_DURATION_MS,
-      ...onboardingCopy.slides.privacy,
-      icon: 'mdi:key-variant',
-    },
-    {
-      bgColor: shade300,
-      durationMs: SLIDE_DURATION_MS,
-      ...onboardingCopy.slides.start,
-      icon: 'mdi:shield-check',
-    },
-  ];
-
-  const { ref: horizontalListRef, scrollToIndex: handleScrollToIndex } = useSlideScroll();
-
-  const animatedSlideIndex = useSharedValue(0);
-  const scrollOffsetX = useSharedValue(0);
-  const isDragging = useSharedValue(false);
-  const translateY = useSharedValue(0);
-  const gestureStartY = useSharedValue(0);
-
-  const scrollHandler = useAnimatedScrollHandler({
-    onBeginDrag: () => {
-      isDragging.set(true);
-    },
-    onScroll: (event) => {
-      const offsetX = event.contentOffset.x;
-      scrollOffsetX.set(offsetX);
-      animatedSlideIndex.set(offsetX / screenWidth);
-    },
-    onEndDrag: () => {
-      isDragging.set(false);
-    },
-  });
-
-  const singleTap = Gesture.Tap()
-    .maxDuration(250)
-    .onStart(() => {
-      if (translateY.get() < 0) return;
-      scheduleOnRN(handleScrollToIndex, currentSlideIndex + 1);
-      isDragging.set(false);
+  const swipe = Gesture.Pan()
+    .activeOffsetX([-SWIPE_PX / 2, SWIPE_PX / 2])
+    .failOffsetY([-SWIPE_PX / 2, SWIPE_PX / 2])
+    .onEnd((event) => {
+      if (event.translationX <= -SWIPE_PX) scheduleOnRN(turn, index + 1);
+      else if (event.translationX >= SWIPE_PX) scheduleOnRN(turn, index - 1);
     });
 
-  const panGesture = Gesture.Pan()
-    .onBegin(() => {
-      isDragging.set(true);
-      gestureStartY.set(translateY.get());
-    })
-    .onUpdate((e) => {
-      if (translateY.get() <= -TOP_CAROUSEL_OFFSET && e.translationY < 0) {
-        return;
-      }
-      const proposed = gestureStartY.get() + e.translationY / 4;
-      const clamped = Math.min(0, Math.max(proposed, -TOP_CAROUSEL_OFFSET));
-      translateY.set(clamped);
-    })
-    .onEnd(() => {
-      const currentY = translateY.get();
-      const isExpanded = currentY < 0;
-
-      const isTopThresholdReached =
-        Math.abs(gestureStartY.get()) - Math.abs(currentY) > SWIPE_UP_THRESHOLD;
-      const isBottomThresholdReached =
-        Math.abs(currentY) - Math.abs(gestureStartY.get()) > SWIPE_UP_THRESHOLD;
-
-      const expandedPositionMap = isTopThresholdReached ? 0 : -TOP_CAROUSEL_OFFSET;
-      const collapsedPositionMap = isBottomThresholdReached ? -TOP_CAROUSEL_OFFSET : 0;
-
-      const target = isExpanded ? expandedPositionMap : collapsedPositionMap;
-
-      translateY.set(
-        withSpring(target, {}, (finished) => {
-          if (finished && target === 0) {
-            isDragging.set(false);
-          }
-        })
-      );
-    });
-
-  const welcomeBlockStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(translateY.get(), [0, -TOP_CAROUSEL_OFFSET], [0, 1], Extrapolation.CLAMP),
-  }));
-
-  const gradientStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(translateY.get(), [0, -TOP_CAROUSEL_OFFSET], [0, 1], Extrapolation.CLAMP),
-  }));
-
-  const onGetStartedPress = () => {
-    log.info('onboarding.completed', { slidesSeen: currentSlideIndex + 1 });
+  const finish = () => {
+    log.info('onboarding.completed', { slidesSeen: index + 1 });
     onComplete();
   };
 
-  const onChevronDownPress = () => {
-    isDragging.set(false);
-    translateY.set(withTiming(0, { duration: 300 }));
-  };
+  const entering: EntryAnimation = (
+    reducedMotion ? FadeIn : direction === 'forward' ? FadeInRight : FadeInLeft
+  ).duration(duration.standard);
 
   return (
-    <Log name="OnboardingScreen">
-      <View style={{ flex: 1, backgroundColor: background, paddingBottom: insets.bottom + 10 }}>
-        <Animated.View style={[{ marginTop: 'auto' }, welcomeBlockStyle]}>
-          <Pressable
-            testID="onboarding-collapse-welcome"
-            accessibilityRole="button"
-            accessibilityLabel="Back to slides"
-            style={{ alignSelf: 'center', marginBottom: 24 }}
-            onPress={onChevronDownPress}>
-            <Icon name="mdi:chevron-down" size={24} color={muted} />
-          </Pressable>
-          <Text bold size={28} style={{ color: foreground, textAlign: 'center' }}>
-            {onboardingCopy.welcome}
-          </Text>
-          <Text size={15} style={{ color: muted, textAlign: 'center', marginTop: 12 }}>
-            {onboardingCopy.tagline}
-          </Text>
-        </Animated.View>
-
-        <PressableFeedback
-          testID="onboarding-get-started"
-          accessibilityRole="button"
-          onPress={onGetStartedPress}
-          style={{
-            height: 48,
-            alignItems: 'center',
-            justifyContent: 'center',
-            borderRadius: 999,
-            marginHorizontal: 80,
-            marginTop: 24,
-            backgroundColor: foreground,
-            overflow: 'hidden',
-          }}>
-          <PressableFeedback.Highlight />
-          <Text bold size={16} style={{ color: background }}>
-            {onboardingCopy.getStarted}
-          </Text>
-        </PressableFeedback>
-
-        <Button
-          testID="onboarding-recovery-phrase"
-          text={onboardingCopy.recoveryPhrase}
-          variant="underline"
-          onPress={onRecoveryPhrase ?? openMnemonicRecovery}
-        />
-
-        <GestureDetector gesture={Gesture.Race(panGesture, singleTap)}>
-          <OnboardingInnerCarousel
-            slides={slides}
-            currentSlideIndex={currentSlideIndex}
-            setCurrentSlideIndex={setCurrentSlideIndex}
-            animatedSlideIndex={animatedSlideIndex}
-            horizontalListRef={horizontalListRef}
-            scrollHandler={scrollHandler}
-            translateY={translateY}
-            scrollOffsetX={scrollOffsetX}
-            isDragging={isDragging}
-            topCarouselOffset={TOP_CAROUSEL_OFFSET}
-          />
+    <>
+      <Screen
+        name="OnboardingScreen"
+        scroll="custom"
+        safeArea
+        deferContent={false}
+        footer={
+          <BottomButtons>
+            {index < LAST ? (
+              <Button
+                testID="onboarding-next"
+                text={onboardingCopy.next}
+                onPress={() => turn(index + 1)}
+              />
+            ) : (
+              <Button
+                testID="onboarding-get-started"
+                text={onboardingCopy.getStarted}
+                onPress={finish}
+              />
+            )}
+            <Button
+              testID="onboarding-recovery-phrase"
+              text={onboardingCopy.recoveryPhrase}
+              variant="underline"
+              onPress={onRecoveryPhrase ?? openMnemonicRecovery}
+            />
+          </BottomButtons>
+        }>
+        <GestureDetector gesture={swipe}>
+          <View className="flex-1" collapsable={false}>
+            <View className="h-12 items-start px-8">
+              {index > 0 && (
+                <Button
+                  testID="onboarding-back"
+                  text={onboardingCopy.back}
+                  variant="underline"
+                  onPress={() => turn(index - 1)}
+                />
+              )}
+            </View>
+            <CardStage index={index} entering={entering} />
+          </View>
         </GestureDetector>
-
-        <Animated.View
-          pointerEvents="none"
-          style={[{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }, gradientStyle]}>
-          <LinearGradient
-            colors={['rgba(0,0,0,0.6)', 'transparent']}
-            style={{ width: '100%', height: '60%' }}
-          />
-        </Animated.View>
-      </View>
+      </Screen>
       {!onRecoveryPhrase && <ActionMenuHost />}
-    </Log>
+    </>
   );
-};
+}
 
-export default OnboardingScreen;
+/**
+ * Card content can grow and scroll with text size. The footer stays outside
+ * the card gesture area, so its actions remain directly reachable.
+ */
+function CardStage({ index, entering }: { index: number; entering: EntryAnimation }) {
+  const card = CARDS[index]!;
+  return (
+    <ScreenScrollView className="flex-1" contentContainerClassName="grow justify-center px-8">
+      <Animated.View key={index} entering={entering} className="gap-8 py-6">
+        <View className="min-h-60 items-center justify-center">
+          <OnboardingIllustration kind={card.illustration} />
+        </View>
+        <View className="gap-3">
+          <Text size={28} bold className="text-center" accessibilityRole="header">
+            {card.title}
+          </Text>
+          <Text size={16} className="text-foreground/70 text-center">
+            {card.description}
+          </Text>
+        </View>
+      </Animated.View>
+      <HStack
+        className="justify-center gap-2 pt-6"
+        accessible
+        testID="onboarding-position"
+        accessibilityLabel={`Card ${index + 1} of ${CARDS.length}`}>
+        {CARDS.map((each, dot) => (
+          <View
+            key={each.title}
+            className={`h-2 rounded-full ${dot === index ? 'bg-foreground w-5' : 'bg-foreground/25 w-2'}`}
+          />
+        ))}
+      </HStack>
+    </ScreenScrollView>
+  );
+}

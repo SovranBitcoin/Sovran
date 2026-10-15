@@ -126,7 +126,7 @@ export function classifyObservedState(snap: AxSnapshot | null): ObservedState {
   if (
     visible.some(
       (candidate) =>
-        candidate.label === 'Welcome to Sovran' ||
+        candidate.id === 'onboarding-next' ||
         candidate.label === 'Get Started' ||
         candidate.id === 'terms-acceptance' ||
         candidate.id === 'legal-review-title' ||

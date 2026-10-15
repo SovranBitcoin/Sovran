@@ -1,9 +1,9 @@
 /**
  * @fileoverview Keyframe timeline for the permission gesture demo
  *
- * Pure data + a pure evaluator — deliberately ZERO imports (no reanimated)
- * so the loop-seam and monotonicity invariants are jest-testable without
- * mocking, and the whole choreography is reviewable in one table.
+ * Pure timeline data with only a type import. The loop-seam and ordering
+ * invariants can be tested without loading Reanimated, and the choreography
+ * is reviewable in one table.
  *
  * One master clock `t` (ms, 0 → CYCLE_MS, repeating) drives every element;
  * each element samples its Track via `valueAt`. The non-negotiable invariant:

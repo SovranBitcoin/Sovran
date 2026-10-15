@@ -390,7 +390,7 @@ const FIRST_LAUNCH_ENTRIES: readonly ScreenPromptEntry[] = [
     kind: 'screen',
     id: 'onboarding-carousel',
     title: 'Onboarding',
-    detail: 'The four slides, then Welcome and Get Started',
+    detail: 'The four cards, turned with Next, then Get Started',
     render: (close) => <OnboardingScreen onComplete={close} onRecoveryPhrase={openPhraseSample} />,
   },
 ];

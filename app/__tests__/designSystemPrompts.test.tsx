@@ -132,6 +132,10 @@ jest.mock('react-native-web/dist/exports/BackHandler', () => ({
   __esModule: true,
   default: { addEventListener: () => ({ remove: () => {} }) },
 }));
+jest.mock('react-native-web/dist/exports/AppState', () => ({
+  __esModule: true,
+  default: { currentState: 'active', addEventListener: () => ({ remove: () => {} }) },
+}));
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 47, bottom: 34, left: 0, right: 0 }),
 }));
@@ -144,6 +148,12 @@ jest.mock('react-native-reanimated', () => {
   return {
     __esModule: true,
     default: { View: 'AnimatedView' },
+    FadeIn: { duration: () => undefined },
+    useReducedMotion: () => false,
+    cancelAnimation: () => {},
+    withRepeat: <T,>(value: T) => value,
+    FadeInLeft: { duration: () => undefined },
+    FadeInRight: { duration: () => undefined },
     Extrapolation: { CLAMP: 'clamp' },
     Easing: new Proxy({}, { get: () => () => (value: number) => value }),
     interpolate: () => 0,
@@ -156,10 +166,9 @@ jest.mock('react-native-reanimated', () => {
 });
 jest.mock('react-native-gesture-handler', () => {
   const chain: Record<string, unknown> = {};
-  for (const step of ['maxDuration', 'onStart', 'onBegin', 'onUpdate', 'onEnd'])
-    chain[step] = () => chain;
+  for (const step of ['activeOffsetX', 'failOffsetY', 'onEnd']) chain[step] = () => chain;
   return {
-    Gesture: { Tap: () => chain, Pan: () => chain, Race: () => chain },
+    Gesture: { Pan: () => chain },
     GestureDetector: ({ children }: React.PropsWithChildren) => children,
   };
 });
@@ -230,7 +239,6 @@ jest.mock('@/shared/blocks/status', () => ({
 jest.mock('@/features/settings/screens/SettingsProfileRecoveryScreen', () => ({
   SettingsProfileRecoveryScreen: 'RecoveryInformation',
 }));
-jest.mock('@/features/onboarding/components/OnboardingInnerCarousel', () => 'Carousel');
 jest.mock('@/shared/ui/composed/Screen', () => ({
   Screen: ({ children, footer }: React.PropsWithChildren<{ footer?: React.ReactNode }>) => (
     <>
@@ -526,6 +534,27 @@ describe('a prompt on its sample', () => {
 });
 
 describe('a blocking or first-launch screen on its sample', () => {
+  it('turns every onboarding card, goes back, and closes only from Get Started', async () => {
+    const entry = findPromptEntry('onboarding-carousel');
+    if (!entry) throw new Error('Missing onboarding preview');
+    const view = preview(entry);
+    expect(textOf(view)).toContain('Small payments on your phone');
+    expect(view.root.findAllByProps({ testID: 'onboarding-get-started' })).toHaveLength(0);
+    await act(() => view.root.findByProps({ testID: 'onboarding-next' }).props.onPress());
+    expect(textOf(view)).toContain('Carry your profile with you');
+    await act(() => view.root.findByProps({ testID: 'onboarding-back' }).props.onPress());
+    expect(textOf(view)).toContain('Small payments on your phone');
+    for (const title of ['Carry your profile with you', 'Understand your privacy', 'Start small']) {
+      await act(() => view.root.findByProps({ testID: 'onboarding-next' }).props.onPress());
+      expect(textOf(view)).toContain(title);
+    }
+    expect(mockBack).not.toHaveBeenCalled();
+    await act(() => view.root.findByProps({ testID: 'onboarding-get-started' }).props.onPress());
+    expect(mockBack).toHaveBeenCalledTimes(1);
+    expectNothingTouched();
+    act(() => view.unmount());
+  });
+
   it.each(screenEntries.map((entry) => [entry.id, entry] as const))(
     '%s draws and changes nothing when every control is used',
     async (_id, entry) => {
