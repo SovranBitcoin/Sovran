@@ -164,14 +164,7 @@ jest.mock('react-native-reanimated', () => {
     withTiming: <T,>(value: T) => value,
   };
 });
-jest.mock('react-native-gesture-handler', () => {
-  const chain: Record<string, unknown> = {};
-  for (const step of ['activeOffsetX', 'failOffsetY', 'onEnd']) chain[step] = () => chain;
-  return {
-    Gesture: { Pan: () => chain },
-    GestureDetector: ({ children }: React.PropsWithChildren) => children,
-  };
-});
+
 jest.mock('react-native-worklets', () => ({ scheduleOnRN: jest.fn() }));
 jest.mock('expo-linear-gradient', () => ({ LinearGradient: 'LinearGradient' }));
 jest.mock('heroui-native', () => {

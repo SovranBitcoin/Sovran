@@ -6,8 +6,6 @@ import Animated, {
   FadeInRight,
   useReducedMotion,
 } from 'react-native-reanimated';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { scheduleOnRN } from 'react-native-worklets';
 import { onboardingCopy } from 'copy/onboarding';
 
 import { ActionMenuHost } from '@/shared/blocks/popup/ActionMenuHost';
@@ -34,9 +32,6 @@ const CARDS = [
 const LAST = CARDS.length - 1;
 
 type EntryAnimation = ReturnType<typeof FadeInRight.duration>;
-/** A horizontal drag this far, mostly sideways, turns the card. */
-const SWIPE_PX = 48;
-
 type OnboardingScreenProps = {
   onComplete: () => void;
   /**
@@ -48,8 +43,8 @@ type OnboardingScreenProps = {
 
 /**
  * The introduction: one card at a time, moved on only by the person. Next
- * becomes Get Started on the last card; a sideways swipe and Android back
- * turn the cards too. Nothing advances by itself and no control is hidden.
+ * becomes Get Started on the last card; Back and Android back revisit a
+ * card. Nothing advances by itself and no control is hidden.
  */
 export default function OnboardingScreen({ onComplete, onRecoveryPhrase }: OnboardingScreenProps) {
   const reducedMotion = useReducedMotion();
@@ -72,14 +67,6 @@ export default function OnboardingScreen({ onComplete, onRecoveryPhrase }: Onboa
     });
     return () => subscription.remove();
   }, [index]);
-
-  const swipe = Gesture.Pan()
-    .activeOffsetX([-SWIPE_PX / 2, SWIPE_PX / 2])
-    .failOffsetY([-SWIPE_PX / 2, SWIPE_PX / 2])
-    .onEnd((event) => {
-      if (event.translationX <= -SWIPE_PX) scheduleOnRN(turn, index + 1);
-      else if (event.translationX >= SWIPE_PX) scheduleOnRN(turn, index - 1);
-    });
 
   const finish = () => {
     log.info('onboarding.completed', { slidesSeen: index + 1 });
@@ -120,21 +107,19 @@ export default function OnboardingScreen({ onComplete, onRecoveryPhrase }: Onboa
             />
           </BottomButtons>
         }>
-        <GestureDetector gesture={swipe}>
-          <View className="flex-1" collapsable={false}>
-            <View className="h-12 items-start px-8">
-              {index > 0 && (
-                <Button
-                  testID="onboarding-back"
-                  text={onboardingCopy.back}
-                  variant="underline"
-                  onPress={() => turn(index - 1)}
-                />
-              )}
-            </View>
-            <CardStage index={index} entering={entering} />
+        <View className="flex-1">
+          <View className="h-12 items-start px-8">
+            {index > 0 && (
+              <Button
+                testID="onboarding-back"
+                text={onboardingCopy.back}
+                variant="underline"
+                onPress={() => turn(index - 1)}
+              />
+            )}
           </View>
-        </GestureDetector>
+          <CardStage index={index} entering={entering} />
+        </View>
       </Screen>
       {!onRecoveryPhrase && <ActionMenuHost />}
     </>
@@ -143,7 +128,7 @@ export default function OnboardingScreen({ onComplete, onRecoveryPhrase }: Onboa
 
 /**
  * Card content can grow and scroll with text size. The footer stays outside
- * the card gesture area, so its actions remain directly reachable.
+ * the scrolling content, so its actions remain directly reachable.
  */
 function CardStage({ index, entering }: { index: number; entering: EntryAnimation }) {
   const card = CARDS[index]!;
