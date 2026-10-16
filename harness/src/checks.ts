@@ -17,6 +17,7 @@ const eventData = z.object({
   file: z.string().optional(), name: z.string().optional(), nesting: z.number().int().nonnegative().optional(),
   line: z.number().int().positive().optional(), column: z.number().int().positive().optional(),
   skip: z.union([z.boolean(), z.string()]).optional(), todo: z.union([z.boolean(), z.string()]).optional(),
+  expectFailure: z.boolean().optional(),
   details: z.object({ type: z.string(), passed: z.boolean().optional() }).optional(),
   success: z.boolean().optional(),
   counts: z.object({ tests: z.number().int().nonnegative(), passed: z.number().int().nonnegative(),
@@ -54,6 +55,7 @@ export function inspectNodeTests(raw: string, expected: { invocation: string; ro
   for (const r of records) {
     if (r.kind !== 'event') continue;
     const { type, data: d } = r.event;
+    if (d.expectFailure) problems.push('Expected-failure assertions cannot establish ordinary behavior');
     if (type === 'test:summary') {
       const file = d.file ? normalize(d.file) : '<all>';
       if (summaries.has(file)) problems.push(`Duplicate run summary: ${file}`);
@@ -76,7 +78,10 @@ export function inspectNodeTests(raw: string, expected: { invocation: string; ro
       stacks.set(file, names); started.set(key, { file, names });
     } else if (type === 'test:complete') {
       if (!d.details || d.details.passed === undefined) throw new Error('Test completion lacks result');
-      if (completed.has(key)) problems.push(`Duplicate case completion: ${key}`);
+      // Concurrent subtests can repeat this notification before their ordered terminal event.
+      const previous = completed.get(key);
+      if (previous && (previous.passed !== d.details.passed || previous.type !== d.details.type))
+        problems.push(`Conflicting case completion: ${key}`);
       completed.set(key, { passed: d.details.passed, type: d.details.type });
     } else {
       const start = started.get(key), completion = completed.get(key);

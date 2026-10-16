@@ -41,6 +41,7 @@ test.each([
   ['missing selected case', "import {test} from 'node:test'; test('other',()=>{})"],
   ['skipped', "import {test} from 'node:test'; test.skip('guard',()=>{})"],
   ['todo', "import {test} from 'node:test'; test.todo('guard',()=>{})"],
+  ['expected failure', "import {test} from 'node:test'; import assert from 'node:assert/strict'; test('guard',{expectFailure:true},()=>assert.equal(1,2))"],
   ['early exit', "process.exit(0)"],
   ['assertion fails', "import {test} from 'node:test'; import assert from 'node:assert/strict'; test('guard',()=>assert.equal(1,2))"],
   ['duplicate names', "import {test} from 'node:test'; test('guard',()=>{}); test('guard',()=>{})"],
@@ -77,4 +78,10 @@ test('a test-only marker cannot silently narrow the sealed case selection', asyn
   const { t } = await execute("import {test} from 'node:test'; test('guard',()=>{}); test.only('other',()=>{});");
   expect(t.phase).toBe('reviewing');
   expect(t.receipts[0]?.summary).toContain('Executed 2 named cases');
+});
+
+test('concurrent nested cases retain their identity despite repeated identical completion notifications', async () => {
+  const { t } = await execute("import {test} from 'node:test'; test('parent',{concurrency:true},async t=>{await Promise.all([t.test('left',async t=>{await new Promise(r=>setTimeout(r,20));await t.test('leaf',()=>{})}),t.test('right',async t=>{await t.test('leaf',()=>{})})])});", ['parent','left','leaf']);
+  expect(t.phase).toBe('reviewing');
+  expect(t.receipts[0]?.summary).toContain('Executed 5 named cases');
 });

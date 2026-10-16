@@ -87,7 +87,11 @@ the host collector uses Node's process-isolated test API and retains its structu
 stdout/stderr, runtime version, collector hash, selected file hashes and invocation identity.
 Empty-file wrappers, skipped/todo required cases, missing cases, inconsistent lifecycle or
 summary counts and incomplete streams fail the check. Printed JSON is captured as test
-stdout, never interpreted as runner evidence. This adapter has been exercised with Node
+stdout, never interpreted as runner evidence. This is not authentication of hostile test
+code: Node's child protocol can be forged with binary writes to stdout, and workers share
+the trusted host. Review the test inputs and runner changes independently; the collector
+establishes consistency of Node's reported cases, not that arbitrary code honestly registered
+or asserted them. This adapter has been exercised with Node
 24.14.1; an unsupported event shape fails closed. See the official [Node test stream API](https://nodejs.org/docs/latest-v24.x/api/test.html#class-testsstream).
 Execution evidence does not establish that assertions express the right behavior; independent
 oracle review and a meaningful negative control remain necessary for important fixes.
