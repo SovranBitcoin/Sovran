@@ -14,6 +14,10 @@
     "scripts/lib/phone-frame.mjs": ["exports"]
   },
   "workspaces": {
+    "harness": {
+      "entry": ["src/cli.ts"],
+      "project": ["src/**/*.ts", "tests/**/*.ts"]
+    },
     "app": {
       "entry": [
         "shim.js",

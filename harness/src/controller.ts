@@ -1,0 +1,186 @@
+import { randomUUID } from 'node:crypto';
+import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { join, relative, resolve } from 'node:path';
+import { z } from 'zod';
+import { Journal } from './journal';
+import { assessment, contract, move, roleFor, task, type Task } from './workflow';
+import { digest, fileEvidence, fingerprint, git, within } from './workspace';
+
+export class Controller {
+  readonly journal: Journal;
+  constructor(readonly stateDir: string) {
+    mkdirSync(stateDir, { recursive: true, mode: 0o700 });
+    this.journal = new Journal(join(stateDir, 'tasks.sqlite'));
+  }
+  close() { this.journal.close(); }
+  read(id: string) { return task.parse(this.journal.read(id).value); }
+
+  create(root: string, input: unknown) {
+    root = realpathSync(root);
+    if (!relative(root, resolve(this.stateDir)).startsWith('..'))
+      throw new Error('Task state must live outside the source workspace');
+    const spec = contract.parse(input);
+    if (Date.parse(spec.limits.deadline) <= Date.now()) throw new Error('Task deadline already elapsed');
+    const context = spec.contextFiles.map(path => fileEvidence(root, path));
+    const id = randomUUID();
+    const value: Task = {
+      version: 1, id, root, base: git(root, ['rev-parse', 'HEAD']), contract: spec,
+      phase: 'researching', generation: 0, source: fingerprint(root),
+      policy: digest(JSON.stringify({ spec, context })), context, ticket: null,
+      receipts: [], assessments: [], pending: { kind: 'none' }, reason: '', pr: null,
+    };
+    this.journal.create(id, value);
+    return this.read(id);
+  }
+
+  private change(id: string, key: string, input: unknown, fn: (t: Task) => Task) {
+    return task.parse(this.journal.change(id, key, input, value => fn(task.parse(value))).value);
+  }
+
+  private live(t: Task) {
+    if (Date.parse(t.contract.limits.deadline) <= Date.now()) throw new Error('Task budget exhausted; finish incomplete');
+    if (['ready', 'incomplete', 'cancelled'].includes(t.phase)) throw new Error(`Task is ${t.phase}`);
+  }
+
+  private current(t: Task) {
+    this.live(t);
+    if (fingerprint(t.root) !== t.source) throw new Error('Candidate changed; repair and verify the new source');
+  }
+
+  private issue(t: Task): Task {
+    const role = roleFor(t.phase);
+    if (!role || t.ticket) return t;
+    return { ...t, ticket: { id: `${t.id}:${t.generation}:${role}`, role, target: t.contract.models[role], claim: null } };
+  }
+
+  next(id: string) {
+    const t = this.read(id);
+    if (Date.parse(t.contract.limits.deadline) <= Date.now() && !['ready', 'incomplete', 'cancelled'].includes(t.phase))
+      return this.stop(id, 'deadline', 'Task deadline exhausted');
+    return this.change(id, `issue:${t.generation}:${t.phase}`, {}, value => this.issue(value));
+  }
+
+  claim(id: string, ticketId: string, worker: string, provider: string, model: string) {
+    const input = { ticketId, worker, provider, model };
+    return this.change(id, `claim:${ticketId}:${worker}`, input, t => {
+      this.live(t);
+      if (t.ticket?.id !== ticketId) throw new Error('Stale dispatch ticket');
+      if (t.ticket.target.provider !== provider || t.ticket.target.model !== model) throw new Error('Wrong provider/model');
+      if (t.ticket.claim && t.ticket.claim.worker !== worker) throw new Error('Ticket already claimed; reconcile the original worker');
+      return { ...t, ticket: { ...t.ticket, claim: { worker, provider, model } } };
+    });
+  }
+
+  /** Submission means the worker and its processes have finished. A lost worker is
+   * never replaced on a timer: the operator/coordinator must reconcile first. */
+  submit(id: string, ticketId: string, worker: string, input: unknown) {
+    const result = assessment.parse(input);
+    return this.change(id, `submit:${ticketId}`, { worker, result }, t => {
+      this.live(t);
+      if (t.ticket?.id !== ticketId || t.ticket.claim?.worker !== worker) throw new Error('Unclaimed or stale ticket');
+      const role = t.ticket.role;
+      if (role !== 'implementation') this.current(t);
+      if (role === 'audit' && !t.contract.auditChecks.every(c => t.receipts.some(r => r.id === c.id && r.source === t.source && r.outcome === 'pass')))
+        throw new Error('Run every audit retrieval/check before submitting judgment');
+      const source = fingerprint(t.root);
+      const missing = t.contract.requirements.filter(r => !result.observations.some(o => o.requirement === r.id));
+      if (missing.length) throw new Error(`Missing requirement observations: ${missing.map(r => r.id).join(', ')}`);
+      if (result.verdict === 'pass' && result.findings.some(f => f.severity === 'blocking'))
+        throw new Error('A blocking finding cannot pass');
+      for (const observation of result.observations) this.inspectReference(t, observation.evidence);
+      const evidence = this.save(t, `${ticketId.replaceAll(':', '-')}.json`, result);
+      const next: Task = { ...t, ticket: null, source, assessments: [...t.assessments, { role, source, worker, result, artifact: evidence }] };
+      if (result.verdict === 'inconclusive') return { ...move(next, 'STOP'), reason: result.summary };
+      if (result.verdict === 'fail') {
+        if (role === 'research' || role === 'implementation') return { ...move(next, 'STOP'), reason: result.summary };
+        return this.repairTask(next, result.summary);
+      }
+      return move(next, 'ACCEPT');
+    });
+  }
+
+  private inspectReference(t: Task, reference: string) {
+    // References are whole files. Line/frame observations are kept separately in the assessment.
+    if (reference.startsWith('artifact:')) {
+      const path = reference.slice('artifact:'.length);
+      within(join(this.stateDir, t.id), path);
+    } else {
+      within(t.root, reference);
+    }
+  }
+
+  seal(id: string, policyHash: string) {
+    return this.change(id, 'seal', { policyHash }, t => {
+      this.current(t);
+      if (policyHash !== t.policy) throw new Error('Intake changed; seal the exact reviewed policy');
+      return move(t, 'SEAL');
+    });
+  }
+
+  repair(id: string, reason: string) {
+    const t = this.read(id);
+    return this.change(id, `repair:${t.generation}:${t.phase}`, { reason }, v => this.repairTask(v, reason));
+  }
+
+  private repairTask(t: Task, reason: string): Task {
+    this.live(t);
+    if (t.ticket || t.pending.kind !== 'none') throw new Error('Outstanding work must be reconciled before repair');
+    if (t.generation >= t.contract.limits.repairRounds) return { ...move(t, 'STOP'), reason: `Repair budget exhausted: ${reason}` };
+    return { ...move(t, 'REPAIR'), generation: t.generation + 1, source: fingerprint(t.root), receipts: [], reason };
+  }
+
+  stop(id: string, key: string, reason: string, cancel = false) {
+    if (!reason.trim()) throw new Error('A stopping reason is required');
+    return this.change(id, `stop:${key}`, { reason, cancel }, t => ({ ...move(t, cancel ? 'CANCEL' : 'STOP'), reason }));
+  }
+
+  save(t: Task, name: string, value: unknown) {
+    const dir = join(this.stateDir, t.id);
+    mkdirSync(dir, { recursive: true, mode: 0o700 });
+    const path = `${t.generation}-${name}`;
+    const data = JSON.stringify(value, null, 2);
+    if (existsSync(join(dir, path))) {
+      if (readFileSync(join(dir, path), 'utf8') !== data) throw new Error('Immutable artifact already exists with different content');
+    } else writeFileSync(join(dir, path), data, { flag: 'wx', mode: 0o600 });
+    return { path, sha256: digest(data) };
+  }
+
+  async verify(id: string, audit = false) {
+    let t = this.read(id);
+    this.current(t);
+    if (t.phase !== (audit ? 'auditing' : 'verifying')) throw new Error('Wrong verification phase');
+    if (t.pending.kind !== 'none') throw new Error('Previous command outcome unknown; reconcile before retrying');
+    const commands = audit ? t.contract.auditChecks : t.contract.checks;
+    for (const check of commands) {
+      if (t.receipts.some(r => r.id === check.id && r.source === t.source && r.outcome === 'pass')) continue;
+      t = this.change(id, `execute:${t.generation}:${check.id}`, {}, v => {
+        this.current(v);
+        if (v.pending.kind !== 'none') throw new Error('Another command owns this task');
+        return { ...v, pending: { kind: 'command', id: check.id } };
+      });
+      const cwd = within(t.root, check.cwd);
+      const dir = join(this.stateDir, t.id);
+      mkdirSync(dir, { recursive: true, mode: 0o700 });
+      const log = `${t.generation}-${digest(check.id)}.log`;
+      const proc = Bun.spawn(check.argv, { cwd, stdout: Bun.file(join(dir, log)), stderr: Bun.file(join(dir, `${log}.stderr`)), stdin: 'ignore', env: { ...process.env, CI: '1' } });
+      const timer = setTimeout(() => proc.kill('SIGKILL'), check.timeoutMs);
+      let exit: number;
+      try { exit = await proc.exited; } finally { clearTimeout(timer); }
+      const logArtifact = { path: log, sha256: digest(readFileSync(join(dir, log))) };
+      const stderrArtifact = { path: `${log}.stderr`, sha256: digest(readFileSync(join(dir, `${log}.stderr`))) };
+      t = this.change(id, `result:${t.generation}:${check.id}`, { exit, logArtifact, stderrArtifact }, v => {
+        this.current(v);
+        if (v.pending.kind !== 'command' || v.pending.id !== check.id) throw new Error('Command ownership lost');
+        const source = z.string().parse(v.source);
+        return { ...v, pending: { kind: 'none' }, receipts: [...v.receipts, { id: check.id, source, artifacts: [logArtifact, stderrArtifact], outcome: exit === 0 ? 'pass' : 'fail', summary: `Exit ${exit}: ${check.argv.join(' ')}` }] };
+      });
+      if (exit !== 0) return this.repair(id, `Check failed: ${check.id}`);
+    }
+    if (audit) return t; // Retrieval is evidence; an independent audit ticket supplies judgment.
+    return this.change(id, `verified:${t.generation}`, {}, v => {
+      this.current(v);
+      if (!v.contract.checks.every(c => v.receipts.some(r => r.id === c.id && r.outcome === 'pass' && r.source === v.source))) throw new Error('Missing verification');
+      return move(v, 'ACCEPT');
+    });
+  }
+}

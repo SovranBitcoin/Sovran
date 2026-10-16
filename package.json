@@ -9,7 +9,8 @@
     "wallet",
     "nostr",
     "docs",
-    "copy"
+    "copy",
+    "harness"
   ],
   "overrides": {
     "@cashu/cashu-ts": "5.0.0-rc.4",
@@ -18,6 +19,7 @@
     "nostr-tools": "2.24.2"
   },
   "scripts": {
+    "harness": "bun harness/src/cli.ts",
     "assets:generate": "node scripts/assets.mjs",
     "assets:check": "node scripts/assets.mjs --check",
     "assets:brand": "node scripts/brand-assets.mjs",

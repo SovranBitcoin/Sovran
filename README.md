@@ -29,6 +29,8 @@ before switching delivery or retiring the old website repository.
 
 ## Documentation map
 
+The [task harness](harness/README.md) owns the persistent agent workflow and its evidence gates.
+
 This README is the entry point; every other document in the repository hangs off
 this table.
 
