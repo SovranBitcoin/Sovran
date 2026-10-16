@@ -128,7 +128,7 @@ belong in the documents above; with a fixed shape, in a lint rule or test; when 
 means reading what the code does, in a saved check ([how](docs/review/README.md)). A local skill
 is for a procedure with steps and an end.
 
-**Load these when their moment comes:**
+**Load these when their moment comes:** use `full-send` for the durable task controller in `harness/`.
 
 | Skill | When |
 | --- | --- |

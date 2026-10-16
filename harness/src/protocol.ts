@@ -8,6 +8,11 @@ export const request = z.discriminatedUnion('action', [
   z.object({ action: z.literal('create'), root: text, contract }),
   z.object({ action: z.literal('status'), id }),
   z.object({ action: z.literal('next'), id }),
+  z.object({ action: z.literal('brief'), id }),
+  z.object({ action: z.literal('reconcile-command'), id }),
+  z.object({ action: z.literal('publish'), id }),
+  z.object({ action: z.literal('check-ci'), id }),
+  z.object({ action: z.literal('worker-stopped'), id, ticket: text, worker: text, reason: text }),
   z.object({ action: z.literal('seal'), id, policy: text }),
   z.object({ action: z.literal('claim'), id, ticket: text, worker: text, provider: text, model: text }),
   z.object({ action: z.literal('submit'), id, ticket: text, worker: text, assessment }),
@@ -22,6 +27,11 @@ export async function dispatch(controller: Controller, input: unknown) {
     case 'create': return controller.create(r.root, r.contract);
     case 'status': return controller.read(r.id);
     case 'next': return controller.next(r.id);
+    case 'brief': return controller.brief(r.id);
+    case 'reconcile-command': return controller.reconcileCommand(r.id);
+    case 'publish': return controller.publish(r.id);
+    case 'check-ci': return controller.checkCI(r.id);
+    case 'worker-stopped': return controller.workerStopped(r.id, r.ticket, r.worker, r.reason);
     case 'seal': return controller.seal(r.id, r.policy);
     case 'claim': return controller.claim(r.id, r.ticket, r.worker, r.provider, r.model);
     case 'submit': return controller.submit(r.id, r.ticket, r.worker, r.assessment);

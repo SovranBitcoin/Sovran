@@ -6,17 +6,22 @@ import { Journal } from './journal';
 import { runCommand } from './command';
 import { inspectChange } from './policy';
 import { inspectUpgradeEvidence, upgradeInventorySchema } from './upgrade';
+import { brief } from './brief';
+import { Publisher, publishPlan } from './publisher';
+import { contextPaths } from './context';
+import { prepareReference } from './references';
 import { assessment, contract, move, roleFor, task, type Task } from './workflow';
 import { digest, fileEvidence, fingerprint, git, within } from './workspace';
 
 export class Controller {
   readonly journal: Journal;
-  constructor(readonly stateDir: string) {
+  constructor(readonly stateDir: string, private readonly publisher = new Publisher({ fingerprint })) {
     mkdirSync(stateDir, { recursive: true, mode: 0o700 });
     this.journal = new Journal(join(stateDir, 'tasks.sqlite'));
   }
   close() { this.journal.close(); }
   read(id: string) { return task.parse(this.journal.read(id).value); }
+  brief(id: string) { return brief(this.read(id), this.stateDir); }
 
   create(root: string, input: unknown) {
     root = realpathSync(git(realpathSync(root), ['rev-parse', '--show-toplevel']));
@@ -25,17 +30,19 @@ export class Controller {
     const spec = contract.parse(input);
     if (git(root, ['status', '--porcelain'])) throw new Error('Start from a clean checkout or a dedicated worktree');
     if (Date.parse(spec.limits.deadline) <= Date.now()) throw new Error('Task deadline already elapsed');
-    const context = spec.contextFiles.map(path => fileEvidence(root, path));
+    const context = contextPaths(root, spec).map(path => fileEvidence(root, path));
+    const references = spec.references.map(ref => prepareReference('/tmp/sovran-harness/references', ref));
     const id = randomUUID();
     const value: Task = {
       version: 1, id, root, base: git(root, ['rev-parse', 'HEAD']), contract: spec,
       phase: 'researching', generation: 0, source: fingerprint(root),
-      policy: digest(JSON.stringify({ spec, context })), context, ticket: null,
-      receipts: [], assessments: [], pending: { kind: 'none' }, reason: '', pr: null,
+      policy: digest(JSON.stringify({ spec, context, references: references.map(r => r.sha256) })), context, referenceEvidence: null, ticket: null,
+      receipts: [], assessments: [], pending: { kind: 'none' }, publication: null, reason: '', pr: null,
     };
     const policy = inspectChange(root, value.base, spec);
     if (policy.problems.length) throw new Error(policy.problems.join('\n'));
     this.save(value, 'intake-context.json', context.map(item => ({ ...item, content: readFileSync(within(root, item.path), 'utf8') })));
+    value.referenceEvidence = this.save(value, 'references.json', references);
     this.journal.create(id, value);
     return this.read(id);
   }
@@ -74,6 +81,7 @@ export class Controller {
       if (t.ticket?.id !== ticketId) throw new Error('Stale dispatch ticket');
       if (t.ticket.target.provider !== provider || t.ticket.target.model !== model) throw new Error('Wrong provider/model');
       if (t.ticket.claim && t.ticket.claim.worker !== worker) throw new Error('Ticket already claimed; reconcile the original worker');
+      if (t.assessments.some(a => a.worker === worker && a.role !== t.ticket?.role)) throw new Error('Independent roles need separate workers');
       return { ...t, ticket: { ...t.ticket, claim: { worker, provider, model } } };
     });
   }
@@ -86,7 +94,7 @@ export class Controller {
       this.live(t);
       if (t.ticket?.id !== ticketId || t.ticket.claim?.worker !== worker) throw new Error('Unclaimed or stale ticket');
       const role = t.ticket.role;
-      if (role !== 'implementation') this.current(t);
+      if (role !== 'implementation' && result.verdict !== 'inconclusive') this.current(t);
       if (role === 'audit' && !t.contract.auditChecks.every(c => t.receipts.some(r => r.id === c.id && r.source === t.source && r.outcome === 'pass')))
         throw new Error('Run every audit retrieval/check before submitting judgment');
       const source = fingerprint(t.root);
@@ -98,6 +106,13 @@ export class Controller {
       if (missing.length) throw new Error(`Missing requirement observations: ${missing.map(r => r.id).join(', ')}`);
       if (result.verdict === 'pass' && result.findings.some(f => f.severity === 'blocking'))
         throw new Error('A blocking finding cannot pass');
+      if (['review', 'adversary', 'audit'].includes(role) && result.verdict === 'pass') {
+        for (const item of t.receipts.flatMap(r => r.artifacts)) {
+          if (fileEvidence(join(this.stateDir, t.id), item.path).sha256 !== item.sha256) throw new Error('Evidence changed after execution');
+          if (!result.inspections.some(i => i.path === item.path && i.sha256 === item.sha256))
+            throw new Error(`Missing artifact inspection: ${item.path}`);
+        }
+      }
       for (const observation of result.observations) this.inspectReference(t, observation.evidence);
       const evidence = this.save(t, `${ticketId.replaceAll(':', '-')}.json`, result);
       const next: Task = { ...t, ticket: null, source, assessments: [...t.assessments, { role, source, worker, result, artifact: evidence }] };
@@ -145,6 +160,71 @@ export class Controller {
     return this.change(id, `stop:${key}`, { reason, cancel }, t => ({ ...move(t, cancel ? 'CANCEL' : 'STOP'), reason }));
   }
 
+  workerStopped(id: string, ticket: string, worker: string, reason: string) {
+    // Trusted T3 coordinator attests terminal status and no live child runs.
+    // This releases ownership, never accepts unfinished work as evidence.
+    return this.change(id, `worker-stopped:${ticket}`, { worker, reason }, t => {
+      if (t.ticket?.id !== ticket || t.ticket.claim?.worker !== worker) throw new Error('Worker does not own this ticket');
+      const next: Task = { ...t, ticket: null, reason };
+      return ['incomplete', 'cancelled'].includes(t.phase) ? next : move(next, 'STOP');
+    });
+  }
+
+  reconcileCommand(id: string) {
+    const before = this.read(id);
+    if (before.pending.kind !== 'command' || !before.pending.pid) throw new Error('No recorded process group; outcome requires host investigation');
+    try { process.kill(-before.pending.pid, 0); throw new Error('Command process group is still alive; retain ownership'); }
+    catch (error) {
+      if (!(error instanceof Error && 'code' in error && error.code === 'ESRCH')) throw error;
+    }
+    return this.change(id, `reconcile:${before.generation}:${before.pending.id}`, {}, t => {
+      if (t.ticket) throw new Error('A worker still owns this task');
+      const next: Task = { ...t, pending: { kind: 'none' }, reason: 'Interrupted check process group is gone; available logs retained, outcome unproven' };
+      return ['incomplete', 'cancelled'].includes(t.phase) ? next : move(next, 'STOP');
+    });
+  }
+
+  publish(id: string) {
+    let t = this.read(id);
+    this.current(t);
+    if (t.phase === 'publishing') {
+      if (!t.publication) throw new Error('Missing publication intent');
+      const result = this.publisher.reconcile(t.publication);
+      if (result.status === 'unknown') return { ...t, reason: result.reason };
+      return this.change(id, `published:${t.generation}`, { pr: result.pr.number }, v => ({
+        ...move(v, 'ACCEPT'), pending: { kind: 'none' }, pr: { url: result.pr.url, head: result.pr.headRefOid, number: result.pr.number },
+      }));
+    }
+    if (t.phase !== 'publishable') throw new Error('All local gates must pass before publication');
+    if (t.contract.publish.kind !== 'pull-request') throw new Error('Publication was not authorized at intake');
+    const policy = inspectChange(t.root, t.base, t.contract);
+    if (policy.problems.length) throw new Error(policy.problems.join('\n'));
+    const plan = publishPlan.parse({ ...t.contract.publish, taskId: t.id, root: t.root,
+      source: t.source, head: git(t.root, ['rev-parse', 'HEAD']), title: t.contract.problem.slice(0, 160),
+      body: `${t.contract.problem}\n\n${t.contract.requirements.map(r => `- ${r.outcome}`).join('\n')}\n\nValidation: ${t.receipts.map(r => `${r.id}: ${r.outcome}`).join('; ')}. Independent review, adversarial review and final audit completed for this source.`,
+    });
+    const claim = this.journal.change(id, `publish:${t.generation}`, { plan }, value => {
+      const v = task.parse(value); this.current(v);
+      if (v.pending.kind !== 'none' || v.ticket) throw new Error('Outstanding work');
+      return { ...move(v, 'PUBLISH'), publication: plan, pending: { kind: 'publish', head: plan.head } };
+    });
+    if (!claim.applied) return this.read(id);
+    t = task.parse(claim.value);
+    const result = this.publisher.publish(plan, true);
+    if (result.status === 'unknown') return { ...t, reason: result.reason };
+    return this.change(id, `published:${t.generation}`, { pr: result.pr.number }, v => ({
+      ...move(v, 'ACCEPT'), pending: { kind: 'none' }, pr: { url: result.pr.url, head: result.pr.headRefOid, number: result.pr.number },
+    }));
+  }
+
+  checkCI(id: string) {
+    const t = this.read(id); this.current(t);
+    if (t.phase !== 'ci' || !t.publication || !t.pr) throw new Error('No published task waiting for CI');
+    const result = this.publisher.check(t.publication, t.pr.number);
+    if (result.status !== 'ready') return { ...t, reason: result.reason };
+    return this.change(id, `ready:${t.generation}`, { head: t.pr.head }, v => { this.current(v); return move(v, 'ACCEPT'); });
+  }
+
   save(t: Task, name: string, value: unknown) {
     const dir = join(this.stateDir, t.id);
     mkdirSync(dir, { recursive: true, mode: 0o700 });
@@ -185,7 +265,12 @@ export class Controller {
       t = task.parse(claimed.value);
       const log = `${t.generation}-${digest(check.id)}.log`;
       const { exit, reason } = await runCommand(check.argv, cwd, join(dir, log), join(dir, `${log}.stderr`),
-        Math.max(1, Math.min(check.timeoutMs, Date.parse(t.contract.limits.deadline) - Date.now())));
+        Math.max(1, Math.min(check.timeoutMs, Date.parse(t.contract.limits.deadline) - Date.now())), pid => {
+          this.change(id, `started:${t.generation}:${check.id}`, { pid }, v => {
+            if (v.pending.kind !== 'command' || v.pending.id !== check.id) throw new Error('Command ownership lost');
+            return { ...v, pending: { ...v.pending, pid } };
+          });
+        });
       const logArtifact = { path: log, sha256: digest(readFileSync(join(dir, log))) };
       const stderrArtifact = { path: `${log}.stderr`, sha256: digest(readFileSync(join(dir, `${log}.stderr`))) };
       const artifacts = [logArtifact, stderrArtifact];
@@ -217,6 +302,8 @@ export class Controller {
       if (outcome === 'fail') return this.repair(id, `Check failed: ${check.id}`);
     }
     if (audit) return t; // Retrieval is evidence; an independent audit ticket supplies judgment.
+    if (inspectChange(t.root, t.base, t.contract).risks.some(risk => risk === 'ui' || risk === 'performance'))
+      return this.stop(id, `native-evidence:${t.generation}`, 'Functional native/performance results are not yet bound to an installed binary on both platforms. See docs/follow-ups/F156.md');
     return this.change(id, `verified:${t.generation}`, {}, v => {
       this.current(v);
       if (!commands.every(c => v.receipts.some(r => r.id === c.id && r.outcome === 'pass' && r.source === v.source))) throw new Error('Missing verification');

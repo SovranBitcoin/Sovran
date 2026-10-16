@@ -20,7 +20,7 @@ export function fixture() {
     problem: 'Test the harness', requirements: [{ id: 'behavior', outcome: 'Preserve original text' }], scope: ['source.txt'],
     risks: [], checks: [{ id: 'tests', argv: ['bun', '-e', 'console.log("real check ran")'], cwd: '.', timeoutMs: 5000 }],
     auditChecks: [{ id: 'audit', argv: ['bun', '-e', 'console.log("real audit ran")'], cwd: '.', timeoutMs: 5000 }],
-    contextFiles: ['source.txt'], allowedDependencies: [],
+    contextFiles: ['source.txt'], references: [], allowedDependencies: [],
     models: { research: { provider: 'codex', model: 'luna' }, implementation: { provider: 'codex', model: 'sol' }, review: { provider: 'claudeAgent', model: 'opus' }, adversary: { provider: 'claudeAgent', model: 'fable' }, audit: { provider: 'claudeAgent', model: 'opus' } },
     limits: { deadline: new Date(Date.now() + 60_000).toISOString(), repairRounds: 2 }, publish: { kind: 'local-only' },
   };
@@ -31,7 +31,8 @@ function finish(c: Controller, t: Task) {
   const ticket = c.next(t.id).ticket;
   if (!ticket) throw new Error('Expected dispatch');
   c.claim(t.id, ticket.id, ticket.id, ticket.target.provider, ticket.target.model);
-  return c.submit(t.id, ticket.id, ticket.id, report);
+  return c.submit(t.id, ticket.id, ticket.id, { ...report,
+    inspections: c.read(t.id).receipts.flatMap(r => r.artifacts).map(a => ({ ...a, observation: 'Read fixture command output' })) });
 }
 
 test('the public controller runs actual checks and will not skip review or audit', async () => {
@@ -96,7 +97,7 @@ test('a command that changes source retains its result and releases pending work
 test('a second task cannot own the same workspace while the first is active', () => {
   const { controller: c, root, spec } = fixture();
   const t = c.create(root, spec);
-  expect(() => c.create(root, spec)).toThrow('UNIQUE constraint');
+  expect(() => c.create(root, spec)).toThrow('Workspace already has outstanding work');
   c.stop(t.id, 'done', 'No worker dispatched');
   expect(c.create(root, spec).phase).toBe('researching');
 });
@@ -145,7 +146,7 @@ test('a subdirectory cannot bypass workspace ownership', () => {
   const { controller: c, root, spec } = fixture();
   mkdirSync(join(root, 'child'));
   c.create(root, spec);
-  expect(() => c.create(join(root, 'child'), spec)).toThrow('UNIQUE constraint');
+  expect(() => c.create(join(root, 'child'), spec)).toThrow('Workspace already has outstanding work');
 });
 
 test('a dependency version change requires its exact intake allowance', () => {
@@ -156,4 +157,38 @@ test('a dependency version change requires its exact intake allowance', () => {
   let t = finish(c, c.create(root, spec)); t = c.seal(t.id, t.policy);
   writeFileSync(join(root, 'package.json'), JSON.stringify({ dependencies: { existing: '2.0.0' } }));
   expect(() => finish(c, t)).toThrow('existing@2.0.0');
+});
+
+test('review cannot pass without reading the actual check artifacts', async () => {
+  const { controller: c, root, spec } = fixture();
+  let t = finish(c, c.create(root, spec)); t = c.seal(t.id, t.policy); t = finish(c, t); t = await c.verify(t.id);
+  const ticket = c.next(t.id).ticket;
+  if (!ticket) throw new Error('Missing reviewer');
+  c.claim(t.id, ticket.id, ticket.id, ticket.target.provider, ticket.target.model);
+  expect(() => c.submit(t.id, ticket.id, ticket.id, report)).toThrow('Missing artifact inspection');
+});
+
+test('role context keeps the original instructions after implementation edits them', () => {
+  const { controller: c, root, spec } = fixture();
+  let t = finish(c, c.create(root, spec)); t = c.seal(t.id, t.policy);
+  writeFileSync(join(root, 'source.txt'), 'new instructions');
+  c.next(t.id);
+  expect(c.brief(t.id).packet.context[0]?.content).toBe('original');
+});
+
+test('a green generic command cannot certify functional UI or performance', async () => {
+  const { controller: c, root, spec } = fixture();
+  spec.risks = ['ui', 'performance'];
+  let t = finish(c, c.create(root, spec)); t = c.seal(t.id, t.policy); t = finish(c, t);
+  t = await c.verify(t.id);
+  expect(t.phase).toBe('incomplete'); expect(t.reason).toContain('installed binary');
+});
+
+test('resolver overrides cannot change outside dependency authorization', () => {
+  const { controller: c, root, spec } = fixture();
+  writeFileSync(join(root, 'package.json'), JSON.stringify({ overrides: { transitive: '1.0.0' } }));
+  git(root, ['add', '.']); git(root, ['commit', '-qm', 'existing override']); spec.scope.push('package.json');
+  let t = finish(c, c.create(root, spec)); t = c.seal(t.id, t.policy);
+  writeFileSync(join(root, 'package.json'), JSON.stringify({ overrides: { transitive: '2.0.0' } }));
+  expect(() => finish(c, t)).toThrow('Dependency policy needs intake authorization');
 });

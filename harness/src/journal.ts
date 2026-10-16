@@ -24,17 +24,26 @@ export class Journal {
       this.db.exec(`CREATE TABLE IF NOT EXISTS tasks (id TEXT PRIMARY KEY, revision INTEGER NOT NULL, value TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS events (task TEXT NOT NULL, id TEXT NOT NULL, input TEXT NOT NULL,
           revision INTEGER NOT NULL, value TEXT NOT NULL, PRIMARY KEY(task, id));
-        CREATE UNIQUE INDEX IF NOT EXISTS active_workspace ON tasks(json_extract(value, '$.root'))
-          WHERE json_extract(value, '$.phase') NOT IN ('ready', 'incomplete', 'cancelled')
-          OR json_type(value, '$.ticket') = 'object'
-          OR json_extract(value, '$.pending.kind') IN ('command', 'publish');
+        DROP INDEX IF EXISTS active_workspace;
         PRAGMA user_version = 1;`);
     }).immediate();
   }
 
   create(id: string, value: unknown) {
-    this.db.query('INSERT INTO tasks VALUES (?, 0, ?)').run(id, JSON.stringify(object.parse(value)));
-    return this.read(id);
+    const parsed = object.parse(value);
+    return this.db.transaction(() => {
+      // Existing conflicting prototype rows remain readable for reconciliation.
+      // Checking under the write lock enforces exclusivity without an index
+      // migration that could make the whole journal impossible to open.
+      if (typeof parsed.root === 'string' && this.db.query(`SELECT id FROM tasks
+        WHERE json_extract(value, '$.root') = ? AND (
+          json_extract(value, '$.phase') NOT IN ('ready', 'incomplete', 'cancelled')
+          OR json_type(value, '$.ticket') = 'object'
+          OR json_extract(value, '$.pending.kind') IN ('command', 'publish')) LIMIT 1`).get(parsed.root))
+        throw new Error('Workspace already has outstanding work');
+      this.db.query('INSERT INTO tasks VALUES (?, 0, ?)').run(id, JSON.stringify(parsed));
+      return this.read(id);
+    }).immediate();
   }
 
   read(id: string) {

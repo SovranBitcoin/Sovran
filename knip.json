@@ -15,7 +15,7 @@
   },
   "workspaces": {
     "harness": {
-      "entry": ["src/cli.ts"],
+      "entry": ["src/discover-upgrade.ts"],
       "project": ["src/**/*.ts", "tests/**/*.ts"]
     },
     "app": {

@@ -3,13 +3,15 @@ import { closeSync, openSync } from 'node:fs';
 
 /** Each trusted check owns a POSIX process group, including ordinary descendants.
  * Deliberately detached grandchildren are outside the trusted-host contract. */
-export async function runCommand(argv: string[], cwd: string, stdout: string, stderr: string, timeoutMs: number) {
+export async function runCommand(argv: string[], cwd: string, stdout: string, stderr: string, timeoutMs: number,
+  started?: (pid: number) => void) {
   const executable = argv[0];
   if (!executable) throw new Error('Empty command');
   if (process.platform === 'win32') throw new Error('Process-group supervision requires a POSIX host');
   const out = openSync(stdout, 'wx', 0o600), err = openSync(stderr, 'wx', 0o600);
   let timer: ReturnType<typeof setTimeout> | undefined;
   let timedOut = false;
+  let cleanup = () => {};
   try {
     const child = spawn(executable, argv.slice(1), { cwd, detached: true,
       stdio: ['ignore', out, err], env: { ...process.env, CI: '1' } });
@@ -18,6 +20,12 @@ export async function runCommand(argv: string[], cwd: string, stdout: string, st
       try { process.kill(-child.pid, 'SIGKILL'); }
       catch (error) { if (!(error instanceof Error && 'code' in error && error.code === 'ESRCH')) throw error; }
     };
+    const interrupt = () => { killGroup(); process.exit(130); };
+    process.once('exit', killGroup); process.once('SIGTERM', interrupt); process.once('SIGINT', interrupt);
+    cleanup = () => { process.off('exit', killGroup); process.off('SIGTERM', interrupt); process.off('SIGINT', interrupt); };
+    if (child.pid) {
+      try { started?.(child.pid); } catch (error) { killGroup(); throw error; }
+    }
     timer = setTimeout(() => { timedOut = true; killGroup(); }, timeoutMs);
     const result = await new Promise<{ exit: number; reason: string }>(resolve => {
       child.once('error', error => resolve({ exit: 127, reason: `Launch failed: ${error.message}` }));
@@ -28,6 +36,7 @@ export async function runCommand(argv: string[], cwd: string, stdout: string, st
     return result;
   } finally {
     if (timer) clearTimeout(timer);
+    cleanup();
     closeSync(out); closeSync(err);
   }
 }

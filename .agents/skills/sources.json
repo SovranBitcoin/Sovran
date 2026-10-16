@@ -389,6 +389,12 @@
       "kind": "local",
       "reviewed_on": "2026-10-11",
       "purpose": "Sovran's own procedure for mining past Claude and Codex sessions for repeated instructions and turning them into checks, pointers or documentation; requested by the maintainer. Shaped by the upstream mattpocock/skills retro, which reviews a single session."
+    },
+    {
+      "name": "full-send",
+      "kind": "local",
+      "reviewed_on": "2026-10-16",
+      "purpose": "T3 coordinator for the executable task harness"
     }
   ]
 }
