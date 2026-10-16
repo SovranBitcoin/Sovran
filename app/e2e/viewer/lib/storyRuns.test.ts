@@ -71,6 +71,16 @@ test('story history includes timing and warnings, excludes setup from totals and
     expect(one?.frames[0]?.file).toEndWith('shot.jpg');
     expect(one?.frames[0]?.observations?.warnings).toEqual([{ level: 'warn', event: '<warning>' }]);
     expect(one?.videoEndT).toBeUndefined(); // Old evidence has no recording boundary.
+    const sampled = JSON.parse(await Bun.file(join(out, 'report.json')).text());
+    sampled.screenObservation = 'simctl-samples';
+    sampled.steps[0].screenCapture = { startedAtWallMs: 1000, endedAtWallMs: 1100 };
+    writeFileSync(join(out, 'report.json'), JSON.stringify(sampled));
+    const observation = (await read(dir))?.scenarios.find((item) => item.scenarioId === 'story:one')
+      ?.frames[0].observations;
+    expect(observation).toMatchObject({
+      screenObservation: 'simctl-samples',
+      screenCapture: { startedAtWallMs: 1000, endedAtWallMs: 1100 },
+    });
     expect(run?.fundsSafeToDelete).toBe(false);
     expect(run?.scenarios.find((item) => item.scenarioId === 'story:crashed')?.failure).toBe(
       'child died'

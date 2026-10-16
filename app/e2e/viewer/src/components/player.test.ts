@@ -25,7 +25,7 @@ test('story steps expose measured delays and escaped warnings beside their resul
     0
   );
   expect(row).toContain('125 ms');
-  expect(row).toContain('screen moved 30 ms more');
+  expect(row).toContain('legacy watcher reported 30 ms of motion (unverified)');
   expect(row).toContain('app unresponsive for 500 ms');
   expect(row).toContain('touch repeated; first effect unknown');
   expect(row).toContain('warn: &lt;script&gt;unsafe&lt;/script&gt;');
@@ -107,4 +107,47 @@ test('recordings open paused by default, with screenshots available and an image
     else Reflect.deleteProperty(globalThis, 'document');
     dom.window.close();
   }
+});
+
+test('sampled screen observations remain qualified in the review UI', () => {
+  const row = renderStepRow(
+    {
+      artifactSeq: 1,
+      stepId: '1',
+      phase: 'T',
+      kind: 'story step',
+      file: 'image.jpg',
+      ok: true,
+      observations: {
+        wallMs: 10,
+        screenObservation: 'simctl-samples',
+        screenKeptMoving: true,
+        screenCapture: { startedAtWallMs: 1000, endedAtWallMs: 1200 },
+        warnings: [],
+      },
+    },
+    0
+  );
+  expect(row).toContain('display samples did not settle within the budget');
+  expect(row).toContain('motion between samples is unknown');
+  expect(row).toContain('1970-01-01T00:00:01.000Z');
+  expect(row).toContain('1970-01-01T00:00:01.200Z');
+  expect(row).not.toContain('screen never stopped moving');
+});
+
+test('an interrupted step does not invent a matching display sample', () => {
+  const row = renderStepRow(
+    {
+      artifactSeq: 1,
+      stepId: '1',
+      phase: 'T',
+      kind: 'story step',
+      file: '',
+      ok: false,
+      observations: { wallMs: 10, screenObservation: 'simctl-samples', warnings: [] },
+    },
+    0
+  );
+  expect(row).toContain('display settling was not established');
+  expect(row).not.toContain('display samples matched');
 });

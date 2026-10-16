@@ -32,7 +32,13 @@ import {
 } from '../results/runs';
 import { fileURLToPath } from 'node:url';
 import { startAppLink, type AppHello } from '../link/appLink';
-import { createScreenWatch, keepVideo, pictureName, recordSimulator } from './evidence';
+import {
+  captureSimulatorScreen,
+  createScreenWatch,
+  keepVideo,
+  pictureName,
+  recordSimulator,
+} from './evidence';
 import { withGiven } from './given';
 import { playStory, topPage } from './play';
 import {
@@ -136,13 +142,13 @@ const play = async (
   const expected = { run, platform: 'ios' } satisfies Pick<AppHello, 'run' | 'platform'>;
   const link = startAppLink(expected);
   let recording: Awaited<ReturnType<typeof recordSimulator>> | undefined;
-  let frames: ReturnType<typeof simulator.watchScreen> | undefined;
-  let report: ReturnType<typeof storyReportSchema.parse> & { screenWatcherRestarts?: number } = {
+  let report: ReturnType<typeof storyReportSchema.parse> = {
     id: story.id,
     purpose: story.purpose,
     startsFrom: story.startsFrom,
     ok: false,
     steps: [],
+    screenObservation: 'simctl-samples',
   };
   const failures: { operation: string; error: unknown }[] = [];
   try {
@@ -165,11 +171,10 @@ const play = async (
     }
     recording = await recordSimulator(udid, rawVideo);
     const screen = createScreenWatch({
+      capture: (timeoutMs) => captureSimulatorScreen(udid, timeoutMs),
       now: () => performance.now(),
       wait: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
     });
-    const watching = simulator.watchScreen(screen.changed);
-    frames = watching;
     spentOn('recordingStart');
     simulator.launch({ url: link.url, run });
     spentOn('launch');
@@ -177,6 +182,7 @@ const play = async (
     writeFileSync(join(outDir, 'session.json'), JSON.stringify({ ...session, hello }));
     spentOn('appConnected');
     const pictures: (string | undefined)[] = [];
+    const captures: (Awaited<ReturnType<typeof screen.picture>> | undefined)[] = [];
     const result = await playStory(
       story,
       link,
@@ -185,7 +191,9 @@ const play = async (
       async (index, step) => {
         const file = `${pictureName(index, step.name)}.jpg`;
         report.steps[index] = { ...step };
-        if (await watching.picture(join(outDir, file))) pictures[index] = file;
+        captures[index] = await screen.picture(join(outDir, file));
+        report.steps[index].screenCapture = captures[index];
+        pictures[index] = file;
         report.steps[index].picture = pictures[index];
         writeFileSync(
           join(outDir, `${pictureName(index, step.name)}.screen.json`),
@@ -213,30 +221,28 @@ const play = async (
     // Let the last change be drawn and recorded before the recording ends.
     await link.still(3000).catch(() => undefined);
     await new Promise((resolve) => setTimeout(resolve, LAST_FRAME_MS));
-    watching.stop();
     await recording.stop();
     const videoEndT = Date.now();
     spentOn('recordingEnd');
     await keepVideo(rawVideo, outDir);
     rmSync(rawVideo, { force: true });
     spentOn('video');
-    // A story whose screen could not be watched proved nothing about what was on it.
-    const unwatched = watching.failure();
-    const ok = result.ok && !unwatched;
     report = {
       id: story.id,
       purpose: story.purpose,
       startsFrom: story.startsFrom,
-      ok,
-      ...(unwatched ? { failure: unwatched } : {}),
+      ok: result.ok,
+      screenObservation: 'simctl-samples',
       video: 'story.mp4',
       videoEndT,
       spentMs: spent,
-      screenWatcherRestarts: watching.restarts(),
-      steps: result.steps.map((step, index) => ({ ...step, picture: pictures[index] })),
+      steps: result.steps.map((step, index) => ({
+        ...step,
+        picture: pictures[index],
+        screenCapture: captures[index],
+      })),
     };
 
-    if (unwatched) console.log(`  ${unwatched}`);
     for (const [index, step] of result.steps.entries()) {
       const shown = step.entries
         .filter((entry) => /^(screen\.mount|nav\.transition\.end)$/.test(entry.event))
@@ -248,9 +254,9 @@ const play = async (
         ? `, app unresponsive for ${step.appUnresponsiveMs} ms`
         : '';
       const moved = step.screenKeptMoving
-        ? ', screen never stopped moving'
+        ? ', display samples did not settle within the budget'
         : step.screenMovedMs
-          ? `, screen moved for ${step.screenMovedMs} ms after`
+          ? `, last sampled display change at ${step.screenMovedMs} ms`
           : '';
       console.log(
         `  ${step.ok ? 'ok  ' : 'FAIL'} ${index + 1}. ${step.name}  ${step.wallMs} ms${moved}${busy}${shown.length ? `  (${shown.join(', ')})` : ''}`
@@ -285,7 +291,6 @@ const play = async (
     // windows. This is the received stream, not proof that the app lost no logs.
     // Try every cleanup even if an earlier one fails; a failed cleanup fails play.
     for (const [operation, clean] of [
-      ['stop frames', () => frames?.stop()],
       ['stop recording', () => recording?.stop()],
       ['terminate app', () => simulator.terminate()],
       [

@@ -1,14 +1,15 @@
 /**
  * A story's evidence (ADR 0033): one continuous video, and a picture for each
- * step. Both come from the simulator's screen as it is drawn, so collecting
- * them never pauses the app or changes what is being tested.
+ * step. The video is continuous; checkpoint pictures are new simulator captures.
+ * Capture latency is included in the run and is not app-performance evidence.
  */
-import { spawn } from 'node:child_process';
-import { mkdirSync } from 'node:fs';
+import { execFile, spawn } from 'node:child_process';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import sharp from 'sharp';
 import { join } from 'node:path';
 import { SIMCTL } from './simctl';
 
-/** How long the screen kept changing, and whether it was still changing when the watch gave up. */
+/** Last observed change and whether equal samples were not obtained within the budget. */
 interface ScreenMotion {
   movedForMs: number;
   stillMoving: boolean;
@@ -144,47 +145,84 @@ export async function recordSimulator(
   };
 }
 
-/** The picture must not have changed for this long for the screen to count as still. */
-const STILL_FOR_MS = 100;
-/** A screen that never stops (a spinner, a moving background) is not waited for beyond this. */
-const MOVING_CAP_MS = 900;
-const SAMPLE_EVERY_MS = 8;
-
-interface ScreenWatch {
-  /** The picture on the simulator's screen has just changed. */
-  changed(): void;
-  /** Resolves once the picture on screen has not changed for `stillForMs` (100 ms unless said). */
-  pixelsStill(stillForMs?: number, giveUpAfterMs?: number): Promise<ScreenMotion>;
+/**
+ * One fresh capture of the internal display. stdout belongs to this invocation;
+ * a previous file or a responsive process serving cached bytes cannot satisfy it.
+ */
+export async function captureSimulatorScreen(
+  udid: string,
+  timeoutMs = 5000,
+  command: readonly [string, ...string[]] = SIMCTL
+) {
+  const bytes = await new Promise<Buffer>((resolve, reject) => {
+    execFile(
+      command[0],
+      [...command.slice(1), 'io', udid, 'screenshot', '--type=jpeg', '--display=internal', '-'],
+      { encoding: 'buffer', timeout: timeoutMs, killSignal: 'SIGKILL', maxBuffer: 24_000_000 },
+      (error, stdout) => (error ? reject(error) : resolve(stdout))
+    );
+  });
+  const image = sharp(bytes, { failOn: 'warning', limitInputPixels: 40_000_000 }).timeout({
+    seconds: Math.max(1, Math.ceil(timeoutMs / 1000)),
+  });
+  const metadata = await image.metadata();
+  if (metadata.format !== 'jpeg' || !metadata.width || !metadata.height)
+    throw new Error('The simulator did not return a JPEG screen');
+  // Metadata alone accepts a truncated image. Decode before accepting the capture.
+  const { data: pixels, info } = await image
+    .removeAlpha()
+    .toColourspace('srgb')
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  return { jpeg: bytes, pixels, width: info.width, height: info.height };
 }
 
 /**
- * Whether the picture on screen is changing, from the screen itself: told of
- * every frame that differs from the one before, within a sixtieth of a second
- * of its being drawn. This sees what the app cannot report, an animation
- * running off its JavaScript thread, and needs nothing from the app. (The
- * video file cannot be used for this: on a busy Mac it is written late, and
- * steps were called still while they were moving.)
+ * Compare fresh display samples, never a cached addon surface. Equal samples
+ * are evidence at those observation points, not continuous motion measurement.
  */
 export function createScreenWatch(io: {
+  capture: (timeoutMs: number) => ReturnType<typeof captureSimulatorScreen>;
   now: () => number;
   wait: (ms: number) => Promise<void>;
-}): ScreenWatch {
-  let changedAt = Number.NEGATIVE_INFINITY;
+}) {
   return {
-    changed() {
-      changedAt = io.now();
+    async picture(file: string) {
+      const startedAtWallMs = Date.now();
+      const bytes = await io.capture(5000);
+      writeFileSync(file, bytes.jpeg, { flag: 'wx' });
+      return { startedAtWallMs, endedAtWallMs: Date.now() };
     },
-    async pixelsStill(stillForMs = STILL_FOR_MS, giveUpAfterMs = MOVING_CAP_MS) {
+    async pixelsStill(stillForMs = 100, giveUpAfterMs = 3000): Promise<ScreenMotion> {
       const started = io.now();
+      const deadline = started + giveUpAfterMs;
+      let longestCaptureMs = 0;
+      const sample = async () => {
+        const captureStarted = io.now();
+        const remaining = deadline - captureStarted;
+        if (remaining <= 0) throw new Error('Screen capture exceeded the settling deadline');
+        const bytes = await io.capture(Math.max(1, Math.floor(remaining)));
+        if (io.now() >= deadline) throw new Error('Screen capture exceeded the settling deadline');
+        longestCaptureMs = Math.max(longestCaptureMs, io.now() - captureStarted);
+        return bytes;
+      };
+      let previous = await sample();
+      let movedForMs = 0;
       for (;;) {
-        await io.wait(SAMPLE_EVERY_MS);
-        const now = io.now();
-        // A change from before the watch began says nothing about what the step set off.
-        const moved = changedAt > started;
-        if (now - Math.max(started, changedAt) >= stillForMs)
-          return { movedForMs: moved ? Math.round(changedAt - started) : 0, stillMoving: false };
-        if (now - started >= giveUpAfterMs)
-          return { movedForMs: Math.round(now - started), stillMoving: true };
+        // Capture may happen anywhere during a request. Begin the confirming
+        // request only after the observation interval has elapsed after completion.
+        if (deadline - io.now() <= stillForMs + longestCaptureMs)
+          return { movedForMs, stillMoving: true };
+        await io.wait(stillForMs);
+        const current = await sample();
+        if (
+          previous.width === current.width &&
+          previous.height === current.height &&
+          previous.pixels.equals(current.pixels)
+        )
+          return { movedForMs, stillMoving: false };
+        movedForMs = Math.round(io.now() - started);
+        previous = current;
       }
     },
   };

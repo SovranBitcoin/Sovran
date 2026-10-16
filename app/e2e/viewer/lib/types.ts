@@ -2,8 +2,11 @@
  * The frontend must import from here with `import type` only so Bun's
  * bundler never pulls server code into the browser. */
 
+import type { storyReportSchema } from '../../results/runs';
 import type { Platform } from '../../schema/capabilities';
 import type { ScenarioFacets } from '../../schema/facets';
+
+type StoryReport = ReturnType<typeof storyReportSchema.parse>;
 
 export interface GitInfo {
   sha: string;
@@ -66,12 +69,16 @@ export interface Frame {
   t?: number;
   /** Relative to the run dir, e.g. "toast.receive-lightning/001-P01-launch.png". */
   file: string;
-  observations?: {
-    wallMs: number;
-    screenMovedMs?: number;
-    screenKeptMoving?: boolean;
-    appUnresponsiveMs?: number;
-    touchMadeAgain?: boolean;
+  observations?: Pick<
+    StoryReport['steps'][number],
+    | 'wallMs'
+    | 'screenMovedMs'
+    | 'screenKeptMoving'
+    | 'screenCapture'
+    | 'appUnresponsiveMs'
+    | 'touchMadeAgain'
+  > & {
+    screenObservation?: StoryReport['screenObservation'];
     warnings: { level: string; event: string }[];
   };
   axFile?: string;

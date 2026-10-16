@@ -40,6 +40,7 @@ export const storyReportSchema = z.object({
   startsFrom: z.string(),
   ok: z.boolean(),
   failure: z.string().optional(),
+  screenObservation: z.literal('simctl-samples').optional(),
   video: z.string().optional(),
   videoEndT: z.number().optional(),
   spentMs: z.record(z.string(), z.number()).optional(),
@@ -49,6 +50,12 @@ export const storyReportSchema = z.object({
       ok: z.boolean(),
       wallMs: z.number(),
       picture: z.string().optional(),
+      screenCapture: z
+        .object({
+          startedAtWallMs: z.number().int().min(0).max(8.64e15),
+          endedAtWallMs: z.number().int().min(0).max(8.64e15),
+        })
+        .optional(),
       failure: z.string().optional(),
       endedAtWallMs: z.number().optional(),
       screenMovedMs: z.number().optional(),

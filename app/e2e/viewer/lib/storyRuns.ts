@@ -126,6 +126,8 @@ export function recordedRun(
               file: step.picture ? (served(join(dir, step.picture)) ?? '') : '',
               observations: {
                 wallMs: step.wallMs,
+                screenObservation: data.screenObservation,
+                screenCapture: step.screenCapture,
                 screenMovedMs: step.screenMovedMs,
                 screenKeptMoving: step.screenKeptMoving,
                 appUnresponsiveMs: step.appUnresponsiveMs,

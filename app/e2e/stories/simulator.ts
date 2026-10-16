@@ -1,19 +1,16 @@
 /**
  * An iPhone simulator, as far as a story needs one: start the test build fresh
- * with its runner's address, touch the glass and watch the screen. Touches and
- * frames go through the simulator's own input and display, by the same native
- * addon the earlier driver used.
+ * with its runner's address, touch the glass and inspect system controls.
+ * The native addon supplies simulator input and accessibility; display evidence
+ * is captured separately by the simulator's command-line tool.
  */
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
-import { createInterface } from 'node:readline';
-import { fileURLToPath } from 'node:url';
 import { resolveServeSimNativeAddon } from '../drivers/simulator-session';
 import { writeRunnerNote } from '../link/appLink';
 import { emptyAppFolders, hasState, restoreState, saveState, type StatePlaces } from './savedState';
-import { keepScreenWatcher, type ScreenFrames } from './screenWatcher';
 import { keyPresses, SHIFT_KEY } from './keys';
 import { AUTHORITY } from './privateMint';
 import { SIMCTL, simctl } from './simctl';
@@ -90,8 +87,6 @@ interface StorySimulator extends TouchDevice {
   terminate(): void;
   /** The installed bundle, not the app's mutable data container. */
   installedApp(): string;
-  /** Watch the screen, calling back each time the picture on it changes. */
-  watchScreen(onChange: () => void): ScreenFrames;
 }
 
 export function storySimulator(udid: string): StorySimulator {
@@ -218,9 +213,6 @@ export function storySimulator(udid: string): StorySimulator {
         // Not running.
       }
     },
-    watchScreen(onChange) {
-      return watchScreenFrames(udid, addon, onChange);
-    },
     async systemControls() {
       let described: string;
       try {
@@ -313,24 +305,4 @@ export function storySimulator(udid: string): StorySimulator {
       await lift(x, y);
     },
   };
-}
-
-function watchScreenFrames(udid: string, addon: string, onChange: () => void): ScreenFrames {
-  const script = fileURLToPath(new URL('./screenFrames.ts', import.meta.url));
-  return keepScreenWatcher({
-    onChange,
-    launch: () => {
-      const child = spawn(process.execPath, [script, udid, addon], {
-        stdio: ['pipe', 'pipe', 'ignore'],
-      });
-      child.stdin.on('error', () => undefined);
-      return {
-        onLine: (listener) => void createInterface({ input: child.stdout }).on('line', listener),
-        onExit: (listener) => void child.once('exit', listener),
-        write: (line) => void child.stdin.write(line),
-        kill: () => void child.kill('SIGKILL'),
-        end: () => child.stdin.end(),
-      };
-    },
-  });
 }

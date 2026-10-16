@@ -1,7 +1,8 @@
 # An end-to-end test is one user story, run fast, with its evidence
 
 Status: accepted on 2026-10-12. The owned native driver is kept. Worker counts were measured the same day (see
-"Measured").
+"Measured"). The image capture and pixel-stillness decision is superseded by
+[ADR 0034](0034-native-checkpoints-use-fresh-display-captures.md).
 
 Replaces the running model of [the JSON native harness](../testing-json-native-adr.md). Its scenario schema, page
 registry, selectors, probes, custody rules and "no second test language" stand.

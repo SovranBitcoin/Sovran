@@ -31,6 +31,13 @@ inputs, links or permission overrides. Without the flag, iOS keeps its existing 
 story/saved-state behavior. Neither mode certifies device performance or controller readiness.
 
 
+iOS takes a fresh `simctl` screenshot after each step and records its capture interval.
+Screen-settling checks compare decoded samples separated by an observation interval. They
+can miss motion between samples; they do not measure frame rate or prove continuous stillness.
+Capture/decode failure fails the story. The continuous video remains separate evidence and
+must be reviewed alongside screenshots, control maps and logs. A playable recording that
+ended before the runner requested stop fails the run.
+
 Each play has its own session identity, checked against the app's hello before accepting
 logs or sending requests. A profile restart may reconnect to that same session. The attempt
 keeps the hello and all received log entries, including those outside step windows; this

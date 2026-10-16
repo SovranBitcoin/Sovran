@@ -177,11 +177,21 @@ export function renderStepRow(frame: ReelFrame, index: number): string {
   const observations = measured
     ? [
         `${measured.wallMs} ms`,
-        measured.screenKeptMoving
-          ? 'screen never stopped moving'
-          : measured.screenMovedMs !== undefined
-            ? `screen moved ${measured.screenMovedMs} ms more`
-            : '',
+        measured.screenObservation === 'simctl-samples'
+          ? measured.screenKeptMoving
+            ? 'display samples did not settle within the budget'
+            : measured.screenMovedMs !== undefined
+              ? `display samples matched; last observed change ${measured.screenMovedMs} ms after expectations`
+              : 'display settling was not established'
+          : measured.screenKeptMoving
+            ? 'legacy watcher reported continuous motion (unverified)'
+            : measured.screenMovedMs !== undefined
+              ? `legacy watcher reported ${measured.screenMovedMs} ms of motion (unverified)`
+              : '',
+        measured.screenCapture
+          ? `fresh capture ${new Date(measured.screenCapture.startedAtWallMs).toISOString()} – ${new Date(measured.screenCapture.endedAtWallMs).toISOString()}`
+          : '',
+        measured.screenObservation === 'simctl-samples' ? 'motion between samples is unknown' : '',
         measured.appUnresponsiveMs !== undefined
           ? `app unresponsive for ${measured.appUnresponsiveMs} ms`
           : '',

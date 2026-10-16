@@ -35,7 +35,7 @@ const SWIPE_SETTLES_WITHIN_MS = 3000;
 const SWIPES = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] } as const;
 
 /** The one thing a device does for a story: touch the glass. */
-/** Says when the picture on screen has stopped changing. */
+/** Observes whether display samples have become equal; not a continuous-motion measurement. */
 interface PixelWatch {
   /** `stillForMs`: how long the picture must not change; the watch's own default when left out. */
   pixelsStill(
@@ -75,9 +75,9 @@ interface StepResult {
   wallMs: number;
   /** Wall clock when the step was satisfied or gave up, for finding it in the video. */
   endedAtWallMs: number;
-  /** How long the screen went on changing after the step's expectations held. */
+  /** Time of the last observed sample change after expectations held. See report observation method. */
   screenMovedMs?: number;
-  /** True when the screen never stopped changing: something on it animates for ever. */
+  /** Equal samples were not observed within the settling budget. */
   screenKeptMoving?: true;
   /** The longest the app took to answer the runner, when long enough that a person would feel it. */
   appUnresponsiveMs?: number;
@@ -384,7 +384,7 @@ async function playStep(
         .filter((problem): problem is string => problem !== null);
       if (problems.length === 0) {
         // The app is still and says what was expected; the eye may not agree
-        // yet. An animation off the JavaScript thread shows only in the pixels.
+        // yet. Sampled pixels can reveal animation off the JavaScript thread.
         motion = step.swipe
           ? await pixels?.pixelsStill(STILL_AFTER_SWIPE_MS, SWIPE_SETTLES_WITHIN_MS)
           : await pixels?.pixelsStill();
