@@ -138,3 +138,15 @@ test('each role is offered exactly the owned assessment fields it may submit', (
     expect([role, all.filter(f => fields.includes(f)).sort()]).toEqual([role, [...mine].sort()]);
   }
 });
+
+test('an artifact inspection may use the artifact: citation form, but never a different hash', () => {
+  const { controller: c, root, spec } = fixture();
+  const t = c.create(root, { ...spec, historyPolicy: { version: 1, paths: ['source.txt'] } });
+  const cite = (sha256: string) => c.brief(t.id).packet.artifacts.map(a => ({ path: `artifact:${a.path}`, sha256, observation: 'Read the retained bytes' }));
+  c.next(t.id);
+  const artifact = c.brief(t.id).packet.artifacts[0];
+  if (!artifact) throw new Error('Missing history artifact');
+  expect(() => submit(c, t.id, { history: [investigation(t)], inspections: cite('0'.repeat(64)) })).toThrow('pre-edit history snapshot');
+  // Live 2026-10-16: a research worker cited the snapshot as artifact:<file>, as evidence fields require.
+  expect(submit(c, t.id, { history: [investigation(t)], inspections: cite(artifact.sha256) }).phase).toBe('intake');
+});

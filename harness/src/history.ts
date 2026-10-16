@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { z } from 'zod';
 import { git } from './workspace';
+import { inspected } from './evidence';
 import { risksForPaths } from './policy';
 import type { Task } from './workflow';
 
@@ -58,7 +59,7 @@ export function validateHistory(t: Task, role: string, result: Task['assessments
   if (role === 'research' && result.verdict === 'pass') {
     if (new Set(entries.map(e => e.path)).size !== entries.length || entries.length !== policy.paths.length || policy.paths.some(p => !entries.some(e => e.path === p)))
       throw new Error('Research must investigate every planned path exactly once');
-    if (!result.inspections.some(i => i.path === t.historyEvidence?.path && i.sha256 === t.historyEvidence.sha256))
+    if (!inspected(result, t.historyEvidence))
       throw new Error('Research must inspect the pre-edit history snapshot');
     for (const entry of entries) {
       inspectHistoricalReference(t, `git:${t.base}:${entry.owner}`);

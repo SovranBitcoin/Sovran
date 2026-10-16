@@ -80,6 +80,12 @@ export function validateResolutions(t: Task, role: string, worker: string,
 }
 
 /** The brief and acceptance gate must use the same evidence set. */
+// Evidence elsewhere is cited as artifact:<file>, so a worker may name an inspected
+// artifact either way. The packet hash must still match exactly.
+export function inspected(result: Task['assessments'][number]['result'], item: { path: string; sha256: string }) {
+  return result.inspections.some(i => (i.path === item.path || i.path === `artifact:${item.path}`) && i.sha256 === item.sha256);
+}
+
 export function assessmentArtifacts(t: Task, role: string) {
   const receipts = ['implementation', 'audit'].includes(role) ? [...t.history, ...t.receipts] : t.receipts;
   const artifacts = [...receipts.flatMap(r => r.artifacts), ...(['implementation', 'audit'].includes(role) ? t.ciObservations ?? [] : []), ...(t.historyEvidence ? [t.historyEvidence] : []), ...(role === 'audit'

@@ -8,7 +8,7 @@ import { runCommand } from './command';
 import { inspectChange } from './policy';
 import { inspectUpgradeEvidence, upgradeInventorySchema } from './upgrade';
 import { brief } from './brief';
-import { assessmentArtifacts, unresolved, validateResolutions } from './evidence';
+import { assessmentArtifacts, inspected, unresolved, validateResolutions } from './evidence';
 import { Publisher, publishPlan } from './publisher';
 import { captureHistory, inspectHistoricalReference, validateHistory } from './history';
 import { contextPaths } from './context';
@@ -162,7 +162,7 @@ export class Controller {
       if (['review', 'adversary', 'audit', 'diversityReview'].includes(role) && result.verdict === 'pass') {
         for (const item of assessmentArtifacts(t, role)) {
           if (fileEvidence(join(this.stateDir, t.id), item.path).sha256 !== item.sha256) throw new Error('Evidence changed after execution');
-          if (!result.inspections.some(i => i.path === item.path && i.sha256 === item.sha256))
+          if (!inspected(result, item))
             throw new Error(`Missing artifact inspection: ${item.path}`);
         }
       }
