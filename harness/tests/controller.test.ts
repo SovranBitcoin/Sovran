@@ -401,7 +401,10 @@ test('final reconciliation requires every historical failure artifact unchanged 
   expect(() => finishWith(c, t, { resolutionReviews, inspections: inspections.filter(i => i.path !== stderr.path) })).toThrow('Missing artifact inspection');
   const original = readFileSync(join(state, t.id, stderr.path));
   writeFileSync(join(state, t.id, stderr.path), 'removed failure');
-  expect(() => finishWith(c, t, { resolutionReviews, inspections })).toThrow('Evidence changed');
+  const ticket = c.read(t.id).ticket;
+  if (!ticket?.claim) throw new Error('Missing audit claim');
+  const worker = ticket.claim.worker;
+  expect(() => c.submit(t.id, ticket.id, worker, { ...report, resolutionReviews, inspections })).toThrow('Evidence changed');
   writeFileSync(join(state, t.id, stderr.path), original);
   expect(finishWith(c, t, { resolutionReviews, inspections }).phase).toBe('publishable');
 });
