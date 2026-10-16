@@ -67,11 +67,6 @@
       "count": 2
     }
   },
-  "features/onboarding/components/types.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    }
-  },
   "features/send/providers/Colada.tsx": {
     "@typescript-eslint/consistent-type-assertions": {
       "count": 1
@@ -191,11 +186,6 @@
   "shared/lib/map/mapClustering.ts": {
     "@typescript-eslint/no-explicit-any": {
       "count": 3
-    }
-  },
-  "shared/lib/persist/createMergeWithSchema.ts": {
-    "@typescript-eslint/consistent-type-assertions": {
-      "count": 1
     }
   },
   "shared/lib/popup/ToastSlab.tsx": {
