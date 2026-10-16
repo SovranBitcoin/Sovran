@@ -13,6 +13,7 @@
  */
 import { IS_E2E_LOG_BUILD } from '@/shared/lib/loggerCore';
 import { z } from 'zod';
+import { Platform } from 'react-native';
 
 /** The parts of a React fiber that are read. */
 interface Fiber {
@@ -80,6 +81,8 @@ interface ElementInfo {
 
 interface FiberCapture {
   roots: Set<FiberRoot>;
+  /** Android Fabric includes a viewport offset that physical device taps do not. */
+  normalizeViewportOrigin?: boolean;
   /** The frame a host fiber is laid out at, in window points. */
   measure: (fiber: Fiber) => Rect | null;
   /** Whether a renderer has reported to the hook yet. */
@@ -123,6 +126,7 @@ export function installFiberRootCapture(target: Record<string, unknown>): FiberC
       setStrictMode() {},
     };
   return {
+    normalizeViewportOrigin: Platform.OS === 'android',
     get roots() {
       if (!devTools.success) return roots;
       const live = new Set<FiberRoot>();
@@ -212,7 +216,7 @@ export function collectElements(
       rect.y >= window.height);
   const found: ElementInfo[] = [];
   const topInset = capture.topInset?.() ?? 0;
-  const visit = (start: Fiber) => {
+  const visit = (start: Fiber, origin: { x: number; y: number }) => {
     // Iterative: a screen's tree is deeper than a comfortable call stack.
     // Carried down: the page a fiber is on, the top of the header bar it is in,
     // and how far down the window the sheet it is on begins.
@@ -259,7 +263,8 @@ export function collectElements(
             ? null
             : barTop !== undefined
               ? { ...laidOut, y: (sheetTop || topInset) + BAR_SITS_LOWER + (laidOut.y - barTop) }
-              : { ...laidOut, y: laidOut.y + sheetTop };
+              : { ...laidOut, y: laidOut.y + sheetTop - origin.y };
+          if (rect) rect.x -= origin.x;
           if (rect && !outside(rect)) {
             const state = props.accessibilityState as { disabled?: unknown } | undefined;
             const value = text((props.accessibilityValue as { text?: unknown } | undefined)?.text);
@@ -284,7 +289,13 @@ export function collectElements(
         stack.push([fiber.child, page, barTop, sheetTop]);
     }
   };
-  for (const root of capture.roots) if (root.current) visit(root.current);
+  for (const root of capture.roots) {
+    if (!root.current) continue;
+    // Each React surface has its own viewport offset. Header y is synthesized
+    // above from window insets, so only its x uses this correction.
+    const origin = capture.normalizeViewportOrigin ? rootFrame(capture, root) : null;
+    visit(root.current, origin ?? { x: 0, y: 0 });
+  }
   return found;
 }
 
@@ -292,14 +303,20 @@ const capture = IS_E2E_LOG_BUILD
   ? installFiberRootCapture(globalThis as unknown as Record<string, unknown>)
   : null;
 
+function rootFrame(from: FiberCapture, root: FiberRoot): Rect | null {
+  for (let fiber = root.current; fiber; fiber = fiber.child) {
+    if (fiber.tag !== HOST_COMPONENT) continue;
+    const rect = from.measure(fiber);
+    if (rect) return rect;
+  }
+  return null;
+}
+
 /** The frame of the app's outermost view, which fills its window. */
 export function windowSize(from: FiberCapture): { width: number; height: number } {
   for (const root of from.roots) {
-    for (let fiber = root.current; fiber; fiber = fiber.child) {
-      if (fiber.tag !== HOST_COMPONENT) continue;
-      const rect = from.measure(fiber);
-      if (rect) return { width: rect.width, height: rect.height };
-    }
+    const rect = rootFrame(from, root);
+    if (rect) return { width: rect.width, height: rect.height };
   }
   return { width: 0, height: 0 };
 }

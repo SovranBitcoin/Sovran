@@ -49,6 +49,34 @@ const capturing = (root: TestFiber) => ({
 const BOX = { x: 16, y: 700, width: 370, height: 56 };
 
 describe('collectElements', () => {
+  it('maps Android viewport offsets back to the full window before clipping', () => {
+    const root = fiber(3, {}, [
+      view({}, { x: -12, y: -54, width: 402, height: 874 }, [
+        view({ testID: 'accept' }, { x: 4, y: 646, width: 370, height: 40 }),
+        view({ testID: 'top-control' }, { x: 4, y: -44, width: 40, height: 30 }),
+        fiber(
+          5,
+          { type: 'RNSScreenStackHeaderConfig', rect: { x: -12, y: -100, width: 402, height: 54 } },
+          [view({ testID: 'header-control' }, { x: 4, y: -100, width: 40, height: 30 })]
+        ),
+      ]),
+    ]);
+    const captured = { ...capturing(root), normalizeViewportOrigin: true, topInset: () => 62 };
+    expect(collectElements(captured, { width: 402, height: 874 })).toEqual([
+      { id: 'accept', x: 16, y: 700, width: 370, height: 40 },
+      { id: 'top-control', x: 16, y: 10, width: 40, height: 30 },
+      { id: 'header-control', x: 16, y: 70, width: 40, height: 30 },
+    ]);
+    // iOS reports window coordinates already; preserve its surface origin.
+    expect(collectElements(capturing(root))[0]).toEqual({
+      id: 'accept',
+      x: 4,
+      y: 646,
+      width: 370,
+      height: 40,
+    });
+  });
+
   it('lists a control with its test id, label, frame and the page it is on', () => {
     const root = fiber(3, {}, [
       page('SendScreen', [
