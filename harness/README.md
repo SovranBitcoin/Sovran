@@ -28,7 +28,7 @@ flowchart TD
   audit --> publish[Publish exact reviewed head]
   publish --> ci[Required CI and merge-policy checks]
   ci --> ready[Ready PR: owner merges]
-  verify & review & adversary & audit -->|Verified defect, within budget| implement
+  verify & review & adversary & audit & ci -->|Verified defect, within budget| implement
   verify & review & adversary & audit & ci -->|Missing evidence or exhausted budget| incomplete[Incomplete with evidence gap]
 ```
 
@@ -114,6 +114,7 @@ version must not be presented as production-ready autonomous wallet development.
 `bun run --cwd harness test` exercises real SQLite, temporary git repositories and subprocesses.
 `bun run --cwd harness type-check` checks this tooling independently of the shipped app.
 The publication tests use a temporary bare Git remote and a fake GitHub executable; they
-do not establish live GitHub readiness. No real-wallet, native or funded scenarios are part
+do not establish live GitHub readiness. The remaining complete live T3/GitHub pilot is
+tracked in [F157](../docs/follow-ups/F157.md). No real-wallet, native or funded scenarios are part
 of the tooling tests. Source-backed design references are in the
 [ADR](../app/docs/adr/2026-10-16-task-harness.md).

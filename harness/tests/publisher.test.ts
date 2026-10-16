@@ -134,6 +134,14 @@ test.each(['failed CI', 'concurrent repair'] as const)('controller handles %s an
       }
       expect(t.phase).toBe(value === 'first change' ? 'implementing' : 'ready');
     }
+    const receipt = t.receipts.find(r => r.id === 'harness:ci');
+    const evidence = receipt?.artifacts[0];
+    if (!evidence) throw new Error('Missing CI evidence');
+    const snapshot = JSON.parse(readFileSync(join(f.dir, 'journal', t.id, evidence.path), 'utf8'));
+    expect(snapshot.checks).toEqual([{ name: 'upgrade', bucket: 'pass' }]);
+    expect(snapshot.requiredChecks).toEqual(['upgrade']);
+    expect(snapshot.exitCode).toBe(0);
+    expect(snapshot.pr.headRefOid).toBe(git(f.root, ['rev-parse', 'HEAD']));
     expect(f.read().creates).toBe(1);
     expect(f.read().pr.body.endsWith(`<!-- describes ${git(f.root, ['rev-parse', 'HEAD'])} -->`)).toBe(true);
   } finally { c.close(); }

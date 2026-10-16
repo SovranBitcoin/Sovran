@@ -21,6 +21,7 @@ const pr = z.object({ number: z.number().int().positive(), url: z.url(), state: 
   mergeStateStatus: text, reviewDecision: z.string().nullable(),
 });
 type PullRequest = z.infer<typeof pr>;
+const checkSnapshot = z.array(z.object({ name: text, bucket: z.enum(['pass', 'fail', 'pending', 'skipping', 'cancel']) }));
 const fields = Object.keys(pr.shape).join(',');
 type Publication = { status: 'ci'; pr: PullRequest } | { status: 'unknown'; reason: string };
 export class Publisher {
@@ -100,12 +101,12 @@ export class Publisher {
     return found && found.title === p.title && found.body === this.body(p)
       ? { status: 'ci', pr: found } : { status: 'unknown', reason: 'PR identity or final metadata is not confirmed' };
   }
-  check(input: unknown, number: number): { status: 'ready' | 'waiting' | 'failed'; reason: string; pr: PullRequest } {
+  check(input: unknown, number: number): { status: 'ready' | 'waiting' | 'failed'; reason: string; pr: PullRequest; checks: z.infer<typeof checkSnapshot>; requiredChecks: string[]; exitCode: number } {
     const p = publishPlan.parse(input); this.guard(p);
     const view = () => { const out = this.gh(p, ['pr', 'view', String(number), '--json', fields]); if (out.code !== 0) throw new Error('PR state unavailable'); const found = pr.parse(JSON.parse(out.text)); this.matches(p, found); return found; };
     const before = view();
     const raw = this.gh(p, ['pr', 'checks', String(number), '--required', '--json', 'name,bucket']);
-    const checks = z.array(z.object({ name: text, bucket: z.enum(['pass', 'fail', 'pending', 'skipping', 'cancel']) })).parse(JSON.parse(raw.text));
+    const checks = checkSnapshot.parse(JSON.parse(raw.text));
     const after = view(); this.guard(p);
     if (before.headRefOid !== after.headRefOid || before.baseRefOid !== after.baseRefOid || this.remoteHead(p, p.branch) !== p.head) throw new Error('PR changed during CI inspection');
     const green = raw.code === 0 && checks.length > 0 && new Set(checks.map(c => c.name)).size === checks.length &&
@@ -114,6 +115,6 @@ export class Publisher {
       !['CHANGES_REQUESTED', 'REVIEW_REQUIRED'].includes(after.reviewDecision ?? '') && after.body === this.body(p) && after.title === p.title;
     const failed = checks.some(c => c.bucket === 'fail' || c.bucket === 'cancel') || after.reviewDecision === 'CHANGES_REQUESTED';
     return { status: ready ? 'ready' : failed ? 'failed' : 'waiting', reason: ready ? 'Exact head satisfies required checks and current merge policy' :
-      `Required checks or PR merge policy are unsatisfied: ${checks.map(c => `${c.name}=${c.bucket}`).join(', ')}; review=${after.reviewDecision}`, pr: after };
+      `Required checks or PR merge policy are unsatisfied: ${checks.map(c => `${c.name}=${c.bucket}`).join(', ')}; review=${after.reviewDecision}`, pr: after, checks, requiredChecks: p.requiredChecks, exitCode: raw.code };
   }
 }
