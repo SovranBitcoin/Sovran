@@ -1,0 +1,214 @@
+import { expect, test } from 'bun:test';
+import { fixture } from './controller.test';
+import { Controller } from '../src/controller';
+import type { RuntimeTask } from '../src/models';
+import type { Task } from '../src/workflow';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+
+export function routedModels() {
+  const sol = { provider: 'codex', model: 'gpt-6.1-sol', options: { reasoningEffort: 'high' } };
+  const astra = { provider: 'codex', model: 'gpt-6-astra', options: { reasoningEffort: 'high' } };
+  const opus = { provider: 'claudeAgent', model: 'claude-opus-5-5', options: { effort: 'high' } };
+  const route = (...candidates: (typeof sol | typeof opus)[]) => ({ purpose: 'Fixture route', candidates });
+  return {
+    kind: 'routed', allowGptOnly: true,
+    catalog: { observedAt: new Date().toISOString(), providers: [
+      { providerInstanceId: 'codex', driverKind: 'codex', canRunChildTask: true,
+        models: ['gpt-6.1-sol', 'gpt-6-astra'].map(id => ({ id, options: [
+          { id: 'reasoningEffort', type: 'select', options: [{ id: 'high' }, { id: 'medium' }] },
+        ] })) },
+      { providerInstanceId: 'claudeAgent', driverKind: 'claudeAgent', canRunChildTask: true,
+        models: [{ id: 'claude-opus-5-5', options: [{ id: 'effort', type: 'select', options: [{ id: 'high' }] }] }] },
+    ] },
+    routes: { research: route(sol), implementation: route(sol, opus), review: route(opus, sol),
+      adversary: route(opus, sol), audit: route(opus, sol), diversityReview: route(astra) },
+  };
+}
+
+test('a sealed route dispatches its primary model and explicit supported effort', () => {
+  const { controller: c, root, spec } = fixture();
+  const t = c.create(root, { ...spec, models: routedModels() });
+  expect(c.next(t.id).ticket?.target).toEqual({ provider: 'codex', model: 'gpt-6.1-sol', options: { reasoningEffort: 'high' } });
+});
+
+test('unsupported models and effort cannot enter a sealed route', () => {
+  const { controller: c, root, spec } = fixture();
+  const models = routedModels();
+  models.routes.research.candidates = [{ provider: 'codex', model: 'gpt-6.1-sol', options: { reasoningEffort: 'invented' } }];
+  expect(() => c.create(root, { ...spec, models })).toThrow('Unsupported model option');
+  models.routes.research.candidates = [{ provider: 'codex', model: 'missing', options: { reasoningEffort: 'high' } }];
+  expect(() => c.create(root, { ...spec, models })).toThrow('Unavailable model');
+});
+
+function claimed(c: Controller, id: string) {
+  const ticket = c.next(id).ticket;
+  if (!ticket) throw new Error('Missing ticket');
+  const runtime: RuntimeTask = { taskId: `runtime:${ticket.id}`, providerInstanceId: ticket.target.provider,
+    model: ticket.target.model, status: 'running', workState: 'working', hasPendingChildRuns: false, hasPendingQuestion: false };
+  c.beginDispatch(id, ticket.id, 'coordinator', 'session');
+  c.claim(id, ticket.id, runtime.taskId, runtime.providerInstanceId, ticket.target.model, runtime);
+  return { ticket, runtime };
+}
+
+function completed(c: Controller, t: Task) {
+  const { ticket, runtime } = claimed(c, t.id);
+  return c.submit(t.id, ticket.id, runtime.taskId, {
+    verdict: 'pass', summary: 'Inspected fixture', findings: [],
+    observations: [{ requirement: 'behavior', evidence: 'source.txt', observation: 'Read fixture source' }],
+    reuse: { searched: ['source.txt'], used: ['source.txt'], added: [], removed: [] },
+    inspections: t.receipts.flatMap(r => r.artifacts).map(a => ({ ...a, observation: 'Read fixture output' })),
+  }, { ...runtime, status: 'completed', workState: 'result_available' });
+}
+
+function quota(c: Controller, t: Task) {
+  const { ticket, runtime } = claimed(c, t.id);
+  return c.fallback(t.id, ticket.id, 'quota-exhausted', {
+    ...runtime, status: 'failed', workState: 'result_available', summary: 'Synthetic quota fixture',
+  }, 'Synthetic terminal quota result; all child work reconciled');
+}
+
+async function reviewStage(c: Controller, t: Task) {
+  t = completed(c, t); t = c.seal(t.id, t.policy); t = completed(c, t);
+  return c.verify(t.id);
+}
+
+test('dispatch reservation survives restart and authorizes exactly one external call', () => {
+  const { controller: c, root, state, spec } = fixture();
+  const t = c.next(c.create(root, { ...spec, models: routedModels() }).id);
+  const ticket = t.ticket;
+  if (!ticket) throw new Error('Missing ticket');
+  const first = c.beginDispatch(t.id, ticket.id, 'coordinator', 'session');
+  expect(first.dispatchAuthorized).toBe(true);
+  const resumed = new Controller(state);
+  try {
+    expect(resumed.beginDispatch(t.id, ticket.id, 'coordinator', 'session').dispatchAuthorized).toBe(false);
+    expect(resumed.read(t.id).ticket?.dispatch).toEqual(first.task.ticket?.dispatch);
+    expect(() => resumed.beginDispatch(t.id, ticket.id, 'other', 'session')).toThrow();
+  } finally { resumed.close(); }
+});
+
+test('quota fallback needs terminal lineage, preserves budget, and cannot accept the old worker', async () => {
+  const { controller: c, root, state, spec } = fixture();
+  let t = await reviewStage(c, c.create(root, { ...spec, models: routedModels() }));
+  const { ticket, runtime } = claimed(c, t.id);
+  const terminal: RuntimeTask = { ...runtime, status: 'failed', workState: 'result_available', summary: 'Quota fixture' };
+  expect(() => c.fallback(t.id, ticket.id, 'quota-exhausted', { ...terminal, hasPendingChildRuns: true }, 'quota')).toThrow('Reconcile');
+  expect(() => c.fallback(t.id, ticket.id, 'quota-exhausted', { ...terminal, hasPendingQuestion: true }, 'quota')).toThrow('Reconcile');
+  expect(() => c.fallback(t.id, ticket.id, 'quota-exhausted', runtime, 'quota')).toThrow('Reconcile');
+  t = c.fallback(t.id, ticket.id, 'quota-exhausted', terminal, 'quota');
+  expect(t.ticket?.target.model).toBe('gpt-6.1-sol');
+  expect(t.ticket?.id).not.toBe(ticket.id);
+  expect(t.generation).toBe(0); expect(t.contract.limits).toEqual(spec.limits);
+  const resumed = new Controller(state);
+  try {
+    expect(resumed.fallback(t.id, ticket.id, 'quota-exhausted', terminal, 'quota').ticket?.id).toBe(t.ticket?.id);
+    expect(resumed.read(t.id).attempts.at(-1)?.completion.kind).toBe('unavailable');
+  } finally { resumed.close(); }
+  expect(() => c.submit(t.id, ticket.id, runtime.taskId, {
+    verdict: 'pass', summary: 'Late result', findings: [], observations: [{ requirement: 'behavior', evidence: 'source.txt', observation: 'late' }],
+    reuse: { searched: ['source.txt'], used: [], added: [], removed: [] },
+  }, { ...terminal, status: 'completed' })).toThrow('stale ticket');
+});
+
+test('GPT-only reviews require a separate fresh model slot after every normal review', async () => {
+  const { controller: c, root, spec } = fixture();
+  const models = routedModels();
+  models.routes.research = models.routes.review; // Claude research must not waive review diversity.
+  let t = await reviewStage(c, c.create(root, { ...spec, models }));
+  t = quota(c, t); t = completed(c, t); expect(t.phase).toBe('adversarial');
+  t = quota(c, t); t = completed(c, t); expect(t.phase).toBe('auditing');
+  t = await c.verify(t.id, true); t = quota(c, t); t = completed(c, t);
+  expect(t.phase).toBe('diversityReviewing');
+  expect(c.next(t.id).ticket?.target.model).toBe('gpt-6-astra');
+  t = completed(c, t); expect(t.phase).toBe('publishable');
+  expect(t.attempts.filter(a => a.ticket.role === 'diversityReview')).toHaveLength(1);
+});
+
+test('a partial failed author remains excluded from extra review and its edits are retained', async () => {
+  const { controller: c, root, spec } = fixture();
+  const models = routedModels();
+  const astra = models.routes.diversityReview.candidates[0];
+  const sol = models.routes.research.candidates[0];
+  if (!astra || !sol) throw new Error('Missing fixture targets');
+  models.routes.implementation.candidates = [astra, sol];
+  let t = completed(c, c.create(root, { ...spec, models })); t = c.seal(t.id, t.policy);
+  const { ticket, runtime } = claimed(c, t.id);
+  writeFileSync(join(root, 'source.txt'), 'Partial implementation retained');
+  t = c.fallback(t.id, ticket.id, 'quota-exhausted', { ...runtime, status: 'failed', workState: 'result_available' }, 'quota');
+  expect(readFileSync(join(root, 'source.txt'), 'utf8')).toBe('Partial implementation retained');
+  expect(t.attempts.at(-1)?.ticket.target.model).toBe('gpt-6-astra');
+  t = completed(c, t); t = await c.verify(t.id);
+  t = completed(c, quota(c, t)); t = completed(c, quota(c, t));
+  t = await c.verify(t.id, true); t = completed(c, quota(c, t));
+  expect(t.phase).toBe('diversityReviewing');
+  t = c.next(t.id);
+  expect(t.phase).toBe('incomplete');
+  expect(t.reason).toContain('No eligible authorized model');
+});
+
+test('negative review enters repair and cannot shop for a replacement verdict', async () => {
+  const { controller: c, root, state, spec } = fixture();
+  let t = await reviewStage(c, c.create(root, { ...spec, models: routedModels() }));
+  const { ticket, runtime } = claimed(c, t.id);
+  t = c.submit(t.id, ticket.id, runtime.taskId, {
+    verdict: 'fail', summary: 'Fixture defect', findings: [{ id: 'defect', severity: 'blocking', evidence: 'source.txt', detail: 'Fixture counterexample' }],
+    observations: [{ requirement: 'behavior', evidence: 'source.txt', observation: 'Counterexample' }],
+    reuse: { searched: ['source.txt'], used: [], added: [], removed: [] },
+  }, { ...runtime, status: 'completed', workState: 'result_available' });
+  expect(t.phase).toBe('implementing'); expect(t.generation).toBe(1);
+  expect(() => c.fallback(t.id, ticket.id, 'quota-exhausted', { ...runtime, status: 'failed', workState: 'result_available' }, 'quota')).toThrow('No routed attempt');
+  c.next(t.id);
+  expect(c.brief(t.id).packet.repairFindings).toMatchObject([{ id: 'defect', detail: 'Fixture counterexample' }]);
+  const historical = t.history[0]?.artifacts[0];
+  if (!historical) throw new Error('Missing repair log');
+  const original = readFileSync(join(state, t.id, historical.path));
+  writeFileSync(join(state, t.id, historical.path), 'forged history');
+  const repair = claimed(c, t.id);
+  const result = { verdict: 'pass', summary: 'Repaired', findings: [],
+    observations: [{ requirement: 'behavior', evidence: `artifact:${historical.path}`, observation: 'Read old failure' }],
+    reuse: { searched: ['source.txt'], used: [], added: [], removed: [] } };
+  const terminal: RuntimeTask = { ...repair.runtime, status: 'completed', workState: 'result_available' };
+  expect(() => c.submit(t.id, repair.ticket.id, repair.runtime.taskId, result, terminal)).toThrow('Evidence changed');
+  writeFileSync(join(state, t.id, historical.path), original);
+  t = c.submit(t.id, repair.ticket.id, repair.runtime.taskId, result, terminal);
+  t = await c.verify(t.id); c.next(t.id);
+  expect(c.brief(t.id).packet.repairReason).toBe('');
+});
+
+test('a prior generation Claude pass does not waive fresh diversity review on unchanged bytes', async () => {
+  const { controller: c, root, spec } = fixture();
+  let t = await reviewStage(c, c.create(root, { ...spec, models: routedModels() }));
+  t = completed(c, t); // Accepted Claude review in generation zero.
+  t = c.repair(t.id, 'Repeat with a stronger test obligation');
+  t = completed(c, t); t = await c.verify(t.id);
+  t = completed(c, quota(c, t)); t = completed(c, quota(c, t));
+  t = await c.verify(t.id, true); t = completed(c, quota(c, t));
+  expect(t.generation).toBe(1); expect(t.phase).toBe('diversityReviewing');
+});
+
+test('cancelled availability work is reconciled without reopening or dispatching a successor', () => {
+  const { controller: c, root, spec } = fixture();
+  const t = c.create(root, { ...spec, models: routedModels() });
+  const { ticket, runtime } = claimed(c, t.id);
+  c.stop(t.id, 'cancel', 'Cancelled fixture', true);
+  const stopped = c.fallback(t.id, ticket.id, 'quota-exhausted', { ...runtime, status: 'failed', workState: 'result_available' }, 'quota');
+  expect(stopped.phase).toBe('cancelled'); expect(stopped.ticket).toBeNull();
+  expect(stopped.attempts.at(-1)?.completion.kind).toBe('unavailable');
+});
+
+test('routed claims and completion require actual matching runtime identity and terminal work', () => {
+  const { controller: c, root, spec } = fixture();
+  const t = c.next(c.create(root, { ...spec, models: routedModels() }).id);
+  const ticket = t.ticket;
+  if (!ticket) throw new Error('Missing ticket');
+  expect(() => c.claim(t.id, ticket.id, 'self-declared', ticket.target.provider, ticket.target.model)).toThrow('Reserve dispatch');
+  c.beginDispatch(t.id, ticket.id, 'coordinator', 'session');
+  expect(() => c.claim(t.id, ticket.id, 'self-declared', ticket.target.provider, ticket.target.model)).toThrow('runtime identity');
+  const { runtime } = claimed(c, t.id);
+  expect(() => c.submit(t.id, ticket.id, runtime.taskId, {
+    verdict: 'pass', summary: 'Premature', findings: [],
+    observations: [{ requirement: 'behavior', evidence: 'source.txt', observation: 'premature' }],
+    reuse: { searched: ['source.txt'], used: [], added: [], removed: [] },
+  }, { ...runtime, status: 'completed', workState: 'result_available', hasPendingChildRuns: true })).toThrow('Reconcile');
+});

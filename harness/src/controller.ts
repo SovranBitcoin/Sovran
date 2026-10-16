@@ -10,6 +10,7 @@ import { brief } from './brief';
 import { Publisher, publishPlan } from './publisher';
 import { contextPaths } from './context';
 import { prepareReference } from './references';
+import { availability, candidates, driver, runtimeTask, type Model, type RuntimeTask } from './models';
 import { assessment, contract, move, roleFor, task, type Task } from './workflow';
 import { digest, fileEvidence, fingerprint, git, within } from './workspace';
 
@@ -39,7 +40,7 @@ export class Controller {
       version: 1, id, root, base: git(root, ['rev-parse', 'HEAD']), contract: spec,
       phase: 'researching', generation: 0, source: fingerprint(root),
       policy: digest(JSON.stringify({ spec, context, references: references.map(r => r.sha256) })), context, referenceEvidence: null, ticket: null,
-      receipts: [], history: [], assessments: [], pending: { kind: 'none' }, publication: null, reason: '', pr: null,
+      receipts: [], history: [], assessments: [], attempts: [], pending: { kind: 'none' }, publication: null, reason: '', pr: null,
     };
     const policy = inspectChange(root, value.base, spec);
     if (policy.problems.length) throw new Error(policy.problems.join('\n'));
@@ -63,39 +64,68 @@ export class Controller {
     if (fingerprint(t.root) !== t.source) throw new Error('Candidate changed; repair and verify the new source');
   }
 
-  private issue(t: Task): Task {
+  private issue(t: Task, startIndex = 0): Task {
     const role = roleFor(t.phase);
     if (!role || t.ticket) return t;
-    return { ...t, ticket: { id: `${t.id}:${t.generation}:${role}`, role, target: t.contract.models[role], claim: null } };
+    const route = candidates(t.contract.models, role);
+    const candidateIndex = route.findIndex((target, i) => i >= startIndex && (role !== 'diversityReview' || this.eligibleDiversity(t, target)));
+    const target = route[candidateIndex];
+    if (!target) return { ...move(t, 'STOP'), reason: `No eligible authorized model remains for ${role}` };
+    const suffix = 'kind' in t.contract.models ? `:${t.attempts.length}` : '';
+    return { ...t, ticket: { id: `${t.id}:${t.generation}:${role}${suffix}`, role, target, claim: null,
+      candidateIndex, sourceAtIssue: t.source, dispatch: null, runtime: null } };
   }
 
   next(id: string) {
     const t = this.read(id);
     if (Date.parse(t.contract.limits.deadline) <= Date.now() && !['ready', 'incomplete', 'cancelled'].includes(t.phase))
       return this.stop(id, 'deadline', 'Task deadline exhausted');
-    return this.change(id, `issue:${t.generation}:${t.phase}`, {}, value => this.issue(value));
+    return this.change(id, `issue:${t.generation}:${t.phase}:${t.attempts.length}`, {}, value => this.issue(value));
   }
 
-  claim(id: string, ticketId: string, worker: string, provider: string, model: string) {
-    const input = { ticketId, worker, provider, model };
+  beginDispatch(id: string, ticketId: string, coordinator: string, session: string) {
+    const input = { ticketId, coordinator, session };
+    const result = this.journal.change(id, `dispatch:${ticketId}`, input, value => {
+      const t = task.parse(value); this.current(t);
+      if (t.ticket?.id !== ticketId || t.ticket.claim || t.ticket.dispatch) throw new Error('Ticket unavailable for dispatch');
+      if (t.pending.kind !== 'none') throw new Error('Wait for the outstanding command before dispatch');
+      return { ...t, ticket: { ...t.ticket, dispatch: { coordinator, session, requestId: `sovran:${ticketId}` } } };
+    });
+    return { task: task.parse(result.value), dispatchAuthorized: result.applied };
+  }
+
+  claim(id: string, ticketId: string, worker: string, provider: string, model: string, runtime?: RuntimeTask) {
+    const observed = runtime ? runtimeTask.parse(runtime) : null;
+    const input = { ticketId, worker, provider, model, runtime: observed };
     return this.change(id, `claim:${ticketId}:${worker}`, input, t => {
       this.live(t);
       if (t.ticket?.id !== ticketId) throw new Error('Stale dispatch ticket');
       if (t.ticket.target.provider !== provider || t.ticket.target.model !== model) throw new Error('Wrong provider/model');
       if (t.ticket.claim && t.ticket.claim.worker !== worker) throw new Error('Ticket already claimed; reconcile the original worker');
       if (t.assessments.some(a => a.worker === worker && a.role !== t.ticket?.role)) throw new Error('Independent roles need separate workers');
-      return { ...t, ticket: { ...t.ticket, claim: { worker, provider, model } } };
+      if ('kind' in t.contract.models) {
+        if (!t.ticket.dispatch) throw new Error('Reserve dispatch before claiming a routed attempt');
+        if (!observed || observed.taskId !== worker || observed.providerInstanceId !== provider || observed.model !== model)
+          throw new Error('Claim requires matching T3 runtime identity');
+        if (t.attempts.some(a => a.ticket.claim?.worker === worker)) throw new Error('Every attempt needs a fresh worker');
+      }
+      return { ...t, ticket: { ...t.ticket, claim: { worker, provider, model }, runtime: observed } };
     });
   }
 
   /** Submission means the worker and its processes have finished. A lost worker is
    * never replaced on a timer: the operator/coordinator must reconcile first. */
-  submit(id: string, ticketId: string, worker: string, input: unknown) {
+  submit(id: string, ticketId: string, worker: string, input: unknown, runtime?: RuntimeTask) {
     const result = assessment.parse(input);
-    return this.change(id, `submit:${ticketId}`, { worker, result }, t => {
+    const observed = runtime ? runtimeTask.parse(runtime) : null;
+    return this.change(id, `submit:${ticketId}`, { worker, result, runtime: observed }, t => {
       this.live(t);
       if (t.ticket?.id !== ticketId || t.ticket.claim?.worker !== worker) throw new Error('Unclaimed or stale ticket');
       if (t.pending.kind !== 'none') throw new Error('Wait for the outstanding command before submitting');
+      if ('kind' in t.contract.models) {
+        this.terminalWorker(t, observed);
+        if (observed?.status !== 'completed') throw new Error('Only completed worker output can be submitted');
+      }
       const role = t.ticket.role;
       if (role !== 'implementation' && result.verdict !== 'inconclusive') this.current(t);
       if (role === 'audit' && !t.contract.auditChecks.every(c => t.receipts.some(r => r.id === c.id && r.source === t.source && r.outcome === 'pass')))
@@ -109,7 +139,7 @@ export class Controller {
       if (missing.length) throw new Error(`Missing requirement observations: ${missing.map(r => r.id).join(', ')}`);
       if (result.verdict === 'pass' && result.findings.some(f => f.severity === 'blocking'))
         throw new Error('A blocking finding cannot pass');
-      if (['review', 'adversary', 'audit'].includes(role) && result.verdict === 'pass') {
+      if (['review', 'adversary', 'audit', 'diversityReview'].includes(role) && result.verdict === 'pass') {
         for (const item of t.receipts.flatMap(r => r.artifacts)) {
           if (fileEvidence(join(this.stateDir, t.id), item.path).sha256 !== item.sha256) throw new Error('Evidence changed after execution');
           if (!result.inspections.some(i => i.path === item.path && i.sha256 === item.sha256))
@@ -119,13 +149,66 @@ export class Controller {
       for (const observation of result.observations) this.inspectReference(t, observation.evidence);
       for (const finding of result.findings) this.inspectReference(t, finding.evidence);
       const evidence = this.save(t, `${ticketId.replaceAll(':', '-')}.json`, result);
-      const next: Task = { ...t, ticket: null, source, assessments: [...t.assessments, { role, source, worker, result, artifact: evidence }] };
+      const next: Task = { ...t, ticket: null, source, assessments: [...t.assessments, { role, source, worker, result, artifact: evidence }],
+        attempts: [...t.attempts, { ticket: t.ticket, generation: t.generation, sourceAfter: source,
+          completion: { kind: 'submitted', verdict: result.verdict, runtime: observed } }] };
       if (result.verdict === 'inconclusive') return { ...move(next, 'STOP'), reason: result.summary };
       if (result.verdict === 'fail') {
         if (role === 'research' || role === 'implementation') return { ...move(next, 'STOP'), reason: result.summary };
         return this.repairTask(next, result.summary);
       }
+      if (role === 'audit' && 'kind' in t.contract.models && !this.hasProviderDiversity(next)) {
+        if (!t.contract.models.allowGptOnly) return { ...move(next, 'STOP'), reason: 'Independent provider review unavailable; GPT-only completion was not authorized' };
+        return move(next, 'DIVERSITY');
+      }
       return move(next, 'ACCEPT');
+    });
+  }
+
+  private terminalWorker(t: Task, runtime: RuntimeTask | null) {
+    if (!runtime || !t.ticket?.claim || runtime.taskId !== t.ticket.claim.worker ||
+        runtime.providerInstanceId !== t.ticket.target.provider || runtime.model !== t.ticket.target.model ||
+        !['completed', 'failed', 'cancelled', 'interrupted'].includes(runtime.status) ||
+        runtime.workState !== 'result_available' || runtime.hasPendingChildRuns || runtime.hasPendingQuestion)
+      throw new Error('Reconcile the exact worker and every child before releasing ownership');
+  }
+
+  private eligibleDiversity(t: Task, target: Model) {
+    return driver(t.contract.models, target) === 'codex' && !t.attempts.some(a => a.ticket.role === 'implementation' &&
+      a.ticket.claim && a.ticket.target.model === target.model);
+  }
+
+  private currentReviews(t: Task) {
+    return t.attempts.filter(a => a.generation === t.generation && a.sourceAfter === t.source &&
+      a.completion.kind === 'submitted' && a.completion.verdict === 'pass' &&
+      ['review', 'adversary', 'audit', 'diversityReview'].includes(a.ticket.role));
+  }
+
+  private hasProviderDiversity(t: Task) {
+    return this.currentReviews(t).some(a => driver(t.contract.models, a.ticket.target) === 'claudeAgent' &&
+      t.attempts.some(author => author.ticket.role === 'implementation' && author.ticket.claim &&
+        driver(t.contract.models, author.ticket.target) === 'codex'));
+  }
+
+  fallback(id: string, ticketId: string, reason: z.infer<typeof availability>, runtime: RuntimeTask, detail: string) {
+    const observed = runtimeTask.parse(runtime);
+    const cause = availability.parse(reason);
+    if (!detail.trim()) throw new Error('Availability evidence is required');
+    return this.change(id, `fallback:${ticketId}`, { cause, observed, detail }, t => {
+      if (t.ticket?.id !== ticketId || !('kind' in t.contract.models)) throw new Error('No routed attempt owns this fallback');
+      if (t.pending.kind !== 'none') throw new Error('Outstanding command must finish first');
+      this.terminalWorker(t, observed);
+      if (observed.status !== 'failed') throw new Error('Only a failed availability attempt can fall back');
+      const source = fingerprint(t.root);
+      const previous = t.ticket;
+      const next: Task = { ...t, ticket: null, source,
+        attempts: [...t.attempts, { ticket: previous, generation: t.generation, sourceAfter: source,
+          completion: { kind: 'unavailable', reason: cause, runtime: observed, detail } }] };
+      if (['incomplete', 'cancelled'].includes(t.phase)) return next;
+      if (Date.parse(t.contract.limits.deadline) <= Date.now()) return { ...move(next, 'STOP'), reason: 'Task deadline exhausted during reconciliation' };
+      if (previous.role !== 'implementation' && source !== t.source)
+        return { ...move(next, 'STOP'), reason: 'Read-only worker changed source; availability fallback refused' };
+      return this.issue(next, previous.candidateIndex + 1);
     });
   }
 
@@ -177,7 +260,9 @@ export class Controller {
     // This releases ownership, never accepts unfinished work as evidence.
     return this.change(id, `worker-stopped:${ticket}`, { worker, reason }, t => {
       if (t.ticket?.id !== ticket || t.ticket.claim?.worker !== worker) throw new Error('Worker does not own this ticket');
-      const next: Task = { ...t, ticket: null, reason };
+      const next: Task = { ...t, ticket: null, reason, attempts: [...t.attempts, {
+        ticket: t.ticket, generation: t.generation, sourceAfter: fingerprint(t.root), completion: { kind: 'stopped', reason },
+      }] };
       return ['incomplete', 'cancelled'].includes(t.phase) ? next : move(next, 'STOP');
     });
   }
@@ -187,7 +272,9 @@ export class Controller {
     // is terminal. Never use this for an ambiguous/lost dispatch response.
     return this.change(id, `withdraw:${ticket}`, { reason }, t => {
       if (t.ticket?.id !== ticket || t.ticket.claim) throw new Error('Only an unclaimed, undispatched ticket can be withdrawn');
-      const next: Task = { ...t, ticket: null, reason };
+      const next: Task = { ...t, ticket: null, reason, attempts: [...t.attempts, {
+        ticket: t.ticket, generation: t.generation, sourceAfter: fingerprint(t.root), completion: { kind: 'stopped', reason },
+      }] };
       return ['incomplete', 'cancelled'].includes(t.phase) ? next : move(next, 'STOP');
     });
   }
@@ -217,13 +304,21 @@ export class Controller {
       return this.published(t, { url: result.pr.url, head: result.pr.headRefOid, number: result.pr.number });
     }
     if (t.phase !== 'publishable') throw new Error('All local gates must pass before publication');
+    if ('kind' in t.contract.models) {
+      const reviews = this.currentReviews(t);
+      if (!['review', 'adversary', 'audit'].every(role => reviews.some(a => a.ticket.role === role)))
+        throw new Error('Missing current independent review slots');
+      if (!this.hasProviderDiversity(t) && (!t.contract.models.allowGptOnly || !reviews.some(a =>
+        a.ticket.role === 'diversityReview' && this.eligibleDiversity(t, a.ticket.target))))
+        throw new Error('Missing additional review by a GPT model outside the complete author set');
+    }
     if (t.contract.publish.kind !== 'pull-request') throw new Error('Publication was not authorized at intake');
     const policy = inspectChange(t.root, t.base, t.contract);
     if (policy.problems.length) throw new Error(policy.problems.join('\n'));
     const plan = publishPlan.parse({ ...t.contract.publish, taskId: t.id, root: t.root,
       previousRemoteHead: t.pr?.head ?? t.contract.publish.previousRemoteHead,
       source: t.source, head: git(t.root, ['rev-parse', 'HEAD']), title: t.contract.problem.slice(0, 160),
-      body: `${t.contract.problem}\n\n${t.contract.requirements.map(r => `- ${r.outcome}`).join('\n')}\n\nValidation: ${t.receipts.map(r => `${r.id}: ${r.outcome}`).join('; ')}. Independent review, adversarial review and final audit completed for this source.`,
+      body: `${t.contract.problem}\n\n${t.contract.requirements.map(r => `- ${r.outcome}`).join('\n')}\n\nValidation: ${t.receipts.map(r => `${r.id}: ${r.outcome}`).join('; ')}. Independent review, adversarial review and final audit completed for this source.${'kind' in t.contract.models ? `\n\nModel attempts: ${t.attempts.map(a => `${a.ticket.role}: ${a.ticket.target.provider}/${a.ticket.target.model} (${a.completion.kind})`).join('; ')}. Requested effort is recorded; T3 did not report effective effort.${!this.hasProviderDiversity(t) ? ' GPT-only review fallback used with a separate model outside the author set.' : ''}` : ''}`,
     });
     const claim = this.journal.change(id, `publish:${t.generation}`, { plan }, value => {
       const v = task.parse(value); this.current(v);

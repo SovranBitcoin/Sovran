@@ -11,6 +11,7 @@ const duties: Record<Role, string> = {
   review: 'Independently inspect the source diff and requirements. Actually read every supplied test output and log; open screenshots and videos and identify the frames inspected. Assess persistence state combinations, performance measurements and missing platforms. Check docs against behavior, reuse and dependency choices. Tests passing alone cannot certify all historic upgrades. Do not edit source or publish.',
   adversary: 'Try concrete counterexamples: stale identity, retries, interrupted migration, delayed effects, partial storage, duplicate sends, stale test evidence and scope creep. Inspect the original evidence and code yourself. Report reproductions and bounded conclusions, not another reviewer verdict. Do not edit source or publish.',
   audit: 'Read the final saved-check retrieval and changed source, then judge each applicable rule. JevLint completed means retrieval completed, never that code passed. Verify fixes, dependency allowances, docs, structured follow-ups and every requirement at this exact source. Any required missing evidence is inconclusive. Do not edit source or publish.',
+  diversityReview: 'Independently review the full requirements, source and raw test evidence using a model that has not authored this task. Challenge the design and test validity. Do not rely on other reviewers agreeing. Do not edit source or publish.',
 };
 
 export function brief(t: Task, stateDir: string) {
@@ -38,7 +39,11 @@ export function brief(t: Task, stateDir: string) {
     task: t.id, ticket: t.ticket.id, policy: t.policy, source: t.source,
     root: t.root, base: t.base, role: t.ticket.role, target: t.ticket.target,
     instructions: `${duties[t.ticket.role]} No user questions after sealing. No nested delegation. If blocked, return inconclusive with the missing prerequisite. Host access is trusted; role text does not restrict tools. Return assessment JSON matching harness/src/workflow.ts. Include a specific inspection for every supplied artifact, with its hash. Do not invent evidence.`,
-    contract: t.contract, context, artifacts, research, repairReason: t.reason,
+    contract: t.contract, context, artifacts, research, repairReason: t.ticket.role === 'implementation' ? t.reason : '',
+    attempts: t.attempts.map(a => ({ ticket: a.ticket.id, role: a.ticket.role, target: a.ticket.target,
+      worker: a.ticket.claim?.worker ?? null, generation: a.generation, sourceBefore: a.ticket.sourceAtIssue,
+      sourceAfter: a.sourceAfter, availability: a.completion.kind === 'unavailable' ? a.completion.reason : null })),
+    effortEvidence: 'Target options record requested effort. Runtime model identity comes from T3. Effective effort is unreported unless separately observed; never infer it from the request.',
     researchScope: 'Research describes its recorded source, not the current candidate. Recheck claims against changed code. It is context, never implementation or test proof. Reviewers must reach their own conclusions.',
     assessmentSchema: z.toJSONSchema(assessment),
     referenceFormat: 'observations.evidence and findings.evidence must be a repository-relative file path or artifact:<saved artifact filename>. Put explanations and line/frame details in observation/detail, never in the path. Copy hashes from the packet; do not guess them.',

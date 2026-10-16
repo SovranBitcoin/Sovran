@@ -28,10 +28,13 @@ flowchart TD
   verify --> review[Independent model reviews code and outputs]
   review --> adversary[Adversarial counterexamples]
   adversary --> audit[Saved-check retrieval and final judgment]
-  audit --> publish[Publish exact reviewed head]
+  audit --> diversity{Cross-provider review established?}
+  diversity -->|Yes| publish[Publish exact reviewed head]
+  diversity -->|Approved GPT fallback| extra[Extra GPT review outside every author model]
+  extra --> publish
   publish --> ci[Required CI and merge-policy checks]
   ci --> ready[Ready PR: owner merges]
-  verify & review & adversary & audit & ci -->|Verified defect, within budget| implement
+  verify & review & adversary & audit & extra & ci -->|Verified defect, within budget| implement
   verify & review & adversary & audit & ci -->|Missing evidence or exhausted budget| incomplete[Incomplete with evidence gap]
 ```
 
@@ -81,8 +84,21 @@ Independent reviewers receive that context without other reviewers' verdicts.
 Reviewers must submit observations for the actual hashed command artifacts. No controller
 can prove a model understood a log; this gate makes missing or stale evidence visible.
 T3's coordinator verifies model identity and terminal child state from tool results; a role
-brief is not a provider system prompt or a technical tool restriction. Cross-provider review
-is required by the contract even when that provider is rate-limited.
+brief is not a provider system prompt or a technical tool restriction. The typed
+[model policy](src/models.ts) owns the initial model choices and effort. Its live-catalog
+snapshot establishes advertised support, not availability or effective effort. These choices
+are evaluation hypotheses, not a ranking proven for this repository.
+
+Routed contracts authorize a finite ordered availability fallback. A replacement needs a
+terminal worker and no live children; it keeps the deadline, source, failed evidence and
+all prior authors. Unknown dispatch outcomes retain ownership. Dispatch reservation grants
+one caller permission to launch; a replay must reconcile the existing attempt. Negative
+reviews enter repair, never model shopping. Old single-target contracts gain no fallback.
+
+Without a current Claude review against GPT-authored work, the approved GPT fallback requires
+an extra fresh reviewer using a GPT model outside every source-author model across attempts
+and repairs. Normal review, adversarial review and audit remain required. Missing eligible
+models end incomplete. The PR discloses model attempts, fallback and unreported effective effort.
 
 The SQLite transaction stores the transition and outstanding action together. An interrupted
 command remains pending. Restarting does not silently rerun it. Immutable artifact writes are

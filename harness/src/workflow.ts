@@ -2,11 +2,11 @@ import { createMachine, transition } from 'xstate';
 import { z } from 'zod';
 import { publishPlan } from './publisher';
 import { reference } from './references';
+import { availability, model, models, role, runtimeTask } from './models';
+export { role } from './models';
 
 const text = z.string().trim().min(1);
 const hash = z.string().regex(/^[a-f0-9]{64}$/);
-export const role = z.enum(['research', 'implementation', 'review', 'adversary', 'audit']);
-const model = z.object({ provider: text, model: text });
 const command = z.object({
   id: text, argv: z.array(text).min(1), cwd: text.default('.'),
   timeoutMs: z.number().int().positive().max(3_600_000),
@@ -21,7 +21,7 @@ export const contract = z.object({
   contextFiles: z.array(text).min(1),
   references: z.array(reference).default([]),
   allowedDependencies: z.array(text).default([]),
-  models: z.object({ research: model, implementation: model, review: model, adversary: model, audit: model }),
+  models,
   limits: z.object({ deadline: z.iso.datetime(), repairRounds: z.number().int().min(0).max(20) }),
   publish: z.discriminatedUnion('kind', [
     z.object({ kind: z.literal('local-only') }),
@@ -38,12 +38,10 @@ export const contract = z.object({
   }
   if ([...value.checks, ...value.auditChecks].some(c => c.id.startsWith('harness:')))
     ctx.addIssue({ code: 'custom', message: 'harness: check ids are reserved for controller gates' });
-  if (value.models.implementation.provider === value.models.review.provider)
-    ctx.addIssue({ code: 'custom', message: 'Implementation and independent review must use different providers' });
 });
 export type Contract = z.infer<typeof contract>;
 export type Role = z.infer<typeof role>;
-const phase = z.enum(['researching', 'intake', 'implementing', 'verifying', 'reviewing', 'adversarial', 'auditing', 'publishable', 'publishing', 'ci', 'ready', 'incomplete', 'cancelled']);
+const phase = z.enum(['researching', 'intake', 'implementing', 'verifying', 'reviewing', 'adversarial', 'auditing', 'diversityReviewing', 'publishable', 'publishing', 'ci', 'ready', 'incomplete', 'cancelled']);
 const artifact = z.object({ path: text, sha256: hash });
 const receipt = z.object({
   id: text, source: hash, artifacts: z.array(artifact).min(1),
@@ -60,6 +58,10 @@ export const assessment = z.object({
 const ticket = z.object({
   id: text, role, target: model,
   claim: z.object({ worker: text, provider: text, model: text }).nullable(),
+  candidateIndex: z.number().int().nonnegative().default(0),
+  sourceAtIssue: hash.nullable().default(null),
+  dispatch: z.object({ coordinator: text, session: text, requestId: text }).nullable().default(null),
+  runtime: runtimeTask.nullable().default(null),
 });
 const legacyPublication = z.object({ kind: z.literal('pull-request'), remote: text, base: text, branch: text })
   .catchall(z.json()).transform(original => ({ kind: 'legacy-pull-request' as const, original }));
@@ -78,6 +80,14 @@ export const task = z.object({
   history: z.array(receipt).default([]),
   referenceEvidence: artifact.nullable().default(null),
   assessments: z.array(z.object({ role, source: hash, worker: text, result: assessment, artifact })),
+  attempts: z.array(z.object({
+    ticket, generation: z.number().int().nonnegative(), sourceAfter: hash,
+    completion: z.discriminatedUnion('kind', [
+      z.object({ kind: z.literal('submitted'), verdict: assessment.shape.verdict, runtime: runtimeTask.nullable() }),
+      z.object({ kind: z.literal('unavailable'), reason: availability, runtime: runtimeTask, detail: text }),
+      z.object({ kind: z.literal('stopped'), reason: text }),
+    ]),
+  })).default([]),
   pending: z.discriminatedUnion('kind', [z.object({ kind: z.literal('none') }),
     z.object({ kind: z.literal('command'), id: text, pid: z.number().int().positive().optional() }),
     z.object({ kind: z.literal('publish'), head: text }),
@@ -97,7 +107,8 @@ const machine = createMachine({
     verifying: { on: { ACCEPT: 'reviewing', REPAIR: 'implementing' } },
     reviewing: { on: { ACCEPT: 'adversarial', REPAIR: 'implementing' } },
     adversarial: { on: { ACCEPT: 'auditing', REPAIR: 'implementing' } },
-    auditing: { on: { ACCEPT: 'publishable', REPAIR: 'implementing' } },
+    auditing: { on: { ACCEPT: 'publishable', DIVERSITY: 'diversityReviewing', REPAIR: 'implementing' } },
+    diversityReviewing: { on: { ACCEPT: 'publishable', REPAIR: 'implementing' } },
     publishable: { on: { PUBLISH: 'publishing' } },
     publishing: { on: { ACCEPT: 'ci' } },
     ci: { on: { ACCEPT: 'ready', REPAIR: 'implementing' } },
@@ -105,7 +116,7 @@ const machine = createMachine({
   },
 });
 
-export function move(current: Task, event: 'ACCEPT' | 'SEAL' | 'REPAIR' | 'PUBLISH' | 'STOP' | 'CANCEL'): Task {
+export function move(current: Task, event: 'ACCEPT' | 'SEAL' | 'REPAIR' | 'PUBLISH' | 'STOP' | 'CANCEL' | 'DIVERSITY'): Task {
   const before = machine.resolveState({ value: current.phase });
   if (!before.can({ type: event })) throw new Error(`Cannot ${event} from ${current.phase}`);
   const [after] = transition(machine, before, { type: event });
@@ -119,6 +130,7 @@ export function roleFor(state: Task['phase']): Role | null {
     case 'reviewing': return 'review';
     case 'adversarial': return 'adversary';
     case 'auditing': return 'audit';
+    case 'diversityReviewing': return 'diversityReview';
     default: return null;
   }
 }
