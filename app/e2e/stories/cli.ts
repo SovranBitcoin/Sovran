@@ -190,15 +190,19 @@ const play = async (
       screen,
       async (index, step) => {
         const file = `${pictureName(index, step.name)}.jpg`;
-        report.steps[index] = { ...step };
+        // A step whose evidence was not retained has not passed, whatever its assertions said.
+        report.steps[index] = {
+          ...step,
+          ok: false,
+          failure: step.failure ?? 'evidence not retained',
+        };
         captures[index] = await screen.picture(join(outDir, file));
-        report.steps[index].screenCapture = captures[index];
         pictures[index] = file;
-        report.steps[index].picture = pictures[index];
         writeFileSync(
           join(outDir, `${pictureName(index, step.name)}.screen.json`),
           JSON.stringify(await link.screen())
         );
+        report.steps[index] = { ...step, picture: file, screenCapture: captures[index] };
       },
       // Whoever hands the person ecash holds it on the simulator's first mint.
       async (what): Promise<Record<string, string>> => {
