@@ -27,6 +27,7 @@ import {
   lstatSync,
   openSync,
   readlinkSync,
+  realpathSync,
   readdirSync,
   readFileSync,
   readSync,
@@ -36,6 +37,7 @@ import {
 } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
+import { z } from 'zod';
 import { ROOT, type Platform } from './plan';
 import type { NativeBuildSummary } from './promote';
 import { resolveAndroidSdkRoot } from '../drivers/android/adb';
@@ -51,18 +53,29 @@ const GENERATED_NATIVE_DIRS = ['ios/**', 'android/**'];
 /** `dev` loads its JavaScript from a bundler; `bundled` carries it. */
 export type BuildKind = 'dev' | 'bundled';
 
-export type NativeBuildStamp = NativeBuildSummary & {
-  version: 1;
-  platform: Platform;
-  kind?: BuildKind;
-  appVariant: 'development';
-  gitDirty: boolean;
-  bundleId: string;
-  artifact: string;
-  toolchain: string;
-  /** Absent on older caches, which cannot certify a bundled rebuild. */
-  sourceFingerprint?: string;
-};
+const nativeBuildStampSchema = z.object({
+  version: z.literal(1),
+  platform: z.enum(['ios', 'android']),
+  kind: z.enum(['dev', 'bundled']).optional(),
+  appVariant: z.literal('development'),
+  gitDirty: z.boolean(),
+  bundleId: z.string().min(1),
+  artifact: z.string().min(1),
+  toolchain: z.string(),
+  fingerprint: z.string().min(1),
+  appVersion: z.string(),
+  buildNumber: z.string(),
+  gitSha: z.string().regex(/^[a-f0-9]{40}$/),
+  builtAt: z.string(),
+  artifactSha256: z
+    .string()
+    .regex(/^[a-f0-9]{64}$/)
+    .optional(),
+  // Older cache records remain readable, but cannot certify bundled source.
+  sourceFingerprint: z.string().optional(),
+  edition: z.string().optional(),
+});
+export type NativeBuildStamp = z.infer<typeof nativeBuildStampSchema>;
 
 export type RebuildPolicy = 'auto' | 'force' | 'never';
 
@@ -113,6 +126,112 @@ export function nativeArtifactHash(artifact: string): string {
   return hash.digest('hex');
 }
 
+/** Compare installed contents without weakening the stamped artifact hash. CoreSimulator
+ * was observed to remove execute permission from embedded framework binaries only. */
+export function inspectInstalledIosApp(selected: string, installed: string) {
+  const selectedPath = realpathSync(selected);
+  const installedPath = realpathSync(installed);
+  if (selectedPath === installedPath) throw new Error('Installed app must be a separate payload');
+  const mismatches: string[] = [];
+  const normalizedModes: { path: string; selected: number; installed: number }[] = [];
+  const buffer = Buffer.allocUnsafe(HASH_CHUNK);
+  const fileHash = (path: string) => {
+    const hash = createHash('sha256');
+    const file = openSync(path, 'r');
+    try {
+      for (let n = readSync(file, buffer); n > 0; n = readSync(file, buffer))
+        hash.update(buffer.subarray(0, n));
+      return hash.digest('hex');
+    } finally {
+      closeSync(file);
+    }
+  };
+  const visit = (path: string) => {
+    const a = join(selectedPath, path),
+      b = join(installedPath, path);
+    // lstat distinguishes dangling links from absent entries; never follow links.
+    const left = lstatSync(a, { throwIfNoEntry: false });
+    const right = lstatSync(b, { throwIfNoEntry: false });
+    if (!left || !right) {
+      mismatches.push(`${path}: missing entry`);
+      return;
+    }
+    if (left.mode !== right.mode) {
+      if (
+        left.isFile() &&
+        right.isFile() &&
+        left.mode === 0o100755 &&
+        right.mode === 0o100644 &&
+        /^Frameworks\/([^/]+)\.framework\/\1$/.test(path)
+      )
+        normalizedModes.push({ path, selected: left.mode, installed: right.mode });
+      else mismatches.push(`${path}: mode or type differs`);
+    }
+    if (left.isDirectory() && right.isDirectory()) {
+      for (const child of [...new Set([...readdirSync(a), ...readdirSync(b)])].sort())
+        visit(path ? `${path}/${child}` : child);
+    } else if (left.isFile() && right.isFile()) {
+      if (fileHash(a) !== fileHash(b)) mismatches.push(`${path}: bytes differ`);
+    } else if (left.isSymbolicLink() && right.isSymbolicLink()) {
+      if (readlinkSync(a) !== readlinkSync(b)) mismatches.push(`${path}: link target differs`);
+    } else mismatches.push(`${path}: unsupported or different entry types`);
+  };
+  visit('');
+  return {
+    selectedPath,
+    installedPath,
+    selectedSha256: nativeArtifactHash(selectedPath),
+    installedSha256: nativeArtifactHash(installedPath),
+    normalizedModes,
+    mismatches,
+  };
+}
+
+/** Read-only selection: never rebuild or silently select a different edition. */
+export async function selectBundledIosStoryApp(artifact: string) {
+  const build = nativeBuildStampSchema.parse(
+    JSON.parse(readFileSync(join(dirname(artifact), 'build.json'), 'utf8'))
+  );
+  if (
+    build.platform !== 'ios' ||
+    build.kind !== 'bundled' ||
+    build.bundleId !== BUNDLE_ID ||
+    !build.artifactSha256 ||
+    realpathSync(build.artifact) !== realpathSync(artifact)
+  )
+    throw new Error('Selected app is not the stamped bundled iOS development build');
+  const assertCurrent = async () => {
+    if (
+      !bundledJavaScriptIsCurrent(build) ||
+      nativeArtifactHash(artifact) !== build.artifactSha256 ||
+      (await nativeFingerprint('ios', 'bundled')) !== build.fingerprint ||
+      !bundledJavaScriptIsCurrent(build)
+    )
+      throw new Error(
+        'Selected iOS build no longer matches current clean source or stamped artifact'
+      );
+  };
+  await assertCurrent();
+  let baseline: ReturnType<typeof inspectInstalledIosApp> | undefined;
+  return {
+    build,
+    async inspect(installed: string) {
+      await assertCurrent();
+      const payload = inspectInstalledIosApp(artifact, installed);
+      if (payload.selectedSha256 !== build.artifactSha256)
+        payload.mismatches.push('Selected artifact changed during inspection');
+      if (
+        baseline &&
+        (payload.installedPath !== baseline.installedPath ||
+          payload.installedSha256 !== baseline.installedSha256)
+      )
+        payload.mismatches.push('Installed app changed since the pre-launch inspection');
+      if (!baseline && payload.mismatches.length === 0) baseline = payload;
+      return payload;
+    },
+  };
+}
+
 export async function nativeFingerprint(
   platform: Platform,
   kind: BuildKind = 'dev'
@@ -155,7 +274,9 @@ const stampPath = (platform: Platform, kind: BuildKind) =>
 
 function readStamp(platform: Platform, kind: BuildKind = 'dev'): NativeBuildStamp | undefined {
   try {
-    const stamp = JSON.parse(readFileSync(stampPath(platform, kind), 'utf8')) as NativeBuildStamp;
+    const stamp = nativeBuildStampSchema.parse(
+      JSON.parse(readFileSync(stampPath(platform, kind), 'utf8'))
+    );
     return stamp.version === 1 && stamp.platform === platform ? stamp : undefined;
   } catch {
     return undefined;

@@ -20,6 +20,17 @@ and permission overrides are unsupported. Both lanes retain screenshots, control
 installed-APK comparison and cleanup evidence. See [builds and evidence limits](../README.md#builds-are-part-of-the-evidence).
 Neither lane currently supplies a controller-bound native receipt.
 
+For a fresh iOS story, add `--bundled` to the `--udid … --app …` command above. Use a
+disposable, unfunded simulator: this command resets its app state and keychain. The selected
+app must have its adjacent build stamp, including for an edition build. The runner checks
+current clean source, the selected artifact and the installed payload before launch and
+afterward. Only the observed framework executable permission normalization is allowed;
+other content or permission differences fail the run. Both observations remain in the attempt.
+This bounded mode does not reuse earlier reports or support saved-state stories, fixture
+inputs, links or permission overrides. Without the flag, iOS keeps its existing unbound
+story/saved-state behavior. Neither mode certifies device performance or controller readiness.
+
+
 Each play has its own session identity, checked against the app's hello before accepting
 logs or sending requests. A profile restart may reconnect to that same session. The attempt
 keeps the hello and all received log entries, including those outside step windows; this

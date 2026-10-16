@@ -1,8 +1,23 @@
 import { describe, expect, test } from 'bun:test';
-import { bundledJavaScriptIsCurrent, nativeBuildEnvironment } from './native-build';
+import {
+  bundledJavaScriptIsCurrent,
+  inspectInstalledIosApp,
+  nativeArtifactHash,
+  selectBundledIosStoryApp,
+  nativeBuildEnvironment,
+} from './native-build';
 
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  cpSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -145,3 +160,125 @@ describe('native build environment', () => {
     expect(env.APP_VARIANT).toBe('development');
   });
 });
+
+describe('installed iOS payload identity', () => {
+  const fixture = (run: (selected: string, installed: string) => void) => {
+    const root = mkdtempSync(join(tmpdir(), 'installed-ios-'));
+    const selected = join(root, 'Selected.app'),
+      installed = join(root, 'Installed.app');
+    try {
+      mkdirSync(join(selected, 'Frameworks/Example.framework'), { recursive: true });
+      writeFileSync(join(selected, 'Frameworks/Example.framework/Example'), 'framework bytes', {
+        mode: 0o755,
+      });
+      writeFileSync(join(selected, 'Sovran'), 'app executable', { mode: 0o755 });
+      writeFileSync(join(selected, 'main.jsbundle'), 'bundled wallet');
+      symlinkSync('main.jsbundle', join(selected, 'bundle-link'));
+      cpSync(selected, installed, { recursive: true, verbatimSymlinks: true });
+      run(selected, installed);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  };
+
+  test('identical app and narrowly normalized framework keep distinct full hashes', () =>
+    fixture((a, b) => {
+      expect(inspectInstalledIosApp(a, b).mismatches).toEqual([]);
+      chmodSync(join(b, 'Frameworks/Example.framework/Example'), 0o644);
+      const result = inspectInstalledIosApp(a, b);
+      expect(result.mismatches).toEqual([]);
+      expect(result.normalizedModes).toEqual([
+        { path: 'Frameworks/Example.framework/Example', selected: 0o100755, installed: 0o100644 },
+      ]);
+      expect(result.selectedSha256).toBe(nativeArtifactHash(a));
+      expect(result.installedSha256).toBe(nativeArtifactHash(b));
+      expect(result.selectedSha256).not.toBe(result.installedSha256);
+      expect(() => inspectInstalledIosApp(a, a)).toThrow('separate payload');
+    }));
+
+  test.each([
+    'changed bytes',
+    'extra file',
+    'missing file',
+    'changed link',
+    'changed type',
+    'main executable mode',
+    'framework wrong mode',
+    'framework reverse mode',
+  ])('rejects %s even when the framework has a legitimate permission change', (fault) =>
+    fixture((a, b) => {
+      const framework = 'Frameworks/Example.framework/Example';
+      chmodSync(join(b, framework), 0o644);
+      switch (fault) {
+        case 'changed bytes':
+          writeFileSync(join(b, framework), 'different wallet code');
+          break;
+        case 'extra file':
+          writeFileSync(join(b, 'extra'), 'new');
+          break;
+        case 'missing file':
+          rmSync(join(b, 'main.jsbundle'));
+          break;
+        case 'changed link':
+          rmSync(join(b, 'bundle-link'));
+          symlinkSync('Sovran', join(b, 'bundle-link'));
+          break;
+        case 'changed type':
+          rmSync(join(b, 'main.jsbundle'));
+          mkdirSync(join(b, 'main.jsbundle'));
+          break;
+        case 'main executable mode':
+          chmodSync(join(b, 'Sovran'), 0o644);
+          break;
+        case 'framework wrong mode':
+          chmodSync(join(b, framework), 0o600);
+          break;
+        case 'framework reverse mode':
+          chmodSync(join(a, framework), 0o644);
+          chmodSync(join(b, framework), 0o755);
+          break;
+      }
+      const result = inspectInstalledIosApp(a, b);
+      expect(result.mismatches.length).toBeGreaterThan(0);
+      expect(result.selectedSha256).not.toBe(result.installedSha256);
+    })
+  );
+});
+
+test.each(['dev', 'android', 'production', 'wrong path', 'missing hash', 'old source'])(
+  'bundled iOS selection rejects %s before touching a device',
+  async (fault) => {
+    const root = mkdtempSync(join(tmpdir(), 'ios-selection-'));
+    const artifact = join(root, 'Sovran.app');
+    try {
+      mkdirSync(artifact);
+      writeFileSync(join(artifact, 'main.jsbundle'), 'stale selected bundle');
+      const stamp = {
+        version: 1,
+        platform: fault === 'android' ? 'android' : 'ios',
+        kind: fault === 'dev' ? 'dev' : 'bundled',
+        appVariant: 'development',
+        bundleId: fault === 'production' ? 'com.sovranbitcoin' : 'com.sovranbitcoin.dev',
+        artifact: fault === 'wrong path' ? root : artifact,
+        toolchain: 'test',
+        fingerprint: 'old-native',
+        appVersion: '1',
+        buildNumber: '1',
+        gitSha: '0'.repeat(40),
+        gitDirty: false,
+        builtAt: '2026-10-16',
+        sourceFingerprint: 'old-source',
+        edition: 'full',
+        ...(fault === 'missing hash' ? {} : { artifactSha256: nativeArtifactHash(artifact) }),
+      };
+      writeFileSync(join(root, 'build.json'), JSON.stringify(stamp));
+      await expect(selectBundledIosStoryApp(artifact)).rejects.toThrow(
+        fault === 'old source'
+          ? 'no longer matches current clean source'
+          : 'not the stamped bundled iOS development build'
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+);

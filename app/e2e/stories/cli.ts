@@ -20,7 +20,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import {
   attemptDirectory,
   createStoryRun,
@@ -46,6 +46,7 @@ import { makePerson } from './person';
 import { storySimulator } from './simulator';
 import { madeFrom, reachState } from './states';
 import { storySchema, type Story } from './story';
+import { selectBundledIosStoryApp } from '../press/native-build';
 
 const args = process.argv.slice(2);
 const flags = args[0]?.startsWith('--') ? args : args.slice(1);
@@ -57,6 +58,8 @@ const flag = (name: string) => {
 const udid = flag('udid');
 const appPath = flag('app');
 const onlyState = flag('state');
+const bundled = flags.includes('--bundled');
+let boundApp: Awaited<ReturnType<typeof selectBundledIosStoryApp>> | undefined;
 const platform = flag('platform') ?? 'ios';
 if (platform === 'android') {
   const androidFlags = flags.filter((value) => value !== '--bundled');
@@ -120,7 +123,8 @@ const play = async (
   story: Story,
   outDir: string,
   look: boolean,
-  person: ReturnType<typeof makePerson>
+  person: ReturnType<typeof makePerson>,
+  sourceText?: string
 ): Promise<boolean> => {
   if (existsSync(join(outDir, 'report.json')))
     throw new Error(`Evidence already exists: ${outDir}`);
@@ -137,7 +141,23 @@ const play = async (
     (ReturnType<typeof storyReportSchema.parse> & { screenWatcherRestarts?: number }) | undefined;
   const failures: { operation: string; error: unknown }[] = [];
   try {
-    writeFileSync(join(outDir, 'session.json'), JSON.stringify({ expected, story: story.id }));
+    const executedStory = JSON.stringify(story, null, 2);
+    writeFileSync(join(outDir, 'story.json'), executedStory);
+    if (sourceText) writeFileSync(join(outDir, 'source-story.json'), sourceText);
+    const session = {
+      expected,
+      story: story.id,
+      storySha256: createHash('sha256').update(executedStory).digest('hex'),
+      sourceStorySha256: sourceText ? createHash('sha256').update(sourceText).digest('hex') : null,
+      build: boundApp?.build,
+      evidenceClass: bundled ? 'ios-bundled-functional' : 'ios-unbound-story',
+    };
+    writeFileSync(join(outDir, 'session.json'), JSON.stringify(session));
+    if (boundApp) {
+      const payload = await boundApp.inspect(simulator.installedApp());
+      writeFileSync(join(outDir, 'payload-before.json'), JSON.stringify(payload, null, 2));
+      if (payload.mismatches.length) throw new Error(payload.mismatches.join('; '));
+    }
     recording = await recordSimulator(udid, rawVideo);
     const screen = createScreenWatch({
       now: () => performance.now(),
@@ -149,10 +169,7 @@ const play = async (
     simulator.launch({ url: link.url, run });
     spentOn('launch');
     const hello = await link.connected(20_000);
-    writeFileSync(
-      join(outDir, 'session.json'),
-      JSON.stringify({ expected, story: story.id, hello })
-    );
+    writeFileSync(join(outDir, 'session.json'), JSON.stringify({ ...session, hello }));
     spentOn('appConnected');
     const pictures: (string | undefined)[] = [];
     const result = await playStory(
@@ -163,6 +180,10 @@ const play = async (
       async (index, step) => {
         const file = `${pictureName(index, step.name)}.jpg`;
         if (await watching.picture(join(outDir, file))) pictures[index] = file;
+        writeFileSync(
+          join(outDir, `${pictureName(index, step.name)}.screen.json`),
+          JSON.stringify(await link.screen())
+        );
       },
       // Whoever hands the person ecash holds it on the simulator's first mint.
       async (what): Promise<Record<string, string>> => {
@@ -260,6 +281,15 @@ const play = async (
       ['stop frames', () => frames?.stop()],
       ['stop recording', () => recording?.stop()],
       ['terminate app', () => simulator.terminate()],
+      [
+        'verify installed build',
+        async () => {
+          if (!boundApp) return;
+          const payload = await boundApp.inspect(simulator.installedApp());
+          writeFileSync(join(outDir, 'payload-after.json'), JSON.stringify(payload, null, 2));
+          if (payload.mismatches.length) throw new Error(payload.mismatches.join('; '));
+        },
+      ],
       ['close link', () => link.close()],
       [
         'retain received logs',
@@ -319,7 +349,7 @@ const play = async (
  * started from where their folder was left (put back with the wallet's state), and stopped afterwards so
  * the folder can be saved or put back again.
  */
-const playWithMint = async (story: Story, outDir: string, look: boolean) => {
+const playWithMint = async (story: Story, outDir: string, look: boolean, sourceText?: string) => {
   // Someone else for the story to pay, with a key made for this play alone.
   const person = makePerson();
   const usesMint = /\{\{mint|"handed"/.test(JSON.stringify(story));
@@ -331,7 +361,7 @@ const playWithMint = async (story: Story, outDir: string, look: boolean) => {
   try {
     const [mint, mint2] = privateMintAddresses(udid);
     const ready = await withGiven(story, { mint: mint.url, mint2: mint2.url, person: person.npub });
-    return await play(ready, outDir, look, person);
+    return await play(ready, outDir, look, person, sourceText);
   } finally {
     person.leave();
     stopMint();
@@ -366,6 +396,20 @@ const previousEvidence = (id: string): string | undefined => {
 let ok = false;
 let failure: string | undefined;
 try {
+  if (bundled) {
+    if (
+      !story ||
+      onlyState ||
+      story.startsFrom !== 'fresh' ||
+      story.given ||
+      story.allow?.length ||
+      story.steps.some((step) => step.handed || step.open)
+    )
+      throw new Error(
+        'Bound iOS stories require fresh state without inputs, links or permission overrides'
+      );
+    boundApp = await selectBundledIosStoryApp(appPath);
+  }
   const actions = {
     hasState: simulator.hasState,
     startFrom: (state: string) => simulator.startFrom(appPath, state),
@@ -378,10 +422,9 @@ try {
     ok = true;
   } else {
     const endsIn = madeFrom(story, storyText);
-    const earlierEvidence = reusableEvidence(
-      simulator.hasState(story.id, endsIn),
-      previousEvidence(story.id)
-    );
+    const earlierEvidence =
+      !bundled &&
+      reusableEvidence(simulator.hasState(story.id, endsIn), previousEvidence(story.id));
     if (earlierEvidence) {
       // Already played on this simulator, as the start of another story. Playing
       // it again would take the wallet back in time, and a mint refuses secrets
@@ -397,7 +440,7 @@ try {
       await reachState(story.startsFrom, actions);
       for (const service of story.allow ?? []) simulator.allow(service);
       spentOn('startState');
-      ok = await playWithMint(story, outDir, flags.includes('--look'));
+      ok = await playWithMint(story, outDir, flags.includes('--look'), storyText);
       // Where it ended is kept, so a story that starts from here does not play this one again.
       if (ok) await simulator.saveState(story.id, endsIn);
       spentOn('saveState');
@@ -409,6 +452,7 @@ try {
       .join(', ')
   );
 } catch (error) {
+  ok = false;
   failure = error instanceof Error ? error.message : String(error);
   console.log(
     `FAIL  ${story?.id ?? onlyState}: ${error instanceof Error ? error.message : String(error)}`

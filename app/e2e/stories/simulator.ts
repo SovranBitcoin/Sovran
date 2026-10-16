@@ -88,6 +88,8 @@ interface StorySimulator extends TouchDevice {
   /** Start the app, telling it where its runner listens. */
   launch(runner: { url: string; run: string }): void;
   terminate(): void;
+  /** The installed bundle, not the app's mutable data container. */
+  installedApp(): string;
   /** Watch the screen, calling back each time the picture on it changes. */
   watchScreen(onChange: () => void): ScreenFrames;
 }
@@ -160,6 +162,7 @@ export function storySimulator(udid: string): StorySimulator {
     throw new Error(`The simulator's ${label} did not stop.`);
   };
   return {
+    installedApp: () => simctl('get_app_container', udid, BUNDLE_ID, 'app'),
     async startFrom(appPath, state) {
       simctl('bootstatus', udid, '-b');
       this.terminate();
