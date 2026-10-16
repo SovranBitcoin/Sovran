@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { z } from 'zod';
 import { git } from './workspace';
+import { risksForPaths } from './policy';
 import type { Task } from './workflow';
 
 const text = z.string().trim().min(1);
@@ -63,7 +64,7 @@ export function validateHistory(t: Task, role: string, result: Task['assessments
       inspectHistoricalReference(t, `git:${t.base}:${entry.owner}`);
       for (const inquiry of [entry.changes, entry.callersAndTests, entry.priorPRs, entry.followups])
         for (const citation of inquiry.evidence) inspect(citation);
-      if (entry.intent === 'unknown' && t.contract.risks.some(r => r === 'payments' || r === 'persistence'))
+      if (entry.intent === 'unknown' && risksForPaths(policy.paths, t.contract.risks).some(r => r === 'payments' || r === 'persistence'))
         throw new Error('Unknown historical protection cannot authorize money or persistence edits');
     }
   }

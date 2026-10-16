@@ -157,7 +157,9 @@ export class Controller {
         }
       }
       if (new Set(result.findings.map(f => f.id)).size !== result.findings.length) throw new Error('Duplicate finding IDs');
-      validateHistory(t, role, result, inspectChange(t.root, t.base, t.contract).changed, reference => this.inspectReference(t, reference));
+      const changed = t.contract.historyPolicy && result.verdict === 'pass'
+        ? inspectChange(t.root, t.base, t.contract).changed : [];
+      validateHistory(t, role, result, changed, reference => this.inspectReference(t, reference));
       validateResolutions(t, role, worker, result, reference => this.inspectReference(t, reference));
       for (const observation of result.observations) this.inspectReference(t, observation.evidence);
       for (const finding of result.findings) this.inspectReference(t, finding.evidence);

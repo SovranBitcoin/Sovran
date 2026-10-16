@@ -56,10 +56,14 @@ export function inspectChange(root: string, base: string, spec: Pick<Contract, '
       git(root, ['ls-tree', '--name-only', base, '--', path]) === path)
       problems.push(`Historical check input must be settled before sealing: ${path}`);
   }
-  const risks = new Set(spec.risks);
+  return { changed, problems, risks: risksForPaths(changed, spec.risks) };
+}
+
+export function risksForPaths(changed: string[], declared: Contract['risks']) {
+  const risks = new Set(declared);
   // Conservative routing. A missed storage dependency is worse than an extra upgrade run.
   if (changed.some(p => /^(wallet\/|app\/)|(^|\/)(package\.json|bun\.lock)$/.test(p))) risks.add('persistence');
   if (changed.some(p => /^wallet\//.test(p) || /^app\/shared\/lib\/(cashu|nostr)\//.test(p))) risks.add('payments');
   if (changed.some(p => /^app\/(app|features|shared\/(components|ui|hooks))\//.test(p))) risks.add('ui');
-  return { changed, problems, risks: [...risks] };
+  return [...risks];
 }

@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { readFileSync, writeFileSync, unlinkSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { fixture } from './controller.test';
 import { Controller } from '../src/controller';
@@ -97,4 +97,22 @@ test('planned paths cannot add authority and completed history cannot omit its s
   expect(() => c.create(root, { ...spec, historyPolicy: { version: 1, paths: ['source.txt', 'source.txt'] } })).toThrow('unique');
   const t = c.create(root, { ...spec, historyPolicy: { version: 1, paths: ['source.txt'] } });
   expect(() => submit(c, t.id, { history: [{ ...investigation(t), changes: { status: 'complete', explanation: 'Claimed complete without retrieval', evidence: [] } }] })).toThrow('Completed investigation needs evidence');
+});
+
+test('path-inferred money risk cannot bypass unknown historical protection with an empty declared risk list', () => {
+  const { controller: c, root, spec } = fixture();
+  mkdirSync(join(root, 'wallet')); writeFileSync(join(root, 'wallet', 'guard.ts'), 'export const guard = true;');
+  git(root, ['add', '.']); git(root, ['commit', '-qm', 'Preserve payment guard']);
+  const t = c.create(root, { ...spec, scope: ['wallet/guard.ts'], risks: [], historyPolicy: { version: 1, paths: ['wallet/guard.ts'] } });
+  expect(() => submit(c, t.id, { history: [{ ...investigation(t, 'wallet/guard.ts'), owner: 'wallet/guard.ts', intent: 'unknown' }] })).toThrow('Unknown historical protection');
+});
+
+test('a failed legacy implementation can retain its outcome even when its edited manifest is invalid', () => {
+  const { controller: c, root, spec } = fixture();
+  let t = submit(c, c.create(root, { ...spec, scope: ['package.json'] }).id);
+  t = c.seal(t.id, t.policy);
+  writeFileSync(join(root, 'package.json'), 'invalid unfinished JSON');
+  t = submit(c, t.id, { verdict: 'inconclusive', summary: 'Interrupted manifest edit; source preserved for investigation' });
+  expect(t.phase).toBe('incomplete');
+  expect(t.assessments.at(-1)?.result.summary).toContain('Interrupted manifest edit');
 });
