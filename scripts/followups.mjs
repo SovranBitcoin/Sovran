@@ -123,13 +123,18 @@ function readReadme() {
 }
 
 function scannedFiles() {
-  const out = execFileSync("git", ["ls-files", "-co", "--exclude-standard"], {
-    cwd: ROOT,
-    encoding: "utf8",
-    maxBuffer: 64 << 20,
-  });
+  // NUL-separated, because git quotes a name holding a tab, a newline or a non-ASCII byte.
+  const out = execFileSync(
+    "git",
+    ["ls-files", "-z", "-co", "--exclude-standard"],
+    {
+      cwd: ROOT,
+      encoding: "utf8",
+      maxBuffer: 64 << 20,
+    },
+  );
   return out
-    .split("\n")
+    .split("\0")
     .filter(
       (f) =>
         (PROSE.test(f) || CODE.test(f)) &&
