@@ -11,7 +11,7 @@ Run `bun run harness request.json`, or pipe a request to `bun run harness -`.
 `bun run harness mcp` serves the same operations over stdio using the official MCP SDK.
 The controller never merges or deploys.
 
-The [reliability research and proposed model policy](../docs/research/full-send-reliability.md)
+The [reliability research and model-policy rationale](../docs/research/full-send-reliability.md)
 define the next improvements. They distinguish approved choices from gates implemented here.
 
 Use the repository's `full-send` skill from an existing T3 conversation. It performs the
@@ -58,7 +58,12 @@ backdating research or silently changing the sealed plan. Old records stay reada
 claiming this stronger history coverage. Historical citations can name removed files at an
 exact ancestor revision.
 
-Context is copied before execution, with hashes. Routing uses the exact planned paths when
+Context is copied before execution, with hashes. Authority and skill procedures stay in the
+brief. Large reference documents use exact JSON Pointers into that original private snapshot,
+so workers can read applicable guidance without copying the whole catalogue into every prompt.
+Snapshot references are verified on every brief; editing a live document does not replace the
+sealed text. This reduces prompt size, not the obligation to investigate relevant rules.
+Routing uses the exact planned paths when
 available, preserving declared and inferred risk obligations. Native execution receives the
 superseding story ADR as well as the older custody rules; component tests receive their
 declared library version's reference. Per-role briefs point at existing skills and platform

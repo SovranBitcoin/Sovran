@@ -232,7 +232,8 @@ test('role context keeps the original instructions after implementation edits th
   let t = finish(c, c.create(root, spec)); t = c.seal(t.id, t.policy);
   writeFileSync(join(root, 'source.txt'), 'new instructions');
   c.next(t.id);
-  expect(c.brief(t.id).packet.context[0]?.content).toBe('original');
+  const context = c.brief(t.id).packet.context[0];
+  expect(context?.delivery === 'inline' && context.content).toBe('original');
 });
 
 test('a green generic command cannot certify functional UI or performance', async () => {

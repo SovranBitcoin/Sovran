@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
-import { mkdirSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { join, relative } from 'node:path';
 import { fixture } from './controller.test';
 import { contextPaths } from '../src/context';
 import { Controller } from '../src/controller';
@@ -84,7 +84,51 @@ test('explicit risks survive focused routing and selected contents survive resta
   const resumed = new Controller(state);
   try {
     expect(resumed.brief(t.id).packet.context).toEqual(before);
-    expect(before.find(p => p.path === 'AGENTS.md')?.content).toBe('Keep the sealed original rules');
-    expect(before.find(p => p.path.includes('0033-'))?.content).toContain('Original rule');
+    expect(before.filter(p => p.delivery === 'inline').find(p => p.path === 'AGENTS.md')?.content).toBe('Keep the sealed original rules');
+    expect(before.filter(p => p.delivery === 'inline').find(p => p.path.includes('0033-'))?.content).toContain('Original rule');
   } finally { resumed.close(); }
+});
+
+
+test('large references stay readable from their sealed snapshot without flooding each brief', () => {
+  const { root, spec, state, controller: c } = fixture();
+  const path = 'docs/reference.md';
+  const original = 'Historical protection that must survive.\n'.repeat(2400);
+  mkdirSync(join(root, 'docs'));
+  writeFileSync(join(root, path), original);
+  git(root, ['add', '.']); git(root, ['commit', '-qm', 'Large reference']);
+  const t = c.next(c.create(root, { ...spec, contextFiles: ['source.txt', path] }).id);
+  const before = c.brief(t.id).packet.context;
+  expect(Buffer.byteLength(JSON.stringify(before))).toBeLessThan(Buffer.byteLength(original));
+  const reference = before.find(item => item.path === path);
+  expect(reference?.delivery).toBe('snapshot');
+  if (reference?.delivery !== 'snapshot') throw new Error('Expected a sealed reference');
+  const index = Number(reference.snapshot.pointer.split('/')[1]);
+  expect(JSON.parse(readFileSync(reference.snapshot.file, 'utf8'))[index].content).toBe(original);
+  writeFileSync(join(root, path), 'Later edits must not replace the reference');
+  const resumed = new Controller(relative(process.cwd(), state));
+  try { expect(resumed.brief(t.id).packet.context).toEqual(before); }
+  finally { resumed.close(); }
+  const saved = JSON.parse(readFileSync(reference.snapshot.file, 'utf8'));
+  saved[index].content = 'Corrupted snapshot';
+  writeFileSync(reference.snapshot.file, JSON.stringify(saved));
+  expect(() => c.brief(t.id)).toThrow('Sealed context snapshot is missing or changed');
+});
+
+
+test('authority and skill procedures remain inline even when large', () => {
+  const { root, spec, controller: c } = fixture();
+  const paths = ['docs/AGENTS.md', '.agents/skills/task/SKILL.md'];
+  const content = 'Preserve this required procedure. '.repeat(3000);
+  for (const path of paths) {
+    mkdirSync(join(root, path, '..'), { recursive: true });
+    writeFileSync(join(root, path), content);
+  }
+  git(root, ['add', '.']); git(root, ['commit', '-qm', 'Required procedures']);
+  const t = c.next(c.create(root, { ...spec, contextFiles: paths }).id);
+  const context = c.brief(t.id).packet.context;
+  for (const path of paths) {
+    const item = context.find(item => item.path === path);
+    expect(item?.delivery === 'inline' && item.content).toBe(content);
+  }
 });

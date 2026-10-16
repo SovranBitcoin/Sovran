@@ -1,4 +1,4 @@
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { readFileSync } from 'node:fs';
 import { z } from 'zod';
 import { digest, fileEvidence } from './workspace';
@@ -17,33 +17,42 @@ const duties: Record<Role, string> = {
 
 export function brief(t: Task, stateDir: string) {
   if (!t.ticket) throw new Error('Issue a role ticket first');
-  if (!t.referenceEvidence || fileEvidence(join(stateDir, t.id), t.referenceEvidence.path).sha256 !== t.referenceEvidence.sha256)
+  const taskDir = resolve(stateDir, t.id);
+  if (!t.referenceEvidence || fileEvidence(taskDir, t.referenceEvidence.path).sha256 !== t.referenceEvidence.sha256)
     throw new Error('Pinned reference snapshot is missing or changed');
-  const contextFile = join(stateDir, t.id, '0-intake-context.json');
-  const context = z.array(z.object({ path: z.string(), sha256: z.string(), content: z.string() }))
+  const contextFile = join(taskDir, '0-intake-context.json');
+  const snapshots = z.array(z.object({ path: z.string(), sha256: z.string(), content: z.string() }))
     .parse(JSON.parse(readFileSync(contextFile, 'utf8')));
-  for (const item of t.context) {
-    const snapshot = context.find(c => c.path === item.path);
+  const context = t.context.map(item => {
+    const index = snapshots.findIndex(c => c.path === item.path);
+    const snapshot = snapshots[index];
     if (!snapshot || snapshot.sha256 !== item.sha256 || digest(snapshot.content) !== item.sha256)
       throw new Error('Sealed context snapshot is missing or changed');
-  }
+    // Authority and skill procedures stay inline. Large reference documents are
+    // read from the same verified snapshot, never substituted with live files.
+    if (/^(?:app\/)?docs\//.test(item.path) && !/(?:^|\/)(?:AGENTS|SKILL)\.md$/.test(item.path) && Buffer.byteLength(snapshot.content) > 8192)
+      return { delivery: 'snapshot' as const, path: item.path, sha256: item.sha256,
+        snapshot: { file: contextFile, pointer: `/${index}/content` } };
+    return { delivery: 'inline' as const, ...snapshot };
+  });
   const artifacts = assessmentArtifacts(t, t.ticket.role).map(item => {
-    if (fileEvidence(join(stateDir, t.id), item.path).sha256 !== item.sha256) throw new Error('Evidence changed');
-    return { ...item, absolutePath: join(stateDir, t.id, item.path) };
+    if (fileEvidence(taskDir, item.path).sha256 !== item.sha256) throw new Error('Evidence changed');
+    return { ...item, absolutePath: join(taskDir, item.path) };
   });
   const research = t.assessments.filter(a => a.role === 'research' && a.result.verdict === 'pass').map(a => {
-    if (fileEvidence(join(stateDir, t.id), a.artifact.path).sha256 !== a.artifact.sha256)
+    if (fileEvidence(taskDir, a.artifact.path).sha256 !== a.artifact.sha256)
       throw new Error('Research evidence changed');
     return { source: a.source, artifact: a.artifact, result: a.result };
   });
   if (['implementation', 'audit'].includes(t.ticket.role)) {
     for (const item of [...obligations(t).map(o => o.origin), ...proposals(t).map(p => p.artifact)])
-      if (fileEvidence(join(stateDir, t.id), item.path).sha256 !== item.sha256) throw new Error('Reconciliation evidence changed');
+      if (fileEvidence(taskDir, item.path).sha256 !== item.sha256) throw new Error('Reconciliation evidence changed');
   }
   const packet = {
     task: t.id, ticket: t.ticket.id, policy: t.policy, source: t.source,
     root: t.root, base: t.base, role: t.ticket.role, target: t.ticket.target,
     instructions: `${duties[t.ticket.role]} No user questions after sealing. No nested delegation. If blocked, return inconclusive with the missing prerequisite. Host access is trusted; role text does not restrict tools. Return assessment JSON matching harness/src/workflow.ts. Include a specific inspection for every supplied artifact, with its hash. Do not invent evidence.`,
+    contextInstructions: 'Inline context is supplied below. Before making a decision, read applicable snapshot references from their absolute JSON file at the given JSON Pointer. Verify the extracted content against its sha256. References contain the sealed original content, not the current checkout. Use the reference path to identify relevance; record missing or contradictory guidance instead of ignoring it. Do not load the entire snapshot into the prompt when extracting one reference.',
     contract: t.contract, context, artifacts, research, repairReason: t.ticket.role === 'implementation' ? t.reason : '',
     attempts: t.attempts.map(a => ({ ticket: a.ticket.id, role: a.ticket.role, target: a.ticket.target,
       worker: a.ticket.claim?.worker ?? null, generation: a.generation, sourceBefore: a.ticket.sourceAtIssue,
@@ -54,7 +63,7 @@ export function brief(t: Task, stateDir: string) {
     researchScope: 'Research describes its recorded source, not the current candidate. Recheck claims against changed code. It is context, never implementation or test proof. Reviewers must reach their own conclusions.',
     assessmentSchema: z.toJSONSchema(assessment),
     referenceFormat: 'observations.evidence and findings.evidence must be a repository-relative file path, artifact:<saved artifact filename>, or git:<full ancestor commit>:<relative file> for historical/deleted evidence. Put explanations and line/frame details in observation/detail, never in the path. Copy hashes from the packet; do not guess them.',
-    referenceSnapshot: join(stateDir, t.id, '0-references.json'),
+    referenceSnapshot: join(taskDir, '0-references.json'),
     relatedProjects: Object.values(projects),
     reconciliation: ['implementation', 'audit'].includes(t.ticket.role) ? {
       obligations: obligations(t), proposals: proposals(t),
