@@ -162,6 +162,18 @@ test('Claude-only completion needs an extra review by a Claude model outside the
   t = completed(c, t); expect(t.phase).toBe('publishable');
 });
 
+test('Claude-only approval alone reaches the extra review with GPT-only off', async () => {
+  const { controller: c, root, spec } = fixture();
+  const models = { ...claudeOnlyModels(true), allowGptOnly: false };
+  let t = completed(c, c.create(root, { ...spec, historyPolicy: { version: 1, paths: ['source.txt'] }, verificationPolicy: fixtureVerification, models }));
+  t = c.seal(t.id, t.policy); t = quota(c, t); t = completed(c, t); t = await c.verify(t.id);
+  t = completed(c, t); t = completed(c, t);
+  t = await c.verify(t.id, true); t = completed(c, t);
+  expect(t.phase).toBe('diversityReviewing');
+  expect(c.next(t.id).ticket?.target.model).toBe('claude-fable-5-1');
+  t = completed(c, t); expect(t.phase).toBe('publishable');
+});
+
 test('a GPT-only policy sealed before Claude-only approval cannot finish on a Claude extra review', async () => {
   const { controller: c, root, spec } = fixture();
   const { allowClaudeOnly: _absent, ...models } = claudeOnlyModels(false);
