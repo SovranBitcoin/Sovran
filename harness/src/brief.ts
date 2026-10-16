@@ -28,11 +28,17 @@ export function brief(t: Task, stateDir: string) {
     if (fileEvidence(join(stateDir, t.id), item.path).sha256 !== item.sha256) throw new Error('Evidence changed');
     return { ...item, absolutePath: join(stateDir, t.id, item.path) };
   });
+  const research = t.assessments.filter(a => a.role === 'research' && a.result.verdict === 'pass').map(a => {
+    if (fileEvidence(join(stateDir, t.id), a.artifact.path).sha256 !== a.artifact.sha256)
+      throw new Error('Research evidence changed');
+    return { source: a.source, artifact: a.artifact, result: a.result };
+  });
   const packet = {
     task: t.id, ticket: t.ticket.id, policy: t.policy, source: t.source,
     root: t.root, base: t.base, role: t.ticket.role, target: t.ticket.target,
     instructions: `${duties[t.ticket.role]} No user questions after sealing. No nested delegation. If blocked, return inconclusive with the missing prerequisite. Host access is trusted; role text does not restrict tools. Return assessment JSON matching harness/src/workflow.ts. Include a specific inspection for every supplied artifact, with its hash. Do not invent evidence.`,
-    contract: t.contract, context, artifacts, repairReason: t.reason,
+    contract: t.contract, context, artifacts, research, repairReason: t.reason,
+    researchScope: 'Research describes its recorded source, not the current candidate. Recheck claims against changed code. It is context, never implementation or test proof. Reviewers must reach their own conclusions.',
     assessmentSchema: z.toJSONSchema(assessment),
     referenceFormat: 'observations.evidence and findings.evidence must be a repository-relative file path or artifact:<saved artifact filename>. Put explanations and line/frame details in observation/detail, never in the path. Copy hashes from the packet; do not guess them.',
     referenceSnapshot: join(stateDir, t.id, '0-references.json'),

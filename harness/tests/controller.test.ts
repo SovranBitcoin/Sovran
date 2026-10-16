@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from 'bun:test';
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Controller } from '../src/controller';
@@ -62,6 +62,65 @@ test('a different worker cannot claim a ticket after controller restart', () => 
   try {
     expect(() => resumed.claim(t.id, ticket.id, 'worker-2', 'codex', 'luna')).toThrow('already claimed');
     expect(resumed.next(t.id).ticket?.claim?.worker).toBe('worker-1');
+  } finally { resumed.close(); }
+});
+
+test('findings need real file evidence before a submission can advance', () => {
+  const { controller: c, root, spec } = fixture();
+  const t = c.next(c.create(root, spec).id);
+  const ticket = t.ticket;
+  if (!ticket) throw new Error('Missing ticket');
+  c.claim(t.id, ticket.id, 'researcher', ticket.target.provider, ticket.target.model);
+  const finding = { id: 'followup', severity: 'follow-up', detail: 'Consider simplifying the source' };
+  for (const evidence of ['missing.txt', '.', join(root, 'source.txt'), 'artifact:unregistered.json']) {
+    expect(() => c.submit(t.id, ticket.id, 'researcher', {
+      ...report, findings: [{ ...finding, evidence }],
+    })).toThrow();
+    expect(c.read(t.id).phase).toBe('researching');
+    expect(c.read(t.id).assessments).toEqual([]);
+  }
+  expect(c.submit(t.id, ticket.id, 'researcher', {
+    ...report, findings: [{ ...finding, evidence: 'source.txt' }],
+  }).phase).toBe('intake');
+});
+
+test('artifact citations require registered, unchanged evidence, including in findings', async () => {
+  const { controller: c, root, state, spec } = fixture();
+  let t = finish(c, c.create(root, spec));
+  t = c.seal(t.id, t.policy); t = finish(c, t); t = await c.verify(t.id); t = c.next(t.id);
+  const ticket = t.ticket;
+  const log = t.receipts[0]?.artifacts[0];
+  if (!ticket || !log) throw new Error('Missing review evidence');
+  c.claim(t.id, ticket.id, 'reviewer', ticket.target.provider, ticket.target.model);
+  const inspections = t.receipts.flatMap(r => r.artifacts).map(a => ({ ...a, observation: 'Read log' }));
+  const submit = (evidence: string) => c.submit(t.id, ticket.id, 'reviewer', {
+    ...report, inspections, findings: [{ id: 'note', severity: 'follow-up', evidence, detail: 'Observed command output' }],
+  });
+  writeFileSync(join(state, t.id, 'unregistered.json'), '{}');
+  expect(() => submit('artifact:unregistered.json')).toThrow('Unregistered evidence artifact');
+  const logPath = join(state, t.id, log.path);
+  const original = readFileSync(logPath);
+  writeFileSync(logPath, 'forged output');
+  expect(() => submit(`artifact:${log.path}`)).toThrow('Evidence changed');
+  writeFileSync(logPath, original);
+  expect(submit(`artifact:${log.path}`).phase).toBe('adversarial');
+});
+
+test('accepted research reaches implementation after restart with its source and artifact', () => {
+  const { controller: c, root, state, spec } = fixture();
+  let t = finish(c, c.create(root, spec));
+  t = c.seal(t.id, t.policy);
+  const research = t.assessments[0];
+  if (!research) throw new Error('Missing research');
+  const resumed = new Controller(state);
+  try {
+    resumed.next(t.id);
+    expect(resumed.brief(t.id).packet).toMatchObject({
+      research: [{ source: research.source, artifact: research.artifact,
+        result: { summary: 'Inspected source', observations: report.observations, reuse: report.reuse } }],
+    });
+    writeFileSync(join(state, t.id, research.artifact.path), '{}');
+    expect(() => resumed.brief(t.id)).toThrow('Research evidence changed');
   } finally { resumed.close(); }
 });
 

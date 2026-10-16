@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
-import { join, relative, resolve } from 'node:path';
+import { isAbsolute, join, relative, resolve } from 'node:path';
 import { z } from 'zod';
 import { Journal } from './journal';
 import { runCommand } from './command';
@@ -117,6 +117,7 @@ export class Controller {
         }
       }
       for (const observation of result.observations) this.inspectReference(t, observation.evidence);
+      for (const finding of result.findings) this.inspectReference(t, finding.evidence);
       const evidence = this.save(t, `${ticketId.replaceAll(':', '-')}.json`, result);
       const next: Task = { ...t, ticket: null, source, assessments: [...t.assessments, { role, source, worker, result, artifact: evidence }] };
       if (result.verdict === 'inconclusive') return { ...move(next, 'STOP'), reason: result.summary };
@@ -132,9 +133,16 @@ export class Controller {
     // References are whole files. Line/frame observations are kept separately in the assessment.
     if (reference.startsWith('artifact:')) {
       const path = reference.slice('artifact:'.length);
-      within(join(this.stateDir, t.id), path);
+      const registered = [
+        ...t.receipts.flatMap(r => r.artifacts), ...t.history.flatMap(r => r.artifacts),
+        ...t.assessments.map(a => a.artifact), ...(t.referenceEvidence ? [t.referenceEvidence] : []),
+      ].find(item => item.path === path);
+      if (!registered) throw new Error(`Unregistered evidence artifact: ${path}`);
+      if (fileEvidence(join(this.stateDir, t.id), path).sha256 !== registered.sha256)
+        throw new Error(`Evidence changed: ${path}`);
     } else {
-      within(t.root, reference);
+      if (isAbsolute(reference)) throw new Error('Evidence must use a repository-relative file path');
+      fileEvidence(t.root, reference);
     }
   }
 

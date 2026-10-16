@@ -71,6 +71,11 @@ adversarial review precede the final audit. An audit command completing is evide
 the audit worker must still judge it. The controller rejects skipped stages and missing
 requirement observations. Qualitative judgments remain model judgments, not proofs.
 
+Observations and findings must cite real repository files or registered, unchanged task
+artifacts. Accepted research travels with its source and evidence identity into later briefs;
+it describes what was learned before implementation, not proof about the changed candidate.
+Independent reviewers receive that context without other reviewers' verdicts.
+
 Reviewers must submit observations for the actual hashed command artifacts. No controller
 can prove a model understood a log; this gate makes missing or stale evidence visible.
 T3's coordinator verifies model identity and terminal child state from tool results; a role
