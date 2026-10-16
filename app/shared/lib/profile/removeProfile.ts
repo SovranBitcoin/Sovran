@@ -1,13 +1,7 @@
 import type { ProfileEntry } from '@/shared/stores/global/profileStore';
 
 type RemovalRefusal =
-  | 'active'
-  | 'last'
-  | 'missing'
-  | 'balance'
-  | 'pending'
-  | 'unreadable'
-  | 'imported-confirmation';
+  'active' | 'last' | 'missing' | 'balance' | 'pending' | 'unreadable' | 'imported-confirmation';
 type RemovalResult =
   | { kind: 'removed'; completed: string[] }
   | { kind: 'refused'; reason: RemovalRefusal }

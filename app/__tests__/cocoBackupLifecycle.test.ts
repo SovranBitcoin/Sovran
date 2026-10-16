@@ -83,15 +83,15 @@ describe('CocoManager pre-v2 backup lifecycle', () => {
   });
 
   /** The SQLite directory exists; no file in it is reported as left behind. */
+  const info = (uri: string, exists: boolean): FileSystem.FileInfo =>
+    exists
+      ? { exists, uri, size: 0, isDirectory: true, modificationTime: 0 }
+      : { exists, uri, isDirectory: false };
   const directoryExists = () =>
     jest
       .mocked(FileSystem.getInfoAsync)
-      .mockImplementation(
-        async (path: string) => ({ exists: path.endsWith('SQLite/') }) as FileSystem.FileInfo
-      );
-  afterEach(() =>
-    jest.mocked(FileSystem.getInfoAsync).mockResolvedValue({ exists: false } as FileSystem.FileInfo)
-  );
+      .mockImplementation(async (path: string) => info(path, path.endsWith('SQLite/')));
+  afterEach(() => jest.mocked(FileSystem.getInfoAsync).mockResolvedValue(info('', false)));
 
   it('completeReset deletes every wallet database on the phone, listed or not', async () => {
     directoryExists();
