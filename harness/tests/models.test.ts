@@ -133,6 +133,48 @@ test('GPT-only reviews require a separate fresh model slot after every normal re
   expect(t.attempts.filter(a => a.ticket.role === 'diversityReview')).toHaveLength(1);
 });
 
+function claudeOnlyModels(allowClaudeOnly: boolean) {
+  const models = routedModels();
+  const [sol, opus] = models.routes.implementation.candidates;
+  const astra = models.routes.diversityReview.candidates[0];
+  if (!sol || !opus || !astra) throw new Error('Missing fixture targets');
+  const fable = { provider: 'claudeAgent', model: 'claude-fable-5-1', options: { effort: 'high' } };
+  models.catalog.providers[1]?.models.push({ id: 'claude-fable-5-1', options: [{ id: 'effort', type: 'select', options: [{ id: 'high' }] }] });
+  const route = (...candidates: (typeof sol)[]) => ({ purpose: 'Fixture route', candidates });
+  return { ...models, allowClaudeOnly,
+    routes: { ...models.routes, research: route(opus), adversary: route(fable),
+      // The author model is listed first to prove it can never take the extra slot.
+      diversityReview: route(opus, astra, fable) } };
+}
+
+test('Claude-only completion needs an extra review by a Claude model outside the author set', async () => {
+  const { controller: c, root, spec } = fixture();
+  let t = completed(c, c.create(root, { ...spec, historyPolicy: { version: 1, paths: ['source.txt'] }, verificationPolicy: fixtureVerification, models: claudeOnlyModels(true) }));
+  t = c.seal(t.id, t.policy); t = quota(c, t);
+  expect(t.ticket?.target.model).toBe('claude-opus-5-5');
+  t = completed(c, t); t = await c.verify(t.id);
+  t = completed(c, t); t = completed(c, t);
+  t = await c.verify(t.id, true); t = completed(c, t);
+  expect(t.phase).toBe('diversityReviewing');
+  expect(c.next(t.id).ticket?.target.model).toBe('gpt-6-astra');
+  t = quota(c, t);
+  expect(t.ticket?.target.model).toBe('claude-fable-5-1');
+  t = completed(c, t); expect(t.phase).toBe('publishable');
+});
+
+test('a GPT-only policy sealed before Claude-only approval cannot finish on a Claude extra review', async () => {
+  const { controller: c, root, spec } = fixture();
+  const { allowClaudeOnly: _absent, ...models } = claudeOnlyModels(false);
+  let t = completed(c, c.create(root, { ...spec, historyPolicy: { version: 1, paths: ['source.txt'] }, verificationPolicy: fixtureVerification, models }));
+  t = c.seal(t.id, t.policy); t = quota(c, t); t = completed(c, t); t = await c.verify(t.id);
+  t = completed(c, t); t = completed(c, t);
+  t = await c.verify(t.id, true); t = completed(c, t);
+  expect(t.phase).toBe('diversityReviewing');
+  t = quota(c, t);
+  expect(t.phase).toBe('incomplete');
+  expect(t.reason).toContain('No eligible authorized model');
+});
+
 test('a partial failed author remains excluded from extra review and its edits are retained', async () => {
   const { controller: c, root, spec } = fixture();
   const models = routedModels();

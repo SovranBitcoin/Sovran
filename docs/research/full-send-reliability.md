@@ -9,7 +9,9 @@ The [harness README](../../harness/README.md) describes implemented behavior; th
 
 The owner selected availability fallback: if Claude is out of quota, GPT-only completion
 is allowed with fresh reviewers, an additional review using a different GPT model, and
-disclosure. This supersedes the earlier product preference for mandatory cross-provider
+disclosure. On 2026-10-16, with Codex out of quota, the owner approved the mirror image:
+Claude-only completion with an additional review by a Claude model that authored no source.
+This supersedes the earlier product preference for mandatory cross-provider
 review. The executable policy and remaining live validation are described in the harness
 README and F159.
 

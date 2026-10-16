@@ -30,7 +30,7 @@ flowchart TD
   adversary --> audit[Saved-check retrieval and final judgment]
   audit --> diversity{Cross-provider review established?}
   diversity -->|Yes| publish[Publish exact reviewed head]
-  diversity -->|Approved GPT fallback| extra[Extra GPT review outside every author model]
+  diversity -->|Approved single-provider fallback| extra[Extra review outside every author model]
   extra --> publish
   publish --> ci[Required CI and merge-policy checks]
   ci --> ready[Ready PR: owner merges]
@@ -171,8 +171,10 @@ If the provider definitively rejected creation, the coordinator records that exa
 and provider error instead of inventing a child. An empty lineage search is insufficient.
 
 Normal reviews must include a non-GPT review and cover every source-author provider with
-a different provider. Otherwise the approved fallback requires an extra fresh reviewer using
-a GPT model outside every source-author model across attempts and repairs. Normal review,
+a different provider. Otherwise an approved single-provider fallback requires an extra fresh
+reviewer using a model outside every source-author model across attempts and repairs: a GPT
+model under `allowGptOnly`, a Claude model under `allowClaudeOnly`. Policies sealed before
+`allowClaudeOnly` existed gain no Claude extra review. Normal review,
 adversarial review and audit remain required. Missing eligible
 models end incomplete. The PR discloses model attempts, fallback and unreported effective effort.
 

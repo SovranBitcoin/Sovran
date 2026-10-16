@@ -196,7 +196,7 @@ export class Controller {
         return this.repairTask(next, result.summary);
       }
       if (role === 'audit' && 'kind' in t.contract.models && !this.hasIndependentCoverage(next)) {
-        if (!t.contract.models.allowGptOnly) return { ...move(next, 'STOP'), reason: 'Normal reviews lack complete author-provider coverage or a non-GPT review; additional GPT review was not authorized' };
+        if (!t.contract.models.allowGptOnly && !t.contract.models.allowClaudeOnly) return { ...move(next, 'STOP'), reason: 'Normal reviews lack complete author-provider coverage or a non-GPT review; additional single-provider review was not authorized' };
         return move(next, 'DIVERSITY');
       }
       return move(next, 'ACCEPT');
@@ -212,7 +212,11 @@ export class Controller {
   }
 
   private eligibleDiversity(t: Task, target: Model) {
-    return driver(t.contract.models, target) === 'codex' && !t.attempts.some(a => a.ticket.role === 'implementation' &&
+    const policy = t.contract.models;
+    if (!('kind' in policy)) return false;
+    const family = driver(policy, target);
+    const approved = family === 'codex' ? policy.allowGptOnly : family === 'claudeAgent' && policy.allowClaudeOnly === true;
+    return approved && !t.attempts.some(a => a.ticket.role === 'implementation' &&
       a.ticket.claim && a.ticket.target.model === target.model);
   }
 
@@ -368,9 +372,9 @@ export class Controller {
       const reviews = this.currentReviews(t);
       if (!['review', 'adversary', 'audit'].every(role => reviews.some(a => a.ticket.role === role)))
         throw new Error('Missing current independent review slots');
-      if (!this.hasIndependentCoverage(t) && (!t.contract.models.allowGptOnly || !reviews.some(a =>
-        a.ticket.role === 'diversityReview' && this.eligibleDiversity(t, a.ticket.target))))
-        throw new Error('Missing additional review by a GPT model outside the complete author set');
+      if (!this.hasIndependentCoverage(t) && !reviews.some(a =>
+        a.ticket.role === 'diversityReview' && this.eligibleDiversity(t, a.ticket.target)))
+        throw new Error('Missing additional approved single-provider review by a model outside the complete author set');
     }
     if (t.contract.publish.kind !== 'pull-request') throw new Error('Publication was not authorized at intake');
     const policy = inspectChange(t.root, t.base, t.contract);
@@ -378,7 +382,7 @@ export class Controller {
     const plan = publishPlan.parse({ ...t.contract.publish, taskId: t.id, root: t.root,
       previousRemoteHead: t.pr?.head ?? t.contract.publish.previousRemoteHead,
       source: t.source, head: git(t.root, ['rev-parse', 'HEAD']), title: t.contract.problem.slice(0, 160),
-      body: `${t.contract.problem}\n\n${t.contract.requirements.map(r => `- ${r.outcome}`).join('\n')}\n\nValidation: ${t.receipts.map(r => `${r.id}: ${r.outcome}`).join('; ')}. Independent review, adversarial review and final audit completed for this source.${'kind' in t.contract.models ? `\n\nModel attempts: ${t.attempts.map(a => `${a.ticket.role}: ${a.ticket.target.provider}/${a.ticket.target.model} (${a.completion.kind})`).join('; ')}. Requested effort is recorded; T3 did not report effective effort.${!this.hasIndependentCoverage(t) ? ' Additional GPT review used outside the author set because normal reviews lacked full provider coverage or a non-GPT reviewer.' : ''}` : ''}`,
+      body: `${t.contract.problem}\n\n${t.contract.requirements.map(r => `- ${r.outcome}`).join('\n')}\n\nValidation: ${t.receipts.map(r => `${r.id}: ${r.outcome}`).join('; ')}. Independent review, adversarial review and final audit completed for this source.${'kind' in t.contract.models ? `\n\nModel attempts: ${t.attempts.map(a => `${a.ticket.role}: ${a.ticket.target.provider}/${a.ticket.target.model} (${a.completion.kind})`).join('; ')}. Requested effort is recorded; T3 did not report effective effort.${!this.hasIndependentCoverage(t) ? ` Additional ${t.attempts.some(a => a.ticket.role === 'diversityReview' && a.completion.kind === 'submitted' && driver(t.contract.models, a.ticket.target) === 'claudeAgent') ? 'Claude' : 'GPT'} review used outside the author set because normal reviews lacked full provider coverage or a non-GPT reviewer.` : ''}` : ''}`,
     });
     const claim = this.journal.change(id, `publish:${t.generation}`, { plan }, value => {
       const v = task.parse(value); this.current(v);

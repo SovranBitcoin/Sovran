@@ -15,6 +15,8 @@ export const modelCatalog = z.object({ observedAt: z.iso.datetime(), providers: 
   })) });
 const routedModels = z.object({
   kind: z.literal('routed'), allowGptOnly: z.boolean(), catalog: modelCatalog,
+  // Added later: tasks sealed before it was approved keep no Claude-only authority.
+  allowClaudeOnly: z.boolean().optional(),
   routes: z.record(role, z.object({ purpose: text, candidates: z.array(model).min(1).max(4) })),
 });
 const legacyModels = z.object({ research: model, implementation: model, review: model, adversary: model, audit: model });
@@ -76,18 +78,17 @@ export function recommendedModels(catalog: unknown) {
   const sol = { provider: 'codex', model: 'gpt-6.1-sol', options: { reasoningEffort: 'high' } };
   const astra = { provider: 'codex', model: 'gpt-6-astra', options: { reasoningEffort: 'high' } };
   const opus = { provider: 'claudeAgent', model: 'claude-opus-5-5', options: { effort: 'high' } };
-  return models.parse({ kind: 'routed', allowGptOnly: true, catalog,
+  const fable = { provider: 'claudeAgent', model: 'claude-fable-5-1', options: { effort: 'high' } };
+  return models.parse({ kind: 'routed', allowGptOnly: true, allowClaudeOnly: true, catalog,
     routes: {
       research: { purpose: 'Bounded evidence extraction, escalating to the coding model when unavailable', candidates: [
         { provider: 'codex', model: 'gpt-6-luna', options: { reasoningEffort: 'high' } }, sol,
       ] },
       implementation: { purpose: 'Coding work with a cross-provider availability replacement', candidates: [sol, opus] },
       review: { purpose: 'Fresh cross-provider correctness review, with disclosed GPT fallback', candidates: [opus, sol] },
-      adversary: { purpose: 'Counterexamples and test-validity challenges; model advantage remains an evaluation question', candidates: [
-        { provider: 'claudeAgent', model: 'claude-fable-5-1', options: { effort: 'high' } }, astra,
-      ] },
+      adversary: { purpose: 'Counterexamples and test-validity challenges; model advantage remains an evaluation question', candidates: [fable, astra] },
       audit: { purpose: 'Final rules and evidence reconciliation', candidates: [opus, sol] },
-      diversityReview: { purpose: 'Extra GPT review outside the complete source-author model set', candidates: [astra] },
+      diversityReview: { purpose: 'Extra single-provider review by a model outside the complete source-author model set', candidates: [astra, fable] },
     },
   });
 }
