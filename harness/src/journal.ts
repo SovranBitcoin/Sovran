@@ -51,12 +51,15 @@ export class Journal {
     return { revision: result.revision, value: object.parse(JSON.parse(result.value)) };
   }
 
-  change(id: string, operationId: string, input: unknown, update: (value: Value) => unknown) {
+  change(id: string, operationId: string, input: unknown, update: (value: Value) => unknown, equivalentInputs: unknown[] = []) {
     const inputHash = createHash('sha256').update(JSON.stringify(z.json().parse(input))).digest('hex');
     return this.db.transaction(() => {
       const previous = this.db.query('SELECT input FROM events WHERE task = ? AND id = ?').get(id, operationId);
       if (previous) {
-        if (operation.parse(previous).input !== inputHash) throw new Error('Operation id reused with different input');
+        const previousHash = operation.parse(previous).input;
+        if (previousHash !== inputHash && !equivalentInputs.some(value =>
+          createHash('sha256').update(JSON.stringify(z.json().parse(value))).digest('hex') === previousHash))
+          throw new Error('Operation id reused with different input');
         return { ...this.read(id), applied: false };
       }
       const current = this.read(id);

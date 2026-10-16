@@ -50,8 +50,8 @@ export class Controller {
     return this.read(id);
   }
 
-  private change(id: string, key: string, input: unknown, fn: (t: Task) => Task) {
-    return task.parse(this.journal.change(id, key, input, value => fn(task.parse(value))).value);
+  private change(id: string, key: string, input: unknown, fn: (t: Task) => Task, equivalentInputs: unknown[] = []) {
+    return task.parse(this.journal.change(id, key, input, value => fn(task.parse(value)), equivalentInputs).value);
   }
 
   private live(t: Task) {
@@ -110,7 +110,7 @@ export class Controller {
         if (t.attempts.some(a => a.ticket.claim?.worker === worker)) throw new Error('Every attempt needs a fresh worker');
       }
       return { ...t, ticket: { ...t.ticket, claim: { worker, provider, model }, runtime: observed } };
-    });
+    }, observed ? [] : [{ ...input, runtime: null }]);
   }
 
   /** Submission means the worker and its processes have finished. A lost worker is
@@ -162,7 +162,7 @@ export class Controller {
         return move(next, 'DIVERSITY');
       }
       return move(next, 'ACCEPT');
-    });
+    }, observed ? [] : [{ worker, result, runtime: null }]);
   }
 
   private terminalWorker(t: Task, runtime: RuntimeTask | null) {

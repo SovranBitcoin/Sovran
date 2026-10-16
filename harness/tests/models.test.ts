@@ -214,12 +214,13 @@ test('routed claims and completion require actual matching runtime identity and 
   }, { ...runtime, status: 'completed', workState: 'result_available', hasPendingChildRuns: true })).toThrow('Reconcile');
 });
 
-test('legacy journal claim and submission inputs remain idempotent after upgrade', () => {
+test.each([false, true])('legacy journal claim and submission inputs replay (explicit null runtime: %s)', (explicitNull) => {
   const { controller: c, root, spec } = fixture();
   const t = c.next(c.create(root, spec).id);
   const ticket = t.ticket;
   if (!ticket) throw new Error('Missing ticket');
-  const oldClaim = { ticketId: ticket.id, worker: 'old-worker', provider: ticket.target.provider, model: ticket.target.model };
+  const oldClaim = { ticketId: ticket.id, worker: 'old-worker', provider: ticket.target.provider, model: ticket.target.model,
+    ...(explicitNull ? { runtime: null } : {}) };
   c.journal.change(t.id, `claim:${ticket.id}:old-worker`, oldClaim, () => ({
     ...t, ticket: { ...ticket, claim: { worker: 'old-worker', provider: ticket.target.provider, model: ticket.target.model } },
   }));
@@ -227,8 +228,13 @@ test('legacy journal claim and submission inputs remain idempotent after upgrade
   const result = assessment.parse({ verdict: 'pass', summary: 'Old accepted research', findings: [],
     observations: [{ requirement: 'behavior', evidence: 'source.txt', observation: 'original retained' }],
     reuse: { searched: ['source.txt'], used: [], added: [], removed: [] } });
-  c.journal.change(t.id, `submit:${ticket.id}`, { worker: 'old-worker', result }, value => ({ ...value, ticket: null, phase: 'intake' }));
+  c.journal.change(t.id, `submit:${ticket.id}`, { worker: 'old-worker', result, ...(explicitNull ? { runtime: null } : {}) }, value => ({ ...value, ticket: null, phase: 'intake' }));
   expect(c.submit(t.id, ticket.id, 'old-worker', result).phase).toBe('intake');
+  expect(() => c.submit(t.id, ticket.id, 'old-worker', { ...result, summary: 'Changed result' })).toThrow('different input');
+  expect(() => c.submit(t.id, ticket.id, 'old-worker', result, {
+    taskId: 'old-worker', providerInstanceId: ticket.target.provider, model: ticket.target.model,
+    status: 'completed', workState: 'result_available', hasPendingChildRuns: false, hasPendingQuestion: false,
+  })).toThrow('different input');
 });
 
 test('mixed source authors cannot be certified by only one author provider', async () => {
