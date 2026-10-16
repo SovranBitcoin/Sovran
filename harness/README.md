@@ -47,6 +47,17 @@ Resolve planned dependency changes in a disposable preview before intake so the 
 approve the resulting allowance. Unexpected dependency needs stop work without a mid-run
 question. Deletions still have to satisfy scope and tests.
 
+New routed tasks seal a `historyPolicy` with exact planned paths within their authorized
+scope. Before a writer starts, the controller captures baseline Git blobs, blame and up to
+eight path-specific changes. Research records each protection, its preservation plan,
+and evidence or gaps for changes, callers/tests, PRs and follow-ups. This is bounded
+retrieval, not a complete explanation of intent. Follow older commits and discussions where
+relevant. Final audit rechecks every changed path; an uninvestigated path cannot be accepted.
+If another path becomes necessary, this version requires a new prepared task rather than
+backdating research or silently changing the sealed plan. Old records stay readable without
+claiming this stronger history coverage. Historical citations can name removed files at an
+exact ancestor revision.
+
 Context is copied before execution, with hashes. Per-role briefs point at existing skills,
 including the navigation document's reason for `-flow` wrappers. They do not replace those
 rules with another standards catalogue. Relevant external files are pinned by commit under

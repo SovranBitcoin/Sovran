@@ -82,7 +82,7 @@ export function validateResolutions(t: Task, role: string, worker: string,
 /** The brief and acceptance gate must use the same evidence set. */
 export function assessmentArtifacts(t: Task, role: string) {
   const receipts = ['implementation', 'audit'].includes(role) ? [...t.history, ...t.receipts] : t.receipts;
-  const artifacts = [...receipts.flatMap(r => r.artifacts), ...(role === 'audit'
+  const artifacts = [...receipts.flatMap(r => r.artifacts), ...(t.historyEvidence ? [t.historyEvidence] : []), ...(role === 'audit'
     ? [...obligations(t).map(o => o.origin), ...proposals(t).map(p => p.artifact)] : [])];
   return [...new Map(artifacts.map(a => [a.path, a])).values()];
 }

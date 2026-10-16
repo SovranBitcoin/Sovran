@@ -15,7 +15,11 @@ Research the requested behavior, existing owners and relevant primary sources. U
 existing repository skills and rules. Ask multiple-choice questions only for unsettled
 product or authority choices. Put the resulting contract in the schema from
 `harness/src/workflow.ts`: outcomes, scope, exact checks, context, pinned references,
-models, deadline, repair budget, dependency allowances and publication intent.
+models, deadline, repair budget, dependency allowances and publication intent. Include
+`historyPolicy:{version:1,paths:[...]}` for the exact planned files; it must fit scope. The
+controller captures pre-edit Git evidence. Research must inspect it and record each file's
+protection/preservation plan, relevant PRs and active/deleted follow-ups, with explicit gaps.
+Final audit rechecks changed paths. Do not invent complete intent from blame alone.
 
 Resolve models with `orchestrator_capabilities`, not remembered model names. Pass its
 providers and the observation time to the controller's `model-policy` action. The typed

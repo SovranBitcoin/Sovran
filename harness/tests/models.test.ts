@@ -29,7 +29,8 @@ export function routedModels() {
 
 test('a sealed route dispatches its primary model and explicit supported effort', () => {
   const { controller: c, root, spec } = fixture();
-  const t = c.create(root, { ...spec, models: routedModels() });
+  expect(() => c.create(root, { ...spec, models: routedModels() })).toThrow('pre-edit history policy');
+  const t = c.create(root, { ...spec, historyPolicy: { version: 1, paths: ['source.txt'] }, models: routedModels() });
   expect(c.next(t.id).ticket?.target).toEqual({ provider: 'codex', model: 'gpt-6.1-sol', options: { reasoningEffort: 'high' } });
 });
 
@@ -37,9 +38,9 @@ test('unsupported models and effort cannot enter a sealed route', () => {
   const { controller: c, root, spec } = fixture();
   const models = routedModels();
   models.routes.research.candidates = [{ provider: 'codex', model: 'gpt-6.1-sol', options: { reasoningEffort: 'invented' } }];
-  expect(() => c.create(root, { ...spec, models })).toThrow('Unsupported model option');
+  expect(() => c.create(root, { ...spec, historyPolicy: { version: 1, paths: ['source.txt'] }, models })).toThrow('Unsupported model option');
   models.routes.research.candidates = [{ provider: 'codex', model: 'missing', options: { reasoningEffort: 'high' } }];
-  expect(() => c.create(root, { ...spec, models })).toThrow('Unavailable model');
+  expect(() => c.create(root, { ...spec, historyPolicy: { version: 1, paths: ['source.txt'] }, models })).toThrow('Unavailable model');
 });
 
 function claimed(c: Controller, id: string) {
@@ -56,9 +57,13 @@ function completed(c: Controller, t: Task) {
   const { ticket, runtime } = claimed(c, t.id);
   return c.submit(t.id, ticket.id, runtime.taskId, {
     verdict: 'pass', summary: 'Inspected fixture', findings: [],
+    ...(ticket.role === 'audit' && t.contract.historyPolicy ? { historyReview: [{ path: 'source.txt', observation: 'Fixture original protection reviewed against current source', evidence: ['source.txt'] }] } : {}),
+    ...(ticket.role === 'research' && t.contract.historyPolicy ? { history: [{ path: 'source.txt', owner: 'source.txt', intent: 'recorded',
+      reason: 'The initial fixture preserves original text', preserveBy: 'Keep the original fixture value',
+      ...Object.fromEntries(['changes', 'callersAndTests', 'priorPRs', 'followups'].map(key => [key, { status: 'gap', explanation: 'Synthetic routing fixture has no app history', evidence: [] }])) }] } : {}),
     observations: [{ requirement: 'behavior', evidence: 'source.txt', observation: 'Read fixture source' }],
     reuse: { searched: ['source.txt'], used: ['source.txt'], added: [], removed: [] },
-    inspections: t.receipts.flatMap(r => r.artifacts).map(a => ({ ...a, observation: 'Read fixture output' })),
+    inspections: c.brief(t.id).packet.artifacts.map(a => ({ ...a, observation: 'Read fixture output' })),
   }, { ...runtime, status: 'completed', workState: 'result_available' });
 }
 
@@ -76,7 +81,7 @@ async function reviewStage(c: Controller, t: Task) {
 
 test('dispatch reservation survives restart and authorizes exactly one external call', () => {
   const { controller: c, root, state, spec } = fixture();
-  const t = c.next(c.create(root, { ...spec, models: routedModels() }).id);
+  const t = c.next(c.create(root, { ...spec, historyPolicy: { version: 1, paths: ['source.txt'] }, models: routedModels() }).id);
   const ticket = t.ticket;
   if (!ticket) throw new Error('Missing ticket');
   const first = c.beginDispatch(t.id, ticket.id, 'coordinator', 'session');
@@ -91,7 +96,7 @@ test('dispatch reservation survives restart and authorizes exactly one external 
 
 test('quota fallback needs terminal lineage, preserves budget, and cannot accept the old worker', async () => {
   const { controller: c, root, state, spec } = fixture();
-  let t = await reviewStage(c, c.create(root, { ...spec, models: routedModels() }));
+  let t = await reviewStage(c, c.create(root, { ...spec, historyPolicy: { version: 1, paths: ['source.txt'] }, models: routedModels() }));
   const { ticket, runtime } = claimed(c, t.id);
   const terminal: RuntimeTask = { ...runtime, status: 'failed', workState: 'result_available', summary: 'Quota fixture' };
   expect(() => c.fallback(t.id, ticket.id, 'quota-exhausted', { ...terminal, hasPendingChildRuns: true }, 'quota')).toThrow('Reconcile');
@@ -116,7 +121,7 @@ test('GPT-only reviews require a separate fresh model slot after every normal re
   const { controller: c, root, spec } = fixture();
   const models = routedModels();
   models.routes.research = models.routes.review; // Claude research must not waive review diversity.
-  let t = await reviewStage(c, c.create(root, { ...spec, models }));
+  let t = await reviewStage(c, c.create(root, { ...spec, historyPolicy: { version: 1, paths: ['source.txt'] }, models }));
   t = quota(c, t); t = completed(c, t); expect(t.phase).toBe('adversarial');
   t = quota(c, t); t = completed(c, t); expect(t.phase).toBe('auditing');
   t = await c.verify(t.id, true); t = quota(c, t); t = completed(c, t);
@@ -133,7 +138,7 @@ test('a partial failed author remains excluded from extra review and its edits a
   const sol = models.routes.research.candidates[0];
   if (!astra || !sol) throw new Error('Missing fixture targets');
   models.routes.implementation.candidates = [astra, sol];
-  let t = completed(c, c.create(root, { ...spec, models })); t = c.seal(t.id, t.policy);
+  let t = completed(c, c.create(root, { ...spec, historyPolicy: { version: 1, paths: ['source.txt'] }, models })); t = c.seal(t.id, t.policy);
   const { ticket, runtime } = claimed(c, t.id);
   writeFileSync(join(root, 'source.txt'), 'Partial implementation retained');
   t = c.fallback(t.id, ticket.id, 'quota-exhausted', { ...runtime, status: 'failed', workState: 'result_available' }, 'quota');
@@ -150,7 +155,7 @@ test('a partial failed author remains excluded from extra review and its edits a
 
 test('negative review enters repair and cannot shop for a replacement verdict', async () => {
   const { controller: c, root, state, spec } = fixture();
-  let t = await reviewStage(c, c.create(root, { ...spec, models: routedModels() }));
+  let t = await reviewStage(c, c.create(root, { ...spec, historyPolicy: { version: 1, paths: ['source.txt'] }, models: routedModels() }));
   const { ticket, runtime } = claimed(c, t.id);
   t = c.submit(t.id, ticket.id, runtime.taskId, {
     verdict: 'fail', summary: 'Fixture defect', findings: [{ id: 'defect', severity: 'blocking', evidence: 'source.txt', detail: 'Fixture counterexample' }],
@@ -179,7 +184,7 @@ test('negative review enters repair and cannot shop for a replacement verdict', 
 
 test('a prior generation Claude pass does not waive fresh diversity review on unchanged bytes', async () => {
   const { controller: c, root, spec } = fixture();
-  let t = await reviewStage(c, c.create(root, { ...spec, models: routedModels() }));
+  let t = await reviewStage(c, c.create(root, { ...spec, historyPolicy: { version: 1, paths: ['source.txt'] }, models: routedModels() }));
   t = completed(c, t); // Accepted Claude review in generation zero.
   t = c.repair(t.id, 'Repeat with a stronger test obligation');
   t = completed(c, t); t = await c.verify(t.id);
@@ -190,7 +195,7 @@ test('a prior generation Claude pass does not waive fresh diversity review on un
 
 test('cancelled availability work is reconciled without reopening or dispatching a successor', () => {
   const { controller: c, root, spec } = fixture();
-  const t = c.create(root, { ...spec, models: routedModels() });
+  const t = c.create(root, { ...spec, historyPolicy: { version: 1, paths: ['source.txt'] }, models: routedModels() });
   const { ticket, runtime } = claimed(c, t.id);
   c.stop(t.id, 'cancel', 'Cancelled fixture', true);
   const stopped = c.fallback(t.id, ticket.id, 'quota-exhausted', { ...runtime, status: 'failed', workState: 'result_available' }, 'quota');
@@ -200,7 +205,7 @@ test('cancelled availability work is reconciled without reopening or dispatching
 
 test('routed claims and completion require actual matching runtime identity and terminal work', () => {
   const { controller: c, root, spec } = fixture();
-  const t = c.next(c.create(root, { ...spec, models: routedModels() }).id);
+  const t = c.next(c.create(root, { ...spec, historyPolicy: { version: 1, paths: ['source.txt'] }, models: routedModels() }).id);
   const ticket = t.ticket;
   if (!ticket) throw new Error('Missing ticket');
   expect(() => c.claim(t.id, ticket.id, 'self-declared', ticket.target.provider, ticket.target.model)).toThrow('Reserve dispatch');
@@ -239,7 +244,7 @@ test.each([false, true])('legacy journal claim and submission inputs replay (exp
 
 test('mixed source authors cannot be certified by only one author provider', async () => {
   const { controller: c, root, spec } = fixture();
-  let t = completed(c, c.create(root, { ...spec, models: routedModels() })); t = c.seal(t.id, t.policy);
+  let t = completed(c, c.create(root, { ...spec, historyPolicy: { version: 1, paths: ['source.txt'] }, models: routedModels() })); t = c.seal(t.id, t.policy);
   t = quota(c, t); // Sol may have written; Opus is the replacement author.
   t = completed(c, t); t = await c.verify(t.id);
   t = completed(c, t); t = completed(c, t); t = await c.verify(t.id, true); t = completed(c, t);
@@ -250,7 +255,7 @@ test('mixed source authors cannot be certified by only one author provider', asy
 test('a definitive rejection before child creation permits only the next sealed candidate', async () => {
   const { controller: c, root, spec } = fixture();
   const models = routedModels(); models.routes.research = models.routes.implementation;
-  const t = c.next(c.create(root, { ...spec, models }).id);
+  const t = c.next(c.create(root, { ...spec, historyPolicy: { version: 1, paths: ['source.txt'] }, models }).id);
   const ticket = t.ticket;
   if (!ticket) throw new Error('Missing ticket');
   const reserved = c.beginDispatch(t.id, ticket.id, 'coordinator', 'session');

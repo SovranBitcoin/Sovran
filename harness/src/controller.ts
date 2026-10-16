@@ -9,6 +9,7 @@ import { inspectUpgradeEvidence, upgradeInventorySchema } from './upgrade';
 import { brief } from './brief';
 import { assessmentArtifacts, unresolved, validateResolutions } from './evidence';
 import { Publisher, publishPlan } from './publisher';
+import { captureHistory, inspectHistoricalReference, validateHistory } from './history';
 import { contextPaths } from './context';
 import { prepareReference } from './references';
 import { availability, candidates, dispatchRejection, driver, runtimeTask, type Model, type RuntimeTask } from './models';
@@ -30,6 +31,10 @@ export class Controller {
     if (!relative(root, resolve(this.stateDir)).startsWith('..'))
       throw new Error('Task state must live outside the source workspace');
     const spec = contract.parse(input);
+    if ('kind' in spec.models && !spec.historyPolicy) throw new Error('New routed tasks require a pre-edit history policy');
+    if (spec.historyPolicy && (new Set(spec.historyPolicy.paths).size !== spec.historyPolicy.paths.length ||
+      spec.historyPolicy.paths.some(p => !spec.scope.some(s => p === s || p.startsWith(`${s.replace(/\/$/, '')}/`)))))
+      throw new Error('Planned history paths must be unique and within sealed scope');
     if (git(root, ['status', '--porcelain'])) throw new Error('Start from a clean checkout or a dedicated worktree');
     if (spec.publish.kind === 'pull-request' && spec.publish.baseHead !== git(root, ['rev-parse', 'HEAD']))
       throw new Error('Start the task at its sealed PR base so the entire published diff is reviewed');
@@ -47,6 +52,10 @@ export class Controller {
     if (policy.problems.length) throw new Error(policy.problems.join('\n'));
     this.save(value, 'intake-context.json', context.map(item => ({ ...item, content: readFileSync(within(root, item.path), 'utf8') })));
     value.referenceEvidence = this.save(value, 'references.json', references);
+    if (spec.historyPolicy) {
+      value.historyEvidence = this.save(value, 'baseline-history.json', captureHistory(root, value.base, spec.historyPolicy.paths));
+      value.policy = digest(JSON.stringify({ spec, context, references: references.map(r => r.sha256), history: value.historyEvidence.sha256 }));
+    }
     this.journal.create(id, value);
     return this.read(id);
   }
@@ -148,6 +157,7 @@ export class Controller {
         }
       }
       if (new Set(result.findings.map(f => f.id)).size !== result.findings.length) throw new Error('Duplicate finding IDs');
+      validateHistory(t, role, result, inspectChange(t.root, t.base, t.contract).changed, reference => this.inspectReference(t, reference));
       validateResolutions(t, role, worker, result, reference => this.inspectReference(t, reference));
       for (const observation of result.observations) this.inspectReference(t, observation.evidence);
       for (const finding of result.findings) this.inspectReference(t, finding.evidence);
@@ -235,12 +245,13 @@ export class Controller {
   }
 
   private inspectReference(t: Task, reference: string) {
+    if (reference.startsWith('git:')) return inspectHistoricalReference(t, reference);
     // References are whole files. Line/frame observations are kept separately in the assessment.
     if (reference.startsWith('artifact:')) {
       const path = reference.slice('artifact:'.length);
       const registered = [
         ...t.receipts.flatMap(r => r.artifacts), ...t.history.flatMap(r => r.artifacts),
-        ...t.assessments.map(a => a.artifact), ...(t.referenceEvidence ? [t.referenceEvidence] : []),
+        ...t.assessments.map(a => a.artifact), ...([t.referenceEvidence, t.historyEvidence].filter((a): a is NonNullable<typeof a> => !!a)),
       ].find(item => item.path === path);
       if (!registered) throw new Error(`Unregistered evidence artifact: ${path}`);
       if (fileEvidence(join(this.stateDir, t.id), path).sha256 !== registered.sha256)

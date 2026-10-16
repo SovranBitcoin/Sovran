@@ -2,6 +2,7 @@ import { createMachine, transition } from 'xstate';
 import { z } from 'zod';
 import { publishPlan } from './publisher';
 import { reference } from './references';
+import { historyPolicy, historyEntry, historyReview } from './history';
 import { resolutionProposal, resolutionReview } from './evidence';
 import { availability, dispatchRejection, model, models, role, runtimeTask } from './models';
 export { role } from './models';
@@ -13,6 +14,7 @@ const command = z.object({
   timeoutMs: z.number().int().positive().max(3_600_000),
 });
 export const contract = z.object({
+  historyPolicy: historyPolicy.optional(),
   problem: text,
   requirements: z.array(z.object({ id: text, outcome: text })).min(1),
   scope: z.array(text).min(1),
@@ -54,6 +56,8 @@ export const assessment = z.object({
   observations: z.array(z.object({ requirement: text, evidence: text, observation: text })).min(1),
   findings: z.array(z.object({ id: text, severity: z.enum(['blocking', 'follow-up']), evidence: text, detail: text })),
   reuse: z.object({ searched: z.array(text).min(1), used: z.array(text), added: z.array(text), removed: z.array(text) }),
+  history: z.array(historyEntry).optional(),
+  historyReview: z.array(historyReview).optional(),
   resolutionProposals: z.array(resolutionProposal).optional(),
   resolutionReviews: z.array(resolutionReview).optional(),
   inspections: z.array(z.object({ path: text, sha256: hash, observation: text })).default([]),
@@ -82,6 +86,7 @@ export const task = z.object({
   context: z.array(artifact), receipts: z.array(receipt),
   history: z.array(receipt).default([]),
   referenceEvidence: artifact.nullable().default(null),
+  historyEvidence: artifact.optional(),
   assessments: z.array(z.object({ role, source: hash, worker: text, result: assessment, artifact, generation: z.number().int().nonnegative().optional() })),
   attempts: z.array(z.object({
     ticket, generation: z.number().int().nonnegative(), sourceAfter: hash,

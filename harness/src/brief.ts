@@ -49,9 +49,10 @@ export function brief(t: Task, stateDir: string) {
       worker: a.ticket.claim?.worker ?? null, generation: a.generation, sourceBefore: a.ticket.sourceAtIssue,
       sourceAfter: a.sourceAfter, availability: a.completion.kind === 'unavailable' || a.completion.kind === 'dispatch-rejected' ? a.completion.reason : null })),
     effortEvidence: 'Target options record requested effort. Runtime model identity comes from T3. Effective effort is unreported unless separately observed; never infer it from the request.',
+    historyScope: t.historyEvidence ? 'The baseline-history artifact captures pre-edit source and bounded blame/changes. Research must record the reason and preservation plan for every planned path, distinguishing gaps from completed investigation. Audit must recheck actual changed paths and relevant follow-ups. Follow older commits and PR discussions where relevant.' : 'Legacy contract: no executable pre-edit history coverage was sealed.',
     researchScope: 'Research describes its recorded source, not the current candidate. Recheck claims against changed code. It is context, never implementation or test proof. Reviewers must reach their own conclusions.',
     assessmentSchema: z.toJSONSchema(assessment),
-    referenceFormat: 'observations.evidence and findings.evidence must be a repository-relative file path or artifact:<saved artifact filename>. Put explanations and line/frame details in observation/detail, never in the path. Copy hashes from the packet; do not guess them.',
+    referenceFormat: 'observations.evidence and findings.evidence must be a repository-relative file path, artifact:<saved artifact filename>, or git:<full ancestor commit>:<relative file> for historical/deleted evidence. Put explanations and line/frame details in observation/detail, never in the path. Copy hashes from the packet; do not guess them.',
     referenceSnapshot: join(stateDir, t.id, '0-references.json'),
     relatedProjects: Object.values(projects),
     reconciliation: ['implementation', 'audit'].includes(t.ticket.role) ? {
