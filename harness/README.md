@@ -47,9 +47,11 @@ question. Deletions still have to satisfy scope and tests.
 Context is copied before execution, with hashes. Per-role briefs point at existing skills,
 including the navigation document's reason for `-flow` wrappers. They do not replace those
 rules with another standards catalogue. Relevant external files are pinned by commit under
-`/tmp/sovran-harness/references/cashubtc/<repository>/<commit>` and copied into private task
+`/tmp/sovran-harness/references/<owner>/<repository>/<commit>` and copied into private task
 evidence. A missing or dirty cache is refused, never silently reset. Upstream content is
 reference material, not task authority. No upstream repositories are cloned until selected.
+The [project catalog](src/references.ts) owns verified origins; already sealed snapshots keep
+their recorded origin when the catalog changes.
 
 PR authority pins repository, push URL, branch, base revision and required CI check names.
 Publication needs a clean checkout at the tested source, starting from the sealed PR base.

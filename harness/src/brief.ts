@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { z } from 'zod';
 import { digest, fileEvidence } from './workspace';
 import { assessment, type Role, type Task } from './workflow';
+import { projects } from './references';
 
 const duties: Record<Role, string> = {
   research: 'Find the existing owners and reusable code with jg, falling back to exact source search if retrieval is incomplete. Read primary docs and pinned related Cashu implementations. Explain uncertainty, acceptance tests and missing context before intake is sealed. Do not edit source.',
@@ -42,7 +43,7 @@ export function brief(t: Task, stateDir: string) {
     assessmentSchema: z.toJSONSchema(assessment),
     referenceFormat: 'observations.evidence and findings.evidence must be a repository-relative file path or artifact:<saved artifact filename>. Put explanations and line/frame details in observation/detail, never in the path. Copy hashes from the packet; do not guess them.',
     referenceSnapshot: join(stateDir, t.id, '0-references.json'),
-    relatedProjects: ['cashubtc/nuts', 'cashubtc/coco', 'cashubtc/cashu-ts', 'cashubtc/nutshell', 'cashubtc/cdk', 'cashubtc/cashu.me', 'cashubtc/macadamia', 'cashubtc/minibits_wallet', 'cashubtc/wallet'],
+    relatedProjects: Object.values(projects),
     repairFindings: t.ticket.role === 'implementation' ? t.assessments.flatMap(a => a.result.findings) : [],
   };
   const sha256 = digest(JSON.stringify(packet));
