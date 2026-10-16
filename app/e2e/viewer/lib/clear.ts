@@ -42,7 +42,12 @@ export async function clearRuns(): Promise<ClearResult> {
       continue;
     }
     if (!detail || !detail.fundsSafeToDelete) {
-      skipped.push({ runId: runDirName, reason: 'funded ledger not reconciled' });
+      skipped.push({
+        runId: runDirName,
+        reason: detail?.origin
+          ? 'recorded evidence retained; deletion safety not assessed'
+          : 'funded ledger not reconciled',
+      });
       continue;
     }
     const runDir = join(ARTIFACTS, runDirName);

@@ -39,11 +39,16 @@ function okGlyph(
 let lastScrolledScenarioId: string | undefined;
 
 function escapeHtml(value: string): string {
-  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 function latestRun(entry: ScenarioCatalogEntry): CatalogRunRef | undefined {
-  return entry.runs.find((run) => run.proof === 'product-run');
+  return entry.runs.find((run) => run.proof !== 'orchestration-smoke');
 }
 
 /** "iPhone" / "Android" chips: a scenario shows every platform it is specified
@@ -94,7 +99,7 @@ export function renderRunList(root: HTMLElement): void {
   if (state.catalog.length === 0) {
     parts.push('<div class="scenario-row">no scenarios found</div>');
   } else if (
-    !state.catalog.some((entry) => entry.runs.some((run) => run.proof === 'product-run'))
+    !state.catalog.some((entry) => entry.runs.some((run) => run.proof !== 'orchestration-smoke'))
   ) {
     parts.push('<div class="scenario-row">no runs yet — trigger one above</div>');
   }
@@ -109,7 +114,7 @@ export function renderRunList(root: HTMLElement): void {
 
   function renderScenarioRows(entry: ScenarioCatalogEntry): string {
     const rows: string[] = [];
-    const runs = entry.runs.filter((run) => run.proof === 'product-run');
+    const runs = entry.runs.filter((run) => run.proof !== 'orchestration-smoke');
     const selected = state.selectedScenarioId === entry.id && state.mode === 'browse';
     const latest = runs[0];
     const tooltip = [entry.description, entry.tags.map(facetTagLabel).join(' · ')]
@@ -117,7 +122,7 @@ export function renderRunList(root: HTMLElement): void {
       .join('\n');
     rows.push(
       `<div class="run-row${selected ? ' selected' : ''}${runs.length === 0 ? ' smoke' : ''}" data-scenario="${escapeHtml(entry.id)}" title="${escapeHtml(tooltip)}">` +
-        `${latest ? okGlyph(latest.ok, latest.status, latest.scenarioStatus) : ''}<span class="title">${escapeHtml(entry.name)}</span>` +
+        `${latest ? (latest.proof === 'manual-review' ? '<span class="glyph-pending">◈</span>' : okGlyph(latest.ok, latest.status, latest.scenarioStatus)) : ''}<span class="title">${escapeHtml(entry.name)}</span>` +
         platformChips(entry.platforms) +
         `<span class="badge">${runs.length || ''}</span>` +
         `</div>`
@@ -128,7 +133,7 @@ export function renderRunList(root: HTMLElement): void {
         const runSelected = state.selectedRunId === run.runId;
         rows.push(
           `<div class="scenario-row${runSelected ? ' selected' : ''}" data-run="${run.runId}" data-scenario="${escapeHtml(entry.id)}">` +
-            `${okGlyph(run.ok, run.status, run.scenarioStatus)}<span class="${run.commitRun ? 'commit' : ''}">${escapeHtml(run.label)}</span>${runPlatformChip(run)}</div>`
+            `${run.proof === 'manual-review' ? '<span class="glyph-pending">◈</span>' : okGlyph(run.ok, run.status, run.scenarioStatus)}<span class="${run.commitRun ? 'commit' : ''}">${escapeHtml(run.label)}${run.proof === 'manual-review' ? ' · Manual review' : ''}</span>${runPlatformChip(run)}</div>`
         );
       }
       if (runs.length === 0) rows.push('<div class="scenario-row">no runs yet</div>');
@@ -153,7 +158,7 @@ function bindRows(root: HTMLElement): void {
   for (const row of root.querySelectorAll<HTMLElement>('.run-row[data-scenario]')) {
     row.addEventListener('click', () => {
       const entry = state.catalog.find((candidate) => candidate.id === row.dataset.scenario);
-      const newest = entry?.runs.find((run) => run.proof === 'product-run');
+      const newest = entry?.runs.find((run) => run.proof !== 'orchestration-smoke');
       if (entry) void selectScenario(newest?.runId, entry.id);
     });
   }

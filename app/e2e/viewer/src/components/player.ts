@@ -161,7 +161,7 @@ export function transportTogglePlay(): void {
 
 /** One diff-viewer-style row: line-number gutter, status glyph, tokenized
  * step text (id / kind / label), and the error as its own annotation line. */
-function renderStepRow(frame: ReelFrame, index: number): string {
+export function renderStepRow(frame: ReelFrame, index: number): string {
   const failed = frame.ok === false;
   const rowClass = `step-item${failed ? ' fail' : ''}${frame.named ? ' named' : ''}`;
   const status = failed ? '✗' : frame.named ? '◈' : frame.ok ? '✓' : '·';
@@ -173,11 +173,30 @@ function renderStepRow(frame: ReelFrame, index: number): string {
   const error = failed
     ? `<span class="tok-error">${escapeHtml(frame.error ?? 'failed')}</span>`
     : '';
+  const measured = frame.observations;
+  const observations = measured
+    ? [
+        `${measured.wallMs} ms`,
+        measured.screenKeptMoving
+          ? 'screen never stopped moving'
+          : measured.screenMovedMs !== undefined
+            ? `screen moved ${measured.screenMovedMs} ms more`
+            : '',
+        measured.appUnresponsiveMs !== undefined
+          ? `app unresponsive for ${measured.appUnresponsiveMs} ms`
+          : '',
+        measured.touchMadeAgain ? 'first touch not taken; touch repeated' : '',
+        ...measured.warnings.map((warning) => `${warning.level}: ${warning.event}`),
+      ]
+        .filter(Boolean)
+        .map((text) => `<span class="tok-label">${escapeHtml(text)}</span>`)
+        .join(' · ')
+    : '';
   return (
     `<div class="${rowClass}" data-index="${index}">` +
     `<span class="step-gutter">${index + 1}</span>` +
     `<span class="step-status ${statusClass}">${status}</span>` +
-    `<span class="step-code">${code}${error}</span>` +
+    `<span class="step-code">${code}${error}<span class="step-observations">${observations}</span></span>` +
     `</div>`
   );
 }
@@ -202,7 +221,7 @@ export function renderPlayer(root: HTMLElement): void {
               : ''
           }
         </div>
-        <div class="stage"><span class="empty">no runs yet — use “Run scenario” above</span></div>
+        <div class="stage"><span class="empty">${entry.runDisabledReason ? escapeHtml(entry.runDisabledReason) : 'no runs yet — use “Run scenario” above'}</span></div>
       </div>`;
       return;
     }
@@ -241,13 +260,15 @@ function buildShell(
   const liveScenario =
     timeline.ok === undefined && !timeline.deferred && state.runDetail?.status === 'in-progress';
   const outcome =
-    timeline.ok === undefined
-      ? liveScenario
-        ? ' <span class="glyph-running">● running</span>'
-        : ''
-      : timeline.ok
-        ? ' <span class="glyph-pass">✓ passed</span>'
-        : ' <span class="glyph-fail">✗ failed</span>';
+    state.runDetail?.proof === 'manual-review'
+      ? ' <span class="glyph-pending">◈ Manual review</span>'
+      : timeline.ok === undefined
+        ? liveScenario
+          ? ' <span class="glyph-running">● running</span>'
+          : ''
+        : timeline.ok
+          ? ' <span class="glyph-pass">✓ passed</span>'
+          : ' <span class="glyph-fail">✗ failed</span>';
 
   const stepItems = frames.map((frame, index) => renderStepRow(frame, index)).join('');
 
@@ -339,7 +360,8 @@ function buildShell(
     <div class="player-head">
       <div class="titles">
         <h1>${escapeHtml(timeline.name)}${outcome}</h1>
-        <p>${escapeHtml(entry?.description ?? '')}</p>
+        <p>${escapeHtml(timeline.description ?? entry?.description ?? '')}</p>
+        ${timeline.failure ? `<p class="tok-error">${escapeHtml(timeline.failure)}</p>` : ''}
         ${facetChips ? `<div class="facet-chips">${facetChips}</div>` : ''}
         ${detailsBlock}
       </div>
@@ -613,7 +635,9 @@ function patchDynamic(
 
   const img = root.querySelector<HTMLImageElement>('#stage-img');
   if (img && frame) {
-    const src = api.runFileUrl(runId, frame.file);
+    img.hidden = !frame.file;
+    const src = frame.file ? api.runFileUrl(runId, frame.file) : '';
+    if (!frame.file) img.removeAttribute('src');
     if (!img.src.endsWith(src)) img.src = src;
   }
 
@@ -647,7 +671,7 @@ function patchDynamic(
 
   // keep neighbours warm so scrubbing feels instant
   for (const neighbour of [frames[index - 1], frames[index + 1]]) {
-    if (neighbour) new Image().src = api.runFileUrl(runId, neighbour.file);
+    if (neighbour?.file) new Image().src = api.runFileUrl(runId, neighbour.file);
   }
 
   if (state.sideTab === 'state') patchStatePane(root, runId, frames, index);

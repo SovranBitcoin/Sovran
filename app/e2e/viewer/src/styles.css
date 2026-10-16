@@ -1845,3 +1845,10 @@ label.check input[type='checkbox'] {
 .modal summary {
   cursor: pointer;
 }
+
+/* Story observations are evidence, not an error verdict. */
+.step-observations {
+  display: block;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}

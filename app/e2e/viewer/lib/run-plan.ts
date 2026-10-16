@@ -20,13 +20,14 @@ export function buildRunPlan(
   if (request.kind === 'scenario') {
     const scenario = catalog.find((entry) => entry.id === request.scenarioId);
     if (!scenario) return { error: 'unknown scenario' };
+    if (scenario.runDisabledReason) return { error: scenario.runDisabledReason };
     selected = [scenario];
     selectionArgs = ['--suite', 'full', '--scenario', request.scenarioId];
   } else {
     const suite = request.kind === 'suite' ? request.suite : (request.suite ?? 'default');
     if (suite !== 'default' && suite !== 'full' && suite !== 'store-screenshots')
       return { error: 'unknown suite' };
-    selected = catalog.filter((entry) => entry.suites.includes(suite));
+    selected = catalog.filter((entry) => !entry.runDisabledReason && entry.suites.includes(suite));
     if (selected.length === 0) return { error: `suite "${suite}" selected zero scenarios` };
     selectionArgs = ['--suite', suite];
   }

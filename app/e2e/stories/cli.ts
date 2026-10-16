@@ -1,17 +1,34 @@
 /* eslint-disable no-console -- CLI boundary */
 /**
  * Play one story on a simulator:
- *   bun e2e/stories/cli.ts <story.json> --udid <simulator> --app <Sovran.app> [--out <dir>] [--look]
+ *   bun e2e/stories/cli.ts <story.json> --udid <simulator> --app <Sovran.app> [--look]
  *   bun e2e/stories/cli.ts --state <name> --udid <simulator> --app <Sovran.app>
  *
  * `--look` lists what is on screen when the story ends, for writing the next step.
  * `--state` only builds and saves a state on the simulator, if it is not there already.
  *
- * Leaves the story's video, a picture per step and a report in `--out`, by
- * default e2e/artifacts/stories/<story id>/.
+ * Leaves each invocation in its own e2e/artifacts/run-<id>/ folder, browsable
+ * with bun run e2e:viewer. --run-dir and --attempt are worker coordinator flags.
  */
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { dirname, join } from 'node:path';
+import {
+  attemptDirectory,
+  createStoryRun,
+  finishStoryRun,
+  registerAttempt,
+  reusableEvidence,
+  storyReportSchema,
+  finishAttempt,
+} from '../results/runs';
 import { fileURLToPath } from 'node:url';
 import { startAppLink } from '../link/appLink';
 import { createScreenWatch, keepVideo, pictureName, recordSimulator } from './evidence';
@@ -41,7 +58,7 @@ const appPath = flag('app');
 const onlyState = flag('state');
 if ((!storyPath && !onlyState) || !udid || !appPath) {
   console.error(
-    'Usage: bun e2e/stories/cli.ts <story.json> --udid <simulator> --app <Sovran.app> [--out <dir>] [--look]\n' +
+    'Usage: bun e2e/stories/cli.ts <story.json> --udid <simulator> --app <Sovran.app> [--look]\n' +
       '       bun e2e/stories/cli.ts --state <name> --udid <simulator> --app <Sovran.app>'
   );
   process.exit(2);
@@ -49,7 +66,6 @@ if ((!storyPath && !onlyState) || !udid || !appPath) {
 
 /** What the recorder is given to capture the final screen. This paces no step. */
 const LAST_FRAME_MS = 300;
-const STORIES_OUT = join(dirname(fileURLToPath(import.meta.url)), '../artifacts/stories');
 
 // Made before the simulator is told to trust them.
 ensureCertificates();
@@ -73,7 +89,8 @@ const play = async (
   look: boolean,
   person: ReturnType<typeof makePerson>
 ): Promise<boolean> => {
-  rmSync(outDir, { recursive: true, force: true });
+  if (existsSync(join(outDir, 'report.json')))
+    throw new Error(`Evidence already exists: ${outDir}`);
   mkdirSync(outDir, { recursive: true });
   const rawVideo = join(outDir, 'raw.mp4');
   const link = startAppLink();
@@ -125,6 +142,7 @@ const play = async (
     await new Promise((resolve) => setTimeout(resolve, LAST_FRAME_MS));
     watching.stop();
     await recording.stop();
+    const videoEndT = Date.now();
     spentOn('recordingEnd');
     await keepVideo(rawVideo, outDir);
     rmSync(rawVideo, { force: true });
@@ -134,7 +152,7 @@ const play = async (
     const ok = result.ok && !unwatched;
     writeFileSync(
       join(outDir, 'report.json'),
-      `${JSON.stringify({ id: story.id, purpose: story.purpose, startsFrom: story.startsFrom, ok, ...(unwatched ? { failure: unwatched } : {}), video: 'story.mp4', spentMs: spent, screenWatcherRestarts: watching.restarts(), steps: result.steps.map((step, index) => ({ ...step, picture: pictures[index] })) }, null, 2)}\n`
+      `${JSON.stringify({ id: story.id, purpose: story.purpose, startsFrom: story.startsFrom, ok, ...(unwatched ? { failure: unwatched } : {}), video: 'story.mp4', videoEndT, spentMs: spent, screenWatcherRestarts: watching.restarts(), steps: result.steps.map((step, index) => ({ ...step, picture: pictures[index] })) }, null, 2)}\n`
     );
 
     console.log(`${ok ? 'PASS' : 'FAIL'}  ${story.id}: ${story.purpose}`);
@@ -217,8 +235,31 @@ const playWithMint = async (story: Story, outDir: string, look: boolean) => {
 
 const storyText = storyPath ? readFileSync(storyPath, 'utf8') : undefined;
 const story = storyText ? storySchema.parse(JSON.parse(storyText)) : undefined;
-const stateEvidence = (id: string) => join(STORIES_OUT, `state-${id}-${udid.slice(0, 8)}`);
+const suppliedRun = flag('run-dir');
+const runDir =
+  suppliedRun ??
+  createStoryRun(
+    join(dirname(fileURLToPath(import.meta.url)), '../artifacts'),
+    'single-story',
+    story ? [flag('attempt') ?? story.id] : []
+  );
+const attemptId = flag('attempt') ?? story?.id ?? onlyState ?? 'setup';
+const outDir =
+  suppliedRun || !story
+    ? attemptDirectory(runDir, udid, attemptId)
+    : registerAttempt(runDir, udid, attemptId);
+const stateEvidence = (id: string) =>
+  attemptDirectory(runDir, udid, `${id}--${attemptId}`, 'setup');
+const previousEvidence = (id: string): string | undefined => {
+  const setup = join(runDir, 'workers', udid, 'setup');
+  if (!existsSync(setup)) return undefined;
+  return readdirSync(setup)
+    .filter((name) => name.startsWith(`${id}--`))
+    .map((name) => join(setup, name))
+    .find((dir) => existsSync(join(dir, 'report.json')));
+};
 let ok = false;
+let failure: string | undefined;
 try {
   const actions = {
     hasState: simulator.hasState,
@@ -231,15 +272,19 @@ try {
     await reachState(onlyState ?? '', actions);
     ok = true;
   } else {
-    const outDir = flag('out') ?? join(STORIES_OUT, story.id);
     const endsIn = madeFrom(story, storyText);
-    if (simulator.hasState(story.id, endsIn) && existsSync(stateEvidence(story.id))) {
+    const earlierEvidence = reusableEvidence(
+      simulator.hasState(story.id, endsIn),
+      previousEvidence(story.id)
+    );
+    if (earlierEvidence) {
       // Already played on this simulator, as the start of another story. Playing
       // it again would take the wallet back in time, and a mint refuses secrets
       // it has seen; what it left then is this story's result.
-      rmSync(outDir, { recursive: true, force: true });
-      cpSync(stateEvidence(story.id), outDir, { recursive: true });
-      ok = (JSON.parse(readFileSync(join(outDir, 'report.json'), 'utf8')) as { ok: boolean }).ok;
+      cpSync(earlierEvidence, outDir, { recursive: true });
+      ok = storyReportSchema.parse(
+        JSON.parse(readFileSync(join(outDir, 'report.json'), 'utf8'))
+      ).ok;
       console.log(
         `${ok ? 'PASS' : 'FAIL'}  ${story.id}: played earlier on this simulator as the start of another story`
       );
@@ -259,9 +304,12 @@ try {
       .join(', ')
   );
 } catch (error) {
+  failure = error instanceof Error ? error.message : String(error);
   console.log(
     `FAIL  ${story?.id ?? onlyState}: ${error instanceof Error ? error.message : String(error)}`
   );
 }
+if (story) finishAttempt(outDir, attemptId, ok ? 0 : 1, failure);
+if (!suppliedRun) finishStoryRun(runDir);
 // The link's server and the simulator's input addon keep the process alive.
 process.exit(ok ? 0 : 1);

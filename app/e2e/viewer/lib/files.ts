@@ -3,6 +3,7 @@ import { basename, join } from 'node:path';
 import { ARTIFACTS, isValidRunDirName, safeArtifactPath } from './paths';
 
 const CONTENT_TYPES: Record<string, string> = {
+  '.jpg': 'image/jpeg',
   '.png': 'image/png',
   '.json': 'application/json',
   '.jsonl': 'application/x-ndjson',

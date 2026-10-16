@@ -1,3 +1,4 @@
+import { recordedRun } from './storyRuns';
 import { readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod';
@@ -106,15 +107,16 @@ async function fundsSafeToDelete(runDir: string): Promise<boolean> {
 export async function getRunDetail(runDirName: string): Promise<RunDetail | undefined> {
   if (!isValidRunDirName(runDirName)) return undefined;
   const runDir = join(ARTIFACTS, runDirName);
+  const manifest = await readManifest(runDir);
+  if (!manifest) return undefined;
+  if (manifest.kind === 'stories' || manifest.kind === 'manual-review')
+    return recordedRun(runDir, runDirName, manifest);
   const cached = cache.get(runDirName);
   if (cached?.pinned) return cached.detail;
   const stat = eventsStat(runDir);
   if (cached && cached.mtimeMs === stat.mtimeMs && cached.size === stat.size) {
     return refreshVolatileStatus(cached.detail);
   }
-
-  const manifest = await readManifest(runDir);
-  if (!manifest) return undefined;
 
   let eventsText = '';
   try {
@@ -210,7 +212,7 @@ export async function listRuns(): Promise<RunDetail[]> {
     const detail = await getRunDetail(name);
     if (detail) details.push(detail);
   }
-  return details;
+  return details.sort((a, b) => (Date.parse(b.startedAt) || 0) - (Date.parse(a.startedAt) || 0));
 }
 
 export function evictRun(runDirName: string): void {

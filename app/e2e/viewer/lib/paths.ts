@@ -6,13 +6,13 @@ export const E2E_ROOT = resolve(LIB, '..', '..');
 export const APP_ROOT = resolve(E2E_ROOT, '..');
 export const ARTIFACTS = join(E2E_ROOT, 'artifacts');
 export const SUITES = join(E2E_ROOT, 'suites');
-const VIEWER_CACHE = join(ARTIFACTS, 'viewer-cache');
+const VIEWER_CACHE = join(ARTIFACTS, 'cache', 'viewer');
 export const DIFF_CACHE = join(VIEWER_CACHE, 'diff');
 
 const RUN_ID_RE = /^run-[A-Za-z0-9][A-Za-z0-9._-]*$/;
 /** Artifact bytes the viewer may serve. Bare `.log` (metro.log, bridge logs)
  * and anything under custody/ stay server-private. */
-const SERVABLE_EXTENSIONS = ['.png', '.ax.json', '.json', '.jsonl', '.mp4'];
+const SERVABLE_EXTENSIONS = ['.png', '.jpg', '.ax.json', '.json', '.jsonl', '.mp4'];
 const STORE_ARCHIVE =
   /^store\/(screenshots|app-store|freedom-store|google-play|zapstore|github-apk|website)\.zip$/;
 

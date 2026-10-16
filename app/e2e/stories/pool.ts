@@ -37,3 +37,15 @@ export async function runPool<Story, Outcome>(
   );
   return results;
 }
+
+/** Repetitions get fresh disposable workers: a public mint cannot rewind with
+ * a saved wallet, and repeated attempts must execute rather than copy proof. */
+export async function runRounds<Story, Outcome>(
+  rounds: readonly (readonly Story[])[],
+  prepareWorkers: () => readonly string[],
+  play: (story: Story, worker: string) => Promise<Outcome>
+): Promise<PoolResult<Story, Outcome>[]> {
+  const results: PoolResult<Story, Outcome>[] = [];
+  for (const round of rounds) results.push(...(await runPool(round, prepareWorkers(), play)));
+  return results;
+}

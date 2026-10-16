@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { runPool } from './pool';
+import { runPool, runRounds } from './pool';
 
 const after = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
@@ -39,4 +39,30 @@ describe('sharing stories among workers', () => {
 
     expect(overlapped).toBe(false);
   });
+});
+
+test('each repetition executes on fresh workers while a round keeps its own wallet', async () => {
+  let created = 0;
+  const seen = new Map<string, string[]>();
+  const results = await runRounds(
+    [
+      ['receive', 'spend'],
+      ['receive', 'spend'],
+    ],
+    () => [`wallet-${++created}`],
+    async (story, worker) => {
+      seen.set(worker, [...(seen.get(worker) ?? []), story]);
+      return story;
+    }
+  );
+  expect([...seen.values()]).toEqual([
+    ['receive', 'spend'],
+    ['receive', 'spend'],
+  ]);
+  expect(results.map((result) => result.worker)).toEqual([
+    'wallet-1',
+    'wallet-1',
+    'wallet-2',
+    'wallet-2',
+  ]);
 });

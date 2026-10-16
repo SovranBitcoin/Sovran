@@ -33,6 +33,16 @@ const CATALOG = [
 ];
 
 describe('buildRunPlan', () => {
+  test('refuses a recorded story instead of sending its ID to the legacy harness', () => {
+    const story = {
+      ...scenario('story:preview', ['ios']),
+      runDisabledReason: 'Run stories with e2e:story.',
+    };
+    expect(buildRunPlan({ kind: 'scenario', scenarioId: story.id }, [story])).toEqual({
+      error: story.runDisabledReason,
+    });
+  });
+
   test('expands a cross-platform scenario into sequential iOS and Android commands', () => {
     expect(buildRunPlan({ kind: 'scenario', scenarioId: 'both' }, CATALOG)).toEqual({
       argvs: [
