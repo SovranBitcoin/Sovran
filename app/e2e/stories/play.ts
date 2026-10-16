@@ -196,26 +196,27 @@ async function playStep(
     step.type?.into ||
     step.expect.some((expectation) => !('logged' in expectation));
   const readScreen = async () => {
-    const asked = performance.now();
-    try {
-      for (;;) {
-        const screen = await link.screen(Math.max(ANSWER_WITHIN_MS, deadline - performance.now()));
-        if (
-          !needsControlMap ||
-          (Number.isFinite(screen.width) &&
-            screen.width > 0 &&
-            Number.isFinite(screen.height) &&
-            screen.height > 0)
-        )
-          return screen;
-        if (performance.now() >= deadline)
-          throw new Error(`control map unavailable: ${screen.source ?? 'no measured window'}`);
-        // Capture may not have a mounted root during startup. Observe again,
-        // without treating missing instrumentation as proof that a control is gone.
-        await new Promise((resolve) => setTimeout(resolve, 100));
+    for (;;) {
+      const asked = performance.now();
+      let screen: AppScreen;
+      try {
+        screen = await link.screen(Math.max(ANSWER_WITHIN_MS, deadline - asked));
+      } finally {
+        slowestAnswerMs = Math.max(slowestAnswerMs, Math.round(performance.now() - asked));
       }
-    } finally {
-      slowestAnswerMs = Math.max(slowestAnswerMs, Math.round(performance.now() - asked));
+      if (
+        !needsControlMap ||
+        (Number.isFinite(screen.width) &&
+          screen.width > 0 &&
+          Number.isFinite(screen.height) &&
+          screen.height > 0)
+      )
+        return screen;
+      if (performance.now() >= deadline)
+        throw new Error(`control map unavailable: ${screen.source ?? 'no measured window'}`);
+      // Capture may not have a mounted root during startup. Observe again,
+      // without treating missing instrumentation as proof that a control is gone.
+      await new Promise((resolve) => setTimeout(resolve, 100));
     }
   };
   const finish = (failure?: string): StepResult => {

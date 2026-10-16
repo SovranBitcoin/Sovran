@@ -132,14 +132,15 @@ describe('playStory', () => {
     expect(logged.ok).toBe(true);
     let reads = 0;
     app.link.screen = async () =>
-      ++reads === 1 ? app.state.screen : screenOf(box({ id: 'new-page' }));
+      ++reads <= 3 ? app.state.screen : screenOf(box({ id: 'new-page' }));
     const gone = await playStory(
-      story([{ name: 'old page is gone', withinMs: 500, expect: [{ gone: { id: 'old-page' } }] }]),
+      story([{ name: 'old page is gone', withinMs: 1000, expect: [{ gone: { id: 'old-page' } }] }]),
       app.link,
       device
     );
     expect(gone.ok).toBe(true);
     expect(gone.steps[0].failure).toBeUndefined();
+    expect(gone.steps[0].appUnresponsiveMs).toBeUndefined();
   });
 
   test('taps the centre of the control once and passes when what it expects is true', async () => {
