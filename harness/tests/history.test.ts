@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { fixture } from './controller.test';
 import { Controller } from '../src/controller';
 import { git } from '../src/workspace';
-import type { Task } from '../src/workflow';
+import { assessmentFor, type Task } from '../src/workflow';
 
 function investigation(t: Task, path = 'source.txt') {
   if (!t.historyEvidence) throw new Error('Missing captured history');
@@ -127,4 +127,14 @@ test("a research brief offers only research's fields, and the controller refuses
   // Live 2026-10-16: shown the full schema, a research worker added the audit's historyReview.
   const review = { path: 'source.txt', observation: 'Rechecked', evidence: ['source.txt'] };
   expect(() => submit(c, t.id, { history: [investigation(t)], historyReview: [review] })).toThrow('belongs to audit');
+});
+
+test('each role is offered exactly the owned assessment fields it may submit', () => {
+  const owned = { research: ['history'], implementation: ['resolutionProposals'], audit: ['historyReview', 'resolutionReviews'],
+    review: [], adversary: [], diversityReview: [] } as const;
+  const all = Object.values(owned).flat();
+  for (const [role, mine] of Object.entries(owned)) {
+    const fields = Object.keys(assessmentFor(role as keyof typeof owned).shape);
+    expect([role, all.filter(f => fields.includes(f)).sort()]).toEqual([role, [...mine].sort()]);
+  }
 });
