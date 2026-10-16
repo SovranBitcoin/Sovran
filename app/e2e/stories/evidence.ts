@@ -3,7 +3,7 @@
  * step. The video is continuous; checkpoint pictures are new simulator captures.
  * Capture latency is included in the run and is not app-performance evidence.
  */
-import { execFile, spawn } from 'node:child_process';
+import { execFile, spawn, type ChildProcess } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import sharp from 'sharp';
 import { join } from 'node:path';
@@ -20,19 +20,22 @@ interface Recording {
   stop(): Promise<void>;
 }
 
+type Launch = (command: string, args: string[]) => ChildProcess;
+interface RecorderIo {
+  launch?: Launch;
+  startupMs?: number;
+  stopMs?: number;
+}
+
 /**
  * Record a simulator's screen for the story's video. Resolves when the first
  * frame has been captured, which is when `simctl` says "Recording started".
  * Nothing is timed from this file: on a busy Mac it is written seconds late.
  */
-const spawnRecorder = (command: string, args: string[]) =>
-  spawn(command, args, { stdio: ['ignore', 'ignore', 'pipe'] });
+const spawnRecorder: Launch = (command, args) =>
+  spawn(command, args, { stdio: ['ignore', 'pipe', 'pipe'] });
 
-export async function recordSimulator(
-  udid: string,
-  file: string,
-  io: { launch?: typeof spawnRecorder; startupMs?: number; stopMs?: number } = {}
-): Promise<Recording> {
+export function recordSimulator(udid: string, file: string, io: RecorderIo = {}) {
   const child = (io.launch ?? spawnRecorder)(SIMCTL[0], [
     ...SIMCTL.slice(1),
     'io',
@@ -43,6 +46,54 @@ export async function recordSimulator(
     '--force',
     file,
   ]);
+  return recordScreen(child, { ...io, ready: 'Recording started' });
+}
+
+/** Where an Android recording is written on the device before it is pulled. */
+export const ANDROID_RECORDING = '/data/local/tmp/sovran-story.mp4';
+/** `screenrecord` stops itself after this; a story still running then has a gap. */
+const ANDROID_RECORDING_LIMIT_S = 180;
+
+/**
+ * Record an emulator's screen with `screenrecord` for the story's video. Ready
+ * once it reports the content area it captures. It finalizes only on an
+ * interrupt delivered on the device: interrupting the local adb client leaves
+ * an unreadable file. A story longer than the time limit fails as a gap.
+ */
+export function recordAndroid(
+  adb: readonly [string, ...string[]],
+  io: RecorderIo & { interrupt?: () => Promise<unknown> } = {}
+) {
+  const shell = (args: string[]) => [...adb.slice(1), 'shell', ...args];
+  const child = (io.launch ?? spawnRecorder)(
+    adb[0],
+    shell([
+      'screenrecord',
+      '--verbose',
+      '--time-limit',
+      String(ANDROID_RECORDING_LIMIT_S),
+      ANDROID_RECORDING,
+    ])
+  );
+  const interrupt =
+    io.interrupt ??
+    (() =>
+      new Promise<void>((resolve, reject) =>
+        execFile(adb[0], shell(['pkill', '-INT', '-x', 'screenrecord']), { timeout: 10_000 }, (error) =>
+          error ? reject(error) : resolve()
+        )
+      ));
+  return recordScreen(child, { ...io, ready: 'Content area is', interrupt });
+}
+
+/**
+ * The recorder lifecycle both platforms share. Exiting before stop, even with
+ * status 0, leaves a gap in the video and fails; so does any unclean finish.
+ */
+async function recordScreen(
+  child: ChildProcess,
+  io: RecorderIo & { ready: string; interrupt?: () => Promise<unknown> }
+): Promise<Recording> {
   type End = { code: number | null; signal: NodeJS.Signals | null } | { error: Error };
   let ended: End | undefined;
   const exited = new Promise<End>((resolve) => {
@@ -66,12 +117,14 @@ export async function recordSimulator(
   const describe = (end: End) =>
     'error' in end ? end.error.message : `code ${end.code}, signal ${end.signal}`;
   let said = '';
-  const ready = new Promise<void>((resolve) =>
-    child.stderr.on('data', (chunk: Buffer) => {
+  const ready = new Promise<void>((resolve) => {
+    const hear = (chunk: Buffer) => {
       said = (said + chunk.toString()).slice(-4000);
-      if (said.includes('Recording started')) resolve();
-    })
-  );
+      if (said.includes(io.ready)) resolve();
+    };
+    child.stdout?.on('data', hear);
+    child.stderr?.on('data', hear);
+  });
   const bounded = async <T>(work: Promise<T>, ms: number, message: string): Promise<T> => {
     let timer: ReturnType<typeof setTimeout> | undefined;
     try {
@@ -91,7 +144,8 @@ export async function recordSimulator(
   const reap = async () => {
     if (!ended) child.kill('SIGKILL');
     await bounded(exited, 5000, 'Recorder did not exit after forced cleanup');
-    child.stderr.destroy();
+    child.stdout?.destroy();
+    child.stderr?.destroy();
   };
   const cleanFailure = async (error: unknown): Promise<never> => {
     try {
@@ -114,7 +168,7 @@ export async function recordSimulator(
         }),
       ]),
       io.startupMs ?? 10000,
-      'The simulator did not start recording'
+      'The screen did not start recording'
     );
   } catch (error) {
     return cleanFailure(new Error(`Recorder failed before readiness: ${String(error)}`));
@@ -127,7 +181,8 @@ export async function recordSimulator(
           // Even exit(0) before this request leaves a gap in the story's video.
           if (processError) throw processError;
           if (ended) throw new Error(`Recorder exited before stop: ${describe(ended)}`);
-          if (!child.kill('SIGINT')) throw new Error('Recorder was gone before stop');
+          if (io.interrupt) await io.interrupt();
+          else if (!child.kill('SIGINT')) throw new Error('Recorder was gone before stop');
           const end = await bounded(
             Promise.race([exited, failed]),
             io.stopMs ?? 10000,
@@ -135,7 +190,8 @@ export async function recordSimulator(
           );
           if ('error' in end || end.code !== 0 || end.signal !== null)
             throw new Error(`Recorder did not finalize successfully: ${describe(end)}`);
-          child.stderr.destroy();
+          child.stdout?.destroy();
+          child.stderr?.destroy();
         } catch (error) {
           return cleanFailure(error);
         }
@@ -239,7 +295,7 @@ function ffmpeg(args: string[]): Promise<void> {
       stdio: ['ignore', 'ignore', 'pipe'],
     });
     let said = '';
-    child.stderr.on('data', (chunk: Buffer) => (said += chunk.toString()));
+    child.stderr?.on('data', (chunk: Buffer) => (said += chunk.toString()));
     child.once('error', reject);
     child.once('exit', (code) =>
       code === 0 ? resolve() : reject(new Error(`ffmpeg failed: ${said.trim().slice(-400)}`))

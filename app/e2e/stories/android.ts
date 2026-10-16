@@ -40,7 +40,7 @@ import {
   finishStoryRun,
   storyReportSchema,
 } from '../results/runs';
-import { pictureName } from './evidence';
+import { ANDROID_RECORDING, keepVideo, pictureName, recordAndroid } from './evidence';
 import { playStory } from './play';
 import { storySchema, type Story } from './story';
 
@@ -123,6 +123,7 @@ export async function runAndroidStory(
   };
   const failures: string[] = [];
   let avdRoot: string | undefined;
+  let recording: Awaited<ReturnType<typeof recordAndroid>> | undefined;
   try {
     writeFileSync(join(outDir, 'story.json'), storyText);
     const build = await ensureNativeBuild('android', 'never', kind);
@@ -148,7 +149,7 @@ export async function runAndroidStory(
               'owned AOSP emulator; root used only to provision runner connection',
               'normal animation scales; display kept awake and system status normalized',
             ]),
-        'no video or pixel-motion measurement',
+        'no pixel-motion measurement',
         'no device performance certification',
       ],
     };
@@ -182,6 +183,8 @@ export async function runAndroidStory(
               outDir,
               note: { url: appLink.url, run },
             });
+            // From launch on, so the video shows every step from the first frame.
+            recording = await recordAndroid([adbBin(resolveAndroidSdkRoot()), '-s', device.serial]);
           });
           const hello = await appLink.connected(90_000);
           signal.throwIfAborted();
@@ -210,6 +213,14 @@ export async function runAndroidStory(
             }
           );
           signal.throwIfAborted();
+          // Let the last change be drawn and recorded before the recording ends.
+          await appLink.still(3000).catch(() => undefined);
+          await recording?.stop();
+          const rawVideo = join(outDir, 'raw.mp4');
+          await device.adb.raw(['pull', ANDROID_RECORDING, rawVideo], { timeoutMs: 120_000 });
+          await keepVideo(rawVideo, outDir);
+          rmSync(rawVideo, { force: true });
+          report.video = 'story.mp4';
           report.ok = result.ok;
           const failed = report.steps.find((step) => !step.ok);
           if (failed) report.failure = `${failed.name}: ${failed.failure ?? 'expectations failed'}`;
@@ -222,6 +233,8 @@ export async function runAndroidStory(
             bin: adbBin(resolveAndroidSdkRoot()),
           });
           for (const capture of [
+            // A failed run still ends its recorder before the emulator goes.
+            async () => recording?.stop(),
             async () =>
               writeFileSync(
                 join(outDir, 'device-log.txt'),
