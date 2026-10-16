@@ -2,14 +2,16 @@
 
 Research date: 2026-10-16. Controller audit baseline: `f12db054d`;
 second history/native-source audit: `db007cc61`.
-This is a researched design, not a claim that the proposed gates already run.
+Implementation observations below describe those pinned audit baselines, not the current checkout.
+This is a researched design, not a second implementation-status ledger.
 The [harness README](../../harness/README.md) describes implemented behavior; the
 [follow-up ledger](../follow-ups/README.md) owns unfinished work.
 
 The owner selected availability fallback: if Claude is out of quota, GPT-only completion
 is allowed with fresh reviewers, an additional review using a different GPT model, and
 disclosure. This supersedes the earlier product preference for mandatory cross-provider
-review. The current controller still enforces the earlier rule until F159 is implemented.
+review. The executable policy and remaining live validation are described in the harness
+README and F159.
 
 ## What the research supports
 
@@ -55,11 +57,11 @@ mutation checks. These are useful precedents to reuse conceptually. Its optional
 quarantine can reclassify known failures; that policy is not suitable to copy into our
 required evidence gates. Only its documentation was inspected, not runtime enforcement.
 
-## What the current implementation actually establishes
+## Findings at the pinned audit baselines
 
 The existing controller has meaningful tests for stale source, duplicate command ownership,
 process cleanup, dependency authority, immutable context, upgrade-report gaps, ambiguous PR
-creation and stale CI after repair. Preserve them. Three additional problems were verified:
+creation and stale CI after repair. Preserve them. Three additional problems were verified at those baselines:
 
 1. Accepted research is stored in assessments, but its summary, observations and reuse
    discoveries are omitted from subsequent worker briefs. A public-controller probe created
@@ -75,7 +77,7 @@ creation and stale CI after repair. Preserve them. Three additional problems wer
    [zeugmaster/macadamia](https://github.com/zeugmaster/macadamia) and
    [minibits-cash/minibits_wallet](https://github.com/minibits-cash/minibits_wallet). See F162.
 
-Other limitations are design gaps: model targets contain no effort or fallback attempts;
+Other baseline limitations were design gaps: model targets contained no effort or fallback attempts;
 ordinary green commands need not establish test discovery or meaningful coverage; docs,
 follow-ups, reuse and many layout requirements are instructions rather than individually
 accounted obligations. The native/performance block in F156 remains necessary. A list of
@@ -344,20 +346,22 @@ by an agent's unrelated-failure classification. Whether an independently establi
 pre-existing unrelated flake may be disclosed without blocking is an intake policy choice;
 absent sealed permission, keep required evidence fail-closed.
 
-### A real local contradiction to resolve
+### The historical action-once contradiction
 
 [ADR 0033](../../app/docs/adr/0033-an-end-to-end-test-is-one-user-story-run-fast.md)
-requires issuing each action once. The current
-[story runner](../../app/e2e/stories/play.ts) can issue a second tap when touch logs/pixel
+requires issuing each action once. At the native-source audit baseline, the
+[story runner](../../app/e2e/stories/play.ts) could issue a second tap when touch logs/pixel
 change have not been observed. Blame and the introducing diff (`9654087556`, refined by
 `60a8856342`) show an intentional workaround for taps lost while sheets open; its unit
 test explicitly expects two taps. That explains its purpose, but absent feedback does
 not establish that a side effect never began. No operation-effect classification guards
 that generic retap path. This is a source-read conflict, not an observed duplicate payment.
 
-The runner fix belongs to F149. F156 must reject ambiguous repeated-action evidence and
+The retap was subsequently removed; F149 preserves the unresolved driver failures that
+motivated it. F156 must reject ambiguous repeated-action evidence and
 retain the native certification block until the runner's action semantics and source/build
-binding are validated. The current story implementation has no Android adapter (F149).
+binding are validated. Android parity was absent at that baseline; current producer limits
+and actual platform evidence belong in F156.
 The older scenario runtime remains coverage where no replacement story exists; do not
 combine their green summaries into a claim of both-platform verification.
 
@@ -386,7 +390,7 @@ experiment and the sealed budget permits it. Readiness requires all applicable o
 dispositions and independent reviews on the exact candidate. Exhausted budget, unavailable
 required evidence, unresolved critical objections or missing authority end incomplete,
 with resumable evidence and follow-ups. They do not produce a ready PR. This is the proposed
-confidence loop; the existing controller still has its simpler bounded repair loop.
+confidence loop; evaluate the executable bounded repair loop against those obligations.
 
 ## Docs, tests, layout and related projects are obligations
 
@@ -423,12 +427,13 @@ Discovered risk cannot silently disappear because the initial scope description 
 Use a vetted project-ID-to-origin catalog and deterministic cache
 `/tmp/sovran-harness/references/<owner>/<repo>/<commit>`. Retain license/provenance and
 exact relevant sections. Reject wrong origin, dirty/partial cache and commit mismatch.
-Do not redirect an old sealed snapshot when updating the catalog. The current hardcoded
-catalog must be corrected before claiming it can load all requested projects (F162).
+Do not redirect an old sealed snapshot when updating the catalog. F162 records the remaining
+validation of corrected origins and actual selected upstream snapshots.
 
-## Tests missing from the first version
+## Acceptance families
 
-These are proposed acceptance families for F159–F163, not a list of tests already passing.
+These are acceptance families for F159–F163, not a current test inventory or a claim that
+local passing tests establish real-agent performance.
 Prefer observable failures over assertions that prompts contain particular words.
 
 | Priority | Test scenario | Required result |
@@ -489,7 +494,7 @@ Ablate added reviewers and context: does the extra stage catch additional verifi
 or just repeat a verdict and increase cost? Promotion should follow measured improvements,
 not a model launch or self-reported confidence. Expected failure cases must remain visible.
 
-## Implementation sequence
+## Original proposed implementation order
 
 1. **Correct reference identity and evidence validation** (F162/F161). Reuse the current
    snapshot/path validation; add reproductions before fixing. Preserve sealed old tasks.
@@ -502,5 +507,6 @@ not a model launch or self-reported confidence. Expected failure cases must rema
 5. **Run held-out agent and live integration evaluations** (F163/F156/F157). Choose model
    defaults from measured outcomes, then expand unattended use. Owner still merges.
 
-This research changes no controller code, wallet state or publication authority. It defines
-the next implementation and records its gaps; an approved policy is not yet an enforced gate.
+This research supplies rationale and evaluation criteria. The harness README owns implemented
+behavior and the follow-up ledger owns remaining work; neither model agreement nor this
+design grants publication authority.

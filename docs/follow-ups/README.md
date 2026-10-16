@@ -139,10 +139,10 @@ reports) keep their evidence, and link here for anything still open.
 | [F156](F156.md) | medium | fix | Bind functional native and performance evidence to full-send task gates |
 | [F157](F157.md) | medium | test | Validate the complete full-send workflow against live T3 providers and GitHub |
 | [F158](F158.md) | low | fix | Web export cannot resolve the platform-only GlassSearchBar |
-| [F159](F159.md) | high | fix | Add explicit model effort and reconciled availability fallback to task attempts |
+| [F159](F159.md) | high | test | Add explicit model effort and reconciled availability fallback to task attempts |
 | [F160](F160.md) | high | fix | Carry research and historical rationale through every task handoff |
 | [F161](F161.md) | high | fix | Validate task findings and protect the meaning of passing test evidence |
-| [F162](F162.md) | medium | fix | Resolve related Cashu project references through verified repository origins |
+| [F162](F162.md) | medium | test | Resolve related Cashu project references through verified repository origins |
 | [F163](F163.md) | medium | test | Evaluate full-send agents on held-out Sovran tasks and failure cases |
 
 <!-- list:end -->
