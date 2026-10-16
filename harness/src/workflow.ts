@@ -1,6 +1,6 @@
 import { createMachine, transition } from 'xstate';
 import { z } from 'zod';
-import { command } from './checks';
+import { command, verificationPolicy, oracleReview } from './checks';
 import { publishPlan } from './publisher';
 import { reference } from './references';
 import { historyPolicy, historyEntry, historyReview } from './history';
@@ -12,6 +12,7 @@ const text = z.string().trim().min(1);
 const hash = z.string().regex(/^[a-f0-9]{64}$/);
 export const contract = z.object({
   historyPolicy: historyPolicy.optional(),
+  verificationPolicy: verificationPolicy.optional(),
   problem: text,
   requirements: z.array(z.object({ id: text, outcome: text })).min(1),
   scope: z.array(text).min(1),
@@ -55,6 +56,7 @@ export const assessment = z.object({
   reuse: z.object({ searched: z.array(text).min(1), used: z.array(text), added: z.array(text), removed: z.array(text) }),
   history: z.array(historyEntry).optional(),
   historyReview: z.array(historyReview).optional(),
+  oracleReviews: z.array(oracleReview).optional(),
   resolutionProposals: z.array(resolutionProposal).optional(),
   resolutionReviews: z.array(resolutionReview).optional(),
   inspections: z.array(z.object({ path: text, sha256: hash, observation: text })).default([]),

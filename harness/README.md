@@ -105,7 +105,24 @@ establishes consistency of Node's reported cases, not that arbitrary code honest
 or asserted them. This adapter has been exercised with Node
 24.14.1; an unsupported event shape fails closed. See the official [Node test stream API](https://nodejs.org/docs/latest-v24.x/api/test.html#class-testsstream).
 Execution evidence does not establish that assertions express the right behavior; independent
-oracle review and a meaningful negative control remain necessary for important fixes.
+oracle judgment is required by the sealed `verificationPolicy`. Each requirement names its
+cases or explicitly declares a bounded inspection. New routed tasks cannot omit this policy.
+Review, final audit and any additional GPT reviewer must explain the assertion, test inputs,
+negative control and producer, citing the test source and current case-result artifacts.
+
+For a regression check, the controller copies only the sealed test inputs into a disposable
+checkout of the task's original base. Selected leaf cases must fail there with an ordinary
+assertion, then pass on the candidate. Missing imports, hook/setup assertions, expected-failure
+inversion and unrelated failures do not establish the regression. Both lanes have distinct
+durable command identities, logs and input manifests; failed attempts survive repair. The
+baseline must run with its own available environment: candidate implementations or dependencies
+are not silently borrowed to make it work. Independent review judges whether the assertion
+actually captures the intended old behavior and whether copied inputs hide the fix.
+Test inputs must be regular source files covered by the candidate fingerprint. Copying
+preserves executable permissions; input bytes and executable status are checked across both
+lanes before and after execution. Ignored, artifact-only and symlink inputs are rejected.
+This adapter selects files in the task's repository itself, not inside nested submodules;
+run a submodule's tests as a separate task rooted in that repository.
 
 Every command records its
 output and the source fingerprint. A changed candidate invalidates evidence. Review and

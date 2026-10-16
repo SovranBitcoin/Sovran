@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
-import { isAbsolute, join, relative, resolve } from 'node:path';
+import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { z } from 'zod';
 import { Journal } from './journal';
-import { inspectNodeTests } from './checks';
+import { inspectNodeTests, regression, validateVerification } from './checks';
 import { runCommand } from './command';
 import { inspectChange } from './policy';
 import { inspectUpgradeEvidence, upgradeInventorySchema } from './upgrade';
@@ -15,7 +15,7 @@ import { contextPaths } from './context';
 import { prepareReference } from './references';
 import { availability, candidates, dispatchRejection, driver, runtimeTask, type Model, type RuntimeTask } from './models';
 import { assessment, contract, move, roleFor, task, type Task } from './workflow';
-import { digest, fileEvidence, fingerprint, git, within } from './workspace';
+import { digest, fileEvidence, fingerprint, git, testInputEvidence, within } from './workspace';
 
 export class Controller {
   readonly journal: Journal;
@@ -33,6 +33,8 @@ export class Controller {
       throw new Error('Task state must live outside the source workspace');
     const spec = contract.parse(input);
     if ('kind' in spec.models && !spec.historyPolicy) throw new Error('New routed tasks require a pre-edit history policy');
+    if ('kind' in spec.models && !spec.verificationPolicy) throw new Error('New routed tasks require a requirement verification policy');
+    validateVerification(spec);
     if (spec.historyPolicy && (new Set(spec.historyPolicy.paths).size !== spec.historyPolicy.paths.length ||
       spec.historyPolicy.paths.some(p => !spec.scope.some(s => p === s || p.startsWith(`${s.replace(/\/$/, '')}/`)))))
       throw new Error('Planned history paths must be unique and within sealed scope');
@@ -150,6 +152,13 @@ export class Controller {
       if (missing.length) throw new Error(`Missing requirement observations: ${missing.map(r => r.id).join(', ')}`);
       if (result.verdict === 'pass' && result.findings.some(f => f.severity === 'blocking'))
         throw new Error('A blocking finding cannot pass');
+      const oracleRequirements = new Set<string>();
+      for (const review of result.oracleReviews ?? []) {
+        if (oracleRequirements.has(review.requirement) || !t.contract.verificationPolicy?.requirements.some(r => r.kind === 'node' && r.requirement === review.requirement))
+          throw new Error('Oracle reviews must identify unique sealed test requirements');
+        oracleRequirements.add(review.requirement);
+        if (result.verdict === 'pass' && review.verdict !== 'valid') throw new Error('A negative or unproven test-oracle judgment cannot pass');
+      }
       if (['review', 'adversary', 'audit', 'diversityReview'].includes(role) && result.verdict === 'pass') {
         for (const item of assessmentArtifacts(t, role)) {
           if (fileEvidence(join(this.stateDir, t.id), item.path).sha256 !== item.sha256) throw new Error('Evidence changed after execution');
@@ -162,6 +171,19 @@ export class Controller {
         ? inspectChange(t.root, t.base, t.contract).changed : [];
       validateHistory(t, role, result, changed, reference => this.inspectReference(t, reference));
       validateResolutions(t, role, worker, result, reference => this.inspectReference(t, reference));
+      if (t.contract.verificationPolicy && ['review', 'audit', 'diversityReview'].includes(role) && result.verdict === 'pass') {
+        for (const rule of t.contract.verificationPolicy.requirements.filter(r => r.kind === 'node')) {
+          const reviews = result.oracleReviews?.filter(r => r.requirement === rule.requirement) ?? [];
+          if (reviews.length !== 1 || reviews[0]?.verdict !== 'valid') throw new Error(`Independent test-oracle judgment is missing or negative: ${rule.requirement}`);
+          const review = reviews[0];
+          const checks = [rule.check, ...(rule.regression ? [`harness:baseline:${rule.check}`] : [])];
+          if (rule.cases.some(c => !review.evidence.includes(c.file)) || checks.some(id => {
+            const receipt = t.receipts.find(r => r.id === id && r.source === t.source && r.outcome === 'pass');
+            return !receipt?.artifacts.some(a => a.path.endsWith('-node-inspection.json') && review.evidence.includes(`artifact:${a.path}`));
+          })) throw new Error('Oracle review must cite test source and current candidate/baseline case results');
+        }
+      }
+      for (const review of result.oracleReviews ?? []) for (const ref of review.evidence) this.inspectReference(t, ref);
       for (const observation of result.observations) this.inspectReference(t, observation.evidence);
       for (const finding of result.findings) this.inspectReference(t, finding.evidence);
       const evidence = this.save(t, `${ticketId.replaceAll(':', '-')}.json`, result);
@@ -419,26 +441,29 @@ export class Controller {
     const directory = join(this.stateDir, t.id);
     const upgradePath = join(directory, `${t.generation}-upgrade.json`);
     const needsUpgrade = inspectChange(t.root, t.base, t.contract).risks.includes('persistence');
-    const commands = audit ? t.contract.auditChecks : [...t.contract.checks, ...(needsUpgrade ? [
+    const selectedCommands = audit ? t.contract.auditChecks : [...t.contract.checks, ...(needsUpgrade ? [
       { id: 'harness:upgrade-inventory', argv: ['bun', join(import.meta.dir, 'discover-upgrade.ts'), t.root], cwd: '.', timeoutMs: 60_000 },
       { id: 'harness:upgrade', argv: ['bun', 'run', 'test:upgrade', '--json', `--outputFile=${upgradePath}`], cwd: 'app', timeoutMs: 600_000 },
     ] : [])];
+    const commands = selectedCommands.flatMap(check => 'kind' in check && check.regression
+      ? [{ ...check, id: `harness:baseline:${check.id}`, baseline: check.regression }, check] : [check]);
     for (const check of commands) {
       if (t.receipts.some(r => r.id === check.id && r.source === t.source && r.outcome === 'pass')) continue;
       // Deterministic launch errors must not reserve an effect that never started.
-      const cwd = within(t.root, check.cwd);
+      const baseline = 'baseline' in check ? regression.parse(check.baseline) : null;
+      const executionRoot = baseline ? join(directory, `${t.generation}-${digest(check.id)}-baseline`) : t.root;
+      const cwd = baseline ? executionRoot : within(t.root, check.cwd);
       const node = 'kind' in check ? check : null;
       const invocation = digest(JSON.stringify([t.id, t.generation, check.id, t.source]));
       const collector = join(import.meta.dir, 'node-tests.mjs');
       const nodeExecutable = node ? Bun.which('node') : null;
       if (node && !nodeExecutable) throw new Error('Node test runtime is unavailable');
-      const request = node ? this.save(t, `${digest(check.id)}-node-request.json`, {
-        invocation, root: t.root, source: t.source, nodeExecutable, collector: digest(readFileSync(collector)),
-        files: node.files.map(file => within(t.root, file)),
-        selection: node.requiredCases, inputs: node.files.map(file => fileEvidence(t.root, file)),
-      }) : null;
-      const argv = request ? [z.string().parse(nodeExecutable), collector, join(directory, request.path)] : 'argv' in check ? check.argv : [];
-      if (!Bun.which(z.string().parse(argv[0]), { cwd })) throw new Error('Check executable not found');
+      if (!node && 'argv' in check && !Bun.which(z.string().parse(check.argv[0]), { cwd })) throw new Error('Check executable not found');
+      const inputPaths = node ? [...new Set([...node.files, ...(node.regression?.testInputs ?? [])])] : [];
+      const inputs = testInputEvidence(t.root, inputPaths);
+      const inputsMatch = (root: string) => inputs.every(input =>
+        fileEvidence(root, input.path).sha256 === input.sha256 &&
+        Boolean(lstatSync(within(root, input.path)).mode & 0o111) === input.executable);
       const dir = join(this.stateDir, t.id);
       mkdirSync(dir, { recursive: true, mode: 0o700 });
       const claimed = this.journal.change(id, `execute:${t.generation}:${check.id}`, {}, value => {
@@ -450,7 +475,46 @@ export class Controller {
       if (!claimed.applied) throw new Error('Command was already dispatched; reconcile its outcome');
       t = task.parse(claimed.value);
       const log = `${t.generation}-${digest(check.id)}.log`;
-      const { exit, reason } = await runCommand(argv, cwd, join(dir, log), join(dir, `${log}.stderr`),
+      let ownedBaseline = false;
+      let preparedSource: string | null = null;
+      let setupFailure: string | null = null;
+      let request: { path: string; sha256: string } | null = null;
+      let argv: string[] = 'argv' in check ? check.argv : [];
+      try {
+        if (baseline) {
+          if (existsSync(executionRoot)) throw new Error('Baseline workspace already exists; reconcile its previous ownership');
+          git(t.root, ['worktree', 'add', '--quiet', '--detach', '--', executionRoot, t.base]);
+          ownedBaseline = true;
+          for (const file of baseline.testInputs) {
+            let dest = executionRoot;
+            for (const part of file.split('/')) {
+              dest = join(dest, part);
+              try { if (lstatSync(dest).isSymbolicLink()) throw new Error('Baseline test input traverses a symlink'); }
+              catch (error) { if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) throw error; }
+            }
+            mkdirSync(dirname(dest), { recursive: true });
+            const source = within(t.root, file);
+            writeFileSync(dest, readFileSync(source));
+            chmodSync(dest, lstatSync(source).mode & 0o777);
+          }
+          preparedSource = fingerprint(executionRoot);
+        }
+        if (node) {
+          if (!inputsMatch(executionRoot)) throw new Error('Test input changed during baseline preparation');
+          request = this.save(t, `${digest(check.id)}-node-request.json`, {
+            invocation, root: executionRoot, source: t.source, nodeExecutable, collector: digest(readFileSync(collector)),
+            files: node.files.map(file => within(executionRoot, file)), selection: node.requiredCases,
+            inputs,
+            ...(baseline ? { baseline: t.base, preparedSource, copiedInputs: baseline.testInputs.map(file => fileEvidence(executionRoot, file)), expectedFailures: baseline.cases } : {}),
+          });
+          argv = [z.string().parse(nodeExecutable), collector, join(directory, request.path)];
+        }
+      } catch (error) { setupFailure = String(error); }
+      const { exit, reason } = setupFailure ? (() => {
+        writeFileSync(join(dir, log), '', { flag: 'wx', mode: 0o600 });
+        writeFileSync(join(dir, `${log}.stderr`), setupFailure, { flag: 'wx', mode: 0o600 });
+        return { exit: 1, reason: `Check setup failed: ${setupFailure}` };
+      })() : await runCommand(argv, cwd, join(dir, log), join(dir, `${log}.stderr`),
         Math.max(1, Math.min(check.timeoutMs, Date.parse(t.contract.limits.deadline) - Date.now())), pid => {
           this.change(id, `started:${t.generation}:${check.id}`, { pid }, v => {
             if (v.pending.kind !== 'command' || v.pending.id !== check.id) throw new Error('Command ownership lost');
@@ -464,11 +528,20 @@ export class Controller {
       let summary = `${reason}: ${argv.join(' ')}`;
       if (node) {
         try {
-          const inspected = inspectNodeTests(readFileSync(join(dir, log), 'utf8'), { invocation, root: t.root, files: node.files, requiredCases: node.requiredCases });
+          const inspected = inspectNodeTests(readFileSync(join(dir, log), 'utf8'), { invocation, root: executionRoot, files: node.files, requiredCases: node.requiredCases, expectedFailures: baseline?.cases });
           artifacts.push(this.save(t, `${digest(check.id)}-node-inspection.json`, inspected));
           if (exit === 0) outcome = inspected.outcome;
-          summary = inspected.problems.length ? inspected.problems.join('\n') : `Executed ${inspected.cases.length} named cases with ${inspected.node}; ${reason}`;
+          summary = inspected.problems.length ? inspected.problems.join('\n') : `${baseline ? 'Baseline assertions established; ' : ''}Executed ${inspected.cases.length} named cases with ${inspected.node}; ${reason}`;
         } catch (error) { outcome = 'fail'; summary = `Required test execution was not established: ${String(error)}`; }
+        try {
+          if (!inputsMatch(executionRoot) || !inputsMatch(t.root))
+            throw new Error('Candidate or baseline test input changed during execution');
+        } catch (error) { outcome = 'fail'; summary = String(error); }
+      }
+      if (ownedBaseline) {
+        if (preparedSource && fingerprint(executionRoot) !== preparedSource) { outcome = 'fail'; summary = 'Baseline changed during regression execution'; }
+        // runCommand has reconciled the process group before a disposable baseline is removed.
+        git(t.root, ['worktree', 'remove', '--force', '--', executionRoot]);
       }
       if (check.id === 'harness:upgrade' && exit === 0) {
         try {

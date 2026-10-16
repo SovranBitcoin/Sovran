@@ -1,10 +1,10 @@
 import { expect, test } from 'bun:test';
-import { writeFileSync, readFileSync } from 'node:fs';
+import { mkdirSync, symlinkSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fixture } from './controller.test';
 import { Controller } from '../src/controller';
 import type { Task } from '../src/workflow';
-import { git } from '../src/workspace';
+import { git, testInputEvidence } from '../src/workspace';
 import { inspectNodeTests } from '../src/checks';
 
 function finish(c: Controller, t: Task) {
@@ -84,4 +84,107 @@ test('concurrent nested cases retain their identity despite repeated identical c
   const { t } = await execute("import {test} from 'node:test'; test('parent',{concurrency:true},async t=>{await Promise.all([t.test('left',async t=>{await new Promise(r=>setTimeout(r,20));await t.test('leaf',()=>{})}),t.test('right',async t=>{await t.test('leaf',()=>{})})])});", ['parent','left','leaf']);
   expect(t.phase).toBe('reviewing');
   expect(t.receipts[0]?.summary).toContain('Executed 5 named cases');
+});
+
+async function regressionRun(testCode: string, current = 2, before = 1, names = ['guard'], executableHelper = false) {
+  const f=fixture();
+  writeFileSync(join(f.root,'value.mjs'),`export const value=${before};`); git(f.root,['add','.']);git(f.root,['commit','-qm','Old behavior']);
+  const cases=[{file:'guard.test.mjs',names}];
+  const check={kind:'node-tests',id:'behavior',files:['guard.test.mjs'],requiredCases:cases,cwd:'.',timeoutMs:1000,
+    regression:{testInputs:['guard.test.mjs',...(executableHelper?['helper']:[])],cases}};
+  let t=finish(f.controller,f.controller.create(f.root,{...f.spec,scope:['source.txt','value.mjs','guard.test.mjs','helper'],checks:[check],verificationPolicy:{version:1,requirements:[{kind:'node',requirement:'behavior',check:'behavior',cases,regression:true}]}}));
+  t=f.controller.seal(t.id,t.policy);
+  writeFileSync(join(f.root,'value.mjs'),`export const value=${current};`);
+  writeFileSync(join(f.root,'guard.test.mjs'),testCode);
+  if(executableHelper)writeFileSync(join(f.root,'helper'),'#!/bin/sh\nexit 0\n',{mode:0o755});
+  t=finish(f.controller,t);t=await f.controller.verify(t.id);
+  return {...f,t};
+}
+const meaningfulGuard="import {test} from 'node:test';import assert from 'node:assert/strict';import {value} from './value.mjs';test('guard',()=>assert.equal(value,2));";
+
+test('regression runs the exact candidate test against old code, then requires the candidate ordinarily pass',async()=>{
+  const {t,root,state}=await regressionRun(meaningfulGuard);
+  expect(t.phase).toBe('reviewing');
+  expect(t.receipts.map(r=>[r.id,r.outcome])).toEqual([['harness:baseline:behavior','pass'],['behavior','pass']]);
+  const proof=t.receipts[0]?.artifacts.find(a=>a.path.endsWith('-node-request.json'));
+  if(!proof)throw new Error('Missing baseline input proof');
+  const request=JSON.parse(readFileSync(join(state,t.id,proof.path),'utf8'));
+  expect(request.baseline).toBe(t.base); expect(request.copiedInputs[0].path).toBe('guard.test.mjs');
+  expect(readFileSync(join(root,'value.mjs'),'utf8')).toBe('export const value=2;');
+  expect(git(root,['worktree','list','--porcelain'])).not.toContain('-baseline');
+});
+
+test.each([
+  ['baseline already passes',meaningfulGuard,2,2],
+  ['candidate still fails',meaningfulGuard,1,1],
+  ['assertion is in setup',"import {test,before} from 'node:test';import assert from 'node:assert/strict';import {value} from './value.mjs';before(()=>assert.equal(value,2));test('guard',()=>{});",2,1],
+  ['runtime error is not regression',"import {test} from 'node:test';import {value} from './value.mjs';test('guard',()=>{if(value===1)throw new Error('broken setup')});",2,1],
+  ['missing import is not regression',"import {test} from 'node:test';import {missing} from './absent.mjs';test('guard',()=>{});",2,1],
+  ['expected failure inversion',"import {test} from 'node:test';import assert from 'node:assert/strict';import {value} from './value.mjs';test('guard',{expectFailure:true},()=>assert.equal(value,2));",2,1],
+])('negative control refuses %s',async(_label,code,current,before)=>{
+  const {t}=await regressionRun(code,current,before);
+  expect(t.phase).toBe('implementing');expect(t.history.some(r=>r.outcome==='fail')).toBe(true);
+});
+
+
+test.each(['test','describe'])('baseline failure may propagate through a %s parent but must originate at the selected leaf',async(kind)=>{
+  const code=kind==='test'
+    ? "import {test} from 'node:test';import assert from 'node:assert/strict';import {value} from './value.mjs';test('parent',async t=>{await t.test('guard',()=>assert.equal(value,2))});"
+    : "import {describe,it} from 'node:test';import assert from 'node:assert/strict';import {value} from './value.mjs';describe('parent',()=>it('guard',()=>assert.equal(value,2)));";
+  const {t}=await regressionRun(code,2,1,['parent','guard']);expect(t.phase).toBe('reviewing');
+});
+
+test('requirement verification cannot substitute a process command or omit the agreed regression',()=>{
+  const {controller:c,root,spec}=fixture();
+  const cases=[{file:'guard.test.mjs',names:['guard']}];
+  const verificationPolicy={version:1,requirements:[{kind:'node',requirement:'behavior',check:'check',cases,regression:true}]};
+  expect(()=>c.create(root,{...spec,verificationPolicy})).toThrow('named Node check');
+  const checks=[{kind:'node-tests',id:'check',files:['guard.test.mjs'],requiredCases:cases,cwd:'.',timeoutMs:1000}];
+  expect(()=>c.create(root,{...spec,checks,verificationPolicy})).toThrow('baseline comparison');
+  expect(()=>c.create(root,{...spec,verificationPolicy:{version:1,requirements:[{kind:'inspection',requirement:'another',rationale:'Unrelated'}]}})).toThrow('each requirement');
+});
+
+test('an independent oracle judgment must explain and cite test source and both execution lanes',async()=>{
+  const {controller:c,t}=await regressionRun(meaningfulGuard);
+  const ticket=c.next(t.id).ticket;if(!ticket)throw new Error('Missing review ticket');
+  c.claim(t.id,ticket.id,ticket.id,ticket.target.provider,ticket.target.model);
+  const result={verdict:'pass',summary:'Inspected regression fixture',findings:[],observations:[{requirement:'behavior',evidence:'value.mjs',observation:'Candidate value is two'}],
+    reuse:{searched:['value.mjs'],used:['value.mjs'],added:['guard.test.mjs'],removed:[]},
+    inspections:c.brief(t.id).packet.artifacts.map(a=>({...a,observation:'Inspected fixture execution'}))};
+  expect(()=>c.submit(t.id,ticket.id,ticket.id,result)).toThrow('test-oracle');
+  const review={requirement:'behavior',verdict:'valid',behavior:'Value must equal two',testInputs:'Only the candidate test is copied; the old value remains one',
+    negativeControl:'The same assertion reports one unequal to two on the baseline and passes on the candidate',producer:'Collector and fixture use ordinary Node assertions without protocol manipulation',evidence:['guard.test.mjs']};
+  expect(()=>c.submit(t.id,ticket.id,ticket.id,{...result,oracleReviews:[review]})).toThrow('case results');
+  const evidence=[...review.evidence,...t.receipts.flatMap(r=>r.artifacts.filter(a=>a.path.endsWith('-node-inspection.json')).map(a=>`artifact:${a.path}`))];
+  expect(c.submit(t.id,ticket.id,ticket.id,{...result,oracleReviews:[{...review,evidence}]}).phase).toBe('adversarial');
+  const adversary=c.next(t.id).ticket;if(!adversary)throw new Error('Missing adversarial ticket');
+  c.claim(t.id,adversary.id,adversary.id,adversary.target.provider,adversary.target.model);
+  for(const verdict of ['invalid','unproven']) expect(()=>c.submit(t.id,adversary.id,adversary.id,{...result,oracleReviews:[{...review,evidence,verdict}]})).toThrow('cannot pass');
+  expect(()=>c.submit(t.id,adversary.id,adversary.id,{...result,oracleReviews:[{...review,evidence},{...review,evidence}]})).toThrow('unique sealed');
+  expect(()=>c.submit(t.id,adversary.id,adversary.id,{...result,oracleReviews:[{...review,evidence,requirement:'unknown'}]})).toThrow('unique sealed');
+});
+
+test('executed inputs must be regular files actually covered by the source fingerprint',()=>{
+  const {root}=fixture();
+  writeFileSync(join(root,'.gitignore'),'ignored.mjs\n');
+  writeFileSync(join(root,'ignored.mjs'),'ignored test');
+  symlinkSync('source.txt',join(root,'link.mjs'));
+  mkdirSync(join(root,'app/e2e/artifacts'),{recursive:true});
+  writeFileSync(join(root,'app/e2e/artifacts/test.mjs'),'excluded even when tracked');
+  git(root,['add','-f','app/e2e/artifacts/test.mjs']);
+  for(const path of ['ignored.mjs','link.mjs','app/e2e/artifacts/test.mjs']) expect(()=>testInputEvidence(root,[path])).toThrow('source fingerprint');
+  writeFileSync(join(root,'test.mjs'),'new test');
+  expect(testInputEvidence(root,['test.mjs'])[0]?.path).toBe('test.mjs');
+});
+
+test('a baseline test cannot change its own bytes and still certify the regression',async()=>{
+  const {t}=await regressionRun("import {test} from 'node:test';import assert from 'node:assert/strict';import {writeFileSync} from 'node:fs';import {value} from './value.mjs';test('guard',()=>{writeFileSync(new URL(import.meta.url),'changed test');assert.equal(value,2)});");
+  expect(t.phase).toBe('implementing');
+  expect(t.history.some(r=>r.outcome==='fail' && r.summary.includes('changed'))).toBe(true);
+});
+
+test('copying an executable helper cannot manufacture a regression through lost permissions',async()=>{
+  const {t}=await regressionRun("import {test} from 'node:test';import assert from 'node:assert/strict';import {accessSync,constants} from 'node:fs';test('guard',()=>assert.doesNotThrow(()=>accessSync(new URL('./helper',import.meta.url),constants.X_OK)));",2,2,['guard'],true);
+  expect(t.phase).toBe('implementing');
+  expect(t.history[0]?.summary).toContain('did not expose the baseline assertion');
 });

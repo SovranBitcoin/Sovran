@@ -21,6 +21,13 @@ controller captures pre-edit Git evidence. Research must inspect it and record e
 protection/preservation plan, relevant PRs and active/deleted follow-ups, with explicit gaps.
 Final audit rechecks changed paths. Do not invent complete intent from blame alone.
 
+Include `verificationPolicy` mapping each requirement to exact named Node cases or a justified
+inspection-only outcome. Important bug fixes need a `node-tests` check with `regression`:
+sealed test inputs and selected cases that must expose an assertion failure on the original
+base. The controller runs that comparison and the candidate separately. Reviewers must
+judge the assertions and producer through `oracleReviews`, citing source and both lanes;
+an inspection-only outcome is not execution evidence. Use the schemas, not guessed fields.
+
 Resolve models with `orchestrator_capabilities`, not remembered model names. Pass its
 providers and the observation time to the controller's `model-policy` action. The typed
 policy in `harness/src/models.ts` owns role choices, effort, rationale and ordered availability
