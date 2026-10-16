@@ -1,8 +1,9 @@
 import { expect, test } from 'bun:test';
 import { fixture } from './controller.test';
 import { Controller } from '../src/controller';
+import { dispatch } from '../src/protocol';
 import type { RuntimeTask } from '../src/models';
-import type { Task } from '../src/workflow';
+import { assessment, type Task } from '../src/workflow';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -211,4 +212,50 @@ test('routed claims and completion require actual matching runtime identity and 
     observations: [{ requirement: 'behavior', evidence: 'source.txt', observation: 'premature' }],
     reuse: { searched: ['source.txt'], used: [], added: [], removed: [] },
   }, { ...runtime, status: 'completed', workState: 'result_available', hasPendingChildRuns: true })).toThrow('Reconcile');
+});
+
+test('legacy journal claim and submission inputs remain idempotent after upgrade', () => {
+  const { controller: c, root, spec } = fixture();
+  const t = c.next(c.create(root, spec).id);
+  const ticket = t.ticket;
+  if (!ticket) throw new Error('Missing ticket');
+  const oldClaim = { ticketId: ticket.id, worker: 'old-worker', provider: ticket.target.provider, model: ticket.target.model };
+  c.journal.change(t.id, `claim:${ticket.id}:old-worker`, oldClaim, () => ({
+    ...t, ticket: { ...ticket, claim: { worker: 'old-worker', provider: ticket.target.provider, model: ticket.target.model } },
+  }));
+  expect(c.claim(t.id, ticket.id, 'old-worker', ticket.target.provider, ticket.target.model).ticket?.claim?.worker).toBe('old-worker');
+  const result = assessment.parse({ verdict: 'pass', summary: 'Old accepted research', findings: [],
+    observations: [{ requirement: 'behavior', evidence: 'source.txt', observation: 'original retained' }],
+    reuse: { searched: ['source.txt'], used: [], added: [], removed: [] } });
+  c.journal.change(t.id, `submit:${ticket.id}`, { worker: 'old-worker', result }, value => ({ ...value, ticket: null, phase: 'intake' }));
+  expect(c.submit(t.id, ticket.id, 'old-worker', result).phase).toBe('intake');
+});
+
+test('mixed source authors cannot be certified by only one author provider', async () => {
+  const { controller: c, root, spec } = fixture();
+  let t = completed(c, c.create(root, { ...spec, models: routedModels() })); t = c.seal(t.id, t.policy);
+  t = quota(c, t); // Sol may have written; Opus is the replacement author.
+  t = completed(c, t); t = await c.verify(t.id);
+  t = completed(c, t); t = completed(c, t); t = await c.verify(t.id, true); t = completed(c, t);
+  expect(t.phase).toBe('diversityReviewing');
+  t = completed(c, t); expect(t.phase).toBe('publishable');
+});
+
+test('a definitive rejection before child creation permits only the next sealed candidate', async () => {
+  const { controller: c, root, spec } = fixture();
+  const models = routedModels(); models.routes.research = models.routes.implementation;
+  const t = c.next(c.create(root, { ...spec, models }).id);
+  const ticket = t.ticket;
+  if (!ticket) throw new Error('Missing ticket');
+  const reserved = c.beginDispatch(t.id, ticket.id, 'coordinator', 'session');
+  const rejection = { kind: 'definitively-not-created', requestId: reserved.task.ticket?.dispatch?.requestId,
+    evidence: { code: 'model_unavailable', message: 'Synthetic rejection before child creation' } };
+  await dispatch(c, { action: 'dispatch-rejected', id: t.id, ticket: ticket.id, reason: 'model-unavailable', rejection });
+  const next = c.read(t.id);
+  expect(next.ticket?.target.model).toBe('claude-opus-5-5');
+  expect(next.attempts.at(-1)?.ticket.claim).toBeNull();
+  expect(next.generation).toBe(0);
+  expect(next.contract.limits).toEqual(spec.limits);
+  await expect(dispatch(c, { action: 'dispatch-rejected', id: t.id, ticket: next.ticket?.id,
+    reason: 'model-unavailable', rejection: { ...rejection, kind: 'unknown' } })).rejects.toThrow();
 });

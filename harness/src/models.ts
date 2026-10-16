@@ -55,6 +55,10 @@ export const runtimeTask = z.object({
   hasPendingChildRuns: z.boolean(), hasPendingQuestion: z.boolean(), summary: z.string().nullable().optional(),
 });
 export const availability = z.enum(['quota-exhausted', 'rate-limited', 'capacity-unavailable', 'model-unavailable']);
+export const dispatchRejection = z.object({
+  kind: z.literal('definitively-not-created'), requestId: text,
+  evidence: z.object({ code: text, message: text }),
+});
 export type RuntimeTask = z.infer<typeof runtimeTask>;
 
 export function candidates(policy: Models, selectedRole: Role): Model[] {

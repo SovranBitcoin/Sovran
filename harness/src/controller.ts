@@ -10,7 +10,7 @@ import { brief } from './brief';
 import { Publisher, publishPlan } from './publisher';
 import { contextPaths } from './context';
 import { prepareReference } from './references';
-import { availability, candidates, driver, runtimeTask, type Model, type RuntimeTask } from './models';
+import { availability, candidates, dispatchRejection, driver, runtimeTask, type Model, type RuntimeTask } from './models';
 import { assessment, contract, move, roleFor, task, type Task } from './workflow';
 import { digest, fileEvidence, fingerprint, git, within } from './workspace';
 
@@ -96,7 +96,7 @@ export class Controller {
 
   claim(id: string, ticketId: string, worker: string, provider: string, model: string, runtime?: RuntimeTask) {
     const observed = runtime ? runtimeTask.parse(runtime) : null;
-    const input = { ticketId, worker, provider, model, runtime: observed };
+    const input = { ticketId, worker, provider, model, ...(observed ? { runtime: observed } : {}) };
     return this.change(id, `claim:${ticketId}:${worker}`, input, t => {
       this.live(t);
       if (t.ticket?.id !== ticketId) throw new Error('Stale dispatch ticket');
@@ -118,7 +118,7 @@ export class Controller {
   submit(id: string, ticketId: string, worker: string, input: unknown, runtime?: RuntimeTask) {
     const result = assessment.parse(input);
     const observed = runtime ? runtimeTask.parse(runtime) : null;
-    return this.change(id, `submit:${ticketId}`, { worker, result, runtime: observed }, t => {
+    return this.change(id, `submit:${ticketId}`, { worker, result, ...(observed ? { runtime: observed } : {}) }, t => {
       this.live(t);
       if (t.ticket?.id !== ticketId || t.ticket.claim?.worker !== worker) throw new Error('Unclaimed or stale ticket');
       if (t.pending.kind !== 'none') throw new Error('Wait for the outstanding command before submitting');
@@ -157,8 +157,8 @@ export class Controller {
         if (role === 'research' || role === 'implementation') return { ...move(next, 'STOP'), reason: result.summary };
         return this.repairTask(next, result.summary);
       }
-      if (role === 'audit' && 'kind' in t.contract.models && !this.hasProviderDiversity(next)) {
-        if (!t.contract.models.allowGptOnly) return { ...move(next, 'STOP'), reason: 'Independent provider review unavailable; GPT-only completion was not authorized' };
+      if (role === 'audit' && 'kind' in t.contract.models && !this.hasIndependentCoverage(next)) {
+        if (!t.contract.models.allowGptOnly) return { ...move(next, 'STOP'), reason: 'Normal reviews lack complete author-provider coverage or a non-GPT review; additional GPT review was not authorized' };
         return move(next, 'DIVERSITY');
       }
       return move(next, 'ACCEPT');
@@ -184,10 +184,12 @@ export class Controller {
       ['review', 'adversary', 'audit', 'diversityReview'].includes(a.ticket.role));
   }
 
-  private hasProviderDiversity(t: Task) {
-    return this.currentReviews(t).some(a => driver(t.contract.models, a.ticket.target) === 'claudeAgent' &&
-      t.attempts.some(author => author.ticket.role === 'implementation' && author.ticket.claim &&
-        driver(t.contract.models, author.ticket.target) === 'codex'));
+  private hasIndependentCoverage(t: Task) {
+    const reviews = this.currentReviews(t).filter(a => a.ticket.role !== 'diversityReview');
+    const authors = t.attempts.filter(a => a.ticket.role === 'implementation' && a.ticket.claim);
+    return reviews.some(a => driver(t.contract.models, a.ticket.target) === 'claudeAgent') &&
+      authors.every(author => reviews.some(reviewer =>
+        driver(t.contract.models, reviewer.ticket.target) !== driver(t.contract.models, author.ticket.target)));
   }
 
   fallback(id: string, ticketId: string, reason: z.infer<typeof availability>, runtime: RuntimeTask, detail: string) {
@@ -199,17 +201,34 @@ export class Controller {
       if (t.pending.kind !== 'none') throw new Error('Outstanding command must finish first');
       this.terminalWorker(t, observed);
       if (observed.status !== 'failed') throw new Error('Only a failed availability attempt can fall back');
-      const source = fingerprint(t.root);
-      const previous = t.ticket;
-      const next: Task = { ...t, ticket: null, source,
-        attempts: [...t.attempts, { ticket: previous, generation: t.generation, sourceAfter: source,
-          completion: { kind: 'unavailable', reason: cause, runtime: observed, detail } }] };
-      if (['incomplete', 'cancelled'].includes(t.phase)) return next;
-      if (Date.parse(t.contract.limits.deadline) <= Date.now()) return { ...move(next, 'STOP'), reason: 'Task deadline exhausted during reconciliation' };
-      if (previous.role !== 'implementation' && source !== t.source)
-        return { ...move(next, 'STOP'), reason: 'Read-only worker changed source; availability fallback refused' };
-      return this.issue(next, previous.candidateIndex + 1);
+      return this.replaceAttempt(t, { kind: 'unavailable', reason: cause, runtime: observed, detail });
     });
+  }
+
+  dispatchRejected(id: string, ticketId: string, reason: z.infer<typeof availability>, input: unknown) {
+    const rejection = dispatchRejection.parse(input);
+    const cause = availability.parse(reason);
+    return this.change(id, `dispatch-rejected:${ticketId}`, { cause, rejection }, t => {
+      if (!('kind' in t.contract.models) || t.ticket?.id !== ticketId || t.ticket.claim ||
+          t.ticket.dispatch?.requestId !== rejection.requestId || t.pending.kind !== 'none')
+        throw new Error('Only the exact unclaimed dispatch can be reconciled as not created');
+      // This is a trusted coordinator attestation from a definitive provider error.
+      // A timeout or an empty lineage search can never establish non-creation.
+      return this.replaceAttempt(t, { kind: 'dispatch-rejected', reason: cause, rejection });
+    });
+  }
+
+  private replaceAttempt(t: Task, completion: Task['attempts'][number]['completion']): Task {
+    const previous = t.ticket;
+    if (!previous) throw new Error('Missing replacement attempt');
+    const source = fingerprint(t.root);
+    const next: Task = { ...t, ticket: null, source,
+      attempts: [...t.attempts, { ticket: previous, generation: t.generation, sourceAfter: source, completion }] };
+    if (['incomplete', 'cancelled'].includes(t.phase)) return next;
+    if (Date.parse(t.contract.limits.deadline) <= Date.now()) return { ...move(next, 'STOP'), reason: 'Task deadline exhausted during reconciliation' };
+    if ((previous.role !== 'implementation' || !previous.claim) && source !== t.source)
+      return { ...move(next, 'STOP'), reason: 'Source changed outside a claimed implementation; availability fallback refused' };
+    return this.issue(next, previous.candidateIndex + 1);
   }
 
   private inspectReference(t: Task, reference: string) {
@@ -308,7 +327,7 @@ export class Controller {
       const reviews = this.currentReviews(t);
       if (!['review', 'adversary', 'audit'].every(role => reviews.some(a => a.ticket.role === role)))
         throw new Error('Missing current independent review slots');
-      if (!this.hasProviderDiversity(t) && (!t.contract.models.allowGptOnly || !reviews.some(a =>
+      if (!this.hasIndependentCoverage(t) && (!t.contract.models.allowGptOnly || !reviews.some(a =>
         a.ticket.role === 'diversityReview' && this.eligibleDiversity(t, a.ticket.target))))
         throw new Error('Missing additional review by a GPT model outside the complete author set');
     }
@@ -318,7 +337,7 @@ export class Controller {
     const plan = publishPlan.parse({ ...t.contract.publish, taskId: t.id, root: t.root,
       previousRemoteHead: t.pr?.head ?? t.contract.publish.previousRemoteHead,
       source: t.source, head: git(t.root, ['rev-parse', 'HEAD']), title: t.contract.problem.slice(0, 160),
-      body: `${t.contract.problem}\n\n${t.contract.requirements.map(r => `- ${r.outcome}`).join('\n')}\n\nValidation: ${t.receipts.map(r => `${r.id}: ${r.outcome}`).join('; ')}. Independent review, adversarial review and final audit completed for this source.${'kind' in t.contract.models ? `\n\nModel attempts: ${t.attempts.map(a => `${a.ticket.role}: ${a.ticket.target.provider}/${a.ticket.target.model} (${a.completion.kind})`).join('; ')}. Requested effort is recorded; T3 did not report effective effort.${!this.hasProviderDiversity(t) ? ' GPT-only review fallback used with a separate model outside the author set.' : ''}` : ''}`,
+      body: `${t.contract.problem}\n\n${t.contract.requirements.map(r => `- ${r.outcome}`).join('\n')}\n\nValidation: ${t.receipts.map(r => `${r.id}: ${r.outcome}`).join('; ')}. Independent review, adversarial review and final audit completed for this source.${'kind' in t.contract.models ? `\n\nModel attempts: ${t.attempts.map(a => `${a.ticket.role}: ${a.ticket.target.provider}/${a.ticket.target.model} (${a.completion.kind})`).join('; ')}. Requested effort is recorded; T3 did not report effective effort.${!this.hasIndependentCoverage(t) ? ' Additional GPT review used outside the author set because normal reviews lacked full provider coverage or a non-GPT reviewer.' : ''}` : ''}`,
     });
     const claim = this.journal.change(id, `publish:${t.generation}`, { plan }, value => {
       const v = task.parse(value); this.current(v);

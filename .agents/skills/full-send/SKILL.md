@@ -58,6 +58,9 @@ do not ask the owner questions. A missing prerequisite ends incomplete.
    Reconcile all child work first. Only the controller selects the next sealed candidate.
    Unknown failures, invalid output and negative reviews are not availability; use the
    ordinary repair/incomplete outcome. A failed worker never supplies passing evidence.
+   If the tool definitively rejected creation before a child existed, `dispatch-rejected`
+   records the exact reserved request ID and original provider error code/message. Never
+   classify a timeout, lost response or zero lineage matches as definitive non-creation.
    For an unclaimed
    ticket, `withdraw-ticket` is allowed only when dispatch definitively never occurred or
    all identified children are confirmed terminal. Uncertain dispatches retain ownership.

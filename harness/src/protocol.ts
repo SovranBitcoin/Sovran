@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { Controller } from './controller';
 import { assessment, contract } from './workflow';
-import { availability, modelCatalog, recommendedModels, runtimeTask } from './models';
+import { availability, dispatchRejection, modelCatalog, recommendedModels, runtimeTask } from './models';
 
 const id = z.string().uuid();
 const text = z.string().min(1);
@@ -13,6 +13,7 @@ export const request = z.discriminatedUnion('action', [
   z.object({ action: z.literal('brief'), id }),
   z.object({ action: z.literal('begin-dispatch'), id, ticket: text, coordinator: text, session: text }),
   z.object({ action: z.literal('fallback'), id, ticket: text, reason: availability, runtime: runtimeTask, detail: text }),
+  z.object({ action: z.literal('dispatch-rejected'), id, ticket: text, reason: availability, rejection: dispatchRejection }),
   z.object({ action: z.literal('reconcile-command'), id }),
   z.object({ action: z.literal('publish'), id }),
   z.object({ action: z.literal('check-ci'), id }),
@@ -36,6 +37,7 @@ export async function dispatch(controller: Controller, input: unknown) {
     case 'brief': return controller.brief(r.id);
     case 'begin-dispatch': return controller.beginDispatch(r.id, r.ticket, r.coordinator, r.session);
     case 'fallback': return controller.fallback(r.id, r.ticket, r.reason, r.runtime, r.detail);
+    case 'dispatch-rejected': return controller.dispatchRejected(r.id, r.ticket, r.reason, r.rejection);
     case 'reconcile-command': return controller.reconcileCommand(r.id);
     case 'publish': return controller.publish(r.id);
     case 'check-ci': return controller.checkCI(r.id);

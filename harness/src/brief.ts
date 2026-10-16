@@ -42,7 +42,7 @@ export function brief(t: Task, stateDir: string) {
     contract: t.contract, context, artifacts, research, repairReason: t.ticket.role === 'implementation' ? t.reason : '',
     attempts: t.attempts.map(a => ({ ticket: a.ticket.id, role: a.ticket.role, target: a.ticket.target,
       worker: a.ticket.claim?.worker ?? null, generation: a.generation, sourceBefore: a.ticket.sourceAtIssue,
-      sourceAfter: a.sourceAfter, availability: a.completion.kind === 'unavailable' ? a.completion.reason : null })),
+      sourceAfter: a.sourceAfter, availability: a.completion.kind === 'unavailable' || a.completion.kind === 'dispatch-rejected' ? a.completion.reason : null })),
     effortEvidence: 'Target options record requested effort. Runtime model identity comes from T3. Effective effort is unreported unless separately observed; never infer it from the request.',
     researchScope: 'Research describes its recorded source, not the current candidate. Recheck claims against changed code. It is context, never implementation or test proof. Reviewers must reach their own conclusions.',
     assessmentSchema: z.toJSONSchema(assessment),

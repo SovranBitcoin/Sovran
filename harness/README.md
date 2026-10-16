@@ -94,10 +94,13 @@ terminal worker and no live children; it keeps the deadline, source, failed evid
 all prior authors. Unknown dispatch outcomes retain ownership. Dispatch reservation grants
 one caller permission to launch; a replay must reconcile the existing attempt. Negative
 reviews enter repair, never model shopping. Old single-target contracts gain no fallback.
+If the provider definitively rejected creation, the coordinator records that exact request
+and provider error instead of inventing a child. An empty lineage search is insufficient.
 
-Without a current Claude review against GPT-authored work, the approved GPT fallback requires
-an extra fresh reviewer using a GPT model outside every source-author model across attempts
-and repairs. Normal review, adversarial review and audit remain required. Missing eligible
+Normal reviews must include a non-GPT review and cover every source-author provider with
+a different provider. Otherwise the approved fallback requires an extra fresh reviewer using
+a GPT model outside every source-author model across attempts and repairs. Normal review,
+adversarial review and audit remain required. Missing eligible
 models end incomplete. The PR discloses model attempts, fallback and unreported effective effort.
 
 The SQLite transaction stores the transition and outstanding action together. An interrupted

@@ -2,7 +2,7 @@ import { createMachine, transition } from 'xstate';
 import { z } from 'zod';
 import { publishPlan } from './publisher';
 import { reference } from './references';
-import { availability, model, models, role, runtimeTask } from './models';
+import { availability, dispatchRejection, model, models, role, runtimeTask } from './models';
 export { role } from './models';
 
 const text = z.string().trim().min(1);
@@ -85,6 +85,7 @@ export const task = z.object({
     completion: z.discriminatedUnion('kind', [
       z.object({ kind: z.literal('submitted'), verdict: assessment.shape.verdict, runtime: runtimeTask.nullable() }),
       z.object({ kind: z.literal('unavailable'), reason: availability, runtime: runtimeTask, detail: text }),
+      z.object({ kind: z.literal('dispatch-rejected'), reason: availability, rejection: dispatchRejection }),
       z.object({ kind: z.literal('stopped'), reason: text }),
     ]),
   })).default([]),
