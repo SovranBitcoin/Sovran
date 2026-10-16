@@ -76,6 +76,7 @@ import type { BalancesByMint } from '@cashu/coco-core';
 import {
   applyMintItemAddedUpdate,
   buildAddedMintItem,
+  mintInfoDisplayName,
   shouldApplySovranEntryUpdate,
 } from './createSovranScreenActionsBridge';
 
@@ -198,5 +199,16 @@ describe('buildAddedMintItem', () => {
 
     expect(emptyRow).toMatchObject({ balance: 0, status: 'disabled' });
     expect(fundedRow).toMatchObject({ balance: 21, status: 'available' });
+  });
+});
+
+describe('mintInfoDisplayName', () => {
+  it("prefers the mint's own name, then the name the list showed, then the URL", () => {
+    const url = 'https://mint.example';
+    expect(mintInfoDisplayName('Own Name', 'Listed Name', url)).toBe('Own Name');
+    expect(mintInfoDisplayName(undefined, 'Listed Name', url)).toBe('Listed Name');
+    expect(mintInfoDisplayName('  ', 'Listed Name', url)).toBe('Listed Name');
+    expect(mintInfoDisplayName(undefined, undefined, url)).toBe(url);
+    expect(mintInfoDisplayName('', '', url)).toBe(url);
   });
 });

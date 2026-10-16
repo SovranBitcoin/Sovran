@@ -197,4 +197,26 @@ describe('mint details rows', () => {
     );
     expect(fromString['Last audited'].value).toBe('3 days ago');
   });
+
+  it('writes large counts with separators and drops a name that is only the address', () => {
+    const rows = byTitle(
+      buildMintDetailsRows({
+        mintUrl: MINT,
+        entry: { mintUrl: MINT, displayName: MINT },
+        cached: {
+          nMints: 12345,
+          nMelts: 0,
+          nErrors: 0,
+          reviewCount: 1500,
+          contactFollowers: 98765,
+        },
+        now: NOW,
+      })
+    );
+
+    expect(rows['Name']).toBeUndefined();
+    expect(rows['Total mints'].value).toBe('12,345');
+    expect(rows['Number of reviews'].value).toBe('1,500');
+    expect(rows['Followers'].value).toBe('98,765');
+  });
 });

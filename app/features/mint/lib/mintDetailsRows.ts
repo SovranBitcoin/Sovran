@@ -45,6 +45,9 @@ function text(value: unknown): string | undefined {
 const finite = (value: unknown): value is number =>
   typeof value === 'number' && Number.isFinite(value);
 
+/** A whole number as people write it: 12,345. */
+const count = (n: number): string => Math.round(n).toLocaleString('en-US');
+
 /**
  * When something happened, in words. The store stamps epoch milliseconds; an
  * auditor's own date may be Unix seconds or a date string. Below 1e11 a number
@@ -111,14 +114,13 @@ export function buildMintDetailsRows({
   // ── The mint, in its own words (NUT-06) ───────────────────────────────────
   const info = cached?.info;
   add('Mint', 'Address', text(mintUrl));
-  add(
-    'Mint',
-    'Name',
+  const name =
     text(entry?.displayName) ??
-      text(info?.name) ??
-      text(cached?.displayName) ??
-      text(entry?.seedDisplayName)
-  );
+    text(info?.name) ??
+    text(cached?.displayName) ??
+    text(entry?.seedDisplayName);
+  // A name that is only the address again says nothing the Address row has not.
+  add('Mint', 'Name', name === text(mintUrl) ? undefined : name);
   add('Mint', 'Software', text(info?.version));
   add('Mint', 'Mint public key', text(info?.pubkey));
   const units = cached?.supportedUnits?.map(text).filter((u) => u !== undefined);
@@ -160,26 +162,14 @@ export function buildMintDetailsRows({
       'Average time',
       finite(audit.avgLatencyMs) ? `${Math.round(audit.avgLatencyMs)} ms` : undefined
     );
-    add(
-      'Reliability',
-      'Total mints',
-      finite(audit.mints) ? String(Math.round(audit.mints)) : undefined
-    );
-    add(
-      'Reliability',
-      'Total melts',
-      finite(audit.melts) ? String(Math.round(audit.melts)) : undefined
-    );
+    add('Reliability', 'Total mints', finite(audit.mints) ? count(audit.mints) : undefined);
+    add('Reliability', 'Total melts', finite(audit.melts) ? count(audit.melts) : undefined);
     // Errors are the operations behind the rate that were not successes.
     const errors =
       finite(audit.totalOps) && finite(audit.mints) && finite(audit.melts)
         ? audit.totalOps - audit.mints - audit.melts
         : undefined;
-    add(
-      'Reliability',
-      'Failed operations',
-      errors !== undefined ? String(Math.round(errors)) : undefined
-    );
+    add('Reliability', 'Failed operations', errors !== undefined ? count(errors) : undefined);
     add('Reliability', 'Auditor', audit.source ? AUDITOR_NAMES[audit.source] : undefined);
   }
   // nagg reports uptime as a percentage, 0-100.
@@ -198,11 +188,11 @@ export function buildMintDetailsRows({
     score !== undefined && score >= 0 ? `${score.toFixed(1)} out of 5` : undefined
   );
   const reviewCount = [cached?.reviewCount, entry?.seedReviewCount].find(finite);
-  add('Reviews', 'Number of reviews', reviewCount !== undefined ? String(reviewCount) : undefined);
+  add('Reviews', 'Number of reviews', reviewCount !== undefined ? count(reviewCount) : undefined);
   add(
     'Reviews',
     'Favourites',
-    finite(cached?.favouriteCount) ? String(cached.favouriteCount) : undefined
+    finite(cached?.favouriteCount) ? count(cached.favouriteCount) : undefined
   );
 
   // ── Who runs it ───────────────────────────────────────────────────────────
@@ -213,7 +203,7 @@ export function buildMintDetailsRows({
     'Operator',
     'Followers',
     finite(cached?.contactFollowers) && cached.contactFollowers > 0
-      ? String(cached.contactFollowers)
+      ? count(cached.contactFollowers)
       : undefined
   );
   add(
