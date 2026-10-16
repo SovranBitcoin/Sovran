@@ -13,15 +13,12 @@ Open the shared history with `bun run e2e:viewer`. [Results ownership](../README
 where generated evidence belongs and how to group older output.
 
 For a fresh Android story, use `bun run e2e:story e2e/stories/library/<story>.json --platform android`.
-It uses the current stamped development APK and owns a disposable emulator and Metro server;
-build the APK first with `bun run screenshots:native-build android`. Saved states, handed/given
-inputs, deep links and permission overrides are not supported in this lane yet. It keeps the
-same story report, screenshots, per-step control maps and received logs, plus the installed APK
-comparison and session receipt. Recent device logs and a final screen are captured before
-teardown so an app-link failure has diagnostic evidence; these bounded logs are not a complete
-log history. Cleanup and source drift can fail an otherwise passing story. This is functional
-development-build evidence: toast/triple-tap timing is extended, location is pregranted, and video, pixel-motion and
-device performance measurements are absent. It does not satisfy the controller's native gate.
+Add `--bundled` to use the bundled APK on a disposable AOSP emulator; build it first with
+`bun run screenshots:native-build android --bundled`. Without that flag, the runner uses
+the stamped development APK with owned Metro. Saved states, handed/given inputs, deep links
+and permission overrides are unsupported. Both lanes retain screenshots, control maps, logs,
+installed-APK comparison and cleanup evidence. See [builds and evidence limits](../README.md#builds-are-part-of-the-evidence).
+Neither lane currently supplies a controller-bound native receipt.
 
 Each play has its own session identity, checked against the app's hello before accepting
 logs or sending requests. A profile restart may reconnect to that same session. The attempt
@@ -77,7 +74,7 @@ This checks the React overlay's lifetime, not native compositor visibility or pe
   take whichever post the network sends first.
 - **A place on the map**: the markers are drawn by the map, not by the app; iOS reports them only as one label
   for the whole map.
-- **Android, and a phone**: the driver is for the iPhone simulator only.
+- **Saved-state stories on Android, and physical phones**: these paths are not implemented.
 - **Making a real payment fail on purpose**: with "Mock Fail Send" or "Mock Fail Melt" on, a real send and a real
   Lightning payment went through as usual; the toggles do not reach real payments. The failures that have stories
   are real ones: an invoice already paid, and no money.

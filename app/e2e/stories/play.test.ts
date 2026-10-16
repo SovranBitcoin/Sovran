@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test';
+import { readFileSync } from 'node:fs';
 import type { AppLink, AppLogEntry, AppScreen } from '../link/appLink';
 import { find, playStory, topPage } from './play';
 import { storySchema, type Story } from './story';
@@ -67,6 +68,45 @@ const story = (steps: unknown[]): Story =>
     steps,
   });
 const noSwipe = { swipe: async () => {}, type: async () => {} };
+
+test.each(['blank', 'wrong page', 'onboarding'])(
+  'the legal story requires setup after confirmation: %s',
+  async (destination) => {
+    const legal = storySchema.parse(
+      JSON.parse(
+        readFileSync(new URL('./library/first-launch-accept-terms.json', import.meta.url), 'utf8')
+      )
+    );
+    const finalStep = legal.steps.at(-1);
+    if (!finalStep) throw new Error('The legal story has no final step');
+    const app = fakeApp(
+      screenOf(
+        box({ id: 'screen-legal-document', page: 'LegalDocumentScreen' }),
+        box({ id: 'privacy-confirm', page: 'LegalDocumentScreen' })
+      )
+    );
+    const result = await playStory(
+      { ...legal, steps: [{ ...finalStep, withinMs: 100 }] },
+      app.link,
+      {
+        ...noSwipe,
+        tap: async (x, y) => {
+          app.state.taps.push([x, y]);
+          app.state.screen =
+            destination === 'blank'
+              ? screenOf()
+              : screenOf(
+                  box({
+                    page: destination === 'onboarding' ? 'OnboardingScreen' : 'WalletScreen',
+                  })
+                );
+        },
+      }
+    );
+    expect(result.ok).toBe(destination === 'onboarding');
+    expect(app.state.taps).toEqual([[0.125, 0.03125]]);
+  }
+);
 
 describe('find', () => {
   test('takes the last match, which is the one drawn on top', () => {

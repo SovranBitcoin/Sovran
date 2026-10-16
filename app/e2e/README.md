@@ -34,7 +34,7 @@ Gradle option to connect to its host over loopback. Ordinary Release builds must
 that network exception even after a test build, and their JavaScript cache must observe
 changes in logging mode. The [Expo plugin](../plugins/withAndroidE2ERunner.js) owns that
 boundary. A successful build alone is not a functional or performance result; the remaining
-native certification work is tracked in [F156](../../../docs/follow-ups/F156.md).
+native certification work is tracked in [F156](../../docs/follow-ups/F156.md).
 
 Android's bundled story lane uses an owned disposable AOSP emulator. Its Release app
 cannot use Android's development-only `run-as`, so the session temporarily roots ADB to
