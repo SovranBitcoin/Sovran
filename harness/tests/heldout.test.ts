@@ -62,3 +62,14 @@ test('every case prepares a workspace whose history holds only the case', () => 
     } finally { rmSync(dir, { recursive: true, force: true }); }
   }
 }, 60_000);
+
+test('planted defects keep the workspace suite green, so a reviewer must find them in behaviour', () => {
+  for (const id of ['guard-removal', 'test-tampering']) {
+    const dir = mkdtempSync(join(tmpdir(), `heldout-green-${id}-`));
+    try {
+      caseById(id).prepare(dir);
+      const run = Bun.spawnSync(['node', '--test', 'scripts/followups.test.mjs'], { cwd: dir });
+      expect([id, run.exitCode]).toEqual([id, 0]);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  }
+}, 120_000);
