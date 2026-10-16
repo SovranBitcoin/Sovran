@@ -35,7 +35,7 @@ const value=k=>a[a.indexOf(k)+1], save=()=>writeFileSync(file,JSON.stringify(s))
 if(a[0]==='api'){
  if(s.apiError)process.exit(1);
  if(cmd==='graphql'){
-  const checks=s.checks.map((c,i)=>c.__typename?c:{__typename:'CheckRun',id:'check-'+i,name:c.name,status:c.bucket==='pending'?'IN_PROGRESS':'COMPLETED',conclusion:({pass:'SUCCESS',fail:'FAILURE',skipping:'SKIPPED',cancel:'CANCELLED'})[c.bucket]??null,isRequired:!!c.required,detailsUrl:'https://github.com/fixture/wallet/actions',checkSuite:{databaseId:i+1,commit:{oid:c.head??s.plan.head},app:{databaseId:c.appId??1,slug:'github-actions'},workflowRun:c.workflowRun??null}});
+  const checks=s.checks.map((c,i)=>c.__typename?c:{__typename:'CheckRun',id:'check-'+i,name:c.name,status:c.bucket==='pending'?'IN_PROGRESS':'COMPLETED',conclusion:({pass:'SUCCESS',fail:'FAILURE',skipping:'SKIPPED',cancel:'CANCELLED'})[c.bucket]??null,isRequired:!!c.required,detailsUrl:'https://github.com/fixture/wallet/actions',checkSuite:{databaseId:i+1,commit:{oid:c.head??s.plan.head},app:{databaseId:c.appId??1,slug:c.workflowRun?'github-actions':c.appSlug??'fixture-ci'},workflowRun:c.workflowRun??null}});
   const offset=Number(a.find(x=>x.startsWith('cursor='))?.slice(7)??0), size=s.pageSize??checks.length;
   const nodes=checks.slice(offset,offset+size), more=offset+nodes.length<checks.length;
   console.log(JSON.stringify({data:{repository:{pullRequest:{headRefOid:s.plan.head,baseRefOid:s.plan.baseHead,statusCheckRollup:{commit:{oid:s.plan.head},contexts:{totalCount:checks.length,pageInfo:{hasNextPage:more,endCursor:more?String(offset+nodes.length):null},nodes}}}}},...(s.graphqlErrors?{errors:[{message:'Partial data'}]}:{})}));
@@ -279,4 +279,12 @@ test('all context pages are read and a changing server policy invalidates the ob
   expect(f.publisher.check(f.plan,17).status).toBe('ready');
   f.change(s=>{s.changedPolicy=true;s.policyReads=0;});
   expect(()=>f.publisher.check(f.plan,17)).toThrow('requirements changed');
+});
+
+
+test('a GitHub Actions pass without its workflow identity cannot bypass PR association', () => {
+  const f=fixture(); f.publisher.publish(f.plan,true);
+  f.change(s=>{s.checks[0].appSlug='github-actions';});
+  expect(f.publisher.check(f.plan,17).status).toBe('waiting');
+  expect(f.publisher.check(f.plan,17).reason).toContain('workflow identity is missing');
 });

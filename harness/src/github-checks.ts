@@ -114,6 +114,9 @@ export function githubChecks(p: PublishPlan, number: number, api: Api) {
     }
     const check = matches.length === 1 ? matches[0] : undefined;
     if (!check) { problems.push(`${obligation.name}: ${matches.length ? 'ambiguous publishers or attempts' : 'missing'}`); continue; }
+    if (check.__typename === 'CheckRun' && check.checkSuite.app?.slug === 'github-actions' && !check.checkSuite.workflowRun) {
+      problems.push(`${obligation.name}: GitHub Actions workflow identity is missing`); continue;
+    }
     if (check.__typename === 'CheckRun' && check.checkSuite.workflowRun) {
       const run = check.checkSuite.workflowRun;
       if (!associations.has(run.databaseId)) associations.set(run.databaseId, get([`${endpoint}/actions/runs/${run.databaseId}`]));
