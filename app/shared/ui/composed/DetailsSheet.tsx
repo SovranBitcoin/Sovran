@@ -11,7 +11,9 @@ import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 /**
  * What a row is about. The page is read by context, not top to bottom: who it
  * was with, what the token can do, which mint, then the strings to quote in a
- * bug report. Listed in the order the groups are drawn.
+ * bug report. Listed in the order the groups are drawn. The last four are the
+ * mint page's own: how the mint has been running, what people think of it,
+ * who runs it, and when each was last read.
  */
 const DETAIL_GROUPS = [
   'Payment',
@@ -21,6 +23,10 @@ const DETAIL_GROUPS = [
   'Mint',
   'References',
   'Debug',
+  'Reliability',
+  'Reviews',
+  'Operator',
+  'Last updated',
 ] as const;
 export type DetailGroup = (typeof DETAIL_GROUPS)[number];
 

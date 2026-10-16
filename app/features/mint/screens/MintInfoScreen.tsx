@@ -1,6 +1,6 @@
 import { useIdentityHeader } from '@/shared/ui/composed/IdentityHeader';
 import { Screen } from '@/shared/ui/composed/Screen';
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { StyleSheet } from 'react-native';
 import Animated, {
   useAnimatedStyle,
@@ -54,9 +54,11 @@ import { openExternalUrl } from '@/shared/lib/url';
 import { useNostrProfile } from '@/shared/hooks/useNostrProfile';
 import { useCachedMintMetadata } from '@/shared/stores/global/mintMetadataStore';
 import { Button } from '@/shared/ui/primitives/Button';
+import { DetailsSection } from '@/shared/ui/composed/DetailsSection';
 import { useMintDetailRead, type MintDetailGroupStatus } from '../hooks/useMintDetailRead';
 import { useIsMintTrusted } from '../hooks/useIsMintTrusted';
 import type { MintAuditSummary } from '../lib/auditInfo';
+import { buildMintDetailsRows } from '../lib/mintDetailsRows';
 import {
   formatMintInfoNostrFallback,
   getMintInfoNostrDisplayName,
@@ -337,6 +339,8 @@ export function MintInfoScreen() {
     nostrContactPubkey ?? null
   );
   const nostrContactPicture = nostrContactProfile?.picture || nostrContactProfile?.image;
+  // The footer's Details button asks for the modal; DetailsSection opens it.
+  const [detailsOpen, setDetailsOpen] = useState(false);
 
   // ── Instrumentation ───────────────────────────────────────────────────────
   // Four groups land independently (identity from the route entry, audit and
@@ -491,12 +495,14 @@ export function MintInfoScreen() {
                   : mintUrl && (entry?.fromScan || !isTrusted)
                     ? [
                         {
-                          testID: 'mint-info-close',
-                          text: 'Close',
+                          // The header already closes the page. This slot opens
+                          // everything else known about the mint, every value
+                          // copyable, as the transaction pages do.
+                          testID: 'mint-info-details-open',
+                          text: 'Details',
+                          accessibilityLabel: 'Mint details',
                           variant: 'secondary',
-                          onPress: async () => {
-                            await actions.back.execute();
-                          },
+                          onPress: () => setDetailsOpen(true),
                         },
                         {
                           testID: 'mint-info-trust',
@@ -508,12 +514,11 @@ export function MintInfoScreen() {
                       ]
                     : [
                         {
-                          testID: 'mint-info-close',
-                          text: 'Close',
+                          testID: 'mint-info-details-open',
+                          text: 'Details',
+                          accessibilityLabel: 'Mint details',
                           variant: 'secondary',
-                          onPress: async () => {
-                            await actions.back.execute();
-                          },
+                          onPress: () => setDetailsOpen(true),
                         },
                       ]
               }
@@ -521,6 +526,21 @@ export function MintInfoScreen() {
           </BottomButtons>
         }>
         {morph.probe}
+        <DetailsSection
+          trigger="none"
+          label="Mint details"
+          open={detailsOpen}
+          onOpenChange={setDetailsOpen}
+          items={buildMintDetailsRows({
+            mintUrl,
+            entry,
+            cached: cachedMeta,
+            operator: {
+              pubkey: nostrContactPubkey,
+              name: getMintInfoNostrDisplayName(nostrContactProfile, ''),
+            },
+          })}
+        />
         <View className="pt-4">
           <VStack align="center" className="w-full pb-8 pt-6">
             <Animated.View className="items-center" style={morph.contentStyle}>
@@ -683,7 +703,7 @@ export function MintInfoScreen() {
               <Notice
                 status="info"
                 icon="ri:file-text-line"
-                title="Details"
+                title="More about this mint"
                 collapseLines={4}
                 description={entry.longDescription}
                 testID="mint-info-details"

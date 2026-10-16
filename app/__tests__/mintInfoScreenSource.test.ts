@@ -81,6 +81,29 @@ describe('mint info screen source', () => {
     expect(source).toContain('progress={audit?.successRate}');
   });
 
+  it('replaces Close with Details in the footer', () => {
+    const footer = source.slice(
+      source.indexOf('<BottomButtons>'),
+      source.indexOf('</BottomButtons>')
+    );
+    // Close is gone from the footer; the accepter's Reject keeps its old id.
+    expect(footer).not.toContain("text: 'Close'");
+    expect(footer).toContain("text: 'Reject'");
+    expect(
+      footer.match(
+        /testID: 'mint-info-details-open',\s+text: 'Details',\s+accessibilityLabel: 'Mint details',\s+variant: 'secondary',\s+onPress: \(\) => setDetailsOpen\(true\),/g
+      )
+    ).toHaveLength(2);
+    // The modal opens through the shared DetailsSection, from the footer only.
+    expect(source).toContain('<DetailsSection\n          trigger="none"');
+    expect(source).toContain('open={detailsOpen}');
+    expect(source).toContain('onOpenChange={setDetailsOpen}');
+    expect(source).toContain('items={buildMintDetailsRows({');
+    // One thing on the page is called Details: the long description is not.
+    expect(source).not.toContain('title="Details"');
+    expect(source).toContain('testID="mint-info-details"');
+  });
+
   it('renders the shared status dot for every audit state', () => {
     expect(source).toContain('<AvatarStatusDot status={status} size={badgeSize} />');
     expect(source).not.toContain('STATUS_BADGE_CONFIG');
