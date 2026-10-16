@@ -138,8 +138,9 @@ export function githubChecks(p: PublishPlan, number: number, api: Api) {
     if (['FAILURE', 'ERROR', 'TIMED_OUT', 'CANCELLED', 'ACTION_REQUIRED', 'STARTUP_FAILURE'].includes(state ?? '')) failed = true;
   }
   // Checks outside the sealed and server-required sets bind nothing; they are disclosed, never selected.
-  const chosen = new Set(selected.map(s => s.check));
-  const outsideRequired = checks.filter(c => !chosen.has(c.id)).flatMap(c => {
+  // A superseded attempt of a required check is history, not a check outside the requirements.
+  const requiredNames = new Set(obligations.map(o => o.name));
+  const outsideRequired = checks.filter(c => !requiredNames.has(nameOf(c))).flatMap(c => {
     const state = c.__typename === 'CheckRun' ? (c.status === 'COMPLETED' ? c.conclusion : c.status) : c.state;
     return ['SUCCESS', 'NEUTRAL', 'SKIPPED'].includes(state ?? '') ? [] : [`${nameOf(c)}: ${state}`];
   });

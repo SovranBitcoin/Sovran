@@ -233,6 +233,8 @@ test('known-empty server policy still enforces every sealed check and retains al
   expect(disclosed.reason).toContain('advisory: FAILURE');
   f.change(s => { s.checks = [{name:'upgrade',bucket:'pass'}]; });
   expect(f.publisher.check(f.plan,17).status).toBe('waiting'); // UNSTABLE with nothing outside to explain it
+  f.change(s => { s.checks = [{name:'upgrade',bucket:'fail'}, {name:'upgrade',bucket:'pass'}]; });
+  expect(f.publisher.check(f.plan,17).outsideRequired).toEqual([]); // an earlier required attempt is not 'outside'
 });
 
 test('server policies and observed required contexts strengthen the sealed obligations', () => {
