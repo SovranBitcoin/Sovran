@@ -60,6 +60,21 @@ function epochTable(): { epoch: string; versions: string; commits: string[] }[] 
 }
 
 /** The distinct versions in the list of store builds. */
+function treeVersion(): string {
+  return (
+    JSON.parse(readFileSync(join(APP_DIR, 'app.json'), 'utf8')) as { expo: { version: string } }
+  ).expo.version;
+}
+
+function compareVersions(a: string, b: string): number {
+  const [x, y] = [a, b].map((v) => v.split('.').map(Number));
+  for (let i = 0; i < Math.max(x.length, y.length); i++) {
+    const d = (x[i] ?? 0) - (y[i] ?? 0);
+    if (d) return d;
+  }
+  return 0;
+}
+
 function storeBuildVersions(): string[] {
   const rows = readFileSync(join(PERSISTENCE, 'store-builds.tsv'), 'utf8').trim().split('\n');
   const column = rows[0].split('\t').indexOf('version');
@@ -171,25 +186,27 @@ describe('every build that could be on a phone falls in a fixture', () => {
     expect({ unclaimed, how: HOW }).toEqual({ unclaimed: [], how: HOW });
   });
 
+  // A tree still at a released version ships nothing: merging it starts no release. Its
+  // newest fixture may then describe the next release, which must sort after the tree's
+  // version. Bumping app.json brings back the strict checks before that release ships.
+  const parked = storeBuildVersions().includes(treeVersion());
+
   it('claims the version this tree would ship as', () => {
-    const { expo } = JSON.parse(readFileSync(join(APP_DIR, 'app.json'), 'utf8')) as {
-      expo: { version: string };
-    };
+    const version = treeVersion();
     // Bumping the version without a fixture is how a release ships untested.
-    expect({ version: expo.version, claimed: claimed.has(expo.version), how: HOW }).toEqual({
-      version: expo.version,
+    expect({ version, claimed: claimed.has(version), how: HOW }).toEqual({
+      version,
       claimed: true,
       how: HOW,
     });
-    expect(newest.versions).toContain(expo.version);
+    if (!parked) expect(newest.versions).toContain(version);
   });
 
   it('claims no version the build list and this tree do not know', () => {
-    const { expo } = JSON.parse(readFileSync(join(APP_DIR, 'app.json'), 'utf8')) as {
-      expo: { version: string };
-    };
-    const known = new Set([...storeBuildVersions(), expo.version]);
-    expect([...claimed].filter((version) => !known.has(version))).toEqual([]);
+    const known = new Set([...storeBuildVersions(), treeVersion()]);
+    const upcoming = (version: string) =>
+      parked && newest.versions.includes(version) && compareVersions(version, treeVersion()) > 0;
+    expect([...claimed].filter((version) => !known.has(version) && !upcoming(version))).toEqual([]);
   });
 });
 
