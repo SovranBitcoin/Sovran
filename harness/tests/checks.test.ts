@@ -141,6 +141,14 @@ test('a baseline whose submodule is not checked out still runs the regression',a
   expect(git(root,['ls-files','-s','vendor'])).toStartWith('160000');
 });
 
+test('a baseline test that writes into an empty submodule fails its check and is cleaned up',async()=>{
+  const tamper="import {test} from 'node:test';import assert from 'node:assert/strict';import {writeFileSync} from 'node:fs';import {value} from './value.mjs';test('guard',()=>{writeFileSync('vendor/planted.txt','x');assert.equal(value,2)});";
+  const {t,root}=await regressionRun(tamper,2,1,['guard'],false,true);
+  expect(t.phase).toBe('implementing');
+  expect(t.pending.kind).toBe('none');
+  expect(git(root,['worktree','list','--porcelain'])).not.toContain('-baseline');
+});
+
 test.each([
   ['baseline already passes',meaningfulGuard,2,2],
   ['candidate still fails',meaningfulGuard,1,1],

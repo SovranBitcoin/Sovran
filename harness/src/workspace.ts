@@ -27,7 +27,7 @@ export function fingerprint(root: string) {
  * Identify each empty gitlink by its pinned commit and fingerprint everything else. */
 export function baselineFingerprint(root: string) {
   const empty = git(root, ['ls-files', '-s', '-z']).split('\0').flatMap(entry => {
-    const match = /^160000 ([0-9a-f]+) \d+\t(.+)$/.exec(entry);
+    const match = /^160000 ([0-9a-f]+) \d+\t(.+)$/s.exec(entry);
     return match?.[1] && match[2] && readdirSync(join(root, match[2])).length === 0 ? [{ path: match[2], commit: match[1] }] : [];
   });
   const listed = git(root, ['ls-files', '-z', '--cached', '--others', '--exclude-standard']).split('\0');

@@ -543,7 +543,10 @@ export class Controller {
         } catch (error) { outcome = 'fail'; summary = String(error); }
       }
       if (ownedBaseline) {
-        if (preparedSource && baselineFingerprint(executionRoot) !== preparedSource) { outcome = 'fail'; summary = 'Baseline changed during regression execution'; }
+        // A tampered baseline may no longer fingerprint at all; that is a failed check, not a crash.
+        let unchanged = !preparedSource;
+        try { unchanged ||= baselineFingerprint(executionRoot) === preparedSource; } catch { unchanged = false; }
+        if (!unchanged) { outcome = 'fail'; summary = 'Baseline changed during regression execution'; }
         // runCommand has reconciled the process group before a disposable baseline is removed.
         git(t.root, ['worktree', 'remove', '--force', '--', executionRoot]);
       }
