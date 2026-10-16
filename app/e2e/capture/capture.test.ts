@@ -176,6 +176,23 @@ describe('capture inventory', () => {
       plan.occurrences.some((o) => o.scenario === 'settings.edit.profile' && !o.effectReviewed)
     ).toBe(true);
   });
+  it('mint details recipes stay reviewed after the Details footer', () => {
+    // These three wait for the mint page by its footer button, which became
+    // Details (mint-info-details-open) where it was Close. Their pins were
+    // re-reviewed for that selector alone; any other change still blocks.
+    for (const scenario of [
+      'store.screenshots',
+      'marketing.screenshots',
+      'marketing.screenshots.mints',
+    ])
+      for (const platform of ['ios', 'android']) {
+        const targets = plan.targets.filter(
+          (t) => t.scenario === scenario && t.platform === platform
+        );
+        expect(targets.length).toBeGreaterThan(0);
+        expect(targets.filter((t) => t.blocker?.includes('changed recipe'))).toEqual([]);
+      }
+  });
   it('selects only focused effect-reviewed recipes and never infers captured status', () => {
     expect(plan.invocations.every((i) => i.scenario && i.scenarios.length === 1)).toBe(true);
     expect(plan.invocations.some((i) => i.scenario === 'settings.edit.profile')).toBe(false);
