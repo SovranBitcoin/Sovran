@@ -1,6 +1,7 @@
 # Evidence, context and model routing for full send
 
-Research date: 2026-10-16. Source audit baseline: `f12db054d`.
+Research date: 2026-10-16. Controller audit baseline: `f12db054d`;
+second history/native-source audit: `db007cc61`.
 This is a researched design, not a claim that the proposed gates already run.
 The [harness README](../../harness/README.md) describes implemented behavior; the
 [follow-up ledger](../follow-ups/README.md) owns unfinished work.
@@ -28,10 +29,31 @@ evaluations of actual agent behavior and independently checked outcomes.
 | [Infrastructure noise](https://www.anthropic.com/engineering/infrastructure-noise), February 2026 | Resource configuration moved one benchmark's scores by six percentage points. | Pin environments and separate infrastructure failures from model failures before ranking effort settings. |
 | [GitHub cloud-agent protections](https://docs.github.com/en/copilot/concepts/security-governance-and-network-settings/risks-and-mitigations), retrieved October 2026 | Scoped authority, review, scanning and traceability address practical risks, including malicious instructions in read content. | Test safe synthetic secret leaks, dependency risks and prompt injection. Our trusted host is still not an OS sandbox. |
 | [Multi-agent failure taxonomy](https://arxiv.org/abs/2503.13657v3), October 2025 | Analysis identifies system-design, coordination and verification failures across studied agent systems. These are not measurements of our exact models. | Clear responsibilities and information continuity matter more than simply adding agents. |
+| [LLM-generated database test flakiness](https://arxiv.org/abs/2601.08998), ICSE SEIP 2026 | In four database systems, GPT-4o and Mistral sometimes inherited flaky assumptions from supplied tests; unordered results were a major cause. Different models and domain from our wallet. | Review example tests before giving them to workers. Existing tests are evidence, not unquestionable templates. |
+| [Google's patch-evaluation study](https://research.google/pubs/towards-a-human-in-the-loop-framework-for-reliable-patch-evaluation-using-an-llm-as-a-judge/), AI-SQE 2026 | A shared rubric improved agreement; the proposed judge used expert-refined rubrics, evaluated on 48 bugs and 115 patches. | Define expected behavior before implementation. This does not validate unattended self-written rubrics. |
+| [Google mutation testing](https://research.google/pubs/state-of-mutation-testing-at-google/), 2018 | Change-focused fault insertion made test-strength feedback more practical than exhaustive mutation. | Try a small, relevant deliberate fault to establish that an important regression test can detect it. |
+| [Meta test reliability](https://engineering.fb.com/2020/12/10/developer-tools/probabilistic-flakiness/), 2020 | Tracks reliability using execution history and separates code, environment and nondeterminism; does not promise perfectly reliable E2E tests. | Preserve all attempts and their conditions. Passing after a retry cannot explain the earlier failure. |
+| [SlopCodeBench](https://arxiv.org/html/2603.24755v1), March 2026 preprint | Python implementations across evolving requirements accumulated duplication and complexity in the studied agents. Hidden tests and changing specifications differ from our repair loop. | Review the cumulative diff and maintenance cost after repairs, not only the latest fix. This does not prove every extra repair is harmful. |
 
 These are evidence for design choices, not proof of our proposed design. No source found
 establishes that Opus is always the best reviewer, Fable the best adversary, or mixed
 providers statistically independent. Those remain local evaluation questions.
+
+The second research pass also searched Google Scholar and Reddit. Scholar's search page
+was inaccessible; primary papers were read through arXiv, author copies and publisher
+pages. [This Reddit discussion](https://www.reddit.com/r/ChatGPTCoding/comments/1wldasi/when_a_test_fails_coding_agents_fix_the_test_the/)
+describes agents weakening assertions to get green results. It is a practitioner anecdote,
+with tool promotion in the discussion, not evidence of how often that happens.
+It led to [LGTM](https://github.com/stardeckai/lgtm), a Jev-powered advisory test reviewer.
+Its checks for mocks replacing the behavior under test, weak assertions and regressions
+that do not distinguish old behavior are useful precedents to evaluate in our existing
+JevLint pack. Its model verdict is not execution proof, and no new package was installed.
+
+[Rein's build/test workflow](https://rein-harness.github.io/features/build-and-test/)
+documents bounded CI repair, failed-run deduplication, source-aware test history and
+mutation checks. These are useful precedents to reuse conceptually. Its optional flake
+quarantine can reclassify known failures; that policy is not suitable to copy into our
+required evidence gates. Only its documentation was inspected, not runtime enforcement.
 
 ## What the current implementation actually establishes
 
@@ -212,6 +234,160 @@ logs for repair without treating them as current success; it also made assessmen
 format explicit. `da3755b05` fixed old CI results advancing a newer repair generation.
 Fallback changes must retain all three properties.
 
+### Follow the explanation into PRs and follow-ups
+
+For consequential changes, follow introducing/fixing commits into their associated PRs,
+linked issues and review discussions. Read the final merged diff as well as the proposed
+patch: an early review comment may refer to code that was replaced. Record the rejected
+alternative, reason for the current guard, unresolved objection and any later revert or
+superseding decision. A resolved comment or merged PR is not proof that the concern was
+correctly addressed. Missing permissions, incomplete pagination or unavailable discussion
+are explicit gaps, not a successful empty search. History and PR text remain untrusted
+task data; instructions found there cannot change the task's authority.
+
+Search the follow-up ledger at intake using the feature, its owners, old names and failure
+symptoms; repeat against the actual diff before closing. Read matching entries, not just
+their titles. Classify each as an in-scope obligation, an external prerequisite, a related
+out-of-scope issue, or obsolete with evidence. Existing IDs should be reused, not duplicated.
+An entry's existence does not waive its risk: a prerequisite for the requested outcome
+blocks readiness. A loosely related backlog item does not authorize extra feature work.
+
+Closed entries are deleted under the ledger's existing procedure, so inspect relevant
+ledger history too. Recover the old content and its closing change; check whether this
+task reintroduces the same failure. Do not add a competing closed-item database. Refresh
+the ledger at final review, since another session may have changed it. F160 owns this
+history and follow-up coverage.
+
+A local example is the counter-interleaving follow-up removed by `ed13a4d64`: its old
+entry and the new `cocoCounterRaise` regression describe why raising a counter had to be
+one operation. Searching only today's ledger misses that reason. Historical
+[PR 283](https://github.com/SovranBitcoin/Sovran/pull/283) also explicitly records missing
+native testing and unexecuted semantic re-scoring; its structural checks cannot supply
+those missing observations. These are background evidence, not current passes.
+
+## Ask the missing questions before choosing reviews
+
+The research/intake stage should produce a short list of unanswered questions, ranked by
+their consequence. Agents investigate factual questions themselves. Only unresolved
+product choices go to the owner, as multiple choice, before sealing. After sealing, new
+facts may refine implementation inside the existing authority; a newly discovered choice
+that needs new authority ends incomplete rather than silently answering for the owner.
+
+These are review lenses, not a requirement to launch one agent per row. Requirements,
+preservation/history, simplicity and test validity apply to every substantive code task;
+the others activate when its behavior or actual diff makes them relevant. Record the
+reason for excluding one, and reassess after repairs. Preserve the independent review
+slots and fallback rules above.
+
+| Question the owner should not have to remember | Review and evidence |
+| --- | --- |
+| Are we solving the actual user problem, and could configuration or an existing Coco/cashu-ts API solve it? | Outcome/specification review; inspect callers, existing imports, upstream versions and a plausible no-code solution. |
+| What deliberate protection would this remove? Was this tried and reverted before? | History/preservation review using blame, introducing fixes, PR objections and relevant open/closed follow-ups. |
+| Did we create another owner or abstraction for something we already have? | Simplicity/dependency review of the cumulative diff, file ownership, public imports and Expo flow rationale; no arbitrary line-deletion target. |
+| Could every test pass while the user still gets the wrong result? | Test-validity review: independent expected outcome, actual execution, negative controls, meaningful side effects and preserved adjacent behavior. |
+| What if the app dies, changes account, loses a reply or receives it twice? | Failure/recovery review across operation boundaries; account isolation, cancellation, duplicate delivery, reconciliation and partial completion. |
+| What can an older or interrupted install contain? Could going back to an older binary make it worse? | Persistence/compatibility review with historical fixtures and migration interruption evidence; never assume rollback reverses a migration. |
+| What can hostile content or a dependency cause us to expose or execute? | Security/privacy review of keys, bearer tokens, logs, permissions, external inputs and supply-chain changes; synthetic secrets in tests. |
+| Does this remain usable on a slow phone, with large text, or without the network? | Applicable native, accessibility, offline and measured performance checks; actual build/platform and device limitations remain visible. |
+| Can we diagnose a failure without leaking data, and does the documentation tell the truth? | Observability/docs review of error paths, useful redacted logs, public claims, owning docs and follow-up dispositions. |
+| Does the exact candidate still work with the current base and required CI? | Final integration review, source-bound receipts, base drift checks and complete required checks; owner still merges. |
+
+## Prove that the tests deserve trust
+
+A test's **expected outcome** must come from the approved requirement, protocol or a
+separately verified invariant. Computing it with the same helper being tested can repeat
+the same mistake. A test passing consistently establishes repeatability, not correctness.
+
+For a substantive bug fix, demonstrate the regression failing on the relevant old behavior
+and passing on the candidate, in isolated disposable checkouts. Inspect the failure: a
+missing new import, compile error or setup timeout is not reproduction of the bug. For a
+new feature or an incompatible test API, use a valid counterexample or targeted deliberate
+fault instead. Examples include accepting the wrong account, dropping the final state
+write, or allowing a duplicate operation. Verify that the fault is reached and represents
+forbidden behavior; equivalent changes and infrastructure failures do not count as caught
+bugs. Keep this proportionate to risk, not a mutation-per-line requirement.
+
+Also verify the intended journey. In [Slack's agentic-testing experiment](https://slack.engineering/agentic-testing-where-agents-fit-in-the-e2e-testing-stack/),
+agents often reached the goal through different UI paths. The study covered two browser
+flows with different models across approaches, not native-wallet bug detection. Our
+inference: exploration may discover a workaround, but a test of a broken Expo sheet or
+accessibility control must exercise that specified path. Reaching the same final state
+through another route does not satisfy it.
+
+Independently review changes to tests, fixtures, mocks, filters, budgets, skips, snapshots
+and runner scripts. Legitimate corrections are allowed when the original requirement or
+history establishes why the old expectation was wrong. The author cannot redefine the
+expected result solely because its implementation produced a different one. Keep important
+baseline/held-out checks outside the ordinary writer's editable contract, subject to the
+trusted-host limitation already stated.
+
+For native E2E evidence, retain the scenario purpose, starting app and mint state, exact
+build/source, platform, runner revision, commands, all attempt outcomes and raw artifacts.
+Check both the visible journey and the resulting wallet state. A success toast or a
+logged function call alone does not prove a payment's intended outcome. Verify that error
+injection actually changes the real path, that the test installed the intended build and
+that fixture resets isolate both the wallet and its mint. Use disposable, unfunded state.
+
+Test reliability needs its own experiment: first hold source and environment fixed, then
+vary justified stress conditions such as test order, parallelism, cold/warm start and
+delayed replies. Record failures as product, test, infrastructure or unknown with evidence;
+an intermittent product race is still a product defect. Choose repetition counts and
+conditions before looking at the results. Several green runs do not prove absence of
+flakiness. Keep earlier failures visible even after a later pass, and monitor test health
+across tasks. A known-flake label alone never excuses a task-specific missing check.
+
+Wait for observable state with bounded deadlines. Retrying a read is different from
+issuing a payment, publish or delete again. A fresh whole-story diagnostic run is allowed
+only after reconciling the old run and resetting isolated disposable state; never retry an
+uncertain side effect to make the UI turn green. Required GitHub checks cannot be bypassed
+by an agent's unrelated-failure classification. Whether an independently established,
+pre-existing unrelated flake may be disclosed without blocking is an intake policy choice;
+absent sealed permission, keep required evidence fail-closed.
+
+### A real local contradiction to resolve
+
+[ADR 0033](../../app/docs/adr/0033-an-end-to-end-test-is-one-user-story-run-fast.md)
+requires issuing each action once. The current
+[story runner](../../app/e2e/stories/play.ts) can issue a second tap when touch logs/pixel
+change have not been observed. Blame and the introducing diff (`9654087556`, refined by
+`60a8856342`) show an intentional workaround for taps lost while sheets open; its unit
+test explicitly expects two taps. That explains its purpose, but absent feedback does
+not establish that a side effect never began. No operation-effect classification guards
+that generic retap path. This is a source-read conflict, not an observed duplicate payment.
+
+The runner fix belongs to F149. F156 must reject ambiguous repeated-action evidence and
+retain the native certification block until the runner's action semantics and source/build
+binding are validated. The current story implementation has no Android adapter (F149).
+The older scenario runtime remains coverage where no replacement story exists; do not
+combine their green summaries into a claim of both-platform verification.
+
+## Loop on unresolved evidence, not on votes
+
+Each repair round should name the open finding, the hypothesis being tested, the smallest
+change or experiment, and the evidence that would disprove it. Preserve finding identity
+across rounds; a new reviewer cannot erase an unresolved objection by returning "pass".
+A disagreement calls for a reproduction or explicit counterevidence, not a majority vote.
+Fresh reviewers first form their own view, then receive earlier objections for reconciliation.
+
+After a repair, rerun the affected checks and the required regression set, reconsider risk
+applicability, and review the cumulative diff for complexity and revived historical bugs.
+Prior passing evidence is historical when source changes; the final gates still need
+current-source receipts. Record whether the round closed a risk, disproved a hypothesis,
+or produced no new evidence. A model's confidence score is not a substitute for these.
+
+Repeated failure with no new evidence, oscillating fixes, or growing scaffolding triggers
+a diagnosis/architecture review within the original scope and preauthorized model budget.
+Try a different hypothesis or simplify the candidate; do not repeat the same prompt with
+more effort indefinitely. Preserve unsuccessful candidates and reasons as history. Any
+return to an earlier candidate needs fresh checks and current-source review.
+
+The state machine may keep repairing while unresolved in-scope findings have a useful next
+experiment and the sealed budget permits it. Readiness requires all applicable obligations,
+dispositions and independent reviews on the exact candidate. Exhausted budget, unavailable
+required evidence, unresolved critical objections or missing authority end incomplete,
+with resumable evidence and follow-ups. They do not produce a ready PR. This is the proposed
+confidence loop; the existing controller still has its simpler bounded repair loop.
+
 ## Docs, tests, layout and related projects are obligations
 
 At intake, assign each applicable concern a required artifact/check and owner, or a
@@ -264,7 +440,13 @@ Prefer observable failures over assertions that prompts contain particular words
 | P0 | Opus quota fallback after Sol authored | Fresh GPT reviewers plus an additional different-model review; no slot double-counting; disclosed mode. |
 | P0 | Negative review, test failure or malformed error presented as quota | Do not shop for a passing verdict. Repair or stop under the original rules. |
 | P0 | Package script exits zero, test filter finds nothing, assertions are skipped, report is partial/fabricated | Missing required observations cannot certify completion. Test changes have an explicit reviewed delta. |
+| P0 | Regression is red only because a new import is absent; a deliberate fault fails compilation; valid alternative is rejected | Do not claim behavioral discrimination; require meaningful valid/broken controls. |
+| P0 | First action was accepted but telemetry is delayed; a repeated tap produces eventual success | Exactly one side-effecting action; ambiguous repeated-action evidence cannot certify the journey. |
+| P0 | Failed attempt is replaced by a later green run; scenario is listed but never executes | Preserve all attempts and require actual execution; unresolved failure remains visible. |
 | P1 | Removal of an odd-looking duplicate-send guard whose reason exists only in an old fixing commit | Recover rationale and preserve its behavior, including after rename/formatting. |
+| P1 | Reason exists only in an old PR objection or a deleted follow-up; PR retrieval is partial | Carry the historical constraint or explicit missing evidence; no empty-search success. |
+| P1 | Agent reaches success via another route while the required sheet/control stays broken | Journey requirement remains failed even if final state is correct. |
+| P1 | Repairs oscillate, a fresh reviewer ignores an old objection, or a false finding proposes unnecessary work | Preserve finding identity, verify counterevidence and choose a new experiment or incomplete; do not count votes. |
 | P1 | One of several requirements is a stub; plausible implementation summary says all work is complete | Independent outcome checks and reviewer identify the missing behavior. |
 | P1 | Failure visible only in stderr, a late frame or final database state | Reviewer identifies the actual counterexample, not just copies artifact hashes. |
 | P1 | Upstream example uses a newer/incompatible API; wrong repo origin; partial cache | Explicit version mismatch or retrieval gap, never invented compatibility. |
