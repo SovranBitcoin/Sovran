@@ -190,10 +190,30 @@ async function playStep(
   // busy with something else. It is given until the step's deadline, and the
   // longest it kept the runner waiting is reported.
   let slowestAnswerMs = 0;
+  const needsControlMap =
+    step.tap ||
+    step.swipe ||
+    step.type?.into ||
+    step.expect.some((expectation) => !('logged' in expectation));
   const readScreen = async () => {
     const asked = performance.now();
     try {
-      return await link.screen(Math.max(ANSWER_WITHIN_MS, deadline - asked));
+      for (;;) {
+        const screen = await link.screen(Math.max(ANSWER_WITHIN_MS, deadline - performance.now()));
+        if (
+          !needsControlMap ||
+          (Number.isFinite(screen.width) &&
+            screen.width > 0 &&
+            Number.isFinite(screen.height) &&
+            screen.height > 0)
+        )
+          return screen;
+        if (performance.now() >= deadline)
+          throw new Error(`control map unavailable: ${screen.source ?? 'no measured window'}`);
+        // Capture may not have a mounted root during startup. Observe again,
+        // without treating missing instrumentation as proof that a control is gone.
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
     } finally {
       slowestAnswerMs = Math.max(slowestAnswerMs, Math.round(performance.now() - asked));
     }

@@ -97,6 +97,51 @@ test('topPage is the page of the last element laid out', () => {
 });
 
 describe('playStory', () => {
+  test('an unavailable control map cannot prove that a control is gone', async () => {
+    const app = fakeApp({
+      width: 0,
+      height: 0,
+      elements: [],
+      appClockMs: 0,
+      source: 'another hook was installed first',
+    });
+    const result = await playStory(
+      story([
+        {
+          name: 'leave legal pages',
+          withinMs: 100,
+          expect: [{ gone: { id: 'screen-legal-document' } }],
+        },
+      ]),
+      app.link,
+      { ...noSwipe, tap: async () => {} }
+    );
+    expect(result.ok).toBe(false);
+    expect(result.steps[0].failure).toContain('control map unavailable');
+    expect(result.steps[0].failure).toContain('another hook was installed first');
+  });
+
+  test('waits for a mounted window before judging absence, but log-only checks need no window', async () => {
+    const app = fakeApp({ width: 0, height: 0, elements: [], appClockMs: 0 });
+    const device = { ...noSwipe, tap: async () => {} };
+    const logged = await playStory(
+      story([{ name: 'runner log received', withinMs: 100, expect: [{ logged: 'e2e.step' }] }]),
+      app.link,
+      device
+    );
+    expect(logged.ok).toBe(true);
+    let reads = 0;
+    app.link.screen = async () =>
+      ++reads === 1 ? app.state.screen : screenOf(box({ id: 'new-page' }));
+    const gone = await playStory(
+      story([{ name: 'old page is gone', withinMs: 500, expect: [{ gone: { id: 'old-page' } }] }]),
+      app.link,
+      device
+    );
+    expect(gone.ok).toBe(true);
+    expect(gone.steps[0].failure).toBeUndefined();
+  });
+
   test('taps the centre of the control once and passes when what it expects is true', async () => {
     const app = fakeApp(screenOf(box({ id: 'wallet-send', page: 'WalletScreen', x: 100, y: 600 })));
     const device = {
