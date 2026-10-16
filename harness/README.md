@@ -217,6 +217,10 @@ The Node test collector requires `node:test.expectFailure` support (validated he
 Node 24.14.1). Older runtimes can silently ignore that option and change a test's meaning;
 the collector refuses them before loading candidate tests. The host's `node` on `PATH`
 must provide the capability. See Node's [expected-failure semantics](https://nodejs.org/docs/latest-v24.x/api/test.html#expecting-tests-to-fail).
+`harness/.node-version` pins the tested runtime for CI. The `Harness tests and types`
+check runs on every PR base, including stacked branches, using only the tooling workspace
+and its frozen dependencies. A task targeting that check must still seal its name and
+wait for its actual GitHub result; a local pass is not a CI receipt.
 
 `bun run --cwd harness test` exercises real SQLite, temporary git repositories and subprocesses.
 `bun run --cwd harness type-check` checks this tooling independently of the shipped app.

@@ -19,6 +19,11 @@ jobs:
       - name: Checkout app
         uses: actions/checkout@v6
 
+      # Root tests include the Node test collector in the harness workspace.
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: harness/.node-version
+
       # Lint, Type Check, Knip, and React Compiler coverage each run in their own
       # workflow so the README can carry a status badge per check. This workflow
       # is named for its blocking gate: the test suite.
