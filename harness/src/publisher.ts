@@ -17,7 +17,8 @@ export const publishPlan = z.object({
 export type PublishPlan = z.infer<typeof publishPlan>;
 const pr = z.object({ number: z.number().int().positive(), url: z.url(), state: text,
   headRefName: text, headRefOid: sha, baseRefName: text, baseRefOid: sha,
-  headRepository: z.object({ nameWithOwner: text }), isCrossRepository: z.boolean(),
+  // gh leaves headRepository.nameWithOwner empty for same-repository PRs; name and owner are filled.
+  headRepository: z.object({ name: text }), headRepositoryOwner: z.object({ login: text }), isCrossRepository: z.boolean(),
   isDraft: z.boolean(), title: z.string(), body: z.string(), mergeable: text,
   mergeStateStatus: text, reviewDecision: z.string().nullable(),
 });
@@ -52,7 +53,7 @@ export class Publisher {
   private matches(p: PublishPlan, found: PullRequest) {
     const url = new URL(found.url);
     if (url.hostname !== 'github.com' || url.pathname !== `/${p.repository}/pull/${found.number}` ||
-      found.headRepository.nameWithOwner !== p.repository || found.isCrossRepository ||
+      `${found.headRepositoryOwner.login}/${found.headRepository.name}` !== p.repository || found.isCrossRepository ||
       found.headRefName !== p.branch || found.baseRefName !== p.base || found.headRefOid !== p.head || found.baseRefOid !== p.baseHead ||
       found.state !== 'OPEN' || !found.body.includes(`<!-- sovran-task ${p.taskId} -->`)) throw new Error('PR identity, ownership, state or revision differs');
   }

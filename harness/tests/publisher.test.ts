@@ -50,7 +50,7 @@ if(a[0]!=='pr')process.exit(99);
 if(cmd==='list'){console.log(JSON.stringify(s.pr?[s.pr]:[]));}
 else if(cmd==='view'){console.log(JSON.stringify(s.pr));}
 else if(cmd==='checks'){console.log(JSON.stringify(s.checks));process.exit(s.checks.some(c=>c.bucket!=='pass')?8:0);}
-else if(cmd==='create'){s.creates++;s.pr={number:17,url:'https://github.com/fixture/wallet/pull/17',state:'OPEN',headRefName:s.plan.branch,headRefOid:s.plan.head,baseRefName:s.plan.base,baseRefOid:s.plan.baseHead,headRepository:{nameWithOwner:'fixture/wallet'},isCrossRepository:false,isDraft:false,title:value('--title'),body:readFileSync(value('--body-file'),'utf8'),mergeable:'MERGEABLE',mergeStateStatus:'CLEAN',reviewDecision:'APPROVED'};save();process.exit(s.lost?1:0);}
+else if(cmd==='create'){s.creates++;s.pr={number:17,url:'https://github.com/fixture/wallet/pull/17',state:'OPEN',headRefName:s.plan.branch,headRefOid:s.plan.head,baseRefName:s.plan.base,baseRefOid:s.plan.baseHead,headRepository:{name:'wallet',nameWithOwner:''},headRepositoryOwner:{login:'fixture'},isCrossRepository:false,isDraft:false,title:value('--title'),body:readFileSync(value('--body-file'),'utf8'),mergeable:'MERGEABLE',mergeStateStatus:'CLEAN',reviewDecision:'APPROVED'};save();process.exit(s.lost?1:0);}
 else if(cmd==='edit'){s.pr.title=value('--title');s.pr.body=readFileSync(value('--body-file'),'utf8');save();}
 else process.exit(98);
 `, { mode: 0o700 });
