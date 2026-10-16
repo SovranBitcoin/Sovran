@@ -2,7 +2,7 @@ import { join, resolve } from 'node:path';
 import { readFileSync } from 'node:fs';
 import { z } from 'zod';
 import { digest, fileEvidence } from './workspace';
-import { assessment, type Role, type Task } from './workflow';
+import { assessmentFor, type Role, type Task } from './workflow';
 import { projects } from './references';
 import { assessmentArtifacts, obligations, proposals } from './evidence';
 
@@ -51,7 +51,7 @@ export function brief(t: Task, stateDir: string) {
   const packet = {
     task: t.id, ticket: t.ticket.id, policy: t.policy, source: t.source,
     root: t.root, base: t.base, role: t.ticket.role, target: t.ticket.target,
-    instructions: `${duties[t.ticket.role]} No user questions after sealing. No nested delegation. If blocked, return inconclusive with the missing prerequisite. Host access is trusted; role text does not restrict tools. Return assessment JSON matching harness/src/workflow.ts. Include a specific inspection for every supplied artifact, with its hash. Do not invent evidence.`,
+    instructions: `${duties[t.ticket.role]} No user questions after sealing. No nested delegation. If blocked, return inconclusive with the missing prerequisite. Host access is trusted; role text does not restrict tools. Return assessment JSON matching this packet's assessmentSchema, which omits parts other roles own. Include a specific inspection for every supplied artifact, with its hash. Do not invent evidence.`,
     contextInstructions: 'Inline context is supplied below. Before making a decision, read applicable snapshot references from their absolute JSON file at the given JSON Pointer. Verify the extracted content against its sha256. References contain the sealed original content, not the current checkout. Use the reference path to identify relevance; record missing or contradictory guidance instead of ignoring it. Do not load the entire snapshot into the prompt when extracting one reference.',
     contract: t.contract, context, artifacts, research, repairReason: t.ticket.role === 'implementation' ? t.reason : '',
     attempts: t.attempts.map(a => ({ ticket: a.ticket.id, role: a.ticket.role, target: a.ticket.target,
@@ -61,7 +61,7 @@ export function brief(t: Task, stateDir: string) {
     historyScope: t.historyEvidence ? 'The baseline-history artifact captures pre-edit source and bounded blame/changes. Research must record the reason and preservation plan for every planned path, distinguishing gaps from completed investigation. Search active and deleted follow-ups. In followups.explanation, give each relevant ID its relationship (required, prerequisite, outside scope, resolved, or suspected/verified recurrence), rationale and supporting evidence. Follow older commits and associated PR discussions; distinguish the final merged patch from earlier review comments. Audit must recheck actual changed paths and these relationships. Missing pages or unavailable PRs remain explicit gaps.' : 'Legacy contract: no executable pre-edit history coverage was sealed.',
     verificationScope: 'The sealed verificationPolicy maps requirements to named cases or explicitly bounded inspection. Independent review, final audit and additional GPT review must supply oracleReviews for Node requirements, citing test files and current candidate/baseline node-inspection artifacts. Judge assertions, fixtures, mocks, selectors, skips and test/runner changes against the requirement and history. Inspect negative-control copiedInputs: copying the fix into the baseline cannot establish a regression. Explain why the failing assertion reaches the intended old behavior; setup/import/hook failures do not qualify. Node reports are consistency evidence, not authentication of hostile test code; inspect unusual runner/IPC manipulation. An inspection-only requirement does not gain execution proof.',
     researchScope: 'Research describes its recorded source, not the current candidate. Recheck claims against changed code. It is context, never implementation or test proof. Reviewers must reach their own conclusions.',
-    assessmentSchema: z.toJSONSchema(assessment),
+    assessmentSchema: z.toJSONSchema(assessmentFor(t.ticket.role)),
     referenceFormat: 'observations.evidence and findings.evidence must be a repository-relative file path, artifact:<saved artifact filename>, or git:<full ancestor commit>:<relative file> for historical/deleted evidence. Put explanations and line/frame details in observation/detail, never in the path. Copy hashes from the packet; do not guess them.',
     referenceSnapshot: join(taskDir, '0-references.json'),
     relatedProjects: Object.values(projects),

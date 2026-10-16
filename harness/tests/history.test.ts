@@ -116,3 +116,15 @@ test('a failed legacy implementation can retain its outcome even when its edited
   expect(t.phase).toBe('incomplete');
   expect(t.assessments.at(-1)?.result.summary).toContain('Interrupted manifest edit');
 });
+
+test("a research brief offers only research's fields, and the controller refuses the audit's", () => {
+  const { controller: c, root, spec } = fixture();
+  const t = c.create(root, { ...spec, historyPolicy: { version: 1, paths: ['source.txt'] } });
+  c.next(t.id);
+  const fields = Object.keys((c.brief(t.id).packet.assessmentSchema as { properties: object }).properties);
+  expect(fields).toContain('history');
+  for (const foreign of ['historyReview', 'resolutionProposals', 'resolutionReviews']) expect(fields).not.toContain(foreign);
+  // Live 2026-10-16: shown the full schema, a research worker added the audit's historyReview.
+  const review = { path: 'source.txt', observation: 'Rechecked', evidence: ['source.txt'] };
+  expect(() => submit(c, t.id, { history: [investigation(t)], historyReview: [review] })).toThrow('belongs to audit');
+});

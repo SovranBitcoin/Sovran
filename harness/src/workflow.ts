@@ -61,6 +61,13 @@ export const assessment = z.object({
   resolutionReviews: z.array(resolutionReview).optional(),
   inspections: z.array(z.object({ path: text, sha256: hash, observation: text })).default([]),
 });
+// Parts only one role may submit. Each brief shows its role this narrower shape, so a
+// worker is never offered a field the controller will refuse from it.
+const roleOwnedFields = { history: 'research', historyReview: 'audit', resolutionProposals: 'implementation', resolutionReviews: 'audit' } as const;
+export function assessmentFor(selected: Role) {
+  const foreign = Object.entries(roleOwnedFields).filter(([, owner]) => owner !== selected).map(([field]) => [field, true]);
+  return assessment.omit(Object.fromEntries(foreign) as Partial<Record<keyof typeof roleOwnedFields, true>>);
+}
 const ticket = z.object({
   id: text, role, target: model,
   claim: z.object({ worker: text, provider: text, model: text }).nullable(),
