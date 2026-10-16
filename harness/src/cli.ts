@@ -16,7 +16,9 @@ try {
     const path = process.argv[2];
     if (!path) throw new Error('Usage: bun run harness <request.json | ->; or bun run harness mcp');
     const input: unknown = JSON.parse(await (path === '-' ? Bun.stdin : Bun.file(path)).text());
-    console.log(JSON.stringify(await dispatch(controller, input), null, 2));
+    // console.log can drop the tail of a large result on a non-blocking pipe and still exit 0.
+    const output = `${JSON.stringify(await dispatch(controller, input), null, 2)}\n`;
+    await new Promise<void>((resolve, reject) => process.stdout.write(output, error => error ? reject(error) : resolve()));
     controller.close();
   }
 } catch (error) {
