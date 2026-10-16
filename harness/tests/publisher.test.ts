@@ -164,6 +164,7 @@ test.each(['failed CI', 'concurrent repair'] as const)('controller handles %s an
         if (value === 'first change') expect(t.history.some(r => r.id === 'harness:ci' && r.outcome === 'fail')).toBe(true);
       }
       expect(t.phase).toBe(value === 'first change' ? 'implementing' : 'ready');
+      if (t.phase === 'ready') expect(t.reason).toStartWith('Exact head satisfies'); // not a stale waiting reason
     }
     const receipt = t.receipts.find(r => r.id === 'harness:ci');
     const evidence = receipt?.artifacts[0];
@@ -224,8 +225,14 @@ test('known-empty server policy still enforces every sealed check and retains al
   f.change(s => { s.checks = [{name:'upgrade',bucket:'pass'}, {name:'advisory',bucket:'fail'}]; });
   const result = f.publisher.check(f.plan,17);
   expect(result.status).toBe('ready'); expect(result.checks).toHaveLength(2);
+  // Owner, 2026-10-16: a check outside the sealed and server-required sets (Hunch) is not CI.
+  // GitHub reports UNSTABLE for it; ready discloses it instead of waiting forever.
   f.change(s => { s.pr.mergeStateStatus='UNSTABLE'; });
-  expect(f.publisher.check(f.plan,17).status).toBe('waiting');
+  const disclosed = f.publisher.check(f.plan,17);
+  expect(disclosed.status).toBe('ready'); expect(disclosed.outsideRequired).toEqual(['advisory: FAILURE']);
+  expect(disclosed.reason).toContain('advisory: FAILURE');
+  f.change(s => { s.checks = [{name:'upgrade',bucket:'pass'}]; });
+  expect(f.publisher.check(f.plan,17).status).toBe('waiting'); // UNSTABLE with nothing outside to explain it
 });
 
 test('server policies and observed required contexts strengthen the sealed obligations', () => {

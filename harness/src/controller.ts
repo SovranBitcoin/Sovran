@@ -422,7 +422,7 @@ export class Controller {
       if (result.status === 'waiting') return { ...observed, reason: result.reason };
       const next: Task = { ...observed, receipts: [...v.receipts, { id: 'harness:ci', source: z.string().parse(v.source),
         artifacts: [artifact], outcome: result.status === 'ready' ? 'pass' : 'fail', summary: result.reason }] };
-      return result.status === 'failed' ? this.repairTask(next, result.reason) : move(next, 'ACCEPT');
+      return result.status === 'failed' ? this.repairTask(next, result.reason) : { ...move(next, 'ACCEPT'), reason: result.reason };
     });
   }
 

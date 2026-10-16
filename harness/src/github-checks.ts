@@ -137,9 +137,15 @@ export function githubChecks(p: PublishPlan, number: number, api: Api) {
     if (state !== 'SUCCESS') problems.push(`${obligation.name}: ${state}`);
     if (['FAILURE', 'ERROR', 'TIMED_OUT', 'CANCELLED', 'ACTION_REQUIRED', 'STARTUP_FAILURE'].includes(state ?? '')) failed = true;
   }
+  // Checks outside the sealed and server-required sets bind nothing; they are disclosed, never selected.
+  const chosen = new Set(selected.map(s => s.check));
+  const outsideRequired = checks.filter(c => !chosen.has(c.id)).flatMap(c => {
+    const state = c.__typename === 'CheckRun' ? (c.status === 'COMPLETED' ? c.conclusion : c.status) : c.state;
+    return ['SUCCESS', 'NEUTRAL', 'SKIPPED'].includes(state ?? '') ? [] : [`${nameOf(c)}: ${state}`];
+  });
   const afterPolicy = policy();
   if (JSON.stringify(beforePolicy) !== JSON.stringify(afterPolicy)) throw new Error('GitHub requirements changed during observation');
   return { checks, selected, associations: [...associations].map(([id, evidence]) => ({ id, evidence })),
     serverPolicy: beforePolicy, sealedRequiredChecks: p.requiredChecks,
-    requiredChecks: [...new Set(obligations.map(o => o.name))], problems, failed };
+    requiredChecks: [...new Set(obligations.map(o => o.name))], problems, failed, outsideRequired };
 }

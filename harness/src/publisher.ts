@@ -109,11 +109,14 @@ export class Publisher {
     const evidence = githubChecks(p, number, args => this.run(p, this.dependencies.gh ?? 'gh', ['api', ...args]));
     const after = view(); this.guard(p);
     if (before.headRefOid !== after.headRefOid || before.baseRefOid !== after.baseRefOid || this.remoteHead(p, p.branch) !== p.head) throw new Error('PR changed during CI inspection');
-    const ready = !evidence.problems.length && !after.isDraft && after.mergeable === 'MERGEABLE' && after.mergeStateStatus === 'CLEAN' &&
+    // UNSTABLE is GitHub's state for a failing check that blocks nothing; accept it only when such a check explains it.
+    const merge = after.mergeStateStatus === 'CLEAN' || (after.mergeStateStatus === 'UNSTABLE' && evidence.outsideRequired.length > 0);
+    const ready = !evidence.problems.length && !after.isDraft && after.mergeable === 'MERGEABLE' && merge &&
       !['CHANGES_REQUESTED', 'REVIEW_REQUIRED'].includes(after.reviewDecision ?? '') && after.body === this.body(p) && after.title === p.title;
     const failed = evidence.failed || after.reviewDecision === 'CHANGES_REQUESTED';
     const status = ready ? 'ready' as const : failed ? 'failed' as const : 'waiting' as const;
-    return { status, reason: ready ? 'Exact head satisfies sealed checks, server requirements and current merge policy' :
+    const outside = evidence.outsideRequired.length ? `; not required and not passing: ${evidence.outsideRequired.join('; ')}` : '';
+    return { status, reason: ready ? `Exact head satisfies sealed checks, server requirements and current merge policy${outside}` :
       `Checks or PR merge policy are unsatisfied: ${evidence.problems.join('; ')}; merge=${after.mergeStateStatus}; review=${after.reviewDecision}`,
       pr: after, ...evidence };
   }
