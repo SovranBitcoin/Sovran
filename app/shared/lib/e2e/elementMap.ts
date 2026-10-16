@@ -293,8 +293,8 @@ export function collectElements(
   };
   for (const root of capture.roots) {
     if (!root.current) continue;
-    // Each React surface has its own viewport offset. Header y is synthesized
-    // above from window insets, so only its x uses this correction.
+    // Each React surface has its own viewport offset. On iOS a header's y is
+    // synthesized above from window insets, so only its x uses this correction.
     const origin = capture.normalizeViewportOrigin ? rootFrame(capture, root) : null;
     visit(root.current, origin ?? { x: 0, y: 0 });
   }

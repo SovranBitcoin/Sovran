@@ -6,7 +6,7 @@ const sha = (data: string) => createHash('sha256').update(data).digest('hex');
 
 export type Platform = 'ios' | 'android';
 export type Fault = 'stale-build' | 'installed-differs' | 'missing-picture' | 'no-video' | 'other-story' |
-  'other-app' | 'device-kept' | 'step-failed' | 'short-run' | 'runner-failed' | 'other-invocation' | 'picture-escapes';
+  'other-app' | 'device-kept' | 'step-failed' | 'short-run' | 'runner-failed' | 'other-invocation' | 'picture-escapes' | 'picture-is-folder';
 
 /** Evidence shaped like app/e2e/stories/bound.ts leaves it, optionally with one fault. */
 export function writeNativeEvidence(out: string, o: { invocation: string; source: string; story: string; storyText: string;
@@ -37,7 +37,8 @@ export function writeNativeEvidence(out: string, o: { invocation: string; source
     const steps = [{ name: 'open', ok: true, picture: '01-open.png' }, { name: 'look', ok: fault !== 'step-failed', picture: '02-look.png' }]
       .slice(0, fault === 'short-run' ? 1 : 2);
     if (fault === 'picture-escapes') { steps[1] = { ...steps[1]!, picture: '../02-look.png' }; writeFileSync(join(out, platform, '02-look.png'), 'image'); }
-    for (const step of steps) if (!(fault === 'missing-picture' && step.name === 'look')) put(step.picture, 'image');
+    if (fault === 'picture-is-folder') { steps[1] = { ...steps[1]!, picture: '02-look.png' }; mkdirSync(join(at, '02-look.png')); }
+    for (const step of steps) if (!(['picture-is-folder', 'missing-picture'] as Fault[]).includes(fault!) || step.name !== 'look') put(step.picture, 'image');
     if (fault !== 'no-video') put('story.mp4', 'video');
     put('app-log.json', []);
     put('report.json', { ok: fault !== 'step-failed', steps, ...(fault === 'no-video' ? {} : { video: 'story.mp4' }) });

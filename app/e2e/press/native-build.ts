@@ -511,10 +511,20 @@ async function buildAndroid(fingerprint: string, kind: BuildKind): Promise<Nativ
     ANDROID_HOME: sdk,
     ANDROID_SDK_ROOT: sdk,
   };
+  // A bundled build is evidence of the source: regenerate android/ (ignored by Git
+  // and by the native fingerprint) so nothing left in it reaches the APK.
+  if (kind === 'bundled' && git(['ls-files', '--', 'app/android']).length)
+    throw new Error('Refusing to clean tracked Android sources');
   await step(
     'expo prebuild (android)',
     'node',
-    [require.resolve('expo/bin/cli'), 'prebuild', '--platform', 'android'],
+    [
+      require.resolve('expo/bin/cli'),
+      'prebuild',
+      '--platform',
+      'android',
+      ...(kind === 'bundled' ? ['--clean'] : []),
+    ],
     APP_DIR,
     env,
     log

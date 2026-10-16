@@ -49,6 +49,7 @@ for (const [kind, message] of [
   ['runner-failed', 'runner failed'],
   ['other-invocation', 'another invocation'],
   ['picture-escapes', 'step 2 has no picture'],
+  ['picture-is-folder', 'step 2 has no picture'],
 ] as const) for (const platform of ['ios', 'android'] as const) {
   test(`a ${platform} run is rejected for ${kind}`, () => {
     const result = judge(['ios', 'android'], { platform, kind });
@@ -70,9 +71,10 @@ test('a sealed platform with no run fails, and so does a run nobody sealed', () 
   expect(extra.problems.join('\n')).toContain('Unsealed runs');
 });
 
-test('runner code is guarded but stories, the oracle reviewers judge, may change', () => {
-  expect(nativeRunnerChanges(['app/e2e/stories/bound.ts', 'app/e2e/press/native-build.ts', 'app/package.json', STORY, 'app/features/x.tsx']))
-    .toEqual(['app/e2e/stories/bound.ts', 'app/e2e/press/native-build.ts', 'app/package.json']);
+test('host runner code is guarded; stories, page registrations and the app under test may change', () => {
+  expect(nativeRunnerChanges(['app/e2e/stories/bound.ts', 'app/e2e/press/native-build.ts', 'app/package.json', 'bunfig.toml',
+    'bun.lock', 'scripts/lib/app-source.mjs', STORY, 'app/e2e/schema/pages.ts', 'app/shared/lib/e2e/elementMap.ts', 'app/features/x.tsx']))
+    .toEqual(['app/e2e/stories/bound.ts', 'app/e2e/press/native-build.ts', 'app/package.json', 'bunfig.toml', 'bun.lock', 'scripts/lib/app-source.mjs']);
 });
 
 const FAKE_RUNNER = `

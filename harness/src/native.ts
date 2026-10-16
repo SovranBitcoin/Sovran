@@ -5,14 +5,16 @@ import { z } from 'zod';
 import { within } from './workspace';
 
 /** The story runner a native check executes. The candidate cannot change what judges it. */
-// Everything bound.ts loads or is configured by, beyond the app under test. Story
-// JSON is the sealed oracle, which reviewers judge instead.
-export const NATIVE_RUNNER = ['app/e2e/', 'app/scripts/', 'scripts/', 'press/', 'app/shared/lib/e2e/',
-  'app/shared/lib/cashu/e2eProofReconciliationConfig.ts', 'bunfig.toml', 'app/bunfig.toml', 'package.json',
-  'app/package.json', 'bun.lock', 'app/tsconfig.json', 'tsconfig.json'];
+// The host-side runner bound.ts executes, and what configures it. The app under
+// test is the candidate and reports its own screen, so in-app e2e helpers are not
+// guarded: the frames and video are what reviewers check them against. Page
+// registrations (app/e2e/schema) are data a new route must add; story JSON is the
+// sealed oracle reviewers judge.
+export const NATIVE_RUNNER = ['app/e2e/', 'app/scripts/', 'scripts/', 'press/', 'bunfig.toml', 'app/bunfig.toml',
+  'package.json', 'app/package.json', 'bun.lock', 'app/tsconfig.json', 'tsconfig.json'];
 export const nativeRunnerChanges = (changed: string[]) =>
   changed.filter(p => NATIVE_RUNNER.some(prefix => prefix.endsWith('/') ? p.startsWith(prefix) : p === prefix) &&
-    !(p.startsWith('app/e2e/stories/') && p.endsWith('.json')));
+    !(p.startsWith('app/e2e/stories/') && p.endsWith('.json')) && !p.startsWith('app/e2e/schema/'));
 
 const sha = z.string().regex(/^[a-f0-9]{64}$/);
 const index = z.object({ invocation: z.string(), runs: z.array(z.object({
@@ -86,7 +88,8 @@ export function inspectNativeStories(out: string, spec: { invocation: string; so
       if (result.steps.length !== sealed) problems.push(`${label}: ran ${result.steps.length} of ${sealed} steps`);
       result.steps.forEach((step, i) => {
         if (!step.ok) problems.push(`${label}: step ${i + 1} failed: ${step.failure ?? step.name}`);
-        if (!step.picture || basename(step.picture) !== step.picture || !existsSync(join(dir, step.picture))) problems.push(`${label}: step ${i + 1} has no picture`);
+        const picture = step.picture && basename(step.picture) === step.picture ? join(dir, step.picture) : null;
+        if (!picture || !existsSync(picture) || !lstatSync(picture).isFile()) problems.push(`${label}: step ${i + 1} has no picture`);
       });
       if (result.video !== 'story.mp4' || !existsSync(join(dir, 'story.mp4')) || lstatSync(join(dir, 'story.mp4')).size === 0)
         problems.push(`${label}: no video`);

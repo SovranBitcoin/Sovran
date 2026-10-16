@@ -6,8 +6,8 @@
  * The request names an invocation, an output folder and the stories and
  * platforms the task sealed. Each platform's bundled build is made afresh here,
  * never reused: the build folder is ignored by Git, so a stamp left in it could
- * vouch for any binary. Each story its own disposable simulator or
- * emulator. Every run's evidence is copied to `<out>/<platform>/<story id>/`,
+ * vouch for any binary. Each story is played on its own disposable simulator
+ * or emulator. Every run's evidence is copied to `<out>/<platform>/<story id>/`,
  * and `<out>/index.json` lists the runs. The controller judges the evidence
  * itself; nothing here says whether a run counts.
  */

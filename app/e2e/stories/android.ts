@@ -214,6 +214,7 @@ export async function runAndroidStory(
             createScreenWatch({
               capture: async (timeoutMs) => {
                 const png = Buffer.from(await device.adb.screencapPng());
+                // The watch only compares pixels; its `jpeg` field holds this PNG unused.
                 return { jpeg: png, ...(await decodeScreen(png, 'png', timeoutMs)) };
               },
               now: () => performance.now(),

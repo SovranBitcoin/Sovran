@@ -39,8 +39,9 @@ const stepSchema = z
     tap: z.union([selectorSchema, z.strictObject({ labelEnds: z.string().min(1) })]).optional(),
     /**
      * Tap that many times in quick succession, as a person presses a hidden
-     * control: three presses of the app version within its window. One action;
-     * nothing waits between the taps.
+     * control that needs it: the app version, pressed three times with no more
+     * than 1.5 seconds between presses. One action; nothing waits or looks again
+     * between the taps. Never on a control that sends, publishes or deletes.
      */
     taps: z.number().int().min(2).max(5).optional(),
     /**
