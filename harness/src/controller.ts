@@ -609,8 +609,9 @@ export class Controller {
     if (risks.includes('performance'))
       return this.stop(id, `native-evidence:${t.generation}`, 'Performance results are not yet bound to sealed metrics on a required device. See docs/follow-ups/F156.md');
     // UI work needs bound story runs on both platforms at this source; the receipt loop above required them to pass.
-    if (risks.includes('ui') && !(['ios', 'android'] as const).every(p => t.contract.checks.some(c => isNativeCheck(c) && c.platforms.includes(p))))
-      return this.stop(id, `native-evidence:${t.generation}`, 'UI changes need a native-stories check that plays on both iOS and Android');
+    if (risks.includes('ui') && !(['ios', 'android'] as const).every(p => t.contract.verificationPolicy?.requirements.some(r =>
+      r.kind === 'native' && r.platforms.includes(p))))
+      return this.stop(id, `native-evidence:${t.generation}`, 'UI changes need a native requirement whose sealed stories play on both iOS and Android');
     return this.change(id, `verified:${t.generation}`, {}, v => {
       this.current(v);
       if (v.generation !== t.generation || v.phase !== 'verifying') throw new Error('Stale verification result');

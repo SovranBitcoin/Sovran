@@ -48,6 +48,7 @@ for (const [kind, message] of [
   ['short-run', 'ran 1 of 2 steps'],
   ['runner-failed', 'runner failed'],
   ['other-invocation', 'another invocation'],
+  ['picture-escapes', 'step 2 has no picture'],
 ] as const) for (const platform of ['ios', 'android'] as const) {
   test(`a ${platform} run is rejected for ${kind}`, () => {
     const result = judge(['ios', 'android'], { platform, kind });
@@ -93,7 +94,11 @@ function uiTask(platforms: Platform[] | null, change?: (root: string) => void) {
   writeFileSync(join(root, 'app/e2e/stories/bound.ts'), FAKE_RUNNER);
   git(root, ['add', '.']); git(root, ['commit', '-qm', 'runner']);
   const native = platforms ? [{ id: 'stories', kind: 'native-stories' as const, cwd: '.' as const, timeoutMs: 60_000, stories: [STORY], platforms }] : [];
-  const t = c.create(root, { ...spec, scope: [...spec.scope, ...(change ? ['app/'] : [])], risks: ['ui'], checks: [...spec.checks, ...native] });
+  const verificationPolicy = platforms
+    ? { version: 1 as const, requirements: [{ kind: 'native' as const, requirement: 'behavior', check: 'stories', stories: [STORY], platforms }] }
+    : undefined;
+  const t = c.create(root, { ...spec, scope: [...spec.scope, ...(change ? ['app/'] : [])], risks: ['ui'],
+    checks: [...spec.checks, ...native], ...(verificationPolicy ? { verificationPolicy } : {}) });
   let ready = finishTicket(c, t); ready = c.seal(ready.id, ready.policy);
   change?.(root);
   return { c, root, t: finishTicket(c, ready) };
@@ -113,7 +118,7 @@ test('UI work without bound runs on both platforms stops incomplete', async () =
     const { c, t } = uiTask(platforms ? [...platforms] : null);
     const after = await c.verify(t.id);
     expect(after.phase).toBe('incomplete');
-    expect(after.reason).toContain('native-stories check that plays on both iOS and Android');
+    expect(after.reason).toContain('native requirement whose sealed stories play on both iOS and Android');
   }
 });
 

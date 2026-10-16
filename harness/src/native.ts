@@ -1,12 +1,15 @@
 import { createHash } from 'node:crypto';
 import { existsSync, lstatSync, readdirSync, readFileSync, realpathSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { basename, join, relative } from 'node:path';
 import { z } from 'zod';
 import { within } from './workspace';
 
 /** The story runner a native check executes. The candidate cannot change what judges it. */
-export const NATIVE_RUNNER = ['app/e2e/stories/', 'app/e2e/press/', 'app/e2e/drivers/', 'app/e2e/link/',
-  'app/e2e/results/', 'app/e2e/core/', 'app/scripts/lib/', 'app/package.json'];
+// Everything bound.ts loads or is configured by, beyond the app under test. Story
+// JSON is the sealed oracle, which reviewers judge instead.
+export const NATIVE_RUNNER = ['app/e2e/', 'app/scripts/', 'scripts/', 'press/', 'app/shared/lib/e2e/',
+  'app/shared/lib/cashu/e2eProofReconciliationConfig.ts', 'bunfig.toml', 'app/bunfig.toml', 'package.json',
+  'app/package.json', 'bun.lock', 'app/tsconfig.json', 'tsconfig.json'];
 export const nativeRunnerChanges = (changed: string[]) =>
   changed.filter(p => NATIVE_RUNNER.some(prefix => prefix.endsWith('/') ? p.startsWith(prefix) : p === prefix) &&
     !(p.startsWith('app/e2e/stories/') && p.endsWith('.json')));
@@ -72,8 +75,8 @@ export function inspectNativeStories(out: string, spec: { invocation: string; so
         if (run.deviceRemoved !== true) problems.push(`${label}: owned simulator was not removed`);
       } else {
         const payload = read(androidPayload, join(dir, 'payload.json'));
-        if (payload.built !== payload.installed || payload.built !== session.build.artifactSha256)
-          problems.push(`${label}: installed APK differs from the build`);
+        // `built` hashes the stamped APK's bytes; the stamp's own hash also frames names and modes.
+        if (payload.built !== payload.installed) problems.push(`${label}: installed APK differs from the build`);
         if (read(z.object({ avdRootAbsent: z.boolean().nullable() }), join(dir, 'cleanup.json')).avdRootAbsent !== true)
           problems.push(`${label}: owned emulator was not removed`);
       }
@@ -83,7 +86,7 @@ export function inspectNativeStories(out: string, spec: { invocation: string; so
       if (result.steps.length !== sealed) problems.push(`${label}: ran ${result.steps.length} of ${sealed} steps`);
       result.steps.forEach((step, i) => {
         if (!step.ok) problems.push(`${label}: step ${i + 1} failed: ${step.failure ?? step.name}`);
-        if (!step.picture || !existsSync(join(dir, step.picture))) problems.push(`${label}: step ${i + 1} has no picture`);
+        if (!step.picture || basename(step.picture) !== step.picture || !existsSync(join(dir, step.picture))) problems.push(`${label}: step ${i + 1} has no picture`);
       });
       if (result.video !== 'story.mp4' || !existsSync(join(dir, 'story.mp4')) || lstatSync(join(dir, 'story.mp4')).size === 0)
         problems.push(`${label}: no video`);

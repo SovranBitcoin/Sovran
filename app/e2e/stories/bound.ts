@@ -1,11 +1,12 @@
 /* eslint-disable no-console -- CLI boundary */
 /**
  * Play sealed stories on fresh, owned devices for the task controller:
- *   bun e2e/stories/bound.ts <request.json>
+ *   bun app/e2e/stories/bound.ts <request.json>   (from the repository root)
  *
  * The request names an invocation, an output folder and the stories and
- * platforms the task sealed. Each platform gets its bundled build (built here
- * when the source has changed), and each story its own disposable simulator or
+ * platforms the task sealed. Each platform's bundled build is made afresh here,
+ * never reused: the build folder is ignored by Git, so a stamp left in it could
+ * vouch for any binary. Each story its own disposable simulator or
  * emulator. Every run's evidence is copied to `<out>/<platform>/<story id>/`,
  * and `<out>/index.json` lists the runs. The controller judges the evidence
  * itself; nothing here says whether a run counts.
@@ -75,9 +76,8 @@ async function playIos(storyPath: string, app: string, invocation: string, out: 
       ).status ?? 1;
   } finally {
     await device.dispose();
-    deviceRemoved = !spawnSync('xcrun', ['simctl', 'list', 'devices']).stdout
-      ?.toString()
-      .includes(device.udid);
+    const listed = spawnSync('xcrun', ['simctl', 'list', 'devices']);
+    deviceRemoved = listed.status === 0 && !listed.stdout.toString().includes(device.udid);
   }
   cpSync(attemptDirectory(runDir, device.udid, 'story'), out, { recursive: true });
   return { exit, deviceRemoved };
@@ -103,7 +103,7 @@ export async function playBound(request: z.infer<typeof boundRequestSchema>) {
   mkdirSync(request.out, { recursive: true, mode: 0o700 });
   save();
   for (const platform of request.platforms) {
-    const build = await ensureNativeBuild(platform, 'auto', 'bundled');
+    const build = await ensureNativeBuild(platform, 'force', 'bundled');
     for (const relative of request.stories) {
       const storyPath = join(ROOT, relative);
       const story = storySchema.parse(JSON.parse(readFileSync(storyPath, 'utf8')));

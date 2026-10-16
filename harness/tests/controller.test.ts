@@ -249,7 +249,7 @@ test('role context keeps the original instructions after implementation edits th
 });
 
 test('a green generic command cannot certify functional UI or performance', async () => {
-  for (const [risk, reason] of [['ui', 'native-stories check'], ['performance', 'sealed metrics']] as const) {
+  for (const [risk, reason] of [['ui', 'native requirement'], ['performance', 'sealed metrics']] as const) {
     const { controller: c, root, spec } = fixture();
     spec.risks = [risk];
     let t = finish(c, c.create(root, spec)); t = c.seal(t.id, t.policy); t = finish(c, t);
