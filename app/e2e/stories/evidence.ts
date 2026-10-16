@@ -218,19 +218,26 @@ export async function captureSimulatorScreen(
       (error, stdout) => (error ? reject(error) : resolve(stdout))
     );
   });
+  return { jpeg: bytes, ...(await decodeScreen(bytes, 'jpeg', timeoutMs)) };
+}
+
+/**
+ * Decode a captured screen to raw pixels. Metadata alone accepts a truncated
+ * image, so the whole picture is decoded before the capture is accepted.
+ */
+export async function decodeScreen(bytes: Buffer, format: 'jpeg' | 'png', timeoutMs = 5000) {
   const image = sharp(bytes, { failOn: 'warning', limitInputPixels: 40_000_000 }).timeout({
     seconds: Math.max(1, Math.ceil(timeoutMs / 1000)),
   });
   const metadata = await image.metadata();
-  if (metadata.format !== 'jpeg' || !metadata.width || !metadata.height)
-    throw new Error('The simulator did not return a JPEG screen');
-  // Metadata alone accepts a truncated image. Decode before accepting the capture.
+  if (metadata.format !== format || !metadata.width || !metadata.height)
+    throw new Error(`The device did not return a ${format.toUpperCase()} screen`);
   const { data: pixels, info } = await image
     .removeAlpha()
     .toColourspace('srgb')
     .raw()
     .toBuffer({ resolveWithObject: true });
-  return { jpeg: bytes, pixels, width: info.width, height: info.height };
+  return { pixels, width: info.width, height: info.height };
 }
 
 /**

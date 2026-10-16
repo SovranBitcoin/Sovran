@@ -40,7 +40,14 @@ import {
   finishStoryRun,
   storyReportSchema,
 } from '../results/runs';
-import { ANDROID_RECORDING, keepVideo, pictureName, recordAndroid } from './evidence';
+import {
+  ANDROID_RECORDING,
+  createScreenWatch,
+  decodeScreen,
+  keepVideo,
+  pictureName,
+  recordAndroid,
+} from './evidence';
 import { playStory } from './play';
 import { storySchema, type Story } from './story';
 
@@ -124,6 +131,7 @@ export async function runAndroidStory(
   const failures: string[] = [];
   let avdRoot: string | undefined;
   let recording: Awaited<ReturnType<typeof recordAndroid>> | undefined;
+  let stopTried = false;
   try {
     writeFileSync(join(outDir, 'story.json'), storyText);
     const build = await ensureNativeBuild('android', 'never', kind);
@@ -149,7 +157,7 @@ export async function runAndroidStory(
               'owned AOSP emulator; root used only to provision runner connection',
               'normal animation scales; display kept awake and system status normalized',
             ]),
-        'no pixel-motion measurement',
+        'screen stillness sampled from fresh captures, not measured continuously',
         'no device performance certification',
       ],
     };
@@ -202,7 +210,15 @@ export async function runAndroidStory(
                 if (enter) await device.adb.keyevent('KEYCODE_ENTER');
               },
             },
-            undefined,
+            // Fresh captures, as on iOS: a tap while a list still flings only stops it.
+            createScreenWatch({
+              capture: async (timeoutMs) => {
+                const png = Buffer.from(await device.adb.screencapPng());
+                return { jpeg: png, ...(await decodeScreen(png, 'png', timeoutMs)) };
+              },
+              now: () => performance.now(),
+              wait: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+            }),
             async (index, step) => {
               report.steps[index] = { ...step };
               signal.throwIfAborted();
@@ -215,6 +231,7 @@ export async function runAndroidStory(
           signal.throwIfAborted();
           // Let the last change be drawn and recorded before the recording ends.
           await appLink.still(3000).catch(() => undefined);
+          stopTried = true;
           await recording?.stop();
           const rawVideo = join(outDir, 'raw.mp4');
           await device.adb.raw(['pull', ANDROID_RECORDING, rawVideo], { timeoutMs: 120_000 });
@@ -233,8 +250,9 @@ export async function runAndroidStory(
             bin: adbBin(resolveAndroidSdkRoot()),
           });
           for (const capture of [
-            // A failed run still ends its recorder before the emulator goes.
-            async () => recording?.stop(),
+            // A failed run still ends its recorder before the emulator goes. A stop
+            // already tried has its outcome recorded once, where it was tried.
+            async () => (stopTried ? undefined : recording?.stop()),
             async () =>
               writeFileSync(
                 join(outDir, 'device-log.txt'),
