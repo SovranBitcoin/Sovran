@@ -213,6 +213,11 @@ version must not be presented as production-ready autonomous wallet development.
 
 ## Development
 
+The Node test collector requires `node:test.expectFailure` support (validated here with
+Node 24.14.1). Older runtimes can silently ignore that option and change a test's meaning;
+the collector refuses them before loading candidate tests. The host's `node` on `PATH`
+must provide the capability. See Node's [expected-failure semantics](https://nodejs.org/docs/latest-v24.x/api/test.html#expecting-tests-to-fail).
+
 `bun run --cwd harness test` exercises real SQLite, temporary git repositories and subprocesses.
 `bun run --cwd harness type-check` checks this tooling independently of the shipped app.
 The publication tests use a temporary bare Git remote and a fake GitHub executable; they

@@ -1,11 +1,26 @@
 import { expect, test } from 'bun:test';
 import { mkdirSync, symlinkSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { fixture } from './controller.test';
 import { Controller } from '../src/controller';
 import type { Task } from '../src/workflow';
 import { git, testInputEvidence } from '../src/workspace';
 import { inspectNodeTests } from '../src/checks';
+
+test('the collector refuses unsupported test semantics before executing candidate code', () => {
+  const { root } = fixture();
+  const effect = join(root, 'executed.txt');
+  writeFileSync(join(root, 'guard.test.mjs'), "import {writeFileSync} from 'node:fs';import {test} from 'node:test';test('guard',()=>writeFileSync(" + JSON.stringify(effect) + ", 'executed'));");
+  const request = join(root, 'request.json');
+  writeFileSync(request, JSON.stringify({ invocation: 'unsupported-runtime', root, files: ['guard.test.mjs'] }));
+  const preload = 'data:text/javascript,' + encodeURIComponent("import {test} from 'node:test';test.expectFailure = undefined;");
+  const result = spawnSync('node', ['--import', preload, join(import.meta.dir, '../src/node-tests.mjs'), request], { encoding: 'utf8', timeout: 5000 });
+  expect(result.status).toBe(1);
+  expect(result.stderr).toContain('Unsupported Node test runner');
+  expect(result.stdout).not.toContain('"kind":"end"');
+  expect(() => readFileSync(effect)).toThrow();
+});
 
 function finish(c: Controller, t: Task) {
   const ticket = c.next(t.id).ticket;
