@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from 'bun:test';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Controller } from '../src/controller';
@@ -81,4 +81,55 @@ test('failed verification returns to implementation without reusing its receipts
   expect(t.phase).toBe('implementing'); expect(t.generation).toBe(1); expect(t.receipts).toEqual([]);
   t = finish(c, t); t = await c.verify(t.id); t = finish(c, t); t = await c.verify(t.id);
   expect(t.phase).toBe('incomplete'); expect(t.reason).toContain('Repair budget exhausted');
+});
+
+test('a command that changes source retains its result and releases pending work', async () => {
+  const { controller: c, root, spec } = fixture();
+  spec.checks[0] = { id: 'drift', argv: ['bun', '-e', 'await Bun.write("source.txt", "changed")'], cwd: '.', timeoutMs: 1000 };
+  let t = finish(c, c.create(root, spec)); t = c.seal(t.id, t.policy); t = finish(c, t);
+  t = await c.verify(t.id);
+  expect(t.phase).toBe('incomplete'); expect(t.pending.kind).toBe('none');
+  expect(t.receipts[0]?.outcome).toBe('inconclusive');
+  expect(t.receipts[0]?.artifacts.length).toBe(2);
+});
+
+test('a second task cannot own the same workspace while the first is active', () => {
+  const { controller: c, root, spec } = fixture();
+  const t = c.create(root, spec);
+  expect(() => c.create(root, spec)).toThrow('UNIQUE constraint');
+  c.stop(t.id, 'done', 'No worker dispatched');
+  expect(c.create(root, spec).phase).toBe('researching');
+});
+
+test('a timed out check cannot leave a descendant writing into the next generation', async () => {
+  const { controller: c, root, spec } = fixture();
+  const child = 'setTimeout(() => Bun.write("late.txt", "escaped"), 600)';
+  spec.checks[0] = { id: 'timeout', argv: ['bun', '-e', `Bun.spawn(['bun','-e',${JSON.stringify(child)}]); setTimeout(() => {}, 5000)`], cwd: '.', timeoutMs: 150 };
+  let t = finish(c, c.create(root, spec)); t = c.seal(t.id, t.policy); t = finish(c, t);
+  await c.verify(t.id);
+  await Bun.sleep(800);
+  expect(existsSync(join(root, 'late.txt'))).toBe(false);
+});
+
+test('a missing launch directory leaves no uncertain external effect', async () => {
+  const { controller: c, root, spec } = fixture();
+  spec.checks[0] = { id: 'missing', argv: ['bun', '-e', 'process.exit(0)'], cwd: 'missing', timeoutMs: 1000 };
+  let t = finish(c, c.create(root, spec)); t = c.seal(t.id, t.policy); t = finish(c, t);
+  await expect(c.verify(t.id)).rejects.toThrow();
+  expect(c.read(t.id).pending.kind).toBe('none');
+  expect(c.repair(t.id, 'Correct the sealed environment without changing the command').phase).toBe('implementing');
+});
+
+test('simultaneous verification admits one command owner across controller connections', async () => {
+  const { controller: c, root, state, spec } = fixture();
+  const effect = join(state, 'effects');
+  spec.checks[0] = { id: 'once', argv: ['bun', '-e', `require('node:fs').appendFileSync(${JSON.stringify(effect)}, 'executed\\n'); await Bun.sleep(100)`], cwd: '.', timeoutMs: 1000 };
+  let t = finish(c, c.create(root, spec)); t = c.seal(t.id, t.policy); t = finish(c, t);
+  const other = new Controller(state);
+  try {
+    const results = await Promise.allSettled([c.verify(t.id), other.verify(t.id)]);
+    expect(results.filter(r => r.status === 'fulfilled')).toHaveLength(1);
+    expect(await Bun.file(effect).text()).toBe('executed\n');
+    expect(c.read(t.id).receipts).toHaveLength(1);
+  } finally { other.close(); }
 });

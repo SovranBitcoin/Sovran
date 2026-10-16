@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from
 import { join, relative, resolve } from 'node:path';
 import { z } from 'zod';
 import { Journal } from './journal';
+import { runCommand } from './command';
 import { assessment, contract, move, roleFor, task, type Task } from './workflow';
 import { digest, fileEvidence, fingerprint, git, within } from './workspace';
 
@@ -153,27 +154,35 @@ export class Controller {
     const commands = audit ? t.contract.auditChecks : t.contract.checks;
     for (const check of commands) {
       if (t.receipts.some(r => r.id === check.id && r.source === t.source && r.outcome === 'pass')) continue;
-      t = this.change(id, `execute:${t.generation}:${check.id}`, {}, v => {
+      // Deterministic launch errors must not reserve an effect that never started.
+      const cwd = within(t.root, check.cwd);
+      if (!Bun.which(z.string().parse(check.argv[0]), { cwd })) throw new Error('Check executable not found');
+      const dir = join(this.stateDir, t.id);
+      mkdirSync(dir, { recursive: true, mode: 0o700 });
+      const claimed = this.journal.change(id, `execute:${t.generation}:${check.id}`, {}, value => {
+        const v = task.parse(value);
         this.current(v);
         if (v.pending.kind !== 'none') throw new Error('Another command owns this task');
         return { ...v, pending: { kind: 'command', id: check.id } };
       });
-      const cwd = within(t.root, check.cwd);
-      const dir = join(this.stateDir, t.id);
-      mkdirSync(dir, { recursive: true, mode: 0o700 });
+      if (!claimed.applied) throw new Error('Command was already dispatched; reconcile its outcome');
+      t = task.parse(claimed.value);
       const log = `${t.generation}-${digest(check.id)}.log`;
-      const proc = Bun.spawn(check.argv, { cwd, stdout: Bun.file(join(dir, log)), stderr: Bun.file(join(dir, `${log}.stderr`)), stdin: 'ignore', env: { ...process.env, CI: '1' } });
-      const timer = setTimeout(() => proc.kill('SIGKILL'), check.timeoutMs);
-      let exit: number;
-      try { exit = await proc.exited; } finally { clearTimeout(timer); }
+      const { exit, reason } = await runCommand(check.argv, cwd, join(dir, log), join(dir, `${log}.stderr`),
+        Math.max(1, Math.min(check.timeoutMs, Date.parse(t.contract.limits.deadline) - Date.now())));
       const logArtifact = { path: log, sha256: digest(readFileSync(join(dir, log))) };
       const stderrArtifact = { path: `${log}.stderr`, sha256: digest(readFileSync(join(dir, `${log}.stderr`))) };
       t = this.change(id, `result:${t.generation}:${check.id}`, { exit, logArtifact, stderrArtifact }, v => {
-        this.current(v);
         if (v.pending.kind !== 'command' || v.pending.id !== check.id) throw new Error('Command ownership lost');
         const source = z.string().parse(v.source);
-        return { ...v, pending: { kind: 'none' }, receipts: [...v.receipts, { id: check.id, source, artifacts: [logArtifact, stderrArtifact], outcome: exit === 0 ? 'pass' : 'fail', summary: `Exit ${exit}: ${check.argv.join(' ')}` }] };
+        const changed = fingerprint(v.root) !== source;
+        const next: Task = { ...v, pending: { kind: 'none' }, receipts: [...v.receipts, { id: check.id, source, artifacts: [logArtifact, stderrArtifact], outcome: changed ? 'inconclusive' : exit === 0 ? 'pass' : 'fail', summary: `${reason}: ${check.argv.join(' ')}` }] };
+        if (['incomplete', 'cancelled'].includes(v.phase)) return next;
+        if (Date.parse(v.contract.limits.deadline) <= Date.now()) return { ...move(next, 'STOP'), reason: 'Task deadline exhausted during verification' };
+        if (changed) return { ...move(next, 'STOP'), reason: 'Candidate changed during verification; logs retained, result is inconclusive' };
+        return next;
       });
+      if (['incomplete', 'cancelled'].includes(t.phase)) return t;
       if (exit !== 0) return this.repair(id, `Check failed: ${check.id}`);
     }
     if (audit) return t; // Retrieval is evidence; an independent audit ticket supplies judgment.

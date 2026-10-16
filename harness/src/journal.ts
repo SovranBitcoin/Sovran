@@ -24,6 +24,10 @@ export class Journal {
       this.db.exec(`CREATE TABLE IF NOT EXISTS tasks (id TEXT PRIMARY KEY, revision INTEGER NOT NULL, value TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS events (task TEXT NOT NULL, id TEXT NOT NULL, input TEXT NOT NULL,
           revision INTEGER NOT NULL, value TEXT NOT NULL, PRIMARY KEY(task, id));
+        CREATE UNIQUE INDEX IF NOT EXISTS active_workspace ON tasks(json_extract(value, '$.root'))
+          WHERE json_extract(value, '$.phase') NOT IN ('ready', 'incomplete', 'cancelled')
+          OR json_type(value, '$.ticket') = 'object'
+          OR json_extract(value, '$.pending.kind') IN ('command', 'publish');
         PRAGMA user_version = 1;`);
     }).immediate();
   }
@@ -44,14 +48,14 @@ export class Journal {
       const previous = this.db.query('SELECT input FROM events WHERE task = ? AND id = ?').get(id, operationId);
       if (previous) {
         if (operation.parse(previous).input !== inputHash) throw new Error('Operation id reused with different input');
-        return this.read(id);
+        return { ...this.read(id), applied: false };
       }
       const current = this.read(id);
       const value = JSON.stringify(object.parse(update(current.value)));
       const revision = current.revision + 1;
       this.db.query('INSERT INTO events VALUES (?, ?, ?, ?, ?)').run(id, operationId, inputHash, revision, value);
       this.db.query('UPDATE tasks SET revision = ?, value = ? WHERE id = ?').run(revision, value, id);
-      return this.read(id);
+      return { ...this.read(id), applied: true };
     }).immediate();
   }
 
