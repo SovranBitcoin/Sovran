@@ -295,7 +295,7 @@ function finishWith(c: Controller, t: Task, changes: Record<string, unknown> = {
   if (!ticket) throw new Error('Expected dispatch');
   c.claim(t.id, ticket.id, ticket.id, ticket.target.provider, ticket.target.model);
   return c.submit(t.id, ticket.id, ticket.id, { ...report,
-    inspections: c.read(t.id).receipts.flatMap(r => r.artifacts).map(a => ({ ...a, observation: 'Read raw output' })),
+    inspections: c.brief(t.id).packet.artifacts.map(a => ({ ...a, observation: 'Read raw output' })),
     ...changes });
 }
 
@@ -382,4 +382,26 @@ test('resolution claims cannot introduce unknown obligations, duplicate findings
   const finding = { id: 'same', severity: 'follow-up', evidence: 'source.txt', detail: 'Two different concerns need distinct IDs' };
   expect(() => finishWith(c, t, { findings: [finding, finding] })).toThrow('Duplicate finding IDs');
   expect(c.read(t.id).phase).toBe('implementing');
+});
+
+test('final reconciliation requires every historical failure artifact unchanged and inspected', async () => {
+  const { controller: c, root, state, spec } = fixture();
+  spec.checks[0] = { id: 'original', argv: ['bun', '-e', "console.error('diagnostic'); process.exit((await Bun.file('source.txt').text()) === 'repaired' ? 0 : 1)"], cwd: '.', timeoutMs: 5000 };
+  let t = finishWith(c, c.create(root, spec)); t = c.seal(t.id, t.policy); t = finishWith(c, t); t = await c.verify(t.id);
+  const proposal = { ...refutation(c, t), outcome: 'fixed', explanation: 'The candidate repairs the observed failure' };
+  writeFileSync(join(root, 'source.txt'), 'repaired');
+  t = finishWith(c, t, { resolutionProposals: [proposal] }); t = await c.verify(t.id); t = finishWith(c, t); t = finishWith(c, t); await c.verify(t.id, true);
+  c.next(t.id);
+  const packet = c.brief(t.id).packet;
+  const p = packet.reconciliation?.proposals[0];
+  const stderr = t.history[0]?.artifacts[1];
+  if (!p || !stderr) throw new Error('Missing evidence');
+  const resolutionReviews = [{ obligation: p.obligation, proposal: p.digest, decision: 'accept', explanation: 'Checked the diagnosis against all raw evidence', evidence: ['source.txt'] }];
+  const inspections = packet.artifacts.map(a => ({ path: a.path, sha256: a.sha256, observation: 'Read raw historical and current evidence' }));
+  expect(() => finishWith(c, t, { resolutionReviews, inspections: inspections.filter(i => i.path !== stderr.path) })).toThrow('Missing artifact inspection');
+  const original = readFileSync(join(state, t.id, stderr.path));
+  writeFileSync(join(state, t.id, stderr.path), 'removed failure');
+  expect(() => finishWith(c, t, { resolutionReviews, inspections })).toThrow('Evidence changed');
+  writeFileSync(join(state, t.id, stderr.path), original);
+  expect(finishWith(c, t, { resolutionReviews, inspections }).phase).toBe('publishable');
 });

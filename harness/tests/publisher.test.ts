@@ -112,7 +112,7 @@ test.each(['failed CI', 'concurrent repair'] as const)('controller handles %s an
       })) } : {}),
       observations: [{ requirement: 'preserve', evidence: 'app.txt', observation: 'Read actual fixture' }], findings: [],
       reuse: { searched: ['app.txt'], used: ['app.txt'], added: [], removed: [] },
-      inspections: issued.receipts.flatMap(r => r.artifacts).map(a => ({ ...a, observation: 'Read fixture output' })) });
+      inspections: c.brief(t.id).packet.artifacts.map(a => ({ ...a, observation: 'Read fixture output' })) });
   };
   const qualify = async (t: Task) => {
     t = finish(t); t = await c.verify(t.id); t = finish(t); t = finish(t);
@@ -155,5 +155,42 @@ test.each(['failed CI', 'concurrent repair'] as const)('controller handles %s an
     expect(snapshot.pr.headRefOid).toBe(git(f.root, ['rev-parse', 'HEAD']));
     expect(f.read().creates).toBe(1);
     expect(f.read().pr.body.endsWith(`<!-- describes ${git(f.root, ['rev-parse', 'HEAD'])} -->`)).toBe(true);
+  } finally { c.close(); }
+});
+
+test('legacy pending publication reconciles its existing effect before applying stronger readiness gates', () => {
+  const f = fixture();
+  const c = new Controller(join(f.dir, 'legacy-journal'), f.publisher);
+  const target = { provider: 'fixture', model: 'fixture' };
+  const taskId = f.plan.taskId;
+  const dir = join(f.dir, 'legacy-journal', taskId); mkdirSync(dir);
+  const artifact = { path: 'old-failure.log', sha256: new Bun.CryptoHasher('sha256').update('failure').digest('hex') };
+  writeFileSync(join(dir, artifact.path), 'failure');
+  // A persisted pre-gate journal with an authorized effect whose response was lost.
+  // This fixture is migration evidence, not a successful execution assessment.
+  const stored: Task = {
+    version: 1, id: taskId, root: f.root, base: f.plan.baseHead, source: f.plan.source,
+    policy: '0'.repeat(64), phase: 'publishing', generation: 1, ticket: null,
+    context: [], referenceEvidence: null, receipts: [], assessments: [], attempts: [],
+    history: [{ id: 'old-check', source: f.plan.source, artifacts: [artifact], outcome: 'fail', summary: 'Historical failure without new resolution fields' }],
+    pending: { kind: 'publish', head: f.plan.head }, publication: f.plan, reason: '', pr: null,
+    contract: { problem: 'Legacy publication', requirements: [{ id: 'r', outcome: 'Preserve the intended change' }],
+      scope: ['app.txt'], risks: [], contextFiles: ['app.txt'], references: [], allowedDependencies: [],
+      checks: [{ id: 'check', argv: ['true'], cwd: '.', timeoutMs: 1000 }],
+      auditChecks: [{ id: 'audit', argv: ['true'], cwd: '.', timeoutMs: 1000 }],
+      models: { research: target, implementation: target, review: { provider: 'other', model: 'other' }, adversary: target, audit: target },
+      limits: { deadline: new Date(Date.now() + 60000).toISOString(), repairRounds: 2 },
+      publish: { kind: 'pull-request', repository: f.plan.repository, remote: f.plan.remote, remoteUrl: f.plan.remoteUrl,
+        base: f.plan.base, branch: f.plan.branch, baseHead: f.plan.baseHead, previousRemoteHead: null, requiredChecks: ['upgrade'] },
+    },
+  };
+  try {
+    c.journal.create(taskId, stored);
+    f.publisher.publish(f.plan, true);
+    const reconciled = c.publish(taskId);
+    expect(reconciled.phase).toBe('ci'); expect(reconciled.pending.kind).toBe('none');
+    expect(reconciled.pr?.number).toBe(17); expect(f.read().creates).toBe(1);
+    expect(() => c.checkCI(taskId)).toThrow('Unresolved obligations');
+    expect(c.repair(taskId, 'Investigate retained historical evidence under the current gate').phase).toBe('implementing');
   } finally { c.close(); }
 });

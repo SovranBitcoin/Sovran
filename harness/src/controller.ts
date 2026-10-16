@@ -7,7 +7,7 @@ import { runCommand } from './command';
 import { inspectChange } from './policy';
 import { inspectUpgradeEvidence, upgradeInventorySchema } from './upgrade';
 import { brief } from './brief';
-import { unresolved, validateResolutions } from './evidence';
+import { assessmentArtifacts, unresolved, validateResolutions } from './evidence';
 import { Publisher, publishPlan } from './publisher';
 import { contextPaths } from './context';
 import { prepareReference } from './references';
@@ -141,7 +141,7 @@ export class Controller {
       if (result.verdict === 'pass' && result.findings.some(f => f.severity === 'blocking'))
         throw new Error('A blocking finding cannot pass');
       if (['review', 'adversary', 'audit', 'diversityReview'].includes(role) && result.verdict === 'pass') {
-        for (const item of t.receipts.flatMap(r => r.artifacts)) {
+        for (const item of assessmentArtifacts(t, role)) {
           if (fileEvidence(join(this.stateDir, t.id), item.path).sha256 !== item.sha256) throw new Error('Evidence changed after execution');
           if (!result.inspections.some(i => i.path === item.path && i.sha256 === item.sha256))
             throw new Error(`Missing artifact inspection: ${item.path}`);
@@ -319,8 +319,6 @@ export class Controller {
   publish(id: string) {
     let t = this.read(id);
     this.current(t);
-    for (const a of t.assessments) this.inspectReference(t, `artifact:${a.artifact.path}`);
-    if (unresolved(t).length) throw new Error('Unresolved obligations prevent publication');
     if (t.phase === 'publishing') {
       if (!t.publication) throw new Error('Missing publication intent');
       const result = this.publisher.publish(t.publication, false);
@@ -328,6 +326,8 @@ export class Controller {
       return this.published(t, { url: result.pr.url, head: result.pr.headRefOid, number: result.pr.number });
     }
     if (t.phase !== 'publishable') throw new Error('All local gates must pass before publication');
+    for (const a of t.assessments) this.inspectReference(t, `artifact:${a.artifact.path}`);
+    if (unresolved(t).length) throw new Error('Unresolved obligations prevent publication');
     if ('kind' in t.contract.models) {
       const reviews = this.currentReviews(t);
       if (!['review', 'adversary', 'audit'].every(role => reviews.some(a => a.ticket.role === role)))

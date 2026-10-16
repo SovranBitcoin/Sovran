@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { digest, fileEvidence } from './workspace';
 import { assessment, type Role, type Task } from './workflow';
 import { projects } from './references';
-import { obligations, proposals } from './evidence';
+import { assessmentArtifacts, obligations, proposals } from './evidence';
 
 const duties: Record<Role, string> = {
   research: 'Find the existing owners and reusable code with jg, falling back to exact source search if retrieval is incomplete. Read primary docs and pinned related Cashu implementations. Explain uncertainty, acceptance tests and missing context before intake is sealed. Do not edit source.',
@@ -27,7 +27,7 @@ export function brief(t: Task, stateDir: string) {
     if (!snapshot || snapshot.sha256 !== item.sha256 || digest(snapshot.content) !== item.sha256)
       throw new Error('Sealed context snapshot is missing or changed');
   }
-  const artifacts = (['implementation', 'audit'].includes(t.ticket.role) ? [...t.history, ...t.receipts] : t.receipts).flatMap(r => r.artifacts).map(item => {
+  const artifacts = assessmentArtifacts(t, t.ticket.role).map(item => {
     if (fileEvidence(join(stateDir, t.id), item.path).sha256 !== item.sha256) throw new Error('Evidence changed');
     return { ...item, absolutePath: join(stateDir, t.id, item.path) };
   });
