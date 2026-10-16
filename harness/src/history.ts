@@ -12,7 +12,10 @@ const investigation = z.object({
   status: z.enum(['complete', 'gap', 'not-applicable']), explanation: text, evidence: z.array(text),
 }).refine(i => i.status !== 'complete' || i.evidence.length > 0, 'Completed investigation needs evidence');
 export const historyEntry = z.object({
-  path, owner: path, intent: z.enum(['recorded', 'inferred', 'unknown']),
+  // JSON Schema drops refinements; descriptions carry the meaning briefs must show.
+  path: path.describe('A planned path from historyPolicy.paths'),
+  owner: path.describe('Repository-relative path of the file that owns this behavior at the base commit; never a person or prose'),
+  intent: z.enum(['recorded', 'inferred', 'unknown']),
   reason: text, preserveBy: text,
   changes: investigation, callersAndTests: investigation, priorPRs: investigation, followups: investigation,
 });

@@ -150,3 +150,12 @@ test('an artifact inspection may use the artifact: citation form, but never a di
   // Live 2026-10-16: a research worker cited the snapshot as artifact:<file>, as evidence fields require.
   expect(submit(c, t.id, { history: [investigation(t)], inspections: cite(artifact.sha256) }).phase).toBe('intake');
 });
+
+test('a research brief says a history owner is a file path, which the schema type alone cannot show', () => {
+  const { controller: c, root, spec } = fixture();
+  const t = c.create(root, { ...spec, historyPolicy: { version: 1, paths: ['source.txt'] } });
+  c.next(t.id);
+  // Live 2026-10-16: a research worker named the author as owner and the controller refused it.
+  const owner = JSON.parse(JSON.stringify(c.brief(t.id).packet.assessmentSchema)).properties.history.items.properties.owner;
+  expect(owner.description).toContain('path of the file');
+});
