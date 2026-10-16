@@ -11,9 +11,9 @@
  * The same steps build the end-to-end test app (`--bundled`): the Release
  * configuration, with its JavaScript inside it and logging left on, so it
  * launches without a bundler (ADR 0033). Its JavaScript is part of the
- * artifact, so it is current only for the commit it was built from. When only
- * JavaScript has changed, the native part is kept and the bundle inside the
- * app is replaced, which takes under a minute instead of a full build.
+ * artifact, so it is current only for the commit it was built from. On iOS,
+ * when only JavaScript has changed, the native part is kept and the bundle
+ * inside the app is replaced. Android rebuilds the signed APK through Gradle.
  */
 import { execFileSync, spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -63,6 +63,23 @@ export type NativeBuildStamp = NativeBuildSummary & {
 
 export type RebuildPolicy = 'auto' | 'force' | 'never';
 
+/** A bundled story observes ordinary app timing without inherited fixture controls. */
+export function nativeBuildEnvironment(
+  kind: BuildKind,
+  source: NodeJS.ProcessEnv = process.env
+): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = { ...source, CI: '1', APP_VARIANT: 'development' };
+  // EAS takes precedence over APP_VARIANT in app.config.js.
+  delete env.EAS_BUILD_PROFILE;
+  if (kind === 'bundled') {
+    for (const key of Object.keys(env)) if (key.startsWith('EXPO_PUBLIC_E2E_')) delete env[key];
+    delete env.DEBUG_MNEMONIC;
+    env.EXPO_NO_DOTENV = '1';
+    env.EXPO_PUBLIC_E2E_LOGS = '1';
+  }
+  return env;
+}
+
 /** Fixed-size reads, not stream async-iteration: iterating a read stream under
  * Bun took over five minutes on the 385 MB debug APK that `shasum` hashes in
  * about a second, which is what stalled whole capture campaigns before the
@@ -93,7 +110,10 @@ export function nativeArtifactHash(artifact: string): string {
   return hash.digest('hex');
 }
 
-export async function nativeFingerprint(platform: Platform): Promise<string> {
+export async function nativeFingerprint(
+  platform: Platform,
+  kind: BuildKind = 'dev'
+): Promise<string> {
   // Keep Expo's config loader outside Bun's capture/import module graph and put
   // a hard deadline around it: a stuck config must not hang an entire campaign.
   const output = execFileSync(
@@ -108,7 +128,7 @@ export async function nativeFingerprint(platform: Platform): Promise<string> {
     ],
     {
       cwd: APP_DIR,
-      env: { ...process.env, APP_VARIANT: 'development' },
+      env: nativeBuildEnvironment(kind),
       encoding: 'utf8',
       // Bounded so a stuck config cannot hang a campaign, but generous: under
       // campaign load (emulator + Metro + simulator) this loader has exceeded
@@ -119,7 +139,10 @@ export async function nativeFingerprint(platform: Platform): Promise<string> {
     }
   ).trim();
   if (!/^[a-f0-9]{40,64}$/.test(output)) throw new Error('Invalid native fingerprint output');
-  return output;
+  // The same native sources can select a different Release network policy.
+  return platform === 'android' && kind === 'bundled'
+    ? createHash('sha256').update(`${output}\0android-bundled-e2e`).digest('hex')
+    : output;
 }
 
 const buildDir = (platform: Platform, kind: BuildKind) =>
@@ -240,13 +263,7 @@ async function buildIos(fingerprint: string, kind: BuildKind): Promise<NativeBui
   const log = join(out, 'build.log');
   writeFileSync(log, '');
   const configuration = kind === 'bundled' ? 'Release' : 'Debug';
-  const env = {
-    ...process.env,
-    CI: '1',
-    APP_VARIANT: 'development',
-    // Read when Xcode bundles the JavaScript: the test app keeps its log.
-    ...(kind === 'bundled' ? { EXPO_PUBLIC_E2E_LOGS: '1' } : {}),
-  };
+  const env = nativeBuildEnvironment(kind);
   if (git(['ls-files', '--', 'app/ios']).length)
     throw new Error('Refusing to clean tracked iOS sources');
   await step(
@@ -334,8 +351,10 @@ function resolveJdk17(): string {
   return home;
 }
 
-async function buildAndroid(fingerprint: string): Promise<NativeBuildStamp> {
-  const out = join(NATIVE_BUILDS, 'android');
+async function buildAndroid(fingerprint: string, kind: BuildKind): Promise<NativeBuildStamp> {
+  const out = buildDir('android', kind);
+  const configuration = kind === 'bundled' ? 'release' : 'debug';
+  const task = kind === 'bundled' ? 'assembleRelease' : 'assembleDebug';
   mkdirSync(out, { recursive: true });
   const log = join(out, 'build.log');
   writeFileSync(log, '');
@@ -343,9 +362,7 @@ async function buildAndroid(fingerprint: string): Promise<NativeBuildStamp> {
   // prebuild regenerates android/ without local.properties, so gradle needs the SDK path here.
   const sdk = resolveAndroidSdkRoot();
   const env = {
-    ...process.env,
-    CI: '1',
-    APP_VARIANT: 'development',
+    ...nativeBuildEnvironment(kind),
     JAVA_HOME: javaHome,
     ANDROID_HOME: sdk,
     ANDROID_SDK_ROOT: sdk,
@@ -358,16 +375,13 @@ async function buildAndroid(fingerprint: string): Promise<NativeBuildStamp> {
     env,
     log
   );
-  await step(
-    'gradle assembleDebug',
-    './gradlew',
-    ['assembleDebug'],
-    join(APP_DIR, 'android'),
-    env,
-    log
+  const tasks = [...(kind === 'bundled' ? ['-PsovranBundledE2e=true'] : []), task];
+  await step(`gradle ${task}`, './gradlew', tasks, join(APP_DIR, 'android'), env, log);
+  const built = join(
+    APP_DIR,
+    `android/app/build/outputs/apk/${configuration}/app-${configuration}.apk`
   );
-  const built = join(APP_DIR, 'android/app/build/outputs/apk/debug/app-debug.apk');
-  const artifact = join(out, 'app-debug.apk');
+  const artifact = join(out, `app-${configuration}.apk`);
   copyFileSync(built, artifact);
   const badging = apkBadging(artifact);
   if (badging.bundleId !== BUNDLE_ID)
@@ -375,6 +389,7 @@ async function buildAndroid(fingerprint: string): Promise<NativeBuildStamp> {
   return {
     version: 1,
     platform: 'android',
+    ...(kind === 'bundled' ? { kind } : {}),
     appVariant: 'development',
     fingerprint,
     ...badging,
@@ -421,10 +436,7 @@ async function refreshBundledJavaScript(
   const cache = other ? join(out, 'metro-cache') : undefined;
   if (cache) mkdirSync(cache, { recursive: true });
   const env = {
-    ...process.env,
-    CI: '1',
-    APP_VARIANT: 'development',
-    EXPO_PUBLIC_E2E_LOGS: '1',
+    ...nativeBuildEnvironment('bundled'),
     ...(other ? { EXPO_PUBLIC_SOVRAN_EDITION: other.edition, TMPDIR: cache } : {}),
   };
   try {
@@ -504,9 +516,7 @@ export async function ensureNativeBuild(
   policy: RebuildPolicy = 'auto',
   kind: BuildKind = 'dev'
 ): Promise<NativeBuildStamp> {
-  if (kind === 'bundled' && platform !== 'ios')
-    throw new Error('The bundled test build exists for iOS only so far');
-  const fingerprint = await nativeFingerprint(platform);
+  const fingerprint = await nativeFingerprint(platform, kind);
   const stamp = readStamp(platform, kind);
   const nativeCurrent =
     stamp?.fingerprint === fingerprint &&
@@ -520,7 +530,7 @@ export async function ensureNativeBuild(
     );
     return stamp;
   }
-  if (nativeCurrent && kind === 'bundled' && policy !== 'force') {
+  if (nativeCurrent && platform === 'ios' && kind === 'bundled' && policy !== 'force') {
     console.log(`${platform}: native part unchanged; replacing the JavaScript inside the build`);
     const refreshed = await refreshBundledJavaScript(stamp);
     writeStamp(refreshed);
@@ -534,9 +544,9 @@ export async function ensureNativeBuild(
     `${platform}: ${stamp ? 'native inputs changed' : 'no stamped native build'}; building locally (this takes a while)`
   );
   const built =
-    platform === 'ios' ? await buildIos(fingerprint, kind) : await buildAndroid(fingerprint);
+    platform === 'ios' ? await buildIos(fingerprint, kind) : await buildAndroid(fingerprint, kind);
   // Source must not change under the build, or the stamp would lie.
-  if ((await nativeFingerprint(platform)) !== fingerprint)
+  if ((await nativeFingerprint(platform, kind)) !== fingerprint)
     throw new Error(`${platform}: native inputs changed during the build; rerun once edits settle`);
   built.artifactSha256 = nativeArtifactHash(built.artifact);
   writeStamp(built);
@@ -562,7 +572,7 @@ if (import.meta.main) {
       await ensureNativeBuild('ios', 'auto', 'bundled');
       console.log(JSON.stringify(await bundledEdition(edition), null, 2));
     } else if (flag === '--status') {
-      const fingerprint = await nativeFingerprint(platform);
+      const fingerprint = await nativeFingerprint(platform, kind);
       const stamp = readStamp(platform, kind);
       console.log(
         JSON.stringify(

@@ -23,6 +23,17 @@ have their own evidence class and never count as automated passes. Original note
 beside their screenshots. Recorded stories are browsable here; start new stories through the
 story runner, since the viewer's Run action operates the earlier scenario harness.
 
+## Builds are part of the evidence
+
+The [native build owner](press/native-build.ts) keeps development clients separate from
+bundled story builds. Bundled builds exclude inherited fixture and timing controls; they
+carry their JavaScript and retain structured logging. Android needs an explicit test-only
+Gradle option to connect to its host over loopback. Ordinary Release builds must ignore
+that network exception even after a test build, and their JavaScript cache must observe
+changes in logging mode. The [Expo plugin](../plugins/withAndroidE2ERunner.js) owns that
+boundary. A successful build alone is not a functional or performance result; the remaining
+native certification work is tracked in [F156](../../../docs/follow-ups/F156.md).
+
 ## Other generated material
 
 `artifacts/native-builds/` owns reusable app binaries. `artifacts/cache/` owns reusable private
