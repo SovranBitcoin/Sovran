@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from
 import { isAbsolute, join, relative, resolve } from 'node:path';
 import { z } from 'zod';
 import { Journal } from './journal';
+import { inspectNodeTests } from './checks';
 import { runCommand } from './command';
 import { inspectChange } from './policy';
 import { inspectUpgradeEvidence, upgradeInventorySchema } from './upgrade';
@@ -425,7 +426,18 @@ export class Controller {
       if (t.receipts.some(r => r.id === check.id && r.source === t.source && r.outcome === 'pass')) continue;
       // Deterministic launch errors must not reserve an effect that never started.
       const cwd = within(t.root, check.cwd);
-      if (!Bun.which(z.string().parse(check.argv[0]), { cwd })) throw new Error('Check executable not found');
+      const node = 'kind' in check ? check : null;
+      const invocation = digest(JSON.stringify([t.id, t.generation, check.id, t.source]));
+      const collector = join(import.meta.dir, 'node-tests.mjs');
+      const nodeExecutable = node ? Bun.which('node') : null;
+      if (node && !nodeExecutable) throw new Error('Node test runtime is unavailable');
+      const request = node ? this.save(t, `${digest(check.id)}-node-request.json`, {
+        invocation, root: t.root, source: t.source, nodeExecutable, collector: digest(readFileSync(collector)),
+        files: node.files.map(file => within(t.root, file)),
+        selection: node.requiredCases, inputs: node.files.map(file => fileEvidence(t.root, file)),
+      }) : null;
+      const argv = request ? [z.string().parse(nodeExecutable), collector, join(directory, request.path)] : 'argv' in check ? check.argv : [];
+      if (!Bun.which(z.string().parse(argv[0]), { cwd })) throw new Error('Check executable not found');
       const dir = join(this.stateDir, t.id);
       mkdirSync(dir, { recursive: true, mode: 0o700 });
       const claimed = this.journal.change(id, `execute:${t.generation}:${check.id}`, {}, value => {
@@ -437,18 +449,26 @@ export class Controller {
       if (!claimed.applied) throw new Error('Command was already dispatched; reconcile its outcome');
       t = task.parse(claimed.value);
       const log = `${t.generation}-${digest(check.id)}.log`;
-      const { exit, reason } = await runCommand(check.argv, cwd, join(dir, log), join(dir, `${log}.stderr`),
+      const { exit, reason } = await runCommand(argv, cwd, join(dir, log), join(dir, `${log}.stderr`),
         Math.max(1, Math.min(check.timeoutMs, Date.parse(t.contract.limits.deadline) - Date.now())), pid => {
           this.change(id, `started:${t.generation}:${check.id}`, { pid }, v => {
             if (v.pending.kind !== 'command' || v.pending.id !== check.id) throw new Error('Command ownership lost');
             return { ...v, pending: { ...v.pending, pid } };
           });
-        });
+        }, node ? { ...process.env, NODE_OPTIONS: undefined, NODE_TEST_CONTEXT: undefined } : process.env);
       const logArtifact = { path: log, sha256: digest(readFileSync(join(dir, log))) };
       const stderrArtifact = { path: `${log}.stderr`, sha256: digest(readFileSync(join(dir, `${log}.stderr`))) };
-      const artifacts = [logArtifact, stderrArtifact];
+      const artifacts = [logArtifact, stderrArtifact, ...(request ? [request] : [])];
       let outcome: 'pass' | 'fail' | 'inconclusive' = exit === 0 ? 'pass' : 'fail';
-      let summary = `${reason}: ${check.argv.join(' ')}`;
+      let summary = `${reason}: ${argv.join(' ')}`;
+      if (node) {
+        try {
+          const inspected = inspectNodeTests(readFileSync(join(dir, log), 'utf8'), { invocation, root: t.root, files: node.files, requiredCases: node.requiredCases });
+          artifacts.push(this.save(t, `${digest(check.id)}-node-inspection.json`, inspected));
+          if (exit === 0) outcome = inspected.outcome;
+          summary = inspected.problems.length ? inspected.problems.join('\n') : `Executed ${inspected.cases.length} named cases with ${inspected.node}; ${reason}`;
+        } catch (error) { outcome = 'fail'; summary = `Required test execution was not established: ${String(error)}`; }
+      }
       if (check.id === 'harness:upgrade' && exit === 0) {
         try {
           const inventoryPath = join(dir, `${t.generation}-${digest('harness:upgrade-inventory')}.log`);

@@ -1,5 +1,6 @@
 import { createMachine, transition } from 'xstate';
 import { z } from 'zod';
+import { command } from './checks';
 import { publishPlan } from './publisher';
 import { reference } from './references';
 import { historyPolicy, historyEntry, historyReview } from './history';
@@ -9,10 +10,6 @@ export { role } from './models';
 
 const text = z.string().trim().min(1);
 const hash = z.string().regex(/^[a-f0-9]{64}$/);
-const command = z.object({
-  id: text, argv: z.array(text).min(1), cwd: text.default('.'),
-  timeoutMs: z.number().int().positive().max(3_600_000),
-});
 export const contract = z.object({
   historyPolicy: historyPolicy.optional(),
   problem: text,

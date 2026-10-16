@@ -4,7 +4,7 @@ import { closeSync, openSync } from 'node:fs';
 /** Each trusted check owns a POSIX process group, including ordinary descendants.
  * Deliberately detached grandchildren are outside the trusted-host contract. */
 export async function runCommand(argv: string[], cwd: string, stdout: string, stderr: string, timeoutMs: number,
-  started?: (pid: number) => void) {
+  started?: (pid: number) => void, environment: NodeJS.ProcessEnv = process.env) {
   const executable = argv[0];
   if (!executable) throw new Error('Empty command');
   if (process.platform === 'win32') throw new Error('Process-group supervision requires a POSIX host');
@@ -14,7 +14,7 @@ export async function runCommand(argv: string[], cwd: string, stdout: string, st
   let cleanup = () => {};
   try {
     const child = spawn(executable, argv.slice(1), { cwd, detached: true,
-      stdio: ['ignore', out, err], env: { ...process.env, CI: '1' } });
+      stdio: ['ignore', out, err], env: { ...environment, CI: '1' } });
     const killGroup = () => {
       if (!child.pid) return;
       try { process.kill(-child.pid, 'SIGKILL'); }

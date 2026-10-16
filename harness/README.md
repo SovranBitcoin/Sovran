@@ -81,7 +81,18 @@ a deadline. Research precedes sealing. A worker must claim its exact ticket befo
 another worker cannot take over merely because time passed. Completion means that worker
 and its child processes have stopped. Unknown outcomes require reconciliation, not replay.
 
-Verification runs the agreed command arguments without a shell. Every command records its
+Verification runs the agreed command arguments without a shell. Plain commands establish
+process results only. A `node-tests` check seals exact files and required case-name paths;
+the host collector uses Node's process-isolated test API and retains its structured events,
+stdout/stderr, runtime version, collector hash, selected file hashes and invocation identity.
+Empty-file wrappers, skipped/todo required cases, missing cases, inconsistent lifecycle or
+summary counts and incomplete streams fail the check. Printed JSON is captured as test
+stdout, never interpreted as runner evidence. This adapter has been exercised with Node
+24.14.1; an unsupported event shape fails closed. See the official [Node test stream API](https://nodejs.org/docs/latest-v24.x/api/test.html#class-testsstream).
+Execution evidence does not establish that assertions express the right behavior; independent
+oracle review and a meaningful negative control remain necessary for important fixes.
+
+Every command records its
 output and the source fingerprint. A changed candidate invalidates evidence. Review and
 adversarial review precede the final audit. An audit command completing is evidence only:
 the audit worker must still judge it. The controller rejects skipped stages and missing
