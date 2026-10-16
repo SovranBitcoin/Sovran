@@ -30,6 +30,9 @@ const CODE = /\.(ts|tsx|mts|cts|mjs|cjs|js|sh|py|yml|yaml|swift|kt)$/;
 // Vendored code, and this checker and its tests, which have to spell out what they reject.
 const NOT_SCANNED = [
   "scripts/followups.",
+  // Held-out evaluation cases quote ledger ids as fixtures of this checker.
+  "harness/evaluations/",
+  "harness/tests/heldout.",
   ".agents/",
   "app/vendor/",
   "app/modules/bitchat-module/ios/",
