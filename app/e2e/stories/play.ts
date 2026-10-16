@@ -198,7 +198,7 @@ async function playStep(
   const needsControlMap =
     step.tap ||
     step.swipe ||
-    step.type?.into ||
+    step.type ||
     step.expect.some((expectation) => !('logged' in expectation));
   const readScreen = async () => {
     for (;;) {
@@ -209,18 +209,25 @@ async function playStep(
       } finally {
         slowestAnswerMs = Math.max(slowestAnswerMs, Math.round(performance.now() - asked));
       }
+      const covered = screen.elements.some((element) => element.id === 'boot-splash-overlay');
       if (
         !needsControlMap ||
-        (Number.isFinite(screen.width) &&
+        (!covered &&
+          Number.isFinite(screen.width) &&
           screen.width > 0 &&
           Number.isFinite(screen.height) &&
           screen.height > 0)
       )
         return screen;
       if (performance.now() >= deadline)
-        throw new Error(`control map unavailable: ${screen.source ?? 'no measured window'}`);
+        throw new Error(
+          covered
+            ? 'The current splash still covers the app controls'
+            : `control map unavailable: ${screen.source ?? 'no measured window'}`
+        );
       // Capture may not have a mounted root during startup. Observe again,
-      // without treating missing instrumentation as proof that a control is gone.
+      // without treating missing instrumentation or covered controls as proof
+      // that a control is gone. A previous splash.gone log cannot settle a remount.
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
   };
@@ -358,6 +365,9 @@ async function playStep(
         await link.mark(`${label}:focused`);
         await link.still(Math.max(1, deadline - performance.now()) + STILL_GRACE_MS);
       }
+      // A focused field can survive a new splash cycle without being targeted
+      // again. Check the current map before sending keys to that existing focus.
+      await readScreen();
       await device.type(step.type.enter ? `${step.type.text}\n` : step.type.text);
     }
     // A second mark, sent after the touch: the app treats a mark as something

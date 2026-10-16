@@ -66,6 +66,32 @@ describe('the boot splash over a page shown in place of the wallet home', () => 
     expect(splashGone()).toBe(true);
   });
 
+  it('exposes the currently covering overlay again after a completed cycle remounts', () => {
+    // The node preset renders RN Web host elements, which translate testID to data-testid.
+    const overlayMounted = () =>
+      screen.UNSAFE_root.findAll(
+        (node) => node.type === 'div' && node.props['data-testid'] === 'boot-splash-overlay'
+      ).length > 0;
+    const gate = (key: string) => (
+      <NativeSplashLayoutGate key={key}>
+        <GatePage />
+      </NativeSplashLayoutGate>
+    );
+    render(gate('first'));
+    expect(overlayMounted()).toBe(true);
+    layOutRoot();
+    act(() => jest.advanceTimersByTime(1000));
+    expect(overlayMounted()).toBe(false);
+    expect(splashGone()).toBe(true);
+
+    screen.unmount();
+    render(gate('second'));
+    expect(overlayMounted()).toBe(true);
+    layOutRoot();
+    act(() => jest.advanceTimersByTime(1000));
+    expect(overlayMounted()).toBe(false);
+  });
+
   it('still waits for the wallet home when no such page is shown', () => {
     render(
       <NativeSplashLayoutGate>

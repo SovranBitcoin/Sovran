@@ -97,6 +97,94 @@ test('topPage is the page of the last element laid out', () => {
 });
 
 describe('playStory', () => {
+  test('does not tap or certify controls covered by the current splash after an earlier splash ended', async () => {
+    const covered = screenOf(box({ id: 'accept' }), box({ id: 'boot-splash-overlay' }));
+    const app = fakeApp(covered);
+    app.log('splash.gone');
+    app.link.still = async () => ({ appClockMs: app.state.clock, forced: true });
+    const device = {
+      ...noSwipe,
+      tap: async (x: number, y: number) => {
+        app.state.taps.push([x, y]);
+      },
+    };
+    const action = await playStory(
+      story([
+        {
+          name: 'accept',
+          withinMs: 100,
+          tap: { id: 'accept' },
+          expect: [{ visible: { id: 'accept' } }],
+        },
+      ]),
+      app.link,
+      device
+    );
+    expect(action.ok).toBe(false);
+    expect(app.state.taps).toEqual([]);
+    expect(action.steps[0].failure).toContain('splash');
+    const observation = await playStory(
+      story([{ name: 'observe', withinMs: 100, expect: [{ gone: { id: 'unrelated' } }] }]),
+      app.link,
+      device
+    );
+    expect(observation.ok).toBe(false);
+    expect(observation.steps[0].failure).toContain('splash');
+  });
+
+  test('waits for the current overlay to unmount, then dispatches one tap', async () => {
+    const app = fakeApp(screenOf(box({ id: 'accept' }), box({ id: 'boot-splash-overlay' })));
+    let reads = 0;
+    app.link.screen = async () => {
+      reads++;
+      if (reads === 2) app.state.screen = screenOf(box({ id: 'accept' }));
+      return app.state.screen;
+    };
+    const result = await playStory(
+      story([{ name: 'accept', tap: { id: 'accept' }, expect: [{ enabled: { id: 'continue' } }] }]),
+      app.link,
+      {
+        ...noSwipe,
+        tap: async (x, y) => {
+          expect(
+            app.state.screen.elements.some((element) => element.id === 'boot-splash-overlay')
+          ).toBe(false);
+          app.state.taps.push([x, y]);
+          app.state.screen = screenOf(box({ id: 'continue' }));
+        },
+      }
+    );
+    expect(result.ok).toBe(true);
+    expect(app.state.taps).toEqual([[0.125, 0.03125]]);
+  });
+
+  test('does not type into existing focus while a splash covers it', async () => {
+    const app = fakeApp(screenOf(box({ id: 'boot-splash-overlay' })));
+    const typed: string[] = [];
+    const result = await playStory(
+      story([
+        {
+          name: 'enter text',
+          withinMs: 100,
+          type: { text: 'example' },
+          expect: [{ logged: 'text.changed' }],
+        },
+      ]),
+      app.link,
+      {
+        ...noSwipe,
+        tap: async () => {},
+        type: async (text) => {
+          typed.push(text);
+          app.log('text.changed');
+        },
+      }
+    );
+    expect(result.ok).toBe(false);
+    expect(typed).toEqual([]);
+    expect(result.steps[0].failure).toContain('splash');
+  });
+
   test('an enabled expectation rejects a visible disabled control and observes a real state change', async () => {
     const app = fakeApp(screenOf(box({ id: 'continue', disabled: true })));
     const check = story([

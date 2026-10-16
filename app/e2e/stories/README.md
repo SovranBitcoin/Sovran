@@ -33,6 +33,11 @@ A story is a JSON file in `library/`: a purpose, the state it starts from, and s
 swipe, type) and says what must then be true. `states/` holds stories that only set things up; any story's end
 can be another's start. `--look` lists what is on screen when a story ends, which is how the next step is written.
 
+Controls behind the current splash cannot satisfy visual assertions or be targeted by the
+player. It observes the mounted overlay in a valid control map within the step's deadline;
+an earlier splash log or forced settle response is not evidence that a later overlay has gone.
+This checks the React overlay's lifetime, not native compositor visibility or performance.
+
 ## What has a story
 
 | The app's pages (`app/app`)                                                    | Stories                                                                                                                                                                                                                                                                                                                                                                                                                                                          |

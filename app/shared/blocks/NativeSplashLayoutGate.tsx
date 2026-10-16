@@ -518,7 +518,11 @@ export function NativeSplashLayoutGate({ children }: { children: React.ReactNode
       onLayout={onLayoutRootView}>
       {children}
       {showSplash ? (
-        <Animated.View ref={splashOverlayRef} pointerEvents="none" style={overlayStyle}>
+        <Animated.View
+          ref={splashOverlayRef}
+          testID="boot-splash-overlay"
+          pointerEvents="none"
+          style={overlayStyle}>
           {/* Content layer — solid white fill + all visuals. Self-fades on the
               UI thread after the tween docks (see contentFadeStyle). */}
           <Animated.View pointerEvents="none" style={contentFadeStyle}>
