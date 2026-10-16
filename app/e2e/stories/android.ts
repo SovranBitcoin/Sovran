@@ -14,7 +14,13 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { appSourceStamp } from '../../../scripts/lib/app-source.mjs';
 import { withAndroidEmulatorSession } from '../drivers/android/android-session';
-import { ANDROID_PACKAGE_ID as PACKAGE, escapeInputText, type Adb } from '../drivers/android/adb';
+import {
+  ANDROID_PACKAGE_ID as PACKAGE,
+  escapeInputText,
+  Adb,
+  adbBin,
+  resolveAndroidSdkRoot,
+} from '../drivers/android/adb';
 import { startOwnedMetro } from '../drivers/simulator-session';
 import { startAppLink, type AppHello } from '../link/appLink';
 import { ensureNativeBuild, nativeArtifactHash, nativeFingerprint } from '../press/native-build';
@@ -155,44 +161,70 @@ export async function runAndroidStory(storyPath: string): Promise<{ ok: boolean;
           metroPort: device.metroPort,
         };
         save('session.json', { ...session, ownership });
-        await device.install('erase', async () => {
-          await bindAndroidStoryApp({
-            adb: device.adb,
-            apk: build.artifact,
-            outDir,
-            note: { url: appLink.url, run },
+        try {
+          await device.install('erase', async () => {
+            await bindAndroidStoryApp({
+              adb: device.adb,
+              apk: build.artifact,
+              outDir,
+              note: { url: appLink.url, run },
+            });
           });
-        });
-        const hello = await appLink.connected(90_000);
-        signal.throwIfAborted();
-        save('session.json', { ...session, ownership, hello });
-        save('screen-initial.json', await appLink.screen());
-        const result = await playStory(
-          story,
-          appLink,
-          {
-            tap: (x, y) => device.adb.tap(x, y),
-            swipe: (from, to) =>
-              device.adb.swipe({ x: from[0], y: from[1] }, { x: to[0], y: to[1] }),
-            type: async (text) => {
-              const enter = text.endsWith('\n');
-              await device.adb.typeText(enter ? text.slice(0, -1) : text);
-              if (enter) await device.adb.keyevent('KEYCODE_ENTER');
+          const hello = await appLink.connected(90_000);
+          signal.throwIfAborted();
+          save('session.json', { ...session, ownership, hello });
+          const result = await playStory(
+            story,
+            appLink,
+            {
+              tap: (x, y) => device.adb.tap(x, y),
+              swipe: (from, to) =>
+                device.adb.swipe({ x: from[0], y: from[1] }, { x: to[0], y: to[1] }),
+              type: async (text) => {
+                const enter = text.endsWith('\n');
+                await device.adb.typeText(enter ? text.slice(0, -1) : text);
+                if (enter) await device.adb.keyevent('KEYCODE_ENTER');
+              },
             },
-          },
-          undefined,
-          async (index, step) => {
-            report.steps[index] = { ...step };
-            signal.throwIfAborted();
-            const file = `${pictureName(index, step.name)}.png`;
-            writeFileSync(join(outDir, file), await device.adb.screencapPng());
-            report.steps[index].picture = file;
+            undefined,
+            async (index, step) => {
+              report.steps[index] = { ...step };
+              signal.throwIfAborted();
+              const file = `${pictureName(index, step.name)}.png`;
+              writeFileSync(join(outDir, file), await device.adb.screencapPng());
+              report.steps[index].picture = file;
+              save(`${pictureName(index, step.name)}.screen.json`, await appLink.screen());
+            }
+          );
+          signal.throwIfAborted();
+          report.ok = result.ok;
+          const failed = report.steps.find((step) => !step.ok);
+          if (failed) report.failure = `${failed.name}: ${failed.failure ?? 'expectations failed'}`;
+        } finally {
+          // A failed connection has no app-link logs. Keep device evidence before
+          // the owned emulator is destroyed, and attempt each capture separately.
+          // Like session cleanup, bounded reads must survive the run's abort.
+          const captureAdb = new Adb({
+            serial: device.serial,
+            bin: adbBin(resolveAndroidSdkRoot()),
+          });
+          for (const capture of [
+            async () =>
+              writeFileSync(
+                join(outDir, 'device-log.txt'),
+                await captureAdb.raw(['logcat', '-d', '-t', '1000']),
+                { mode: 0o600 }
+              ),
+            async () =>
+              writeFileSync(join(outDir, 'screen-final.png'), await captureAdb.screencapPng()),
+          ]) {
+            try {
+              await capture();
+            } catch (error) {
+              failures.push(errorText(error));
+            }
           }
-        );
-        signal.throwIfAborted();
-        report.ok = result.ok;
-        const failed = report.steps.find((step) => !step.ok);
-        if (failed) report.failure = `${failed.name}: ${failed.failure ?? 'expectations failed'}`;
+        }
       },
       {
         findApk: () => build.artifact,

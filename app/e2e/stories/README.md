@@ -16,8 +16,10 @@ For a fresh Android story, use `bun run e2e:story e2e/stories/library/<story>.js
 It uses the current stamped development APK and owns a disposable emulator and Metro server;
 build the APK first with `bun run screenshots:native-build android`. Saved states, handed/given
 inputs, deep links and permission overrides are not supported in this lane yet. It keeps the
-same story report, screenshots and received logs, plus the installed APK comparison and session
-receipt. Cleanup and source drift can fail an otherwise passing story. This is functional
+same story report, screenshots, per-step control maps and received logs, plus the installed APK
+comparison and session receipt. Recent device logs and a final screen are captured before
+teardown so an app-link failure has diagnostic evidence; these bounded logs are not a complete
+log history. Cleanup and source drift can fail an otherwise passing story. This is functional
 development-build evidence: toast/triple-tap timing is extended, location is pregranted, and video, pixel-motion and
 device performance measurements are absent. It does not satisfy the controller's native gate.
 
