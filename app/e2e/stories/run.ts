@@ -89,8 +89,7 @@ function playOne(play: Play, udid: string): Promise<{ ok: boolean; output: strin
       resolve({ ok: false, output: error.message });
     });
     child.on('close', (code) => {
-      const recorded = JSON.parse(readFileSync(join(out, 'attempt.json'), 'utf8'));
-      finishAttempt(out, play.attemptId, code ?? 1, recorded.failure);
+      finishAttempt(out, play.attemptId, code ?? 1);
       resolve({ ok: code === 0, output });
     });
   });

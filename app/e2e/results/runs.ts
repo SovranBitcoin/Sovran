@@ -1,7 +1,7 @@
 /** On-disk ownership of story evidence. Each invocation owns a fresh run;
  * workers own separate attempt directories and never replace earlier results. */
 import { randomUUID } from 'node:crypto';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync, renameSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod';
 import { captureGitInfo } from '../core/git';
@@ -68,11 +68,14 @@ export function alive(pid: number): boolean {
     return false;
   }
 }
+function replaceJson(file: string, value: unknown): void {
+  const temporary = `${file}.${process.pid}.tmp`;
+  writeFileSync(temporary, `${JSON.stringify(value, null, 2)}\n`);
+  renameSync(temporary, file);
+}
+
 export function writeManifest(dir: string, manifest: EvidenceManifest): void {
-  writeFileSync(
-    join(dir, 'manifest.json'),
-    `${JSON.stringify(evidenceManifestSchema.parse(manifest), null, 2)}\n`
-  );
+  replaceJson(join(dir, 'manifest.json'), evidenceManifestSchema.parse(manifest));
 }
 export function createStoryRun(root: string, suite: string, selection: string[]): string {
   const dir = join(
@@ -117,9 +120,26 @@ export function registerAttempt(run: string, worker: string, id: string): string
   return dir;
 }
 export function finishAttempt(dir: string, id: string, exitCode: number, failure?: string): void {
-  writeFileSync(
-    join(dir, 'attempt.json'),
-    JSON.stringify(attemptSchema.parse({ id, exitCode, failure }))
+  const file = join(dir, 'attempt.json');
+  let earlierFailure: string | undefined;
+  try {
+    const earlier = attemptSchema.safeParse(JSON.parse(readFileSync(file, 'utf8')));
+    if (earlier.success) earlierFailure = earlier.data.failure;
+  } catch {
+    /* An interrupted child may have left an incomplete marker. */
+  }
+  replaceJson(
+    file,
+    attemptSchema.parse({
+      id,
+      exitCode,
+      failure:
+        failure ??
+        earlierFailure ??
+        (exitCode === 0
+          ? undefined
+          : `Process exited with status ${exitCode} without a readable failure explanation.`),
+    })
   );
 }
 
