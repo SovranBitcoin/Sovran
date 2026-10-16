@@ -58,9 +58,14 @@ backdating research or silently changing the sealed plan. Old records stay reada
 claiming this stronger history coverage. Historical citations can name removed files at an
 exact ancestor revision.
 
-Context is copied before execution, with hashes. Per-role briefs point at existing skills,
-including the navigation document's reason for `-flow` wrappers. They do not replace those
-rules with another standards catalogue. Relevant external files are pinned by commit under
+Context is copied before execution, with hashes. Routing uses the exact planned paths when
+available, preserving declared and inferred risk obligations. Native execution receives the
+superseding story ADR as well as the older custody rules; component tests receive their
+declared library version's reference. Per-role briefs point at existing skills and platform
+flow decisions rather than another standards catalogue. Research classifies related active
+and deleted follow-ups in its existing explanation field; final audit rechecks those judgments.
+These judgments are worker responsibilities, not proof of complete historical retrieval.
+Relevant external files are pinned by commit under
 `/tmp/sovran-harness/references/<owner>/<repository>/<commit>` and copied into private task
 evidence. A missing or dirty cache is refused, never silently reset. Upstream content is
 reference material, not task authority. No upstream repositories are cloned until selected.
