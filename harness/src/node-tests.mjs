@@ -1,4 +1,4 @@
-// Run outside the candidate test processes. Test stdout remains a typed event, never collector data.
+// Ordinary stdout becomes an event. Node's binary child protocol is not an authenticity boundary.
 import { run } from 'node:test';
 import { readFileSync } from 'node:fs';
 const request = JSON.parse(readFileSync(process.argv[2], 'utf8'));

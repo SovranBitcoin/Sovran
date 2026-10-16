@@ -253,7 +253,7 @@ export class Controller {
     if (reference.startsWith('artifact:')) {
       const path = reference.slice('artifact:'.length);
       const registered = [
-        ...t.receipts.flatMap(r => r.artifacts), ...t.history.flatMap(r => r.artifacts),
+        ...t.receipts.flatMap(r => r.artifacts), ...t.history.flatMap(r => r.artifacts), ...(t.ciObservations ?? []),
         ...t.assessments.map(a => a.artifact), ...([t.referenceEvidence, t.historyEvidence].filter((a): a is NonNullable<typeof a> => !!a)),
       ].find(item => item.path === path);
       if (!registered) throw new Error(`Unregistered evidence artifact: ${path}`);
@@ -391,9 +391,10 @@ export class Controller {
       if (v.generation !== t.generation || v.phase !== 'ci' || v.source !== t.source ||
         v.publication?.head !== t.publication?.head || v.pr?.head !== t.pr?.head || v.pr?.number !== t.pr?.number)
         throw new Error('Stale CI result; keep the current task generation');
-      if (result.status === 'waiting') return { ...v, reason: result.reason };
       const artifact = this.save(v, `ci-${digest(JSON.stringify(result))}.json`, result);
-      const next: Task = { ...v, receipts: [...v.receipts, { id: 'harness:ci', source: z.string().parse(v.source),
+      const observed: Task = { ...v, ciObservations: [...(v.ciObservations ?? []), artifact] };
+      if (result.status === 'waiting') return { ...observed, reason: result.reason };
+      const next: Task = { ...observed, receipts: [...v.receipts, { id: 'harness:ci', source: z.string().parse(v.source),
         artifacts: [artifact], outcome: result.status === 'ready' ? 'pass' : 'fail', summary: result.reason }] };
       return result.status === 'failed' ? this.repairTask(next, result.reason) : move(next, 'ACCEPT');
     });

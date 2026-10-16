@@ -32,6 +32,20 @@ function fixture() {
 import {readFileSync,writeFileSync} from 'node:fs';
 const file=process.env.FAKE_GH_STATE, s=JSON.parse(readFileSync(file,'utf8')), a=process.argv.slice(2), cmd=a[1];
 const value=k=>a[a.indexOf(k)+1], save=()=>writeFileSync(file,JSON.stringify(s));
+if(a[0]==='api'){
+ if(s.apiError)process.exit(1);
+ if(cmd==='graphql'){
+  const checks=s.checks.map((c,i)=>c.__typename?c:{__typename:'CheckRun',id:'check-'+i,name:c.name,status:c.bucket==='pending'?'IN_PROGRESS':'COMPLETED',conclusion:({pass:'SUCCESS',fail:'FAILURE',skipping:'SKIPPED',cancel:'CANCELLED'})[c.bucket]??null,isRequired:!!c.required,detailsUrl:'https://github.com/fixture/wallet/actions',checkSuite:{databaseId:i+1,commit:{oid:c.head??s.plan.head},app:{databaseId:c.appId??1,slug:'github-actions'},workflowRun:c.workflowRun??null}});
+  const offset=Number(a.find(x=>x.startsWith('cursor='))?.slice(7)??0), size=s.pageSize??checks.length;
+  const nodes=checks.slice(offset,offset+size), more=offset+nodes.length<checks.length;
+  console.log(JSON.stringify({data:{repository:{pullRequest:{headRefOid:s.plan.head,baseRefOid:s.plan.baseHead,statusCheckRollup:{commit:{oid:s.plan.head},contexts:{totalCount:checks.length,pageInfo:{hasNextPage:more,endCursor:more?String(offset+nodes.length):null},nodes}}}}},...(s.graphqlErrors?{errors:[{message:'Partial data'}]}:{})}));
+ } else if(cmd.includes('/actions/runs/'))console.log(JSON.stringify(s.run));
+ else if(cmd.includes('/rules/branches/'))console.log(JSON.stringify([s.changedPolicy && s.policyReads>1 ? [{type:'required_status_checks',parameters:{required_status_checks:[{context:'new-gate'}]}}] : s.rules??[]]));
+ else if(cmd.endsWith('/protection'))console.log(JSON.stringify(s.protection));
+ else if(cmd.includes('/branches/')){s.policyReads=(s.policyReads??0)+1;save();console.log(JSON.stringify({protected:!!s.protected,commit:{sha:s.plan.baseHead}}));}
+ else process.exit(97);
+ process.exit(0);
+}
 if(a[0]!=='pr')process.exit(99);
 if(cmd==='list'){console.log(JSON.stringify(s.pr?[s.pr]:[]));}
 else if(cmd==='view'){console.log(JSON.stringify(s.pr));}
@@ -125,6 +139,12 @@ test.each(['failed CI', 'concurrent repair'] as const)('controller handles %s an
       f.change(s => { s.plan.head = git(f.root, ['rev-parse', 'HEAD']); if (s.pr) s.pr.headRefOid = s.plan.head; });
       t = await qualify(t); t = c.publish(t.id);
       expect(t.phase).toBe('ci');
+      f.change(s => { s.checks[0].bucket = 'pending'; });
+      t = c.checkCI(t.id);
+      expect(t.phase).toBe('ci');
+      const waiting = t.ciObservations?.at(-1);
+      if (!waiting) throw new Error('Missing retained waiting observation');
+      expect(JSON.parse(readFileSync(join(f.dir, 'journal', t.id, waiting.path), 'utf8')).status).toBe('waiting');
       f.change(s => { s.checks[0].bucket = value === 'first change' && trigger === 'failed CI' ? 'fail' : 'pass'; });
       if (value === 'first change' && trigger === 'concurrent repair') {
         const other = new Controller(join(f.dir, 'journal'), f.publisher);
@@ -149,9 +169,10 @@ test.each(['failed CI', 'concurrent repair'] as const)('controller handles %s an
     const evidence = receipt?.artifacts[0];
     if (!evidence) throw new Error('Missing CI evidence');
     const snapshot = JSON.parse(readFileSync(join(f.dir, 'journal', t.id, evidence.path), 'utf8'));
-    expect(snapshot.checks).toEqual([{ name: 'upgrade', bucket: 'pass' }]);
+    expect(snapshot.checks).toMatchObject([{ name: 'upgrade', status: 'COMPLETED', conclusion: 'SUCCESS' }]);
+    expect(snapshot.serverPolicy.required).toEqual([]);
     expect(snapshot.requiredChecks).toEqual(['upgrade']);
-    expect(snapshot.exitCode).toBe(0);
+    expect(snapshot.sealedRequiredChecks).toEqual(['upgrade']);
     expect(snapshot.pr.headRefOid).toBe(git(f.root, ['rev-parse', 'HEAD']));
     expect(f.read().creates).toBe(1);
     expect(f.read().pr.body.endsWith(`<!-- describes ${git(f.root, ['rev-parse', 'HEAD'])} -->`)).toBe(true);
@@ -193,4 +214,69 @@ test('legacy pending publication reconciles its existing effect before applying 
     expect(() => c.checkCI(taskId)).toThrow('Unresolved obligations');
     expect(c.repair(taskId, 'Investigate retained historical evidence under the current gate').phase).toBe('implementing');
   } finally { c.close(); }
+});
+
+test('known-empty server policy still enforces every sealed check and retains all observed evidence', () => {
+  const f = fixture(); f.publisher.publish(f.plan, true);
+  expect(f.publisher.check(f.plan,17).status).toBe('ready');
+  f.change(s => { s.checks = [{name:'unrelated',bucket:'pass'}]; });
+  expect(f.publisher.check(f.plan,17).status).toBe('waiting');
+  f.change(s => { s.checks = [{name:'upgrade',bucket:'pass'}, {name:'advisory',bucket:'fail'}]; });
+  const result = f.publisher.check(f.plan,17);
+  expect(result.status).toBe('ready'); expect(result.checks).toHaveLength(2);
+  f.change(s => { s.pr.mergeStateStatus='UNSTABLE'; });
+  expect(f.publisher.check(f.plan,17).status).toBe('waiting');
+});
+
+test('server policies and observed required contexts strengthen the sealed obligations', () => {
+  const f=fixture(); f.publisher.publish(f.plan,true);
+  f.change(s=>{s.rules=[{type:'required_status_checks',parameters:{required_status_checks:[{context:'security',integration_id:2}]}}];});
+  expect(f.publisher.check(f.plan,17).reason).toContain('security: missing');
+  f.change(s=>{s.checks.push({name:'security',bucket:'pass',appId:1});});
+  expect(f.publisher.check(f.plan,17).status).toBe('waiting');
+  f.change(s=>{s.checks[1].appId=2;}); expect(f.publisher.check(f.plan,17).status).toBe('ready');
+  f.change(s=>{s.checks.push({name:'new-required',bucket:'pending',required:true});});
+  expect(f.publisher.check(f.plan,17).status).toBe('waiting');
+  f.change(s=>{s.checks[2].bucket='fail';}); expect(f.publisher.check(f.plan,17).status).toBe('failed');
+  f.change(s=>{s.rules=[];s.checks.splice(2);s.protected=true;s.protection={required_status_checks:{contexts:['classic'],checks:[{context:'classic',app_id:3}]}};});
+  expect(f.publisher.check(f.plan,17).reason).toContain('classic: missing');
+  f.change(s=>{s.protection.required_status_checks.checks[0].app_id=-1;s.checks.push({name:'classic',bucket:'pass',appId:42});});
+  expect(f.publisher.check(f.plan,17).status).toBe('ready');
+});
+
+test('unavailable, partial or stale CI evidence cannot become a known-empty passing policy', () => {
+  const f=fixture(); f.publisher.publish(f.plan,true);
+  f.change(s=>{s.apiError=true;}); expect(()=>f.publisher.check(f.plan,17)).toThrow('unavailable');
+  f.change(s=>{s.apiError=false;s.graphqlErrors=true;}); expect(()=>f.publisher.check(f.plan,17)).toThrow('Partial');
+  f.change(s=>{s.graphqlErrors=false;s.checks[0].head='a'.repeat(40);}); expect(()=>f.publisher.check(f.plan,17)).toThrow('Stale check');
+});
+
+test('ambiguous publishers cannot be replaced by whichever duplicate passed', () => {
+  const f=fixture(); f.publisher.publish(f.plan,true);
+  f.change(s=>{s.checks.push({name:'upgrade',bucket:'fail',appId:2});});
+  const result=f.publisher.check(f.plan,17);
+  expect(result.status).toBe('waiting'); expect(result.reason).toContain('ambiguous'); expect(result.checks).toHaveLength(2);
+});
+
+test('only the latest identified workflow attempt can satisfy a required check and it must bind the base', () => {
+  const f=fixture(); f.publisher.publish(f.plan,true);
+  const workflowRun=(id:number,n:number)=>({databaseId:id,runNumber:n,runAttempt:1,event:'pull_request',file:{path:'.github/workflows/check.yml'},workflow:{databaseId:7,name:'Checks'}});
+  f.change(s=>{
+    s.checks=[{name:'upgrade',bucket:'pass',workflowRun:workflowRun(50,1)}, {name:'upgrade',bucket:'pending',workflowRun:workflowRun(51,2)}];
+    s.run={id:51,head_sha:s.plan.head,run_attempt:1,run_number:2,event:'pull_request',workflow_id:7,pull_requests:[{number:17,head:{sha:s.plan.head},base:{sha:s.plan.baseHead}}]};
+  });
+  expect(f.publisher.check(f.plan,17).status).toBe('waiting');
+  f.change(s=>{s.checks[1].bucket='fail';}); expect(f.publisher.check(f.plan,17).status).toBe('failed');
+  f.change(s=>{s.checks[1].bucket='pass';}); const result=f.publisher.check(f.plan,17);
+  expect(result.status).toBe('ready'); expect(result.checks).toHaveLength(2); expect(result.associations).toHaveLength(1);
+  f.change(s=>{s.run.pull_requests[0].base.sha='a'.repeat(40);}); expect(f.publisher.check(f.plan,17).status).toBe('waiting');
+  f.change(s=>{s.checks[0].workflowRun.workflow.databaseId=8;}); expect(f.publisher.check(f.plan,17).reason).toContain('ambiguous');
+});
+
+test('all context pages are read and a changing server policy invalidates the observation', () => {
+  const f=fixture(); f.publisher.publish(f.plan,true);
+  f.change(s=>{s.pageSize=1;s.checks=[{name:'advisory',bucket:'pass'}, {name:'upgrade',bucket:'pass'}];});
+  expect(f.publisher.check(f.plan,17).status).toBe('ready');
+  f.change(s=>{s.changedPolicy=true;s.policyReads=0;});
+  expect(()=>f.publisher.check(f.plan,17)).toThrow('requirements changed');
 });

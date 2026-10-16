@@ -84,6 +84,7 @@ export const task = z.object({
   history: z.array(receipt).default([]),
   referenceEvidence: artifact.nullable().default(null),
   historyEvidence: artifact.optional(),
+  ciObservations: z.array(artifact).optional(),
   assessments: z.array(z.object({ role, source: hash, worker: text, result: assessment, artifact, generation: z.number().int().nonnegative().optional() })),
   attempts: z.array(z.object({
     ticket, generation: z.number().int().nonnegative(), sourceAfter: hash,

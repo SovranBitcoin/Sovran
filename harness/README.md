@@ -74,6 +74,17 @@ A missing PR after an uncertain request does not authorize another
 create. A base changing after verification invalidates integration evidence. The publisher
 never force-pushes, merges, enables auto-merge, or deploys.
 
+CI requires both the sealed check names and current server requirements. Raw GitHub rollup
+pages preserve competing attempts and publisher identities; a newer failed or pending run
+cannot borrow an older pass. Actions run association must match the PR's head and base.
+Every completed observation, including waiting, is retained for later diagnosis. Unavailable
+policy, incomplete pages, ambiguous publishers, skipped checks or stale revisions cannot
+certify readiness. This currently supports head-attached checks; merge-only receipts and
+protected branches whose classic policy cannot be read remain incomplete. Run association
+and a trusted workflow are bounded integration evidence, not attestation of arbitrary CI code.
+See [GitHub's check objects](https://docs.github.com/en/graphql/reference/checks) and
+[effective branch rules](https://docs.github.com/en/rest/repos/rules#get-rules-for-a-branch).
+
 ## What a transition proves
 
 The initial contract records outcomes, scope, commands, models, allowed dependencies and
