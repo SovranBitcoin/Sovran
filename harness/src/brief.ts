@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { digest, fileEvidence } from './workspace';
 import { assessment, type Role, type Task } from './workflow';
 import { projects } from './references';
+import { obligations, proposals } from './evidence';
 
 const duties: Record<Role, string> = {
   research: 'Find the existing owners and reusable code with jg, falling back to exact source search if retrieval is incomplete. Read primary docs and pinned related Cashu implementations. Explain uncertainty, acceptance tests and missing context before intake is sealed. Do not edit source.',
@@ -26,7 +27,7 @@ export function brief(t: Task, stateDir: string) {
     if (!snapshot || snapshot.sha256 !== item.sha256 || digest(snapshot.content) !== item.sha256)
       throw new Error('Sealed context snapshot is missing or changed');
   }
-  const artifacts = (t.ticket.role === 'implementation' ? t.history : t.receipts).flatMap(r => r.artifacts).map(item => {
+  const artifacts = (['implementation', 'audit'].includes(t.ticket.role) ? [...t.history, ...t.receipts] : t.receipts).flatMap(r => r.artifacts).map(item => {
     if (fileEvidence(join(stateDir, t.id), item.path).sha256 !== item.sha256) throw new Error('Evidence changed');
     return { ...item, absolutePath: join(stateDir, t.id, item.path) };
   });
@@ -35,6 +36,10 @@ export function brief(t: Task, stateDir: string) {
       throw new Error('Research evidence changed');
     return { source: a.source, artifact: a.artifact, result: a.result };
   });
+  if (['implementation', 'audit'].includes(t.ticket.role)) {
+    for (const item of [...obligations(t).map(o => o.origin), ...proposals(t).map(p => p.artifact)])
+      if (fileEvidence(join(stateDir, t.id), item.path).sha256 !== item.sha256) throw new Error('Reconciliation evidence changed');
+  }
   const packet = {
     task: t.id, ticket: t.ticket.id, policy: t.policy, source: t.source,
     root: t.root, base: t.base, role: t.ticket.role, target: t.ticket.target,
@@ -49,7 +54,10 @@ export function brief(t: Task, stateDir: string) {
     referenceFormat: 'observations.evidence and findings.evidence must be a repository-relative file path or artifact:<saved artifact filename>. Put explanations and line/frame details in observation/detail, never in the path. Copy hashes from the packet; do not guess them.',
     referenceSnapshot: join(stateDir, t.id, '0-references.json'),
     relatedProjects: Object.values(projects),
-    repairFindings: t.ticket.role === 'implementation' ? t.assessments.flatMap(a => a.result.findings) : [],
+    reconciliation: ['implementation', 'audit'].includes(t.ticket.role) ? {
+      obligations: obligations(t), proposals: proposals(t),
+      instructions: 'Implementation proposes fixed or refuted dispositions, with hypothesis, experiment, disconfirming evidence and regression evidence. Final audit independently accepts or rejects each exact proposal digest. No blocking obligation can be deferred. Initial review and adversary inspect blind; final audit reconciles every retained objection and failed run.',
+    } : null,
   };
   const sha256 = digest(JSON.stringify(packet));
   return { marker: `SOVRAN_TASK=${t.id} TICKET=${t.ticket.id} POLICY=${t.policy} BRIEF=${sha256}`, sha256, packet };

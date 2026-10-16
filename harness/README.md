@@ -79,7 +79,16 @@ requirement observations. Qualitative judgments remain model judgments, not proo
 Observations and findings must cite real repository files or registered, unchanged task
 artifacts. Accepted research travels with its source and evidence identity into later briefs;
 it describes what was learned before implementation, not proof about the changed candidate.
-Independent reviewers receive that context without other reviewers' verdicts.
+Initial review and adversarial review receive that context without other reviewers' verdicts.
+The final audit then reconciles retained objections against the author's proposed resolutions.
+
+Blocking findings keep artifact-qualified IDs across repairs. Negative assessments and failed
+checks also remain obligations; a later pass cannot erase them. Implementation proposes a
+fix or refutation with its hypothesis, experiment, disconfirming evidence and regression
+evidence. The independent final audit must accept each exact proposal at the current source
+and repair generation. An author cannot approve its own resolution, and blockers cannot be
+deferred to make publication pass. These records establish accountability, not proof that
+a model's diagnosis is correct.
 
 Reviewers must submit observations for the actual hashed command artifacts. No controller
 can prove a model understood a log; this gate makes missing or stale evidence visible.

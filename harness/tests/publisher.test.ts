@@ -98,7 +98,18 @@ test.each(['failed CI', 'concurrent repair'] as const)('controller handles %s an
   const finish = (t: Task) => {
     const issued = c.next(t.id); const ticket = issued.ticket; if (!ticket) throw new Error('Missing ticket');
     c.claim(t.id, ticket.id, ticket.id, ticket.target.provider, ticket.target.model);
+    const reconciliation = c.brief(t.id).packet.reconciliation;
     return c.submit(t.id, ticket.id, ticket.id, { verdict: 'pass', summary: 'Inspected fixture',
+      ...(ticket.role === 'implementation' ? { resolutionProposals: reconciliation?.obligations.map(o => ({
+        obligation: o.id, outcome: 'fixed', explanation: 'Applied the fixture CI correction',
+        hypothesis: 'The earlier candidate fails its required check', experiment: 'Apply the correction and rerun the fixture check',
+        disconfirmingEvidence: 'A continuing required-check failure would reject this correction',
+        evidence: ['app.txt', o.evidence], regressionEvidence: ['app.txt'],
+      })) } : {}),
+      ...(ticket.role === 'audit' ? { resolutionReviews: reconciliation?.proposals.map(p => ({
+        obligation: p.obligation, proposal: p.digest, decision: 'accept',
+        explanation: 'Independent fixture review accepts correction; live CI is still required by the controller', evidence: ['app.txt'],
+      })) } : {}),
       observations: [{ requirement: 'preserve', evidence: 'app.txt', observation: 'Read actual fixture' }], findings: [],
       reuse: { searched: ['app.txt'], used: ['app.txt'], added: [], removed: [] },
       inspections: issued.receipts.flatMap(r => r.artifacts).map(a => ({ ...a, observation: 'Read fixture output' })) });

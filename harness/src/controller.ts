@@ -7,6 +7,7 @@ import { runCommand } from './command';
 import { inspectChange } from './policy';
 import { inspectUpgradeEvidence, upgradeInventorySchema } from './upgrade';
 import { brief } from './brief';
+import { unresolved, validateResolutions } from './evidence';
 import { Publisher, publishPlan } from './publisher';
 import { contextPaths } from './context';
 import { prepareReference } from './references';
@@ -146,10 +147,12 @@ export class Controller {
             throw new Error(`Missing artifact inspection: ${item.path}`);
         }
       }
+      if (new Set(result.findings.map(f => f.id)).size !== result.findings.length) throw new Error('Duplicate finding IDs');
+      validateResolutions(t, role, worker, result, reference => this.inspectReference(t, reference));
       for (const observation of result.observations) this.inspectReference(t, observation.evidence);
       for (const finding of result.findings) this.inspectReference(t, finding.evidence);
       const evidence = this.save(t, `${ticketId.replaceAll(':', '-')}.json`, result);
-      const next: Task = { ...t, ticket: null, source, assessments: [...t.assessments, { role, source, worker, result, artifact: evidence }],
+      const next: Task = { ...t, ticket: null, source, assessments: [...t.assessments, { role, source, worker, result, artifact: evidence, generation: t.generation }],
         attempts: [...t.attempts, { ticket: t.ticket, generation: t.generation, sourceAfter: source,
           completion: { kind: 'submitted', verdict: result.verdict, runtime: observed } }] };
       if (result.verdict === 'inconclusive') return { ...move(next, 'STOP'), reason: result.summary };
@@ -316,6 +319,8 @@ export class Controller {
   publish(id: string) {
     let t = this.read(id);
     this.current(t);
+    for (const a of t.assessments) this.inspectReference(t, `artifact:${a.artifact.path}`);
+    if (unresolved(t).length) throw new Error('Unresolved obligations prevent publication');
     if (t.phase === 'publishing') {
       if (!t.publication) throw new Error('Missing publication intent');
       const result = this.publisher.publish(t.publication, false);
@@ -365,6 +370,7 @@ export class Controller {
   checkCI(id: string) {
     const t = this.read(id); this.current(t);
     if (t.phase !== 'ci' || !t.publication || !t.pr) throw new Error('No published task waiting for CI');
+    if (unresolved(t).length) throw new Error('Unresolved obligations prevent readiness');
     const result = this.publisher.check(t.publication, t.pr.number);
     return this.change(id, `ci:${t.generation}:${digest(JSON.stringify(result))}`, result, v => {
       this.current(v);

@@ -67,6 +67,9 @@ do not ask the owner questions. A missing prerequisite ends incomplete.
 5. Run `verify` in verifying, and `verify` with `audit:true` before the audit worker.
    Use the returned state to continue. Repair invalidates old receipts. Each new ticket
    is a new delegated task, not a message restarting an old child's thread.
+   Implementation and final audit receive a reconciliation packet. Preserve obligation IDs;
+   the author proposes evidence-backed fixes/refutations and the final audit independently
+   reviews exact proposal digests. A pass cannot omit an old blocker or unexplained failed run.
    A diversityReview ticket is an additional independent review, not an alias for audit.
 
 Same-key delegation is idempotent only within the original provider session. After a

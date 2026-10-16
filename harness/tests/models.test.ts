@@ -160,7 +160,7 @@ test('negative review enters repair and cannot shop for a replacement verdict', 
   expect(t.phase).toBe('implementing'); expect(t.generation).toBe(1);
   expect(() => c.fallback(t.id, ticket.id, 'quota-exhausted', { ...runtime, status: 'failed', workState: 'result_available' }, 'quota')).toThrow('No routed attempt');
   c.next(t.id);
-  expect(c.brief(t.id).packet.repairFindings).toMatchObject([{ id: 'defect', detail: 'Fixture counterexample' }]);
+  expect(c.brief(t.id).packet.reconciliation?.obligations).toMatchObject([{ detail: 'Fixture counterexample' }]);
   const historical = t.history[0]?.artifacts[0];
   if (!historical) throw new Error('Missing repair log');
   const original = readFileSync(join(state, t.id, historical.path));

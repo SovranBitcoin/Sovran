@@ -289,3 +289,97 @@ test('publication cannot include changes preceding the sealed task', () => {
     remoteUrl: 'https://github.com/fixture/wallet.git', baseHead: 'a'.repeat(40), previousRemoteHead: null, requiredChecks: ['tests'] };
   expect(() => c.create(root, spec)).toThrow('entire published diff');
 });
+
+function finishWith(c: Controller, t: Task, changes: Record<string, unknown> = {}) {
+  const ticket = c.next(t.id).ticket;
+  if (!ticket) throw new Error('Expected dispatch');
+  c.claim(t.id, ticket.id, ticket.id, ticket.target.provider, ticket.target.model);
+  return c.submit(t.id, ticket.id, ticket.id, { ...report,
+    inspections: c.read(t.id).receipts.flatMap(r => r.artifacts).map(a => ({ ...a, observation: 'Read raw output' })),
+    ...changes });
+}
+
+async function repairedFinding() {
+  const f = fixture();
+  const c = f.controller;
+  let t = finishWith(c, c.create(f.root, f.spec));
+  t = c.seal(t.id, t.policy); t = finishWith(c, t); t = await c.verify(t.id);
+  t = finishWith(c, t, { verdict: 'fail', findings: [{ id: 'guard', severity: 'blocking', evidence: 'source.txt', detail: 'A required guard appears missing' }] });
+  return { ...f, t };
+}
+
+test('an old blocking objection cannot disappear behind later empty passing reviews', async () => {
+  const { controller: c, t: repaired } = await repairedFinding();
+  let t = finishWith(c, repaired); t = await c.verify(t.id);
+  t = finishWith(c, t); t = finishWith(c, t); await c.verify(t.id, true);
+  expect(() => finishWith(c, t)).toThrow('Unresolved obligations');
+  expect(c.read(t.id).phase).toBe('auditing');
+});
+
+function refutation(c: Controller, t: Task) {
+  c.next(t.id);
+  const obligation = c.brief(t.id).packet.reconciliation?.obligations[0];
+  if (!obligation) throw new Error('Missing retained objection');
+  return { obligation: obligation.id, outcome: 'refuted', explanation: 'The original text already provides the required fixture protection',
+    hypothesis: 'The original guard was removed', experiment: 'Read source.txt and compare the sealed original',
+    disconfirmingEvidence: 'The original protection is still present', evidence: ['source.txt'], regressionEvidence: ['source.txt'] };
+}
+
+test('a false finding can be independently refuted after restart without unnecessary edits', async () => {
+  const { controller: c, state, t: repaired } = await repairedFinding();
+  const proposal = refutation(c, repaired);
+  let t = finishWith(c, repaired, { resolutionProposals: [proposal] });
+  t = await c.verify(t.id);
+  c.next(t.id); expect(c.brief(t.id).packet.reconciliation).toBeNull();
+  t = finishWith(c, t); t = finishWith(c, t); await c.verify(t.id, true);
+  const resumed = new Controller(state);
+  try {
+    resumed.next(t.id);
+    const reconciliation = resumed.brief(t.id).packet.reconciliation;
+    const p = reconciliation?.proposals[0];
+    if (!p) throw new Error('Proposal lost during handoff');
+    expect(() => finishWith(resumed, t)).toThrow('Unresolved obligations');
+    const review = { obligation: p.obligation, proposal: p.digest, decision: 'accept', explanation: 'Independently checked guard and baseline', evidence: ['source.txt'] };
+    expect(() => finishWith(resumed, t, { resolutionReviews: [{ ...review, proposal: '0'.repeat(64) }] })).toThrow('current proposal');
+    expect(() => finishWith(resumed, t, { resolutionReviews: [{ ...review, decision: 'reject' }] })).toThrow('Unresolved obligations');
+    expect(() => finishWith(resumed, t, { resolutionReviews: [{ ...review, evidence: ['missing.txt'] }] })).toThrow();
+    t = finishWith(resumed, t, { resolutionReviews: [review] });
+    expect(t.phase).toBe('publishable');
+    expect(t.assessments.flatMap(a => a.result.findings)).toHaveLength(1);
+  } finally { resumed.close(); }
+});
+
+test('a passing run cannot erase an earlier failed execution without independent diagnosis', async () => {
+  const { controller: c, root, spec } = fixture();
+  spec.checks[0] = { id: 'original', argv: ['bun', '-e', "process.exit((await Bun.file('source.txt').text()) === 'repaired' ? 0 : 1)"], cwd: '.', timeoutMs: 5000 };
+  let t = finishWith(c, c.create(root, spec)); t = c.seal(t.id, t.policy); t = finishWith(c, t); t = await c.verify(t.id);
+  expect(t.phase).toBe('implementing');
+  c.next(t.id); expect(c.brief(t.id).packet.reconciliation?.obligations[0]?.id).toStartWith('check:');
+  writeFileSync(join(root, 'source.txt'), 'repaired');
+  t = finishWith(c, t); t = await c.verify(t.id); t = finishWith(c, t); t = finishWith(c, t); await c.verify(t.id, true);
+  expect(() => finishWith(c, t)).toThrow('Unresolved obligations');
+  expect(c.read(t.id).history.some(r => r.outcome === 'fail')).toBe(true);
+});
+
+test('source changes and repair rounds invalidate an earlier proposed disposition', async () => {
+  const { controller: c, root, t: repaired } = await repairedFinding();
+  let t = finishWith(c, repaired, { resolutionProposals: [refutation(c, repaired)] });
+  t = await c.verify(t.id);
+  t = finishWith(c, t, { verdict: 'fail', summary: 'Another independent defect requires repair' });
+  c.next(t.id);
+  expect(c.brief(t.id).packet.reconciliation?.proposals).toEqual([]);
+  writeFileSync(join(root, 'source.txt'), 'new candidate');
+  t = finishWith(c, t); t = await c.verify(t.id); t = finishWith(c, t); t = finishWith(c, t); await c.verify(t.id, true);
+  expect(() => finishWith(c, t)).toThrow('Unresolved obligations');
+});
+
+test('resolution claims cannot introduce unknown obligations, duplicate findings or unregistered evidence', async () => {
+  const { controller: c, t } = await repairedFinding();
+  const proposal = refutation(c, t);
+  expect(() => finishWith(c, t, { resolutionProposals: [{ ...proposal, obligation: 'invented' }] })).toThrow('Unknown obligation');
+  expect(() => finishWith(c, t, { resolutionProposals: [proposal, proposal] })).toThrow('Duplicate obligation');
+  expect(() => finishWith(c, t, { resolutionProposals: [{ ...proposal, regressionEvidence: ['artifact:invented.json'] }] })).toThrow('Unregistered evidence');
+  const finding = { id: 'same', severity: 'follow-up', evidence: 'source.txt', detail: 'Two different concerns need distinct IDs' };
+  expect(() => finishWith(c, t, { findings: [finding, finding] })).toThrow('Duplicate finding IDs');
+  expect(c.read(t.id).phase).toBe('implementing');
+});
