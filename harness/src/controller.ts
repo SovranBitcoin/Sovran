@@ -15,7 +15,7 @@ import { contextPaths } from './context';
 import { prepareReference } from './references';
 import { availability, candidates, dispatchRejection, driver, runtimeTask, type Model, type RuntimeTask } from './models';
 import { assessment, contract, move, roleFor, task, type Task } from './workflow';
-import { digest, fileEvidence, fingerprint, git, testInputEvidence, within } from './workspace';
+import { baselineFingerprint, digest, fileEvidence, fingerprint, git, testInputEvidence, within } from './workspace';
 
 export class Controller {
   readonly journal: Journal;
@@ -501,7 +501,7 @@ export class Controller {
             writeFileSync(dest, readFileSync(source));
             chmodSync(dest, lstatSync(source).mode & 0o777);
           }
-          preparedSource = fingerprint(executionRoot);
+          preparedSource = baselineFingerprint(executionRoot);
         }
         if (node) {
           if (!inputsMatch(executionRoot)) throw new Error('Test input changed during baseline preparation');
@@ -543,7 +543,7 @@ export class Controller {
         } catch (error) { outcome = 'fail'; summary = String(error); }
       }
       if (ownedBaseline) {
-        if (preparedSource && fingerprint(executionRoot) !== preparedSource) { outcome = 'fail'; summary = 'Baseline changed during regression execution'; }
+        if (preparedSource && baselineFingerprint(executionRoot) !== preparedSource) { outcome = 'fail'; summary = 'Baseline changed during regression execution'; }
         // runCommand has reconciled the process group before a disposable baseline is removed.
         git(t.root, ['worktree', 'remove', '--force', '--', executionRoot]);
       }

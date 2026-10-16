@@ -101,8 +101,12 @@ test('concurrent nested cases retain their identity despite repeated identical c
   expect(t.receipts[0]?.summary).toContain('Executed 5 named cases');
 });
 
-async function regressionRun(testCode: string, current = 2, before = 1, names = ['guard'], executableHelper = false) {
+async function regressionRun(testCode: string, current = 2, before = 1, names = ['guard'], executableHelper = false, submodule = false) {
   const f=fixture();
+  if(submodule){ // A gitlink, as in this repository's vendored BitChat; a fresh baseline worktree leaves it empty.
+    const vendor=join(f.root,'vendor');mkdirSync(vendor);git(vendor,['init','-q']);writeFileSync(join(vendor,'lib.txt'),'vendored');
+    git(vendor,['add','.']);git(vendor,['-c','user.email=v@example.invalid','-c','user.name=V','commit','-qm','vendor']);
+  }
   writeFileSync(join(f.root,'value.mjs'),`export const value=${before};`); git(f.root,['add','.']);git(f.root,['commit','-qm','Old behavior']);
   const cases=[{file:'guard.test.mjs',names}];
   const check={kind:'node-tests',id:'behavior',files:['guard.test.mjs'],requiredCases:cases,cwd:'.',timeoutMs:1000,
@@ -127,6 +131,14 @@ test('regression runs the exact candidate test against old code, then requires t
   expect(request.baseline).toBe(t.base); expect(request.copiedInputs[0].path).toBe('guard.test.mjs');
   expect(readFileSync(join(root,'value.mjs'),'utf8')).toBe('export const value=2;');
   expect(git(root,['worktree','list','--porcelain'])).not.toContain('-baseline');
+});
+
+test('a baseline whose submodule is not checked out still runs the regression',async()=>{
+  // Live 2026-10-16: Sovran's BitChat gitlinks made every baseline fail with 'Source fingerprint unavailable'.
+  const {t,root}=await regressionRun(meaningfulGuard,2,1,['guard'],false,true);
+  expect([t.phase,t.reason]).toEqual(['reviewing','']);
+  expect(t.receipts.map(r=>[r.id,r.outcome])).toEqual([['harness:baseline:behavior','pass'],['behavior','pass']]);
+  expect(git(root,['ls-files','-s','vendor'])).toStartWith('160000');
 });
 
 test.each([

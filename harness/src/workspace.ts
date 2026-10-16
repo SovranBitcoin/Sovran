@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
-import { lstatSync, readFileSync, realpathSync } from 'node:fs';
-import { isAbsolute, relative, resolve, sep } from 'node:path';
+import { lstatSync, readdirSync, readFileSync, realpathSync } from 'node:fs';
+import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { captureSourceFingerprint, fingerprintSourceFiles } from '../../app/e2e/core/git';
 
@@ -21,6 +21,19 @@ export function fingerprint(root: string) {
   const result = captureSourceFingerprint(root);
   if (!result) throw new Error('Source fingerprint unavailable');
   return result;
+}
+
+/** A fresh baseline worktree leaves submodules empty, which the source fingerprint refuses.
+ * Identify each empty gitlink by its pinned commit and fingerprint everything else. */
+export function baselineFingerprint(root: string) {
+  const empty = git(root, ['ls-files', '-s', '-z']).split('\0').flatMap(entry => {
+    const match = /^160000 ([0-9a-f]+) \d+\t(.+)$/.exec(entry);
+    return match?.[1] && match[2] && readdirSync(join(root, match[2])).length === 0 ? [{ path: match[2], commit: match[1] }] : [];
+  });
+  const listed = git(root, ['ls-files', '-z', '--cached', '--others', '--exclude-standard']).split('\0');
+  const files = fingerprintSourceFiles(root, listed.filter(path => !empty.some(link => link.path === path)));
+  if (!files) throw new Error('Baseline fingerprint unavailable');
+  return digest(JSON.stringify({ files, empty }));
 }
 
 export function fileEvidence(root: string, path: string) {
