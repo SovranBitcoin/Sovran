@@ -13,6 +13,8 @@ import { selectorSchema } from '../schema/selectors';
 const expectationSchema = z.union([
   /** An element is laid out on screen. */
   z.strictObject({ visible: selectorSchema }),
+  /** A visible control can be used, after an action changes its disabled state. */
+  z.strictObject({ enabled: selectorSchema }),
   /** No such element is laid out. */
   z.strictObject({ gone: selectorSchema }),
   /** The topmost page is this `Screen`. */

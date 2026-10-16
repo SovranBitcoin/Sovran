@@ -11,7 +11,7 @@
     {
       "name": "agree to the Terms",
       "tap": { "id": "terms-acceptance" },
-      "expect": [{ "visible": { "id": "terms-continue" } }]
+      "expect": [{ "enabled": { "id": "terms-continue" } }]
     },
     {
       "name": "continue to Privacy",
@@ -24,7 +24,7 @@
     {
       "name": "acknowledge the Privacy Policy",
       "tap": { "id": "privacy-acknowledgment" },
-      "expect": [{ "visible": { "id": "privacy-confirm" } }]
+      "expect": [{ "enabled": { "id": "privacy-confirm" } }]
     },
     {
       "name": "confirm and leave the legal pages",

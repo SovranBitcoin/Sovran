@@ -97,6 +97,27 @@ test('topPage is the page of the last element laid out', () => {
 });
 
 describe('playStory', () => {
+  test('an enabled expectation rejects a visible disabled control and observes a real state change', async () => {
+    const app = fakeApp(screenOf(box({ id: 'continue', disabled: true })));
+    const check = story([
+      { name: 'continue becomes usable', withinMs: 100, expect: [{ enabled: { id: 'continue' } }] },
+    ]);
+    const unavailable = await playStory(check, app.link, { ...noSwipe, tap: async () => {} });
+    expect(unavailable.ok).toBe(false);
+    expect(unavailable.steps[0].failure).toContain('disabled');
+    const action = story([
+      { name: 'accept terms', tap: { id: 'accept' }, expect: [{ enabled: { id: 'continue' } }] },
+    ]);
+    app.state.screen = screenOf(box({ id: 'accept' }), box({ id: 'continue', disabled: true }));
+    const enabled = await playStory(action, app.link, {
+      ...noSwipe,
+      tap: async () => {
+        app.state.screen = screenOf(box({ id: 'continue' }));
+      },
+    });
+    expect(enabled.ok).toBe(true);
+  });
+
   test('an unavailable control map cannot prove that a control is gone', async () => {
     const app = fakeApp({
       width: 0,
@@ -405,11 +426,21 @@ describe('playStory', () => {
   test('an action with an unchanged screen and missing log still happens only once', async () => {
     const app = fakeApp(screenOf(box({ id: 'publish' })));
     let publications = 0;
-    const pixels = { pixelsStill: async () => ({ movedForMs: 0, stillMoving: false }), changedSince: () => false };
+    const pixels = {
+      pixelsStill: async () => ({ movedForMs: 0, stillMoving: false }),
+      changedSince: () => false,
+    };
     const result = await playStory(
-      story([{ name: 'publish', tap: { id: 'publish' }, expect: [{ visible: { id: 'publish' } }] }]),
+      story([
+        { name: 'publish', tap: { id: 'publish' }, expect: [{ visible: { id: 'publish' } }] },
+      ]),
       app.link,
-      { ...noSwipe, tap: async () => { publications += 1; } },
+      {
+        ...noSwipe,
+        tap: async () => {
+          publications += 1;
+        },
+      },
       pixels
     );
     expect(result.ok).toBe(true);

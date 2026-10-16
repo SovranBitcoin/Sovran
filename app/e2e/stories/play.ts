@@ -133,6 +133,11 @@ const describeSelector = (selector: TapSelector) => JSON.stringify(selector);
 
 /** Null when the expectation holds, otherwise what is wrong. */
 function unmet(expectation: Expectation, screen: AppScreen, entries: AppLogEntry[]): string | null {
+  if ('enabled' in expectation) {
+    const control = find(expectation.enabled, screen);
+    if (!control) return `${describeSelector(expectation.enabled)} is not on screen`;
+    return control.disabled ? `${describeSelector(expectation.enabled)} is disabled` : null;
+  }
   if ('visible' in expectation)
     return find(expectation.visible, screen)
       ? null
