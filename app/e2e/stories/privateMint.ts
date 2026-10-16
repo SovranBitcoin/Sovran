@@ -19,7 +19,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { startLocalMint } from './localMint';
 
-const TLS_DIR = join(dirname(fileURLToPath(import.meta.url)), '../artifacts/stories-tls');
+const TLS_DIR = join(dirname(fileURLToPath(import.meta.url)), '../artifacts/cache/stories-tls');
 /** The certificate a simulator is told to trust. */
 export const AUTHORITY = join(TLS_DIR, 'ca.pem');
 
@@ -45,6 +45,8 @@ function stillGood(name: string): boolean {
  * again when either is missing or within a month of running out.
  */
 export function ensureCertificates(): void {
+  if (existsSync(join(TLS_DIR, '../../stories-tls')))
+    throw new Error('Run bun e2e/results/migrate.ts to preserve existing test certificates.');
   if (stillGood('ca') && stillGood('leaf')) return;
   mkdirSync(TLS_DIR, { recursive: true });
   openssl(

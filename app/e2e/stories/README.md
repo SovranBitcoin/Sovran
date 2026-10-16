@@ -5,9 +5,12 @@ An end-to-end test here is one thing a person does with the app, played on an iP
 
 ```sh
 bun app/e2e/press/native-build.ts ios --bundled   # the test build, once per change to the app
-cd app && bun run e2e:stories --workers 4         # every story; the report is e2e/artifacts/stories/index.html
+cd app && bun run e2e:stories --workers 4         # every story; each invocation preserves a run
 bun run e2e:story e2e/stories/library/<story>.json --udid <simulator> --app e2e/artifacts/native-builds/ios-bundled/Sovran.app --look
 ```
+
+Open the shared history with `bun run e2e:viewer`. [Results ownership](../README.md) explains
+where generated evidence belongs and how to group older output.
 
 A story is a JSON file in `library/`: a purpose, the state it starts from, and steps. A step does one thing (tap,
 swipe, type) and says what must then be true. `states/` holds stories that only set things up; any story's end

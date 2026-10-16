@@ -62,6 +62,7 @@ test('story history includes timing and warnings, excludes setup from totals and
     finishStoryRun(dir);
     const run = await read(dir);
     expect(run?.result).toMatchObject({ passed: 1, failed: 2 });
+    expect(run?.commitRun).toBe(false);
     expect(
       run?.scenarios.find((item) => item.scenarioId === 'setup:worker:base')?.videoFile
     ).toBeUndefined();
@@ -128,10 +129,12 @@ test('a watcher failure remains visible even when every step passed', () => {
       version: 1,
       kind: 'stories',
       suite: 'library',
+      git: { sha: 'abc', shortSha: 'abc', branch: 'test', dirty: false },
       selection: ['story'],
       state: { status: 'complete', endedAt: '2026-10-16T00:00:00Z' },
     });
     expect(run?.scenarios[0]?.failure).toBe('screen watcher died');
+    expect(run?.commitRun).toBe(false);
     expect(run?.result?.failed).toBe(1);
   } finally {
     rmSync(root, { recursive: true, force: true });

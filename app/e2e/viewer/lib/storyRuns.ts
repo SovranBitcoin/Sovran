@@ -168,7 +168,9 @@ export function recordedRun(
     startedAt: manifest.startedAt ?? '',
     scenarioIds: selected,
     git: manifest.git,
-    commitRun: !!manifest.git && !manifest.git.dirty,
+    // Repository metadata identifies the runner, not the installed native build.
+    // Stories do not yet attest source and binary identity as the legacy CLI does.
+    commitRun: false,
     label:
       manifest.label ??
       (manifest.startedAt

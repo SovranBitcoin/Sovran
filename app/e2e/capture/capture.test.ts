@@ -310,6 +310,8 @@ describe('verified capture import', () => {
     'failed',
     'missing-readiness',
     'wrong-source',
+    'manual-review',
+    'stories',
     'fake',
     'wrong-page',
     'missing-step',
@@ -328,6 +330,8 @@ describe('verified capture import', () => {
         )!.stepId = 'T999';
       }
       if (failure === 'wrong-source') e.manifest.sourceFingerprint = 'e'.repeat(64);
+      if (failure === 'manual-review' || failure === 'stories')
+        Object.assign(e.manifest, { kind: failure });
       if (failure === 'fake') e.manifest.driver = 'fake';
       if (failure === 'wrong-page')
         e.events.find((v) => v.type === 'artifact')!.path = '../private.png';
