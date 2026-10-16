@@ -11,6 +11,9 @@ Run `bun run harness request.json`, or pipe a request to `bun run harness -`.
 `bun run harness mcp` serves the same operations over stdio using the official MCP SDK.
 The controller never merges or deploys.
 
+The [reliability research and proposed model policy](../docs/research/full-send-reliability.md)
+define the next improvements. They distinguish approved choices from gates implemented here.
+
 Use the repository's `full-send` skill from an existing T3 conversation. It performs the
 initial multiple-choice intake and drives the JSON controller with T3-owned child tasks.
 That works through the host when the conversation is viewed on an iPhone; no mobile build
