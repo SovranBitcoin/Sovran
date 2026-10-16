@@ -106,7 +106,7 @@ function stageVideo(): HTMLVideoElement | null {
   return document.querySelector<HTMLVideoElement>('#stage-video');
 }
 
-function videoIsActive(timeline: ScenarioTimeline | undefined): boolean {
+export function videoIsActive(timeline: ScenarioTimeline | undefined): boolean {
   return !!(state.videoMode && timeline?.videoFile);
 }
 
@@ -597,9 +597,9 @@ function attachVideo(
         });
       }
     }
-    // open on the step the reel was showing when the mode flipped
+    // Keep launch footage visible on first open; preserve later selected steps.
     const start = frameTimes[state.frameIndex];
-    if (start !== undefined && start > 0.05) video.currentTime = start;
+    if (state.frameIndex > 0 && start !== undefined && start > 0.05) video.currentTime = start;
     syncTime();
   });
   video.addEventListener('timeupdate', syncTime);

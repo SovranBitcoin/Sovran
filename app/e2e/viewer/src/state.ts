@@ -40,7 +40,7 @@ export interface AppState {
    * <video> element owns play state and this stays false. */
   playing: boolean;
   showAllPhases: boolean;
-  /** Play the scenario's test+verify screen recording instead of the frame reel. */
+  /** Preferred media view; recordings fall back to images when unavailable. */
   videoMode: boolean;
   /** Active tab of the side panel: the step list, or the per-frame app-state
    * view (zustand snapshot + coco db dump). */
@@ -102,7 +102,7 @@ export const state: AppState = {
   frameIndex: 0,
   playing: false,
   showAllPhases: false,
-  videoMode: false,
+  videoMode: true,
   sideTab: 'steps',
   diff: { view: 'side-by-side', pairIndex: 0 },
   pages: { allRuns: false },

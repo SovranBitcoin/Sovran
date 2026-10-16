@@ -12,7 +12,8 @@ evidence or live queued attempts; unrun authoring definitions stay available to 
 without creating empty result pages. Both runners leave independent
 `artifacts/run-<id>/` folders. A story run separates workers, selected stories and setup evidence;
 setup remains inspectable without counting as another passing story. Each report owns its
-step pictures, video, timings and warnings. Crashed attempts remain failures even when no
+step pictures, video, timings and warnings. Recordings open paused by default; the Screenshots
+tab shows the step pictures. Evidence without a recording opens on its images. Crashed attempts remain failures even when no
 report was written.
 
 The viewer reads each format through an adapter; it does not rewrite old events or infer
