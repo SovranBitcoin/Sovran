@@ -39,6 +39,7 @@ import { dirname, join } from 'node:path';
 import { ROOT, type Platform } from './plan';
 import type { NativeBuildSummary } from './promote';
 import { resolveAndroidSdkRoot } from '../drivers/android/adb';
+import { captureGitInfo, captureSourceFingerprint } from '../core/git';
 
 const APP_DIR = join(ROOT, 'app');
 const NATIVE_BUILDS = join(APP_DIR, 'e2e/artifacts/native-builds');
@@ -59,6 +60,8 @@ export type NativeBuildStamp = NativeBuildSummary & {
   bundleId: string;
   artifact: string;
   toolchain: string;
+  /** Absent on older caches, which cannot certify a bundled rebuild. */
+  sourceFingerprint?: string;
 };
 
 export type RebuildPolicy = 'auto' | 'force' | 'never';
@@ -178,6 +181,26 @@ export function nativeEnv(stamp: NativeBuildStamp): Record<string, string> {
 }
 
 const git = (args: string[]) => execFileSync('git', args, { cwd: ROOT, encoding: 'utf8' }).trim();
+
+/** Build outputs cannot be attributed to a commit observed only after compilation. */
+export async function withStableBuildSource<T extends object>(
+  root: string,
+  build: () => Promise<T>
+): Promise<T & { sourceFingerprint: string }> {
+  const before = captureGitInfo(root);
+  const source = captureSourceFingerprint(root);
+  if (!before || !source) throw new Error('Build source identity unavailable');
+  const result = await build();
+  const after = captureGitInfo(root);
+  if (
+    !after ||
+    before.sha !== after.sha ||
+    before.dirty !== after.dirty ||
+    source !== captureSourceFingerprint(root)
+  )
+    throw new Error('Source changed during the build; refusing to stamp it');
+  return { ...result, sourceFingerprint: source };
+}
 
 /** Run a long build step, streaming its full output to a log file. */
 function step(
@@ -375,7 +398,14 @@ async function buildAndroid(fingerprint: string, kind: BuildKind): Promise<Nativ
     env,
     log
   );
-  const tasks = [...(kind === 'bundled' ? ['-PsovranBundledE2e=true'] : []), task];
+  // Gradle's app-local JS inputs omit sibling workspace code and some assets.
+  // Once this owner requires a rebuild, Metro must traverse its actual graph.
+  const tasks = [
+    ...(kind === 'bundled'
+      ? ['-PsovranBundledE2e=true', ':app:createBundleReleaseJsAndAssets', '--rerun']
+      : []),
+    task,
+  ];
   await step(`gradle ${task}`, './gradlew', tasks, join(APP_DIR, 'android'), env, log);
   const built = join(
     APP_DIR,
@@ -404,11 +434,18 @@ async function buildAndroid(fingerprint: string, kind: BuildKind): Promise<Nativ
 /** The JavaScript inside a bundled build is the tree it was built from, so it
  *  stands only for a clean tree at that same commit. */
 export function bundledJavaScriptIsCurrent(
-  stamp: Pick<NativeBuildStamp, 'gitSha' | 'gitDirty'>,
+  stamp: Pick<NativeBuildStamp, 'gitSha' | 'gitDirty' | 'sourceFingerprint'>,
   head = git(['rev-parse', 'HEAD']),
-  dirty = git(['status', '--porcelain']).length > 0
+  dirty = git(['status', '--porcelain']).length > 0,
+  source = captureSourceFingerprint(ROOT)
 ): boolean {
-  return !stamp.gitDirty && !dirty && stamp.gitSha === head;
+  return (
+    !stamp.gitDirty &&
+    !dirty &&
+    stamp.gitSha === head &&
+    source !== undefined &&
+    stamp.sourceFingerprint === source
+  );
 }
 
 /**
@@ -428,68 +465,70 @@ async function refreshBundledJavaScript(
   stamp: NativeBuildStamp,
   other?: { out: string; edition: string }
 ): Promise<NativeBuildStamp> {
-  const out = other?.out ?? buildDir('ios', 'bundled');
-  const log = join(out, 'build.log');
-  const plain = join(out, 'main.js');
-  // Metro's cache does not know which edition a file was transformed for: the
-  // default edition's cached copy would be used again. Another edition keeps its own.
-  const cache = other ? join(out, 'metro-cache') : undefined;
-  if (cache) mkdirSync(cache, { recursive: true });
-  const env = {
-    ...nativeBuildEnvironment('bundled'),
-    ...(other ? { EXPO_PUBLIC_SOVRAN_EDITION: other.edition, TMPDIR: cache } : {}),
-  };
-  try {
+  return withStableBuildSource(ROOT, async () => {
+    const out = other?.out ?? buildDir('ios', 'bundled');
+    const log = join(out, 'build.log');
+    const plain = join(out, 'main.js');
+    // Metro's cache does not know which edition a file was transformed for: the
+    // default edition's cached copy would be used again. Another edition keeps its own.
+    const cache = other ? join(out, 'metro-cache') : undefined;
+    if (cache) mkdirSync(cache, { recursive: true });
+    const env = {
+      ...nativeBuildEnvironment('bundled'),
+      ...(other ? { EXPO_PUBLIC_SOVRAN_EDITION: other.edition, TMPDIR: cache } : {}),
+    };
+    try {
+      await step(
+        'expo export:embed (ios)',
+        'node',
+        [
+          require.resolve('expo/bin/cli'),
+          'export:embed',
+          '--entry-file',
+          join(APP_DIR, 'index.js'),
+          '--platform',
+          'ios',
+          '--dev',
+          'false',
+          '--minify',
+          'false',
+          '--bundle-output',
+          plain,
+          '--assets-dest',
+          stamp.artifact,
+        ],
+        APP_DIR,
+        env,
+        log
+      );
+      await step(
+        'hermesc',
+        hermesCompiler(),
+        ['-emit-binary', '-O', '-out', join(stamp.artifact, 'main.jsbundle'), plain],
+        APP_DIR,
+        env,
+        log
+      );
+    } finally {
+      rmSync(plain, { force: true });
+      if (cache) rmSync(cache, { recursive: true, force: true });
+    }
     await step(
-      'expo export:embed (ios)',
-      'node',
-      [
-        require.resolve('expo/bin/cli'),
-        'export:embed',
-        '--entry-file',
-        join(APP_DIR, 'index.js'),
-        '--platform',
-        'ios',
-        '--dev',
-        'false',
-        '--minify',
-        'false',
-        '--bundle-output',
-        plain,
-        '--assets-dest',
-        stamp.artifact,
-      ],
+      'codesign',
+      'codesign',
+      ['--force', '--sign', '-', '--preserve-metadata=entitlements', stamp.artifact],
       APP_DIR,
       env,
       log
     );
-    await step(
-      'hermesc',
-      hermesCompiler(),
-      ['-emit-binary', '-O', '-out', join(stamp.artifact, 'main.jsbundle'), plain],
-      APP_DIR,
-      env,
-      log
-    );
-  } finally {
-    rmSync(plain, { force: true });
-    if (cache) rmSync(cache, { recursive: true, force: true });
-  }
-  await step(
-    'codesign',
-    'codesign',
-    ['--force', '--sign', '-', '--preserve-metadata=entitlements', stamp.artifact],
-    APP_DIR,
-    env,
-    log
-  );
-  return {
-    ...stamp,
-    gitSha: git(['rev-parse', 'HEAD']),
-    gitDirty: git(['status', '--porcelain']).length > 0,
-    builtAt: new Date().toISOString(),
-    artifactSha256: nativeArtifactHash(stamp.artifact),
-  };
+    return {
+      ...stamp,
+      gitSha: git(['rev-parse', 'HEAD']),
+      gitDirty: git(['status', '--porcelain']).length > 0,
+      builtAt: new Date().toISOString(),
+      artifactSha256: nativeArtifactHash(stamp.artifact),
+    };
+  });
 }
 
 /**
@@ -543,8 +582,9 @@ export async function ensureNativeBuild(
   console.log(
     `${platform}: ${stamp ? 'native inputs changed' : 'no stamped native build'}; building locally (this takes a while)`
   );
-  const built =
-    platform === 'ios' ? await buildIos(fingerprint, kind) : await buildAndroid(fingerprint, kind);
+  const built = await withStableBuildSource(ROOT, () =>
+    platform === 'ios' ? buildIos(fingerprint, kind) : buildAndroid(fingerprint, kind)
+  );
   // Source must not change under the build, or the stamp would lie.
   if ((await nativeFingerprint(platform, kind)) !== fingerprint)
     throw new Error(`${platform}: native inputs changed during the build; rerun once edits settle`);

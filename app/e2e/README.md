@@ -27,7 +27,9 @@ story runner, since the viewer's Run action operates the earlier scenario harnes
 
 The [native build owner](press/native-build.ts) keeps development clients separate from
 bundled story builds. Bundled builds exclude inherited fixture and timing controls; they
-carry their JavaScript and retain structured logging. Android needs an explicit test-only
+carry their JavaScript and retain structured logging. The source must stay unchanged during
+compilation, including sibling workspace code; old caches without that evidence are rebuilt.
+Android needs an explicit test-only
 Gradle option to connect to its host over loopback. Ordinary Release builds must ignore
 that network exception even after a test build, and their JavaScript cache must observe
 changes in logging mode. The [Expo plugin](../plugins/withAndroidE2ERunner.js) owns that
