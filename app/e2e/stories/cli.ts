@@ -137,8 +137,13 @@ const play = async (
   const link = startAppLink(expected);
   let recording: Awaited<ReturnType<typeof recordSimulator>> | undefined;
   let frames: ReturnType<typeof simulator.watchScreen> | undefined;
-  let report:
-    (ReturnType<typeof storyReportSchema.parse> & { screenWatcherRestarts?: number }) | undefined;
+  let report: ReturnType<typeof storyReportSchema.parse> & { screenWatcherRestarts?: number } = {
+    id: story.id,
+    purpose: story.purpose,
+    startsFrom: story.startsFrom,
+    ok: false,
+    steps: [],
+  };
   const failures: { operation: string; error: unknown }[] = [];
   try {
     const executedStory = JSON.stringify(story, null, 2);
@@ -179,7 +184,9 @@ const play = async (
       screen,
       async (index, step) => {
         const file = `${pictureName(index, step.name)}.jpg`;
+        report.steps[index] = { ...step };
         if (await watching.picture(join(outDir, file))) pictures[index] = file;
+        report.steps[index].picture = pictures[index];
         writeFileSync(
           join(outDir, `${pictureName(index, step.name)}.screen.json`),
           JSON.stringify(await link.screen())
@@ -309,13 +316,6 @@ const play = async (
           `${operation}: ${error instanceof Error ? error.message : String(error)}`
       )
       .join('\n');
-    report ??= {
-      id: story.id,
-      purpose: story.purpose,
-      startsFrom: story.startsFrom,
-      ok: false,
-      steps: [],
-    };
     if (failure)
       report = {
         ...report,

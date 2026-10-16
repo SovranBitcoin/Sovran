@@ -24,32 +24,124 @@ interface Recording {
  * frame has been captured, which is when `simctl` says "Recording started".
  * Nothing is timed from this file: on a busy Mac it is written seconds late.
  */
-export function recordSimulator(udid: string, file: string): Promise<Recording> {
-  return new Promise((resolve, reject) => {
-    const child = spawn(
-      SIMCTL[0],
-      [...SIMCTL.slice(1), 'io', udid, 'recordVideo', '--codec', 'h264', '--force', file],
-      { stdio: ['ignore', 'ignore', 'pipe'] }
-    );
-    const exited = new Promise<void>((done) => child.once('exit', () => done()));
-    let said = '';
-    const failed = setTimeout(() => {
-      child.kill('SIGKILL');
-      reject(new Error(`The simulator did not start recording: ${said.trim() || 'no output'}`));
-    }, 10_000);
-    child.once('error', reject);
-    child.stderr.on('data', (chunk: Buffer) => {
-      said += chunk.toString();
-      if (!said.includes('Recording started')) return;
-      clearTimeout(failed);
-      resolve({
-        stop: async () => {
-          child.kill('SIGINT');
-          await exited;
-        },
-      });
+const spawnRecorder = (command: string, args: string[]) =>
+  spawn(command, args, { stdio: ['ignore', 'ignore', 'pipe'] });
+
+export async function recordSimulator(
+  udid: string,
+  file: string,
+  io: { launch?: typeof spawnRecorder; startupMs?: number; stopMs?: number } = {}
+): Promise<Recording> {
+  const child = (io.launch ?? spawnRecorder)(SIMCTL[0], [
+    ...SIMCTL.slice(1),
+    'io',
+    udid,
+    'recordVideo',
+    '--codec',
+    'h264',
+    '--force',
+    file,
+  ]);
+  type End = { code: number | null; signal: NodeJS.Signals | null } | { error: Error };
+  let ended: End | undefined;
+  const exited = new Promise<End>((resolve) => {
+    const finish = (result: End) => {
+      ended = result;
+      resolve(result);
+    };
+    child.once('exit', (code, signal) => finish({ code, signal }));
+    child.once('error', (error) => {
+      // A failed signal is not termination. Only a spawn with no PID has nothing to reap.
+      if (child.pid === undefined) finish({ error });
     });
   });
+  let processError: Error | undefined;
+  const failed = new Promise<never>((_, reject) =>
+    child.on('error', (error) => {
+      processError ??= error;
+      reject(error);
+    })
+  );
+  const describe = (end: End) =>
+    'error' in end ? end.error.message : `code ${end.code}, signal ${end.signal}`;
+  let said = '';
+  const ready = new Promise<void>((resolve) =>
+    child.stderr.on('data', (chunk: Buffer) => {
+      said = (said + chunk.toString()).slice(-4000);
+      if (said.includes('Recording started')) resolve();
+    })
+  );
+  const bounded = async <T>(work: Promise<T>, ms: number, message: string): Promise<T> => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      return await Promise.race([
+        work,
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(
+            () => reject(new Error(`${message}: ${said.trim() || 'no output'}`)),
+            ms
+          );
+        }),
+      ]);
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+  const reap = async () => {
+    if (!ended) child.kill('SIGKILL');
+    await bounded(exited, 5000, 'Recorder did not exit after forced cleanup');
+    child.stderr.destroy();
+  };
+  const cleanFailure = async (error: unknown): Promise<never> => {
+    try {
+      await reap();
+    } catch (cleanup) {
+      throw new AggregateError(
+        [error, cleanup],
+        `Recorder failed: ${String(error)}; cleanup failed: ${String(cleanup)}`
+      );
+    }
+    throw error;
+  };
+  try {
+    await bounded(
+      Promise.race([
+        ready,
+        failed,
+        exited.then((end) => {
+          throw new Error(`Recorder exited before readiness: ${describe(end)}`);
+        }),
+      ]),
+      io.startupMs ?? 10000,
+      'The simulator did not start recording'
+    );
+  } catch (error) {
+    return cleanFailure(new Error(`Recorder failed before readiness: ${String(error)}`));
+  }
+  let stopping: Promise<void> | undefined;
+  return {
+    stop() {
+      stopping ??= (async () => {
+        try {
+          // Even exit(0) before this request leaves a gap in the story's video.
+          if (processError) throw processError;
+          if (ended) throw new Error(`Recorder exited before stop: ${describe(ended)}`);
+          if (!child.kill('SIGINT')) throw new Error('Recorder was gone before stop');
+          const end = await bounded(
+            Promise.race([exited, failed]),
+            io.stopMs ?? 10000,
+            'Recorder did not stop gracefully'
+          );
+          if ('error' in end || end.code !== 0 || end.signal !== null)
+            throw new Error(`Recorder did not finalize successfully: ${describe(end)}`);
+          child.stderr.destroy();
+        } catch (error) {
+          return cleanFailure(error);
+        }
+      })();
+      return stopping;
+    },
+  };
 }
 
 /** The picture must not have changed for this long for the screen to count as still. */
