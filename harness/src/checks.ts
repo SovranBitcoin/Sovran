@@ -7,7 +7,7 @@ const base = { id: text, cwd: text.default('.'), timeoutMs: z.number().int().pos
 export const requiredCase = z.object({ file: text, names: z.array(text).min(1) });
 const inputPath = text.refine(p => !isAbsolute(p) && !p.includes('\\') && p.split('/').every(part => part && !['.', '..', '.git'].includes(part)), 'Use explicit repository test input paths');
 export const regression = z.object({ testInputs: z.array(inputPath).min(1), cases: z.array(requiredCase).min(1) });
-export const nodeCheck = z.object({ ...base, cwd: z.literal('.').default('.'), kind: z.literal('node-tests'), files: z.array(text).min(1), requiredCases: z.array(requiredCase).min(1), regression: regression.optional() }).strict().superRefine((c, ctx) => {
+const nodeCheck = z.object({ ...base, cwd: z.literal('.').default('.'), kind: z.literal('node-tests'), files: z.array(text).min(1), requiredCases: z.array(requiredCase).min(1), regression: regression.optional() }).strict().superRefine((c, ctx) => {
   if (new Set(c.files).size !== c.files.length || c.requiredCases.some(r => !c.files.includes(r.file)) ||
       new Set(c.requiredCases.map(r => JSON.stringify(r))).size !== c.requiredCases.length)
     ctx.addIssue({ code: 'custom', message: 'Test selection requires unique files and unique cases in those files' });
@@ -18,7 +18,7 @@ export const nodeCheck = z.object({ ...base, cwd: z.literal('.').default('.'), k
     ctx.addIssue({ code: 'custom', message: 'Regression inputs must include the selected files and unique cases from requiredCases' });
 });
 export const command = z.union([nodeCheck, z.object({ ...base, argv: z.array(text).min(1) }).strict()]);
-export type NodeCheck = z.infer<typeof nodeCheck>;
+type NodeCheck = z.infer<typeof nodeCheck>;
 
 const failure = z.object({ code: z.string().optional(), failureType: z.string().optional(),
   cause: z.union([z.string(), z.object({ name: z.string().optional(), code: z.string().optional() }).passthrough()]).optional(),

@@ -43,8 +43,8 @@ export const models = z.union([routedModels, legacyModels]).superRefine((policy,
     }
   }
 });
-export type Models = z.infer<typeof models>;
-export type Role = z.infer<typeof role>;
+type Models = z.infer<typeof models>;
+type Role = z.infer<typeof role>;
 export type Model = z.infer<typeof model>;
 
 // A parsed T3 task result is coordinator evidence, not a worker's self-description.
