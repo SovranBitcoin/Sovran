@@ -73,9 +73,12 @@ function runPlatformChip(run: CatalogRunRef): string {
  * Collapse state lives in state.collapsedFlows and survives reloads; a
  * collapsed group keeps failures visible via a red count on its header. */
 export function renderRunList(root: HTMLElement): void {
-  const parts: string[] = ['<div class="panel-title">Scenarios</div>'];
+  const parts: string[] = ['<div class="panel-title">Results</div>'];
+  // Authoring definitions still serve run planning; browsing needs actual evidence
+  // (or a live queued attempt), not an empty page for every authored scenario.
+  const recorded = state.catalog.filter((entry) => latestRun(entry) !== undefined);
   const byFlow = (flow: string | undefined) =>
-    state.catalog.filter((entry) => entry.facets?.flow === flow);
+    recorded.filter((entry) => entry.facets?.flow === flow);
   const grouped: [string, ScenarioCatalogEntry[]][] = [
     ...FACETS.flow.map((flow): [string, ScenarioCatalogEntry[]] => [flow, byFlow(flow)]),
     ['untagged', byFlow(undefined)],
@@ -96,12 +99,10 @@ export function renderRunList(root: HTMLElement): void {
       parts.push('<div class="tree-children">', ...entries.map(renderScenarioRows), '</div>');
     }
   }
-  if (state.catalog.length === 0) {
-    parts.push('<div class="scenario-row">no scenarios found</div>');
-  } else if (
-    !state.catalog.some((entry) => entry.runs.some((run) => run.proof !== 'orchestration-smoke'))
-  ) {
-    parts.push('<div class="scenario-row">no runs yet — trigger one above</div>');
+  if (recorded.length === 0) {
+    parts.push(
+      '<div class="scenario-row">No recorded results yet — run a story or suite to begin.</div>'
+    );
   }
   root.innerHTML = parts.join('');
   bindRows(root);
@@ -121,7 +122,7 @@ export function renderRunList(root: HTMLElement): void {
       .filter(Boolean)
       .join('\n');
     rows.push(
-      `<div class="run-row${selected ? ' selected' : ''}${runs.length === 0 ? ' smoke' : ''}" data-scenario="${escapeHtml(entry.id)}" title="${escapeHtml(tooltip)}">` +
+      `<div class="run-row${selected ? ' selected' : ''}" data-scenario="${escapeHtml(entry.id)}" title="${escapeHtml(tooltip)}">` +
         `${latest ? (latest.proof === 'manual-review' ? '<span class="glyph-pending">◈</span>' : okGlyph(latest.ok, latest.status, latest.scenarioStatus)) : ''}<span class="title">${escapeHtml(entry.name)}</span>` +
         platformChips(entry.platforms) +
         `<span class="badge">${runs.length || ''}</span>` +
@@ -136,7 +137,6 @@ export function renderRunList(root: HTMLElement): void {
             `${run.proof === 'manual-review' ? '<span class="glyph-pending">◈</span>' : okGlyph(run.ok, run.status, run.scenarioStatus)}<span class="${run.commitRun ? 'commit' : ''}">${escapeHtml(run.label)}${run.proof === 'manual-review' ? ' · Manual review' : ''}</span>${runPlatformChip(run)}</div>`
         );
       }
-      if (runs.length === 0) rows.push('<div class="scenario-row">no runs yet</div>');
       rows.push('</div>');
     }
     return rows.join('');

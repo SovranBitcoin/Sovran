@@ -7,7 +7,9 @@ Source belongs beside the runner that owns it; generated evidence belongs in the
 
 ## One history
 
-Run `bun run e2e:viewer` from `app/` to browse recorded results. Both runners leave independent
+Run `bun run e2e:viewer` from `app/` to browse recorded results. Navigation shows tests with
+evidence or live queued attempts; unrun authoring definitions stay available to the runners
+without creating empty result pages. Both runners leave independent
 `artifacts/run-<id>/` folders. A story run separates workers, selected stories and setup evidence;
 setup remains inspectable without counting as another passing story. Each report owns its
 step pictures, video, timings and warnings. Crashed attempts remain failures even when no

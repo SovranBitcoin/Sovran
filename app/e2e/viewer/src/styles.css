@@ -318,17 +318,6 @@ input:focus-visible,
   color: var(--foreground);
 }
 
-/* run-less scenarios stay clickable — dimmed at rest, full strength on
- * hover/selection */
-.run-row.smoke {
-  opacity: 0.55;
-}
-
-.run-row.smoke:hover,
-.run-row.smoke.selected {
-  opacity: 1;
-}
-
 .glyph-pass {
   color: var(--success);
 }
