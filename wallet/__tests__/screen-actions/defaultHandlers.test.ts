@@ -1067,14 +1067,52 @@ describe("mintSelector default handlers", () => {
   });
 
   describe("getInfo", () => {
-    it("calls buildMintReviewInfo and navigates to mintInfo", async () => {
-      const { handlers, ops, navigation } = createMockConfig();
+    it("mintSelector.getInfo navigates before mint info resolves", async () => {
+      // Mint info that never arrives on its own: the page must still open.
+      let release: () => void = () => {};
+      const pending = new Promise((resolve) => {
+        release = () => resolve({ mintUrl: MINT1 });
+      });
+      const { handlers, navigation } = createMockConfig({
+        operations: {
+          buildMintReviewInfo: vi.fn(
+            () => pending,
+          ) as unknown as MachineOperations["buildMintReviewInfo"],
+        },
+      });
       const { mgr } = createManager("mintSelector", handlers, {});
+      const item = {
+        mintUrl: MINT1,
+        displayName: "Mint One",
+        iconUrl: "https://mint1.example/icon.png",
+        kymScore: 4.2,
+        reviewCount: 7,
+        auditScore: 4.9,
+      };
 
-      await mgr.execute("getInfo", { mintUrl: MINT1 });
-
-      expect(ops.buildMintReviewInfo).toHaveBeenCalledWith(MINT1, undefined);
-      expect(navigation.mintInfo).toHaveBeenCalled();
+      // Not awaited: on a handler that waits for the info this would hang.
+      const run = mgr.execute("getInfo", { mintUrl: MINT1, item });
+      try {
+        await vi.waitFor(
+          () => expect(navigation.mintInfo).toHaveBeenCalled(),
+          { timeout: 500 },
+        );
+        const parsed = JSON.parse(
+          (navigation.mintInfo as MockFn).mock.calls[0][0],
+        );
+        // Seed keys only, so the page's own NUT-06 read still runs.
+        expect(parsed).toEqual({
+          mintUrl: MINT1,
+          seedDisplayName: "Mint One",
+          seedIconUrl: "https://mint1.example/icon.png",
+          seedKymScore: 4.2,
+          seedReviewCount: 7,
+        });
+      } finally {
+        // Resolve, not reject: a rejected promise nobody awaits fails the run.
+        release();
+        await run;
+      }
     });
 
     it("navigates with bare mintUrl when buildMintReviewInfo is unavailable", async () => {
