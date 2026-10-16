@@ -315,7 +315,7 @@ async function playStep(
         : outside
           ? [outside.x + outside.width * across, outside.y + outside.height * down]
           : [0, 0];
-      await device.tap(...at);
+      for (let tap = 0; tap < (step.taps ?? 1); tap++) await device.tap(...at);
       // Missing feedback cannot establish that an effect did not happen.
       // Observe the expected state below; never repeat the action to obtain it.
     }

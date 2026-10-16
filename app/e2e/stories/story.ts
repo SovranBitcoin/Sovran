@@ -38,6 +38,12 @@ const stepSchema = z
      */
     tap: z.union([selectorSchema, z.strictObject({ labelEnds: z.string().min(1) })]).optional(),
     /**
+     * Tap that many times in quick succession, as a person presses a hidden
+     * control: three presses of the app version within its window. One action;
+     * nothing waits between the taps.
+     */
+    taps: z.number().int().min(2).max(5).optional(),
+    /**
      * Keep something read off the screen once the step is satisfied, for a later
      * step to use: the label of an element, or what follows `after` in it.
      */
@@ -129,7 +135,8 @@ const stepSchema = z
   .refine(
     (step) => !step.tapAt || step.tap,
     '`tapAt` says where in the tapped element; it needs `tap`.'
-  );
+  )
+  .refine((step) => !step.taps || step.tap, '`taps` says how many times to tap; it needs `tap`.');
 export type Step = z.infer<typeof stepSchema>;
 
 export const storySchema = z.strictObject({

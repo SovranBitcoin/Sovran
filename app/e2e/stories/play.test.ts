@@ -665,3 +665,38 @@ describe('playStory', () => {
     expect(result.steps.map((step) => [step.name, step.ok])).toEqual([['first', false]]);
   });
 });
+
+test('a step with taps presses its element that many times, back to back, as one action', async () => {
+  const app = fakeApp(screenOf(box({ id: 'version' })));
+  const story = storySchema.parse({
+    id: 'reveal',
+    purpose: 'Press the version three times.',
+    startsFrom: 'fresh',
+    steps: [{ name: 'press three times', tap: { id: 'version' }, taps: 3, expect: [{ logged: 'dev' }] }],
+  });
+  let presses = 0;
+  const result = await playStory(story, app.link, {
+    ...noSwipe,
+    tap: async (x, y) => {
+      app.state.taps.push([x, y]);
+      if (++presses === 3) app.log('dev');
+    },
+  });
+  expect(result.ok).toBe(true);
+  expect(app.state.taps).toEqual([
+    [0.125, 0.03125],
+    [0.125, 0.03125],
+    [0.125, 0.03125],
+  ]);
+});
+
+test('taps needs a tap', () => {
+  expect(() =>
+    storySchema.parse({
+      id: 'reveal',
+      purpose: 'Press.',
+      startsFrom: 'fresh',
+      steps: [{ name: 'no target', taps: 3, expect: [{ logged: 'dev' }] }],
+    })
+  ).toThrow('it needs `tap`');
+});

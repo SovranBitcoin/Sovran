@@ -214,40 +214,16 @@
       ]
     },
     {
-      "name": "press the version, once",
+      "name": "press the version three times",
       "tap": {
         "id": "settings-version-row"
       },
+      "taps": 3,
       "expect": [
         {
-          "visible": {
-            "id": "settings-terms-row"
-          }
-        }
-      ]
-    },
-    {
-      "name": "press the version, twice",
-      "tap": {
-        "id": "settings-version-row"
-      },
-      "expect": [
-        {
-          "visible": {
-            "id": "settings-terms-row"
-          }
-        }
-      ]
-    },
-    {
-      "name": "press the version, three times",
-      "tap": {
-        "id": "settings-version-row"
-      },
-      "expect": [
-        {
-          "visible": {
-            "id": "settings-terms-row"
+          "logged": "settings.dev_mode.toggle",
+          "with": {
+            "enabled": true
           }
         }
       ]
