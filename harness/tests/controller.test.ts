@@ -249,11 +249,13 @@ test('role context keeps the original instructions after implementation edits th
 });
 
 test('a green generic command cannot certify functional UI or performance', async () => {
-  const { controller: c, root, spec } = fixture();
-  spec.risks = ['ui', 'performance'];
-  let t = finish(c, c.create(root, spec)); t = c.seal(t.id, t.policy); t = finish(c, t);
-  t = await c.verify(t.id);
-  expect(t.phase).toBe('incomplete'); expect(t.reason).toContain('installed binary');
+  for (const [risk, reason] of [['ui', 'native-stories check'], ['performance', 'sealed metrics']] as const) {
+    const { controller: c, root, spec } = fixture();
+    spec.risks = [risk];
+    let t = finish(c, c.create(root, spec)); t = c.seal(t.id, t.policy); t = finish(c, t);
+    t = await c.verify(t.id);
+    expect(t.phase).toBe('incomplete'); expect(t.reason).toContain(reason);
+  }
 });
 
 test('resolver overrides cannot change outside dependency authorization', () => {

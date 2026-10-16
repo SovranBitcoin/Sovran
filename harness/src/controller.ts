@@ -3,7 +3,8 @@ import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, realpathSync
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { z } from 'zod';
 import { Journal } from './journal';
-import { inspectNodeTests, regression, validateVerification } from './checks';
+import { inspectNodeTests, isNativeCheck, isNodeCheck, regression, validateVerification } from './checks';
+import { inspectNativeStories, nativeRunnerChanges } from './native';
 import { runCommand } from './command';
 import { inspectChange } from './policy';
 import { inspectUpgradeEvidence, upgradeInventorySchema } from './upgrade';
@@ -154,7 +155,7 @@ export class Controller {
         throw new Error('A blocking finding cannot pass');
       const oracleRequirements = new Set<string>();
       for (const review of result.oracleReviews ?? []) {
-        if (oracleRequirements.has(review.requirement) || !t.contract.verificationPolicy?.requirements.some(r => r.kind === 'node' && r.requirement === review.requirement))
+        if (oracleRequirements.has(review.requirement) || !t.contract.verificationPolicy?.requirements.some(r => (r.kind === 'node' || r.kind === 'native') && r.requirement === review.requirement))
           throw new Error('Oracle reviews must identify unique sealed test requirements');
         oracleRequirements.add(review.requirement);
         if (result.verdict === 'pass' && review.verdict !== 'valid') throw new Error('A negative or unproven test-oracle judgment cannot pass');
@@ -181,6 +182,14 @@ export class Controller {
             const receipt = t.receipts.find(r => r.id === id && r.source === t.source && r.outcome === 'pass');
             return !receipt?.artifacts.some(a => a.path.endsWith('-node-inspection.json') && review.evidence.includes(`artifact:${a.path}`));
           })) throw new Error('Oracle review must cite test source and current candidate/baseline case results');
+        }
+        for (const rule of t.contract.verificationPolicy.requirements.filter(r => r.kind === 'native')) {
+          const reviews = result.oracleReviews?.filter(r => r.requirement === rule.requirement) ?? [];
+          if (reviews.length !== 1 || reviews[0]?.verdict !== 'valid') throw new Error(`Independent story-oracle judgment is missing or negative: ${rule.requirement}`);
+          const receipt = t.receipts.find(r => r.id === rule.check && r.source === t.source && r.outcome === 'pass');
+          if (rule.stories.some(story => !reviews[0]?.evidence.includes(story)) ||
+            !receipt?.artifacts.some(a => a.path.endsWith('-native-inspection.json') && reviews[0]?.evidence.includes(`artifact:${a.path}`)))
+            throw new Error('Story-oracle review must cite each sealed story and the current native inspection');
         }
       }
       for (const review of result.oracleReviews ?? []) for (const ref of review.evidence) this.inspectReference(t, ref);
@@ -449,7 +458,7 @@ export class Controller {
       { id: 'harness:upgrade-inventory', argv: ['bun', join(import.meta.dir, 'discover-upgrade.ts'), t.root], cwd: '.', timeoutMs: 60_000 },
       { id: 'harness:upgrade', argv: ['bun', 'run', 'test:upgrade', '--json', `--outputFile=${upgradePath}`], cwd: 'app', timeoutMs: 600_000 },
     ] : [])];
-    const commands = selectedCommands.flatMap(check => 'kind' in check && check.regression
+    const commands = selectedCommands.flatMap(check => isNodeCheck(check) && check.regression
       ? [{ ...check, id: `harness:baseline:${check.id}`, baseline: check.regression }, check] : [check]);
     for (const check of commands) {
       if (t.receipts.some(r => r.id === check.id && r.source === t.source && r.outcome === 'pass')) continue;
@@ -457,12 +466,14 @@ export class Controller {
       const baseline = 'baseline' in check ? regression.parse(check.baseline) : null;
       const executionRoot = baseline ? join(directory, `${t.generation}-${digest(check.id)}-baseline`) : t.root;
       const cwd = baseline ? executionRoot : within(t.root, check.cwd);
-      const node = 'kind' in check ? check : null;
+      const node = isNodeCheck(check) ? check : null;
+      const native = isNativeCheck(check) ? check : null;
+      const nativeOut = `${t.generation}-${digest(check.id)}-native`;
       const invocation = digest(JSON.stringify([t.id, t.generation, check.id, t.source]));
       const collector = join(import.meta.dir, 'node-tests.mjs');
       const nodeExecutable = node ? Bun.which('node') : null;
       if (node && !nodeExecutable) throw new Error('Node test runtime is unavailable');
-      if (!node && 'argv' in check && !Bun.which(z.string().parse(check.argv[0]), { cwd })) throw new Error('Check executable not found');
+      if ('argv' in check && !Bun.which(z.string().parse(check.argv[0]), { cwd })) throw new Error('Check executable not found');
       const inputPaths = node ? [...new Set([...node.files, ...(node.regression?.testInputs ?? [])])] : [];
       const inputs = testInputEvidence(t.root, inputPaths);
       const inputsMatch = (root: string) => inputs.every(input =>
@@ -513,6 +524,15 @@ export class Controller {
           });
           argv = [z.string().parse(nodeExecutable), collector, join(directory, request.path)];
         }
+        if (native) {
+          // The runner is candidate code; a candidate that edits it could grade itself.
+          const runner = nativeRunnerChanges(inspectChange(t.root, t.base, t.contract).changed);
+          if (runner.length) throw new Error(`Candidate changes the native story runner: ${runner.join(', ')}`);
+          if (existsSync(join(directory, nativeOut))) throw new Error('Native evidence already exists; reconcile its previous run');
+          request = this.save(t, `${digest(check.id)}-native-request.json`, {
+            invocation, out: join(directory, nativeOut), stories: native.stories, platforms: native.platforms });
+          argv = ['bun', 'app/e2e/stories/bound.ts', join(directory, request.path)];
+        }
       } catch (error) { setupFailure = String(error); }
       const { exit, reason } = setupFailure ? (() => {
         writeFileSync(join(dir, log), '', { flag: 'wx', mode: 0o600 });
@@ -541,6 +561,15 @@ export class Controller {
           if (!inputsMatch(executionRoot) || !inputsMatch(t.root))
             throw new Error('Candidate or baseline test input changed during execution');
         } catch (error) { outcome = 'fail'; summary = String(error); }
+      }
+      if (native && request) {
+        try {
+          const inspected = inspectNativeStories(join(dir, nativeOut), { invocation, source: z.string().parse(t.source), root: t.root, stories: native.stories, platforms: native.platforms });
+          // Every frame, video and log becomes receipt evidence, which reviewers must inspect.
+          artifacts.push(...inspected.files.map(file => fileEvidence(dir, join(nativeOut, file))), this.save(t, `${digest(check.id)}-native-inspection.json`, inspected));
+          if (exit === 0) outcome = inspected.outcome;
+          summary = inspected.problems.length ? inspected.problems.join('\n') : `Played ${native.stories.length} sealed stories on ${native.platforms.join(' and ')}; ${reason}`;
+        } catch (error) { outcome = 'fail'; summary = `Native story evidence was not established: ${String(error)}`; }
       }
       if (ownedBaseline) {
         // A tampered baseline may no longer fingerprint at all; that is a failed check, not a crash.
@@ -576,8 +605,12 @@ export class Controller {
       if (outcome === 'fail') return this.repair(id, `Check failed: ${check.id}`);
     }
     if (audit) return t; // Retrieval is evidence; an independent audit ticket supplies judgment.
-    if (inspectChange(t.root, t.base, t.contract).risks.some(risk => risk === 'ui' || risk === 'performance'))
-      return this.stop(id, `native-evidence:${t.generation}`, 'Functional native/performance results are not yet bound to an installed binary on both platforms. See docs/follow-ups/F156.md');
+    const risks = inspectChange(t.root, t.base, t.contract).risks;
+    if (risks.includes('performance'))
+      return this.stop(id, `native-evidence:${t.generation}`, 'Performance results are not yet bound to sealed metrics on a required device. See docs/follow-ups/F156.md');
+    // UI work needs bound story runs on both platforms at this source; the receipt loop above required them to pass.
+    if (risks.includes('ui') && !(['ios', 'android'] as const).every(p => t.contract.checks.some(c => isNativeCheck(c) && c.platforms.includes(p))))
+      return this.stop(id, `native-evidence:${t.generation}`, 'UI changes need a native-stories check that plays on both iOS and Android');
     return this.change(id, `verified:${t.generation}`, {}, v => {
       this.current(v);
       if (v.generation !== t.generation || v.phase !== 'verifying') throw new Error('Stale verification result');

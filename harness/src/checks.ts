@@ -17,8 +17,19 @@ const nodeCheck = z.object({ ...base, cwd: z.literal('.').default('.'), kind: z.
     c.regression.cases.some(r => !c.requiredCases.some(c => c.file === r.file && JSON.stringify(c.names) === JSON.stringify(r.names)))))
     ctx.addIssue({ code: 'custom', message: 'Regression inputs must include the selected files and unique cases from requiredCases' });
 });
-export const command = z.union([nodeCheck, z.object({ ...base, argv: z.array(text).min(1) }).strict()]);
+const platform = z.enum(['ios', 'android']);
+/** Sealed stories played on fresh owned devices from bundled builds of the candidate (app/e2e/stories/bound.ts). */
+const nativeCheck = z.object({ ...base, cwd: z.literal('.').default('.'), kind: z.literal('native-stories'),
+  stories: z.array(inputPath.refine(p => p.startsWith('app/e2e/stories/') && p.endsWith('.json'), 'Stories live in app/e2e/stories')).min(1),
+  platforms: z.array(platform).min(1) }).strict().superRefine((c, ctx) => {
+  if (new Set(c.stories).size !== c.stories.length || new Set(c.platforms).size !== c.platforms.length)
+    ctx.addIssue({ code: 'custom', message: 'Native checks name each story and platform once' });
+});
+export const command = z.union([nodeCheck, nativeCheck, z.object({ ...base, argv: z.array(text).min(1) }).strict()]);
 type NodeCheck = z.infer<typeof nodeCheck>;
+export type NativeCheck = z.infer<typeof nativeCheck>;
+export const isNodeCheck = (c: z.infer<typeof command>): c is NodeCheck => 'kind' in c && c.kind === 'node-tests';
+export const isNativeCheck = (c: z.infer<typeof command>): c is NativeCheck => 'kind' in c && c.kind === 'native-stories';
 
 const failure = z.object({ code: z.string().optional(), failureType: z.string().optional(),
   cause: z.union([z.string(), z.object({ name: z.string().optional(), code: z.string().optional() }).passthrough()]).optional(),
@@ -145,6 +156,7 @@ export function inspectNodeTests(raw: string, expected: { invocation: string; ro
 
 export const verificationPolicy = z.object({ version: z.literal(1), requirements: z.array(z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('node'), requirement: text, check: text, cases: z.array(requiredCase).min(1), regression: z.boolean() }),
+  z.object({ kind: z.literal('native'), requirement: text, check: text, stories: z.array(text).min(1), platforms: z.array(platform).min(1) }),
   z.object({ kind: z.literal('inspection'), requirement: text, rationale: text }),
 ])).min(1) });
 export const oracleReview = z.object({ requirement: text, verdict: z.enum(['valid', 'invalid', 'unproven']),
@@ -158,9 +170,14 @@ export function validateVerification(spec: { requirements: {id:string}[]; checks
     throw new Error('Verification policy must cover each requirement exactly once');
   for (const rule of policy.requirements) if (rule.kind === 'node') {
     const check = spec.checks.find(c=>c.id===rule.check);
-    if (!check || !('kind' in check)) throw new Error('Behavior verification needs a named Node check, not process exit alone');
+    if (!check || !isNodeCheck(check)) throw new Error('Behavior verification needs a named Node check, not process exit alone');
     const same = (a:z.infer<typeof requiredCase>,b:z.infer<typeof requiredCase>)=>a.file===b.file && JSON.stringify(a.names)===JSON.stringify(b.names);
     if (rule.cases.some(c=>!check.requiredCases.some(r=>same(r,c)))) throw new Error('Verification case is not required by its check');
     if (rule.regression && rule.cases.some(c=>!check.regression?.cases.some(r=>same(r,c)))) throw new Error('Regression requirement lacks a sealed baseline comparison');
+  } else if (rule.kind === 'native') {
+    const check = spec.checks.find(c=>c.id===rule.check);
+    if (!check || !isNativeCheck(check)) throw new Error('Native verification needs a named native-stories check');
+    if (rule.stories.some(s=>!check.stories.includes(s)) || rule.platforms.some(p=>!check.platforms.includes(p)))
+      throw new Error('Native verification names a story or platform its check does not play');
   }
 }
