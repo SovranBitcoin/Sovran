@@ -249,6 +249,51 @@ describe('windowSize', () => {
 });
 
 describe('installFiberRootCapture', () => {
+  it('reads live DevTools roots without replacing the existing hook or its callbacks', () => {
+    const first = {
+      current: fiber(3, {}, [
+        fiber(5, {
+          memoizedProps: { testID: 'first' },
+          stateNode: { node: { rect: [16, 700, 370, 56] } },
+        }),
+      ]),
+    };
+    const second = {
+      current: fiber(3, {}, [
+        fiber(5, {
+          memoizedProps: { testID: 'second' },
+          stateNode: { node: { rect: [16, 700, 370, 56] } },
+        }),
+      ]),
+    };
+    const mounted = new Map([
+      [1, new Set([first])],
+      [2, new Set([second])],
+    ]);
+    const existing = Object.freeze({
+      renderers: new Map([[1, {}]]),
+      getFiberRoots(id: number) {
+        expect(this).toBe(existing);
+        return mounted.get(id);
+      },
+      onCommitFiberRoot: jest.fn(),
+    });
+    const target = {
+      __REACT_DEVTOOLS_GLOBAL_HOOK__: existing,
+      nativeFabricUIManager: { getBoundingClientRect: (node: { rect: number[] }) => node.rect },
+    };
+    const capture = installFiberRootCapture(target);
+    expect(capture).not.toBeNull();
+    if (!capture) throw new Error('No capture');
+    expect(collectElements(capture)).toEqual([{ id: 'first', ...BOX }]);
+    existing.renderers.set(2, {});
+    expect(collectElements(capture).map((element) => element.id)).toEqual(['first', 'second']);
+    mounted.get(1)?.clear();
+    expect(collectElements(capture).map((element) => element.id)).toEqual(['second']);
+    expect(target.__REACT_DEVTOOLS_GLOBAL_HOOK__).toBe(existing);
+    expect(existing.onCommitFiberRoot).not.toHaveBeenCalled();
+  });
+
   it('remembers a root React commits and forgets one that is unmounted', () => {
     const target: Record<string, unknown> = {
       nativeFabricUIManager: {

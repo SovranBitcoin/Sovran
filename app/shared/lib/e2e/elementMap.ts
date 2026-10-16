@@ -7,12 +7,12 @@
  * with its test id, label and laid-out frame, so in the test build it answers
  * the runner directly, in a few milliseconds.
  *
- * React offers one supported way to see its tree from outside a component: the
- * hook renderers report to when one exists at start-up, the same one React
- * DevTools uses. This module installs a minimal one, in the test build only,
- * that does nothing but remember the tree's roots.
+ * React renderers report their roots through the DevTools hook. In the test
+ * build, read its live root registry or install a minimal hook when none exists.
+ * The development hook keeps ownership of its callbacks and root lifecycle.
  */
 import { IS_E2E_LOG_BUILD } from '@/shared/lib/loggerCore';
+import { z } from 'zod';
 
 /** The parts of a React fiber that are read. */
 interface Fiber {
@@ -88,41 +88,61 @@ interface FiberCapture {
   topInset?: () => number;
 }
 
+const devToolsHookSchema = z.object({
+  renderers: z.instanceof(Map),
+  getFiberRoots: z.function(),
+});
+
 /**
  * Install the hook a React renderer reports to. Must run before the renderer
- * loads. An existing hook (React DevTools in a development build) is left alone.
+ * loads. Read an existing DevTools root registry without modifying its hook.
  */
 export function installFiberRootCapture(target: Record<string, unknown>): FiberCapture | null {
-  if (target.__REACT_DEVTOOLS_GLOBAL_HOOK__ !== undefined) return null;
+  const existing = target.__REACT_DEVTOOLS_GLOBAL_HOOK__;
+  const devTools = devToolsHookSchema.safeParse(existing);
+  if (existing !== undefined && !devTools.success) return null;
   const roots = new Set<FiberRoot>();
   let reported = false;
-  target.__REACT_DEVTOOLS_GLOBAL_HOOK__ = {
-    supportsFiber: true,
-    isDisabled: false,
-    checkDCE() {},
-    inject() {
-      reported = true;
-      return 1;
-    },
-    onCommitFiberRoot(_rendererId: number, root: FiberRoot) {
-      // A root that committed nothing has been unmounted.
-      if (root.current?.child) roots.add(root);
-      else roots.delete(root);
-    },
-    onCommitFiberUnmount() {},
-    onPostCommitFiberRoot() {},
-    onScheduleFiberRoot() {},
-    setStrictMode() {},
-  };
+  if (existing === undefined)
+    target.__REACT_DEVTOOLS_GLOBAL_HOOK__ = {
+      supportsFiber: true,
+      isDisabled: false,
+      checkDCE() {},
+      inject() {
+        reported = true;
+        return 1;
+      },
+      onCommitFiberRoot(_rendererId: number, root: FiberRoot) {
+        // A root that committed nothing has been unmounted.
+        if (root.current?.child) roots.add(root);
+        else roots.delete(root);
+      },
+      onCommitFiberUnmount() {},
+      onPostCommitFiberRoot() {},
+      onScheduleFiberRoot() {},
+      setStrictMode() {},
+    };
   return {
-    roots,
+    get roots() {
+      if (!devTools.success) return roots;
+      const live = new Set<FiberRoot>();
+      for (const id of devTools.data.renderers.keys()) {
+        const mounted: unknown = Reflect.apply(devTools.data.getFiberRoots, existing, [id]);
+        if (!(mounted instanceof Set))
+          throw new Error('DevTools returned an invalid root registry');
+        // React DevTools owns these live FiberRoot references, just as the
+        // renderer owns the roots passed to our release-build commit hook.
+        for (const root of mounted as Set<FiberRoot>) live.add(root);
+      }
+      return live;
+    },
     measure: (fiber) => {
       const node = (fiber.stateNode as { node?: unknown } | null | undefined)?.node;
       const fabric = target.nativeFabricUIManager as FabricUIManager | undefined;
       const rect = node ? fabric?.getBoundingClientRect?.(node, true) : null;
       return rect ? { x: rect[0], y: rect[1], width: rect[2], height: rect[3] } : null;
     },
-    hasRenderer: () => reported,
+    hasRenderer: () => (devTools.success ? devTools.data.renderers.size > 0 : reported),
     topInset: () => {
       try {
         const safeArea =
@@ -286,8 +306,8 @@ export function windowSize(from: FiberCapture): { width: number; height: number 
 
 /**
  * The window and the elements in it now; empty outside the test build. `source`
- * says why a map is empty: the hook was not installed (`off`, or another one was
- * there first), no renderer reported to it, or React has committed no tree.
+ * says why a map is empty: capture is off, an existing hook is incompatible,
+ * no renderer reported to it, or React has committed no tree.
  */
 export function readScreen(): {
   width: number;
@@ -300,7 +320,7 @@ export function readScreen(): {
       width: 0,
       height: 0,
       elements: [],
-      source: IS_E2E_LOG_BUILD ? 'another hook was installed first' : 'off',
+      source: IS_E2E_LOG_BUILD ? 'existing hook has no compatible root registry' : 'off',
     };
   const window = windowSize(capture);
   return {
