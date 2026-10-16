@@ -12,6 +12,12 @@ bun run e2e:story e2e/stories/library/<story>.json --udid <simulator> --app e2e/
 Open the shared history with `bun run e2e:viewer`. [Results ownership](../README.md) explains
 where generated evidence belongs and how to group older output.
 
+Each play has its own session identity, checked against the app's hello before accepting
+logs or sending requests. A profile restart may reconnect to that same session. The attempt
+keeps the hello and all received log entries, including those outside step windows; this
+does not prove the app emitted every expected log, identify its installed binary, or certify
+cleanup. Keep those obligations separate when reviewing native evidence.
+
 A story is a JSON file in `library/`: a purpose, the state it starts from, and steps. A step does one thing (tap,
 swipe, type) and says what must then be true. `states/` holds stories that only set things up; any story's end
 can be another's start. `--look` lists what is on screen when a story ends, which is how the next step is written.

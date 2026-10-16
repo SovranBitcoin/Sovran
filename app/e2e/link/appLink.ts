@@ -8,6 +8,7 @@
  */
 import { mkdirSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { z } from 'zod';
 
 /** A log entry as the app sends it. Only the fields a runner waits on are named. */
 export interface AppLogEntry {
@@ -18,11 +19,12 @@ export interface AppLogEntry {
   [field: string]: unknown;
 }
 
-export interface AppHello {
-  run: string;
-  platform: string;
-  appClockMs: number;
-}
+const helloSchema = z.object({
+  run: z.string().min(1),
+  platform: z.enum(['ios', 'android']),
+  appClockMs: z.number().finite(),
+});
+export type AppHello = z.infer<typeof helloSchema>;
 
 /** The app saying its screen has stopped changing. */
 export interface AppSettled {
@@ -92,14 +94,18 @@ export function writeRunnerNote(containerDir: string, note: { url: string; run: 
   renameSync(`${path}.tmp`, path);
 }
 
-export function startAppLink(): AppLink {
+/** Session matching prevents accidental cross-run evidence, not a hostile host
+ * impersonating the app. Installed-payload verification is a separate obligation. */
+export function startAppLink(expected?: Pick<AppHello, 'run' | 'platform'>): AppLink {
   const entries: AppLogEntry[] = [];
   const stills = new Map<number, AppSettled>();
   const screens = new Map<number, AppScreen>();
   let nextRequest = 1;
   const watchers = new Set<() => void>();
   let hello: AppHello | null = null;
-  let app: { send(data: string): unknown } | null = null;
+  let identity = expected;
+  let app: { send(data: string): unknown; close(): unknown } | null = null;
+  const retired = new WeakSet<object>();
   // What the app has been asked and has not answered. The app starts again
   // within a story when a person adds or switches profile; it connects anew,
   // and whatever it was asked before is asked of it again.
@@ -120,15 +126,15 @@ export function startAppLink(): AppLink {
       return bunServer.upgrade(request) ? undefined : new Response('app link', { status: 426 });
     },
     websocket: {
-      open(socket) {
-        app = socket;
-        for (const payload of unanswered.values()) socket.send(payload);
-      },
       close(socket) {
         // The old connection can close after the restarted app's new one has opened.
-        if (app === socket) app = null;
+        if (app === socket) {
+          app = null;
+          hello = null;
+        }
       },
-      message(_socket, data) {
+      message(socket, data) {
+        if (retired.has(socket)) return;
         if (typeof data !== 'string') return;
         let message: { type?: unknown; entry?: unknown; forced?: unknown; id?: unknown } & Partial<
           AppHello & AppScreen
@@ -138,13 +144,36 @@ export function startAppLink(): AppLink {
         } catch {
           return;
         }
-        if (message.type === 'hello' && typeof message.run === 'string') {
-          hello = {
-            run: message.run,
-            platform: String(message.platform),
-            appClockMs: Number(message.appClockMs),
-          };
-        } else if (message.type === 'log' && isEntry(message.entry)) {
+        if (typeof message !== 'object' || message === null) return;
+        if (message.type === 'hello') {
+          const parsed = helloSchema.safeParse(message);
+          if (
+            !parsed.success ||
+            (identity &&
+              (parsed.data.run !== identity.run || parsed.data.platform !== identity.platform))
+          ) {
+            retired.add(socket);
+            socket.close();
+            return;
+          }
+          if (app === socket) return;
+          // A valid restart may replace a connection before its close event arrives.
+          // Retiring it prevents late logs (or another hello) from reclaiming ownership.
+          if (app) {
+            retired.add(app);
+            app.close();
+          }
+          identity ??= { run: parsed.data.run, platform: parsed.data.platform };
+          hello = parsed.data;
+          app = socket;
+          for (const payload of unanswered.values()) socket.send(payload);
+          changed();
+          return;
+        }
+        // Opening a socket is not a handshake. Neither queued requests nor evidence
+        // cross this boundary until the exact run and platform are known.
+        if (app !== socket) return;
+        if (message.type === 'log' && isEntry(message.entry)) {
           entries.push(message.entry);
           if (message.entry.event === 'e2e.step')
             unanswered.delete(`mark:${String(message.entry.params?.step)}`);

@@ -12,13 +12,13 @@ afterEach(() => {
 });
 
 /** Stands in for the app: connects, says hello, and logs each step mark it is sent. */
-function connectApp(url: string): Promise<WebSocket> {
+function connectApp(url: string, identity = { run: 'r1', platform: 'ios' }): Promise<WebSocket> {
   return new Promise((resolve, reject) => {
     const app = new WebSocket(url);
     let clock = 100;
     app.onerror = () => reject(new Error('could not connect'));
     app.onopen = () => {
-      app.send(JSON.stringify({ type: 'hello', run: 'r1', platform: 'ios', appClockMs: clock }));
+      app.send(JSON.stringify({ type: 'hello', ...identity, appClockMs: clock }));
       resolve(app);
     };
     app.onmessage = (message) => {
@@ -51,11 +51,96 @@ const log = (app: WebSocket, event: string, _t: number, params?: Record<string, 
   app.send(JSON.stringify({ type: 'log', entry: { _t, level: 'debug', event, params } }));
 
 describe('the runner end of the app link', () => {
+  test('another run cannot satisfy a story or receive its queued requests', async () => {
+    link = startAppLink({ run: 'r1', platform: 'ios' });
+    const foreign = await connectApp(link.url, { run: 'yesterday', platform: 'ios' });
+    try {
+      log(foreign, 'foreign.mount', 100);
+      await expect(link.connected(60)).rejects.toThrow('The app is not connected');
+      const marked = link.mark('expected-session', 1000);
+      socket = await connectApp(link.url);
+      expect((await marked).params?.step).toBe('expected-session');
+      expect(link.entries.map((entry) => entry.event)).toEqual(['e2e.step']);
+      expect(await link.connected(1000)).toEqual({ run: 'r1', platform: 'ios', appClockMs: 100 });
+    } finally {
+      foreign.close();
+    }
+  });
+
   test('knows the app has connected, and which run it belongs to', async () => {
     link = startAppLink();
     socket = await connectApp(link.url);
 
     expect(await link.connected(1000)).toEqual({ run: 'r1', platform: 'ios', appClockMs: 100 });
+  });
+
+  test('the expected run on the wrong platform is not accepted', async () => {
+    link = startAppLink({ run: 'r1', platform: 'ios' });
+    socket = await connectApp(link.url, { run: 'r1', platform: 'android' });
+    log(socket, 'wrong-platform', 100);
+    await expect(link.connected(60)).rejects.toThrow('The app is not connected');
+    expect(link.entries).toEqual([]);
+  });
+
+  test('logs before hello cannot enter evidence even on the eventual valid socket', async () => {
+    link = startAppLink({ run: 'r1', platform: 'ios' });
+    socket = new WebSocket(link.url);
+    const app = socket;
+    await new Promise<void>((resolve, reject) => {
+      app.onerror = () => reject(new Error('could not connect'));
+      app.onopen = () => {
+        app.send('null');
+        log(app, 'before-hello', 90);
+        app.send(JSON.stringify({ type: 'hello', run: 'r1', platform: 'ios', appClockMs: 100 }));
+        log(app, 'after-hello', 110);
+        resolve();
+      };
+    });
+    await link.waitFor((entry) => entry.event === 'after-hello', {
+      timeoutMs: 1000,
+      what: 'ordered log',
+    });
+    expect(link.entries.map((entry) => entry.event)).toEqual(['after-hello']);
+  });
+
+  test('a disconnected hello does not satisfy another connection wait', async () => {
+    link = startAppLink({ run: 'r1', platform: 'ios' });
+    socket = await connectApp(link.url);
+    await link.connected(1000);
+    const app = socket;
+    await new Promise<void>((resolve) => {
+      app.onclose = () => resolve();
+      app.close();
+    });
+    // The client close callback can precede the server's close callback.
+    // Observe the server reporting the disconnect before asking for a new hello.
+    await expect(link.screen(40)).rejects.toThrow('The app is not connected');
+    await expect(link.connected(60)).rejects.toThrow('The app is not connected');
+    const asked = link.screen(1000);
+    socket = await connectApp(link.url);
+    expect((await asked).elements[0].id).toBe('wallet-send');
+  });
+
+  test('a valid replacement retires the old socket without losing the new connection', async () => {
+    link = startAppLink({ run: 'r1', platform: 'ios' });
+    const first = await connectApp(link.url);
+    try {
+      await link.connected(1000);
+      const oldClosed = new Promise<void>((resolve) => {
+        first.onclose = () => resolve();
+      });
+      socket = await connectApp(link.url);
+      log(socket, 'replacement', 110);
+      await link.waitFor((entry) => entry.event === 'replacement', {
+        timeoutMs: 1000,
+        what: 'new connection',
+      });
+      await oldClosed;
+      expect((await link.screen(1000)).elements[0].id).toBe('wallet-send');
+      expect(link.entries.map((entry) => entry.event)).toEqual(['replacement']);
+    } finally {
+      first.close();
+    }
   });
 
   test('a wait resolves on the entry it names, whether that came before or after asking', async () => {

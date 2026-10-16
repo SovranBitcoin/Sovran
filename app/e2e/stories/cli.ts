@@ -20,6 +20,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { randomUUID } from 'node:crypto';
 import {
   attemptDirectory,
   createStoryRun,
@@ -30,7 +31,7 @@ import {
   finishAttempt,
 } from '../results/runs';
 import { fileURLToPath } from 'node:url';
-import { startAppLink } from '../link/appLink';
+import { startAppLink, type AppHello } from '../link/appLink';
 import { createScreenWatch, keepVideo, pictureName, recordSimulator } from './evidence';
 import { withGiven } from './given';
 import { playStory, topPage } from './play';
@@ -93,10 +94,18 @@ const play = async (
     throw new Error(`Evidence already exists: ${outDir}`);
   mkdirSync(outDir, { recursive: true });
   const rawVideo = join(outDir, 'raw.mp4');
-  const link = startAppLink();
+  // A story can be played repeatedly, including as another story's setup.
+  // Its name is not an invocation identity.
+  const run = randomUUID();
+  const expected = { run, platform: 'ios' } satisfies Pick<AppHello, 'run' | 'platform'>;
+  const link = startAppLink(expected);
   let recording: Awaited<ReturnType<typeof recordSimulator>> | undefined;
   let frames: ReturnType<typeof simulator.watchScreen> | undefined;
+  let report:
+    (ReturnType<typeof storyReportSchema.parse> & { screenWatcherRestarts?: number }) | undefined;
+  const failures: { operation: string; error: unknown }[] = [];
   try {
+    writeFileSync(join(outDir, 'session.json'), JSON.stringify({ expected, story: story.id }));
     recording = await recordSimulator(udid, rawVideo);
     const screen = createScreenWatch({
       now: () => performance.now(),
@@ -105,9 +114,13 @@ const play = async (
     const watching = simulator.watchScreen(screen.changed);
     frames = watching;
     spentOn('recordingStart');
-    simulator.launch({ url: link.url, run: story.id });
+    simulator.launch({ url: link.url, run });
     spentOn('launch');
-    await link.connected(20_000);
+    const hello = await link.connected(20_000);
+    writeFileSync(
+      join(outDir, 'session.json'),
+      JSON.stringify({ expected, story: story.id, hello })
+    );
     spentOn('appConnected');
     const pictures: (string | undefined)[] = [];
     const result = await playStory(
@@ -150,12 +163,19 @@ const play = async (
     // A story whose screen could not be watched proved nothing about what was on it.
     const unwatched = watching.failure();
     const ok = result.ok && !unwatched;
-    writeFileSync(
-      join(outDir, 'report.json'),
-      `${JSON.stringify({ id: story.id, purpose: story.purpose, startsFrom: story.startsFrom, ok, ...(unwatched ? { failure: unwatched } : {}), video: 'story.mp4', videoEndT, spentMs: spent, screenWatcherRestarts: watching.restarts(), steps: result.steps.map((step, index) => ({ ...step, picture: pictures[index] })) }, null, 2)}\n`
-    );
+    report = {
+      id: story.id,
+      purpose: story.purpose,
+      startsFrom: story.startsFrom,
+      ok,
+      ...(unwatched ? { failure: unwatched } : {}),
+      video: 'story.mp4',
+      videoEndT,
+      spentMs: spent,
+      screenWatcherRestarts: watching.restarts(),
+      steps: result.steps.map((step, index) => ({ ...step, picture: pictures[index] })),
+    };
 
-    console.log(`${ok ? 'PASS' : 'FAIL'}  ${story.id}: ${story.purpose}`);
     if (unwatched) console.log(`  ${unwatched}`);
     for (const [index, step] of result.steps.entries()) {
       const shown = step.entries
@@ -198,14 +218,68 @@ const play = async (
         );
     }
     console.log(`evidence: ${outDir}`);
-    return ok;
+  } catch (error) {
+    failures.push({ operation: 'play', error });
   } finally {
-    // Reached with these still running only when the story threw part-way.
-    frames?.stop();
-    await recording?.stop();
-    simulator.terminate();
-    link.close();
+    // Preserve every received entry, including startup and entries outside step
+    // windows. This is the received stream, not proof that the app lost no logs.
+    // Try every cleanup even if an earlier one fails; a failed cleanup fails play.
+    for (const [operation, clean] of [
+      ['stop frames', () => frames?.stop()],
+      ['stop recording', () => recording?.stop()],
+      ['terminate app', () => simulator.terminate()],
+      ['close link', () => link.close()],
+      [
+        'retain received logs',
+        () =>
+          writeFileSync(join(outDir, 'app-log.json'), `${JSON.stringify(link.entries, null, 2)}\n`),
+      ],
+    ] satisfies [string, () => unknown][]) {
+      try {
+        await clean();
+      } catch (error) {
+        failures.push({ operation, error });
+      }
+    }
+    const failure = failures
+      .map(
+        ({ operation, error }) =>
+          `${operation}: ${error instanceof Error ? error.message : String(error)}`
+      )
+      .join('\n');
+    report ??= {
+      id: story.id,
+      purpose: story.purpose,
+      startsFrom: story.startsFrom,
+      ok: false,
+      steps: [],
+    };
+    if (failure)
+      report = {
+        ...report,
+        ok: false,
+        failure: [report.failure, failure].filter(Boolean).join('\n'),
+      };
+    // Setup plays have no outer attempt marker. Their own report must stay red
+    // if retaining evidence or cleanup fails, even when all UI assertions passed.
+    try {
+      writeFileSync(join(outDir, 'report.json'), `${JSON.stringify(report, null, 2)}\n`);
+    } catch (error) {
+      throw new AggregateError(
+        [...failures.map(({ error }) => error), error],
+        [failure, `retain report: ${error instanceof Error ? error.message : String(error)}`]
+          .filter(Boolean)
+          .join('\n')
+      );
+    }
+    console.log(`${report.ok ? 'PASS' : 'FAIL'}  ${story.id}: ${story.purpose}`);
+    if (failures.length)
+      throw new AggregateError(
+        failures.map(({ error }) => error),
+        failure
+      );
   }
+  return report.ok;
 };
 
 /**
