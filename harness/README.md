@@ -224,6 +224,9 @@ wait for its actual GitHub result; a local pass is not a CI receipt.
 
 `bun run --cwd harness test` exercises real SQLite, temporary git repositories and subprocesses.
 `bun run --cwd harness type-check` checks this tooling independently of the shipped app.
+The root test command finishes the harness before starting the other workspaces. Its
+real Git/CLI tests otherwise compete with the app's Jest workers and can hit the outer
+test watchdog; this ordering preserves the same assertions and timeout limits.
 The publication tests use a temporary bare Git remote and a fake GitHub executable; they
 do not establish live GitHub readiness. The remaining complete live T3/GitHub pilot is
 tracked in [F157](../docs/follow-ups/F157.md). No real-wallet, native or funded scenarios are part

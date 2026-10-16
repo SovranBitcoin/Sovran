@@ -41,8 +41,9 @@ jobs:
         continue-on-error: true
         run: bun run pretty:check
 
-      # Runs at the repo ROOT, not in app/: `test` fans out over every workspace
-      # package (`bun run --filter '*'`). Pinning this to app/ is what left
+      # Runs at the repo ROOT, not in app/: `test` runs the harness first, then
+      # every remaining workspace. Their subprocess-heavy suites must not compete
+      # for the same test deadlines. Pinning this to app/ is what left
       # wallet's 1183 vitest tests and nostr's 259 — the payment engine and the
       # Nostr data layer — running nowhere on a push, so a change to either
       # could break every one of its own tests and still merge green.

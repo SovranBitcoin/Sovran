@@ -35,7 +35,7 @@
     "prebuild": "cd app && bun run prebuild",
     "type-check": "bun run --filter '*' type-check",
     "lint": "cd app && bun run lint",
-    "test": "bun run --filter '*' test",
+    "test": "bun run --cwd harness test && bun run --filter '!@sovran/task-harness' test",
     "test:app": "cd app && bun run test",
     "knip": "knip",
     "followups": "node scripts/followups.mjs",
