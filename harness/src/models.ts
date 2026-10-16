@@ -81,8 +81,8 @@ export function recommendedModels(catalog: unknown) {
   const fable = { provider: 'claudeAgent', model: 'claude-fable-5-1', options: { effort: 'high' } };
   return models.parse({ kind: 'routed', allowGptOnly: true, allowClaudeOnly: true, catalog,
     routes: {
-      research: { purpose: 'Bounded evidence extraction, escalating to the coding model when unavailable', candidates: [
-        { provider: 'codex', model: 'gpt-6-luna', options: { reasoningEffort: 'high' } }, sol,
+      research: { purpose: 'Bounded evidence extraction, escalating to the coding model, then across providers, when unavailable', candidates: [
+        { provider: 'codex', model: 'gpt-6-luna', options: { reasoningEffort: 'high' } }, sol, opus,
       ] },
       implementation: { purpose: 'Coding work with a cross-provider availability replacement', candidates: [sol, opus] },
       review: { purpose: 'Fresh cross-provider correctness review, with disclosed GPT fallback', candidates: [opus, sol] },

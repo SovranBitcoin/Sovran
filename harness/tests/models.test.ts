@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test';
 import { fixture } from './controller.test';
 import { Controller } from '../src/controller';
 import { dispatch } from '../src/protocol';
-import type { RuntimeTask } from '../src/models';
+import { recommendedModels, type RuntimeTask } from '../src/models';
 import { assessment, type Task } from '../src/workflow';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -34,6 +34,19 @@ test('a sealed route dispatches its primary model and explicit supported effort'
   expect(() => c.create(root, { ...spec, models: routedModels() })).toThrow('pre-edit history policy');
   const t = c.create(root, { ...spec, historyPolicy: { version: 1, paths: ['source.txt'] }, verificationPolicy: fixtureVerification, models: routedModels() });
   expect(c.next(t.id).ticket?.target).toEqual({ provider: 'codex', model: 'gpt-6.1-sol', options: { reasoningEffort: 'high' } });
+});
+
+test('every default route survives either provider being out of quota', () => {
+  const select = (id: string) => ({ id, type: 'select', options: ['high'].map(o => ({ id: o })) });
+  const policy = recommendedModels({ observedAt: new Date().toISOString(), providers: [
+    { providerInstanceId: 'codex', driverKind: 'codex', canRunChildTask: true,
+      models: ['gpt-6-luna', 'gpt-6.1-sol', 'gpt-6-astra'].map(id => ({ id, options: [select('reasoningEffort')] })) },
+    { providerInstanceId: 'claudeAgent', driverKind: 'claudeAgent', canRunChildTask: true,
+      models: ['claude-opus-5-5', 'claude-fable-5-1'].map(id => ({ id, options: [select('effort')] })) },
+  ] });
+  if (!('kind' in policy)) throw new Error('Expected a routed policy');
+  for (const [name, route] of Object.entries(policy.routes))
+    expect([name, [...new Set(route.candidates.map(c => c.provider))].sort()]).toEqual([name, ['claudeAgent', 'codex']]);
 });
 
 test('unsupported models and effort cannot enter a sealed route', () => {
