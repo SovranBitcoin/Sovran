@@ -178,8 +178,10 @@ describe('capture inventory', () => {
   });
   it('mint details recipes stay reviewed after the Details footer', () => {
     // These three wait for the mint page by its footer button, which became
-    // Details (mint-info-details-open) where it was Close. Their pins were
-    // re-reviewed for that selector alone; any other change still blocks.
+    // Details (mint-info-details-open) where it was Close. Details shows on the
+    // first frame, so store.screenshots also waits for the loaded reviews action
+    // before its mint-info shot. The pins were re-reviewed for those two
+    // read-only steps alone; any other change still blocks.
     for (const scenario of [
       'store.screenshots',
       'marketing.screenshots',

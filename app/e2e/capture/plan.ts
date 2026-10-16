@@ -62,7 +62,7 @@ const rules: Rule[] = [];
 // Pin expanded steps, including setup/cleanup fixtures. A new tap in a previously
 // reviewed scenario must not silently inherit permission to publish or spend.
 const REVIEWED_STEPS: Record<string, string> = {
-  'store.screenshots': 'a8e0914db4353e4df2a89b7ee55ca402c38c09e5dc48c7fb18c7a5bbb651b452',
+  'store.screenshots': 'a52bc34fb965b292b3cd6a120fcfd6e562f29d09993f54abddb8d45ca6ce5880',
   'marketing.screenshots': '450416c9fad96340bffb49213debaa305d255dd733499078dc191c71a84772b3',
   'marketing.screenshots.wallpapers':
     '0975631fb929f95d12fa4b28ca3e64acea5e0baeaa7d0d9e193834ba40a51897',
