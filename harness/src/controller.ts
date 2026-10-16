@@ -582,7 +582,8 @@ export class Controller {
       this.current(v);
       if (v.generation !== t.generation || v.phase !== 'verifying') throw new Error('Stale verification result');
       if (!commands.every(c => v.receipts.some(r => r.id === c.id && r.outcome === 'pass' && r.source === v.source))) throw new Error('Missing verification');
-      return move(v, 'ACCEPT');
+      // The repair reason served the repair; the journal keeps it.
+      return { ...move(v, 'ACCEPT'), reason: '' };
     });
   }
 }

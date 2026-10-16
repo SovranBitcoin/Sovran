@@ -143,6 +143,18 @@ test('failed verification returns to implementation without reusing its receipts
   expect(t.phase).toBe('incomplete'); expect(t.reason).toContain('Repair budget exhausted');
 });
 
+test('a repaired task that passes verification no longer reports the old failure', async () => {
+  const { controller: c, root, spec } = fixture();
+  const marker = join(mkdtempSync(join(tmpdir(), 'harness-once-')), 'failed-once');
+  spec.checks[0] = { id: 'flaky-once', argv: ['bun', '-e', `const fs=require('fs');if(fs.existsSync(${JSON.stringify(marker)}))process.exit(0);fs.writeFileSync(${JSON.stringify(marker)},'');process.exit(1)`], cwd: '.', timeoutMs: 5000 };
+  let t = finish(c, c.create(root, spec));
+  t = c.seal(t.id, t.policy); t = finish(c, t); t = await c.verify(t.id);
+  expect(t.reason).toBe('Check failed: flaky-once');
+  t = finish(c, t); t = await c.verify(t.id);
+  // Live 2026-10-16: status kept 'Check failed' while the task was already in review.
+  expect([t.phase, t.reason]).toEqual(['reviewing', '']);
+});
+
 test('a command that changes source retains its result and releases pending work', async () => {
   const { controller: c, root, spec } = fixture();
   spec.checks[0] = { id: 'drift', argv: ['bun', '-e', 'await Bun.write("source.txt", "changed")'], cwd: '.', timeoutMs: 1000 };
