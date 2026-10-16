@@ -1,4 +1,4 @@
-import { avatarStateFor } from '@/shared/lib/imageLoadState';
+import { avatarStateFor, profileAvatarStateFor } from '@/shared/lib/imageLoadState';
 
 describe('avatarStateFor', () => {
   it.each([
@@ -14,5 +14,18 @@ describe('avatarStateFor', () => {
     ['https://x/a.png', true, 'image'],
   ])('picture=%j resolved=%j → %s', (picture, resolved, expected) => {
     expect(avatarStateFor(picture, resolved)).toBe(expected);
+  });
+});
+
+describe('profileAvatarStateFor', () => {
+  it.each([
+    [undefined, 'loading', 'loading'],
+    ['', 'loading', 'loading'],
+    [undefined, 'cached', 'fallback'],
+    [undefined, 'absent', 'fallback'],
+    ['real.png', 'loading', 'image'],
+    ['real.png', 'cached', 'image'],
+  ] as const)('picture=%j status=%s → %s', (picture, status, expected) => {
+    expect(profileAvatarStateFor(picture, status)).toBe(expected);
   });
 });

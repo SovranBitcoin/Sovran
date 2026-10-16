@@ -28,7 +28,7 @@ import {
   type WalletContext,
 } from 'wallet';
 import { getReadyProofs } from '@/shared/lib/cashu/managerInternals';
-import { amountToNumber } from '@/shared/lib/cashu/amount';
+import { amountToNumber } from 'wallet/amount';
 
 import { useIsTestnutMint } from '@/shared/stores/global/mintTestnutStore';
 import { useMintStore, type ActiveUnit } from '@/shared/stores/profile/mintStore';

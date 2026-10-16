@@ -1,0 +1,187 @@
+{
+  "id": "testnut-mint",
+  "purpose": "A person with an empty wallet adds the public test mint by typing its address, chooses it, and switches to its test bitcoin account.",
+  "startsFrom": "onboarded",
+  "steps": [
+    {
+      "name": "the wallet opens",
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-mint-selector"
+          }
+        },
+        {
+          "logged": "splash.gone"
+        }
+      ],
+      "withinMs": 20000
+    },
+    {
+      "name": "open the mint selector",
+      "tap": {
+        "id": "wallet-mint-selector"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "mint-select-add"
+          }
+        },
+        {
+          "page": "MintListScreen"
+        }
+      ]
+    },
+    {
+      "name": "add a mint",
+      "tap": {
+        "id": "mint-select-add"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "mint-add-search-toggle"
+          }
+        }
+      ]
+    },
+    {
+      "name": "open search",
+      "tap": {
+        "id": "mint-add-search-toggle"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "mint-add-search-input"
+          }
+        }
+      ]
+    },
+    {
+      "name": "type the test mint's address",
+      "type": {
+        "into": {
+          "id": "mint-add-search-input"
+        },
+        "text": "https://testnut.cashu.space"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "contact-row:mint:https://testnut.cashu.space"
+          }
+        }
+      ],
+      "withinMs": 10000
+    },
+    {
+      "name": "pick the test mint",
+      "tap": {
+        "id": "contact-row:mint:https://testnut.cashu.space"
+      },
+      "expect": [
+        {
+          "visible": {
+            "label": "Add (1)"
+          }
+        }
+      ]
+    },
+    {
+      "name": "add it",
+      "tap": {
+        "id": "mint-add-confirm"
+      },
+      "expect": [
+        {
+          "logged": "mint.add.item.added"
+        },
+        {
+          "logged": "mint.add.restore.success"
+        }
+      ],
+      "withinMs": 30000
+    },
+    {
+      "name": "go back to the mints",
+      "tap": {
+        "id": "mint-import-done"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "mint-currency-tab-TSAT"
+          }
+        },
+        {
+          "gone": {
+            "id": "mint-import-done"
+          }
+        }
+      ]
+    },
+    {
+      "name": "show the test mints",
+      "tap": {
+        "id": "mint-currency-tab-TSAT"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "contact-row:mint:https://testnut.cashu.space"
+          }
+        }
+      ]
+    },
+    {
+      "name": "choose the test mint, and let the wallet settle on an account",
+      "tap": {
+        "id": "contact-row:mint:https://testnut.cashu.space"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-selected-mint:testnut.cashu.space"
+          }
+        },
+        {
+          "visible": {
+            "id": "wallet-receive"
+          }
+        },
+        {
+          "gone": {
+            "id": "screen-mint-list"
+          }
+        },
+        {
+          "logged": "store.mint.set_active_unit",
+          "with": {
+            "to": "tusd"
+          }
+        }
+      ],
+      "withinMs": 40000
+    },
+    {
+      "name": "swipe the balance across to the test bitcoin account",
+      "swipe": {
+        "on": {
+          "id": "wallet-balance-toggle-tusd"
+        },
+        "direction": "right",
+        "distance": 0.5
+      },
+      "expect": [
+        {
+          "logged": "store.mint.set_active_unit",
+          "with": {
+            "to": "tsat"
+          }
+        }
+      ]
+    }
+  ]
+}

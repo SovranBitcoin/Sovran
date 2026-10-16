@@ -1,0 +1,62 @@
+{
+  "id": "sending-with-no-money-is-refused",
+  "purpose": "A person with an empty wallet tries to create ecash; the wallet says there is not enough balance and stays on Send.",
+  "startsFrom": "onboarded",
+  "steps": [
+    {
+      "name": "the wallet opens",
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-send"
+          }
+        },
+        {
+          "logged": "splash.gone"
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "open Send",
+      "tap": {
+        "id": "wallet-send"
+      },
+      "expect": [
+        {
+          "page": "SendScreen"
+        },
+        {
+          "visible": {
+            "id": "send-method-createEcash"
+          }
+        }
+      ]
+    },
+    {
+      "name": "try to create ecash",
+      "tap": {
+        "id": "send-method-createEcash"
+      },
+      "expect": [
+        {
+          "logged": "flow.sendEcash.noValidMint",
+          "with": {
+            "reasonCode": "NO_MINT_SUFFICIENT_BALANCE"
+          }
+        },
+        {
+          "logged": "popup.toast.shown",
+          "with": {
+            "label": "Insufficient balance"
+          }
+        },
+        {
+          "visible": {
+            "id": "send-method-createEcash"
+          }
+        }
+      ]
+    }
+  ]
+}

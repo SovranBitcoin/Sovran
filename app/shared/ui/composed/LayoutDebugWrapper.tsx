@@ -2,7 +2,6 @@ import React, { ReactNode } from 'react';
 import {
   Platform,
   RefreshControlProps,
-  ScrollView,
   ScrollViewProps,
   StyleProp,
   StyleSheet,
@@ -10,6 +9,7 @@ import {
   ViewStyle,
 } from 'react-native';
 import { useHeaderHeight } from 'expo-router/react-navigation';
+import Animated, { useAnimatedScrollHandler, type SharedValue } from 'react-native-reanimated';
 
 import { AnimatedBackgroundView } from '@/shared/ui/composed/BackgroundView';
 import { Log } from '@/shared/lib/logger';
@@ -40,6 +40,8 @@ interface LayoutDebugWrapperProps {
   refreshControl?: React.ReactElement<RefreshControlProps>;
   onScrollBeginDrag?: ScrollViewProps['onScrollBeginDrag'];
   onScrollEndDrag?: ScrollViewProps['onScrollEndDrag'];
+  /** Receives the vertical scroll offset on the UI thread. */
+  scrollY?: SharedValue<number>;
 }
 
 export function LayoutDebugWrapper({
@@ -50,8 +52,12 @@ export function LayoutDebugWrapper({
   refreshControl,
   onScrollBeginDrag,
   onScrollEndDrag,
+  scrollY,
 }: LayoutDebugWrapperProps) {
   const headerHeight = useHeaderHeight();
+  const scrollHandler = useAnimatedScrollHandler((event) => {
+    scrollY?.set(event.contentOffset.y);
+  });
   const { bottom } = useScreenInsets();
 
   const flattenedContentStyle = StyleSheet.flatten(contentContainerStyle) ?? {};
@@ -81,8 +87,10 @@ export function LayoutDebugWrapper({
   return (
     <Log name="LayoutDebugWrapper">
       <AnimatedBackgroundView>
-        <ScrollView
+        <Animated.ScrollView
           className="flex-1"
+          onScroll={scrollHandler}
+          scrollEventThrottle={16}
           contentInsetAdjustmentBehavior="automatic"
           onScrollBeginDrag={onScrollBeginDrag}
           onScrollEndDrag={onScrollEndDrag}
@@ -93,7 +101,7 @@ export function LayoutDebugWrapper({
           ]}
           refreshControl={refreshControl}>
           {children}
-        </ScrollView>
+        </Animated.ScrollView>
       </AnimatedBackgroundView>
     </Log>
   );

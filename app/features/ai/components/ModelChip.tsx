@@ -49,7 +49,7 @@ import { withAlpha } from '@/shared/lib/color';
  *     derived from the live catalog (persisted last-known snapshot when
  *     offline — see `shared/lib/routstr/lineup.ts`). Send-time runtime
  *     fallback (5xx / network) walks the same tier across the *other*
- *     providers — the user's chosen provider stays the primary attempt.
+ *     providers. An accepted fallback updates the selected slot to its model.
  *   - Rows whose underlying model exceeds the user's balance render
  *     half-faded with the gap shown as the row description.
  *

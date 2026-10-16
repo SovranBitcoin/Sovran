@@ -1,0 +1,89 @@
+{
+  "id": "find-bitcoin-near-me",
+  "purpose": "A person opens the map of places that accept bitcoin from the More menu, zooms in, and closes it.",
+  "startsFrom": "onboarded",
+  "steps": [
+    {
+      "name": "the wallet opens",
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-send"
+          }
+        },
+        {
+          "logged": "splash.gone"
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "open More",
+      "tap": {
+        "id": "wallet-more"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-more"
+          }
+        }
+      ]
+    },
+    {
+      "name": "choose Bitcoin near me",
+      "tap": {
+        "label": "Bitcoin near me, Places that accept Bitcoin"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "screen-map"
+          }
+        },
+        {
+          "visible": {
+            "id": "map-zoom-in"
+          }
+        },
+        {
+          "visible": {
+            "id": "map-category-filter"
+          }
+        }
+      ],
+      "withinMs": 15000
+    },
+    {
+      "name": "zoom in",
+      "tap": {
+        "id": "map-zoom-in"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "map-zoom-out"
+          }
+        }
+      ]
+    },
+    {
+      "name": "close the map",
+      "tap": {
+        "id": "flow-header-close"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-send"
+          }
+        },
+        {
+          "gone": {
+            "id": "map-zoom-in"
+          }
+        }
+      ]
+    }
+  ]
+}

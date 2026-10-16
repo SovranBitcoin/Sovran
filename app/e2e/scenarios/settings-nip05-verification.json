@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "id": "settings.nip05.verification",
+  "name": "NIP-05 verification gates profile saving",
+  "description": "An invalid or unresolved identity cannot be saved; removing it restores editing.",
+  "details": "Unfunded navigation only. Uses the reserved .invalid domain and leaves without publishing.",
+  "lane": "simulator",
+  "tags": ["flow:wallet"],
+  "requires": ["fresh-install"],
+  "setup": [
+    {"use":"flow.onboard"}
+  ],
+  "steps": [
+    {"action":"tap","selector":{"id":"header-profile-avatar"}},
+    {"action":"waitFor","selector":{"id":"drawer-menu-settings"},"timeoutMs":30000},
+    {"action":"tap","selector":{"id":"drawer-menu-settings"}},
+    {"action":"waitFor","selector":{"id":"settings-profile-row"},"timeoutMs":30000},
+    {"action":"tap","selector":{"id":"settings-profile-row"}},
+    {"action":"waitFor","selector":{"id":"settings-profile-edit"},"timeoutMs":30000},
+    {"action":"tap","selector":{"id":"settings-profile-edit"}},
+    {"action":"waitFor","selector":{"id":"edit-profile-name"},"state":"enabled","timeoutMs":10000},
+    {"action":"input","selector":{"id":"edit-profile-name"},"value":"Identity check draft"},
+    {"action":"tapUntil","sequence":[{"swipe":{"dir":"up"}}],"until":{"id":"edit-profile-nip05"},"attempts":4},
+    {"action":"input","selector":{"id":"edit-profile-nip05"},"value":"nobody@identity.invalid"},
+    {"action":"waitFor","selector":{"label":"nobody@identity.invalid. Could not verify"},"timeoutMs":15000},
+    {"action":"assert","that":"ax","selector":{"id":"edit-profile-save"},"state":{"enabled":false}},
+    {"action":"tap","selector":{"id":"edit-profile-nip05-retry"}},
+    {"action":"waitFor","selector":{"label":"nobody@identity.invalid. Could not verify"},"timeoutMs":15000},
+    {"action":"screenshot","name":"settings-edit-profile"},
+    {"action":"input","selector":{"id":"edit-profile-nip05"},"value":""},
+    {"action":"waitFor","selector":{"id":"edit-profile-save"},"state":"enabled","timeoutMs":10000},
+    {"action":"goHome"}
+  ],
+  "verify": [
+    {"action":"assert","that":"visible","selector":{"id":"wallet-send"}}
+  ],
+  "finally": [
+    {"use":"flow.return-to-wallet"}
+  ],
+  "endState": "wallet"
+}

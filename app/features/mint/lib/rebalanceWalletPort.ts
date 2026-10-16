@@ -1,9 +1,9 @@
 import type { Proof } from '@cashu/cashu-ts';
 import type { Manager } from '@cashu/coco-core';
 import type { RebalanceWalletPort } from 'wallet';
+import { amountToNumber, requireAmount } from 'wallet/amount';
 
 import { releaseTrustWindow } from '@/features/mint/components/rebalance';
-import { amountToNumber } from '@/shared/lib/cashu/amount';
 import { prepareBolt11MeltQuote, prepareBolt11MintQuote } from '@/shared/lib/cashu/cocoOperations';
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { getReadyProofs, getWallet } from '@/shared/lib/cashu/managerInternals';
@@ -27,13 +27,13 @@ export function createRebalanceWalletPort(manager: Manager, unit: string): Rebal
     async worstCaseInputFee(mintUrl) {
       const proofs = await getReadyProofs(manager, mintUrl);
       const wallet = await getWallet(manager, mintUrl, 'sat');
-      return amountToNumber(wallet.getFeesForProofs(proofs as unknown as Proof[]));
+      return requireAmount(wallet.getFeesForProofs(proofs as unknown as Proof[]));
     },
     async probeMeltFeeReserve(mintUrl, invoice) {
       // cashu-ts quote only: an HTTP read with no persistence or events.
       const wallet = await getWallet(manager, mintUrl, 'sat');
       const quote = await wallet.createMeltQuoteBolt11(invoice);
-      return amountToNumber(quote.fee_reserve ?? 0);
+      return requireAmount(quote.fee_reserve);
     },
     createMintReceipt: (mintUrl, amount) => prepareBolt11MintQuote(manager, mintUrl, amount, unit),
     getMintOperation: (operationId) => manager.ops.mint.get(operationId),

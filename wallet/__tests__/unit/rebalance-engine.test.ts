@@ -7,6 +7,7 @@ import {
   ProofValidationError,
 } from '@cashu/coco-core';
 
+import { insertStepsAfter } from '../../src/rebalance/chain';
 import { createRebalanceEngine } from '../../src/rebalance/engine';
 import { RebalanceMeltRolledBackError, RebalanceRoutesExhaustedError } from '../../src/rebalance/errors';
 import { createRebalanceLock } from '../../src/rebalance/lock';
@@ -401,5 +402,282 @@ describe('rebalance engine — runs', () => {
     ).rejects.toThrow('boom');
     expect(wallet.port.trustMint).toHaveBeenCalledWith(MIDDLEMAN);
     expect(wallet.port.releaseTrust).toHaveBeenCalledWith([MIDDLEMAN]);
+  });
+});
+
+describe('rebalance engine — routing a transfer through chosen mints', () => {
+  const PATH = [SOURCE, MIDDLEMAN, DESTINATION];
+
+  function routeThrough(settled: Set<string> = new Set([STEP.id])) {
+    const harness = setup({
+      balances: { [SOURCE]: 1000, [MIDDLEMAN]: 1000 },
+      trusted: [SOURCE, DESTINATION],
+    });
+    const rerouted: RebalanceTransfer[][] = [];
+    const started: string[] = [];
+    const finished: string[] = [];
+    const result = harness.engine.routeThrough(STEP, PATH, [STEP], {
+      isActive: () => true,
+      isSettled: (stepId) => settled.has(stepId),
+      sinkFor: () => harness.recorder.sink,
+      onTransferStart: (step) => started.push(step.id),
+      makeId: (label) => `id:${label}`,
+      onRerouted: (hops) => {
+        // Told once the intermediary is trusted and before anything is sent.
+        expect(harness.wallet.port.trustMint).toHaveBeenCalledWith(MIDDLEMAN);
+        expect(harness.wallet.port.prepareMelt).not.toHaveBeenCalled();
+        rerouted.push(hops);
+      },
+      onRunFinished: (result) => {
+        // Told the result before the trust is given back.
+        expect(result.status).toBe('finished');
+        expect(harness.wallet.port.releaseTrust).not.toHaveBeenCalled();
+        finished.push(result.status);
+      },
+    });
+    return { ...harness, result, rerouted, started, finished };
+  }
+
+  it('runs one transfer per hop, in order, and then gives the trust back', async () => {
+    const { result, rerouted, started, finished, wallet } = routeThrough();
+    await expect(result).resolves.toEqual({ status: 'finished', anyFailed: false, anyPending: false });
+    expect(finished).toEqual(['finished']);
+
+    // Swap history refers to legs by these ids.
+    expect(rerouted).toEqual([
+      [
+        {
+          ...STEP,
+          id: 'id:reroute-step-1-0',
+          fromMintUrl: SOURCE,
+          toMintUrl: MIDDLEMAN,
+          chainId: 'id:chain',
+          chainPath: PATH,
+          chainHopIndex: 0,
+        },
+        {
+          ...STEP,
+          id: 'id:reroute-step-1-1',
+          fromMintUrl: MIDDLEMAN,
+          toMintUrl: DESTINATION,
+          chainId: 'id:chain',
+          chainPath: PATH,
+          chainHopIndex: 1,
+        },
+      ],
+    ]);
+    expect(started).toEqual(['id:reroute-step-1-0', 'id:reroute-step-1-1']);
+    expect(wallet.port.executeMelt).toHaveBeenCalledTimes(2);
+    expect(wallet.port.releaseTrust).toHaveBeenCalledWith([MIDDLEMAN]);
+  });
+
+  it('gives the trust back when the run throws', async () => {
+    const harness = setup({ trusted: [SOURCE, DESTINATION] });
+    await expect(
+      harness.engine.routeThrough(STEP, PATH, [STEP], {
+        isActive: () => true,
+        isSettled: () => false,
+        sinkFor: () => harness.recorder.sink,
+        makeId: (label) => `id:${label}`,
+        onRerouted: () => {
+          throw new Error('boom');
+        },
+      })
+    ).rejects.toThrow('boom');
+    expect(harness.wallet.port.releaseTrust).toHaveBeenCalledWith([MIDDLEMAN]);
+  });
+});
+
+describe('chain steps', () => {
+  it('puts inserted steps straight after the named step, and copies the list when it is absent', () => {
+    const a = { ...STEP, id: 'a' };
+    const b = { ...STEP, id: 'b' };
+    const hop = { ...STEP, id: 'hop' };
+    expect(insertStepsAfter([a, b], 'a', [hop]).map((step) => step.id)).toEqual(['a', 'hop', 'b']);
+    expect(insertStepsAfter([a, b], 'missing', [hop]).map((step) => step.id)).toEqual(['a', 'b']);
+  });
+});
+
+describe('rebalance engine — money still on its way', () => {
+  const route: RebalanceRoute = {
+    path: [SOURCE, MIDDLEMAN, DESTINATION],
+    pathNames: ['Source', 'Middleman', 'Destination'],
+    source: 'local_history',
+  };
+  const balances = { [SOURCE]: 1000, [MIDDLEMAN]: 100, [DESTINATION]: 0 };
+  /** A melt that settles at the source while the destination has not issued yet. */
+  const paidNotIssued = async (id: string) => ({ id, state: 'finalized' });
+
+  it('stops a middleman chain at a hop whose money has not arrived, and pays nothing twice', async () => {
+    const second: RebalanceRoute = { ...route, source: 'graph' };
+    const { run, wallet, recorder } = setup({ balances, routes: [route, second] });
+    wallet.port.executeMelt
+      // The direct melt finds no route...
+      .mockRejectedValueOnce(new MintOperationError(20004, 'no_route'))
+      // ...and the first hop pays, but the middleman has not issued.
+      .mockImplementationOnce(paidNotIssued);
+
+    await expect(run()).resolves.toEqual({ status: 'settling' });
+
+    // The direct attempt and the one hop: no second hop from a mint that is
+    // short, and no second route sending the same amount again.
+    expect(wallet.port.executeMelt).toHaveBeenCalledTimes(2);
+    expect(recorder.statuses('step-1-hop-1-0').at(-1)).toBe('settling');
+    // The next hop is left as it was: not failed, not skipped.
+    expect(recorder.statuses('step-1-hop-1-1')).toEqual([]);
+    expect(recorder.events.some((event) => event.legId.startsWith('step-1-hop-2'))).toBe(false);
+    // The middleman the money is arriving at is not untrusted from under it.
+    expect(wallet.port.releaseTrust).toHaveBeenCalledWith([]);
+  });
+
+  it('holds a plan step that spends money still arriving at its source, then runs it once it is in', async () => {
+    const first: RebalanceTransfer = { ...STEP, id: 'to-middle', toMintUrl: MIDDLEMAN };
+    const second: RebalanceTransfer = {
+      ...STEP,
+      id: 'onward',
+      fromMintUrl: MIDDLEMAN,
+      toMintUrl: DESTINATION,
+    };
+    const { engine, wallet, recorder } = setup({
+      balances: { [SOURCE]: 1000, [MIDDLEMAN]: 0 },
+      trusted: [SOURCE, MIDDLEMAN, DESTINATION],
+    });
+    wallet.port.executeMelt.mockImplementationOnce(paidNotIssued);
+    const outcomes = new Map<string, string>();
+    const callbacks = {
+      isActive: () => true,
+      isSettled: (stepId: string) =>
+        ['done', 'settling', 'skipped'].includes(outcomes.get(stepId) ?? ''),
+      sinkFor: () => recorder.sink,
+      onTransferSettled: (step: RebalanceTransfer, outcome: { status: string }) =>
+        void outcomes.set(step.id, outcome.status),
+    };
+
+    await expect(engine.runTransfers([first, second], callbacks)).resolves.toEqual({
+      status: 'finished',
+      anyFailed: false,
+      anyPending: true,
+    });
+    expect(outcomes.get('to-middle')).toBe('settling');
+    // Not run, not skipped, not failed: nothing was reported for it at all.
+    expect(outcomes.has('onward')).toBe(false);
+    expect(recorder.statuses('onward')).toEqual([]);
+    expect(wallet.port.executeMelt).toHaveBeenCalledTimes(1);
+
+    // The middleman issues. A later run takes the held step up and sends it once.
+    wallet.payInvoice(wallet.invoiceByMelt.get('melt-1') ?? '');
+    wallet.port.balancesByMint.mockResolvedValue({ [SOURCE]: 900, [MIDDLEMAN]: 100 });
+    await expect(engine.runTransfers([first, second], callbacks)).resolves.toEqual({
+      status: 'finished',
+      anyFailed: false,
+      anyPending: false,
+    });
+    expect(outcomes.get('onward')).toBe('done');
+    expect(wallet.port.executeMelt).toHaveBeenCalledTimes(2);
+  });
+
+  it('tries no other route once a hop has paid: the amount has already left the source', async () => {
+    const second: RebalanceRoute = { ...route, source: 'graph' };
+    const { run, wallet, recorder } = setup({ balances, routes: [route, second] });
+    const refused = new MintOperationError(11001, 'Token already spent');
+    wallet.port.executeMelt
+      .mockRejectedValueOnce(new MintOperationError(20004, 'no_route'))
+      // Hop one pays and arrives at the middleman (the default behaviour)...
+      .mockImplementationOnce(async (id: string) => {
+        wallet.payInvoice(wallet.invoiceByMelt.get(id) ?? '');
+        return { id, state: 'finalized' };
+      })
+      // ...and hop two is turned down for good.
+      .mockRejectedValueOnce(refused);
+
+    const outcome = await run();
+
+    expect(outcome).toEqual({ status: 'failed', error: refused });
+    // Direct attempt, hop one, hop two. No second route from the source.
+    expect(wallet.port.executeMelt).toHaveBeenCalledTimes(3);
+    expect(recorder.events.some((event) => event.legId.startsWith('step-1-hop-2'))).toBe(false);
+  });
+
+  it('remembers what is in flight when the engine is rebuilt for the same screen', async () => {
+    const first: RebalanceTransfer = { ...STEP, id: 'to-middle', toMintUrl: MIDDLEMAN };
+    const second: RebalanceTransfer = { ...STEP, id: 'onward', fromMintUrl: MIDDLEMAN };
+    const wallet = fakeWallet({ [SOURCE]: 1000, [MIDDLEMAN]: 0 });
+    const clock = fakeClock();
+    const lock = createRebalanceLock(clock);
+    const build = () =>
+      createRebalanceEngine({
+        wallet: wallet.port,
+        findRoutes: async () => [],
+        trustedMintUrls: new Set([SOURCE, MIDDLEMAN, DESTINATION]),
+        minTransferThreshold: 5,
+        minFeeReserve: 5,
+        lock,
+        clock,
+      });
+    wallet.port.executeMelt.mockImplementationOnce(paidNotIssued);
+    const recorder = recordingSink();
+    const settled = new Set<string>();
+    const callbacks = {
+      isActive: () => true,
+      isSettled: (stepId: string) => settled.has(stepId),
+      sinkFor: () => recorder.sink,
+      onTransferSettled: (step: RebalanceTransfer) => void settled.add(step.id),
+    };
+
+    await build().runTransfers([first, second], callbacks);
+    // The screen rebuilds its engine (its inputs changed) and runs again.
+    const result = await build().runTransfers([first, second], callbacks);
+
+    expect(result).toEqual({ status: 'finished', anyFailed: false, anyPending: true });
+    expect(settled.has('onward')).toBe(false);
+    expect(wallet.port.executeMelt).toHaveBeenCalledTimes(1);
+  });
+
+  it('gives up on money that has not arrived after an hour, so nothing is held for good', async () => {
+    const first: RebalanceTransfer = { ...STEP, id: 'to-middle', toMintUrl: MIDDLEMAN };
+    const second: RebalanceTransfer = { ...STEP, id: 'onward', fromMintUrl: MIDDLEMAN };
+    const { engine, wallet, clock, recorder } = setup({
+      balances: { [SOURCE]: 1000, [MIDDLEMAN]: 100 },
+      trusted: [SOURCE, MIDDLEMAN, DESTINATION],
+    });
+    wallet.port.executeMelt.mockImplementationOnce(paidNotIssued);
+    const settled = new Set<string>();
+    const callbacks = {
+      isActive: () => true,
+      isSettled: (stepId: string) => settled.has(stepId),
+      sinkFor: () => recorder.sink,
+      onTransferSettled: (step: RebalanceTransfer) => void settled.add(step.id),
+    };
+    await engine.runTransfers([first, second], callbacks);
+    expect(settled.has('onward')).toBe(false);
+
+    await clock.sleep(60 * 60 * 1000);
+    await engine.runTransfers([first, second], callbacks);
+    // No longer held: it runs on what the mint actually holds.
+    expect(settled.has('onward')).toBe(true);
+  });
+
+  it('keeps a manually routed middleman trusted while the first hop is still arriving', async () => {
+    const harness = setup({
+      balances: { [SOURCE]: 1000, [MIDDLEMAN]: 0 },
+      trusted: [SOURCE, DESTINATION],
+    });
+    harness.wallet.port.executeMelt.mockImplementationOnce(paidNotIssued);
+    const outcomes = new Map<string, string>();
+
+    const result = await harness.engine.routeThrough(STEP, route.path, [STEP], {
+      isActive: () => true,
+      isSettled: (stepId) => stepId === STEP.id || outcomes.has(stepId),
+      sinkFor: () => harness.recorder.sink,
+      onTransferSettled: (step, outcome) => void outcomes.set(step.id, outcome.status),
+      makeId: (label) => `id:${label}`,
+      onRerouted: () => {},
+    });
+
+    expect(result).toEqual({ status: 'finished', anyFailed: false, anyPending: true });
+    expect(outcomes.get('id:reroute-step-1-0')).toBe('settling');
+    expect(outcomes.has('id:reroute-step-1-1')).toBe(false);
+    expect(harness.wallet.port.executeMelt).toHaveBeenCalledTimes(1);
+    expect(harness.wallet.port.releaseTrust).toHaveBeenCalledWith([]);
   });
 });

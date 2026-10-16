@@ -396,7 +396,7 @@ export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLay
         { viewer: short(request.viewerPubkey), paged: !!request.cursor },
         async (ctx) => {
           const candidates = candidatesFor<DmEnvelopesBundle>(config.tiers, 'getDmEnvelopes', (t) => () => t.getDmEnvelopes!(request));
-          return (await resolveAcrossTiers<DmEnvelopesBundle>(candidates, ctx)).map(({ tier, value }) => ({ tier, envelopes: value.envelopes, cursor: value.cursor }));
+          return (await resolveAcrossTiers<DmEnvelopesBundle>(candidates, ctx)).map(({ tier, value }) => ({ tier, envelopes: value.envelopes, cursor: value.cursor, ...(value.received === undefined ? {} : { received: value.received }) }));
         },
         (d) => ({ envelopes: d.envelopes.length }),
       );

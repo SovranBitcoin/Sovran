@@ -99,5 +99,5 @@ metadata without discarding credentials or sessions. The existing top-level
 was deliberately blessed for these additive fields, with populated round-trip
 and enum/resilience regressions.
 
-Follow-up F05 (critical-store recovery after whole-blob merge rejection) remains
+Follow-up F113 (a store with one bad saved field runs on defaults for every field) remains
 out of scope. These tolerant additions do not solve that broader recovery policy.

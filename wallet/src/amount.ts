@@ -8,60 +8,62 @@ export type AmountLike =
       toNumber(): number;
     };
 
-type AmountValue = AmountLike | null | undefined;
+export type AmountValue = AmountLike | null | undefined;
 
-function amountValueKind(value: AmountValue): string {
-  if (value == null) return "nullish";
-  if (typeof value !== "object") return typeof value;
-  return typeof value.toNumber === "function" ? "object.toNumber" : "object";
-}
-
-function logAmountConversion(
-  event: string,
-  value: AmountValue,
-  result: number | undefined,
-): void {
-  const kind = amountValueKind(value);
-  if (
-    kind === "number" &&
-    result != null &&
-    Number.isFinite(result) &&
-    Number.isSafeInteger(result)
-  ) {
-    return;
-  }
-
-  logger.debug(event, {
-    valueKind: kind,
-    resultKind: typeof result,
-    isFinite: typeof result === "number" ? Number.isFinite(result) : false,
-    isSafeInteger:
-      typeof result === "number" ? Number.isSafeInteger(result) : false,
-    isNullish: value == null,
-  });
-}
-
-export function amountToNumber(value: AmountValue): number {
+/** Undefined when the amount is missing or is not a finite number. */
+function parseAmount(value: AmountValue): number | undefined {
+  if (value == null) return undefined;
   let result: number;
-  if (value == null) {
-    result = 0;
-  } else if (typeof value === "number") {
+  if (typeof value === "number") {
     result = value;
   } else if (typeof value === "bigint") {
     result = Number(value);
   } else if (typeof value === "string") {
-    result = Number(value);
+    // `Number("")` is 0, which would turn a blank field into a real amount.
+    result = value.trim() === "" ? NaN : Number(value);
+  } else if (typeof value.toNumber === "function") {
+    try {
+      // cashu-ts throws for an amount too large to hold exactly.
+      result = value.toNumber();
+    } catch {
+      result = NaN;
+    }
   } else {
-    result = value.toNumber();
+    result = NaN;
   }
-  logAmountConversion("amount.toNumber.result", value, result);
-  return result;
+  if (Number.isFinite(result)) return result;
+  // Runs on every rendered amount, so only the anomaly is logged.
+  logger.warn("amount.unreadable", { valueKind: typeof value });
+  return undefined;
 }
 
+/**
+ * An amount to show. A missing or unreadable amount shows as 0, so this is for display and
+ * read models only: a price, a fee or an amount to pay or accept goes through `requireAmount`.
+ */
+export function amountToNumber(value: AmountValue): number {
+  return parseAmount(value) ?? 0;
+}
+
+/** As `amountToNumber`, keeping "not known" apart from zero. */
 export function amountToNumberOrUndefined(
   value: AmountValue,
 ): number | undefined {
-  const result = value == null ? undefined : amountToNumber(value);
-  logAmountConversion("amount.toNumberOrUndefined.result", value, result);
-  return result;
+  return parseAmount(value);
+}
+
+/**
+ * An amount that decides what is paid or accepted. Throws instead of inventing a number when
+ * the value is missing, unreadable, fractional, negative or too large to hold exactly.
+ */
+export function requireAmount(value: AmountValue): number {
+  // Plain digits only: `Number` would also read "1e3", "0x10" and " 21 ".
+  const amount =
+    typeof value === "string" && !/^\d+$/.test(value)
+      ? undefined
+      : parseAmount(value);
+  if (amount === undefined || !Number.isSafeInteger(amount) || amount < 0) {
+    throw new TypeError("amount is not a whole, non-negative number");
+  }
+  return amount;
 }

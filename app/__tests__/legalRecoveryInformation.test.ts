@@ -1,9 +1,22 @@
 import { readRecoveryInformation } from '@/features/settings/lib/readRecoveryInformation';
-import { retrieveMnemonic, retrieveImportedNsec } from '@/shared/lib/nostr/secureStorage';
+import {
+  hashMnemonic,
+  readAccountSecretsUnchanged,
+  retrieveMnemonic,
+  retrieveImportedNsec,
+} from '@/shared/lib/nostr/secureStorage';
 import type { ProfileEntry } from '@/shared/stores/global/profileStore';
 jest.mock('@/shared/lib/nostr/secureStorage', () => ({
   retrieveMnemonic: jest.fn(),
   retrieveImportedNsec: jest.fn(),
+  hashMnemonic: (phrase: string) => `hash:${phrase.length}:${phrase.slice(0, 6)}`,
+  readAccountSecretsUnchanged: jest.fn(async () => ({
+    importedNsec: null,
+    derivedKeys: null,
+    walletPhrase: null,
+    walletSeed: null,
+    keptDerivedNsec: null,
+  })),
 }));
 jest.mock('@/shared/lib/logger', () => ({ log: { info: jest.fn(), debug: jest.fn() } }));
 // Public vectors shared with keyDerivation.test.ts.
@@ -19,6 +32,13 @@ const profile: ProfileEntry = {
 };
 beforeEach(() => {
   jest.clearAllMocks();
+  jest.mocked(readAccountSecretsUnchanged).mockResolvedValue({
+    importedNsec: null,
+    derivedKeys: null,
+    walletPhrase: null,
+    walletSeed: null,
+    keptDerivedNsec: null,
+  });
   jest.mocked(retrieveMnemonic).mockResolvedValue(ROOT_MNEMONIC);
   jest.mocked(retrieveImportedNsec).mockResolvedValue(IMPORTED_NSEC);
 });
@@ -43,4 +63,66 @@ test('missing root does not hide an available imported identity or manufacture w
     nsec: IMPORTED_NSEC,
   });
   await expect(readRecoveryInformation(null)).rejects.toThrow('unavailable');
+});
+
+// The account 0 key and wallet phrase of the NIP-06 vector above.
+const derivedProfile: ProfileEntry = {
+  accountIndex: 0,
+  pubkey: '17162c921dc4d2518f9a101db33695df1afb56ab82f5ff3e5da6eec3ca5cd917',
+  addedAt: 0,
+};
+const DERIVED_WALLET_PHRASE =
+  'bitter session sketch page tissue silent purity mix begin series arrow various pigeon destroy woman judge agree marine seek crush change alone liar tortoise';
+const OTHER_WALLET_PHRASE =
+  'omit minute century number region device breeze trophy enter phrase item harsh shove garbage embark audit law turtle scene lift segment renew sister useful';
+const nothingStored = {
+  importedNsec: null,
+  derivedKeys: null,
+  walletPhrase: null,
+  walletSeed: null,
+  keptDerivedNsec: null,
+};
+
+test('shows a conflicting wallet phrase cached on the device beside the derived one', async () => {
+  // Stamped as made from the current phrase, but not what it derives: the
+  // wallet may have been opened under it, so a person keeping a copy needs both.
+  jest.mocked(readAccountSecretsUnchanged).mockResolvedValue({
+    ...nothingStored,
+    walletPhrase: { value: OTHER_WALLET_PHRASE, mnemonicHash: hashMnemonic(ROOT_MNEMONIC) },
+  });
+  expect(await readRecoveryInformation(derivedProfile)).toEqual({
+    mnemonic: ROOT_MNEMONIC,
+    nsec: OTHER_NSEC,
+    cashuMnemonic: DERIVED_WALLET_PHRASE,
+    storedCashuMnemonic: OTHER_WALLET_PHRASE,
+  });
+});
+
+test('shows nothing extra for a cache that agrees, or one left by an earlier phrase', async () => {
+  for (const walletPhrase of [
+    { value: DERIVED_WALLET_PHRASE, mnemonicHash: hashMnemonic(ROOT_MNEMONIC) },
+    { value: OTHER_WALLET_PHRASE, mnemonicHash: 'an-earlier-phrase' },
+  ]) {
+    jest.mocked(readAccountSecretsUnchanged).mockResolvedValue({ ...nothingStored, walletPhrase });
+    expect(await readRecoveryInformation(derivedProfile)).toEqual({
+      mnemonic: ROOT_MNEMONIC,
+      nsec: OTHER_NSEC,
+      cashuMnemonic: DERIVED_WALLET_PHRASE,
+    });
+  }
+});
+
+test('shows the key kept in the cache for a profile the phrase does not derive, even from a damaged blob', async () => {
+  const mismatched: ProfileEntry = { ...derivedProfile, pubkey: profile.pubkey };
+  jest.mocked(readAccountSecretsUnchanged).mockResolvedValue(nothingStored);
+  await expect(readRecoveryInformation(mismatched)).rejects.toThrow('does not match');
+
+  jest
+    .mocked(readAccountSecretsUnchanged)
+    .mockResolvedValue({ ...nothingStored, keptDerivedNsec: IMPORTED_NSEC });
+  expect(await readRecoveryInformation(mismatched)).toEqual({
+    mnemonic: ROOT_MNEMONIC,
+    nsec: IMPORTED_NSEC,
+    cashuMnemonic: null,
+  });
 });

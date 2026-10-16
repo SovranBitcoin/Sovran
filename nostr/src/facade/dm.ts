@@ -13,10 +13,9 @@ import type { TierOutcome } from '../tiers';
 // sender inside the seal, so no tier can build a sender-keyed conversation list
 // or per-peer unread. Tiers are pure transport for opaque envelopes.
 //
-// Pagination is by wrap ARRIVAL/ingest time, NOT event created_at: a gift wrap's
-// created_at is randomized into the past, so ordering/filtering by it would
-// silently drop conversations. nagg stores ingest time and paginates by it; the
-// relay floor fetches with NO since/limit for the same reason.
+// nagg paginates by event created_at; gift-wrap timestamps are randomized into
+// the past, so the relay floor fetches without a limit. Incremental inbox callers
+// may explicitly bound event created_at with since, allowing for randomization.
 // ---------------------------------------------------------------------------
 
 export type DmEnvelope = {
@@ -32,8 +31,10 @@ export type DmEnvelope = {
 
 export type DmEnvelopesRequest = RequestControls & {
   viewerPubkey: string;
-  /** Arrival-time cursor (nagg); ignored by the relay floor. */
+  /** Event-time pagination cursor (nagg); ignored by the relay floor. */
   cursor?: NostrCursor;
+  /** Inclusive event created_at lower bound; gift-wrap callers need an overlap. */
+  since?: number;
   limit?: number;
   refresh?: boolean;
 };
@@ -41,12 +42,19 @@ export type DmEnvelopesRequest = RequestControls & {
 export type DmEnvelopesBundle = {
   envelopes: DmEnvelope[];
   cursor: NostrCursor;
+  /**
+   * How many wraps the tier sent, counting any left out because they did not
+   * parse. A pager that judges "was this page full" by `envelopes.length`
+   * would stop at the first page that lost one. Absent: `envelopes.length`.
+   */
+  received?: number;
 };
 
 export type ResolvedDmEnvelopes = {
   tier: NostrTier;
   envelopes: DmEnvelope[];
   cursor: NostrCursor;
+  received?: number;
 };
 
 export interface DmTier {
@@ -60,7 +68,7 @@ export const DM_ENVELOPE_KINDS = [4, 1059];
 /**
  * Bridge a v2 DM envelope into opaque DmEnvelopes. By design the DM routes
  * carry NO aggregates and NO profile hydration (privacy) — only the raw
- * encrypted wraps, ordered by arrival. The tail envelope is the next page's
+ * encrypted wraps, ordered by event time. The tail envelope is the next page's
  * cursor.
  */
 export function bundleFromDmEnvelope(envelope: NaggEnvelope): DmEnvelopesBundle {
@@ -78,5 +86,9 @@ export function bundleFromDmEnvelope(envelope: NaggEnvelope): DmEnvelopesBundle 
     };
   });
   const last = envelopes[envelopes.length - 1];
-  return { envelopes, cursor: last ? { createdAt: last.createdAtSec, id: last.id } : null };
+  return {
+    envelopes,
+    cursor: last ? { createdAt: last.createdAtSec, id: last.id } : null,
+    received: Math.max(envelope.order.length, envelopes.length),
+  };
 }

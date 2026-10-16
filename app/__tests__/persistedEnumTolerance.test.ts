@@ -13,7 +13,7 @@
  * invariant), and it is why the house rule is `.catch(D)` where a neutral
  * member exists and a tolerant collection where one does not.
  *
- * `skills/sovran-deslop/rules/persisted-enum-needs-catch.yml` enforces this
+ * The workspace's `persisted-enum-needs-catch` rule enforces this
  * syntactically, but it matches `z.enum(...)` text inside store-file globs, so
  * it cannot see:
  *   - an enum imported from elsewhere (`ThemeMode` from
@@ -55,6 +55,7 @@ import '@/shared/stores/global/settingsStore';
 import { useMintMetadataStore } from '@/shared/stores/global/mintMetadataStore';
 import '@/shared/stores/global/walletLifecycleStore';
 import '@/shared/stores/global/ctaStore';
+import '@/shared/stores/global/legacyEcashStore';
 import '@/shared/stores/global/wallpaperStore';
 import '@/shared/stores/profile/dataMigrationStore';
 import '@/shared/stores/profile/dmLastMessageStore';
@@ -231,7 +232,14 @@ const APP_DIR = resolve(__dirname, '..');
  * Files that call `persistConfig` but register no fixed store name, so they
  * cannot be imported above. Mirrors `persistRoundTrip`'s list.
  */
-const NOT_A_CONCRETE_STORE = ['shared/lib/cache/createQueryCacheStore.ts'];
+const NOT_A_CONCRETE_STORE = [
+  'shared/lib/profile/profileRemovalStorage.ts', // Registry consumer, no store declaration.
+  'shared/lib/cache/createQueryCacheStore.ts',
+  // Readers of the registry, not stores.
+  'shared/lib/cashu/profileScopedStorage.ts',
+  'shared/lib/debug/storageInventory.ts',
+  'shared/lib/profile/inProcessProfileSwitch.ts',
+];
 
 /** Every file that calls `persistConfig`, from the source tree. */
 function persistConfigCallSites(): string[] {

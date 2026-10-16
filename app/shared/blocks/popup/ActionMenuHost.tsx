@@ -37,7 +37,7 @@ import Icon from 'assets/icons';
 import { E2EAccessibilityProbe } from '@/shared/lib/e2e/E2EAccessibilityProbe';
 import { markE2EHerouiMenu } from '@/shared/lib/popup/E2EActionMenuProbe';
 import { OPEN_WATCHDOG_MS } from '@/shared/lib/popup/openWatchdog';
-import { SheetMenuRowContent } from '@/shared/lib/popup/popups/sheetMenuRow';
+import { MenuRowTint, SheetMenuRowContent } from '@/shared/lib/popup/popups/sheetMenuRow';
 import { SheetSearchField } from '@/shared/lib/popup/SheetSearchField';
 import { MenuScrim } from '@/shared/blocks/popup/MenuScrim';
 
@@ -470,7 +470,11 @@ function ActionMenuInstance({
             broke" at a glance instead of competing visually with neighbouring
             "Recommended" items. The description prefix ("Failed: ...") stays
             for screen readers — colour alone is not an accessibility signal. */}
-        {button.isFailed ? <View className="bg-danger/10 mx-1 rounded-2xl">{item}</View> : item}
+        <MenuRowTint
+          tone={button.isFailed ? 'failed' : button.isCaution ? 'caution' : undefined}
+          disabled={button.disabled === true}>
+          {item}
+        </MenuRowTint>
       </React.Fragment>
     );
   };

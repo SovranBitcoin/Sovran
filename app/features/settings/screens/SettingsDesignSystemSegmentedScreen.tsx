@@ -1,12 +1,13 @@
 import { ScreenScrollView } from '@/shared/ui/composed/ScreenScrollView';
 import { useEffect, useRef, useState } from 'react';
 
-import { Button, Card } from 'heroui-native';
+import { Button as HerouiButton, Card } from 'heroui-native';
 
 import { getDesignSystemFamily } from '@/features/settings/design-system/catalog';
 import { SEGMENT_COUNT_OPTIONS } from '@/features/settings/design-system/segmentedProgress';
 import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
 import { Section } from '@/shared/ui/composed/Section';
+import { Button } from '@/shared/ui/primitives/Button';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
@@ -121,22 +122,22 @@ export function SettingsDesignSystemSegmentedScreen() {
             <HStack gap={8} wrap="wrap">
               {SEGMENT_COUNT_OPTIONS.map((count) => (
                 <View key={count} style={{ width: 58 }}>
-                  <Button
+                  <HerouiButton
                     variant={segmentCount === count ? 'primary' : 'secondary'}
                     size="sm"
                     testID={`design-system-segmented-count-${count}`}
                     accessibilityLabel={`${count} segments`}
                     accessibilityState={{ selected: segmentCount === count }}
                     onPress={() => onSelectSegmentCount(count)}>
-                    <Button.Label>{count}</Button.Label>
-                  </Button>
+                    <HerouiButton.Label>{count}</HerouiButton.Label>
+                  </HerouiButton>
                 </View>
               ))}
             </HStack>
 
             <HStack gap={8}>
               <View className="flex-1">
-                <Button
+                <HerouiButton
                   variant={segmentsAuto ? 'primary' : 'secondary'}
                   size="sm"
                   testID="design-system-segmented-auto"
@@ -144,26 +145,26 @@ export function SettingsDesignSystemSegmentedScreen() {
                   accessibilityLabel="Auto-play"
                   accessibilityState={{ checked: segmentsAuto }}
                   onPress={() => setSegmentsAuto((value) => !value)}>
-                  <Button.Label>{segmentsAuto ? 'Pause' : 'Play'}</Button.Label>
-                </Button>
+                  <HerouiButton.Label>{segmentsAuto ? 'Pause' : 'Play'}</HerouiButton.Label>
+                </HerouiButton>
               </View>
               <View className="flex-1">
                 <Button
                   variant="secondary"
-                  size="sm"
+                  size="compact"
+                  text="Step"
                   testID="design-system-segmented-step"
-                  onPress={onStepSegment}>
-                  <Button.Label>Step</Button.Label>
-                </Button>
+                  onPress={onStepSegment}
+                />
               </View>
               <View className="flex-1">
                 <Button
                   variant="secondary"
-                  size="sm"
+                  size="compact"
+                  text="Reset"
                   testID="design-system-segmented-reset"
-                  onPress={onResetSegments}>
-                  <Button.Label>Reset</Button.Label>
-                </Button>
+                  onPress={onResetSegments}
+                />
               </View>
             </HStack>
           </Card.Body>

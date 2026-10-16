@@ -1,6 +1,6 @@
 import { api } from './api';
 import { state, update, type JobView } from './state';
-import { visibleFrames } from './components/player';
+import { videoIsActive, visibleFrames } from './components/player';
 import { buildRunPlan } from '../lib/run-plan';
 import type { DiffResult, RunDetail, RunSummary, TriggerRequest } from '../lib/types';
 
@@ -121,7 +121,7 @@ function applyLiveDetail(detail: RunDetail): void {
       nextTimeline &&
       atTail &&
       !current.playing &&
-      !current.videoMode &&
+      !videoIsActive(nextTimeline) &&
       scenarioId === detail.activeScenarioId
     ) {
       current.frameIndex = Math.max(visibleFrames(nextTimeline).length - 1, 0);

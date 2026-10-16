@@ -21,7 +21,7 @@ import { View } from 'react-native';
 import { BottomSheet, Menu } from 'heroui-native';
 
 import Icon from 'assets/icons';
-import { SheetMenuRowContent } from './sheetMenuRow';
+import { MenuRowTint, SheetMenuRowContent } from './sheetMenuRow';
 import { log } from '@/shared/lib/logger';
 import { E2EActionMenuRenderMarker, E2EActionMenuTargetMarker } from '../E2EActionMenuProbe';
 
@@ -89,29 +89,33 @@ export function ActionMenuSheetContent({ payload, close }: ActionMenuSheetConten
             : button.description;
           const isDanger = button.isFailed === true || button.variant === 'dangerous';
           return (
-            <Menu.Item
+            <MenuRowTint
               key={button.testID}
-              testID={button.testID}
-              accessibilityLabel={button.accessibilityLabel}
-              accessibilityHint={button.accessibilityHint}
-              isDisabled={disabled}
-              isSelected={button.selected}
-              variant={isDanger ? 'danger' : 'default'}
-              onPress={() => {
-                if (disabled) return;
-                pickedRef.current = true;
-                void runSheetAction(button, close);
-              }}>
-              <E2EActionMenuTargetMarker actionId={button.testID} disabled={disabled} />
-              <SheetMenuRowContent
-                icon={
-                  button.iconNode ?? (button.icon ? <Icon name={button.icon} size={20} /> : null)
-                }
-                title={button.text}
-                description={description || null}
-                trailing={button.suffix ? <View>{button.suffix}</View> : null}
-              />
-            </Menu.Item>
+              tone={button.isFailed ? 'failed' : button.isCaution ? 'caution' : undefined}
+              disabled={button.disabled === true}>
+              <Menu.Item
+                testID={button.testID}
+                accessibilityLabel={button.accessibilityLabel}
+                accessibilityHint={button.accessibilityHint}
+                isDisabled={disabled}
+                isSelected={button.selected}
+                variant={isDanger ? 'danger' : 'default'}
+                onPress={() => {
+                  if (disabled) return;
+                  pickedRef.current = true;
+                  void runSheetAction(button, close);
+                }}>
+                <E2EActionMenuTargetMarker actionId={button.testID} disabled={disabled} />
+                <SheetMenuRowContent
+                  icon={
+                    button.iconNode ?? (button.icon ? <Icon name={button.icon} size={20} /> : null)
+                  }
+                  title={button.text}
+                  description={description || null}
+                  trailing={button.suffix ? <View>{button.suffix}</View> : null}
+                />
+              </Menu.Item>
+            </MenuRowTint>
           );
         })}
       </Menu>

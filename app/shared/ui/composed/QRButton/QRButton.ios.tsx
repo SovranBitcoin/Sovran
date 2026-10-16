@@ -20,6 +20,7 @@ export function QRButton(props: QRButtonProps): React.ReactElement {
   const {
     foreground,
     background,
+    glass,
     borderRadius,
     containerStyle,
     pressableStyle,
@@ -76,9 +77,9 @@ export function QRButton(props: QRButtonProps): React.ReactElement {
             style={[styles.pressable, pressableStyle]}>
             <PressableFeedback.Ripple />
             <View style={[styles.container, containerStyle]} pointerEvents="none">
-              <QRButtonFace foreground={foreground} background={background} />
+              <QRButtonFace foreground={foreground} background={background} glass={glass} />
             </View>
-            <QRButtonGlyph background={background} />
+            <QRButtonGlyph background={background} size={Math.round(size * 0.56)} />
           </PressableFeedback>
         </Animated.View>
       </Animated.View>

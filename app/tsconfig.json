@@ -35,6 +35,7 @@
     // their callers at all.
     "moduleSuffixes": [".ios", ""],
     "paths": {
+      "bitchat-module": ["./modules/bitchat-module/index.ts"],
       // Match Metro: workspace source, including worktrees with shared node_modules.
       "nostr": ["../nostr/src/index.ts"],
       "nostr/map": ["../nostr/src/map/index.ts"],
@@ -42,6 +43,7 @@
       "nostr/schemas": ["../nostr/src/schemas.ts"],
       "wallet": ["../wallet/src/index.ts"],
       "wallet/react": ["../wallet/src/react/index.ts"],
+      "wallet/amount": ["../wallet/src/amount.ts"],
       "wallet/units": ["../wallet/src/units/index.ts"],
       "wallet/safeFetch": ["../wallet/src/safeFetch.ts"],
       "wallet/operations": ["../wallet/src/operations/index.ts"],

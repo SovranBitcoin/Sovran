@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSyncExternalStore } from "react";
 import type { HistoryEntry, Manager } from "@cashu/coco-core";
 
 import { logger } from "../logger";
@@ -17,7 +17,7 @@ import {
 } from "../annotations";
 import type { AnnotationStoreAdapter } from "../annotations";
 import { useAnnotationStore, useColadaManager } from "./ColadaProvider";
-import { useLatestRef } from "./useLatestRef";
+import { createSharedReadStore, type SharedReadStore } from "./sharedReadStore";
 
 export interface UseColadaTransactionsResult {
   /** Merged, deduped, newest-first transaction history. */
@@ -41,10 +41,9 @@ export interface UseColadaTransactionsResult {
  * The annotation store notifies on every write, including one for a
  * transaction that is not on screen, so without this an unrelated annotation
  * would hand every history consumer a brand-new list. The stabiliser owns its
- * own `previous` — a closure variable created once per hook instance, not a
- * ref. That distinction is the point: a ref read and written in render is what
- * the React Compiler refuses to compile past, and this hook feeding the
- * transaction list unmemoized is a worse trade than the render it saves.
+ * own `previous` in the shared annotation view. External-store notifications
+ * recompute that view directly, so the compiler cannot cache an annotation
+ * read behind a version dependency that its body does not read.
  */
 function createAnnotatedListStabiliser(): (
   entries: readonly HistoryEntry[],
@@ -64,17 +63,7 @@ function createAnnotatedListStabiliser(): (
   };
 }
 
-/**
- * Keep the previous array whenever the complete row content is unchanged, so a refresh that returns the same rows cannot hand
- * consumers a brand-new list. Written to be passed straight to `setState`,
- * where React additionally short-circuits the re-render once the updater
- * returns the value it already holds.
- *
- * This is where list identity is now established. It used to be re-derived in
- * render from a snapshot ref after the merge — same guarantee, but a ref read
- * and written during render is a Rules-of-React violation, and it was one of
- * the reasons this hook never compiled.
- */
+/** Keep list identity when the complete display-relevant row content is unchanged. */
 function keepIfSame(
   prev: HistoryEntry[],
   next: HistoryEntry[],
@@ -193,366 +182,228 @@ export function useColadaTransactions(
 ): UseColadaTransactionsResult {
   const manager = useColadaManager();
   const annotationStore = useAnnotationStore();
+  const store = transactionStore(manager, pageSize, annotationStore);
+  return useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
+}
 
-  const [cocoHistory, setCocoHistory] = useState<HistoryEntry[]>([]);
-  const [receiveEntries, setReceiveEntries] = useState<HistoryEntry[]>([]);
-  const [pendingRequestEntries, setPendingRequestEntries] = useState<
-    HistoryEntry[]
-  >([]);
-  const [isFetching, setIsFetching] = useState(false);
-  // `hasMore` is state, not a bare ref. It used to be read straight off
-  // `hasMoreRef.current` in the returned object — a ref read during render,
-  // which means the value the consumer gets is whatever the ref happened to
-  // hold at the last render React decided to run. Nothing re-renders when the
-  // ref moves, so an infinite-scroll list could keep asking for a page that no
-  // longer exists, or stop asking while pages remained. The ref stays only as
-  // the synchronous re-entry guard for `loadMore`, mirrored on every write —
-  // the same split `isFetching`/`fetchingRef` already uses here.
-  const [hasMore, setHasMore] = useState(true);
-  // Bumped whenever the annotation store changes so the merged list recomputes.
-  const [annotationVersion, setAnnotationVersion] = useState(0);
+const transactions = new WeakMap<Manager, Map<number, {
+  base: SharedReadStore<UseColadaTransactionsResult>;
+  annotated: WeakMap<AnnotationStoreAdapter, SharedReadStore<UseColadaTransactionsResult>>;
+}>>();
 
-  // coco pagination state — mirrors @cashu/coco-react usePaginatedHistory.
-  // Last successfully loaded page; a failed first read must retry offset zero.
-  const offsetRef = useRef(-pageSize);
-  const hasMoreRef = useRef(true);
-  const modeRef = useRef<"infinite" | "page">("infinite");
-  // Which code path produced the current cocoHistory — stamped right before
-  // each setCocoHistory, logged once per committed change below.
-  const historyReasonRef = useRef("init");
-  const mountedRef = useRef(true);
-  const sessionRef = useRef(0);
-  const fetchingRef = useRef(false);
-  const refreshPendingRef = useRef(false);
-  const refreshRef = useRef<() => Promise<void>>(async () => {});
-  const supplementReadRef = useRef<{
-    session: number;
-    requested: boolean;
-    promise: Promise<void>;
-  } | null>(null);
-  // Written in useInsertionEffect rather than in the render body: a ref write
-  // during render switches the React Compiler off for the whole hook, and a
-  // discarded concurrent render must not mutate it. Every read is from a
-  // callback or a coco event, all of which run after insertion effects.
-  const managerRef = useLatestRef(manager);
-
-  const setFetching = useCallback((value: boolean) => {
-    fetchingRef.current = value;
-    setIsFetching(value);
-    if (!value && refreshPendingRef.current) {
-      refreshPendingRef.current = false;
-      // History can change during a page read. Keep one trailing refresh so
-      // those events cannot disappear behind the pagination re-entry guard.
-      void refreshRef.current();
-    }
-  }, []);
-
-  const applyHasMore = useCallback((value: boolean) => {
-    hasMoreRef.current = value;
-    setHasMore(value);
-  }, []);
-
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
+function transactionStore(
+  manager: Manager,
+  pageSize: number,
+  annotationStore: AnnotationStoreAdapter,
+): SharedReadStore<UseColadaTransactionsResult> {
+  let sizes = transactions.get(manager);
+  if (!sizes) {
+    sizes = new Map();
+    transactions.set(manager, sizes);
+  }
+  let scope = sizes.get(pageSize);
+  if (!scope) {
+    scope = { base: createTransactionStore(manager, pageSize), annotated: new WeakMap() };
+    sizes.set(pageSize, scope);
+  }
+  let view = scope.annotated.get(annotationStore);
+  if (!view) {
+    const base = scope.base;
+    const annotate = createAnnotatedListStabiliser();
+    let previous: UseColadaTransactionsResult | undefined;
+    const project = () => {
+      const snapshot = base.getSnapshot();
+      const history = annotate(snapshot.history, annotationStore);
+      if (previous && previous.history === history &&
+          previous.hasMore === snapshot.hasMore &&
+          previous.isFetching === snapshot.isFetching &&
+          previous.refresh === snapshot.refresh) return previous;
+      previous = { ...snapshot, history };
+      return previous;
     };
-  }, []);
-
-  // Render-order diagnostics: one line per committed list change, tagged
-  // with the path that produced it.
-  useEffect(() => {
-    logger.info("history.state.applied", {
-      reason: historyReasonRef.current,
-      mode: modeRef.current,
-      offset: offsetRef.current,
-      ...summarizeEntries(cocoHistory),
+    view = createSharedReadStore(project, (publish) => {
+      const onChange = () => publish(project());
+      const offAnnotations = annotationStore.subscribe(onChange);
+      const offBase = base.subscribe(onChange);
+      onChange();
+      return () => {
+        offAnnotations();
+        offBase();
+      };
     });
-  }, [cocoHistory]);
+    scope.annotated.set(annotationStore, view);
+  }
+  return view;
+}
 
-  const fetchPage = useCallback(
-    (offset: number) => readHistoryPage(managerRef.current, offset, pageSize),
-    // The dep list names the ref the body reaches as well as `pageSize`. Refs
-    // are stable, so this is longer, not looser — but a memo whose body reads
-    // something the list does not name is one the compiler refuses to
-    // preserve, and that stops it compiling the whole hook.
-    [pageSize, managerRef],
-  );
+function emptyTransactions(): UseColadaTransactionsResult {
+  return {
+    history: [], hasMore: true, isFetching: false,
+    loadMore: async () => {}, goToPage: async () => {}, refresh: async () => {},
+  };
+}
 
-  const fetchSupplements = useCallback(() => {
-    const session = sessionRef.current;
-    const active = supplementReadRef.current;
-    if (active?.session === session) {
-      active.requested = true;
-      return active.promise;
-    }
-    const manager = managerRef.current;
-    const work = { session, requested: true, promise: Promise.resolve() };
-    supplementReadRef.current = work;
-    const run = async () => {
-      while (
-        work.requested &&
-        mountedRef.current &&
-        sessionRef.current === session
-      ) {
-        work.requested = false;
-        const next = await readSupplements(manager);
-        if (
-          !next ||
-          work.requested ||
-          !mountedRef.current ||
-          sessionRef.current !== session
-        )
-          continue;
-        setReceiveEntries((prev) => keepIfSame(prev, next.receives));
-        setPendingRequestEntries((prev) =>
-          keepIfSame(prev, next.pendingRequests),
-        );
-      }
-    };
-    // Each scope has one read plus one trailing invalidation. A retired
-    // manager's completion must never release the new manager's queue.
-    work.promise = run().finally(() => {
-      if (supplementReadRef.current === work) supplementReadRef.current = null;
-    });
-    return work.promise;
-  }, [managerRef, mountedRef, sessionRef]);
-
-  const refresh = useCallback(async () => {
-    if (fetchingRef.current) {
-      refreshPendingRef.current = true;
-      return;
-    }
-    const session = sessionRef.current;
-    setFetching(true);
-    // `Promise.prototype.finally` rather than a `try`/`finally` statement,
-    // here and in loadMore/goToPage below. The guarantee is identical — the
-    // spinner stops and `fetchingRef` clears on success and on throw alike —
-    // but the React Compiler cannot lower a `try` with a `finally`, and these
-    // three statements were the whole reason this hook rendered unmemoized.
-    const run = async () => {
-      const supplements = fetchSupplements();
-      if (modeRef.current === "infinite") {
-        // Merge a fresh page 0 onto the head at ANY scroll depth. This
-        // deliberately diverges from coco-react's usePaginatedHistory, which
-        // only head-merges at offset 0 and otherwise REPLACES the whole
-        // accumulated list with the single window at the current offset —
-        // after loadMore, a history:updated event (any new transaction)
-        // would drop every newer page and jump the list to old history.
-        // Upstream-feedback case; report against coco-react.
-        const page = await fetchPage(0);
-        if (page && mountedRef.current && sessionRef.current === session) {
-          if (offsetRef.current <= 0) applyHasMore(page.length === pageSize);
-          offsetRef.current = Math.max(0, offsetRef.current);
-          historyReasonRef.current = "refresh-head";
-          setCocoHistory((prev) => {
-            const pageIds = new Set(page.map((n) => n.id));
-            const fresh = prev.filter((p) => !pageIds.has(p.id));
-            return keepIfSame(prev, [...page, ...fresh]);
-          });
-        }
-      } else {
-        const page = await fetchPage(offsetRef.current);
-        if (page && mountedRef.current && sessionRef.current === session) {
-          applyHasMore(page.length === pageSize);
-          historyReasonRef.current = "refresh-window";
-          setCocoHistory((prev) => keepIfSame(prev, page));
-        }
-      }
-      await supplements;
-    };
-    await run().finally(() => {
-      if (mountedRef.current && sessionRef.current === session)
-        setFetching(false);
-    });
-  }, [
-    fetchPage,
-    fetchSupplements,
-    setFetching,
-    applyHasMore,
-    pageSize,
-    sessionRef,
-  ]);
-
-  // Keep a stable ref to refresh for event handlers.
-  useEffect(() => {
-    refreshRef.current = refresh;
-  }, [refresh]);
-
-  // Initial load + reload when the manager identity changes (profile switch).
-  useEffect(() => {
+function createTransactionStore(
+  manager: Manager,
+  pageSize: number,
+): SharedReadStore<UseColadaTransactionsResult> {
+  return createSharedReadStore(emptyTransactions, (publish) => {
+    // Everything below belongs to this subscription lifetime. Cleanup retires
+    // its reads and callbacks even if the same scope immediately remounts.
     let cancelled = false;
-    sessionRef.current += 1;
-    refreshPendingRef.current = false;
-    setCocoHistory([]);
-    setReceiveEntries([]);
-    setPendingRequestEntries([]);
-    applyHasMore(true);
+    let cocoHistory: HistoryEntry[] = [];
+    let receiveEntries: HistoryEntry[] = [];
+    let pendingRequestEntries: HistoryEntry[] = [];
+    let history: HistoryEntry[] = [];
+    let isFetching = false;
+    let hasMore = true;
+    let offset = -pageSize;
+    let mode: "infinite" | "page" = "infinite";
+    let refreshPending = false;
+    let supplementRead: { requested: boolean; promise: Promise<void> } | null = null;
+
+    const emit = () => {
+      if (cancelled) return;
+      history = keepIfSame(history, mergeTransactionSources({
+        cocoHistory, receiveEntries, pendingRequestEntries,
+      }));
+      publish({ history, loadMore, goToPage, refresh, hasMore, isFetching });
+    };
+    const applyHistory = (next: HistoryEntry[], reason: string) => {
+      const previous = cocoHistory;
+      cocoHistory = keepIfSame(previous, next);
+      if (cocoHistory !== previous) {
+        logger.info("history.state.applied", {
+          reason, mode, offset, ...summarizeEntries(cocoHistory),
+        });
+      }
+      emit();
+    };
+    const setFetching = (value: boolean) => {
+      isFetching = value;
+      emit();
+      if (!value && refreshPending && !cancelled) {
+        refreshPending = false;
+        void refresh();
+      }
+    };
+    const fetchPage = (offset: number) => readHistoryPage(manager, offset, pageSize);
+    const fetchSupplements = () => {
+      if (cancelled) return Promise.resolve();
+      if (supplementRead) {
+        supplementRead.requested = true;
+        return supplementRead.promise;
+      }
+      const work = { requested: true, promise: Promise.resolve() };
+      supplementRead = work;
+      const run = async () => {
+        while (work.requested && !cancelled) {
+          work.requested = false;
+          const next = await readSupplements(manager);
+          if (!next || work.requested || cancelled) continue;
+          receiveEntries = keepIfSame(receiveEntries, next.receives);
+          pendingRequestEntries = keepIfSame(pendingRequestEntries, next.pendingRequests);
+          emit();
+        }
+      };
+      work.promise = run().finally(() => {
+        if (supplementRead === work) supplementRead = null;
+      });
+      return work.promise;
+    };
+    const refresh = async () => {
+      if (cancelled) return;
+      if (isFetching) {
+        refreshPending = true;
+        return;
+      }
+      setFetching(true);
+      const run = async () => {
+        const supplements = fetchSupplements();
+        if (mode === "infinite") {
+          // Refresh the head at any scroll depth without dropping older pages.
+          const page = await fetchPage(0);
+          if (page && !cancelled) {
+            if (offset <= 0) hasMore = page.length === pageSize;
+            offset = Math.max(0, offset);
+            const pageIds = new Set(page.map((n) => n.id));
+            const fresh = cocoHistory.filter((p) => !pageIds.has(p.id));
+            applyHistory([...page, ...fresh], "refresh-head");
+          }
+        } else {
+          const page = await fetchPage(offset);
+          if (page && !cancelled) {
+            hasMore = page.length === pageSize;
+            applyHistory(page, "refresh-window");
+          }
+        }
+        await supplements;
+      };
+      await run().finally(() => { if (!cancelled) setFetching(false); });
+    };
+    const loadMore = async () => {
+      if (cancelled || !hasMore || isFetching) return;
+      setFetching(true);
+      const run = async () => {
+        const nextOffset = offset + pageSize;
+        const page = await fetchPage(nextOffset);
+        if (page && !cancelled) {
+          hasMore = page.length === pageSize;
+          mode = "infinite";
+          const seen = new Set<string>();
+          const out: HistoryEntry[] = [];
+          for (const entry of [...cocoHistory, ...page]) {
+            if (seen.has(entry.id)) continue;
+            seen.add(entry.id);
+            out.push(entry);
+          }
+          offset = nextOffset;
+          applyHistory(out, "loadMore");
+        }
+      };
+      await run().finally(() => { if (!cancelled) setFetching(false); });
+    };
+    const goToPage = async (page: number) => {
+      if (cancelled || isFetching) return;
+      setFetching(true);
+      const run = async () => {
+        const nextOffset = page * pageSize;
+        const result = await fetchPage(nextOffset);
+        if (result && !cancelled) {
+          hasMore = result.length === pageSize;
+          mode = "page";
+          offset = nextOffset;
+          applyHistory(result, "goToPage");
+        }
+      };
+      await run().finally(() => { if (!cancelled) setFetching(false); });
+    };
+
+    const onHistory = () => void refresh();
+    const onReceive = () => void fetchSupplements();
+    manager.on("history:updated", onHistory);
+    const receiveEvents = [
+      "receive-op:prepared", "receive-op:finalized", "receive-op:rolled-back", "proofs:saved",
+    ] as const;
+    for (const event of receiveEvents) manager.on(event, onReceive);
+    const offRequests = onPaymentRequestCreated(onReceive);
     setFetching(true);
-    modeRef.current = "infinite";
-    offsetRef.current = -pageSize;
-    (async () => {
+    void (async () => {
       const supplements = fetchSupplements();
       const page = await fetchPage(0);
-      // Inside the guard, not before it. `hasMore` is state now, so a run this
-      // effect already cancelled (a pageSize change, or the manager swapping)
-      // would otherwise publish its page length as the live flag and either
-      // stop pagination early or keep asking past the end.
-      if (page && !cancelled && mountedRef.current) {
-        applyHasMore(page.length === pageSize);
-        offsetRef.current = 0;
-        historyReasonRef.current = "initial";
-        setCocoHistory((prev) => keepIfSame(prev, page));
+      if (page && !cancelled) {
+        hasMore = page.length === pageSize;
+        offset = 0;
+        applyHistory(page, "initial");
       }
       await supplements;
       if (!cancelled) setFetching(false);
     })();
     return () => {
       cancelled = true;
-      sessionRef.current += 1;
+      manager.off("history:updated", onHistory);
+      for (const event of receiveEvents) manager.off(event, onReceive);
+      offRequests();
     };
-  }, [
-    manager,
-    pageSize,
-    fetchPage,
-    fetchSupplements,
-    setFetching,
-    applyHasMore,
-  ]);
-
-  // Annotation store changes -> recompute the merged list (new metadata only).
-  useEffect(() => {
-    const unsubscribe = annotationStore.subscribe(() =>
-      setAnnotationVersion((v) => v + 1),
-    );
-    return unsubscribe;
-  }, [annotationStore]);
-
-  // coco history changes (mint/melt/send/receive projected) -> refresh page 0.
-  useEffect(() => {
-    const onHistory = () => void refreshRef.current();
-    manager.on("history:updated", onHistory);
-    return () => manager.off("history:updated", onHistory);
-  }, [manager]);
-
-  // Receive operation lifecycle -> re-fetch the in-flight receive supplement.
-  useEffect(() => {
-    const onReceive = () => void fetchSupplements();
-    manager.on("receive-op:prepared", onReceive);
-    manager.on("receive-op:finalized", onReceive);
-    manager.on("receive-op:rolled-back", onReceive);
-    manager.on("proofs:saved", onReceive);
-    return () => {
-      manager.off("receive-op:prepared", onReceive);
-      manager.off("receive-op:finalized", onReceive);
-      manager.off("receive-op:rolled-back", onReceive);
-      manager.off("proofs:saved", onReceive);
-    };
-  }, [manager, fetchSupplements]);
-
-  // Incoming payment request created -> re-list active requests. coco emits no
-  // event on incoming.create, so this in-package signal is the only trigger
-  // that surfaces a freshly created "as Ecash" request without a restart.
-  useEffect(
-    () => onPaymentRequestCreated(() => void fetchSupplements()),
-    [fetchSupplements],
-  );
-
-  const loadMore = useCallback(async () => {
-    if (!hasMoreRef.current || fetchingRef.current) return;
-    const session = sessionRef.current;
-    setFetching(true);
-    const run = async () => {
-      const nextOffset = offsetRef.current + pageSize;
-      const page = await fetchPage(nextOffset);
-      if (page && mountedRef.current && sessionRef.current === session) {
-        applyHasMore(page.length === pageSize);
-        modeRef.current = "infinite";
-        historyReasonRef.current = "loadMore";
-        setCocoHistory((prev) => {
-          const seen = new Set<string>();
-          const out: HistoryEntry[] = [];
-          for (const entry of [...prev, ...page]) {
-            if (seen.has(entry.id)) continue;
-            seen.add(entry.id);
-            out.push(entry);
-          }
-          return keepIfSame(prev, out);
-        });
-        offsetRef.current = nextOffset;
-      }
-    };
-    await run().finally(() => {
-      if (mountedRef.current && sessionRef.current === session)
-        setFetching(false);
-    });
-  }, [fetchPage, pageSize, setFetching, applyHasMore, sessionRef]);
-
-  const goToPage = useCallback(
-    async (page: number) => {
-      if (fetchingRef.current) return;
-      const session = sessionRef.current;
-      setFetching(true);
-      const run = async () => {
-        const offset = page * pageSize;
-        const result = await fetchPage(offset);
-        if (result && mountedRef.current && sessionRef.current === session) {
-          applyHasMore(result.length === pageSize);
-          modeRef.current = "page";
-          historyReasonRef.current = "goToPage";
-          setCocoHistory((prev) => keepIfSame(prev, result));
-          offsetRef.current = offset;
-        }
-      };
-      await run().finally(() => {
-        if (mountedRef.current && sessionRef.current === session)
-          setFetching(false);
-      });
-    },
-    [fetchPage, pageSize, setFetching, applyHasMore, sessionRef],
-  );
-
-  // Merge sources. Identity is already stable: each source keeps its previous
-  // array whenever `sameTransactionList` says the display-relevant content is
-  // unchanged (see `keepIfSame`), so an unchanged refresh does not move this
-  // memo's inputs and consumers never see a new list for the same rows.
-  //
-  // This used to be a render-time snapshot ref compared after the merge. Same
-  // guarantee, but reading and writing a ref in render is a Rules-of-React
-  // violation the compiler refuses to compile past — and it took the whole
-  // hook down with it. Stabilising at the source is also cheaper: a no-op
-  // `setState` short-circuits before React even schedules a render.
-  const baseHistory = useMemo(
-    () =>
-      mergeTransactionSources({
-        cocoHistory,
-        receiveEntries,
-        pendingRequestEntries,
-      }),
-    [cocoHistory, receiveEntries, pendingRequestEntries],
-  );
-
-  // Merge per-transaction annotations into each entry's metadata. Un-annotated
-  // rows keep their reference (mergeAnnotationsIntoEntry is identity on empty),
-  // and the stabiliser keeps the whole list's reference unless an annotation
-  // that is actually on screen changed. `annotationVersion` is the cache key
-  // for the store read: it is bumped by the subscription above, which is the
-  // only thing that can change what `getMany` returns.
-  const [annotateList] = useState(createAnnotatedListStabiliser);
-  const history = useMemo(
-    () => annotateList(baseHistory, annotationStore),
-    [annotateList, baseHistory, annotationStore, annotationVersion],
-  );
-
-  return useMemo(
-    () => ({
-      history,
-      loadMore,
-      goToPage,
-      refresh,
-      hasMore,
-      isFetching,
-    }),
-    [history, loadMore, goToPage, refresh, hasMore, isFetching],
-  );
+  });
 }

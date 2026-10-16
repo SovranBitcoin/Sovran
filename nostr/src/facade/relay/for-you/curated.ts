@@ -7,7 +7,7 @@
 // seed, not an allow-list — none of these accounts are guaranteed to appear in
 // the feed; only the authors they collectively like do.
 //
-// TODO(product): confirm this list and each hex pubkey before ship. Names are
+// FOLLOWUP(F101): confirm this list and each hex pubkey before ship. Names are
 // the intent; the hex values must be verified (a wrong key = a wrong account).
 // ---------------------------------------------------------------------------
 

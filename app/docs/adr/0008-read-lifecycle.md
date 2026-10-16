@@ -1,7 +1,7 @@
 # 8. One read lifecycle: status vocabulary, cache-first paint, sequential vs aggregate tiers
 
 Date: 2026-09-13
-Status: Accepted (builds on ADR 0003's facade; closes convention-audit follow-ups F01 and F06)
+Status: Accepted (builds on ADR 0003's facade; closes two convention-audit follow-ups: stale completions writing, and failed reads shown as empty)
 
 ## Context
 
@@ -25,15 +25,15 @@ reviews), where a slower tier can complete what a faster one missed.
 Every hook and screen reports `loading | revalidating | ready | empty | error`
 plus `partial` and `source`. Cached data always paints synchronously; a refetch
 is background work that never blanks what is on screen. A key change shows that
-key's cached entry or a skeleton, never `null` plus a spinner. Skeletons are data
-items rendered by the same row component (FlashList surfaces) or a
-`SkeletonContentCrossfade` with the same component in both branches. Unknown
-counts render a placeholder or a dash, never a zero.
+key's cached entry immediately. Payment identities use known names and stable
+key-based avatars while enrichment runs; unresolved search placeholders are not
+rendered. Existing skeleton surfaces remain outside that payment policy. Unknown
+counts render a dash, never a zero.
 
 ### One consumer over the query cache
 
 `createQueryCacheStore.run` has a per-key generation and a store-wide scope
-generation; a completion that is no longer current never writes (F01).
+generation; a completion that is no longer current never writes.
 `useCachedRead` is the one React consumer: `data` is the store selector, so
 persistence, LRU, scope and cold-start policy stay in the store. `seed` paints a
 value from a prior step as `revalidating`; `keepPreviousData` opts a same-surface
@@ -41,12 +41,21 @@ refinement (a search query) into holding the previous rows; `classify` maps zero
 items to `empty` and an unavailable read to `error`. The DM paging engine keeps
 its own loop (cursor + client-side decrypt) but speaks the same status vocabulary.
 
+### Profile enrichment follows the shared owner
+
+Home warm-up, list rows and payment steps read the same profile entity cache.
+Overlapping automatic revalidation shares work by public key and data-layer
+instance, including aggregate gap filling after the first answer. Switching
+accounts or tier configuration cannot join a prior layer's request. Reads with
+caller-owned cancellation remain independent. A completed miss can be retried;
+sharing in-flight work must not become a permanent negative cache.
+
 ### Empty is not unavailable
 
 Feed, thread and notification results carry `read: ReadStatusMeta`
 (`ok | unavailable | disabled` with the tier attempt trail). Screens derive:
 unavailable with nothing retained → error with Retry; unavailable with retained
-rows → keep them, show degraded; ok with zero items → the empty state (F06).
+rows → keep them, show degraded; ok with zero items → the empty state.
 
 ### Two tier engines, chosen by the shape of the data
 

@@ -22,6 +22,7 @@ import React, { useCallback, useState } from 'react';
 import * as Clipboard from 'expo-clipboard';
 import { useFocusEffect } from 'expo-router';
 import { Button as HerouiButton, ListGroup, Separator } from 'heroui-native';
+import { Button } from '@/shared/ui/primitives/Button';
 import QRCode from 'react-native-qrcode-svg';
 
 import Icon from 'assets/icons';
@@ -109,6 +110,10 @@ export function ShareSignerScreen(): React.ReactElement {
   // `connect` is answered without a cold start. `regenerate` re-keys on
   // `keys?.pubkey` (explicit useCallback above), so the focus effect re-runs
   // when keys finish deriving — the keys-arrived-while-focused path.
+  //
+  // Screen focus only, not the app's foreground: the link is usually pasted
+  // into another app on this phone, and leaving for it must neither stop the
+  // service that answers nor replace the link being pasted.
   useFocusEffect(
     useCallback(() => {
       useNip46RequestsStore.getState().setServiceHotRequested(true);
@@ -177,15 +182,16 @@ export function ShareSignerScreen(): React.ReactElement {
           <Text size={14} color={danger} style={{ textAlign: 'center' }}>
             {MINT_FAILED_MESSAGE}
           </Text>
-          <HerouiButton
+          <Button
             testID="share-signer-retry"
             variant="secondary"
-            size="sm"
+            size="compact"
+            text={TRY_AGAIN_LABEL}
+            icon={<Icon name="mdi:refresh" size={16} color={muted} />}
+            contentColor={muted}
             onPress={() => regenerate(false)}
-            accessibilityLabel={TRY_AGAIN_LABEL}>
-            <Icon name="mdi:refresh" size={16} color={muted} />
-            <HerouiButton.Label style={{ color: muted }}>{TRY_AGAIN_LABEL}</HerouiButton.Label>
-          </HerouiButton>
+            accessibilityLabel={TRY_AGAIN_LABEL}
+          />
         </VStack>
       ) : (
         <View className="px-5 pt-4">

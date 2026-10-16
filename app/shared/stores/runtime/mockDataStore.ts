@@ -8,7 +8,7 @@ import { isLegacyMockProfile } from './legacyMockProfiles';
  * Legacy cleanup below removes only identifiable fixtures from older builds.
  */
 
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { storeLog } from '@/shared/lib/logger';
 import { useScanHistoryStore, type ScanSource } from '@/shared/stores/profile/scanHistoryStore';
 import {
@@ -20,7 +20,7 @@ import {
   useNostrMetadataCache,
   type NostrProfileMetadata,
 } from '@/shared/stores/global/nostrMetadataCache';
-import { amountToNumber } from '@/shared/lib/cashu/amount';
+import { amountToNumber } from 'wallet/amount';
 import type { HistoryEntry } from '@cashu/coco-core';
 import { asHistoryEntry } from '@/shared/lib/cashu/syntheticHistory';
 // Type-only import — `useRecentContacts` does not import this file at runtime
@@ -516,7 +516,10 @@ export function purgeLegacyMockData() {
   });
 }
 
-export const useMockDataStore = create<MockDataState>()((set) => ({
+export const useMockDataStore = create<MockDataState>({
+  name: 'useMockDataStore',
+  scope: 'global',
+})((set) => ({
   walletUnit: 'sat',
   setWalletUnit: (walletUnit) => set({ walletUnit }),
   mockHistory: MOCK.history,

@@ -1,3 +1,4 @@
+import { registerAccountScoped } from '@/shared/lib/account/accountRegistry';
 /**
  * @fileoverview NIP-61 nutzap-info discovery (`kind:10019` lookup).
  *
@@ -125,7 +126,8 @@ export function createNutzapProfileResolver(deps: {
     } finally {
       pool.destroy();
     }
-    writeCache(pubkeyHex, profile, clock());
+    // A timeout/absence is not evidence that the identity key is the wallet key.
+    if (profile.source === 'nutzapInfo') writeCache(pubkeyHex, profile, clock());
     return profile;
   }
 
@@ -166,3 +168,12 @@ export function prefetchNutzapProfile(pubkeyHex: string | undefined | null): voi
     /* resolveNutzapProfile degrades rather than rejects; this is belt-and-braces */
   });
 }
+
+registerAccountScoped(
+  'nostr.nutzap-profile-cache',
+  () => {
+    cache.clear();
+    inflight.clear();
+  },
+  () => cache.size === 0 && inflight.size === 0
+);

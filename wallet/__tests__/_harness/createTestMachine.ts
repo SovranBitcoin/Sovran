@@ -89,6 +89,7 @@ function buildWalletContext(overrides?: Partial<WalletContext>): WalletContext {
 const ALL_STEPS: FlowStep[] = [
   'chooseOption',
   'chooseFallbackOption',
+  'chooseSendFallback',
   'enterAmount',
   'selectMint',
   'chooseProofs',

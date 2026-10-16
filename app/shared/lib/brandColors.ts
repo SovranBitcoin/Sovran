@@ -88,3 +88,7 @@ export const TOAST_DANGER_DARK_BG = '#9A082E';
 
 /** Theme-invariant dark warning tint for animated frosted payment toasts. */
 export const TOAST_WARNING_DARK_BG = '#9A6A08';
+
+/** Layout-guide red (#FF2D55). The review overlay's lines: a colour no theme
+ *  or wallpaper uses, so a guide is never mistaken for part of the design. */
+export const LAYOUT_GUIDE = '#FF2D55';

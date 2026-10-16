@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "id": "settings.design-system.prompts",
+  "name": "Open a prompt from the design system",
+  "description": "Opens the design system's list of prompts and blocking screens, opens the update prompt on sample data, and closes it. A purely visual check: nothing is updated, recorded or paid.",
+  "details": "Developer entry copied from the existing design-system captures. The prompt is the app's own, drawn from sample data in the prompt flow; ds-prompt-open marks a sample on show and Not now closes it without recording a dismissal. Only the first row is exercised: the rest need scrolling and are covered by designSystemPrompts.test.tsx. No native run yet.",
+  "lane": "simulator",
+  "tags": ["flow:wallet","check:navigation"],
+  "requires": ["fresh-install"],
+  "setup": [
+    {"use":"flow.onboard"},
+    {"use":"capture.developer"}
+  ],
+  "steps": [
+    {"action":"tapUntil","sequence":[{"tap":{"id":"settings-design-system-row"}}],"until":{"id":"design-system-prompts-row"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"design-system-prompts-row"}}],"until":{"id":"ds-prompt-cta-update-required-available"},"attempts":4,"settleMs":6000},
+    {"action":"screenshot","name":"settings-design-system-prompts"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"ds-prompt-cta-update-required-available"}}],"until":{"id":"ds-prompt-open"},"attempts":4,"settleMs":6000},
+    {"action":"waitFor","selector":{"id":"cta-secondary"},"timeoutMs":15000},
+    {"action":"screenshot","name":"settings-design-system-prompt"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"cta-secondary"}}],"until":{"id":"ds-prompt-cta-update-required-available"},"attempts":4,"settleMs":6000},
+    {"action":"goHome"}
+  ],
+  "verify": [
+    {"action":"waitFor","selector":{"id":"wallet-send"},"timeoutMs":15000}
+  ],
+  "finally": [
+    {"use":"flow.return-to-wallet"}
+  ],
+  "endState": "wallet"
+}

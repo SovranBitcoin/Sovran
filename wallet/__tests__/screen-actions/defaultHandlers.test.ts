@@ -521,7 +521,7 @@ describe("receiveToken default handlers", () => {
 
       await mgr.execute("redeem");
 
-      expect(ops.executeReceive).toHaveBeenCalledWith(rawToken, MINT1, 1);
+      expect(ops.executeReceive).toHaveBeenCalledWith({ tokenString: rawToken, mintUrl: MINT1, amount: 1 });
     });
 
     it("upgrades a decoded V3 entry to V4 at the redeem boundary", async () => {
@@ -537,8 +537,9 @@ describe("receiveToken default handlers", () => {
 
       await mgr.execute("redeem");
 
-      const [upgraded, mintUrl, amount] = (ops.executeReceive as MockFn).mock
-        .calls[0]!;
+      const [{ tokenString: upgraded, mintUrl, amount }] = (
+        ops.executeReceive as MockFn
+      ).mock.calls[0]!;
       expect(upgraded).toMatch(/^cashuB/);
       expect(mintUrl).toBe("https://8333.space:3338");
       expect(amount).toBe(10);
@@ -558,11 +559,7 @@ describe("receiveToken default handlers", () => {
 
       await mgr.execute("redeem");
 
-      expect(ops.executeReceive).toHaveBeenCalledWith(
-        LEGACY_BASE64_KEYSET_V3_TOKEN,
-        "https://legacy.example",
-        1,
-      );
+      expect(ops.executeReceive).toHaveBeenCalledWith({ tokenString: LEGACY_BASE64_KEYSET_V3_TOKEN, mintUrl: "https://legacy.example", amount: 1 });
     });
 
     it("notification sequence: onReceiveProcessing → onReceiveConfirmed → onTransactionCreated", async () => {

@@ -7,6 +7,7 @@
 // ---------------------------------------------------------------------------
 
 import type { AmountEntryEnvelope } from '../mint-capabilities';
+import type { AmountEntryMethodContext } from '../types';
 
 /** Integer amount in a unit's minor denomination (sat, usd-cents, …). */
 export interface UnitAmount {
@@ -106,6 +107,20 @@ export interface QuickSendSuggestion {
  * where these values genuinely don't change for the manager's lifetime.
  */
 export interface CreateAmountActionManagerConfig {
+  /**
+   * Live reachability for the Next menu: `offline` when the device has no
+   * network, `mintUnreachable` when a send already found the selected mint
+   * down. Either one disables the options that need the mint (Lightning,
+   * locked ecash, onchain) while plain ecash stays on its offline path.
+   */
+  getNetwork?: () => { offline: boolean; mintUnreachable: boolean };
+  /**
+   * The wallet's trusted mints, balances and method capabilities as they are
+   * now. The entry the screen opened with carries a copy taken at that moment;
+   * with this getter the Next menu is gated on the live values instead, so a
+   * rail is offered only while the picker it opens has a mint to offer.
+   */
+  getMethodContext?: () => AmountEntryMethodContext | undefined;
   /** Returns the currently selected mint URL. */
   getMintUrl: () => string | undefined;
   /** Returns proof amounts for the selected mint, in the active unit's minor units. */

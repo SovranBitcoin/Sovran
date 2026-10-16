@@ -45,12 +45,14 @@ export async function fetchMintReviews(args: {
   mintUrl: string;
   signal?: AbortSignal;
   readId?: string;
+  onUpdate?: (response: MintReviewsResponse) => void;
 }): Promise<Result<MintReviewsResponse, Error>> {
   const layer = buildNostrDataLayer();
   if (!layer) return reviewMint({ mintUrl: args.mintUrl, signal: args.signal });
   try {
     const resolved = await layer.getMintReviews({
       mintUrl: args.mintUrl,
+      onUpdate: (value) => args.onUpdate?.(reviewsFromFacade(value)),
       ...(args.signal ? { signal: args.signal } : {}),
       ...(args.readId ? { readId: args.readId } : {}),
     });

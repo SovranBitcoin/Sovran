@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { NaggFeedEventSchema } from './schemas';
+import { NaggFeedEventSchema, NostrHexId } from './schemas';
 import type {
   NaggFeedEvent,
   NaggFeedItem,
@@ -10,6 +10,7 @@ import type {
   NaggReposterInfo,
 } from './map/feed';
 import { firstTagValue } from './map/feed';
+import { supersedes } from './replaceable';
 
 // ---------------------------------------------------------------------------
 // nagg v2 envelope — ONE generic response shape for every app-view route
@@ -36,29 +37,55 @@ import { firstTagValue } from './map/feed';
 // metrics/profiles/quoted side maps) so the app-facing surface barely moves.
 // ---------------------------------------------------------------------------
 
-/**
- * A Go nil slice/map serializes to `null`, not `[]`/`{}` — tolerate both so an
- * empty view never fails the parse and silently drops a whole tier.
- */
-function arrayOrEmpty<T extends z.ZodTypeAny>(value: T) {
-  return z
-    .array(value)
-    .nullish()
-    .transform((v): Array<z.infer<T>> => v ?? []);
-}
+/** One event's counts: `[rule][metric] = number`. Rule and metric names are short. */
+const AggregateRules = z.record(z.string().max(128), z.record(z.string().max(128), z.number()));
 
+/**
+ * `aggregates[id][rule][metric]`, read one id at a time: an id whose counts do
+ * not parse (or whose key is not plausibly an id) loses its counts, and the
+ * rest of the page keeps theirs.
+ */
 export const NaggAggregatesSchema = z
-  .record(z.string(), z.record(z.string(), z.record(z.string(), z.number())))
+  .record(z.string(), z.unknown())
   .nullish()
-  .transform((v): NaggAggregates => v ?? {});
+  .transform((v): NaggAggregates => {
+    const out: NaggAggregates = {};
+    for (const [id, rules] of Object.entries(v ?? {})) {
+      if (id.length > 128) continue;
+      const parsed = AggregateRules.safeParse(rules);
+      if (parsed.success) out[id] = parsed.data;
+    }
+    return out;
+  });
+
+/**
+ * An array whose items arrive from the network one by one: an item that does
+ * not parse is left out instead of failing the whole array. One malformed or
+ * oversized event must not cost the page it came on. A Go nil slice serializes
+ * to `null`, not `[]`, so both read as empty and an empty view never fails the
+ * parse and silently drops a whole tier.
+ */
+function tolerantArrayOrEmpty<T extends z.ZodTypeAny>(value: T) {
+  return z
+    .array(z.unknown())
+    .nullish()
+    .transform((items): Array<z.infer<T>> =>
+      (items ?? []).flatMap((item) => {
+        const parsed = value.safeParse(item);
+        return parsed.success ? [parsed.data as z.infer<T>] : [];
+      }),
+    );
+}
 
 export const NaggEnvelopeSchema = z
   .object({
-    order: arrayOrEmpty(z.string()),
+    // Ids, or keys built from them; an element longer than any of those is left out.
+    order: tolerantArrayOrEmpty(z.string().max(512)),
     orderBy: z.enum(['created_at', 'rank']).catch('created_at'),
-    events: arrayOrEmpty(NaggFeedEventSchema),
+    events: tolerantArrayOrEmpty(NaggFeedEventSchema),
     aggregates: NaggAggregatesSchema,
-    cursor: z.string().nullish(),
+    // Opaque and echoed back; one too long to be a cursor is read as none.
+    cursor: z.string().max(2048).nullish().catch(null),
     hasMore: z.boolean().nullish(),
   })
   .passthrough();
@@ -66,8 +93,8 @@ export const NaggEnvelopeSchema = z
 /** One actor inside a grouped notification entry. */
 export const NaggNotificationEntryActorSchema = z
   .object({
-    pubkey: z.string(),
-    eventId: z.string(),
+    pubkey: NostrHexId,
+    eventId: NostrHexId,
     createdAt: z.number(),
     actorVertexScore: z.number().optional(),
   })
@@ -82,29 +109,41 @@ export const NaggNotificationEntryActorSchema = z
  */
 export const NaggNotificationEntrySchema = z
   .object({
-    id: z.string(),
+    id: NostrHexId,
     kind: z.number().int(),
-    actor: z.string(),
-    target: z.string().optional(),
+    actor: NostrHexId,
+    // A target that is not an event id is read as no target.
+    target: NostrHexId.optional().catch(undefined),
     total: z.number().optional(),
     totalCapped: z.boolean().optional(),
-    actors: z.array(NaggNotificationEntryActorSchema).nullish(),
+    actors: tolerantArrayOrEmpty(NaggNotificationEntryActorSchema),
   })
   .passthrough();
 
 export const NaggNotificationsEnvelopeSchema = NaggEnvelopeSchema.extend({
-  entries: arrayOrEmpty(NaggNotificationEntrySchema),
+  entries: tolerantArrayOrEmpty(NaggNotificationEntrySchema),
   hasNext: z
     .boolean()
     .nullish()
     .transform((v) => v ?? false),
 });
 
+const ProviderFields = z.record(z.string().max(64), z.record(z.string().max(64), z.unknown()));
+
 /** Per-provider enrichment on the profile routes, e.g. `vertex.{rank,score}`, `nip05.valid`. */
-export const NaggProvidersSchema = z.record(
-  z.string(),
-  z.record(z.string(), z.record(z.string(), z.unknown())),
-);
+export const NaggProvidersSchema = z
+  .record(z.string(), z.unknown())
+  .transform((providers) => {
+    // Keyed by pubkey and read one at a time: a key that is not a pubkey, or a
+    // value of the wrong shape, costs that pubkey its enrichment and no more.
+    const out: Record<string, Record<string, Record<string, unknown>>> = {};
+    for (const [pubkey, raw] of Object.entries(providers)) {
+      if (!NostrHexId.safeParse(pubkey).success) continue;
+      const parsed = ProviderFields.safeParse(raw);
+      if (parsed.success) out[pubkey] = parsed.data;
+    }
+    return out;
+  });
 
 /** A number nagg could not establish is `null`, never 0 — kept as null here. */
 const nullableNumber = z
@@ -129,11 +168,10 @@ const stringList = z
  * Tolerant per field: a route that omits a block (a mint-only deployment
  * has no `firstEventAt`) still parses, and a field nagg adds later passes.
  */
-const HEX_64 = /^[0-9a-f]{64}$/;
 
 export const NaggIdentitySchema = z
   .object({
-    pubkey: z.string().regex(HEX_64),
+    pubkey: NostrHexId,
     npub: z.string().max(128).nullish(),
     profile: z
       .object({
@@ -183,7 +221,7 @@ export const NaggIdentitiesSchema = z
     if (!v) return out;
     let n = 0;
     for (const [key, identity] of Object.entries(v)) {
-      if (!identity || !HEX_64.test(key) || n >= 512) continue;
+      if (!identity || !NostrHexId.safeParse(key).success || n >= 512) continue;
       out[key] = identity;
       n += 1;
     }
@@ -192,7 +230,7 @@ export const NaggIdentitiesSchema = z
 
 export const NaggProfilesEnvelopeSchema = NaggEnvelopeSchema.extend({
   /** Complete ranked pubkey list (includes profiles without a local kind-0). */
-  pubkeys: arrayOrEmpty(z.string()),
+  pubkeys: tolerantArrayOrEmpty(NostrHexId),
   providers: NaggProvidersSchema.nullish().transform(
     (v): z.infer<typeof NaggProvidersSchema> => v ?? {},
   ),
@@ -201,11 +239,21 @@ export const NaggProfilesEnvelopeSchema = NaggEnvelopeSchema.extend({
   vertexFresh: z.boolean().nullish(),
 });
 
+const FollowEdge = z.object({ out: z.boolean(), in: z.boolean() });
+
 export const NaggFollowStatusEnvelopeSchema = NaggEnvelopeSchema.extend({
+  // Keyed by pubkey and read one at a time, like the providers.
   edges: z
-    .record(z.string(), z.object({ out: z.boolean(), in: z.boolean() }))
+    .record(z.string(), z.unknown())
     .nullish()
-    .transform((v): Record<string, { out: boolean; in: boolean }> => v ?? {}),
+    .transform((v): Record<string, { out: boolean; in: boolean }> => {
+      const out: Record<string, { out: boolean; in: boolean }> = {};
+      for (const [pubkey, raw] of Object.entries(v ?? {})) {
+        const parsed = FollowEdge.safeParse(raw);
+        if (parsed.success && NostrHexId.safeParse(pubkey).success) out[pubkey] = parsed.data;
+      }
+      return out;
+    }),
 });
 
 export type NaggAggregates = Record<string, Record<string, Record<string, number>>>;
@@ -392,7 +440,7 @@ export function latestKind0ByPubkey(envelope: NaggEnvelope): Map<string, NaggFee
   for (const event of envelope.events) {
     if (event.kind !== 0) continue;
     const current = latest.get(event.pubkey);
-    if (!current || event.created_at > current.created_at) latest.set(event.pubkey, event);
+    if (!current || supersedes(event, current)) latest.set(event.pubkey, event);
   }
   return latest;
 }
@@ -734,6 +782,11 @@ export type NaggNotificationNode = {
 export type NaggNotificationsPage = {
   notifications: {
     nodes: NaggNotificationNode[];
+    /**
+     * `endCursor` is where the page ends by the envelope's own entries, as
+     * `{ createdAt, id }`, whether or not their events could be read. A page
+     * all of whose events were left out still says where the next one starts.
+     */
     pageInfo?: { endCursor?: unknown; hasNextPage?: boolean };
   };
   metrics: Record<string, NaggNoteMetrics>;
@@ -754,9 +807,14 @@ export function notificationsPageFromEnvelope(
   const byId = envelopeEventsById(envelope);
   const nodes: NaggNotificationNode[] = [];
   const metricIds = new Set<string>();
+  // Entries arrive newest first; the last one with a known time ends the page.
+  let endCursor: { createdAt: number; id: string } | undefined;
 
   for (const entry of envelope.entries) {
     const event = byId.get(entry.id);
+    // An entry whose event was left out is still dated by its newest actor.
+    const createdAt = event?.created_at ?? entry.actors[0]?.createdAt;
+    if (typeof createdAt === 'number') endCursor = { createdAt, id: entry.id };
     if (!event) continue;
     const reason = deriveNotificationReason(entry, event);
     if (!reason) continue;
@@ -782,7 +840,7 @@ export function notificationsPageFromEnvelope(
   return {
     notifications: {
       nodes,
-      pageInfo: { hasNextPage: envelope.hasNext },
+      pageInfo: { hasNextPage: envelope.hasNext, ...(endCursor ? { endCursor } : {}) },
     },
     metrics: noteMetricsMapFromAggregates(envelope.aggregates, metricIds),
     profiles: profileInfoMapFromEnvelope(envelope),

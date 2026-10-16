@@ -12,7 +12,7 @@
  */
 
 import { err, ok, type Result } from 'neverthrow';
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { persist } from 'zustand/middleware';
 import { z } from 'zod';
 
@@ -271,15 +271,16 @@ interface Nip46ConnectionsActions {
   setEncryption: (clientPubkey: string, encryption: ConnectionEncryption) => void;
   /**
    * Persistent "Always" decrypt grant for one (app, peer, method). Same
-   * compile-time `{ peerIsSelf: false }` guard pattern as the session grant —
-   * a self-decrypt grant is unrepresentable through this API.
+   * compile-time `peerIsSelf: false` guard as the session grant — a
+   * self-decrypt grant is unrepresentable through this API. Named fields: the
+   * app's key and the peer's key are both hex strings and must not be swapped.
    */
-  setPeerDecryptGrant: (
-    clientPubkey: string,
-    peerPubkey: string,
-    method: DecryptMethod,
-    guard: { peerIsSelf: false }
-  ) => Result<void, SetPeerDecryptGrantError>;
+  setPeerDecryptGrant: (grant: {
+    clientPubkey: string;
+    peerPubkey: string;
+    method: DecryptMethod;
+    peerIsSelf: false;
+  }) => Result<void, SetPeerDecryptGrantError>;
   /** Drop one method, or the whole peer entry when `method` is omitted. */
   revokePeerDecryptGrant: (
     clientPubkey: string,
@@ -372,7 +373,10 @@ function sanitizeGrants(
   return out;
 }
 
-export const useNip46ConnectionsStore = create<Nip46ConnectionsStore>()(
+export const useNip46ConnectionsStore = create<Nip46ConnectionsStore>({
+  name: 'nip46-connections-store',
+  scope: 'profile',
+})(
   persist(
     (set, get) => {
       const patchApp = (
@@ -532,10 +536,10 @@ export const useNip46ConnectionsStore = create<Nip46ConnectionsStore>()(
           return ok(undefined);
         },
 
-        setPeerDecryptGrant: (clientPubkey, peerPubkey, method, guard) => {
+        setPeerDecryptGrant: ({ clientPubkey, peerPubkey, method, peerIsSelf }) => {
           // Runtime re-check of the compile-time contract — a cast must not be
           // able to mint a self-decrypt grant.
-          if (guard.peerIsSelf !== false) return err('self_decrypt_forbidden');
+          if (peerIsSelf !== false) return err('self_decrypt_forbidden');
           if (!isNostrPubkeyHex(peerPubkey)) return err('invalid_peer');
           const app = get().apps[clientPubkey];
           if (!app) return err('unknown_app');

@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test';
 
 import { fixtureSchema, scenarioSchema } from '../../schema';
 import type { RunDetail, ScenarioTimeline } from './types';
-import { catalogRunRef, catalogScenarioPlatforms } from './catalog';
+import { catalogRunRef, catalogScenarioPlatforms, recordedCatalogEntries } from './catalog';
 
 function timeline(scenarioId: string, over: Partial<ScenarioTimeline> = {}): ScenarioTimeline {
   return {
@@ -100,4 +100,41 @@ describe('catalogScenarioPlatforms', () => {
       'android',
     ]);
   });
+});
+
+test('recorded story and manual timelines remain selectable without legacy suite membership', () => {
+  const stories: RunDetail = {
+    ...run,
+    origin: 'stories',
+    scenarioIds: ['story:preview'],
+    scenarios: [
+      timeline('story:preview', {
+        name: 'Preview the cards',
+        description: 'Read all four cards.',
+        ok: true,
+      }),
+    ],
+  };
+  const manual: RunDetail = {
+    ...run,
+    runId: 'manual',
+    origin: 'manual',
+    proof: 'manual-review',
+    scenarioIds: ['review:onboarding'],
+    scenarios: [timeline('review:onboarding', { name: 'Onboarding review', ok: true })],
+  };
+  const entries = recordedCatalogEntries([stories, manual]);
+  expect(
+    entries.map((entry) => ({
+      id: entry.id,
+      purpose: entry.description,
+      suites: entry.suites,
+      versions: entry.runs.map((version) => version.runId),
+    }))
+  ).toEqual([
+    { id: 'story:preview', purpose: 'Read all four cards.', suites: [], versions: ['run-example'] },
+    { id: 'review:onboarding', purpose: '', suites: [], versions: ['run-manual'] },
+  ]);
+  expect(entries.every((entry) => Boolean(entry.runDisabledReason))).toBe(true);
+  expect(entries[1]?.runs[0]?.ok).toBeUndefined();
 });

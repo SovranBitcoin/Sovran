@@ -23,7 +23,8 @@ import { useHeaderHeight } from 'expo-router/react-navigation';
 import { useScreenBottomPadding } from '@/shared/hooks/useScreenInsets';
 import { useLocalSearchParams } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
-import { ListGroup, PressableFeedback, Separator, Switch as HeroSwitch } from 'heroui-native';
+import { ListGroup, PressableFeedback, Separator } from 'heroui-native';
+import { Switch as HeroSwitch } from '@/shared/ui/primitives/Switch';
 import Animated from 'react-native-reanimated';
 import { useIdentityHeader } from '@/shared/ui/composed/IdentityHeader';
 
@@ -399,7 +400,10 @@ export function SignerAppDetailScreen(): React.ReactElement {
             let failed = 0;
             for (const peer of peers) {
               for (const method of ['nip04_decrypt', 'nip44_decrypt'] as const) {
-                const result = setPeerDecryptGrant(clientPubkey, peer, method, {
+                const result = setPeerDecryptGrant({
+                  clientPubkey,
+                  peerPubkey: peer,
+                  method,
                   peerIsSelf: false,
                 });
                 if (result.isErr()) failed += 1;

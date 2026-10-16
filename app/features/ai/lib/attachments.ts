@@ -1,3 +1,4 @@
+import { registerAccountScoped } from '@/shared/lib/account/accountRegistry';
 /**
  * Image attach for the AI chat composer: pick + encode.
  *
@@ -139,3 +140,11 @@ export async function encodeChatImage(attachment: ChatAttachment): Promise<strin
     return null;
   }
 }
+
+registerAccountScoped(
+  'ai.attachment-encode-cache',
+  () => {
+    encodeCache.clear();
+  },
+  () => encodeCache.size === 0
+);

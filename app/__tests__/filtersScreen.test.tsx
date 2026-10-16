@@ -54,7 +54,10 @@ jest.mock('@/shared/lib/logger', () => ({
   useLifecycleLogger: jest.fn(),
   log: { info: jest.fn() },
 }));
-jest.mock('@/shared/lib/color', () => ({ withAlpha: (color: string) => color }));
+jest.mock('@/shared/lib/color', () => ({
+  ...jest.requireActual('@/shared/lib/color'),
+  withAlpha: (color: string) => color,
+}));
 jest.mock('@/shared/hooks/useThemeColor', () => ({
   useThemeColor: (tokens: string | string[]) =>
     Array.isArray(tokens) ? tokens.map(() => 'rgb(128, 128, 128)') : 'rgb(128, 128, 128)',

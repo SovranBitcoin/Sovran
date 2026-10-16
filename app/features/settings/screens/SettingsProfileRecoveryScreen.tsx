@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 import { npubEncode } from 'nostr-tools/nip19';
-import { Button } from 'heroui-native';
+import { Button as HerouiButton } from 'heroui-native';
+import { Button } from '@/shared/ui/primitives/Button';
 import { Text } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { useProfileStore, type ProfileEntry } from '@/shared/stores/global/profileStore';
@@ -24,16 +25,16 @@ export function SettingsProfileRecoveryScreen({ onBack }: { onBack: () => void }
             Choose a profile to view its existing keys. This does not switch your wallet or accept
             the documents.
           </Text>
-          <Button
+          <HerouiButton
             variant="secondary"
             isDisabled={!profile}
             testID="profile-recovery-select-root"
             accessibilityState={{ selected: !profile, disabled: !profile }}
             onPress={() => setProfile(null)}>
-            <Button.Label>Root recovery phrase</Button.Label>
-          </Button>
+            <HerouiButton.Label>Root recovery phrase</HerouiButton.Label>
+          </HerouiButton>
           {profiles.map((entry) => (
-            <Button
+            <HerouiButton
               key={entry.pubkey}
               variant="secondary"
               isDisabled={profile?.pubkey === entry.pubkey}
@@ -43,10 +44,10 @@ export function SettingsProfileRecoveryScreen({ onBack }: { onBack: () => void }
                 disabled: profile?.pubkey === entry.pubkey,
               }}
               onPress={() => setProfile(entry)}>
-              <Button.Label>
+              <HerouiButton.Label>
                 {entry.cachedDisplayName || `Profile ${entry.accountIndex}`}
-              </Button.Label>
-            </Button>
+              </HerouiButton.Label>
+            </HerouiButton>
           ))}
           <Text className="text-muted">
             Keys alone may not recover all ecash. Keep this installation, mint information and
@@ -71,6 +72,7 @@ function RecoveryDetails({
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  const [showStored, setShowStored] = useState(false);
   const request = useRef({ generation: 0 });
   useEffect(() => {
     const pending = request.current;
@@ -81,6 +83,7 @@ function RecoveryDetails({
       if (state !== 'active') {
         pending.generation++;
         setInformation(null);
+        setShowStored(false);
         setLoading(false);
       }
     });
@@ -125,6 +128,28 @@ function RecoveryDetails({
       }
       onBack={onBack}>
       {selection}
+      {information?.storedCashuMnemonic && (
+        <VStack className="mb-4 gap-2" testID="profile-recovery-stored-wallet-phrase">
+          <Text bold>Wallet phrase stored on this device</Text>
+          <Text>
+            This device holds a wallet phrase for this profile that differs from the one your
+            recovery phrase produces. The wallet may have been opened with it. Keep a copy of both.
+          </Text>
+          {showStored ? (
+            <Text selectable testID="profile-recovery-stored-wallet-phrase-value">
+              {information.storedCashuMnemonic}
+            </Text>
+          ) : (
+            <Button
+              variant="secondary"
+              text="Show stored wallet phrase"
+              testID="profile-recovery-stored-wallet-phrase-show"
+              accessibilityLabel="Show the wallet phrase stored on this device"
+              onPress={() => setShowStored(true)}
+            />
+          )}
+        </VStack>
+      )}
       {!information && !loading && (
         <VStack className="mb-4 gap-2">
           <Text>
@@ -134,10 +159,10 @@ function RecoveryDetails({
           </Text>
           <Button
             variant="secondary"
+            text="Reload recovery information"
             testID="profile-recovery-reload"
-            onPress={() => setAttempt((value) => value + 1)}>
-            <Button.Label>Reload recovery information</Button.Label>
-          </Button>
+            onPress={() => setAttempt((value) => value + 1)}
+          />
         </VStack>
       )}
     </ProfileDetailsScreen>

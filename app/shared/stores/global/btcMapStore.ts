@@ -1,6 +1,5 @@
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { persist } from 'zustand/middleware';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { z } from 'zod';
 import { redactError, storeLog } from '@/shared/lib/logger';
 import {
@@ -13,6 +12,7 @@ import {
 import { fetchJson } from '@/shared/lib/apiClient';
 import { type RequestControls } from 'wallet';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
+import { createFileCacheStorage } from '@/shared/lib/persist/fileCacheStorage';
 import { backendConfig } from '@/shared/config/backend';
 
 // Upstream BTCMap exposes colon-keyed `osm:*` properties under the schema's
@@ -146,7 +146,7 @@ const PersistedBtcMapStore = z.object({
   placeDetailsCache: z.record(z.string().max(32), PersistedPlaceDetailEntry).default({}),
 });
 
-export const useBTCMapStore = create<BTCMapStore>()(
+export const useBTCMapStore = create<BTCMapStore>({ name: 'btcmap-store', scope: 'global' })(
   persist(
     (set, get) => ({
       placesCache: null,
@@ -317,7 +317,10 @@ export const useBTCMapStore = create<BTCMapStore>()(
     }),
     persistConfig({
       name: 'btcmap-store',
-      storage: AsyncStorage,
+      // Thousands of places, over 2 MB: too large for AsyncStorage on Android.
+      storage: createFileCacheStorage(),
+      // A cache of public map data: a bad blob is simply replaced.
+      preserveUnreadable: false,
       schema: PersistedBtcMapStore,
       logKey: 'btc_map',
       partialize: (state) => ({

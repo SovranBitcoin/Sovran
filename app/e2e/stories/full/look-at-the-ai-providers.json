@@ -1,0 +1,126 @@
+{
+  "id": "look-at-the-ai-providers",
+  "purpose": "A person opens the AI tab, opens the list of providers that could answer them, reads about one, and comes back.",
+  "startsFrom": "onboarded",
+  "steps": [
+    {
+      "name": "the wallet opens",
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-send"
+          }
+        },
+        {
+          "logged": "splash.gone"
+        }
+      ],
+      "withinMs": 20000
+    },
+    {
+      "name": "go to AI",
+      "tap": {
+        "label": "AI"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "screen-ai"
+          }
+        },
+        {
+          "visible": {
+            "id": "ai-model-chip"
+          }
+        },
+        {
+          "gone": {
+            "id": "wallet-send"
+          }
+        }
+      ],
+      "withinMs": 20000
+    },
+    {
+      "name": "open the providers",
+      "tap": {
+        "id": "ai-funds-button"
+      },
+      "expect": [
+        {
+          "page": "ProviderListScreen"
+        },
+        {
+          "visible": {
+            "idPrefix": "ai-provider-inspect:"
+          }
+        },
+        {
+          "visible": {
+            "id": "ai-provider-list-close"
+          }
+        }
+      ],
+      "withinMs": 40000
+    },
+    {
+      "name": "read about the first",
+      "tap": {
+        "idPrefix": "ai-provider-inspect:",
+        "matchIndex": 0
+      },
+      "expect": [
+        {
+          "page": "ProviderInfoScreen"
+        },
+        {
+          "visible": {
+            "id": "ai-provider-info-close"
+          }
+        },
+        {
+          "logged": "ui.touch"
+        }
+      ],
+      "withinMs": 15000
+    },
+    {
+      "name": "close it",
+      "tap": {
+        "id": "ai-provider-info-close"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "ai-provider-list-close"
+          }
+        },
+        {
+          "gone": {
+            "id": "ai-provider-info-close"
+          }
+        }
+      ],
+      "withinMs": 10000
+    },
+    {
+      "name": "close the providers",
+      "tap": {
+        "id": "ai-provider-list-close"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "ai-model-chip"
+          }
+        },
+        {
+          "gone": {
+            "id": "ai-provider-list-close"
+          }
+        }
+      ],
+      "withinMs": 10000
+    }
+  ]
+}

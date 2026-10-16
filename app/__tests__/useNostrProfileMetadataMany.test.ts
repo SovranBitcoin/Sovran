@@ -3,16 +3,18 @@ import { facade } from 'nostr';
 import { StrictMode, useLayoutEffect } from 'react';
 import { useNostrProfileMetadataMany } from '@/shared/hooks/useNostrProfileMetadata';
 
+let mockCache: facade.NostrEntityCache;
 let mockStore: facade.NormalizingStore<facade.CachedProfile>;
 const mockFetchProfiles = jest.fn();
 jest.mock('@/shared/lib/nostr/buildNostrDataLayer', () => ({
-  buildNostrDataLayer: () => ({ cache: { profiles: mockStore } }),
+  buildNostrDataLayer: () => ({ cache: { ...mockCache, profiles: mockStore } }),
 }));
 jest.mock('@/shared/lib/nostr/fetchProfiles', () => ({
   fetchProfilesViaFacade: (...args: unknown[]) => mockFetchProfiles(...args),
 }));
 
 beforeEach(() => {
+  mockCache = facade.createNostrEntityCache();
   mockStore = facade.createNormalizingStore({ maxEntries: 1000 });
   mockFetchProfiles.mockReset();
 });
@@ -85,4 +87,60 @@ it('shows cold loading on its first commit and does not duplicate the request in
   expect(commits[0]).toBe(true);
   expect(mockFetchProfiles).toHaveBeenCalledTimes(1);
   expect(result.current.isLoading).toBe(false);
+});
+
+it('holds seeded and missing contact avatars only until the first attempt settles', async () => {
+  let finish!: (value: Record<string, never>) => void;
+  mockFetchProfiles.mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      })
+  );
+  mockStore.set('seed', { name: 'Stranger', seenAt: 0 });
+  const keys = ['seed', 'missing'];
+  const { result, rerender } = renderHook(() => useNostrProfileMetadataMany(keys));
+  expect([...result.current.loadingPubkeys]).toEqual(keys);
+  await act(async () => finish({}));
+  expect([...result.current.loadingPubkeys]).toEqual([]);
+  rerender(undefined);
+  expect([...result.current.loadingPubkeys]).toEqual([]);
+});
+
+it('does not refetch a tier-fetched profile inside its freshness TTL', () => {
+  const cache = facade.createNostrEntityCache();
+  mockStore = cache.profiles;
+  cache.ingestProfileMetadata({ contact: { name: 'Fresh contact' } }, 1, 'primal');
+  const { result } = renderHook(() => useNostrProfileMetadataMany(['contact']));
+  expect(result.current.metadata.get('contact')?.fetchedAt).toBeGreaterThan(Date.now() - 1000);
+  expect(result.current.isLoading).toBe(false);
+  expect([...result.current.loadingPubkeys]).toEqual([]);
+  expect(mockFetchProfiles).not.toHaveBeenCalled();
+});
+
+it('keeps the list extraData inputs identical across unrelated cache writes and re-renders', () => {
+  // ContactsScreen hands { profilesMap, loadingPubkeys } to its list as
+  // extraData; a new identity for either redraws every row.
+  mockStore.set('contact', { name: 'Contact', picture: 'a.png', seenAt: Date.now() });
+  mockFetchProfiles.mockReturnValue(new Promise(() => {}));
+  const { result, rerender } = renderHook(() => useNostrProfileMetadataMany(['contact']));
+  const { metadata, loadingPubkeys } = result.current;
+
+  act(() => mockStore.set('feed-author', { name: 'Feed author', seenAt: Date.now() }));
+  act(() => mockCache.settledProfiles.set('feed-author', { settledAt: Date.now() }));
+  rerender(undefined);
+  expect(result.current.metadata).toBe(metadata);
+  expect(result.current.loadingPubkeys).toBe(loadingPubkeys);
+
+  act(() => mockStore.set('contact', { name: 'Renamed' }));
+  expect(result.current.metadata).not.toBe(metadata);
+  expect(result.current.metadata.get('contact')?.name).toBe('Renamed');
+});
+
+it('keeps a previously settled miss out of grey on a new consumer', () => {
+  mockFetchProfiles.mockReturnValue(new Promise(() => {}));
+  mockCache.pendingProfiles.begin(['stranger']);
+  mockCache.pendingProfiles.end(['stranger']);
+  const { result } = renderHook(() => useNostrProfileMetadataMany(['stranger']));
+  expect(result.current.loadingPubkeys.has('stranger')).toBe(false);
 });

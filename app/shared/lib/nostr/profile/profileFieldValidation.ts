@@ -1,3 +1,4 @@
+import { parseNip05Identifier } from 'wallet';
 import { LightningAddress } from '@sovranbitcoin/schemas';
 
 /**
@@ -10,8 +11,8 @@ import { LightningAddress } from '@sovranbitcoin/schemas';
  *   (case-insensitive, stored lowercase); `_@<domain>` is the root name and a
  *   bare domain is shorthand for it.
  *
- * Neither is resolved over the network here — a typo that still parses is
- * the user's to catch; an unparsable value must never be published.
+ * These are syntax checks. Changed NIP-05 claims must also pass the
+ * publisher's fresh domain-to-key verification before signing.
  */
 export type ProfileFieldCheck = { ok: true; value: string } | { ok: false; message: string };
 
@@ -38,11 +39,10 @@ export function checkLud16(input: string): ProfileFieldCheck {
 export function checkNip05(input: string): ProfileFieldCheck {
   const value = input.trim().toLowerCase();
   if (!value) return { ok: true, value: '' };
-  // A bare domain is the root identifier `_@domain` (NIP-05).
-  const parts = splitAddress(value) ?? (DOMAIN.test(value) ? { local: '_', domain: value } : null);
-  if (!parts || !LOCAL_PART.test(parts.local) || !DOMAIN.test(parts.domain))
-    return { ok: false, message: 'Enter a Nostr address like name@domain.com.' };
-  return { ok: true, value: `${parts.local}@${parts.domain}` };
+  const parsed = parseNip05Identifier(value);
+  return parsed
+    ? { ok: true, value: parsed.identifier }
+    : { ok: false, message: 'Enter a Nostr address like name@domain.com.' };
 }
 
 export const ABOUT_MAX_LENGTH = 500;

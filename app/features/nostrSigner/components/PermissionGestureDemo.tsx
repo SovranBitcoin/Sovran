@@ -20,19 +20,15 @@
  * starts at all under Reduce Motion (the t=0 idle frame + caption stand in).
  */
 
-import React, { useCallback } from 'react';
-import { useFocusEffect } from 'expo-router';
+import React from 'react';
+import { useLoopClock, KEYFRAME_EASINGS as EASINGS } from '@/shared/hooks/useLoopClock';
+import { valueAt, type Track } from '@/shared/lib/motion/keyframes';
 import { withAlpha } from '@/shared/lib/color';
 import Animated, {
-  cancelAnimation,
-  Easing,
   interpolateColor,
   useAnimatedProps,
   useAnimatedStyle,
   useReducedMotion,
-  useSharedValue,
-  withRepeat,
-  withTiming,
   type SharedValue,
 } from 'react-native-reanimated';
 import Svg, { Circle, Path } from 'react-native-svg';
@@ -53,9 +49,6 @@ import {
   RY_IDLE,
   SCENE_H,
   SCENE_W,
-  valueAt,
-  type EasingMap,
-  type Track,
 } from '@/features/nostrSigner/components/permissionGestureDemo.timeline';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -93,17 +86,6 @@ const {
   WORD_HOLD,
   WORD_BLOCK,
 } = DEMO_TRACKS;
-
-// Easing.bezierFn (not Easing.bezier) — the Fn variant is directly callable
-// inside worklets; the plain one returns a factory for withTiming configs.
-const EASINGS: EasingMap = {
-  linear: Easing.linear,
-  outCubic: Easing.out(Easing.cubic),
-  inQuad: Easing.in(Easing.quad),
-  outQuad: Easing.out(Easing.quad),
-  overshoot: Easing.bezierFn(0.34, 1.56, 0.64, 1),
-  inOutSin: Easing.inOut(Easing.sin),
-};
 
 const MOCK_TITLE = 'Post publicly'; // mirrors the first real bundle row below
 
@@ -309,21 +291,7 @@ export function PermissionGestureDemo(): React.ReactElement {
     'danger',
   ] as const);
   const reducedMotion = useReducedMotion();
-  const t = useSharedValue(0);
-
-  useFocusEffect(
-    useCallback(() => {
-      if (reducedMotion) return undefined;
-      t.set(0);
-      t.set(
-        withRepeat(withTiming(CYCLE_MS, { duration: CYCLE_MS, easing: Easing.linear }), -1, false)
-      );
-      return () => {
-        cancelAnimation(t);
-        t.set(0);
-      };
-    }, [reducedMotion, t])
-  );
+  const t = useLoopClock(CYCLE_MS);
 
   // Theme-derived plain strings, captured by the worklets below.
   const rowFill = withAlpha(foreground, 0.06);

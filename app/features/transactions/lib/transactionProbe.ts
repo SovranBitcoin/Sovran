@@ -1,4 +1,4 @@
-import { amountToNumber, type AmountValue } from '@/shared/lib/cashu/amount';
+import { amountToNumber, type AmountValue } from 'wallet/amount';
 import type { SpendingConditions } from 'wallet';
 
 export type TransactionProbeEntry = {

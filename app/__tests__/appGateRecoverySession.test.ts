@@ -4,11 +4,16 @@ import {
   recoverMnemonicSession,
   deleteAllProfiles,
 } from '@/shared/lib/profile/profileSessionOrchestrator';
-import { storeMnemonic, clearAllSecureData } from '@/shared/lib/nostr/secureStorage';
+import {
+  storeMnemonic,
+  clearAllSecureData,
+  prepareSecureDataReset,
+} from '@/shared/lib/nostr/secureStorage';
 import { useSecureStoreState } from '@/shared/stores/runtime/secureStoreState';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { restartApp } from '@/shared/lib/profile/appRestart';
+import { deriveNostrKeys } from '@/shared/lib/nostr/keyDerivation';
 import { CocoManager } from '@/shared/lib/cashu/manager';
 
 jest.mock('@react-native-async-storage/async-storage', () => ({
@@ -24,8 +29,14 @@ jest.mock('@/shared/lib/logger', () => ({
   redactError: () => 'redacted',
 }));
 jest.mock('@/shared/lib/nostr/secureStorage', () => ({
+  // A stand-in fingerprint: the same phrase gives the same text, another gives another.
+  hashMnemonic: (mnemonic: string) => `fingerprint of ${mnemonic}`,
+  retrieveMnemonic: jest.fn(async () => null),
   storeMnemonic: jest.fn(async () => true),
   clearAllSecureData: jest.fn(async () => true),
+  prepareSecureDataReset: jest.fn(
+    async () => jest.requireMock('@/shared/lib/nostr/secureStorage').clearAllSecureData
+  ),
 }));
 jest.mock('@/shared/lib/profile/appRestart', () => ({ restartApp: jest.fn(() => true) }));
 jest.mock('@/shared/lib/cashu/manager', () => ({
@@ -89,6 +100,45 @@ it('does not restart if storing the phrase fails', async () => {
   expect(restartApp).not.toHaveBeenCalled();
 });
 
+it('puts the restore decision back when the phrase cannot be stored', async () => {
+  // Left as written, the next start would find a restore owed for a phrase
+  // that was never replaced.
+  const previous = JSON.stringify({
+    state: { seedCreatedAt: 5, restoreStatus: 'not-needed', lastRestoreAt: null },
+    version: 0,
+  });
+  jest
+    .mocked(AsyncStorage.getItem)
+    .mockImplementation(async (key) => (key === 'wallet-lifecycle' ? previous : null));
+  jest.mocked(storeMnemonic).mockResolvedValue(false);
+
+  await expect(recoverMnemonicSession(phrase)).resolves.toBe(false);
+
+  const writes = jest
+    .mocked(AsyncStorage.setItem)
+    .mock.calls.filter(([key]) => key === 'wallet-lifecycle');
+  expect(JSON.parse(writes[0][1]).state.restoreStatus).toBe('pending');
+  expect(JSON.parse(writes.at(-1)![1]).state).toMatchObject({
+    seedCreatedAt: 5,
+    restoreStatus: 'not-needed',
+  });
+  expect(restartApp).not.toHaveBeenCalled();
+  jest.mocked(AsyncStorage.getItem).mockImplementation(async () => null);
+});
+
+it('still recovers when the saved restore record is damaged', async () => {
+  // Reading it back for a rollback must not be what stops a recovery.
+  jest
+    .mocked(AsyncStorage.getItem)
+    .mockImplementation(async (key) => (key === 'wallet-lifecycle' ? '{"state":{"se' : null));
+
+  await expect(recoverMnemonicSession(phrase)).resolves.toBe(true);
+
+  expect(storeMnemonic).toHaveBeenCalledWith(phrase);
+  expect(restartApp).toHaveBeenCalledTimes(1);
+  jest.mocked(AsyncStorage.getItem).mockImplementation(async () => null);
+});
+
 it('rejects a recovery phrase that changes a known derived identity', async () => {
   useProfileStore.setState({
     profiles: [{ accountIndex: 0, pubkey: 'b'.repeat(64), source: 'derived', addedAt: 1 }],
@@ -108,16 +158,82 @@ it('discards only the unused onboarding profile projection before replacing the 
   expect(useSettingsStore.persist.getOptions().storage!.setItem).toHaveBeenCalled();
 });
 
-it('does not erase preferences or restart when secure deletion fails', async () => {
-  jest.mocked(clearAllSecureData).mockResolvedValue(false);
+it('leaves databases and keys intact when reset enumeration fails', async () => {
+  jest.mocked(prepareSecureDataReset).mockRejectedValueOnce(new Error('index unreadable'));
   await expect(deleteAllProfiles()).resolves.toBe(false);
-  expect(clearAllSecureData).toHaveBeenCalled();
+  expect(CocoManager.completeReset).not.toHaveBeenCalled();
+  expect(clearAllSecureData).not.toHaveBeenCalled();
   expect(AsyncStorage.clear).not.toHaveBeenCalled();
-  expect(restartApp).not.toHaveBeenCalled();
+});
+
+describe('an imported account whose wallet was made from a recorded phrase', () => {
+  const imported = (walletPhraseFingerprint?: string) => ({
+    accountIndex: 848431463,
+    pubkey: 'c'.repeat(64),
+    source: 'imported' as const,
+    addedAt: 2,
+    ...(walletPhraseFingerprint ? { walletPhraseFingerprint } : {}),
+  });
+  /** The keychain cannot be read, which is when a phrase is typed in for imported accounts. */
+  const lockedWith = (profile: ReturnType<typeof imported>) => {
+    useSecureStoreState.setState({ secureStoreState: 'locked', errorName: null });
+    useProfileStore.setState({ activeAccountIndex: profile.accountIndex, profiles: [profile] });
+  };
+  afterEach(() => useSecureStoreState.setState({ secureStoreState: 'available', errorName: null }));
+
+  it('refuses another phrase: it would derive the account a different wallet', async () => {
+    lockedWith(imported('fingerprint of some other twelve words'));
+    await expect(recoverMnemonicSession(phrase)).resolves.toBe(false);
+    expect(storeMnemonic).not.toHaveBeenCalled();
+    expect(CocoManager.cleanup).not.toHaveBeenCalled();
+  });
+
+  it('accepts the phrase the account recorded', async () => {
+    lockedWith(imported(`fingerprint of ${phrase}`));
+    await expect(recoverMnemonicSession(phrase)).resolves.toBe(true);
+    expect(storeMnemonic).toHaveBeenCalledWith(phrase);
+  });
+
+  it('holds an account imported before this was recorded against nothing', async () => {
+    lockedWith(imported());
+    await expect(recoverMnemonicSession(phrase)).resolves.toBe(true);
+  });
+});
+
+it('lets a derived account recover its matching phrase after a setup failure', async () => {
+  useSecureStoreState.setState({ secureStoreState: 'available', errorName: null });
+  jest
+    .mocked(useSettingsStore.getState)
+    .mockReturnValueOnce({ ...useSettingsStore.getState(), hasSeenOnboarding: true });
+  useProfileStore.setState({
+    profiles: [
+      { accountIndex: 0, pubkey: deriveNostrKeys(phrase, 0).pubkey, source: 'derived', addedAt: 1 },
+    ],
+  });
+  jest.mocked(AsyncStorage.setItem).mockClear();
+  await expect(recoverMnemonicSession(phrase)).resolves.toBe(true);
+  expect(storeMnemonic).toHaveBeenCalledWith(phrase);
+  expect(
+    jest.mocked(AsyncStorage.setItem).mock.calls.some(([key]) => key === 'profile-store')
+  ).toBe(false);
 });
 
 it('clears secure data and preferences before restarting fresh', async () => {
+  useProfileStore.setState({
+    profiles: [
+      { accountIndex: 0, pubkey: 'a'.repeat(64), addedAt: 1, walletDatabaseCreated: true },
+      { accountIndex: 3, pubkey: 'b'.repeat(64), addedAt: 2, walletDatabaseCreated: true },
+    ],
+  });
+  // A wipe that stops once the databases are gone leaves the list behind.
+  // Reopening must not then take the missing databases for a loss.
+  let recordedAtReset: unknown;
+  jest.mocked(CocoManager.completeReset).mockImplementationOnce(async () => {
+    recordedAtReset = useProfileStore.getState().profiles.map((p) => p.walletDatabaseCreated);
+  });
   await expect(deleteAllProfiles()).resolves.toBe(true);
+  expect(CocoManager.completeReset).toHaveBeenCalledWith([0, 3]);
+  expect(recordedAtReset).toEqual([false, false]);
   expect(clearAllSecureData).toHaveBeenCalled();
   expect(AsyncStorage.clear).toHaveBeenCalled();
   expect(restartApp).toHaveBeenCalledTimes(1);

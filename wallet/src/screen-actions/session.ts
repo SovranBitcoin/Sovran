@@ -49,6 +49,8 @@ export interface ScreenActionSession<S extends ScreenType> {
   ) => Promise<void>;
   setEntry: (entry: Record<string, unknown>) => void;
   setEntrySeed: (entrySeed: ScreenActionEntrySeed) => void;
+  /** Recompute the actions after a change in something they read through a getter. */
+  refresh: () => void;
   dispose: () => void;
 }
 
@@ -272,9 +274,11 @@ export function createScreenActionSession<S extends ScreenType>(
   }
 
   const unsubscribeManager = manager.subscribe(notify);
+  // Through the manager, not `notify` alone: the manager caches its action
+  // states, and a bare notify would hand the stale ones back.
   const unsubscribeScreenActionsChanged = subscriptionBus?.subscribe(
     { type: 'screenActions.changed' },
-    notify,
+    () => manager.refresh(),
   );
 
   function subscribeToEntryUpdates(): void {
@@ -438,6 +442,9 @@ export function createScreenActionSession<S extends ScreenType>(
       manager.setEntry(entry);
     },
     setEntrySeed,
+    refresh: () => {
+      if (!disposed) manager.refresh();
+    },
     dispose: () => {
       if (disposed) return;
       disposed = true;

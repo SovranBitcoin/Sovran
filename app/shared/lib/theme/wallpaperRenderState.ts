@@ -13,7 +13,7 @@
  * invisible. `WalletWallpaperProbe` exposes this so e2e can assert the real
  * render.
  */
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 
 type WallpaperRenderStatus = 'loaded' | 'failed';
 
@@ -23,7 +23,10 @@ interface WallpaperRenderState {
   markFailed: (theme: string) => void;
 }
 
-export const useWallpaperRenderStore = create<WallpaperRenderState>((set) => ({
+export const useWallpaperRenderStore = create<WallpaperRenderState>({
+  name: 'useWallpaperRenderStore',
+  scope: 'session',
+})((set) => ({
   statusByTheme: {},
   markLoaded: (theme) =>
     set((s) =>

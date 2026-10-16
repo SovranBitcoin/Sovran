@@ -13,7 +13,7 @@ jest.mock('@/shared/lib/color', () => ({
 }));
 
 jest.mock('@/shared/lib/logger', () => ({
-  log: { warn: jest.fn() },
+  log: { warn: jest.fn(), debug: jest.fn() },
   storeLog: { warn: jest.fn() },
   redactError: (error: unknown) => error,
 }));

@@ -77,3 +77,27 @@ export function SheetMenuRowContent({
     </HStack>
   );
 }
+
+/**
+ * Row tint for a menu item's state. heroui's `variant="danger"` only colours
+ * text, so a failed row (red) or a caution row (yellow) gets its whole
+ * background tinted to read at a glance. The description still carries the
+ * meaning for screen readers; colour alone is not an accessibility signal.
+ */
+export function MenuRowTint({
+  tone,
+  disabled = false,
+  children,
+}: {
+  tone: 'failed' | 'caution' | undefined;
+  /** A disabled row is already dimmed; a caution tint on top would only add noise. */
+  disabled?: boolean;
+  children: ReactNode;
+}) {
+  if (!tone || (tone === 'caution' && disabled)) return <>{children}</>;
+  return (
+    <View className={`${tone === 'failed' ? 'bg-danger/10' : 'bg-warning/15'} mx-1 rounded-2xl`}>
+      {children}
+    </View>
+  );
+}

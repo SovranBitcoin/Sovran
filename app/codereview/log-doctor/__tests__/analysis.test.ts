@@ -1,6 +1,7 @@
 import {
   clusterErrorEntries,
   errorClusterKey,
+  logLineJson,
   normalizeErrorText,
   percentile,
   scanRedactionAudit,
@@ -8,6 +9,30 @@ import {
   summarizeDurations,
   type AnalyzableEntry,
 } from '../analysis';
+
+describe('logLineJson', () => {
+  const json =
+    '{"ts":"2026-10-12T15:31:59.357Z","_t":3765.02,"level":"debug","event":"screen.mount"}';
+
+  it('returns a bare JSON line unchanged', () => {
+    expect(logLineJson(json)).toBe(json);
+  });
+
+  it("drops the level badge Metro's terminal puts in front of each entry", () => {
+    const badge = '\u001b[7m\u001b[37m\u001b[1m DEBUG \u001b[22m\u001b[39m\u001b[27m ';
+    expect(logLineJson(`${badge}${json}`)).toBe(json);
+    expect(logLineJson(` LOG  ${json}`)).toBe(json);
+  });
+
+  it('keeps colour codes that Metro wrapped around the entry out of the JSON', () => {
+    expect(logLineJson(`\u001b[33m${json}\u001b[39m`)).toBe(json);
+  });
+
+  it('has nothing to return for a line with no entry on it', () => {
+    expect(logLineJson('Starting Metro Bundler')).toBeNull();
+    expect(logLineJson('')).toBeNull();
+  });
+});
 
 describe('percentile / summarizeDurations', () => {
   const samples = [100, 300, 500, 800, 1000];

@@ -16,8 +16,10 @@
  * product decision (Kelbie, 2026-09-13). Do not widen auto-execution beyond
  * the guards above without revisiting that decision.
  *
- * Lifecycle: useFocusEffect — arming stops the moment the wallet blurs
- * (navigating into any flow, backgrounding via blur) and the held native
+ * Lifecycle: useForegroundFocusEffect — arming stops the moment the wallet
+ * blurs or the app goes to the background, and starts again when the wallet
+ * is focused in the foreground again: the system drops the session while the
+ * app is away, and a focus effect alone would not notice. The held native
  * session is cancelled, so other NFC apps and flows are unaffected. Each
  * cycle is one machine.scan(source: 'nfc') call: it times out quietly after
  * 30s (suppressed by the ambient flag in the nfc scan source) and re-arms.
@@ -25,7 +27,7 @@
 
 import { useCallback } from 'react';
 import { Platform } from 'react-native';
-import { useFocusEffect } from 'expo-router';
+import { useForegroundFocusEffect } from '@/shared/hooks/useForegroundFocusEffect';
 
 import {
   isNfcEnabled,
@@ -75,7 +77,7 @@ export function useAmbientNfcArm(machine: AmbientNfcMachine): void {
   // latest through a ref so focus/blur is the only thing that restarts it.
   const machineRef = useLatestRef(machine);
 
-  useFocusEffect(
+  useForegroundFocusEffect(
     useCallback(() => {
       if (Platform.OS !== 'android') return;
       let active = true;
@@ -113,7 +115,11 @@ export function useAmbientNfcArm(machine: AmbientNfcMachine): void {
         if (!(await isNfcSupported())) return;
         walletLog.info('wallet.nfc.ambient_arm_start');
         while (active) {
-          if (!(await isNfcEnabled())) {
+          const enabled = await isNfcEnabled();
+          // The screen lost focus or the app left the foreground while that
+          // was asked: this loop is over, and must not start a scan.
+          if (!active) break;
+          if (!enabled) {
             useNfcTapStore.getState().setArmed(false);
             await delay(DISABLED_RECHECK_MS);
             continue;

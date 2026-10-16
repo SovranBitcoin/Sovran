@@ -16,6 +16,7 @@
 
 import type { BalancesByMint, HistoryEntry } from "@cashu/coco-core";
 
+import { amountToNumber, type AmountValue } from "../amount";
 import { isReservedPendingEcash } from "../history/filters";
 
 export interface WalletBalanceBreakdown {
@@ -25,18 +26,6 @@ export interface WalletBalanceBreakdown {
   pending: number;
   redeeming: number;
   byMint: BalancesByMint;
-}
-
-type AmountLike = number | bigint | string | { toNumber(): number } | null | undefined;
-
-/** Coerce a coco Amount (number | bigint | string | {toNumber}) to a number. */
-export function amountToNumber(value: AmountLike): number {
-  if (value == null) return 0;
-  if (typeof value === "number") return value;
-  if (typeof value === "bigint") return Number(value);
-  if (typeof value === "string") return Number(value) || 0;
-  if (typeof value.toNumber === "function") return value.toNumber();
-  return 0;
 }
 
 /**
@@ -51,14 +40,14 @@ export function sumReservedSends(history: readonly HistoryEntry[]): number {
   return history.reduce(
     (sum, entry) =>
       isReservedPendingEcash(entry)
-        ? sum + amountToNumber((entry as { amount?: AmountLike }).amount)
+        ? sum + amountToNumber((entry as { amount?: AmountValue }).amount)
         : sum,
     0,
   );
 }
 
 /** Sum a list of coco amounts (e.g. in-flight receive operation amounts). */
-export function sumAmounts(values: readonly AmountLike[]): number {
+export function sumAmounts(values: readonly AmountValue[]): number {
   return values.reduce<number>((sum, value) => sum + amountToNumber(value), 0);
 }
 

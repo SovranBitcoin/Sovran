@@ -286,6 +286,7 @@ function isMintValidForFlow(
 
 function buildSelectMintRedirect(
   ctx: FlowContext,
+  walletCtx: WalletContext,
   destination: Destination,
   candidates: MintCandidate[],
   amount: number | undefined,
@@ -295,10 +296,14 @@ function buildSelectMintRedirect(
     ctx,
     ctx.unit,
   );
-  const finalCandidates =
+  // A flow picker lists the active account's mints, by that rule and not
+  // because the other account's mints happen to read as unsupported.
+  const finalCandidates = accountMintCandidates(
+    walletCtx,
     destination === "mintQuote" && requirement
       ? hideMethodUnsupportedCandidates(candidates)
-      : candidates;
+      : candidates,
+  );
 
   const result: ContextResolutionResult<"selectMint"> = {
     step: "selectMint",
@@ -422,6 +427,7 @@ function revalidateMintForAmount(
         kind: "redirect",
         result: buildSelectMintRedirect(
           ctx,
+          walletCtx,
           destination,
           methodCandidates,
           amount,
@@ -491,6 +497,7 @@ function revalidateMintForAmount(
           kind: "redirect",
           result: buildSelectMintRedirect(
             ctx,
+            walletCtx,
             destination,
             fullAmountCandidates.length > 0
               ? fullAmountCandidates
@@ -517,6 +524,7 @@ function revalidateMintForAmount(
         kind: "redirect",
         result: buildSelectMintRedirect(
           ctx,
+          walletCtx,
           destination,
           selection.validMints,
           amount,
@@ -765,7 +773,7 @@ export function resolveFromContext(
     if (methodCandidates && availableCandidates.length > 0) {
       return logContextResult(
         "mint_quote_select_mint_for_method",
-        buildSelectMintRedirect(ctx, destination, methodCandidates, amount),
+        buildSelectMintRedirect(ctx,walletCtx, destination, methodCandidates, amount),
       );
     }
 

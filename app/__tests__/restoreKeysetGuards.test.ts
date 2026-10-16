@@ -8,7 +8,6 @@ import {
   isAlreadyRecoveredError,
   isRestorableKeysetId,
   restoreKeysetForMint,
-  type ProofStateTally,
 } from '@/shared/lib/cashu/managerInternals';
 
 jest.mock('@/shared/lib/logger', () => ({
@@ -105,87 +104,28 @@ describe('isAlreadyRecoveredError', () => {
   });
 });
 
-describe('restoreKeysetForMint proof-state tally', () => {
-  const STATES = [{ state: 'SPENT' }, { state: 'UNSPENT' }, { state: 'SPENT' }, { state: 'SPENT' }];
+describe('restoreKeysetForMint', () => {
+  it('passes the cached wallet to Coco without patching it', async () => {
+    const wallet = Object.freeze({});
+    const restoreKeyset = jest.fn(async () => undefined);
+    const getWallet = jest.fn(async () => wallet);
+    const manager = {
+      walletService: { getWallet },
+      walletRestoreService: { restoreKeyset },
+    } as unknown as Manager;
 
-  /**
-   * A wallet whose `checkProofsStates` lives on the prototype, matching cashu-ts
-   * — the tally shadows it with an own property and must put it back.
-   */
-  class FakeWallet {
-    async checkProofsStates() {
-      return STATES;
-    }
-  }
+    await restoreKeysetForMint(manager, {
+      mintUrl: 'https://mint.example',
+      keysetId: '009a1f293253e41e',
+      unit: 'sat',
+    });
 
-  function fakeManager(restoreKeyset: () => Promise<void>) {
-    const wallet = new FakeWallet();
-    return {
+    expect(getWallet).toHaveBeenCalledWith('https://mint.example', 'sat');
+    expect(restoreKeyset).toHaveBeenCalledWith(
+      'https://mint.example',
       wallet,
-      manager: {
-        walletService: { getWallet: async () => wallet },
-        walletRestoreService: { restoreKeyset },
-      } as unknown as Manager,
-    };
-  }
-
-  it('counts the spent/unspent split', async () => {
-    const tally: ProofStateTally = { ready: 0, spent: 0 };
-    const { manager, wallet } = fakeManager(async () => {
-      await wallet.checkProofsStates();
-    });
-
-    await restoreKeysetForMint(
-      manager,
-      { mintUrl: 'https://mint.example', keysetId: '009a1f293253e41e', unit: 'sat' },
-      tally
+      '009a1f293253e41e',
+      'sat'
     );
-
-    expect(tally).toEqual({ ready: 1, spent: 3 });
-  });
-
-  it('keeps the counts when the restore throws afterwards', async () => {
-    // The regression. A keyset that already holds its proofs gets a full
-    // verdict from `checkProofsStates` and THEN fails in `saveProofs`, so a
-    // returned value is discarded exactly where the numbers matter — which is
-    // how a run reported 0 ready / 0 spent while coco logged 75 and 445.
-    const tally: ProofStateTally = { ready: 0, spent: 0 };
-    const { manager, wallet } = fakeManager(async () => {
-      await wallet.checkProofsStates();
-      throw new Error('Proof with secret already exists: 038a8dbb');
-    });
-
-    await expect(
-      restoreKeysetForMint(
-        manager,
-        { mintUrl: 'https://mint.example', keysetId: '009a1f293253e41e', unit: 'sat' },
-        tally
-      )
-    ).rejects.toThrow('already exists');
-
-    expect(tally).toEqual({ ready: 1, spent: 3 });
-  });
-
-  it('accumulates across keysets and leaves the cached wallet unpatched', async () => {
-    const tally: ProofStateTally = { ready: 0, spent: 0 };
-    const { manager, wallet } = fakeManager(async () => {
-      await wallet.checkProofsStates();
-    });
-
-    await restoreKeysetForMint(
-      manager,
-      { mintUrl: 'https://mint.example', keysetId: '009a1f293253e41e', unit: 'sat' },
-      tally
-    );
-    await restoreKeysetForMint(
-      manager,
-      { mintUrl: 'https://mint.example', keysetId: '00107937db0cc865', unit: 'sat' },
-      tally
-    );
-
-    expect(tally).toEqual({ ready: 2, spent: 6 });
-    // WalletService caches per (mintUrl, unit), so the instrumented method must
-    // not outlive the restore — a leaked wrapper would double-count forever.
-    expect(Object.hasOwn(wallet, 'checkProofsStates')).toBe(false);
   });
 });

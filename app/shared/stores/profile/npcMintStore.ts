@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { persist, subscribeWithSelector } from 'zustand/middleware';
 import { finalizeEvent } from 'nostr-tools/pure';
 import type { EventTemplate, VerifiedEvent } from 'nostr-tools/core';
@@ -64,7 +64,7 @@ function migrateNpcMintStore(state: unknown, version: number): V2Persisted {
   return s as V2Persisted;
 }
 
-export const useNpcMintStore = create<NpcMintStore>()(
+export const useNpcMintStore = create<NpcMintStore>({ name: 'npc-mint-store', scope: 'profile' })(
   subscribeWithSelector(
     persist(
       (set, get) => ({

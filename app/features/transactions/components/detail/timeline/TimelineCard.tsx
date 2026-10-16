@@ -6,8 +6,10 @@
 // ONCE per input change (no per-second rebuild — the countdown badge owns its
 // own interval in ExpiryCountdown, and expiry flips the model exactly once via
 // a single boundary timeout). Rows are keyed by the engine's semantic
-// `step.rowKey`, so shape changes morph slots in place.
+// `step.rowKey`, and the engine only ever appends rows, so a change of state
+// morphs the open slot in place and fades the next one in below it.
 
+import { useStylePaint } from '@/shared/styles/appStyle';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet } from 'react-native';
 
@@ -22,6 +24,7 @@ import {
   getStatusColorType,
   getStatusHeader,
   type ChainOnchainConfirmationProgress as OnchainConfirmationProgress,
+  type TimelineFlowVariant,
   type TimelineStep,
 } from 'wallet';
 import { withAlpha } from '@/shared/lib/color';
@@ -32,7 +35,7 @@ import { SpendingConditionsCard } from '@/features/send/components/SpendingCondi
 import type { HistoryEntry } from '@cashu/coco-core';
 
 import { mapCheckpointStatusToIndicator } from '@/shared/blocks/status';
-import { GradientCard } from '@/shared/ui/composed/GradientCard';
+import { Surface } from '@/shared/ui/composed/Surface';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -71,6 +74,20 @@ interface HistoryEntryTimelineProps {
  * `react-hooks/exhaustive-deps` flagged and which could not have been
  * satisfied without defeating that memo (the closure is new every render).
  */
+const NO_ROWS: readonly string[] = [];
+
+function timelineIdentity(entry: HistoryEntry): string {
+  const record = entry as {
+    id?: unknown;
+    operationId?: unknown;
+    quoteId?: unknown;
+    metadata?: { operationId?: unknown };
+  };
+  const identity =
+    record.operationId ?? record.metadata?.operationId ?? record.quoteId ?? record.id;
+  return `${entry.type}:${String(identity ?? 'no-id')}`;
+}
+
 function ownsConfirmationRing(step: TimelineStep, progress: unknown): boolean {
   return !!progress && !!step.confirmationRing;
 }
@@ -98,6 +115,7 @@ export function HistoryEntryTimeline({
   onchainConfirmationProgress,
   onchainSettledInternally,
 }: HistoryEntryTimelineProps) {
+  const { cardIsBare } = useStylePaint();
   const [foreground, successColor, dangerColor, warningColor] = useThemeColor([
     'foreground',
     'success',
@@ -129,7 +147,11 @@ export function HistoryEntryTimeline({
   // change-gated: countdown ticks live inside ExpiryCountdown and never reach
   // this component; only actual visual transitions (rows, dots, lines,
   // labels, badge) emit.
-  const entryId = String((historyEntry as { id?: unknown }).id ?? 'no-id');
+  // One payment reaches this card under more than one id: the history stream
+  // calls a melt `melt:<operation>` and the operation stream calls it
+  // `<operation>`, and the entry merge takes whichever spoke last. The card's
+  // memory of what it has drawn has to follow the payment, not the label.
+  const entryId = timelineIdentity(historyEntry);
   const renderCountRef = useRenderCount();
 
   useEffect(() => {
@@ -182,7 +204,12 @@ export function HistoryEntryTimeline({
   const reclaimClock = useBoundaryClock(
     unlockAt === undefined ? undefined : unlockAt + LOCK_CLOCK_SKEW_MS
   );
-  const currentTime = Math.max(expiryClock, reclaimClock);
+  // The model also names its own next moment: when a payment that has been
+  // in flight this long should start saying so. It is known only after the
+  // model is built, so it is carried over from the previous build.
+  const [recheckAt, setRecheckAt] = useState<number | undefined>(undefined);
+  const recheckClock = useBoundaryClock(recheckAt);
+  const currentTime = Math.max(expiryClock, reclaimClock, recheckClock);
   const conditions = useMemo(
     () =>
       historyEntry.type === 'send'
@@ -194,6 +221,16 @@ export function HistoryEntryTimeline({
     [historyEntry, currentTime, ourPubkeys]
   );
 
+  // The rows this card has already drawn as finished, for this entry. A
+  // terminal state forgets how far the flow got (`rolled_back` does not say
+  // from where), so the model is handed back its own previous answer: that is
+  // what keeps a row on screen once it has been shown.
+  const [drawn, setDrawn] = useState<{
+    entryId: string;
+    flow?: TimelineFlowVariant;
+    rowKeys: readonly string[];
+  }>({ entryId, rowKeys: NO_ROWS });
+  const doneRowKeys = drawn.entryId === entryId ? drawn.rowKeys : NO_ROWS;
   const model = useMemo(
     () =>
       buildTimelineModel({
@@ -205,6 +242,12 @@ export function HistoryEntryTimeline({
         onchainConfirmationProgress,
         onchainSettledInternally,
         paymentCopy,
+        // Local feedback for the tap; the engine draws coco's own
+        // `rolling_back` the same way, so the answer lands in the same row.
+        cancelling: cancelling && historyEntry.type === 'send',
+        doneRowKeys,
+        // The engine drops the rows if the entry now resolves to another flow.
+        ...(drawn.entryId === entryId && drawn.flow ? { doneRowKeysFlow: drawn.flow } : {}),
         ...(ourPubkeys ? { ourPubkeys } : {}),
       }),
     [
@@ -217,30 +260,28 @@ export function HistoryEntryTimeline({
       onchainConfirmationProgress,
       onchainSettledInternally,
       paymentCopy,
+      cancelling,
+      doneRowKeys,
+      drawn.entryId,
+      drawn.flow,
+      entryId,
     ]
   );
-  const cancellationActive =
-    cancelling && historyEntry.type === 'send' && model.outcome.kind === 'pending';
-  const timeline = useMemo(() => {
-    if (!cancellationActive) return model.steps;
-    const pendingIndex = model.steps.findIndex((step) => step.rowKey === 'pending');
-    if (pendingIndex < 0) return model.steps;
-    return model.steps.slice(0, pendingIndex + 1).map((step, index): TimelineStep =>
-      index === pendingIndex
-        ? {
-            ...step,
-            id: 'cancelling',
-            displayLabel: 'Cancelling',
-            info: 'Returning ecash to your balance',
-            stepType: 'current',
-            timestamp: undefined,
-          }
-        : step
-    );
-  }, [model.steps, cancellationActive]);
+  // Derived state, set during render. Within one flow the model only ever
+  // returns a superset of what it was given, and a change of flow starts the
+  // memory again, so this settles after one extra pass either way.
+  if (
+    drawn.entryId !== entryId ||
+    drawn.flow !== model.flow ||
+    model.doneRowKeys.join('|') !== drawn.rowKeys.join('|')
+  ) {
+    setDrawn({ entryId, flow: model.flow, rowKeys: model.doneRowKeys });
+  }
+  if (model.recheckAt !== recheckAt) setRecheckAt(model.recheckAt);
+  const timeline = model.steps;
 
   const cardLabel = getCardLabel(historyEntry, timeline, tokenCreated, nostrSent, paymentCopy);
-  const statusHeader = cancellationActive ? 'Cancelling transaction' : getStatusHeader(timeline);
+  const statusHeader = getStatusHeader(timeline);
   const statusColorType = getStatusColorType(timeline);
   // Change signature for the render log's effect gate (fires on real timeline
   // shape changes, not object identity). Step types read straight off the
@@ -322,15 +363,18 @@ export function HistoryEntryTimeline({
           dotResult: indicator.result,
           dotColorRole: step.stepType === 'waiting' ? 'warning' : 'theme-foreground',
           dotPendingColorRole: step.stepType === 'waiting' ? 'warning' : 'muted-rail',
-          textColorRole: isFutureState
-            ? 'foreground-50'
-            : step.stepType === 'expired'
-              ? 'danger'
-              : step.stepType === 'waiting' ||
-                  step.stepType === 'already-spent' ||
-                  step.stepType === 'rolled-back'
-                ? 'warning'
-                : 'foreground',
+          textColorRole:
+            step.stepType === 'complete' || step.stepType === 'success'
+              ? 'success'
+              : step.stepType === 'expired'
+                ? 'danger'
+                : step.stepType === 'waiting' ||
+                    step.stepType === 'already-spent' ||
+                    step.stepType === 'rolled-back'
+                  ? 'warning'
+                  : isFutureState
+                    ? 'foreground-50'
+                    : 'foreground',
           isFutureState,
           lineTypeToNext: lineType,
           showConfirmationRing,
@@ -439,10 +483,13 @@ export function HistoryEntryTimeline({
             ? after.stepType
             : `${before.stepType} -> ${after.stepType}`,
         label: before.label === after.label ? after.label : `${before.label} -> ${after.label}`,
-        // The label block is keyed by the step's semantic id, so an id change
-        // ("pending" -> "rolled-back") remounts it with a 220ms crossfade;
-        // info/timestamp-only updates mutate in place.
-        labelCrossfade: before.id !== after.id,
+        // The label block is keyed by id + label, so a new meaning or a
+        // change of tense remounts it with a 220ms crossfade; info/timestamp
+        // updates mutate in place.
+        labelCrossfade:
+          before.id !== after.id ||
+          before.label !== after.label ||
+          before.textColorRole !== after.textColorRole,
         dot: `${before.dotPhase}/${before.dotResult} -> ${after.dotPhase}/${after.dotResult}`,
         lineTypeToNext:
           before.lineTypeToNext === after.lineTypeToNext
@@ -496,7 +543,9 @@ export function HistoryEntryTimeline({
 
   return (
     <Log name="HistoryEntryTimeline">
-      <GradientCard style={styles.card} contentStyle={styles.cardContent}>
+      <Surface
+        style={styles.card}
+        contentStyle={[styles.cardContent, cardIsBare ? styles.cardContentBare : null]}>
         <Text size={11} bold style={[styles.cardLabel, { color: foreground50 }]}>
           {cardLabel}
         </Text>
@@ -525,10 +574,17 @@ export function HistoryEntryTimeline({
             const isLast = index === timeline.length - 1;
             const nextStep = !isLast ? timeline[index + 1] : null;
             const showConfirmationRing = ownsConfirmationRing(step, onchainConfirmationProgress);
+            // A finished ring row draws a full ring whatever our explorer's
+            // count says: the mint can call a transaction deep enough while
+            // our own count is still behind, and a ticked row with a
+            // part-filled ring would be two answers at once.
+            const ringFinished = step.stepType === 'complete' || step.stepType === 'success';
             const confirmationProgress =
               showConfirmationRing && onchainConfirmationProgress
                 ? {
-                    currentConfirmations: onchainConfirmationProgress.currentConfirmations,
+                    currentConfirmations: ringFinished
+                      ? onchainConfirmationProgress.requiredConfirmations
+                      : onchainConfirmationProgress.currentConfirmations,
                     requiredConfirmations: onchainConfirmationProgress.requiredConfirmations,
                   }
                 : undefined;
@@ -545,9 +601,12 @@ export function HistoryEntryTimeline({
                 segmentedInProgress={onchainConfirmationProgress?.hasPayment}
                 entryId={entryId}
                 detail={
+                  // On the row that is about the lock: the unlock row when
+                  // there is a date, otherwise the row waiting on the recipient.
                   conditions &&
-                  ((step.id === 'unlock' && conditions.unlockAt !== null) ||
-                    (step.id === 'locked' && conditions.unlockAt === null)) ? (
+                  (conditions.unlockAt !== null
+                    ? step.id === 'unlock'
+                    : step.id === 'claimed' && step.stepType === 'next-pending') ? (
                     <SpendingConditionsCard
                       conditions={conditions}
                       recipientName={getCounterparty(historyEntry)?.displayName ?? null}
@@ -558,7 +617,7 @@ export function HistoryEntryTimeline({
             );
           })}
         </View>
-      </GradientCard>
+      </Surface>
     </Log>
   );
 }
@@ -569,6 +628,10 @@ const styles = StyleSheet.create({
   },
   cardContent: {
     padding: 20,
+  },
+  // No frame, so no inner inset: the steps line up with the screen gutter.
+  cardContentBare: {
+    paddingHorizontal: 0,
   },
   cardLabel: {
     marginBottom: 8,

@@ -52,6 +52,7 @@ jest.mock('@/features/mint/data/mintDiscoverCache', () => {
   return {
     MINT_DISCOVER_CACHE_KEY: 'all',
     mintDiscoverCache: createQueryCacheStore({
+      scope: 'global',
       name: 'mint-discover-cache-mapper-test',
       staleTtlMs: 20 * 60 * 1000,
       maxEntries: 1,

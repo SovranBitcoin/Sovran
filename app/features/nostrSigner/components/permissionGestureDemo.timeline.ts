@@ -1,9 +1,9 @@
 /**
  * @fileoverview Keyframe timeline for the permission gesture demo
  *
- * Pure data + a pure evaluator — deliberately ZERO imports (no reanimated)
- * so the loop-seam and monotonicity invariants are jest-testable without
- * mocking, and the whole choreography is reviewable in one table.
+ * Pure timeline data with only a type import. The loop-seam and ordering
+ * invariants can be tested without loading Reanimated, and the choreography
+ * is reviewable in one table.
  *
  * One master clock `t` (ms, 0 → CYCLE_MS, repeating) drives every element;
  * each element samples its Track via `valueAt`. The non-negotiable invariant:
@@ -26,45 +26,13 @@
  *   6520–6800  idle tail (bob phase-continuous: 6800 / BOB_PERIOD is whole)
  */
 
+import type { Track } from '@/shared/lib/motion/keyframes';
+
 export const CYCLE_MS = 6800;
 
 /** Glove idle bob: BOB_AMP * sin(2πt / BOB_PERIOD), gated by BOB_WEIGHT. */
 export const BOB_PERIOD_MS = 850;
 export const BOB_AMP = 3;
-
-type EasingKey = 'linear' | 'outCubic' | 'inQuad' | 'outQuad' | 'overshoot' | 'inOutSin';
-
-interface TimelineKeyframe {
-  at: number;
-  v: number;
-  /** Easing INTO this keyframe from the previous one. Default linear. */
-  e?: EasingKey;
-}
-
-export type Track = readonly TimelineKeyframe[];
-
-export type EasingMap = Record<EasingKey, (x: number) => number>;
-
-/**
- * Sample a track at time `t` (clamped to the first/last keyframe values).
- * Linear scan — tracks are ≤ 16 frames; runs per-frame on the UI thread.
- */
-export function valueAt(t: number, track: Track, easings: EasingMap): number {
-  'worklet';
-  const first = track[0]!;
-  if (t <= first.at) return first.v;
-  for (let i = 1; i < track.length; i += 1) {
-    const next = track[i]!;
-    if (t <= next.at) {
-      const prev = track[i - 1]!;
-      const span = next.at - prev.at;
-      if (span <= 0) return next.v;
-      const local = (t - prev.at) / span;
-      return prev.v + (next.v - prev.v) * easings[next.e ?? 'linear'](local);
-    }
-  }
-  return track[track.length - 1]!.v;
-}
 
 // ── Scene geometry ──────────────────────────────────────────────
 

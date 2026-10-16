@@ -74,6 +74,7 @@ const attestation = z.object({
 });
 export type CaptureAttestation = z.infer<typeof attestation>;
 const manifestSchema = z.object({
+  kind: z.never().optional(),
   version: z.literal(1),
   runId: z.string().regex(/^[a-zA-Z0-9-]+$/),
   suite: z.string(),

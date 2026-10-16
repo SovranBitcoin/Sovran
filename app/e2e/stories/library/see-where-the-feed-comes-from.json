@@ -1,0 +1,94 @@
+{
+  "id": "see-where-the-feed-comes-from",
+  "purpose": "A person opens Network in Settings and sees which services and relays the app reads from, then goes back.",
+  "startsFrom": "onboarded",
+  "steps": [
+    {
+      "name": "the wallet opens",
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-send"
+          }
+        },
+        {
+          "logged": "splash.gone"
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "open the drawer",
+      "tap": {
+        "id": "header-profile-avatar"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "drawer-menu-settings"
+          }
+        }
+      ]
+    },
+    {
+      "name": "open Settings",
+      "tap": {
+        "id": "drawer-menu-settings"
+      },
+      "expect": [
+        {
+          "page": "SettingsScreen"
+        },
+        {
+          "visible": {
+            "id": "settings-profile-row"
+          }
+        }
+      ]
+    },
+    {
+      "name": "open Network",
+      "tap": {
+        "id": "settings-network-row"
+      },
+      "expect": [
+        {
+          "page": "SettingsNetworkScreen"
+        },
+        {
+          "visible": {
+            "id": "settings-network-tier-nagg"
+          }
+        },
+        {
+          "visible": {
+            "id": "settings-network-tier-primal"
+          }
+        },
+        {
+          "visible": {
+            "id": "settings-network-tier-relay"
+          }
+        }
+      ]
+    },
+    {
+      "name": "go back to Settings",
+      "tap": {
+        "id": "flow-header-back"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "settings-network-row"
+          }
+        },
+        {
+          "gone": {
+            "id": "settings-network-tier-nagg"
+          }
+        }
+      ]
+    }
+  ]
+}

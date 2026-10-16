@@ -1,7 +1,7 @@
 import { normalizeMintUrl, type BalanceSnapshot } from '@cashu/coco-core';
 import { z } from 'zod';
 
-import { amountToNumber } from '@/shared/lib/cashu/amount';
+import { amountToNumber } from 'wallet/amount';
 import { isTestnutMint } from '@/shared/stores/global/mintTestnutStore';
 
 const MintUrl = z.httpUrl();

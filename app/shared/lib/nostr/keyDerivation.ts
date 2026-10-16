@@ -1,3 +1,4 @@
+import { registerAccountScoped } from '@/shared/lib/account/accountRegistry';
 import * as nip19 from 'nostr-tools/nip19';
 import { bytesToHex } from '@noble/hashes/utils.js';
 import { HDKey } from '@scure/bip32';
@@ -13,7 +14,8 @@ import { log } from '../logger';
 let _cachedMnemonic: string | null = null;
 let _cachedRootSeed: Uint8Array | null = null;
 
-function getRootSeed(mnemonic: string): Uint8Array {
+/** The BIP-39 seed of a phrase, stretched once per run and kept for the next caller. */
+export function getRootSeed(mnemonic: string): Uint8Array {
   if (_cachedMnemonic === mnemonic && _cachedRootSeed) return _cachedRootSeed;
   _cachedRootSeed = bip39.mnemonicToSeedSync(mnemonic);
   _cachedMnemonic = mnemonic;
@@ -157,3 +159,13 @@ export function deriveCashuWalletSeedForImported(mnemonic: string, npubNumber: n
   });
   return seed;
 }
+
+registerAccountScoped(
+  'nostr.root-key-cache',
+  () => {
+    _cachedRootSeed?.fill(0);
+    _cachedRootSeed = null;
+    _cachedMnemonic = null;
+  },
+  () => _cachedRootSeed === null && _cachedMnemonic === null
+);

@@ -15,7 +15,7 @@ import { ModeratedDmBubble } from '../components/ModeratedDmBubble';
 
 import { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
-import { useFocusEffect } from 'expo-router';
+import { useForegroundFocusEffect } from '@/shared/hooks/useForegroundFocusEffect';
 import { staticPopup } from '@/shared/lib/popup';
 import { NDKEvent, useNDK } from '@nostr-dev-kit/ndk-mobile';
 import * as nip19 from 'nostr-tools/nip19';
@@ -166,7 +166,7 @@ export function UserMessagesScreen({
   // fetched on mount — and only re-fetch on RE-focus. The refresh keeps the
   // current messages on screen (status 'revalidating'); it never re-skeletons.
   const focusedOnceRef = useRef(false);
-  useFocusEffect(
+  useForegroundFocusEffect(
     useCallback(() => {
       if (isMockThread) return;
       if (!focusedOnceRef.current) {
@@ -208,7 +208,7 @@ export function UserMessagesScreen({
   const lud16 = rawLud16 && LightningAddress.safeParse(rawLud16).success ? rawLud16 : undefined;
   // No (valid) lud16 → fall back to the counterparty's npub.cash address so
   // Send money always works (UserProfileScreen precedent; the send flow's
-  // Select-option menu labels the variant "to npub.cash" for npc targets).
+  // Select-option menu labels the variant "as Lightning (npub.cash)" for npc targets).
   const sendMoneyTarget = useMemo(() => {
     if (lud16) return lud16;
     try {

@@ -111,6 +111,18 @@ final class BitChatBLEBridge: NSObject {
     /// accept + our P2PK lock key. Built in JS (cashu-ts) from our trusted mints
     /// and passed to `start()`; sent in the favorite as `[FAVORITED]:<npub>:<creq>`.
     private var selfCreq: String?
+    private var walletDiscovery = true
+    private let eventScopeLock = NSLock()
+    private var eventScope: String?
+    private var eventGeneration = 0
+    private func setEventScope(_ scope: String?) {
+        eventScopeLock.lock(); defer { eventScopeLock.unlock() }
+        eventScope = scope; eventGeneration += 1
+    }
+    private func currentEventScope() -> (generation: Int, scope: String?) {
+        eventScopeLock.lock(); defer { eventScopeLock.unlock() }
+        return (eventGeneration, eventScope)
+    }
 
     /// peerID (16-hex) → peer's x-only Nostr pubkey hex (from npub) and raw creq,
     /// learned from an inbound `[FAVORITED]:<npub>:<creq>` notification. Drives
@@ -291,7 +303,8 @@ final class BitChatBLEBridge: NSObject {
         noisePrivateKeyHex: String,
         signingPrivateKeyHex: String,
         p2pkPubkeyHex: String,
-        creq: String?
+        creq: String?,
+        walletDiscovery: Bool
     ) throws {
         let identityMaterial = try BitchatBLEIdentityMaterial(
             noisePrivateKeyHex: noisePrivateKeyHex,
@@ -299,17 +312,14 @@ final class BitChatBLEBridge: NSObject {
             p2pkPubkeyHex: p2pkPubkeyHex
         )
         let scope = BitchatProfileScope.storageSuffix(for: profileScope)
-        if isRunning, activeProfileScope == scope, activeIdentityID == identityMaterial.identityID {
+        if isRunning, activeProfileScope == scope, activeIdentityID == identityMaterial.identityID, self.walletDiscovery == walletDiscovery {
             bleService?.requestDiscoveryWindow()
             if activeNickname != nickname {
                 bleService?.setNickname(nickname)
                 activeNickname = nickname
             }
-            // Update the advertised creq when provided (the user's trusted mints
-            // can change without a profile switch). Only SET it — a startBLE call
-            // without a creq (e.g. the delivery path) must not clear it; only
-            // stop() (a profile switch) clears it.
-            if let creq, !creq.isEmpty { selfCreq = creq }
+            // Apply capability withdrawal as well as trusted-mint updates.
+            selfCreq = creq.flatMap { $0.isEmpty ? nil : $0 }
             return
         }
         if isRunning {
@@ -319,6 +329,8 @@ final class BitChatBLEBridge: NSObject {
         let keychain = ProfileScopedBitchatKeychain(profileScope: profileScope)
         try installDeterministicIdentity(identityMaterial, in: keychain)
 
+        setEventScope(profileScope)
+        self.walletDiscovery = walletDiscovery
         isRunning = true
         activeProfileScope = scope
         activeIdentityID = identityMaterial.identityID
@@ -330,14 +342,17 @@ final class BitChatBLEBridge: NSObject {
         // announce TLV. p2pkPubkey is "02" + the 32-byte x-only key.
         selfNpub = try? Bech32.encode(hrp: "npub", data: Data(identityMaterial.p2pkPubkey.dropFirst()))
         selfPeerID = identityMaterial.peerID
-        if let creq, !creq.isEmpty { selfCreq = creq }
+        selfCreq = creq.flatMap { $0.isEmpty ? nil : $0 }
         let idBridge = NostrIdentityBridge(keychain: keychain)
         let identityManager = SecureIdentityStateManager(keychain)
 
         let service = BLEService(
             keychain: keychain,
             idBridge: idBridge,
-            identityManager: identityManager
+            identityManager: identityManager,
+            discoveryServiceUUID: walletDiscovery
+                ? CBUUID(string: "7C6A0001-5A8B-4C9D-AE10-534F5652414E")
+                : BLEService.serviceUUID
         )
         service.delegate = self
         // Re-send our favorite (identity + creq) whenever a Noise session with a
@@ -354,6 +369,8 @@ final class BitChatBLEBridge: NSObject {
     }
 
     func stop() {
+        setEventScope(nil)
+        bleService?.delegate = nil
         bleService?.stopServices()
         bleService = nil
         isRunning = false
@@ -446,6 +463,7 @@ final class BitChatBLEBridge: NSObject {
             .first(where: { $0.peerID == peerID })?.nickname
         let now = Date().timeIntervalSince1970 * 1000
         Task { @MainActor in
+            guard !content.hasPrefix("sovran:nearby:1:"), !content.hasPrefix("sovran:payment:1:") else { return }
             BitChatBLEBridge.shared.recordDmPeer(
                 peerID: peerIDStr,
                 nickname: stampNickname,
@@ -570,6 +588,10 @@ final class BitChatBLEBridge: NSObject {
             // NOT a Nostr pubkey and must never be used for profile lookups.
             if let noisePublicKey = peer.noisePublicKey {
                 dict["noisePublicKeyHex"] = noisePublicKey.hexEncodedString()
+            }
+            let noise = service.getNoiseService()
+            if noise.hasEstablishedSession(with: peer.peerID), let key = noise.getPeerPublicKeyData(peer.peerID) {
+                dict["authenticatedNoiseFingerprint"] = SHA256.hash(data: key).map { String(format: "%02x", $0) }.joined()
             }
             return dict
         }
@@ -745,6 +767,8 @@ extension BitChatBLEBridge: BitchatDelegate {
     /// nickname (looked up via BLEService peer snapshots), message id, body,
     /// and timestamp.
     nonisolated func didReceiveNoisePayload(from peerID: PeerID, type: NoisePayloadType, payload: Data, timestamp: Date) {
+        let eventOwner = currentEventScope()
+        guard let profileScope = eventOwner.scope else { return }
         guard type == .privateMessage,
               let pm = PrivateMessagePacket.decode(from: payload) else {
             return
@@ -779,6 +803,7 @@ extension BitChatBLEBridge: BitchatDelegate {
                 BitChatBLEBridge.shared.setPeerIdentity(peerID.id, nostrHex: nil, creq: nil)
             }
             Task { @MainActor in
+                guard self.currentEventScope().generation == eventOwner.generation else { return }
                 BitChatBLEBridge.shared.holdBackgroundAssertion(name: "ble-favorite")
                 var event: [String: Any] = ["peerID": peerID.id, "isFavorite": isFavorite]
                 if let nostrHex { event["nostrPubkeyHex"] = nostrHex }
@@ -795,18 +820,22 @@ extension BitChatBLEBridge: BitchatDelegate {
             return
         }
         Task { @MainActor in
+            guard self.currentEventScope().generation == eventOwner.generation else { return }
             BitChatBLEBridge.shared.holdBackgroundAssertion(name: "ble-noise-payload")
             let senderNickname = BitChatBLEBridge.shared.bleService?
                 .currentPeerSnapshots()
                 .first(where: { $0.peerID == peerID })?
                 .nickname ?? String(peerID.id.prefix(12))
             let timestampMs = timestamp.timeIntervalSince1970 * 1000
-            BitChatBLEBridge.shared.recordDmPeer(
-                peerID: peerID.id,
-                nickname: senderNickname,
-                timestampMs: timestampMs
-            )
+            if !pm.content.hasPrefix("sovran:nearby:1:") && !pm.content.hasPrefix("sovran:payment:1:") {
+                BitChatBLEBridge.shared.recordDmPeer(
+                    peerID: peerID.id,
+                    nickname: senderNickname,
+                    timestampMs: timestampMs
+                )
+            }
             BitChatBLEBridge.shared.module?.sendEvent("onBLEPrivateMessage", [
+                "profileScope": profileScope,
                 "id": pm.messageID,
                 "peerID": peerID.id,
                 "sender": senderNickname,

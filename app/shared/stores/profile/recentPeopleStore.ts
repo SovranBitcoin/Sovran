@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { persist } from 'zustand/middleware';
 import { z } from 'zod';
 
@@ -135,7 +135,10 @@ const PersistedRecentPeopleStore = z.object({
   entries: z.array(PersistedRecentPersonEntry).max(MAX_RECENT_PEOPLE).default([]),
 });
 
-export const useRecentPeopleStore = create<RecentPeopleState>()(
+export const useRecentPeopleStore = create<RecentPeopleState>({
+  name: 'recent-people-store',
+  scope: 'profile',
+})(
   persist(
     (set) => ({
       entries: [],

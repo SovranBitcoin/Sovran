@@ -68,7 +68,7 @@ jest.mock('@/shared/ui/composed/BottomButtons', () => ({ BottomButtons: 'Footer'
 jest.mock('@/shared/ui/primitives/View/View', () => ({ View: 'View' }));
 jest.mock('@/shared/ui/primitives/Text', () => ({ Text: 'Text' }));
 jest.mock('@/shared/ui/primitives/Button', () => ({ Button: 'Button' }));
-jest.mock('@/shared/ui/composed/GradientCard', () => ({ GradientCard: 'GradientCard' }));
+jest.mock('@/shared/ui/composed/Surface', () => ({ Surface: 'Surface' }));
 jest.mock('heroui-native', () => {
   const React = require('react');
   const host = (name: string) =>

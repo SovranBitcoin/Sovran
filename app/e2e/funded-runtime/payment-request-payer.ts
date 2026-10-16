@@ -18,6 +18,7 @@ import { decodePaymentRequest, getDecodedToken } from '@cashu/cashu-ts';
 import { wrapEvent } from 'nostr-tools/nip17';
 import * as nip19 from 'nostr-tools/nip19';
 import { generateSecretKey } from 'nostr-tools/pure';
+import { requireAmount } from 'wallet/amount';
 
 interface NostrPaymentRequestTarget {
   requestId: string;
@@ -61,12 +62,10 @@ export function decodeNostrPaymentRequest(encoded: string): NostrPaymentRequestT
 
 /** cashu-ts 4.x decodes proof amounts as Amount objects (which JSON-serialize
  * to strings); the receiver's NUT-00 schema needs plain numbers. */
-function amountToNumber(value: unknown): number {
-  const parsed = typeof value === 'number' ? value : Number(String(value));
-  if (!Number.isSafeInteger(parsed) || parsed <= 0) {
-    throw new Error('token proof has a non-integer amount');
-  }
-  return parsed;
+function proofAmount(value: unknown): number {
+  const amount = requireAmount(typeof value === 'number' ? value : String(value));
+  if (amount === 0) throw new Error('token proof has a zero amount');
+  return amount;
 }
 
 /** Build the NUT-18 PaymentRequestPayload JSON from a cocod-minted token.
@@ -85,7 +84,7 @@ export function buildPaymentRequestPayload(params: {
     throw new Error('minted token is not from the declared mint');
   }
   const proofs = decoded.proofs.map((proof) => ({
-    amount: amountToNumber(proof.amount),
+    amount: proofAmount(proof.amount),
     id: proof.id,
     secret: proof.secret,
     C: proof.C,

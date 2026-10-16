@@ -64,6 +64,7 @@ class BitChatModule : Module() {
                 signingPrivateKeyHex: String,
                 p2pkPubkeyHex: String,
                 creq: String?,
+                walletDiscovery: Boolean,
             ->
             BitChatBLEBridge.start(
                 nickname = nickname,
@@ -72,8 +73,11 @@ class BitChatModule : Module() {
                 signingPrivateKeyHex = signingPrivateKeyHex,
                 p2pkPubkeyHex = p2pkPubkeyHex,
                 creq = creq,
+                walletDiscovery = walletDiscovery,
             )
         }
+
+        AsyncFunction("stopBLE") { BitChatBLEBridge.stop() }
 
         AsyncFunction("sendBLEMessage") { content: String ->
             BitChatBLEBridge.sendMessage(content)

@@ -1,0 +1,77 @@
+{
+  "id": "look-at-groups",
+  "purpose": "A person opens Contacts and switches from their contacts to their groups and back.",
+  "startsFrom": "onboarded",
+  "steps": [
+    {
+      "name": "the wallet opens",
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-send"
+          }
+        },
+        {
+          "logged": "splash.gone"
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "go to contacts",
+      "tap": {
+        "label": "Contacts"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "underline-tab-Groups"
+          }
+        },
+        {
+          "visible": {
+            "id": "underline-tab-Contacts"
+          }
+        },
+        {
+          "visible": {
+            "id": "screen-contacts"
+          }
+        }
+      ],
+      "withinMs": 12000
+    },
+    {
+      "name": "show groups",
+      "tap": {
+        "id": "underline-tab-Groups"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "underline-tab-Groups"
+          }
+        },
+        {
+          "logged": "ui.touch"
+        }
+      ]
+    },
+    {
+      "name": "show contacts again",
+      "tap": {
+        "id": "underline-tab-Contacts"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "underline-tab-Contacts"
+          }
+        },
+        {
+          "logged": "ui.touch"
+        }
+      ]
+    }
+  ]
+}

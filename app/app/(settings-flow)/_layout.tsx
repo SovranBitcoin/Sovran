@@ -1,9 +1,9 @@
 /**
- * @fileoverview Settings Flow Modal Layout
+ * @fileoverview Settings Flow Layout
  *
- * Nested stack inside a modal presentation, same pattern as receive-flow.
- * Parent root Stack presents this group as a modal (slides up from bottom).
- * Screens within push horizontally with close/back header.
+ * Nested stack for the settings pages. The root Stack presents this group as a
+ * pushed page (`slideFromRight('(settings-flow)')` in config/modalScreens.ts);
+ * screens within push horizontally with a back header.
  */
 
 import { useMemo } from 'react';
@@ -30,6 +30,11 @@ const DESIGN_SYSTEM_EMPTY_STATES_OPTIONS = { title: 'Empty states' };
 const DESIGN_SYSTEM_SKELETON_CROSSFADE_OPTIONS = { title: 'Skeleton crossfade' };
 const DESIGN_SYSTEM_FADE_STRESS_OPTIONS = { title: 'Fade-reveal stress' };
 const DESIGN_SYSTEM_POSTS_OPTIONS = { title: 'Fake posts' };
+const DESIGN_SYSTEM_SCREENS_OPTIONS = { title: 'Screens' };
+const DESIGN_SYSTEM_VARIATIONS_OPTIONS = { title: 'Variations' };
+const DESIGN_SYSTEM_PROMPTS_OPTIONS = { title: 'Prompts' };
+// A blocking screen has no header in the app; the one page that has sets its own title.
+const DESIGN_SYSTEM_PROMPT_OPTIONS = { headerShown: false };
 const RECOVERY_OPTIONS = { title: 'Recover wallet' };
 const DELETE_OPTIONS = { title: 'Delete account' };
 
@@ -73,6 +78,10 @@ export default function SettingsFlowLayout() {
       />
       <Stack.Screen name="design-system-fade-stress" options={DESIGN_SYSTEM_FADE_STRESS_OPTIONS} />
       <Stack.Screen name="design-system-posts" options={DESIGN_SYSTEM_POSTS_OPTIONS} />
+      <Stack.Screen name="design-system-screens" options={DESIGN_SYSTEM_SCREENS_OPTIONS} />
+      <Stack.Screen name="design-system-variations" options={DESIGN_SYSTEM_VARIATIONS_OPTIONS} />
+      <Stack.Screen name="design-system-prompts" options={DESIGN_SYSTEM_PROMPTS_OPTIONS} />
+      <Stack.Screen name="design-system-prompt" options={DESIGN_SYSTEM_PROMPT_OPTIONS} />
       <Stack.Screen name="recovery" options={RECOVERY_OPTIONS} />
       <Stack.Screen name="delete" options={DELETE_OPTIONS} />
     </Stack>

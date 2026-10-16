@@ -3,14 +3,19 @@
 // the read path is a plain events query instead of a bespoke relay subscription.
 import { z } from 'zod';
 
+import { supersedes } from '../replaceable';
 import type { EventQueryInput } from './rank';
 
 // Tag and content JSON is untrusted relay data, so it is parsed with these
 // schemas at the boundary. They check structure only: per-colour and per-URL
 // constraints belong to the consumer's `@sovranbitcoin/schemas` catalog schema,
 // which this package doesn't import as a value (see `../schemas.ts` for why).
-const PaletteSchema = z.record(z.string(), z.unknown());
-const ColorListSchema = z.array(z.unknown());
+// A palette names a handful of swatches and a colour list a handful of colours;
+// the ceilings only stop a list built to be large.
+const PaletteSchema = z
+  .record(z.string(), z.unknown())
+  .refine((palette) => Object.keys(palette).length <= 64, 'too many palette entries');
+const ColorListSchema = z.array(z.unknown()).max(64);
 
 const NaggWallpaperColorsSchema = z.object({
   palette: PaletteSchema,
@@ -37,17 +42,18 @@ export type WallpaperCatalogEntry = NaggWallpaperColors & {
 // Loose so extra publisher fields (e.g. `author`) reach the consumer, which
 // filters on them.
 const AlbumMetaSchema = z.looseObject({
-  slug: z.string(),
-  displayName: z.string(),
-  description: z.string().default(''),
+  slug: z.string().max(128),
+  displayName: z.string().max(256),
+  description: z.string().max(4096).default(''),
   sortOrder: z.number().default(0),
-  topic: z.string().optional(),
-  coverThemeName: z.string().optional(),
+  topic: z.string().max(128).optional(),
+  coverThemeName: z.string().max(256).optional(),
 });
 
 export type AlbumMeta = z.infer<typeof AlbumMetaSchema>;
 
-const AlbumCatalogContentSchema = z.object({ albums: z.array(z.unknown()) });
+// Albums are parsed one by one below, so one bad album costs only itself.
+const AlbumCatalogContentSchema = z.object({ albums: z.array(z.unknown()).max(1024) });
 
 type RawEventNode = {
   id: string;
@@ -164,7 +170,15 @@ export function parseWallpaperCatalog(
     const entry = parseWallpaperEvent(node, albumNamespace);
     if (!entry) continue;
     const existing = byTheme.get(entry.themeName);
-    if (existing && existing.createdAt >= entry.createdAt) continue;
+    if (
+      existing &&
+      !supersedes(
+        { created_at: entry.createdAt, id: entry.eventId },
+        { created_at: existing.createdAt, id: existing.eventId },
+      )
+    ) {
+      continue;
+    }
     byTheme.set(entry.themeName, entry);
   }
   const wallpapers = [...byTheme.values()].sort((a, b) => b.createdAt - a.createdAt);

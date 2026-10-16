@@ -2,7 +2,11 @@ import { ScreenScrollView } from '@/shared/ui/composed/ScreenScrollView';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, RefreshControl, Share } from 'react-native';
 
-import { Button, Card, Switch as HeroSwitch } from 'heroui-native';
+import { Button as HerouiButton } from 'heroui-native';
+import { Surface } from '@/shared/ui/composed/Surface';
+import { useStylePaint } from '@/shared/styles/appStyle';
+import { Button } from '@/shared/ui/primitives/Button';
+import { Switch as HeroSwitch } from '@/shared/ui/primitives/Switch';
 import * as Clipboard from 'expo-clipboard';
 import {
   log,
@@ -181,40 +185,39 @@ const InventorySection: React.FC<SectionProps> = ({
   items,
   emptyLabel,
 }) => {
+  const { pad, item } = useStylePaint().style.space;
   return (
     <View className="mb-4">
       <SectionHeading title={title} count={items.length} />
-      <Card variant="secondary">
-        <Card.Body className="gap-3">
-          <View>
-            <Text medium size={11} className="text-foreground/70">
-              {subtitle}
-            </Text>
-            <Text size={11} className="text-foreground/50 mt-1">
-              {countLabel}
-            </Text>
-          </View>
+      <Surface contentStyle={{ padding: pad, gap: item }}>
+        <View>
+          <Text medium size={11} className="text-foreground/70">
+            {subtitle}
+          </Text>
+          <Text size={11} className="text-foreground/50 mt-1">
+            {countLabel}
+          </Text>
+        </View>
 
-          {items.length === 0 ? (
-            <Text size={12} className="text-foreground/60">
-              {emptyLabel}
-            </Text>
-          ) : (
-            <View className="gap-2">
-              {items.map((item, index) => (
-                <View key={item} className="bg-surface-tertiary/35 rounded-lg px-2 py-1.5">
-                  <Text size={10} className="text-foreground/45 font-mono">
-                    {String(index + 1).padStart(2, '0')}
-                  </Text>
-                  <Text size={KEY_FONT_SIZE} className="text-foreground/90 font-mono">
-                    {item}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          )}
-        </Card.Body>
-      </Card>
+        {items.length === 0 ? (
+          <Text size={12} className="text-foreground/60">
+            {emptyLabel}
+          </Text>
+        ) : (
+          <View className="gap-2">
+            {items.map((item, index) => (
+              <View key={item} className="bg-surface-tertiary/35 rounded-lg px-2 py-1.5">
+                <Text size={10} className="text-foreground/45 font-mono">
+                  {String(index + 1).padStart(2, '0')}
+                </Text>
+                <Text size={KEY_FONT_SIZE} className="text-foreground/90 font-mono">
+                  {item}
+                </Text>
+              </View>
+            ))}
+          </View>
+        )}
+      </Surface>
     </View>
   );
 };
@@ -232,6 +235,7 @@ const GroupedInventorySection: React.FC<GroupedSectionProps> = ({
   groups,
   emptyLabel,
 }) => {
+  const { pad, item } = useStylePaint().style.space;
   const total = groups.reduce((sum, group) => sum + group.items.length, 0);
 
   if (total === 0) {
@@ -249,46 +253,45 @@ const GroupedInventorySection: React.FC<GroupedSectionProps> = ({
   return (
     <View className="mb-4">
       <SectionHeading title={title} count={total} />
-      <Card variant="secondary">
-        <Card.Body className="gap-3">
-          <Text medium size={11} className="text-foreground/70">
-            {subtitle}
-          </Text>
+      <Surface contentStyle={{ padding: pad, gap: item }}>
+        <Text medium size={11} className="text-foreground/70">
+          {subtitle}
+        </Text>
 
-          {groups
-            .filter((group) => group.items.length > 0)
-            .map((group) => (
-              <View key={group.label} className="gap-2">
-                <View className="flex-row items-center justify-between px-1">
-                  <Text size={11} bold className="text-foreground/70 uppercase tracking-wide">
-                    {group.label}
-                  </Text>
-                  <Text size={10} className="text-foreground/45">
-                    {group.items.length}
-                  </Text>
-                </View>
-                <View className="gap-2">
-                  {group.items.map((item) => (
-                    <View key={item} className="bg-surface-tertiary/35 rounded-lg px-2 py-1.5">
-                      <Text size={10} className="text-foreground/55">
-                        Key
-                      </Text>
-                      <Text size={KEY_FONT_SIZE} className="text-foreground font-mono">
-                        {item}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
+        {groups
+          .filter((group) => group.items.length > 0)
+          .map((group) => (
+            <View key={group.label} className="gap-2">
+              <View className="flex-row items-center justify-between px-1">
+                <Text size={11} bold className="text-foreground/70 uppercase tracking-wide">
+                  {group.label}
+                </Text>
+                <Text size={10} className="text-foreground/45">
+                  {group.items.length}
+                </Text>
               </View>
-            ))}
-        </Card.Body>
-      </Card>
+              <View className="gap-2">
+                {group.items.map((item) => (
+                  <View key={item} className="bg-surface-tertiary/35 rounded-lg px-2 py-1.5">
+                    <Text size={10} className="text-foreground/55">
+                      Key
+                    </Text>
+                    <Text size={KEY_FONT_SIZE} className="text-foreground font-mono">
+                      {item}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          ))}
+      </Surface>
     </View>
   );
 };
 
 export const SettingsStorageScreen = () => {
   useLifecycleLogger('SettingsStorageScreen');
+  const { pad, item } = useStylePaint().style.space;
   const profiles = useProfileStore((state) => state.profiles);
 
   const [isLoading, setIsLoading] = useState(true);
@@ -398,8 +401,8 @@ export const SettingsStorageScreen = () => {
         refreshControl={
           <RefreshControl refreshing={isRefreshing} onRefresh={() => loadSnapshot(true)} />
         }>
-        <Card variant="secondary" className="mb-4">
-          <Card.Body className="gap-3">
+        <View className="mb-4">
+          <Surface contentStyle={{ padding: pad, gap: item }}>
             <Text bold size={16}>
               Storage Inventory
             </Text>
@@ -411,15 +414,15 @@ export const SettingsStorageScreen = () => {
               profile/account data and reports which currently exist.
             </Text>
             <View className="flex-row gap-2">
-              <Button
+              <HerouiButton
                 variant="secondary"
                 size="sm"
                 testID="settings-storage-refresh"
                 accessibilityState={{ busy: isRefreshing }}
                 onPress={() => loadSnapshot(true)}>
-                <Button.Label>Refresh</Button.Label>
-              </Button>
-              <Button
+                <HerouiButton.Label>Refresh</HerouiButton.Label>
+              </HerouiButton>
+              <HerouiButton
                 variant="secondary"
                 size="sm"
                 isDisabled={isSharing}
@@ -427,9 +430,11 @@ export const SettingsStorageScreen = () => {
                 accessibilityLabel="Share Full Dump"
                 accessibilityState={{ disabled: isSharing, busy: isSharing }}
                 onPress={handleShareDump}>
-                <Button.Label>{isSharing ? 'Exporting...' : 'Share Full Dump'}</Button.Label>
-              </Button>
-              <Button
+                <HerouiButton.Label>
+                  {isSharing ? 'Exporting...' : 'Share Full Dump'}
+                </HerouiButton.Label>
+              </HerouiButton>
+              <HerouiButton
                 variant="secondary"
                 size="sm"
                 isDisabled={isCopyingLogs}
@@ -437,26 +442,28 @@ export const SettingsStorageScreen = () => {
                 accessibilityLabel="Copy Debug Logs"
                 accessibilityState={{ disabled: isCopyingLogs, busy: isCopyingLogs }}
                 onPress={handleCopyDebugLogs}>
-                <Button.Label>{isCopyingLogs ? 'Copying...' : 'Copy Debug Logs'}</Button.Label>
-              </Button>
+                <HerouiButton.Label>
+                  {isCopyingLogs ? 'Copying...' : 'Copy Debug Logs'}
+                </HerouiButton.Label>
+              </HerouiButton>
               <Button
                 variant="secondary"
-                size="sm"
+                size="compact"
+                text="Copy coco v2 Report"
                 testID="settings-storage-copy-coco-report"
-                onPress={handleCopyCocoReport}>
-                <Button.Label>Copy coco v2 Report</Button.Label>
-              </Button>
+                onPress={handleCopyCocoReport}
+              />
             </View>
             {error ? (
               <Text size={12} className="text-danger">
                 Failed to refresh inventory: {error}
               </Text>
             ) : null}
-          </Card.Body>
-        </Card>
+          </Surface>
+        </View>
 
-        <Card variant="secondary" className="mb-4">
-          <Card.Body className="gap-3">
+        <View className="mb-4">
+          <Surface contentStyle={{ padding: pad, gap: item }}>
             <View className="flex-row items-center justify-between">
               <Text bold size={16}>
                 On-Device Log File
@@ -477,7 +484,7 @@ export const SettingsStorageScreen = () => {
               {logFileInfo.exists ? ` Stored: ${formatBytes(logFileInfo.bytes)}.` : ' No file yet.'}
             </Text>
             <View className="flex-row gap-2">
-              <Button
+              <HerouiButton
                 variant="secondary"
                 size="sm"
                 isDisabled={isExportingLogs || !logFileInfo.exists}
@@ -488,19 +495,21 @@ export const SettingsStorageScreen = () => {
                   busy: isExportingLogs,
                 }}
                 onPress={handleExportLogFile}>
-                <Button.Label>{isExportingLogs ? 'Exporting...' : 'Export Log File'}</Button.Label>
-              </Button>
+                <HerouiButton.Label>
+                  {isExportingLogs ? 'Exporting...' : 'Export Log File'}
+                </HerouiButton.Label>
+              </HerouiButton>
               <Button
                 variant="secondary"
-                size="sm"
-                isDisabled={!logFileInfo.exists}
+                size="compact"
+                text="Clear Log File"
+                disabled={!logFileInfo.exists}
                 testID="settings-storage-clear-log-file"
-                onPress={handleClearLogFile}>
-                <Button.Label>Clear Log File</Button.Label>
-              </Button>
+                onPress={handleClearLogFile}
+              />
             </View>
-          </Card.Body>
-        </Card>
+          </Surface>
+        </View>
 
         <GroupedInventorySection
           title="Zustand / AsyncStorage"

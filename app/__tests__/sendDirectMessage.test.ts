@@ -96,12 +96,28 @@ describe('sendDirectMessageToRelays', () => {
     expect(publishMock).not.toHaveBeenCalled();
   });
 
-  it('rejects a non-nprofile input before publishing', async () => {
+  it.each([
+    ['npub', () => nip19.npubEncode(recipient)],
+    ['hex key', () => recipient],
+  ])("resolves a bare %s target through the recipient's kind:10050", async (_label, target) => {
+    const dmRelays = ['wss://inbox.example'];
+    const { send, publishMock, resolveDmRelays } = fakePool(
+      (urls) => urls.map(() => Promise.resolve('ok')),
+      dmRelays
+    );
+
+    await send({ senderPrivateKey: generateSecretKey(), nprofile: target(), message: 'hello' });
+
+    expect(resolveDmRelays).toHaveBeenCalledWith(recipient);
+    expect(publishMock.mock.calls[0][0]).toEqual(dmRelays);
+  });
+
+  it('rejects a non-recipient input before publishing', async () => {
     const { send, publishMock } = fakePool(() => []);
     await expect(
       send({
         senderPrivateKey: generateSecretKey(),
-        nprofile: nip19.npubEncode(recipient),
+        nprofile: nip19.noteEncode('a'.repeat(64)),
         message: 'hello',
       })
     ).rejects.toThrow('Invalid nprofile format');

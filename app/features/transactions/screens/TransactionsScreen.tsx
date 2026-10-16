@@ -26,7 +26,7 @@ import {
 import { MonthSelector } from '@/features/transactions/components/MonthSelector';
 import type { MonthItem } from '@/features/transactions/lib/months';
 import { HistoryEntry, SendHistoryEntry } from '@cashu/coco-core';
-import { amountToNumber } from '@/shared/lib/cashu/amount';
+import { amountToNumber } from 'wallet/amount';
 import { useHistoryWithMelts } from '@/features/transactions/hooks/useHistoryWithMelts';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
@@ -283,9 +283,10 @@ export function TransactionsScreen({
       <ButtonHandler
         buttons={[
           {
-            text: isSweeping
-              ? 'Cancelling...'
-              : `Cancel ${visiblePendingEcash.length} pending (${totalVisiblePendingAmount} ${visibleUnit.toUpperCase()})`,
+            text: isSweeping ? 'Cancelling...' : `Cancel ${visiblePendingEcash.length} pending`,
+            // The amount does not fit a pill on a small phone and grows
+            // without limit; it is spoken here and shown on the rows above.
+            accessibilityLabel: `Cancel ${visiblePendingEcash.length} pending, ${totalVisiblePendingAmount} ${visibleUnit.toUpperCase()}`,
             variant: 'primary',
             icon: 'mdi:broom',
             loading: isSweeping,

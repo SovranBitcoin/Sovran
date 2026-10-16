@@ -14,7 +14,7 @@
  * To add the next migration: append one step to `DATA_MIGRATIONS` — no new flag.
  */
 
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { persist } from 'zustand/middleware';
 import { z } from 'zod';
 
@@ -30,7 +30,10 @@ const PersistedDataMigrationStore = z.object({
   level: z.number().int().nonnegative().default(0),
 });
 
-export const useDataMigrationStore = create<DataMigrationState>()(
+export const useDataMigrationStore = create<DataMigrationState>({
+  name: 'data-migration-store',
+  scope: 'profile',
+})(
   persist(
     () => ({ level: 0 }),
     persistConfig({

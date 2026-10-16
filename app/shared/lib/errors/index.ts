@@ -198,3 +198,15 @@ export function describeError(error: unknown, service: ErrorService): ErrorPrese
     (status === 0 ? transport.network : `${service}.unknown`);
   return { id, text: ERROR_COPY[id] };
 }
+
+/**
+ * Text for a failure the wallet package reports as a message. The package
+ * says which messages it wrote itself (`authored`); those are shown as they
+ * are. Any other message is a mint's or a library's wording and is replaced
+ * by catalogue copy.
+ */
+export function describeWalletFailure(failure: { message: string; authored?: boolean }): string {
+  return failure.authored
+    ? failure.message
+    : describeError({ message: failure.message }, 'cashu').text;
+}

@@ -396,14 +396,35 @@ describe('per-peer decrypt grants', () => {
   it('sets, merges methods, and revokes per peer', () => {
     const store = useNip46ConnectionsStore.getState();
     expect(
-      store.setPeerDecryptGrant(client, peerX, 'nip44_decrypt', { peerIsSelf: false }).isOk()
+      store
+        .setPeerDecryptGrant({
+          clientPubkey: client,
+          peerPubkey: peerX,
+          method: 'nip44_decrypt',
+          peerIsSelf: false,
+        })
+        .isOk()
     ).toBe(true);
     expect(
-      store.setPeerDecryptGrant(client, peerX, 'nip04_decrypt', { peerIsSelf: false }).isOk()
+      store
+        .setPeerDecryptGrant({
+          clientPubkey: client,
+          peerPubkey: peerX,
+          method: 'nip04_decrypt',
+          peerIsSelf: false,
+        })
+        .isOk()
     ).toBe(true);
     // Re-granting the same method is idempotent.
     expect(
-      store.setPeerDecryptGrant(client, peerX, 'nip44_decrypt', { peerIsSelf: false }).isOk()
+      store
+        .setPeerDecryptGrant({
+          clientPubkey: client,
+          peerPubkey: peerX,
+          method: 'nip44_decrypt',
+          peerIsSelf: false,
+        })
+        .isOk()
     ).toBe(true);
 
     const grant = useNip46ConnectionsStore.getState().apps[client].peerDecryptGrants[peerX];
@@ -421,18 +442,24 @@ describe('per-peer decrypt grants', () => {
   });
 
   it('lowercases the peer key on write', () => {
-    useNip46ConnectionsStore
-      .getState()
-      .setPeerDecryptGrant(client, peerX.toUpperCase(), 'nip44_decrypt', { peerIsSelf: false });
+    useNip46ConnectionsStore.getState().setPeerDecryptGrant({
+      clientPubkey: client,
+      peerPubkey: peerX.toUpperCase(),
+      method: 'nip44_decrypt',
+      peerIsSelf: false,
+    });
     expect(useNip46ConnectionsStore.getState().apps[client].peerDecryptGrants[peerX]).toBeDefined();
   });
 
   it('refuses a grant asserting peerIsSelf', () => {
     // Deliberately illegal at the type level — pins the runtime guard.
-    const hostileAttestation = { peerIsSelf: true };
-    const result = useNip46ConnectionsStore
-      .getState()
-      .setPeerDecryptGrant(client, peerX, 'nip44_decrypt', hostileAttestation as never);
+    const hostileGrant = {
+      clientPubkey: client,
+      peerPubkey: peerX,
+      method: 'nip44_decrypt',
+      peerIsSelf: true,
+    };
+    const result = useNip46ConnectionsStore.getState().setPeerDecryptGrant(hostileGrant as never);
     expect(result._unsafeUnwrapErr()).toBe('self_decrypt_forbidden');
   });
 
@@ -440,12 +467,22 @@ describe('per-peer decrypt grants', () => {
     const store = useNip46ConnectionsStore.getState();
     expect(
       store
-        .setPeerDecryptGrant(client, 'not-hex', 'nip44_decrypt', { peerIsSelf: false })
+        .setPeerDecryptGrant({
+          clientPubkey: client,
+          peerPubkey: 'not-hex',
+          method: 'nip44_decrypt',
+          peerIsSelf: false,
+        })
         ._unsafeUnwrapErr()
     ).toBe('invalid_peer');
     expect(
       store
-        .setPeerDecryptGrant(pk(21), peerX, 'nip44_decrypt', { peerIsSelf: false })
+        .setPeerDecryptGrant({
+          clientPubkey: pk(21),
+          peerPubkey: peerX,
+          method: 'nip44_decrypt',
+          peerIsSelf: false,
+        })
         ._unsafeUnwrapErr()
     ).toBe('unknown_app');
   });
@@ -455,25 +492,49 @@ describe('per-peer decrypt grants', () => {
     for (let i = 0; i < 50; i++) {
       const peer = i.toString(16).padStart(2, '0').repeat(32);
       expect(
-        store.setPeerDecryptGrant(client, peer, 'nip44_decrypt', { peerIsSelf: false }).isOk()
+        store
+          .setPeerDecryptGrant({
+            clientPubkey: client,
+            peerPubkey: peer,
+            method: 'nip44_decrypt',
+            peerIsSelf: false,
+          })
+          .isOk()
       ).toBe(true);
     }
     const overflowPeer = 'ab'.repeat(32);
     expect(
       store
-        .setPeerDecryptGrant(client, overflowPeer, 'nip44_decrypt', { peerIsSelf: false })
+        .setPeerDecryptGrant({
+          clientPubkey: client,
+          peerPubkey: overflowPeer,
+          method: 'nip44_decrypt',
+          peerIsSelf: false,
+        })
         ._unsafeUnwrapErr()
     ).toBe('peer_grant_limit');
     // Adding a second method to an existing peer is still allowed at the cap.
     const existingPeer = '00'.repeat(32);
     expect(
-      store.setPeerDecryptGrant(client, existingPeer, 'nip04_decrypt', { peerIsSelf: false }).isOk()
+      store
+        .setPeerDecryptGrant({
+          clientPubkey: client,
+          peerPubkey: existingPeer,
+          method: 'nip04_decrypt',
+          peerIsSelf: false,
+        })
+        .isOk()
     ).toBe(true);
   });
 
   it('touchUsage attributes consumption to the peer grant', () => {
     const store = useNip46ConnectionsStore.getState();
-    store.setPeerDecryptGrant(client, peerX, 'nip44_decrypt', { peerIsSelf: false });
+    store.setPeerDecryptGrant({
+      clientPubkey: client,
+      peerPubkey: peerX,
+      method: 'nip44_decrypt',
+      peerIsSelf: false,
+    });
     store.touchUsage(client, { peerGrantPubkey: peerX });
 
     const grant = useNip46ConnectionsStore.getState().apps[client].peerDecryptGrants[peerX];
@@ -486,7 +547,12 @@ describe('per-peer decrypt grants', () => {
 
   it('persists peer grants through the round-trip', async () => {
     const store = useNip46ConnectionsStore.getState();
-    store.setPeerDecryptGrant(client, peerX, 'nip44_decrypt', { peerIsSelf: false });
+    store.setPeerDecryptGrant({
+      clientPubkey: client,
+      peerPubkey: peerX,
+      method: 'nip44_decrypt',
+      peerIsSelf: false,
+    });
     await flushPersistWrites();
 
     const blob = storageMap.get(STORAGE_KEY);
@@ -548,7 +614,12 @@ describe('adoptConnection', () => {
     ).toBe(true);
     store.setGrant(OLD, 'sign_event:1', 'always');
     store.setGrant(OLD, 'sign_event:7', 'deny');
-    store.setPeerDecryptGrant(OLD, peerX, 'nip44_decrypt', { peerIsSelf: false });
+    store.setPeerDecryptGrant({
+      clientPubkey: OLD,
+      peerPubkey: peerX,
+      method: 'nip44_decrypt',
+      peerIsSelf: false,
+    });
     store.setMode(OLD, 'strict');
     store.touchUsage(OLD);
   }

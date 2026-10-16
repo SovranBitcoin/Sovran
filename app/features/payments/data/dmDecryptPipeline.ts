@@ -68,13 +68,11 @@ export function decryptDmEnvelopes(
       if (!unwrapped) continue;
       if (!cached) giftWrapCache.cache.put(viewerPubkey, envelope.id, unwrapped);
       if (unwrapped.kind !== 14) continue;
-      // NIP-17 rooms are defined by all participants. This surface supports
-      // one-to-one rooms, so a group must never be filed under its sender.
-      if (unwrapped.recipientPubkeys.length !== 1) continue;
-      const recipient = unwrapped.recipientPubkeys[0];
+      // A room is the set of participants, not the number of p tags.
+      const participants = new Set([unwrapped.senderPubkey, ...unwrapped.recipientPubkeys]);
+      if (participants.size !== 2 || !participants.has(viewerPubkey)) continue;
       const isOwn = unwrapped.senderPubkey === viewerPubkey;
-      if (isOwn ? recipient === viewerPubkey : recipient !== viewerPubkey) continue;
-      const counterparty = isOwn ? recipient : unwrapped.senderPubkey;
+      const counterparty = [...participants].find((pubkey) => pubkey !== viewerPubkey);
       if (!counterparty || !/^[0-9a-f]{64}$/i.test(counterparty)) continue;
 
       out.push({

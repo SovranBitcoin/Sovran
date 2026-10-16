@@ -314,11 +314,12 @@ export function createRelayTier(config: RelayTierConfig): NostrTierStrategy {
     // candidate and the app hides the counts rather than showing wrong numbers.
 
     async getDmEnvelopes(request: DmEnvelopesRequest): Promise<TierOutcome<DmEnvelopesBundle>> {
-      // Gift-wrap created_at is randomized into the past, so NO since/limit — they
-      // would silently drop old conversations. Pure opaque-envelope transport.
+      // No limit: gift-wrap created_at is randomized. Incremental callers
+      // supply an explicit since with their own overlap; default reads stay unbounded.
       const filter: NostrFilter = {
         kinds: DM_ENVELOPE_KINDS,
         '#p': [request.viewerPubkey],
+        ...(request.since !== undefined ? { since: request.since } : {}),
       };
       const result = await config.connection.request([filter], {
         signal: request.signal,

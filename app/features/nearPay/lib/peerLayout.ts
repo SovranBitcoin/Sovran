@@ -10,24 +10,16 @@ export interface NearPayLayoutPeer {
   lastSeen: number;
   name: string;
   avatarUrl?: string | null;
-  /**
-   * True once the peer's favorite carried a valid `creq` (identity + accepted
-   * mints) — i.e. a Sovran peer we can send an extended token DM to. False ⇒
-   * stock/vanilla peer or one we haven't exchanged identity with yet.
-   * Requires `nostrPubkeyHex`, `creq`, and a matching `nut10` lock key.
-   */
+  /** Valid request from a fresh authenticated wallet capability. */
   lockable: boolean;
-  /**
-   * The peer's x-only Nostr pubkey (64-hex), learned via the favorite exchange.
-   * Use it for the kind-0 profile and "02"-prefix it for the NUT-11 P2PK lock
-   * target.
-   */
+  /** Nostr signer of the wallet capability. */
   nostrPubkeyHex?: string;
   /**
    * The peer's standing NUT-18 payment request (`creq…`) — accepted mints +
    * P2PK lock key. Decoded to verify the lock key and pick a shared mint.
    */
   creq?: string;
+  walletCapabilityExpiresAt?: number;
   /**
    * Identity seed for identicons/word-pair names. For Sovran peers it is the
    * x-only Nostr pubkey (real identity); for stock peers the announced noise

@@ -26,6 +26,7 @@ const PK_B = 'b'.repeat(64);
 const mockRecords = new Map([[PK_A, { pubkey: PK_A, name: 'Alice' }]]);
 
 jest.mock('@/shared/lib/nostr/useEntityCache', () => ({
+  useProfileFetchSettlements: () => new Set(),
   useProfileRecordsMany: () => mockRecords,
   useCachedNostrProfile: () => undefined,
 }));

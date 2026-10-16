@@ -16,7 +16,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect, useMemo } from 'react';
 import { z } from 'zod';
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { persist } from 'zustand/middleware';
 
 import { evictLruOverCap } from '@/shared/lib/cache/evictLruOverCap';
@@ -79,7 +79,10 @@ function evictIfOverCap(byRelayUrl: Record<string, RelayMetadataEntry>): void {
   if (trimmed) storeLog.debug('store.relay_metadata.evicted', trimmed);
 }
 
-export const useRelayMetadataStore = create<RelayMetadataState>()(
+export const useRelayMetadataStore = create<RelayMetadataState>({
+  name: 'relay-metadata-store',
+  scope: 'global',
+})(
   persist(
     (set, get) => ({
       byRelayUrl: {},

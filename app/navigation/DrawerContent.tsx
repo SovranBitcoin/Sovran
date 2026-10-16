@@ -18,41 +18,7 @@ import { alpha, iconSize, spacing } from '@/shared/styles/tokens';
 import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 import { Badge } from '@/shared/ui/primitives/Badge';
 import { useNip46RequestsStore } from '@/features/nostrSigner';
-
-type MenuRoute =
-  | '/(drawer)/(tabs)/feed'
-  // Wallet is the `(tabs)/index` folder, which expo-router collapses to an
-  // empty path segment — so its canonical route is the app root `/`, not
-  // `/(drawer)/(tabs)/index` (that path resolves to +not-found at runtime).
-  | '/'
-  | '/(drawer)/(tabs)/contacts'
-  | '/(drawer)/(tabs)/notifications'
-  | '/(drawer)/(tabs)/ai'
-  | '/(signer-flow)'
-  | '/(settings-flow)';
-
-type MenuIconPair = {
-  default: string;
-  selected: string;
-};
-
-type MenuItem = {
-  /** Stable row identity; drives the `drawer-menu-*` testID and list key. */
-  id: string;
-  icon: MenuIconPair;
-  label: string;
-  route: MenuRoute;
-  /** Segment-prefix that, when matched against `useSegments()`, marks this menu item active. */
-  activeSegments: readonly string[];
-  /**
-   * Optional live badge. A COMPONENT, not a count hook: a hook passed as a
-   * prop is a rules-of-react violation (its identity could change between
-   * renders and reorder the row's hooks), and React Compiler refuses to
-   * compile any component that calls one. Subscribing inside the badge also
-   * narrows a count change to the badge itself rather than the row.
-   */
-  Badge?: React.ComponentType;
-};
+import { drawerMenuItems, type MenuIconPair, type MenuRoute } from '@/navigation/drawerMenu';
 
 /** Pending NIP-46 requests, rendered on the Remote Login row. */
 const SignerPendingBadge = React.memo(function SignerPendingBadge() {
@@ -61,61 +27,18 @@ const SignerPendingBadge = React.memo(function SignerPendingBadge() {
   return <Badge variant="primary">{count}</Badge>;
 });
 
-const MENU_ITEMS: MenuItem[] = [
-  {
-    id: 'feed',
-    icon: { default: 'mingcute:home-4-line', selected: 'mingcute:home-4-fill' },
-    label: 'Feed',
-    route: '/(drawer)/(tabs)/feed',
-    activeSegments: ['(drawer)', '(tabs)', 'feed'],
-  },
-  {
-    id: 'wallet',
-    icon: { default: 'fluent:wallet-20-regular', selected: 'fluent:wallet-20-filled' },
-    label: 'Wallet',
-    route: '/',
-    activeSegments: ['(drawer)', '(tabs)', 'index'],
-  },
-  {
-    id: 'contacts',
-    icon: { default: 'mdi:account-group-outline', selected: 'mdi:account-group' },
-    label: 'Contacts',
-    route: '/(drawer)/(tabs)/contacts',
-    activeSegments: ['(drawer)', '(tabs)', 'contacts'],
-  },
-  {
-    id: 'notifications',
-    icon: { default: 'mdi:bell-outline', selected: 'mdi:bell' },
-    label: 'Notifications',
-    route: '/(drawer)/(tabs)/notifications',
-    activeSegments: ['(drawer)', '(tabs)', 'notifications'],
-  },
-  {
-    id: 'ai',
-    icon: { default: 'mdi:robot-outline', selected: 'mdi:robot' },
-    label: 'AI',
-    route: '/(drawer)/(tabs)/ai',
-    activeSegments: ['(drawer)', '(tabs)', 'ai'],
-  },
-  {
-    id: 'remote-login',
-    icon: { default: 'mdi:key-variant', selected: 'mdi:key-variant' },
-    label: 'Remote Login',
-    route: '/(signer-flow)',
-    activeSegments: ['(signer-flow)'],
-    Badge: SignerPendingBadge,
-  },
-  {
-    id: 'settings',
-    icon: {
-      default: 'material-symbols:settings-rounded',
-      selected: 'material-symbols:settings-rounded',
-    },
-    label: 'Settings',
-    route: '/(settings-flow)',
-    activeSegments: ['(settings-flow)'],
-  },
-];
+/**
+ * Live badges by row id. A COMPONENT, not a count hook: a hook passed as a
+ * prop is a rules-of-react violation (its identity could change between
+ * renders and reorder the row's hooks), and React Compiler refuses to
+ * compile any component that calls one. Subscribing inside the badge also
+ * narrows a count change to the badge itself rather than the row.
+ */
+const MENU_BADGES: Readonly<Record<string, React.ComponentType>> = {
+  'remote-login': SignerPendingBadge,
+};
+
+const MENU_ITEMS = drawerMenuItems();
 
 /**
  * Match the current navigation segments against a menu item's prefix. The
@@ -271,7 +194,7 @@ export function DrawerContent(props: DrawerContentComponentProps) {
               route={item.route}
               onNavigate={handleNavigation}
               isActive={isRouteActive(item.route)}
-              Badge={item.Badge}
+              Badge={MENU_BADGES[item.id]}
             />
           ))}
         </VStack>

@@ -17,7 +17,7 @@ const ROUTE_READY_PROBE_STYLE = {
 
 export default function LightningReceiveStandaloneRoute() {
   return (
-    <FormSheetChrome title={railHeaderTitle('lightningReceive')}>
+    <FormSheetChrome route="lightningReceive" title={railHeaderTitle('lightningReceive')}>
       {__DEV__ ? (
         <View
           testID="lightning-receive-standalone-ready"

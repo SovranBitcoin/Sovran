@@ -2,7 +2,7 @@ import { facade } from 'nostr';
 
 import { recordDebugTiers } from '@/shared/stores/runtime/debugTierStore';
 
-import type { FeedEvent } from '../components/nostr/feedTypes';
+import type { FeedEvent, NoteMetrics, ProfileInfo } from '../components/nostr/feedTypes';
 import type {
   FeedNotification,
   FeedNotificationActor,
@@ -10,6 +10,7 @@ import type {
   FeedNotificationsResult,
 } from './feedClient';
 import { mapFacadePageEnrichment } from './facadePageMaps';
+import { feedEventsEqual, feedNotificationsEqual } from './feedNotificationEquality';
 
 // Pure shape bridge: facade ResolvedNotifications → app FeedNotificationsResult.
 // Dependency-light so it's unit-testable without the facade-builder's RN chain.
@@ -80,5 +81,68 @@ export function resolvedNotificationsToResult(
     // Conservative: only keep paging while a page returns items (the screen
     // dedupes by id, so this can't loop on a repeated tail).
     hasNextPage: notifications.length > 0 && page.cursor !== null,
+  };
+}
+
+function profilesEqual(a: ProfileInfo, b: ProfileInfo): boolean {
+  return a.name === b.name && a.picture === b.picture;
+}
+
+function metricsEqual(a: NoteMetrics, b: NoteMetrics): boolean {
+  return (
+    a.likeCount === b.likeCount &&
+    a.repostCount === b.repostCount &&
+    a.replyCount === b.replyCount &&
+    a.satsZapped === b.satsZapped
+  );
+}
+
+/** `previous` when it holds the same keys, in the same order, with equal values; else `next`. */
+function reuseMap<V>(
+  previous: Map<string, V>,
+  next: Map<string, V>,
+  equal: (a: V, b: V) => boolean
+): Map<string, V> {
+  if (previous.size !== next.size) return next;
+  const previousEntries = previous.entries();
+  for (const [key, value] of next) {
+    const entry = previousEntries.next().value;
+    if (!entry || entry[0] !== key || !equal(entry[1], value)) return next;
+  }
+  return previous;
+}
+
+/**
+ * A session re-emits its whole snapshot whenever any source adds to it, and
+ * `resolvedNotificationsToResult` mints every object afresh. One mapper per
+ * session hands back the previous notification object, and the previous
+ * enrichment map, wherever the new one says the same thing — so a snapshot that
+ * changes one row changes one row's identity, not all of them. The value
+ * returned is always deep-equal to what the plain adapter returns.
+ */
+export function createNotificationsResultMapper(): (
+  page: facade.ResolvedNotifications
+) => FeedNotificationsResult {
+  let previous: FeedNotificationsResult | null = null;
+  return (page) => {
+    const mapped = resolvedNotificationsToResult(page);
+    const last = previous;
+    if (!last) {
+      previous = mapped;
+      return mapped;
+    }
+    const lastByEventId = new Map(last.notifications.map((n) => [n.event.id, n]));
+    const result: FeedNotificationsResult = {
+      ...mapped,
+      notifications: mapped.notifications.map((n) => {
+        const before = lastByEventId.get(n.event.id);
+        return before && feedNotificationsEqual(before, n) ? before : n;
+      }),
+      profilesMap: reuseMap(last.profilesMap, mapped.profilesMap, profilesEqual),
+      metricsMap: reuseMap(last.metricsMap, mapped.metricsMap, metricsEqual),
+      quotedEventsMap: reuseMap(last.quotedEventsMap, mapped.quotedEventsMap, feedEventsEqual),
+    };
+    previous = result;
+    return result;
   };
 }

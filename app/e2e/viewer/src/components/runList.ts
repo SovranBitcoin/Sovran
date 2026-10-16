@@ -39,11 +39,16 @@ function okGlyph(
 let lastScrolledScenarioId: string | undefined;
 
 function escapeHtml(value: string): string {
-  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 function latestRun(entry: ScenarioCatalogEntry): CatalogRunRef | undefined {
-  return entry.runs.find((run) => run.proof === 'product-run');
+  return entry.runs.find((run) => run.proof !== 'orchestration-smoke');
 }
 
 /** "iPhone" / "Android" chips: a scenario shows every platform it is specified
@@ -68,9 +73,12 @@ function runPlatformChip(run: CatalogRunRef): string {
  * Collapse state lives in state.collapsedFlows and survives reloads; a
  * collapsed group keeps failures visible via a red count on its header. */
 export function renderRunList(root: HTMLElement): void {
-  const parts: string[] = ['<div class="panel-title">Scenarios</div>'];
+  const parts: string[] = ['<div class="panel-title">Results</div>'];
+  // Authoring definitions still serve run planning; browsing needs actual evidence
+  // (or a live queued attempt), not an empty page for every authored scenario.
+  const recorded = state.catalog.filter((entry) => latestRun(entry) !== undefined);
   const byFlow = (flow: string | undefined) =>
-    state.catalog.filter((entry) => entry.facets?.flow === flow);
+    recorded.filter((entry) => entry.facets?.flow === flow);
   const grouped: [string, ScenarioCatalogEntry[]][] = [
     ...FACETS.flow.map((flow): [string, ScenarioCatalogEntry[]] => [flow, byFlow(flow)]),
     ['untagged', byFlow(undefined)],
@@ -91,12 +99,10 @@ export function renderRunList(root: HTMLElement): void {
       parts.push('<div class="tree-children">', ...entries.map(renderScenarioRows), '</div>');
     }
   }
-  if (state.catalog.length === 0) {
-    parts.push('<div class="scenario-row">no scenarios found</div>');
-  } else if (
-    !state.catalog.some((entry) => entry.runs.some((run) => run.proof === 'product-run'))
-  ) {
-    parts.push('<div class="scenario-row">no runs yet — trigger one above</div>');
+  if (recorded.length === 0) {
+    parts.push(
+      '<div class="scenario-row">No recorded results yet — run a story or suite to begin.</div>'
+    );
   }
   root.innerHTML = parts.join('');
   bindRows(root);
@@ -109,15 +115,15 @@ export function renderRunList(root: HTMLElement): void {
 
   function renderScenarioRows(entry: ScenarioCatalogEntry): string {
     const rows: string[] = [];
-    const runs = entry.runs.filter((run) => run.proof === 'product-run');
+    const runs = entry.runs.filter((run) => run.proof !== 'orchestration-smoke');
     const selected = state.selectedScenarioId === entry.id && state.mode === 'browse';
     const latest = runs[0];
     const tooltip = [entry.description, entry.tags.map(facetTagLabel).join(' · ')]
       .filter(Boolean)
       .join('\n');
     rows.push(
-      `<div class="run-row${selected ? ' selected' : ''}${runs.length === 0 ? ' smoke' : ''}" data-scenario="${escapeHtml(entry.id)}" title="${escapeHtml(tooltip)}">` +
-        `${latest ? okGlyph(latest.ok, latest.status, latest.scenarioStatus) : ''}<span class="title">${escapeHtml(entry.name)}</span>` +
+      `<div class="run-row${selected ? ' selected' : ''}" data-scenario="${escapeHtml(entry.id)}" title="${escapeHtml(tooltip)}">` +
+        `${latest ? (latest.proof === 'manual-review' ? '<span class="glyph-pending">◈</span>' : okGlyph(latest.ok, latest.status, latest.scenarioStatus)) : ''}<span class="title">${escapeHtml(entry.name)}</span>` +
         platformChips(entry.platforms) +
         `<span class="badge">${runs.length || ''}</span>` +
         `</div>`
@@ -128,10 +134,9 @@ export function renderRunList(root: HTMLElement): void {
         const runSelected = state.selectedRunId === run.runId;
         rows.push(
           `<div class="scenario-row${runSelected ? ' selected' : ''}" data-run="${run.runId}" data-scenario="${escapeHtml(entry.id)}">` +
-            `${okGlyph(run.ok, run.status, run.scenarioStatus)}<span class="${run.commitRun ? 'commit' : ''}">${escapeHtml(run.label)}</span>${runPlatformChip(run)}</div>`
+            `${run.proof === 'manual-review' ? '<span class="glyph-pending">◈</span>' : okGlyph(run.ok, run.status, run.scenarioStatus)}<span class="${run.commitRun ? 'commit' : ''}">${escapeHtml(run.label)}${run.proof === 'manual-review' ? ' · Manual review' : ''}</span>${runPlatformChip(run)}</div>`
         );
       }
-      if (runs.length === 0) rows.push('<div class="scenario-row">no runs yet</div>');
       rows.push('</div>');
     }
     return rows.join('');
@@ -153,7 +158,7 @@ function bindRows(root: HTMLElement): void {
   for (const row of root.querySelectorAll<HTMLElement>('.run-row[data-scenario]')) {
     row.addEventListener('click', () => {
       const entry = state.catalog.find((candidate) => candidate.id === row.dataset.scenario);
-      const newest = entry?.runs.find((run) => run.proof === 'product-run');
+      const newest = entry?.runs.find((run) => run.proof !== 'orchestration-smoke');
       if (entry) void selectScenario(newest?.runId, entry.id);
     });
   }

@@ -1,0 +1,92 @@
+{
+  "id": "open-a-thread-from-the-live-feed",
+  "purpose": "A person opens the feed, presses the replies of a post that came from the network, sees its thread with a place to reply, and goes back.",
+  "startsFrom": "onboarded",
+  "steps": [
+    {
+      "name": "the wallet opens",
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-send"
+          }
+        },
+        {
+          "logged": "splash.gone"
+        }
+      ],
+      "withinMs": 20000
+    },
+    {
+      "name": "go to the feed",
+      "tap": {
+        "label": "Feed"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "screen-feed"
+          }
+        },
+        {
+          "gone": {
+            "id": "wallet-send"
+          }
+        }
+      ],
+      "withinMs": 20000
+    },
+    {
+      "name": "wait for a post from the network",
+      "expect": [
+        {
+          "visible": {
+            "id": "post-comment"
+          }
+        }
+      ],
+      "withinMs": 40000
+    },
+    {
+      "name": "open its replies",
+      "tap": {
+        "id": "post-comment"
+      },
+      "expect": [
+        {
+          "page": "ThreadScreen"
+        },
+        {
+          "visible": {
+            "id": "thread-reply-input"
+          }
+        },
+        {
+          "gone": {
+            "id": "composer-open"
+          }
+        }
+      ],
+      "withinMs": 15000
+    },
+    {
+      "name": "close the thread",
+      "tap": {
+        "id": "flow-header-close"
+      },
+      "expect": [
+        {
+          "gone": {
+            "id": "thread-reply-input"
+          }
+        },
+        {
+          "visible": {
+            "id": "composer-open"
+          }
+        }
+      ],
+      "withinMs": 10000
+    }
+  ]
+}

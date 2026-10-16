@@ -3,6 +3,7 @@ import type {
   Keypair,
   KeypairPurpose,
   KeyRingRepository,
+  ProofRepository,
   Repositories,
   RepositoryTransactionScope,
 } from '@cashu/coco-core/adapter';
@@ -171,31 +172,84 @@ function createCounterWriteQueue(): (key: string, task: CounterTask) => Promise<
 
 /** MAX-on-conflict counter repository. A restore, migration replay, or stale
  * service write may skip derivation indices, but can never reuse one by
- * lowering the persisted high-water mark. */
+ * lowering the persisted high-water mark.
+ *
+ * It also covers a Coco restore fault (follow-up F90): restore computes the
+ * next counter as `last ? last + 1 : 0`, so when the only signature the mint
+ * holds is at counter 0 it writes 0 and the next output repeats a signed one.
+ * Coco writes that counter before it saves the proofs, and never saves spent
+ * ones, so the write itself is the only reliable signal:
+ *
+ * - A keyset with no row reads as 0 here, so Coco's own first-use
+ *   initialisation never writes 0. The only remaining write of 0 is the
+ *   restore, which Coco reaches only after the mint returned a signature, so
+ *   it is stored as 1.
+ * - A wallet restored by an earlier build already holds the 0. While it still
+ *   holds a proof for that keyset, the counter reads as 1. Coco advances the
+ *   counter before any output is sent, so a held proof at counter 0 can only
+ *   come from that restore; a wrong guess would skip one index, never reuse. */
+/**
+ * Runs a read-then-write on the counter table with nothing able to write in
+ * between. On the root connection that means its own transaction: Coco's
+ * adapter makes a root statement wait for a transaction in progress, but
+ * between two root statements a transaction can start, save a higher counter
+ * and commit, and the second statement would then lower it. Inside a
+ * transaction the two statements are already together.
+ */
+type Atomically = (task: (counters: CounterRepository) => Promise<void>) => Promise<void>;
+
 function wrapCounterRepository(
   repository: CounterRepository,
-  enqueue: (key: string, task: CounterTask) => Promise<void>
+  proofs: ProofRepository,
+  enqueue: (key: string, task: CounterTask) => Promise<void>,
+  atomically: Atomically
 ): CounterRepository {
   return {
-    getCounter: (mintUrl, keysetId) => repository.getCounter(mintUrl, keysetId),
-    setCounter: async (mintUrl, keysetId, counter) => {
-      await enqueue(`${mintUrl}\u0000${keysetId}`, async () => {
-        const current = await repository.getCounter(mintUrl, keysetId);
-        if (current && current.counter >= counter) {
-          cashuLog.debug('cashu.repository.counter.write_skipped', {
+    getCounter: async (mintUrl, keysetId) => {
+      const stored = await repository.getCounter(mintUrl, keysetId);
+      if (stored && stored.counter > 0) return stored;
+      const held = await proofs.getProofsByKeysetId(mintUrl, keysetId);
+      if (held.length === 0) return { mintUrl, keysetId, counter: 0 };
+      // Saved, not only reported: once that proof is sent it is no longer
+      // held, and the next read would go back to 0.
+      // Another write may have raised the counter since the read above, so
+      // the answer is whatever the queued task finds or leaves saved.
+      let counter = 1;
+      await enqueue(`${mintUrl}\u0000${keysetId}`, () =>
+        atomically(async (counters) => {
+          const current = await counters.getCounter(mintUrl, keysetId);
+          if (current && current.counter >= 1) {
+            counter = current.counter;
+            return;
+          }
+          await counters.setCounter(mintUrl, keysetId, 1);
+        })
+      );
+      cashuLog.info('cashu.repository.counter.zero_with_proofs_raised', { keysetId, counter });
+      return { mintUrl, keysetId, counter };
+    },
+    setCounter: async (mintUrl, keysetId, requested) => {
+      const counter = Math.max(requested, 1);
+      await enqueue(`${mintUrl}\u0000${keysetId}`, () =>
+        atomically(async (counters) => {
+          const current = await counters.getCounter(mintUrl, keysetId);
+          if (current && current.counter >= counter) {
+            cashuLog.debug('cashu.repository.counter.write_skipped', {
+              keysetId,
+              current: current.counter,
+              requested,
+            });
+            return;
+          }
+          await counters.setCounter(mintUrl, keysetId, counter);
+          cashuLog.debug('cashu.repository.counter.write_applied', {
             keysetId,
-            current: current.counter,
-            requested: counter,
+            previous: current?.counter ?? null,
+            requested,
+            counter,
           });
-          return;
-        }
-        await repository.setCounter(mintUrl, keysetId, counter);
-        cashuLog.debug('cashu.repository.counter.write_applied', {
-          keysetId,
-          previous: current?.counter ?? null,
-          counter,
-        });
-      });
+        })
+      );
     },
   };
 }
@@ -218,7 +272,12 @@ export function createSovranCocoRepositories(
       ? wrapKeyRingRepository(repositories.keyRingRepository, ephemeralPubkeys, overlay)
       : null;
   const enqueueCounterWrite = createCounterWriteQueue();
-  const counter = wrapCounterRepository(repositories.counterRepository, enqueueCounterWrite);
+  const counter = wrapCounterRepository(
+    repositories.counterRepository,
+    repositories.proofRepository,
+    enqueueCounterWrite,
+    (task) => repositories.withTransaction((scope) => task(scope.counterRepository))
+  );
 
   return {
     ...overlayRepositoryScope(repositories, keyRing, counter),
@@ -232,7 +291,9 @@ export function createSovranCocoRepositories(
         const result = await repositories.withTransaction((scope) => {
           const transactionCounter = wrapCounterRepository(
             scope.counterRepository,
-            createCounterWriteQueue()
+            scope.proofRepository,
+            createCounterWriteQueue(),
+            (task) => task(scope.counterRepository)
           );
           return fn(overlayRepositoryScope(scope, keyRing, transactionCounter));
         });

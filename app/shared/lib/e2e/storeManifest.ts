@@ -17,6 +17,7 @@ import { useMintMetadataStore } from '@/shared/stores/global/mintMetadataStore';
 import { useMintTestnutStore } from '@/shared/stores/global/mintTestnutStore';
 import { useRelayMetadataStore } from '@/shared/stores/global/relayMetadataStore';
 import { useCtaStore } from '@/shared/stores/global/ctaStore';
+import { useLegacyEcashStore } from '@/shared/stores/global/legacyEcashStore';
 import { useNostrMetadataCache } from '@/shared/stores/global/nostrMetadataCache';
 import { usePricelistStore } from '@/shared/stores/global/pricelistStore';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
@@ -54,6 +55,8 @@ import { useNfcTapStore } from '@/shared/stores/runtime/nfcTapStore';
 import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
 import { useSecureStoreState } from '@/shared/stores/runtime/secureStoreState';
 import { useSendLockStore } from '@/shared/stores/runtime/sendLockStore';
+import { useDetailsSheetStore } from '@/shared/stores/runtime/detailsSheetStore';
+import { useNotePickerStore } from '@/shared/stores/runtime/notePickerStore';
 import { usePopupStore } from '@/shared/stores/runtime/popupStore';
 import { useRollbackStore } from '@/shared/stores/runtime/rollbackStore';
 import { useRoutstrTopUpStore } from '@/shared/stores/runtime/routstrTopUpStore';
@@ -78,6 +81,7 @@ export const E2E_STORE_MANIFEST: Record<string, MirrorableStore> = {
   'global/profileStore': useProfileStore,
   'global/settingsStore': useSettingsStore,
   'global/ctaStore': useCtaStore,
+  'global/legacyEcashStore': useLegacyEcashStore,
   'global/walletLifecycleStore': useWalletLifecycleStore,
   'global/wallpaperStore': useWallpaperStore,
   'profile/dataMigrationStore': useDataMigrationStore,
@@ -104,6 +108,8 @@ export const E2E_STORE_MANIFEST: Record<string, MirrorableStore> = {
   'runtime/amountDraftStore': useAmountDraftStore,
   'runtime/contactSendStore': useContactSendStore,
   'runtime/sendLockStore': useSendLockStore,
+  'runtime/detailsSheetStore': useDetailsSheetStore,
+  'runtime/notePickerStore': useNotePickerStore,
   'runtime/debugTierStore': useDebugTierStore,
   'runtime/deleteStatusStore': useDeleteStatusStore,
   'runtime/mockDataStore': useMockDataStore,

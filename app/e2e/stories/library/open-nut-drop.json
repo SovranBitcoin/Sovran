@@ -1,0 +1,54 @@
+{
+  "id": "open-nut-drop",
+  "purpose": "A person opens Nut Drop from Receive to look for people nearby, and closes it again.",
+  "startsFrom": "onboarded",
+  "steps": [
+    {
+      "name": "the wallet opens",
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-send"
+          }
+        },
+        {
+          "logged": "splash.gone"
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "open Receive",
+      "tap": {
+        "id": "wallet-receive"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "receive-method-nutDrop"
+          }
+        }
+      ]
+    },
+    {
+      "name": "open Nut Drop",
+      "tap": {
+        "id": "receive-method-nutDrop"
+      },
+      "expect": [
+        {
+          "page": "NearPayScreen"
+        },
+        {
+          "visible": {
+            "id": "near-pay-peers"
+          }
+        },
+        {
+          "logged": "ui.touch"
+        }
+      ],
+      "withinMs": 10000
+    }
+  ]
+}

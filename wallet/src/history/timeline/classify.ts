@@ -6,11 +6,13 @@
 // for every state) is pinned by the wallet tests and the app's scenario
 // snapshots — behavior must stay identical to the old switch.
 
-import { MintQuoteState, MeltQuoteState } from "@cashu/cashu-ts";
+import { MintQuoteState } from "@cashu/cashu-ts";
 import type { HistoryEntry } from "@cashu/coco-core";
 
 import type { PaymentCopyResolver } from "../../copy";
 import { logger } from "../../logger";
+import { getPaymentRequest } from "../../annotations";
+import { receiveFailedAsSpent } from "../states";
 import {
   DEFAULT_PAYMENT_COPY,
   getMintTimelineState,
@@ -51,11 +53,10 @@ export function getCardLabel(
   switch (historyEntry.type) {
     case "mint": {
       const mintState = getMintTimelineState(historyEntry);
-      const hasObservedPayment = timeline.some(
-        (item) =>
-          item.state === MintQuoteState.PAID &&
-          (item.stepType === "next-pending" || item.stepType === "current"),
-      );
+      // The first row is the request itself; a second finished row means a
+      // payment (or an on-chain deposit) has been seen.
+      const hasObservedPayment =
+        timeline.filter((item) => item.stepType === "complete").length > 1;
       if (isFailed) {
         status = text("timeline.status.failed");
       } else if (mintState === MintQuoteState.ISSUED) {
@@ -81,21 +82,27 @@ export function getCardLabel(
       return label;
     }
     case "melt": {
-      const meltRolledBack =
-        historyEntry.state === "rolledBack" ||
-        historyEntry.state === "rolled_back" ||
-        historyEntry.state === "rolling_back" ||
-        historyEntry.state === "failed";
-      if (meltRolledBack) {
+      // Read off the rows, not the entry: the mint's state and our explorer
+      // are separate observers, and a header taken from one of them can say
+      // "Complete" above a row that is still spinning (or "Ready" above a
+      // confirmed one). The rows are where the two have been reconciled.
+      const last = timeline[timeline.length - 1];
+      const finished = timeline.filter(
+        (item) => item.stepType === "complete",
+      ).length;
+      if (timeline.some((item) => item.id === "payment-failed")) {
+        status = text("timeline.status.failed");
+      } else if (timeline.some((item) => item.stepType === "rolled-back")) {
         status = text("timeline.status.cancelled");
       } else if (isFailed) {
         status = text("timeline.status.failed");
-      } else if (historyEntry.state === MeltQuoteState.PAID) {
+      } else if (last?.stepType === "success") {
         status = text("timeline.status.complete");
-      } else if (historyEntry.state === MeltQuoteState.PENDING) {
-        status = text("timeline.status.inProgress");
-      } else {
+      } else if (last?.stepType === "next-pending" && finished <= 1) {
+        // Nothing has been handed over yet: it is waiting on the tap.
         status = text("timeline.status.ready");
+      } else {
+        status = text("timeline.status.inProgress");
       }
       const label = `${text("timeline.flow.send")} • ${status}`;
       logger.debug("history.timeline.cardLabel.result", {
@@ -111,15 +118,28 @@ export function getCardLabel(
       return label;
     }
     case "send": {
-      const isPaymentRequestMode = tokenCreated !== undefined || nostrSent;
+      const isPaymentRequestMode =
+        tokenCreated !== undefined ||
+        nostrSent ||
+        getPaymentRequest(
+          historyEntry as Parameters<typeof getPaymentRequest>[0],
+        )?.role === "payer";
       const label = isPaymentRequestMode
         ? text("timeline.flow.payment")
         : text("timeline.flow.send");
-      if (historyEntry.state === "rolledBack") {
+      if (
+        historyEntry.state === "rolledBack" ||
+        historyEntry.state === "rolled_back"
+      ) {
         status = text("timeline.status.cancelled");
       } else if (historyEntry.state === "finalized") {
         status = text("timeline.status.complete");
-      } else if (historyEntry.state === "pending") {
+      } else if (
+        historyEntry.state === "pending" ||
+        historyEntry.state === "executing" ||
+        timeline.some((item) => item.id === "cancelling")
+      ) {
+        // A reversal in flight is under way, not waiting on a tap.
         status = text("timeline.status.inProgress");
       } else {
         status = text("timeline.status.ready");
@@ -148,7 +168,9 @@ export function getCardLabel(
         receiveState === "rolledBack" ||
         receiveState === "rolled_back"
       ) {
-        status = text("timeline.status.alreadySpent");
+        status = receiveFailedAsSpent((historyEntry as { error?: unknown }).error)
+          ? text("timeline.status.alreadySpent")
+          : text("timeline.status.notAdded");
       } else {
         status = text("timeline.status.pending");
       }

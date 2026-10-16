@@ -15,9 +15,11 @@
 
 import { describe, it, expect, vi } from "vitest";
 import {
+  Amount,
   PaymentRequest,
   PaymentRequestTransportType,
   decodePaymentRequest,
+  getEncodedToken,
 } from "@cashu/cashu-ts";
 import type { Manager } from "@cashu/coco-core";
 import { createDefaultOperations } from "../../src/operations/defaultOperations";
@@ -43,7 +45,7 @@ interface MockManagerOverrides {
 
 function createMockManager(overrides: MockManagerOverrides = {}) {
   const mockToken = {
-    proofs: [{ id: "proof-1", amount: 100, C: "abc", secret: "def" }],
+    proofs: [{ id: "proof-1", amount: Amount.from(100), C: "abc", secret: "def" }],
   };
 
   return {
@@ -183,8 +185,8 @@ describe("payment request recipient fees", () => {
       });
       const payment =
         transport === "nfc"
-          ? ops.executeNfcSend!(MINT1, 100, "sat")
-          : ops.executePaymentRequest!(MINT1, "creqFees", 100, "sat");
+          ? ops.executeNfcSend!({ mintUrl: MINT1, amount: 100, unit: "sat" })
+          : ops.executePaymentRequest!({ mintUrl: MINT1, paymentRequest: "creqFees", amount: 100, unit: "sat" });
       await expect(payment).rejects.toThrow("without ecash redemption fees");
       expect(manager.ops.send.prepare).not.toHaveBeenCalled();
       expect(manager.paymentRequests.prepare).not.toHaveBeenCalled();
@@ -202,7 +204,7 @@ describe("payment request recipient fees", () => {
       const ops = createDefaultOperations({
         getManager: () => manager as unknown as Manager,
       });
-      await expect(ops.executeNfcSend!(MINT1, 100, "sat")).rejects.toThrow(
+      await expect(ops.executeNfcSend!({ mintUrl: MINT1, amount: 100, unit: "sat" })).rejects.toThrow(
         "without ecash redemption fees",
       );
       expect(manager.ops.send.prepare).not.toHaveBeenCalled();
@@ -225,7 +227,7 @@ describe("payment request recipient fees", () => {
       getManager: () => manager as unknown as Manager,
       sendNostrDM: vi.fn().mockResolvedValue(undefined),
     });
-    await ops.executePaymentRequest!(MINT1, "creqFree", 100, "sat");
+    await ops.executePaymentRequest!({ mintUrl: MINT1, paymentRequest: "creqFree", amount: 100, unit: "sat" });
     expect(manager.ops.send.prepare).toHaveBeenCalledWith({
       mintUrl: MINT1,
       amount: 100,
@@ -248,15 +250,53 @@ describe("executePaymentRequest — Nostr transport", () => {
       getManager: () => manager as unknown as Manager,
       sendNostrDM,
     });
-    await ops.executePaymentRequest!(MINT1, "creqUSD", 100, "usd");
+    await ops.executePaymentRequest!({ mintUrl: MINT1, paymentRequest: "creqUSD", amount: 100, unit: "usd" });
     expect(manager.ops.send.prepare).toHaveBeenCalledWith({
       mintUrl: MINT1,
       amount: 100,
       unit: "usd",
     });
-    const payload = JSON.parse(sendNostrDM.mock.calls[0][1]);
+    const payload = JSON.parse(sendNostrDM.mock.calls[0][0].message);
     expect(payload.unit).toBe("usd");
     expect(payload).not.toHaveProperty("id");
+  });
+
+  it("sends proof amounts as JSON numbers, not cashu-ts Amount strings", async () => {
+    const sendNostrDM = vi.fn().mockResolvedValue(undefined);
+    const manager = createMockManager();
+    manager._mockToken.proofs = [
+      { id: "proof-1", amount: Amount.from(8), C: "abc", secret: "def" },
+    ] as never;
+    mockGetPRInfo.mockReturnValue({
+      mints: [MINT1],
+      amount: 8,
+      unit: "sat",
+      transports: [{ type: "nostr", target: "nprofile1abc" }],
+    });
+    const ops = createDefaultOperations({
+      getManager: () => manager as unknown as Manager,
+      sendNostrDM,
+    });
+    await ops.executePaymentRequest!({ mintUrl: MINT1, paymentRequest: "creqNUM", amount: 8, unit: "sat" });
+    const payload = JSON.parse(sendNostrDM.mock.calls[0][0].message);
+    expect(payload.proofs[0].amount).toBe(8);
+  });
+
+  it("echoes the request's spelling of the paying mint", async () => {
+    const sendNostrDM = vi.fn().mockResolvedValue(undefined);
+    const manager = createMockManager();
+    mockGetPRInfo.mockReturnValue({
+      mints: [`${MINT1.toUpperCase()}/`],
+      amount: 100,
+      unit: "sat",
+      transports: [{ type: "nostr", target: "nprofile1abc" }],
+    });
+    const ops = createDefaultOperations({
+      getManager: () => manager as unknown as Manager,
+      sendNostrDM,
+    });
+    await ops.executePaymentRequest!({ mintUrl: MINT1, paymentRequest: "creqSpelling", amount: 100, unit: "sat" });
+    expect(JSON.parse(sendNostrDM.mock.calls[0][0].message).mint).toBe(`${MINT1.toUpperCase()}/`);
   });
 
   it("rejects unsupported spending conditions before creating or delivering ecash", async () => {
@@ -274,11 +314,39 @@ describe("executePaymentRequest — Nostr transport", () => {
       sendNostrDM,
     });
     await expect(
-      ops.executePaymentRequest!(MINT1, "creqLocked", 100, "sat"),
+      ops.executePaymentRequest!({ mintUrl: MINT1, paymentRequest: "creqLocked", amount: 100, unit: "sat" }),
     ).rejects.toThrow("requires locked ecash");
     expect(manager.ops.send.prepare).not.toHaveBeenCalled();
     expect(sendNostrDM).not.toHaveBeenCalled();
   });
+  it.each([false, true])("preserves plain P2PK and refuses extra conditions (tags=%s)", async (tagged) => {
+    const pubkey = `02${"ab".repeat(32)}`;
+    const request = new PaymentRequest(
+      [{ type: PaymentRequestTransportType.NOSTR, target: "nprofile1abc" }],
+      "locked-request", 100, "sat", [MINT1], undefined, undefined,
+      { kind: "P2PK", data: pubkey, tags: tagged ? [["sigflag", "SIG_ALL"]] : [] },
+    ).toEncodedRequest();
+    mockGetPRInfo.mockReturnValue({
+      requestId: "locked-request", mints: [MINT1], amount: 100, unit: "sat",
+      hasSpendingCondition: true, lockP2pkPubkey: pubkey,
+      transports: [{ type: "nostr", target: "nprofile1abc" }],
+    });
+    const manager = createMockManager();
+    const sendNostrDM = vi.fn().mockResolvedValue(undefined);
+    const ops = createDefaultOperations({ getManager: () => manager as unknown as Manager, sendNostrDM });
+    if (tagged) {
+      await expect(ops.executePaymentRequest!({ mintUrl: MINT1, paymentRequest: request, amount: 100, unit: "sat" })).rejects.toThrow("unsupported spending conditions");
+      expect(manager.ops.send.prepare).not.toHaveBeenCalled();
+      expect(sendNostrDM).not.toHaveBeenCalled();
+      return;
+    }
+    await ops.executePaymentRequest!({ mintUrl: MINT1, paymentRequest: request, amount: 100, unit: "sat" });
+    expect(manager.ops.send.prepare).toHaveBeenCalledWith({
+      mintUrl: MINT1, amount: 100, unit: "sat", target: { type: "p2pk", pubkey },
+    });
+    expect(sendNostrDM).toHaveBeenCalledTimes(1);
+  });
+
   it("calls sendNostrDM with the Nostr target and token payload", async () => {
     const sendNostrDM = vi.fn().mockResolvedValue(undefined);
     const mockManager = createMockManager();
@@ -296,12 +364,7 @@ describe("executePaymentRequest — Nostr transport", () => {
       sendNostrDM,
     });
 
-    const result = await ops.executePaymentRequest!(
-      MINT1,
-      "creqABC",
-      100,
-      "sat",
-    );
+    const result = await ops.executePaymentRequest!({ mintUrl: MINT1, paymentRequest: "creqABC", amount: 100, unit: "sat" });
 
     expect(mockManager.ops.send.prepare).toHaveBeenCalledWith({
       mintUrl: MINT1,
@@ -312,7 +375,7 @@ describe("executePaymentRequest — Nostr transport", () => {
       "prepared-send-1",
     );
     expect(sendNostrDM).toHaveBeenCalledOnce();
-    const [target, payloadStr] = sendNostrDM.mock.calls[0];
+    const [{ nprofile: target, message: payloadStr }] = sendNostrDM.mock.calls[0];
     expect(target).toBe("nprofile1abc");
 
     const payload = JSON.parse(payloadStr);
@@ -321,7 +384,9 @@ describe("executePaymentRequest — Nostr transport", () => {
       mint: MINT1,
       unit: "sat",
     });
-    expect(payload.proofs).toEqual(mockManager._mockToken.proofs);
+    expect(payload.proofs).toEqual([
+      { id: "proof-1", amount: 100, C: "abc", secret: "def" },
+    ]);
 
     expect(result.historyEntry).toBeDefined();
     expect(typeof result.historyEntry).toBe("string");
@@ -343,7 +408,7 @@ describe("executePaymentRequest — Nostr transport", () => {
     });
 
     await expect(
-      ops.executePaymentRequest!(MINT1, "creqABC", 100, "sat"),
+      ops.executePaymentRequest!({ mintUrl: MINT1, paymentRequest: "creqABC", amount: 100, unit: "sat" }),
     ).rejects.toThrow("sendNostrDM operation is required");
   });
 
@@ -366,13 +431,59 @@ describe("executePaymentRequest — Nostr transport", () => {
       sendNostrDM,
     });
 
-    await ops.executePaymentRequest!(MINT1, "creqABC", 500, "sat");
+    await ops.executePaymentRequest!({ mintUrl: MINT1, paymentRequest: "creqABC", amount: 500, unit: "sat" });
 
     expect(mockManager.ops.send.prepare).toHaveBeenCalledWith({
       mintUrl: MINT1,
       amount: 500,
       unit: "sat",
     });
+  });
+
+  it.each([
+    ["a mint the request does not list", { mints: ["https://other.example"] }, 100],
+    ["an amount the request did not ask for", { mints: [MINT1] }, 99],
+  ])("refuses %s before any ecash is prepared", async (_what, request, amount) => {
+    const sendNostrDM = vi.fn().mockResolvedValue(undefined);
+    const mockManager = createMockManager();
+    mockGetPRInfo.mockReturnValue({
+      amount: 100,
+      unit: "sat",
+      transports: [{ type: "nostr", target: "nprofile1abc" }],
+      ...request,
+    });
+    const ops = createDefaultOperations({
+      getManager: () => mockManager as unknown as Manager,
+      sendNostrDM,
+    });
+
+    await expect(
+      ops.executePaymentRequest!({ mintUrl: MINT1, paymentRequest: "creqABC", amount, unit: "sat" }),
+    ).rejects.toThrow(/payment request/);
+    expect(mockManager.ops.send.prepare).not.toHaveBeenCalled();
+    expect(sendNostrDM).not.toHaveBeenCalled();
+  });
+
+  it("pays from a mint outside an advisory list, and any mint when the request lists none", async () => {
+    for (const request of [
+      { mints: ["https://other.example"], mintsPreferred: true },
+      { mints: [] },
+    ]) {
+      const sendNostrDM = vi.fn().mockResolvedValue(undefined);
+      const mockManager = createMockManager();
+      mockGetPRInfo.mockReturnValue({
+        amount: 100,
+        unit: "sat",
+        transports: [{ type: "nostr", target: "nprofile1abc" }],
+        ...request,
+      });
+      const ops = createDefaultOperations({
+        getManager: () => mockManager as unknown as Manager,
+        sendNostrDM,
+      });
+      await ops.executePaymentRequest!({ mintUrl: MINT1, paymentRequest: "creqABC", amount: 100, unit: "sat" });
+      expect(sendNostrDM).toHaveBeenCalledOnce();
+    }
   });
 
   it("throws when the request unit does not match the flow unit (BTC-04)", async () => {
@@ -392,7 +503,7 @@ describe("executePaymentRequest — Nostr transport", () => {
     });
 
     await expect(
-      ops.executePaymentRequest!(MINT1, "creqABC", 500, "sat"),
+      ops.executePaymentRequest!({ mintUrl: MINT1, paymentRequest: "creqABC", amount: 500, unit: "sat" }),
     ).rejects.toThrow("does not match the wallet unit");
     expect(mockManager.ops.send.prepare).not.toHaveBeenCalled();
     expect(sendNostrDM).not.toHaveBeenCalled();
@@ -422,7 +533,7 @@ describe("executePaymentRequest — HTTP transport", () => {
       sendNostrDM,
     });
 
-    await ops.executePaymentRequest!(MINT1, "creqHTTP", 100, "sat");
+    await ops.executePaymentRequest!({ mintUrl: MINT1, paymentRequest: "creqHTTP", amount: 100, unit: "sat" });
 
     expect(sendNostrDM).not.toHaveBeenCalled();
     expect(mockManager.paymentRequests.parse).toHaveBeenCalledWith("creqHTTP");
@@ -455,7 +566,7 @@ describe("executePaymentRequest — inband fallback", () => {
       sendNostrDM,
     });
 
-    await ops.executePaymentRequest!(MINT1, "creqInband", 100, "sat");
+    await ops.executePaymentRequest!({ mintUrl: MINT1, paymentRequest: "creqInband", amount: 100, unit: "sat" });
 
     expect(sendNostrDM).not.toHaveBeenCalled();
     expect(mockManager.paymentRequests.parse).toHaveBeenCalledWith(
@@ -574,7 +685,8 @@ describe("buildMintReviewInfo — social enrichment", () => {
       contactReputation: 1,
     });
     expect(info.auditScore).toBe(3.5);
-    expect(info.successRate).toBeUndefined();
+    // No rate is made up from the score: the type no longer has one to fill.
+    expect(info).not.toHaveProperty("successRate");
   });
 
   it("skips the redundant review + profile fetches when the row already carries them", async () => {
@@ -787,7 +899,7 @@ describe("executeMintQuote — onchain", () => {
       getManager: () => mockManager as unknown as Manager,
     });
 
-    const result = await ops.executeMintQuote!(MINT1, 123, "sat", "onchain");
+    const result = await ops.executeMintQuote!({ mintUrl: MINT1, amount: 123, unit: "sat", method: "onchain" });
 
     // v2 quote-first contract: the canonical quote row exists before the
     // durable operation, and reusable quotes take an explicit amount.
@@ -855,7 +967,7 @@ describe("executeMelt — onchain (coco v2)", () => {
       selectOnchainFeeIndex,
     });
 
-    const result = await ops.executeMelt!(MINT1, ADDRESS, 500, "sat");
+    const result = await ops.executeMelt!({ mintUrl: MINT1, meltTarget: ADDRESS, amount: 500, unit: "sat" });
 
     expect(create).toHaveBeenCalledWith({
       mintUrl: MINT1,
@@ -888,7 +1000,7 @@ describe("executeMelt — onchain (coco v2)", () => {
 
     // The named cancel error routes as a quiet user-cancel (no failure toast).
     await expect(
-      ops.executeMelt!(MINT1, ADDRESS, 500, "sat"),
+      ops.executeMelt!({ mintUrl: MINT1, meltTarget: ADDRESS, amount: 500, unit: "sat" }),
     ).rejects.toMatchObject({
       name: "MeltUserCancelledError",
     });
@@ -919,7 +1031,7 @@ describe("executeMelt — onchain (coco v2)", () => {
       selectOnchainFeeIndex,
     });
 
-    await ops.executeMelt!(MINT1, ADDRESS, 500, "sat");
+    await ops.executeMelt!({ mintUrl: MINT1, meltTarget: ADDRESS, amount: 500, unit: "sat" });
     // NUT-30 requires echoing a fee_index, not that the user pick one — a
     // one-button sheet is noise.
     expect(selectOnchainFeeIndex).not.toHaveBeenCalled();
@@ -940,7 +1052,7 @@ describe("executeMelt — onchain (coco v2)", () => {
       getManager: () => mockManager as unknown as Manager,
     });
 
-    await ops.executeMelt!(MINT1, ADDRESS, 500, "sat");
+    await ops.executeMelt!({ mintUrl: MINT1, meltTarget: ADDRESS, amount: 500, unit: "sat" });
     expect(prepare).toHaveBeenCalledWith({ quote, feeIndex: 1 });
   });
 
@@ -958,7 +1070,7 @@ describe("executeMelt — onchain (coco v2)", () => {
       selectOnchainFeeIndex: vi.fn().mockResolvedValue(0),
     });
 
-    await expect(ops.executeMelt!(MINT1, ADDRESS, 500, "sat")).rejects.toThrow(
+    await expect(ops.executeMelt!({ mintUrl: MINT1, meltTarget: ADDRESS, amount: 500, unit: "sat" })).rejects.toThrow(
       "mint 500",
     );
     expect(cancel).toHaveBeenCalledWith("melt-op-1", "Execute failed");
@@ -978,7 +1090,7 @@ describe("executeMelt — onchain (coco v2)", () => {
       getSatsPerUnitMinor: (unit) => (unit === "usd" ? 10 : null),
     });
 
-    await ops.executeMelt!(MINT1, ADDRESS, 500, "usd");
+    await ops.executeMelt!({ mintUrl: MINT1, meltTarget: ADDRESS, amount: 500, unit: "usd" });
 
     expect(create).toHaveBeenCalledWith({
       mintUrl: MINT1,
@@ -1002,7 +1114,7 @@ describe("executeMelt — onchain (coco v2)", () => {
     });
 
     await expect(
-      ops.executeMelt!(MINT1, ADDRESS, 500, "usd"),
+      ops.executeMelt!({ mintUrl: MINT1, meltTarget: ADDRESS, amount: 500, unit: "usd" }),
     ).rejects.toMatchObject({
       name: "UnitRateUnavailableError",
     });
@@ -1043,7 +1155,7 @@ describe("executeMelt — bolt12 (coco v2)", () => {
       getManager: () => mockManager as unknown as Manager,
     });
 
-    const result = await ops.executeMelt!(MINT1, OFFER, 400, "sat");
+    const result = await ops.executeMelt!({ mintUrl: MINT1, meltTarget: OFFER, amount: 400, unit: "sat" });
 
     // amountSats always supplied (required for amountless, validated for fixed).
     expect(create).toHaveBeenCalledWith({
@@ -1149,7 +1261,7 @@ describe("quoteMelt / executeMelt quote-first (BTC-05)", () => {
       getManager: () => mgr as unknown as Manager,
     });
 
-    const preview = await ops.quoteMelt!(MINT1, BOLT11_TARGET, 200, "sat");
+    const preview = await ops.quoteMelt!({ mintUrl: MINT1, meltTarget: BOLT11_TARGET, amount: 200, unit: "sat" });
 
     expect(mgr.quotes.melt.create).toHaveBeenCalledTimes(1);
     expect(mgr.quotes.melt.create).toHaveBeenCalledWith({
@@ -1176,10 +1288,8 @@ describe("quoteMelt / executeMelt quote-first (BTC-05)", () => {
       getManager: () => mgr as unknown as Manager,
     });
 
-    const preview = await ops.quoteMelt!(MINT1, BOLT11_TARGET, 200, "sat");
-    await ops.executeMelt!(MINT1, BOLT11_TARGET, 200, "sat", {
-      quoteId: preview.quoteId,
-    });
+    const preview = await ops.quoteMelt!({ mintUrl: MINT1, meltTarget: BOLT11_TARGET, amount: 200, unit: "sat" });
+    await ops.executeMelt!({ mintUrl: MINT1, meltTarget: BOLT11_TARGET, amount: 200, unit: "sat", quoteId: preview.quoteId });
 
     expect(mgr.quotes.melt.create).toHaveBeenCalledTimes(1);
     expect(mgr.ops.melt.prepare).toHaveBeenCalledWith({ quote: mgr.quote });
@@ -1192,7 +1302,7 @@ describe("quoteMelt / executeMelt quote-first (BTC-05)", () => {
       getManager: () => mgr as unknown as Manager,
     });
 
-    await ops.executeMelt!(MINT1, BOLT11_TARGET, 200, "sat");
+    await ops.executeMelt!({ mintUrl: MINT1, meltTarget: BOLT11_TARGET, amount: 200, unit: "sat" });
 
     expect(mgr.quotes.melt.create).toHaveBeenCalledTimes(1);
     expect(mgr.ops.melt.prepare).toHaveBeenCalledWith({ quote: mgr.quote });
@@ -1204,14 +1314,10 @@ describe("quoteMelt / executeMelt quote-first (BTC-05)", () => {
       getManager: () => mgr as unknown as Manager,
     });
 
-    const preview = await ops.quoteMelt!(MINT1, BOLT11_TARGET, 200, "sat");
-    await ops.executeMelt!(MINT1, BOLT11_TARGET, 200, "sat", {
-      quoteId: preview.quoteId,
-    });
+    const preview = await ops.quoteMelt!({ mintUrl: MINT1, meltTarget: BOLT11_TARGET, amount: 200, unit: "sat" });
+    await ops.executeMelt!({ mintUrl: MINT1, meltTarget: BOLT11_TARGET, amount: 200, unit: "sat", quoteId: preview.quoteId });
     // Second call with the same quoteId falls back to a fresh quote.
-    await ops.executeMelt!(MINT1, BOLT11_TARGET, 200, "sat", {
-      quoteId: preview.quoteId,
-    });
+    await ops.executeMelt!({ mintUrl: MINT1, meltTarget: BOLT11_TARGET, amount: 200, unit: "sat", quoteId: preview.quoteId });
 
     expect(mgr.quotes.melt.create).toHaveBeenCalledTimes(2);
   });
@@ -1228,9 +1334,7 @@ describe("executeSend — reservation rescue (BTC-07)", () => {
       getManager: () => manager as unknown as Manager,
     });
 
-    await expect(ops.executeSend!(MINT1, 100, undefined, {
-      p2pkLock: { pubkey: `02${"ab".repeat(32)}`, locktimeSec: 1_800_003_600 },
-    })).rejects.toThrow("Invalid P2PK lock");
+    await expect(ops.executeSend!({ mintUrl: MINT1, amount: 100, p2pkLock: { pubkey: `02${"ab".repeat(32)}`, locktimeSec: 1_800_003_600 } })).rejects.toThrow("Invalid P2PK lock");
     expect(manager.ops.send.prepare).not.toHaveBeenCalled();
     expect(manager.ops.send.execute).not.toHaveBeenCalled();
   });
@@ -1254,7 +1358,7 @@ describe("executeSend — reservation rescue (BTC-07)", () => {
       const ops = createDefaultOperations({
         getManager: () => manager as unknown as Manager,
       });
-      const result = await ops.executeSend!(MINT1, 100, "memo retained");
+      const result = await ops.executeSend!({ mintUrl: MINT1, amount: 100, memo: "memo retained" });
       expect(JSON.parse(result.historyEntry)).toMatchObject({
         operationId: "op-1",
         mintUrl: MINT1,
@@ -1287,7 +1391,11 @@ describe("executeSend — reservation rescue (BTC-07)", () => {
       const ops = createDefaultOperations({
         getManager: () => manager as unknown as Manager,
       });
-      const result = await ops[method]!(MINT1, 100, "memo retained");
+      const result = await ops[method]!({
+        mintUrl: MINT1,
+        amount: 100,
+        memo: "memo retained",
+      });
       expect(manager.history.getHistoryEntryById).toHaveBeenCalledWith(
         "send:op-1",
       );
@@ -1313,10 +1421,25 @@ describe("executeSend — reservation rescue (BTC-07)", () => {
       getManager: () => mockManager as unknown as Manager,
     });
 
-    await expect(ops.executeSend!(MINT1, 100)).rejects.toThrow(
+    await expect(ops.executeSend!({ mintUrl: MINT1, amount: 100 })).rejects.toThrow(
       "network drop mid-flight",
     );
     // The prepared op's reservation must be released, not abandoned.
+    expect(mockManager.ops.send.cancel).toHaveBeenCalledWith("prepared-send-1");
+  });
+
+  it("does not create a token when durable delivery binding fails", async () => {
+    const mockManager = createMockManager();
+    const ops = createDefaultOperations({
+      getManager: () => mockManager as unknown as Manager,
+      captureSendDelivery: () => async () => {
+        throw new Error("storage unavailable");
+      },
+    });
+    await expect(ops.executeSend!({ mintUrl: MINT1, amount: 100 })).rejects.toThrow(
+      "storage unavailable",
+    );
+    expect(mockManager.ops.send.execute).not.toHaveBeenCalled();
     expect(mockManager.ops.send.cancel).toHaveBeenCalledWith("prepared-send-1");
   });
 
@@ -1327,7 +1450,7 @@ describe("executeSend — reservation rescue (BTC-07)", () => {
       getManager: () => mockManager as unknown as Manager,
     });
 
-    await ops.executeSend!(MINT1, 100);
+    await ops.executeSend!({ mintUrl: MINT1, amount: 100 });
     expect(mockManager.ops.send.cancel).not.toHaveBeenCalled();
   });
 
@@ -1344,7 +1467,7 @@ describe("executeSend — reservation rescue (BTC-07)", () => {
       getManager: () => mockManager as unknown as Manager,
     });
 
-    await expect(ops.executeSend!(MINT1, 100)).rejects.toThrow(
+    await expect(ops.executeSend!({ mintUrl: MINT1, amount: 100 })).rejects.toThrow(
       "network drop mid-flight",
     );
     expect(mockManager.ops.send.cancel).toHaveBeenCalledWith("prepared-send-1");
@@ -1360,7 +1483,7 @@ describe("executeSend — reservation rescue (BTC-07)", () => {
       getManager: () => mockManager as unknown as Manager,
     });
 
-    await expect(ops.executeOfflineSend!(MINT1, 100)).rejects.toThrow(
+    await expect(ops.executeOfflineSend!({ mintUrl: MINT1, amount: 100 })).rejects.toThrow(
       "local failure",
     );
     expect(mockManager.ops.send.cancel).toHaveBeenCalledWith("prepared-send-1");
@@ -1395,7 +1518,7 @@ it.each(["sat", "usd"])(
     const ops = createDefaultOperations({
       getManager: () => mockManager as unknown as Manager,
     });
-    await ops.executeNfcSend!(MINT1, 100, unit);
+    await ops.executeNfcSend!({ mintUrl: MINT1, amount: 100, unit });
     expect(mockManager.ops.send.prepare).toHaveBeenCalledWith({
       mintUrl: MINT1,
       amount: 100,
@@ -1436,7 +1559,7 @@ describe("executePaymentRequest preferred mint adapter", () => {
       const ops = createDefaultOperations({
         getManager: () => manager as unknown as Manager,
       });
-      await ops.executePaymentRequest!(MINT1, encoded, 100, "sat");
+      await ops.executePaymentRequest!({ mintUrl: MINT1, paymentRequest: encoded, amount: 100, unit: "sat" });
       const input = manager.paymentRequests.parse.mock.calls[0][0];
       const adapted = decodePaymentRequest(input);
       expect(adapted.mints).toEqual(mintsPreferred ? undefined : request.mints);
@@ -1561,5 +1684,51 @@ describe("buildMintListItems testnut split", () => {
     const test = byUrl(await build({ scope: "onchain" }, true));
     expect(test[TESTNUT].status).toBe("available");
     expect(test[MINT1]).toMatchObject(outside);
+  });
+});
+
+describe("legacy nearby receive history ownership", () => {
+  it("returns the canonical child receive id without scanning concurrent history", async () => {
+    const token = getEncodedToken({
+      mint: MINT1,
+      unit: "sat",
+      proofs: [
+        {
+          id: "00".repeat(8),
+          amount: Amount.from(1),
+          C: "02" + "ab".repeat(32),
+          secret: "synthetic",
+        },
+      ],
+    });
+    const manager = createMockManager({
+      ops: {
+        receive: {
+          prepare: vi.fn(async () => ({ id: "receive-a" })),
+          execute: vi.fn(async () => ({ id: "receive-a" })),
+        },
+      },
+      history: {
+        getPaginatedHistory: vi.fn(() => {
+          throw new Error("broad history scan forbidden");
+        }),
+        getHistoryEntryById: vi.fn(async () => ({
+          id: "receive:receive-a",
+          type: "receive",
+          amount: 1,
+        })),
+      },
+    });
+    const operations = createDefaultOperations({
+      getManager: () => manager as unknown as Manager,
+    });
+    const result = await operations.executeAutoRedeem!({ tokenString: token, mintUrl: MINT1 });
+    expect(result.historyEntryId).toBe("receive:receive-a");
+    expect(JSON.parse(result.historyEntry!)).toEqual({
+      id: "receive:receive-a",
+      type: "receive",
+      amount: 1,
+    });
+    expect(manager.history.getPaginatedHistory).not.toHaveBeenCalled();
   });
 });

@@ -1,0 +1,94 @@
+{
+  "id": "browse-the-tabs",
+  "purpose": "A person moves from the wallet to the feed, their contacts and their notifications with the tab bar, and comes back to the wallet.",
+  "startsFrom": "onboarded",
+  "steps": [
+    {
+      "name": "the wallet opens",
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-send"
+          }
+        },
+        {
+          "logged": "splash.gone"
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "go to the feed",
+      "tap": {
+        "label": "Feed"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "screen-feed"
+          }
+        },
+        {
+          "gone": {
+            "id": "wallet-send"
+          }
+        }
+      ],
+      "withinMs": 10000
+    },
+    {
+      "name": "go to contacts",
+      "tap": {
+        "label": "Contacts"
+      },
+      "expect": [
+        {
+          "gone": {
+            "id": "screen-feed"
+          }
+        },
+        {
+          "gone": {
+            "id": "wallet-send"
+          }
+        },
+        {
+          "visible": {
+            "id": "header-profile-avatar"
+          }
+        }
+      ]
+    },
+    {
+      "name": "go to notifications",
+      "tap": {
+        "label": "Notifications"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "notifications-settings"
+          }
+        }
+      ]
+    },
+    {
+      "name": "come back to the wallet",
+      "tap": {
+        "label": "Wallet"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-send"
+          }
+        },
+        {
+          "visible": {
+            "id": "wallet-receive"
+          }
+        }
+      ]
+    }
+  ]
+}

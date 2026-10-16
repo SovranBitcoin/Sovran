@@ -8,15 +8,11 @@ import { NostrNDKProvider } from '@/shared/providers/NostrNDKProvider';
 let mockCanStart = false;
 let mockKeys: { privateKey: string; pubkey: string } | null = null;
 const mockInitialize = jest.fn();
-jest.mock(
-  '@nostr-dev-kit/ndk-mobile',
-  () => ({
-    NDKCacheAdapterSqlite: jest.fn().mockImplementation((dbName: string) => ({ dbName })),
-    NDKPrivateKeySigner: jest.fn(),
-    useNDK: () => ({ init: mockInitialize }),
-  }),
-  { virtual: true }
-);
+jest.mock('@nostr-dev-kit/ndk-mobile', () => ({
+  NDKCacheAdapterSqlite: jest.fn().mockImplementation((dbName: string) => ({ dbName })),
+  NDKPrivateKeySigner: jest.fn(),
+  useNDK: () => ({ init: mockInitialize }),
+}));
 jest.mock('@/shared/ndk', () => ({ relays: [] }));
 jest.mock('@/shared/lib/nostr/giftWrapCache', () => ({
   giftWrapCache: { cache: { hydrate: jest.fn() } },

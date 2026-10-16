@@ -110,12 +110,7 @@ describe('runMintQuoteEffect', () => {
     expect(result.isOk()).toBe(true);
     if (result.isErr()) return;
 
-    expect(executeMintQuote).toHaveBeenCalledWith(
-      'https://mint.example',
-      123,
-      'sat',
-      undefined,
-    );
+    expect(executeMintQuote).toHaveBeenCalledWith({ mintUrl: 'https://mint.example', amount: 123, unit: 'sat' });
     expect(result.value).toMatchObject({
       kind: 'completed',
       step: 'mintQuoteCreated',
@@ -338,7 +333,8 @@ describe('runMintReviewInfoEffect', () => {
     if (result.isOk()) return;
     expect(result.error.data).toMatchObject({
       code: 'UNSUPPORTED_INPUT',
-      message: 'Info unavailable',
+      // The exception's own text stays in the log; the app shows this field as is.
+      message: 'Failed to load mints',
     });
   });
 
@@ -388,7 +384,7 @@ describe('runTrustMintEffect', () => {
     if (result.isOk()) return;
     expect(result.error.data).toMatchObject({
       code: 'UNSUPPORTED_INPUT',
-      message: 'Trust failed',
+      message: 'Failed to trust mint',
     });
   });
 
@@ -487,12 +483,7 @@ describe('runConfirmMeltEffect', () => {
     expect(result.isOk()).toBe(true);
     if (result.isErr()) return;
 
-    expect(executeMelt).toHaveBeenCalledWith(
-      'https://mint.example',
-      'lnurl1target',
-      250,
-      'sat',
-    );
+    expect(executeMelt).toHaveBeenCalledWith({ mintUrl: 'https://mint.example', meltTarget: 'lnurl1target', amount: 250, unit: 'sat' });
     expect(result.value).toMatchObject({
       kind: 'completed',
       step: 'navigateToMeltPreview',
@@ -593,12 +584,7 @@ describe('runConfirmPaymentRequestEffect', () => {
     expect(result.isOk()).toBe(true);
     if (result.isErr()) return;
 
-    expect(executePaymentRequest).toHaveBeenCalledWith(
-      'https://mint.example',
-      'creq1request',
-      250,
-      'sat',
-    );
+    expect(executePaymentRequest).toHaveBeenCalledWith({ mintUrl: 'https://mint.example', paymentRequest: 'creq1request', amount: 250, unit: 'sat' });
     expect(result.value).toMatchObject({
       kind: 'completed',
       step: 'navigateToPaymentRequest',
@@ -722,7 +708,7 @@ describe('runNfcWriteBackEffect', () => {
     expect(result.isOk()).toBe(true);
     if (result.isErr()) return;
 
-    expect(executeNfcSend).toHaveBeenCalledWith('https://mint.example', 250, 'sat');
+    expect(executeNfcSend).toHaveBeenCalledWith({ mintUrl: 'https://mint.example', amount: 250, unit: 'sat' });
     expect(writeToken).toHaveBeenCalledWith('cashuBnfc-token');
     expect(releaseSession).toHaveBeenCalledTimes(1);
     expect(onProgress).toHaveBeenNthCalledWith(1, { phase: 'creating' });
@@ -860,7 +846,7 @@ describe('runConfirmSendEffect', () => {
     expect(result.isOk()).toBe(true);
     if (result.isErr()) return;
 
-    expect(executeSend).toHaveBeenCalledWith('https://mint.example', 100);
+    expect(executeSend).toHaveBeenCalledWith({ mintUrl: 'https://mint.example', amount: 100 });
     expect(executeOfflineSend).not.toHaveBeenCalled();
     expect(result.value).toMatchObject({
       kind: 'completed',
@@ -886,7 +872,7 @@ describe('runConfirmSendEffect', () => {
     });
   });
 
-  it('uses exact local proofs first when offline send is available', async () => {
+  it('sends exact bearer proofs without waiting for an online mint', async () => {
     const executeSend = vi.fn(async () => ({
       historyEntry: sendHistoryEntry('send-entry-1'),
     }));
@@ -907,20 +893,72 @@ describe('runConfirmSendEffect', () => {
     expect(result.isOk()).toBe(true);
     if (result.isErr()) return;
 
-    expect(executeOfflineSend).toHaveBeenCalledWith(
-      'https://mint.example',
-      100,
-    );
+    expect(executeSend).not.toHaveBeenCalled();
+    expect(executeOfflineSend).toHaveBeenCalledWith({ mintUrl: 'https://mint.example', amount: 100 });
+    expect(result.value).toMatchObject({ kind: 'completed', path: 'localFirst' });
+  });
+
+  it('creates a local token without the online path while the device is offline', async () => {
+    const executeSend = vi.fn(async () => ({
+      historyEntry: sendHistoryEntry('send-entry-1'),
+    }));
+    const executeOfflineSend = vi.fn(async () => ({
+      historyEntry: sendHistoryEntry('offline-entry-1'),
+    }));
+
+    const result = await runConfirmSendEffect({
+      data: confirmSendData,
+      operations: { executeSend, executeOfflineSend },
+      context: sendContext,
+      proofAmounts: [64, 32, 4],
+      getOffline: () => true,
+      getLocale: () => 'en',
+      isStale: () => false,
+    });
+
+    expect(result.isOk()).toBe(true);
+    if (result.isErr()) return;
+
+    expect(executeOfflineSend).toHaveBeenCalledWith({ mintUrl: 'https://mint.example', amount: 100 });
     expect(executeSend).not.toHaveBeenCalled();
     expect(result.value).toMatchObject({
       kind: 'completed',
       path: 'localFirst',
-      data: {
-        createdOffline: true,
-      },
+      data: { createdOffline: true },
     });
     expect(result.value).not.toMatchObject({
       data: { mintWasOffline: true },
+    });
+  });
+
+  it('sends exact proofs without reaching a mint that would fail', async () => {
+    const executeOfflineSend = vi.fn(async () => ({
+      historyEntry: sendHistoryEntry('offline-entry-1'),
+    }));
+
+    const result = await runConfirmSendEffect({
+      data: confirmSendData,
+      operations: {
+        executeSend: async () => {
+          throw mintFetchError();
+        },
+        executeOfflineSend,
+      },
+      context: sendContext,
+      proofAmounts: [64, 32, 4],
+      getOffline: () => false,
+      getLocale: () => 'en',
+      isStale: () => false,
+    });
+
+    expect(result.isOk()).toBe(true);
+    if (result.isErr()) return;
+
+    expect(executeOfflineSend).toHaveBeenCalledTimes(1);
+    expect(result.value).toMatchObject({
+      kind: 'completed',
+      path: 'localFirst',
+      data: { createdOffline: true },
     });
   });
 
@@ -980,7 +1018,7 @@ describe('runConfirmSendEffect', () => {
     expect(result.isOk()).toBe(true);
     if (result.isErr()) return;
 
-    expect(executeOfflineSend).toHaveBeenCalledWith('https://mint.example', 96);
+    expect(executeOfflineSend).toHaveBeenCalledWith({ mintUrl: 'https://mint.example', amount: 96 });
     expect(result.value).toMatchObject({
       kind: 'completed',
       path: 'localFirst',

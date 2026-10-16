@@ -59,7 +59,7 @@ function TransactionsFlowContent() {
   );
 
   return (
-    <AndroidSheetFlowStack>
+    <AndroidSheetFlowStack flow="(transactions-flow)">
       <Stack.Screen name="transactions" options={transactionsOptions} />
       <Stack.Screen name="lightningReceive" options={LIGHTNING_RECEIVE_OPTIONS} />
       <Stack.Screen name="onchainReceive" options={ONCHAIN_RECEIVE_OPTIONS} />

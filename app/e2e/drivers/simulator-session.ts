@@ -278,19 +278,11 @@ export function buildMetroEnvironment(
   delete environment.EXPO_PUBLIC_E2E_CONTROLLED_P2PK_PUBKEY;
   delete environment.EXPO_PUBLIC_E2E_MOCK_FAIL_PAYMENT_REQUEST;
   delete environment[E2E_READY_PROOF_RECONCILIATION_ENV];
-  delete environment.EXPO_PUBLIC_E2E_ONBOARDING_SLIDE_MS;
   delete environment.EXPO_PUBLIC_E2E_TOAST_DISMISS_MS;
   delete environment.EXPO_PUBLIC_E2E_TRIPLE_TAP_WINDOW_MS;
   delete environment.EXPO_PUBLIC_E2E_STATE_MIRROR;
   delete environment.EXPO_PUBLIC_E2E_CAPTURE_PROFILE;
   delete environment.RCT_METRO_PORT;
-  // Park each onboarding slide for three minutes. Evidence capture becomes
-  // much slower under concurrent iOS + Android sweeps; the old 20s window let
-  // the carousel auto-advance past a tapUntil destination before or between
-  // retries.
-  // Harness taps still advance immediately, so the longer timer adds no normal
-  // scenario latency while keeping fixture navigation deterministic.
-  environment.EXPO_PUBLIC_E2E_ONBOARDING_SLIDE_MS = '180000';
   // Terminal payment toasts auto-dismiss after 3s while their AX probe is
   // retained 15s past dismissal, so a waitFor-then-screenshot always samples
   // after the visible toast is gone. Slow the dismiss the same way — but only
@@ -299,8 +291,8 @@ export function buildMetroEnvironment(
   environment.EXPO_PUBLIC_E2E_TOAST_DISMISS_MS = '8000';
   // The settings dev-mode gesture is a 1.5s triple-tap. Every harness tap is
   // followed by screenshot + AX + store/db evidence, which can exceed 20s on
-  // a busy simulator. Keep the window aligned with the owned onboarding hold;
-  // this Metro-only override never changes production gesture timing.
+  // a busy simulator. Hold the window open for three minutes; this
+  // Metro-only override never changes production gesture timing.
   environment.EXPO_PUBLIC_E2E_TRIPLE_TAP_WINDOW_MS = '180000';
   // Every owned e2e Metro turns on the in-app zustand state mirror so each
   // evidence frame gets a .store.json sidecar (see shared/lib/e2e/stateMirror).

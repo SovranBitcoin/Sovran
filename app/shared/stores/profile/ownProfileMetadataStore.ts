@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { persist } from 'zustand/middleware';
 import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
@@ -94,7 +94,10 @@ interface OwnProfileMetadataStore {
   setOptimistic: (snapshot: OwnProfileMetadataStore['optimistic']) => void;
   clearOptimistic: (eventId: string) => void;
 }
-export const useOwnProfileMetadataStore = create<OwnProfileMetadataStore>()(
+export const useOwnProfileMetadataStore = create<OwnProfileMetadataStore>({
+  name: 'own-profile-metadata-store',
+  scope: 'profile',
+})(
   persist(
     (set) => ({
       latest: null,

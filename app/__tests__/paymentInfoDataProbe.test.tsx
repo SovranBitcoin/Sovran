@@ -15,8 +15,8 @@ const mockQrRendered = jest.fn();
 let mockScheme = 'dark';
 const mockDimensions = { width: 393, height: 852, scale: 3, fontScale: 1 };
 jest.mock('@/shared/hooks/useColorScheme', () => ({ useColorScheme: () => mockScheme }));
-jest.mock('@/shared/ui/composed/GradientCard', () => ({
-  GradientCard: ({ children, ...props }: React.PropsWithChildren<Record<string, unknown>>) => (
+jest.mock('@/shared/ui/composed/Surface', () => ({
+  Surface: ({ children, ...props }: React.PropsWithChildren<Record<string, unknown>>) => (
     <view {...props}>{children}</view>
   ),
 }));

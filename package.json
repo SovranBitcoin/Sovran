@@ -9,7 +9,8 @@
     "wallet",
     "nostr",
     "docs",
-    "copy"
+    "copy",
+    "harness"
   ],
   "overrides": {
     "@cashu/cashu-ts": "5.0.0-rc.4",
@@ -18,6 +19,7 @@
     "nostr-tools": "2.24.2"
   },
   "scripts": {
+    "harness": "bun harness/src/cli.ts",
     "assets:generate": "node scripts/assets.mjs",
     "assets:check": "node scripts/assets.mjs --check",
     "assets:brand": "node scripts/brand-assets.mjs",
@@ -33,9 +35,10 @@
     "prebuild": "cd app && bun run prebuild",
     "type-check": "bun run --filter '*' type-check",
     "lint": "cd app && bun run lint",
-    "test": "bun run --filter '*' test",
+    "test": "bun run --cwd harness test && bun run --filter '!@sovran/task-harness' test",
     "test:app": "cd app && bun run test",
     "knip": "knip",
+    "followups": "node scripts/followups.mjs",
     "pretty": "cd app && bun run pretty",
     "pretty:check": "cd app && bun run pretty:check",
     "deps:sovran-latest": "cd app && bun run deps:sovran-latest",
@@ -85,6 +88,7 @@
     "react-native-screens@4.25.2": "app/patches/react-native-screens+4.25.2.patch",
     "expo-router@56.2.11": "app/patches/expo-router+56.2.11.patch",
     "@gorhom/bottom-sheet@5.2.14": "app/patches/@gorhom+bottom-sheet+5.2.14.patch",
-    "@routstr/sdk@0.4.6": "app/patches/@routstr+sdk+0.4.6.patch"
+    "@routstr/sdk@0.4.6": "app/patches/@routstr+sdk+0.4.6.patch",
+    "@cashu/coco-core@2.0.0": "app/patches/@cashu+coco-core+2.0.0.patch"
   }
 }

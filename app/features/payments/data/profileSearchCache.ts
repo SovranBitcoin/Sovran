@@ -8,6 +8,7 @@ import type { SearchUsersResponse } from '@sovranbitcoin/schemas';
  * result does not depend on who is asking.
  */
 export const profileSearchCache = createQueryCacheStore<SearchUsersResponse>({
+  scope: 'global',
   name: 'profile-search-cache',
   logKey: 'profile_search_cache',
   staleTtlMs: 5 * 60 * 1000,

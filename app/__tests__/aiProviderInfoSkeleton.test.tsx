@@ -99,7 +99,6 @@ jest.mock('@/shared/lib/routstr/providerHealth', () => ({
   probeProviders: jest.fn(async () => {}),
 }));
 jest.mock('@cashu/coco-react', () => ({ useBalanceContext: () => ({ balances: { byMint: {} } }) }));
-jest.mock('@/shared/lib/cashu/amount', () => ({ amountToNumber: () => 0 }));
 jest.mock('@/shared/ui/composed/IdentityHeader', () => ({
   useIdentityHeader: () => ({
     scrollY: { value: 0 },

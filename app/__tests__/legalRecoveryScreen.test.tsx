@@ -31,6 +31,7 @@ jest.mock('@/features/settings/lib/readRecoveryInformation', () => ({
   readRecoveryInformation: jest.fn(),
 }));
 jest.mock('nostr-tools/nip19', () => ({ npubEncode: () => 'test-public-placeholder' }));
+jest.mock('@/shared/ui/primitives/Button', () => ({ Button: 'Button' }));
 jest.mock('heroui-native', () => {
   const React = require('react');
   return {
@@ -43,10 +44,12 @@ jest.mock('heroui-native', () => {
 function button(screen: TestRenderer.ReactTestRenderer, label: string) {
   return screen.root
     .findAll((node) => String(node.type) === 'Button')
-    .find((node) =>
-      node
-        .findAll((child) => String(child.type) === 'Label')
-        .some((child) => child.children.includes(label))
+    .find(
+      (node) =>
+        node.props.text === label ||
+        node
+          .findAll((child) => String(child.type) === 'Label')
+          .some((child) => child.children.includes(label))
     )!;
 }
 const information: RecoveryInformation = {

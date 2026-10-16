@@ -31,6 +31,14 @@ export const nostrLog: NostrLogger = {
   warn: (event, data) => active.warn(event, data),
 };
 
+/**
+ * True when a sink is installed. Lets a hot path skip counting and building
+ * event data entirely while the layer is silent.
+ */
+export function isNostrLogActive(): boolean {
+  return active !== noopLogger;
+}
+
 /** Install a sink (or `null` to silence). */
 export function setNostrLogger(logger: NostrLogger | null): void {
   active = logger ?? noopLogger;

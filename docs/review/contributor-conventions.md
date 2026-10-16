@@ -1,8 +1,8 @@
 # Contributor conventions
 
-These instructions were preserved from the previous Hunch policy during the semantic-review redesign. They remain human/agent guidance; Hunch does not claim to enforce all of them. Existing repository instructions, ADRs and explicit user decisions take precedence. Use lint/type checks for deterministic requirements.
+These instructions are human and agent guidance; no tool enforces all of them. Existing repository instructions, ADRs and explicit user decisions take precedence. Use lint/type checks for deterministic requirements.
 
-[Automated policy](../../hunch.config.ts) · [Review contracts](contracts.md)
+[Semantic checks](README.md) · [Review contracts](contracts.md)
 
 ## errors/structured
 

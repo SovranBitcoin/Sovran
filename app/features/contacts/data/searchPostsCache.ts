@@ -12,6 +12,7 @@ import { createQueryCacheStore } from '@/shared/lib/cache/createQueryCacheStore'
 import type { FeedParseResult } from '@/features/feed/data/feedClient';
 
 export const searchPostsCache = createQueryCacheStore<FeedParseResult>({
+  scope: 'session',
   name: 'search-posts-cache',
   logKey: 'search_posts_cache',
   staleTtlMs: 2 * 60 * 1000,

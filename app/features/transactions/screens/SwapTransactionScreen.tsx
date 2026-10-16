@@ -35,7 +35,7 @@ import { Screen } from '@/shared/ui/composed/Screen';
 import { TransactionDetailShell } from '@/features/transactions/components/detail/TransactionDetailShell';
 import { useHistoryWithMelts } from '@/features/transactions';
 import type { HistoryEntry, MeltHistoryEntry, MintHistoryEntry } from '@cashu/coco-core';
-import { amountToNumber } from '@/shared/lib/cashu/amount';
+import { amountToNumber } from 'wallet/amount';
 import { navigateToTransactionDetail } from '@/shared/lib/nav/transactionDetailRoutes';
 import {
   useSwapTransactionsStore,
@@ -452,10 +452,13 @@ export function SwapTransactionScreen({ groupId }: Props) {
                               unit: group.unit,
                               type: 'melt' as const,
                               quoteId: leg.meltQuoteId,
+                              // A settling leg's melt was paid; only the destination is outstanding.
                               state:
-                                leg.localStatus === 'done'
+                                leg.localStatus === 'done' || leg.localStatus === 'settling'
                                   ? MeltQuoteState.PAID
-                                  : MeltQuoteState.UNPAID,
+                                  : leg.localStatus === 'paymentPending'
+                                    ? MeltQuoteState.PENDING
+                                    : MeltQuoteState.UNPAID,
                               amount: leg.amount,
                             }) as MeltHistoryEntry)
                           : undefined);

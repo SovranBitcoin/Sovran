@@ -25,7 +25,6 @@ jest.mock('@/shared/lib/logger', () => ({
 jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({
   withSkippedPersistWrites: (fn: () => void) => fn(),
 }));
-jest.mock('@/shared/lib/cashu/amount', () => ({ amountToNumber: Number, toCocoAmount: Number }));
 const mockIngest = jest.fn();
 jest.mock('@/shared/lib/nostr/useEntityCache', () => ({
   ingestResolvedProfiles: (...args: unknown[]) => mockIngest(...args),

@@ -48,13 +48,14 @@ type Session = {
 };
 const ARTIFACTS = join(ROOT, 'app/e2e/artifacts');
 const LIBRARY = join(ROOT, 'press/screenshots');
-const CHECKPOINT = join(ARTIFACTS, 'screenshot-refresh.json');
+const CAPTURE = join(ARTIFACTS, 'capture');
+const CHECKPOINT = join(CAPTURE, 'screenshot-refresh.json');
 /** A focused retry keeps its own checkpoint. The campaign's resume state
  * describes all 54 legs; a one-scenario run must not overwrite it with a
  * one-session report and make every other verified leg look unattempted. */
 const checkpointFor = (scenario: string | undefined) =>
   scenario
-    ? join(ARTIFACTS, `screenshot-refresh.${scenario.replace(/[^a-z0-9.-]/gi, '-')}.json`)
+    ? join(CAPTURE, `screenshot-refresh.${scenario.replace(/[^a-z0-9.-]/gi, '-')}.json`)
     : CHECKPOINT;
 const hash = (value: string | Buffer) => createHash('sha256').update(value).digest('hex');
 const atomicJson = (file: string, value: unknown) => {
@@ -249,8 +250,10 @@ async function refresh(args: string[]) {
     );
     return 0;
   }
-  mkdirSync(ARTIFACTS, { recursive: true });
-  const lock = join(ARTIFACTS, 'screenshot-refresh.lock');
+  mkdirSync(join(CAPTURE, 'history'), { recursive: true });
+  const lock = join(CAPTURE, 'screenshot-refresh.lock');
+  if (existsSync(join(ARTIFACTS, 'screenshot-refresh.lock')))
+    throw new Error('Run bun e2e/results/migrate.ts before starting a capture campaign.');
   let fd: number;
   try {
     fd = openSync(lock, 'wx');
@@ -565,7 +568,7 @@ async function refresh(args: string[]) {
     try {
       save();
       atomicJson(
-        join(ARTIFACTS, `screenshot-refresh-${startedAt.replace(/[:.]/g, '-')}.json`),
+        join(CAPTURE, 'history', `screenshot-refresh-${startedAt.replace(/[:.]/g, '-')}.json`),
         report()
       );
     } finally {

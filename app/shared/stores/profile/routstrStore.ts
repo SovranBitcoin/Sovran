@@ -1,5 +1,5 @@
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
+import { persist, type PersistOptions, type StateStorage } from 'zustand/middleware';
 import { z } from 'zod';
 import { createRoutstrPersistence } from '@/shared/lib/routstr/securePersistence';
 import { mintLocalId } from '@/shared/lib/id';
@@ -264,6 +264,8 @@ export interface RoutstrMessage {
    * messages from before the cost-tracking change shipped.
    */
   costSats?: number;
+  /** Model names at send time, retained with an answer that used a fallback. */
+  modelSwitch?: { from: string; to: string };
   /**
    * Optimistic dispatch flag for user messages — `true` between submit and
    * the moment the streaming round-trip resolves (success or error).
@@ -590,6 +592,7 @@ interface RoutstrActions {
       thinkingDurationSec?: number;
       reasoningContent?: string;
       costSats?: number;
+      modelSwitch?: RoutstrMessage['modelSwitch'];
     }
   ) => void;
   removeMessages: (ids: Set<string>) => void;
@@ -715,6 +718,7 @@ const PersistedRoutstrMessage = z.looseObject({
   thinkingDurationSec: z.number().nonnegative().optional(),
   reasoningContent: z.string().max(65_536).optional(),
   costSats: z.number().int().nonnegative().optional(),
+  modelSwitch: z.object({ from: z.string(), to: z.string() }).optional().catch(undefined),
   pending: z.boolean().optional(),
 });
 
@@ -858,6 +862,167 @@ function truncateTranscript(session: RoutstrSession): RoutstrSession {
   return { ...session, messages, activeChildren };
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+/**
+ * The session list of an older blob, cut to the ceilings before the schema
+ * reads it.
+ *
+ * Releases up to 0.1.0 saved every session and every turn with no limit, and
+ * the schema turns down a list that is too long, which empties the whole
+ * store, key included. A ceiling belongs on what is written. What is read has
+ * to accept what any release wrote, so it is trimmed here, by the same rule
+ * `partialize` uses.
+ *
+ * A session or turn that is not an object is left out: the trim reads their
+ * fields, and the schema would have turned the blob down for a session like
+ * that anyway.
+ */
+function releasedSessionsWithinCeilings(sessions: unknown, currentSessionId: unknown): unknown {
+  if (!Array.isArray(sessions)) return sessions;
+  const readable = sessions.flatMap((session: unknown) =>
+    isRecord(session) && Array.isArray(session.messages)
+      ? [{ ...session, messages: session.messages.filter(isRecord) }]
+      : []
+  );
+  return boundedSessions(
+    // Only the fields the trim reads are known here. The schema checks the rest.
+    readable as unknown as RoutstrSession[],
+    typeof currentSessionId === 'string' ? currentSessionId : null
+  );
+}
+
+type Merge<S> = NonNullable<PersistOptions<S>['merge']>;
+
+/**
+ * Lets the store save only after a load has been accepted.
+ *
+ * A load that the schema turns down, or that throws, leaves the store on
+ * defaults, and persist saves whatever the store holds: at once after a
+ * migration, otherwise on the next change. Through this store's adapter a save
+ * of defaults does more than replace the chat blob. It replaces the key and
+ * the recovery tokens in the secure vault with empty values. So after a load
+ * that was not accepted, saves are dropped until one is. What is stored stays
+ * as it was, for a release that can read it.
+ *
+ * The cost is that nothing from that session is kept, a newly paid key
+ * included. That is the same position the adapter already takes when it
+ * cannot read the vault.
+ */
+function saveOnlyAfterAcceptedLoad(storage: StateStorage) {
+  // Nothing has been read yet, so there is nothing a save could replace
+  // unseen. The adapter refuses a save over a blob it never read.
+  let load: 'accepted' | 'pending' | 'rejected' = 'accepted';
+  let refusalLogged = false;
+  /**
+   * A save arrived while a load was in flight. It cannot be written yet: the
+   * load may be turned down, and then it would be a save of defaults. It must
+   * not be lost either, since it may carry a key paid for a moment ago. If the
+   * load is accepted, the store is saved once more, as it then stands.
+   *
+   * An account switch never sets this. Its write barrier drops saves before
+   * they reach here, on purpose: what is set mid-switch belongs to no account.
+   */
+  let savedDuringLoad = false;
+  const gated: StateStorage = {
+    getItem: (name) => {
+      load = 'pending';
+      refusalLogged = false;
+      savedDuringLoad = false;
+      return storage.getItem(name);
+    },
+    setItem: (name, value) => {
+      if (load === 'accepted') return storage.setItem(name, value);
+      if (load === 'pending') {
+        savedDuringLoad = true;
+        return;
+      }
+      if (!refusalLogged) {
+        refusalLogged = true;
+        storeLog.warn('store.routstr.write_refused', { reason: `load_${load}` });
+      }
+    },
+    removeItem: (name) => storage.removeItem(name),
+  };
+  return {
+    storage: gated,
+    /**
+     * Wraps `merge`, the one place that learns whether the blob was accepted.
+     * `keep` is given the loaded state and the state from before it, when a
+     * save was held back during the load, to carry over what must survive.
+     */
+    watching<S>(merge: Merge<S>, keep: (loaded: S, before: S) => S): Merge<S> {
+      return (persisted, current) => {
+        const merged = merge(persisted, current);
+        // The schema merge hands back `current` itself when it turns a blob down.
+        const turnedDown = isRecord(persisted) && merged === current;
+        load = turnedDown ? 'rejected' : 'accepted';
+        return !turnedDown && savedDuringLoad && merged !== current
+          ? keep(merged, current)
+          : merged;
+      };
+    },
+    /** The load threw. Nothing was read, so nothing may be saved over it. */
+    loadFailed() {
+      load = 'rejected';
+    },
+    /** True once, after an accepted load during which a save was held back. */
+    takeSaveOwed(): boolean {
+      const owed = load === 'accepted' && savedDuringLoad;
+      savedDuringLoad = false;
+      return owed;
+    },
+  };
+}
+
+/**
+ * What survives from the state the store held while a load was in flight.
+ *
+ * The stored blob wins for everything it holds, as in any load: it is the
+ * account's history, and the state before it was defaults plus seconds of use.
+ * Credentials are the exception, because each one is the only route to money
+ * already paid. A key or a recovery token set during the load and missing from
+ * the blob is kept. The stored key stays the live one; a key set during the
+ * load becomes live only if the blob had none, and is otherwise archived,
+ * where reclaim can reach it.
+ */
+function keepCredentialsSetDuringLoad(loaded: RoutstrStore, before: RoutstrStore): RoutstrStore {
+  let legacyAccounts = loaded.legacyAccounts ?? {};
+  for (const account of Object.values(before.legacyAccounts ?? {})) {
+    legacyAccounts = withArchivedAccount(
+      legacyAccounts,
+      account.nodeBaseUrl ?? null,
+      account.apiKey,
+      account.lastKnownBalanceMsats ?? null
+    );
+  }
+  const kept: RoutstrStore = {
+    ...loaded,
+    legacyAccounts,
+    pendingPayments: { ...before.pendingPayments, ...loaded.pendingPayments },
+  };
+  if (!before.apiKey || before.apiKey === loaded.apiKey) return kept;
+  if (loaded.apiKey === null) {
+    return {
+      ...kept,
+      apiKey: before.apiKey,
+      balance: before.balance,
+      nodeBaseUrl: before.nodeBaseUrl ?? loaded.nodeBaseUrl,
+    };
+  }
+  return {
+    ...kept,
+    legacyAccounts: withArchivedAccount(
+      legacyAccounts,
+      before.nodeBaseUrl,
+      before.apiKey,
+      before.balance
+    ),
+  };
+}
+
 const PersistedRoutstrSession = z.looseObject({
   id: z.string().max(128),
   title: z.string().max(512),
@@ -971,7 +1136,15 @@ const PersistedRoutstrStore = z.object({
     .catch(null),
 });
 
-export const useRoutstrStore = create<RoutstrStore>()(
+const acceptedLoad = saveOnlyAfterAcceptedLoad(
+  createRoutstrPersistence({
+    // On a first launch the store loads before account 0 has its row and finds
+    // nothing. This is the same reload an account switch does.
+    onFirstAccount: () => void useRoutstrStore.persist.rehydrate(),
+  })
+);
+
+export const useRoutstrStore = create<RoutstrStore>({ name: 'routstr-store', scope: 'profile' })(
   persist(
     (set, get) => ({
       apiKey: null,
@@ -1122,6 +1295,7 @@ export const useRoutstrStore = create<RoutstrStore>()(
                   thinkingDurationSec: fields.thinkingDurationSec ?? msg.thinkingDurationSec,
                   reasoningContent: fields.reasoningContent ?? msg.reasoningContent,
                   costSats: fields.costSats ?? msg.costSats,
+                  modelSwitch: fields.modelSwitch ?? msg.modelSwitch,
                 }
               : msg
           )
@@ -1481,7 +1655,9 @@ export const useRoutstrStore = create<RoutstrStore>()(
     }),
     persistConfig({
       name: 'routstr-store',
-      storage: createRoutstrPersistence(),
+      storage: acceptedLoad.storage,
+      // The adapter rebuilds the blob with its secrets; see `preserveUnreadable`.
+      preserveUnreadable: false,
       schema: PersistedRoutstrStore,
       // v2: bring back the spend prompt for everyone who had turned it off.
       //
@@ -1515,6 +1691,9 @@ export const useRoutstrStore = create<RoutstrStore>()(
       version: 3,
       migrate: (state, version) => {
         const blob: Record<string, unknown> = { ...(state as Record<string, unknown> | null) };
+        // Every released blob is older than this version, so every one of them
+        // passes through here on its first load.
+        blob.sessions = releasedSessionsWithinCeilings(blob.sessions, blob.currentSessionId);
         if (version < 2) {
           blob.confirmSpend = true;
           if (typeof blob.apiKey === 'string' && blob.apiKey && blob.nodeBaseUrl == null) {
@@ -1583,7 +1762,8 @@ export const useRoutstrStore = create<RoutstrStore>()(
         confirmSpend: state.confirmSpend,
         curatedModels: state.curatedModels,
       }),
-      afterHydrate: (state) => {
+      afterHydrate: (state, error) => {
+        if (error) acceptedLoad.loadFailed();
         if (!state) return;
         // `knownProviders` is derived and never persisted, so a rehydrated
         // store has claims and no rows until this runs. Done here rather than
@@ -1653,3 +1833,20 @@ export const useRoutstrStore = create<RoutstrStore>()(
     })
   )
 );
+
+// Set here, not inside the options above, so that block keeps its shape.
+// Persist reads `merge` when a load finishes, which is after this line has
+// run. If it ever read it sooner, no load would count as accepted and the
+// store would stop saving, which the upgrade tests would catch.
+const schemaMerge = useRoutstrStore.persist.getOptions().merge;
+if (schemaMerge) {
+  useRoutstrStore.persist.setOptions({
+    merge: acceptedLoad.watching(schemaMerge, keepCredentialsSetDuringLoad),
+  });
+}
+// A save held back during a load that was then accepted: save now, once, what
+// the store holds after the load. Otherwise a key paid for in that window
+// would live in memory only, until some later change happened to save it.
+useRoutstrStore.persist.onFinishHydration(() => {
+  if (acceptedLoad.takeSaveOwed()) useRoutstrStore.setState({});
+});

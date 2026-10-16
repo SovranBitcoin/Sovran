@@ -349,11 +349,9 @@ runtime prediction. Every image was opened for visual inspection.
 
 The native iterations identified four concrete issues:
 
-1. The older iOS binary lacks the optional Nitro `OutputDataCreator`. Metro
-   displays a module-initialization error even when the outer require catches it.
-   The loader now checks `hasHybridObject` before importing CDK's eager native
-   export. The existing instrumented cashu-ts fallback remains byte-equivalent;
-   registered native implementations still require the original full self-test.
+1. Optional native modules can trigger Metro errors before a caller catches
+   initialization failures. Cashu uses the JavaScript implementation without
+   loading CDK-Nitro; see [ADR 22](adr/0022-cashu-uses-javascript-cryptography.md).
 2. The revised legal screen no longer requires scrolling to enable consent, and
    the title test ID is absent from iOS AX. Fresh-install and onboarding/reinstall
    scripts now wait for the visible consent controls. Both checkbox confirmations

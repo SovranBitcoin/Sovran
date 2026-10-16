@@ -158,7 +158,9 @@ describe('pending queue', () => {
 
 describe('session grants', () => {
   function grant(app: string, key: 'nip04_decrypt' | 'nip44_decrypt', peer: string) {
-    return useNip46RequestsStore.getState().grantSession(app, key, peer, { peerIsSelf: false });
+    return useNip46RequestsStore
+      .getState()
+      .grantSession({ clientPubkey: app, grantKey: key, peerPubkey: peer, peerIsSelf: false });
   }
 
   it('grants for the session — no expiry', () => {
@@ -183,26 +185,35 @@ describe('session grants', () => {
   });
 
   it('refuses a grant asserting peerIsSelf — wallet payload decrypts always prompt', () => {
-    const selfGuard = { peerIsSelf: true };
-    const result = useNip46RequestsStore
-      .getState()
-      .grantSession(APP_A, 'nip44_decrypt', PEER_X, selfGuard as never);
+    const selfGrant = {
+      clientPubkey: APP_A,
+      grantKey: 'nip44_decrypt',
+      peerPubkey: PEER_X,
+      peerIsSelf: true,
+    };
+    const result = useNip46RequestsStore.getState().grantSession(selfGrant as never);
     expect(result._unsafeUnwrapErr()).toBe('self_decrypt_forbidden');
     expect(useNip46RequestsStore.getState().sessionGrants).toEqual([]);
   });
 
   it('refuses non-decrypt keys smuggled past the type system', () => {
-    const result = useNip46RequestsStore
-      .getState()
-      .grantSession(APP_A, 'sign_event:17375' as SessionGrantKey, PEER_X, { peerIsSelf: false });
+    const result = useNip46RequestsStore.getState().grantSession({
+      clientPubkey: APP_A,
+      grantKey: 'sign_event:17375' as SessionGrantKey,
+      peerPubkey: PEER_X,
+      peerIsSelf: false,
+    });
     expect(result._unsafeUnwrapErr()).toBe('not_session_grantable');
     expect(useNip46RequestsStore.getState().sessionGrants).toEqual([]);
   });
 
   it('refuses a malformed peer pubkey', () => {
-    const result = useNip46RequestsStore
-      .getState()
-      .grantSession(APP_A, 'nip44_decrypt', 'not-hex', { peerIsSelf: false });
+    const result = useNip46RequestsStore.getState().grantSession({
+      clientPubkey: APP_A,
+      grantKey: 'nip44_decrypt',
+      peerPubkey: 'not-hex',
+      peerIsSelf: false,
+    });
     expect(result._unsafeUnwrapErr()).toBe('invalid_peer');
     expect(useNip46RequestsStore.getState().sessionGrants).toEqual([]);
   });
@@ -279,7 +290,12 @@ describe('session allows', () => {
     store.enqueue(makeRequest());
     store.setAppThrottled(APP_A, 9_999_999);
     store.grantSessionAllow(APP_A, 'sign_event:1');
-    store.grantSession(APP_A, 'nip44_decrypt', PEER_X, { peerIsSelf: false });
+    store.grantSession({
+      clientPubkey: APP_A,
+      grantKey: 'nip44_decrypt',
+      peerPubkey: PEER_X,
+      peerIsSelf: false,
+    });
 
     store.clear();
 
@@ -294,10 +310,30 @@ describe('session allows', () => {
 describe('revoke by peer', () => {
   it("removes one peer's grants under both methods, leaving others untouched", () => {
     const store = useNip46RequestsStore.getState();
-    store.grantSession(APP_A, 'nip44_decrypt', PEER_X, { peerIsSelf: false });
-    store.grantSession(APP_A, 'nip04_decrypt', PEER_X, { peerIsSelf: false });
-    store.grantSession(APP_A, 'nip44_decrypt', PEER_Y, { peerIsSelf: false });
-    store.grantSession(APP_B, 'nip44_decrypt', PEER_X, { peerIsSelf: false });
+    store.grantSession({
+      clientPubkey: APP_A,
+      grantKey: 'nip44_decrypt',
+      peerPubkey: PEER_X,
+      peerIsSelf: false,
+    });
+    store.grantSession({
+      clientPubkey: APP_A,
+      grantKey: 'nip04_decrypt',
+      peerPubkey: PEER_X,
+      peerIsSelf: false,
+    });
+    store.grantSession({
+      clientPubkey: APP_A,
+      grantKey: 'nip44_decrypt',
+      peerPubkey: PEER_Y,
+      peerIsSelf: false,
+    });
+    store.grantSession({
+      clientPubkey: APP_B,
+      grantKey: 'nip44_decrypt',
+      peerPubkey: PEER_X,
+      peerIsSelf: false,
+    });
 
     store.revokeSessionGrant(APP_A, undefined, PEER_X.toUpperCase());
 

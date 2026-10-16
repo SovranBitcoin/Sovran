@@ -39,7 +39,12 @@ jest.mock('@/shared/lib/date', () => ({ formatRelativeUnixSeconds: jest.fn() }))
 jest.mock('@/shared/stores/runtime/clearPaymentContext', () => ({
   clearPaymentContext: jest.fn(),
 }));
-jest.mock('@/shared/lib/logger', () => ({ log: {}, feedLog: { info: jest.fn() } }));
+jest.mock('@/shared/lib/logger', () => ({
+  log: {},
+  feedLog: { info: jest.fn() },
+  storeLog: { warn: jest.fn() },
+  redactError: (error: unknown) => error,
+}));
 jest.mock('@/shared/lib/contentShiftLog', () => ({
   useShiftLogger: () => ({ report: jest.fn() }),
   useVisualLayoutLogger: () => ({}),

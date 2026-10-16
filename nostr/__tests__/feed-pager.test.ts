@@ -126,7 +126,9 @@ describe("per-tier feed pager", () => {
     expect(ids(await pager.nextPage())).toEqual(["same", "new", "older"]);
   });
   it("forwards the real relay boundary id and never repeats it", async () => {
-    const events = ["a", "b", "c"].map((id, i) => event(id, 100 - i));
+    // The relay tier refuses an id that is not 64 hex; these are.
+    const [a, b, c] = ["a", "b", "c"].map((id) => id.repeat(64));
+    const events = [a, b, c].map((id, i) => event(id, 100 - i));
     const request = vi
       .fn()
       .mockResolvedValueOnce(ok(events.slice(0, 2)))
@@ -138,12 +140,12 @@ describe("per-tier feed pager", () => {
       spec: { kind: "user", pubkey: "viewer" },
       limit: 1,
     });
-    expect(ids(await pager.nextPage())).toEqual(["a"]);
-    expect(ids(await pager.nextPage())).toEqual(["b"]);
-    expect(ids(await pager.nextPage())).toEqual(["c"]);
+    expect(ids(await pager.nextPage())).toEqual([a]);
+    expect(ids(await pager.nextPage())).toEqual([b]);
+    expect(ids(await pager.nextPage())).toEqual([c]);
     expect(feedPage.mock.calls[1][0].cursor).toEqual({
       createdAt: 99,
-      id: "b",
+      id: b,
     });
   });
   it("keeps hasMore in backoff and ends after all lanes finish", async () => {
@@ -358,9 +360,9 @@ it("resolves following authors before the relay chronological fallback", async (
   const request = vi
     .fn()
     .mockResolvedValueOnce(
-      ok([{ ...event("follows"), kind: 3, tags: [["p", "followed-author"]] }]),
+      ok([{ ...event("f".repeat(64)), kind: 3, tags: [["p", "followed-author"]] }]),
     )
-    .mockResolvedValueOnce(ok([event("post")]));
+    .mockResolvedValueOnce(ok([event("e".repeat(64))]));
   const pager = createFeedPager({
     tiers: [
       tier("nagg", unsupported()),
@@ -371,7 +373,7 @@ it("resolves following authors before the relay chronological fallback", async (
   });
   const page = await pager.nextPage();
   expect(page).toMatchObject({ showingRecent: true, sources: ["relay"] });
-  expect(ids(page)).toEqual(["post"]);
+  expect(ids(page)).toEqual(["e".repeat(64)]);
   expect(request.mock.calls[1][0]).toEqual([
     { kinds: [1], authors: ["followed-author"], limit: 2 },
   ]);

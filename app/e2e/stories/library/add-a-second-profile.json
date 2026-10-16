@@ -1,0 +1,111 @@
+{
+  "id": "add-a-second-profile",
+  "purpose": "A person adds a second profile from the drawer, lands in its empty wallet, and finds both profiles in the switcher.",
+  "startsFrom": "onboarded",
+  "steps": [
+    {
+      "name": "the wallet opens",
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-send"
+          }
+        },
+        {
+          "logged": "splash.gone"
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "open the drawer",
+      "tap": {
+        "id": "header-profile-avatar"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "drawer-menu-settings"
+          }
+        }
+      ]
+    },
+    {
+      "name": "open the profile switcher",
+      "tap": {
+        "id": "drawer-profile-switcher-open"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "profile-create"
+          }
+        },
+        {
+          "visible": {
+            "id": "profile-row-0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "create a new profile",
+      "tap": {
+        "id": "profile-create"
+      },
+      "expect": [
+        {
+          "gone": {
+            "id": "profile-create"
+          }
+        },
+        {
+          "visible": {
+            "id": "wallet-send"
+          }
+        },
+        {
+          "visible": {
+            "id": "header-profile-avatar"
+          }
+        }
+      ],
+      "withinMs": 45000
+    },
+    {
+      "name": "open the drawer again",
+      "tap": {
+        "id": "header-profile-avatar"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "drawer-profile-switcher-open"
+          }
+        },
+        {
+          "logged": "ui.touch"
+        }
+      ],
+      "withinMs": 10000
+    },
+    {
+      "name": "open the profile switcher again",
+      "tap": {
+        "id": "drawer-profile-switcher-open"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "profile-row-0"
+          }
+        },
+        {
+          "visible": {
+            "id": "profile-row-1"
+          }
+        }
+      ]
+    }
+  ]
+}

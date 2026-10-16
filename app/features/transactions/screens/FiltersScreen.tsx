@@ -249,7 +249,10 @@ export function FiltersScreen() {
               },
               {
                 testID: 'filters-apply',
-                text: `Apply Filters (${resultCount})`,
+                // The count is said aloud, not squeezed into half a row: beside
+                // Reset this slot holds about twelve characters.
+                text: 'Apply',
+                accessibilityLabel: `Apply filters, ${resultCount} results`,
                 variant: 'primary',
                 onPress: async () => handleApply(),
               },

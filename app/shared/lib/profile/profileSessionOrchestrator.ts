@@ -17,166 +17,106 @@
  */
 import * as bip39 from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english.js';
-import { storeMnemonic, clearAllSecureData } from '@/shared/lib/nostr/secureStorage';
+import {
+  hashMnemonic,
+  retrieveMnemonic,
+  storeImportedNsec,
+  storeMnemonic,
+  prepareSecureDataReset,
+} from '@/shared/lib/nostr/secureStorage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ResultAsync } from 'neverthrow';
+import { Alert } from 'react-native';
 
 import { log, nostrLog, redactError } from '../logger';
 import { CocoManager } from '@/shared/lib/cashu/manager';
-import { deriveNostrKeys } from '@/shared/lib/nostr/keyDerivation';
+import { forgetWalletDatabases } from '@/shared/lib/cashu/walletDatabaseRecord';
+import { getPublicKey } from 'nostr-tools/pure';
+import { decode as decodeNip19 } from 'nostr-tools/nip19';
+import {
+  storedPhraseDerivesAccount,
+  reportIntegrityFailure,
+  verifyStoredAccount,
+} from '@/shared/lib/nostr/accountIntegrity';
+import {
+  expectedDerivedPubkey,
+  expectedImportedAccountNumber,
+} from '@/shared/lib/nostr/derivationIntegrity';
 import { useSecureStoreState } from '@/shared/stores/runtime/secureStoreState';
 import { useWalletLifecycleStore } from '@/shared/stores/global/walletLifecycleStore';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { restartApp } from '@/shared/lib/profile/appRestart';
 import { clearAllQueryCaches } from '@/shared/lib/cache/createQueryCacheStore';
 import { resetRoutstrClient } from '@/shared/lib/routstr/sdk/client';
-import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
 import { usePopupStore } from '@/shared/stores/runtime/popupStore';
-import {
-  PROFILE_STORE_PERSIST_VERSION,
-  useProfileStore,
-} from '@/shared/stores/global/profileStore';
+import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { useBTCMapStore } from '@/shared/stores/global/btcMapStore';
 
-// ── AsyncStorage-based transition guard ──────────────────────────
-const TRANSITION_KEY = 'profile-transition-in-progress';
-const TRANSITION_EXPIRY_MS = 10_000;
-
-type TransitionGuard = { startedAt: number };
-
-async function beginTransition(): Promise<boolean> {
-  try {
-    const raw = await AsyncStorage.getItem(TRANSITION_KEY);
-    if (raw) {
-      const guard: TransitionGuard = JSON.parse(raw);
-      if (Date.now() - guard.startedAt < TRANSITION_EXPIRY_MS) {
-        return false;
-      }
-      log.warn('profile.orchestrator.stale_guard');
-    }
-    await AsyncStorage.setItem(TRANSITION_KEY, JSON.stringify({ startedAt: Date.now() }));
-    return true;
-  } catch {
-    return true;
-  }
-}
-
-async function endTransition(): Promise<void> {
-  try {
-    await AsyncStorage.removeItem(TRANSITION_KEY);
-  } catch {
-    // best-effort
-  }
-}
-
-/** Call on app startup to clear any stale transition guard left by a previous run. */
-export async function clearTransitionGuardOnStartup(): Promise<void> {
-  try {
-    await AsyncStorage.removeItem(TRANSITION_KEY);
-  } catch {
-    // best-effort
-  }
-}
-
-// ── Registered controls (set at runtime by layout components) ────
-type TransitionControls = {
-  resetStages: (options?: { holdUntilCancel?: boolean }) => void;
-  cancelResetStages: () => void;
-};
-
-type KeyDerivationFn = (accountIndex: number) => Promise<{ pubkey: string } | null>;
-
-let registeredControls: TransitionControls | null = null;
-let registeredKeyDerivation: KeyDerivationFn | null = null;
-
-export function registerTransitionControls(controls: TransitionControls): void {
-  registeredControls = controls;
-}
-
-export function registerKeyDerivation(fn: KeyDerivationFn): void {
-  registeredKeyDerivation = fn;
-}
-
-/**
- * Persist the switch target WITHOUT flipping the in-memory store. The
- * in-memory flip drives RootLayout's keyed remount
- * (`key={account-${activeAccountIndex}}`), and a remount before the native
- * restart boots the new profile in-process — SecureStore reads, coco init,
- * SQLite migrations, PBKDF2 seed warm — only to race the restart: two full
- * boots per switch plus a native-crash window with expo-sqlite work in
- * flight (BTC-13). Persist-first lets the restart boot from the target
- * directly; the in-memory flip is kept only as the failed-restart fallback.
- */
-function persistSwitchTargetToDisk(accountIndex: number): ResultAsync<void, Error> {
-  const { profiles } = useProfileStore.getState();
-  return ResultAsync.fromPromise(
-    AsyncStorage.setItem(
-      'profile-store',
-      JSON.stringify({
-        state: { activeAccountIndex: accountIndex, profiles },
-        version: PROFILE_STORE_PERSIST_VERSION,
-      })
-    ),
-    (error) => (error instanceof Error ? error : new Error(String(error)))
-  );
-}
-
-async function teardownAndRestart(): Promise<boolean> {
-  usePopupStore.getState().destroySheet();
-  usePaymentStatusStore.getState().setActive(null);
-
-  const restarted = restartApp();
-  if (!restarted) {
-    log.error('profile.orchestrator.restart_failed');
-  }
-  return restarted;
-}
-
-// ── Synchronous in-memory guard (supplements the async AsyncStorage guard) ──
-let transitionInFlight = false;
-
-/**
- * coco's Manager.dispose() → NPC plugin shutdown awaits any in-flight sync
- * with NO timeout (BTC-14): a stalled sync would pin the profile switch on
- * the transition splash until the user force-kills (reported as a crash).
- * Bound the teardown wait — the native restart that follows reclaims
- * everything native-side anyway.
- */
-const COCO_CLEANUP_TIMEOUT_MS = 5_000;
-
-async function cleanupCocoWithTimeout(): Promise<void> {
-  let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
-  try {
-    await Promise.race([
-      CocoManager.cleanup(),
-      new Promise<void>((resolve) => {
-        timeoutHandle = setTimeout(() => {
-          log.warn('profile.orchestrator.cleanup_timeout', {
-            timeoutMs: COCO_CLEANUP_TIMEOUT_MS,
-          });
-          resolve();
-        }, COCO_CLEANUP_TIMEOUT_MS);
-      }),
-    ]);
-  } catch (error) {
-    log.warn('profile.orchestrator.cleanup_failed', { error: redactError(error) });
-  } finally {
-    if (timeoutHandle) clearTimeout(timeoutHandle);
-  }
-}
+import {
+  acquireTransition,
+  activateProfileInMemory,
+  cleanupCocoWithTimeout,
+  isTransitionInFlight,
+  keyDerivation,
+  persistSwitchTargetToDisk,
+  settleWithin,
+  splashControls,
+  teardownAndRestart,
+  TIMED_OUT,
+  type KeyDerivationFn,
+  type TransitionControls,
+} from './profileTransition';
+import {
+  runInProcessProfileSwitch,
+  checkProfileSwitchLeaks,
+  holdProfileSwitchForRestart,
+  switchStep,
+} from './inProcessProfileSwitch';
 
 // ── Public API ───────────────────────────────────────────────────
 
+/** Key derivation is slow on old phones; this is a ceiling, not an expectation. */
+const KEY_DERIVATION_TIMEOUT_MS = 30_000;
+const WALLET_CLOSE_TIMEOUT_MS = 10_000;
+
+/**
+ * Whether a saved account may become the active one: everything stored for it
+ * must still follow from the recovery phrase, or from its imported key. A
+ * mismatch is recorded for the critical screen and the switch is refused, with
+ * the active account left as it is. Nothing is written either way.
+ */
+async function targetPassesIntegrity(accountIndex: number): Promise<boolean> {
+  const row = useProfileStore.getState().profiles.find((p) => p.accountIndex === accountIndex);
+  // A missing row is refused by the caller's own existence check.
+  if (!row) return true;
+  try {
+    // Worth the pause if there is one: this account is about to be opened.
+    const result = await verifyStoredAccount(row, { thorough: true });
+    // Null: the phrase cannot be read. Startup handles that on its own screen.
+    if (!result || result.ok) return true;
+    reportIntegrityFailure(result);
+    return false;
+  } catch {
+    // The error is not logged: it may quote a secret.
+    log.warn('profile.orchestrator.integrity_check_failed', { accountIndex });
+    return false;
+  }
+}
+
 export async function switchToExistingProfile(opts: {
   accountIndex: number;
+  /**
+   * The active account is stopped on the critical screen, so its wallet was
+   * never opened: there is nothing to wait for, and the switch always restarts.
+   */
+  fromStoppedAccount?: boolean;
   resetStages?: TransitionControls['resetStages'];
   cancelResetStages?: TransitionControls['cancelResetStages'];
 }): Promise<boolean> {
-  if (transitionInFlight) {
+  if (isTransitionInFlight()) {
     log.warn('profile.orchestrator.switch_blocked_in_flight');
     return false;
   }
-  if (!CocoManager.isReadyForCleanup()) {
+  if (!opts.fromStoppedAccount && !CocoManager.isReadyForCleanup()) {
     // Log the full component breakdown so a "switch did nothing" report says
     // WHICH condition blocked it (BTC-14).
     log.warn('profile.orchestrator.switch_blocked_coco_not_ready', {
@@ -184,18 +124,28 @@ export async function switchToExistingProfile(opts: {
     });
     return false;
   }
-  transitionInFlight = true;
-
-  const resetStages = opts.resetStages ?? registeredControls?.resetStages;
-  const cancelResetStages = opts.cancelResetStages ?? registeredControls?.cancelResetStages;
-
-  if (!(await beginTransition())) {
-    transitionInFlight = false;
+  const lock = acquireTransition();
+  if (!lock) return false;
+  if (!(await lock.takeDiskGuard())) {
+    await lock.release();
     return false;
   }
   try {
     log.info('profile.orchestrator.switch_start', { accountIndex: opts.accountIndex });
-    resetStages?.({ holdUntilCancel: true });
+    // Without a restart, a stage owned above the account providers never
+    // registers again, so it must survive the reset or its dependents never start.
+    // Before the splash and before any teardown: a refused target must leave
+    // the running account exactly as it was.
+    if (!(await targetPassesIntegrity(opts.accountIndex))) {
+      log.warn('profile.orchestrator.switch_refused_integrity', {
+        accountIndex: opts.accountIndex,
+      });
+      await lock.release();
+      return false;
+    }
+    const inProcess =
+      !opts.fromStoppedAccount && useSettingsStore.getState().inProcessProfileSwitch;
+    lock.holdSplash(splashControls(opts), { keepStagesThatOutliveAccount: inProcess });
     usePopupStore.getState().close();
 
     // Validate the target up front — the same existence check
@@ -207,57 +157,125 @@ export async function switchToExistingProfile(opts: {
       throw new Error(`Target profile does not exist: ${opts.accountIndex}`);
     }
 
-    await cleanupCocoWithTimeout();
-
-    // The Routstr client holds a hydrated, profile-scoped store and a wallet
-    // adapter bound to the Coco manager just torn down. A restart discards it
-    // anyway; this covers the in-process fallback below, where the module
-    // survives and would otherwise spend the new profile's wallet against the
-    // old profile's provider state.
-    resetRoutstrClient();
-
-    // Persist the switch target and restart into it WITHOUT the in-memory
-    // store flip — the flip remounts the whole provider tree and would boot
-    // the new profile in-process, racing the native restart (BTC-13).
-    const persisted = await persistSwitchTargetToDisk(opts.accountIndex);
-    if (persisted.isErr()) {
-      throw persisted.error;
-    }
-    const restarted = await teardownAndRestart();
-    if (!restarted) {
-      // Restart unavailable: complete the switch in-process — the remount
-      // boots the new profile, the only boot in this configuration.
-      useProfileStore.getState().switchProfile(opts.accountIndex);
-      cancelResetStages?.();
-      transitionInFlight = false;
-      await endTransition();
-    }
-    // If restarted, leave transitionInFlight=true — the module is about to reload.
-    return true;
+    const release = () => lock.release();
+    return inProcess
+      ? await switchWithoutRestart(opts.accountIndex, release)
+      : await restartInto(opts.accountIndex);
   } catch (error) {
     log.error('profile.orchestrator.switch_failed', { error: redactError(error) });
-    cancelResetStages?.();
-    transitionInFlight = false;
-    await endTransition();
+    await lock.release();
     return false;
   }
 }
 
 /**
- * Unwind a transition that got past `beginTransition()` and cannot continue.
- *
- * All three pieces, always. `transitionInFlight` is module-level and the first
- * thing every switch checks, so a bail that only cancels the held stages
- * leaves it set and refuses EVERY later profile switch for the rest of the
- * session — the guard only clears on the next app start. This is what the
- * `catch` below already does; the early returns have to match it.
+ * The opt-in switch: stop the old account and start the new one in the same
+ * runtime. On any failure it holds the account providers down and restarts,
+ * so a half-switched wallet is never mounted.
  */
-async function abandonTransition(
-  cancelResetStages: TransitionControls['cancelResetStages'] | undefined
-): Promise<void> {
-  cancelResetStages?.();
-  transitionInFlight = false;
-  await endTransition();
+async function switchWithoutRestart(
+  accountIndex: number,
+  release: () => Promise<void>
+): Promise<boolean> {
+  const previousIndex = useProfileStore.getState().activeAccountIndex;
+  const previousPubkey = useProfileStore.getState().getActiveProfile()?.pubkey;
+  try {
+    await runInProcessProfileSwitch({
+      cleanupCoco: () => CocoManager.cleanup({ requireSuccess: true }),
+      flipAccount: async () => {
+        activateProfileInMemory(accountIndex);
+        const persisted = await persistSwitchTargetToDisk(accountIndex);
+        if (persisted.isErr()) throw persisted.error;
+      },
+    });
+    await release();
+    if (previousPubkey) {
+      void checkProfileSwitchLeaks(previousPubkey).catch((error) => {
+        log.warn('profile.switch.leak_check_failed', { error: redactError(error) });
+      });
+    }
+    return true;
+  } catch (error) {
+    // The reason is the only way to learn why a switch fell back.
+    log.warn('profile.switch.in_process_failed', { error: redactError(error) });
+    await holdProfileSwitchForRestart().catch(() => {
+      log.warn('profile.switch.boundary_hold_failed');
+    });
+    // Restore the active identity before restarting; never mount a partial B session.
+    activateProfileInMemory(previousIndex);
+    log.warn('profile.switch.restart_fallback');
+    try {
+      const persisted = await switchStep(() => persistSwitchTargetToDisk(accountIndex));
+      if (persisted.isErr()) log.warn('profile.switch.restart_target_failed');
+    } catch {
+      log.warn('profile.switch.restart_target_failed');
+    }
+    // Holding the boundary unmounts the wallet provider, which starts a
+    // cleanup nobody awaits. Wait for the wallet database to close, as the
+    // restart path does, before the runtime is torn down.
+    await cleanupCocoWithTimeout();
+    // If restart is unavailable, keep the held boundary and write barrier.
+    // Resuming after failed teardown would expose a half-switched wallet.
+    return await teardownAndRestart();
+  }
+}
+
+/**
+ * The shared ending of the default switch and of add-profile: ask the wallet
+ * to close, record the target on disk, restart into it. (The in-process switch
+ * has its own fallback.)
+ *
+ * Asking the wallet to close is the point of no return. Before it, a flow that
+ * fails gives up and releases the lock, and the app carries on as it was. From
+ * it on, the old account can no longer be relied on (its wallet is closed or
+ * closing), so there are only two endings and neither releases the lock:
+ *
+ * - the restart happens, and the new runtime starts as whichever account is
+ *   on disk;
+ * - anything else, and the app is held until it is reopened.
+ *
+ * The active account is never flipped in memory here. That flip remounts the
+ * provider tree over stores still holding the old account's state.
+ *
+ * Resolves true when the write of the target was acknowledged, false when it
+ * was not; the app is then held, and reopening starts as whatever is on disk.
+ */
+async function restartInto(accountIndex: number): Promise<boolean> {
+  await cleanupCocoWithTimeout();
+  // The Routstr client holds a store and a wallet adapter bound to the wallet
+  // just closed. A restart discards it; this covers a restart that does not happen.
+  resetRoutstrClient();
+
+  let recorded = false;
+  try {
+    const persisted = await persistSwitchTargetToDisk(accountIndex);
+    if (persisted.isErr()) throw persisted.error;
+    recorded = true;
+    if (await teardownAndRestart()) return true;
+  } catch (error) {
+    log.error('profile.orchestrator.restart_into_failed', {
+      recorded,
+      error: redactError(error),
+    });
+  }
+  await holdUntilReopened(
+    recorded
+      ? 'Please close and reopen the app to finish switching profiles.'
+      : 'Could not switch profiles. Please close and reopen the app.'
+  );
+  return recorded;
+}
+
+/**
+ * Hold the app until it is reopened: account providers unmounted, per-profile
+ * saves blocked, the splash and the lock kept, and an alert saying so. Nothing
+ * may run as either account once the wallet has been closed for a switch.
+ */
+async function holdUntilReopened(message: string): Promise<void> {
+  await holdProfileSwitchForRestart().catch(() => {
+    log.warn('profile.switch.boundary_hold_failed');
+  });
+  Alert.alert('Restart Required', message, [{ text: 'OK' }]);
 }
 
 export async function createAndSwitchProfile(opts?: {
@@ -265,33 +283,42 @@ export async function createAndSwitchProfile(opts?: {
   resetStages?: TransitionControls['resetStages'];
   cancelResetStages?: TransitionControls['cancelResetStages'];
 }): Promise<boolean> {
-  const getKeysForAccount = opts?.getKeysForAccount ?? registeredKeyDerivation;
-  const resetStages = opts?.resetStages ?? registeredControls?.resetStages;
-  const cancelResetStages = opts?.cancelResetStages ?? registeredControls?.cancelResetStages;
+  const getKeysForAccount = opts?.getKeysForAccount ?? keyDerivation();
 
-  if (transitionInFlight) return false;
-  transitionInFlight = true;
+  const lock = acquireTransition();
+  if (!lock) return false;
 
   if (!getKeysForAccount) {
     log.error('profile.orchestrator.no_key_derivation');
-    transitionInFlight = false;
+    await lock.release();
     return false;
   }
 
-  if (!(await beginTransition())) {
-    transitionInFlight = false;
+  if (!(await lock.takeDiskGuard())) {
+    await lock.release();
     return false;
   }
   try {
-    resetStages?.({ holdUntilCancel: true });
+    lock.holdSplash(splashControls(opts));
     usePopupStore.getState().close();
 
     const profileStore = useProfileStore.getState();
     const nextIndex = profileStore.getNextAccountIndex();
-    const newKeys = await getKeysForAccount(nextIndex);
+    // Bounded: a derivation that never settles would hold the lock for good.
+    // Finishing late is harmless, it only stores keys for an index not in use.
+    const derived = await settleWithin(getKeysForAccount(nextIndex), KEY_DERIVATION_TIMEOUT_MS);
+    const newKeys = derived === TIMED_OUT ? null : derived;
     if (!newKeys?.pubkey) {
-      log.warn('profile.orchestrator.key_derivation_failed');
-      await abandonTransition(cancelResetStages);
+      log.warn('profile.orchestrator.key_derivation_failed', { timedOut: derived === TIMED_OUT });
+      await lock.release();
+      return false;
+    }
+
+    // The row about to be saved is checked against a derivation of its own:
+    // a profile must never be recorded under a key the phrase does not derive.
+    if (!(await storedPhraseDerivesAccount(nextIndex, newKeys.pubkey))) {
+      log.error('profile.orchestrator.create_refused_integrity', { nextIndex });
+      await lock.release();
       return false;
     }
 
@@ -300,34 +327,111 @@ export async function createAndSwitchProfile(opts?: {
     // nothing knows about — profile-scoped storage included.
     if (!profileStore.addProfile(nextIndex, newKeys.pubkey)) {
       log.warn('profile.orchestrator.at_capacity', { nextIndex });
-      await abandonTransition(cancelResetStages);
+      await lock.release();
       return false;
     }
 
-    await cleanupCocoWithTimeout();
-    // Persist-then-restart without the in-memory flip (BTC-13 — see
-    // switchToExistingProfile); the flip is the failed-restart fallback.
-    const persisted = await persistSwitchTargetToDisk(nextIndex);
-    if (persisted.isErr()) {
-      throw persisted.error;
-    }
-    const restarted = await teardownAndRestart();
-    if (!restarted) {
-      const switched = useProfileStore.getState().switchProfile(nextIndex);
-      if (!switched) {
-        throw new Error(`Failed to activate newly-created profile: ${nextIndex}`);
-      }
-      cancelResetStages?.();
-      transitionInFlight = false;
-      await endTransition();
-    }
-    return true;
+    return await restartInto(nextIndex);
   } catch (error) {
     log.error('profile.orchestrator.create_failed', { error: redactError(error) });
-    cancelResetStages?.();
-    transitionInFlight = false;
-    await endTransition();
+    await lock.release();
     return false;
+  }
+}
+
+/** Whether an import names one identity: the key, its public key and its account number agree. */
+function importIsConsistent(opts: { accountIndex: number; pubkeyHex: string; nsec: string }) {
+  try {
+    const decoded = decodeNip19(opts.nsec);
+    return (
+      decoded.type === 'nsec' &&
+      getPublicKey(decoded.data) === opts.pubkeyHex &&
+      expectedImportedAccountNumber(opts.pubkeyHex) === opts.accountIndex
+    );
+  } catch {
+    return false;
+  }
+}
+
+type ImportProfileResult =
+  /** The key is stored, the profile added, and the app is restarting into it (or held). */
+  | 'switching'
+  /** A profile with this identity already exists. Nothing was changed. */
+  | 'exists'
+  /** Another account flow is running, or the wallet is not idle. Nothing was changed. */
+  | 'busy'
+  /** Secure storage refused the key. Nothing was changed. */
+  | 'key-not-stored'
+  /** The key, public key and account number do not describe one identity. Nothing was changed. */
+  | 'key-mismatch'
+  /** The profile list is full. The key was stored, and nothing else changed. */
+  | 'limit';
+
+/**
+ * Add a profile from an imported key and switch to it.
+ *
+ * Storing the key and adding the profile row happen under the same lock as the
+ * switch that follows, so no other account flow can run between them.
+ */
+export async function importAndSwitchProfile(opts: {
+  accountIndex: number;
+  pubkeyHex: string;
+  nsec: string;
+}): Promise<ImportProfileResult> {
+  if (useProfileStore.getState().hasPubkey(opts.pubkeyHex)) return 'exists';
+  if (!importIsConsistent(opts)) {
+    log.error('profile.orchestrator.import_refused_integrity');
+    return 'key-mismatch';
+  }
+  if (isTransitionInFlight() || !CocoManager.isReadyForCleanup()) {
+    log.warn('profile.orchestrator.import_blocked', { ...CocoManager.getCleanupReadiness() });
+    return 'busy';
+  }
+  const lock = acquireTransition();
+  if (!lock) return 'busy';
+  if (!(await lock.takeDiskGuard())) {
+    await lock.release();
+    return 'busy';
+  }
+  try {
+    const inProcess = useSettingsStore.getState().inProcessProfileSwitch;
+    lock.holdSplash(splashControls(), { keepStagesThatOutliveAccount: inProcess });
+    usePopupStore.getState().close();
+
+    if (!(await storeImportedNsec(opts.pubkeyHex, opts.nsec))) {
+      await lock.release();
+      return 'key-not-stored';
+    }
+    if (!useProfileStore.getState().addProfile(opts.accountIndex, opts.pubkeyHex, 'imported')) {
+      log.warn('profile.orchestrator.at_capacity', { nextIndex: opts.accountIndex });
+      await lock.release();
+      return 'limit';
+    }
+    // An imported account's wallet is derived from this phone's recovery
+    // phrase. Record which one, so a later recovery with another phrase is
+    // refused instead of quietly giving the account a different wallet.
+    // A phrase that cannot be read just now records nothing; the import is
+    // not held up for it.
+    try {
+      const phrase = await retrieveMnemonic();
+      if (phrase) {
+        useProfileStore
+          .getState()
+          .recordWalletPhraseFingerprint(opts.pubkeyHex, hashMnemonic(phrase));
+      }
+    } catch (error) {
+      log.warn('profile.orchestrator.wallet_phrase_fingerprint_unrecorded', {
+        error: redactError(error),
+      });
+    }
+    // From here on the endings are the switch's own: a restart or a hold.
+    if (inProcess) await switchWithoutRestart(opts.accountIndex, () => lock.release());
+    else await restartInto(opts.accountIndex);
+    return 'switching';
+  } catch (error) {
+    log.error('profile.orchestrator.import_failed', { error: redactError(error) });
+    await lock.release();
+    return 'busy';
   }
 }
 
@@ -335,59 +439,146 @@ export async function createAndSwitchProfile(opts?: {
 export async function recoverMnemonicSession(mnemonic: string): Promise<boolean> {
   if (!bip39.validateMnemonic(mnemonic, wordlist) || mnemonic.split(' ').length !== 12)
     return false;
-  if (transitionInFlight) return false;
-  transitionInFlight = true;
+  // Recovery runs before any account is usable, so there is no splash to hold
+  // and no earlier runtime's transition to wait out: the in-memory lock only.
+  const lock = acquireTransition();
+  if (!lock) return false;
+  let held = false;
   try {
     const locked = useSecureStoreState.getState().secureStoreState === 'locked';
-    if (!locked && useSettingsStore.getState().hasSeenOnboarding) return false;
+    const onboarding = !locked && !useSettingsStore.getState().hasSeenOnboarding;
     if (
-      locked &&
+      !onboarding &&
+      !locked &&
+      !useProfileStore.getState().profiles.some((p) => p.source !== 'imported')
+    )
+      return false;
+    // The rule that keeps recovery and the integrity check in step: a phrase
+    // is only accepted if it derives every derived account already saved
+    // here. After it, each of those rows still follows from the stored
+    // phrase, so the check has nothing to object to. During onboarding the
+    // list is emptied below instead, and imported accounts answer to their
+    // own stored key, whatever the phrase.
+    const derivedRows = onboarding
+      ? []
+      : useProfileStore.getState().profiles.filter((profile) => profile.source !== 'imported');
+    if (derivedRows.length > 0) {
+      const rootSeed = bip39.mnemonicToSeedSync(mnemonic, '');
+      if (
+        derivedRows.some(
+          (profile) => expectedDerivedPubkey(rootSeed, profile.accountIndex) !== profile.pubkey
+        )
+      )
+        return false;
+    }
+    // An imported account's key is its own, whatever the phrase, but its
+    // wallet is derived from the phrase. Where the account recorded which
+    // phrase that was, another phrase is refused: it would open a different,
+    // empty wallet for the same account. An account imported before that was
+    // recorded is not held against anything.
+    if (
+      !onboarding &&
       useProfileStore
         .getState()
         .profiles.some(
           (profile) =>
-            profile.source !== 'imported' &&
-            deriveNostrKeys(mnemonic, profile.accountIndex).pubkey !== profile.pubkey
+            profile.source === 'imported' &&
+            profile.walletPhraseFingerprint !== undefined &&
+            profile.walletPhraseFingerprint !== hashMnemonic(mnemonic)
         )
-    )
+    ) {
+      log.warn('profile.orchestrator.recovery_refused_wallet_phrase');
       return false;
-    await CocoManager.cleanup();
-
-    // Persist before restart without changing the current account scope mid-flight.
-    const lifecycle = useWalletLifecycleStore.persist.getOptions();
-    await lifecycle.storage!.setItem(lifecycle.name!, {
-      version: lifecycle.version,
-      state: {
-        seedCreatedAt: null,
-        recoveryPhraseVerifiedAt: null,
-        recoveryPhraseVerifiedRevision: null,
-        restoreStatus: 'pending',
-        lastRestoreAt: null,
-        lastRestoreError: null,
-      },
-    });
-    if (useSecureStoreState.getState().secureStoreState !== 'locked') {
-      // The carousel's auto-generated account is disposable. Its row must not
-      // point at the new mnemonic on restart; no wallet operation is available here.
-      const profiles = useProfileStore.persist.getOptions();
-      await profiles.storage!.setItem(profiles.name!, {
-        version: profiles.version,
-        state: { activeAccountIndex: 0, profiles: [] },
-      });
     }
-    if (!(await storeMnemonic(mnemonic))) return false;
-    const settings = useSettingsStore.persist.getOptions();
-    await settings.storage!.setItem(settings.name!, {
-      version: settings.version,
-      state: { ...settings.partialize!(useSettingsStore.getState()), hasSeenOnboarding: true },
-    });
-    nostrLog.info('secure.mnemonic.recovered');
-    return restartApp();
+    // Bounded, and refused on a timeout: the phrase must not be replaced while
+    // the wallet opened under the old one may still be writing.
+    if ((await settleWithin(CocoManager.cleanup(), WALLET_CLOSE_TIMEOUT_MS)) === TIMED_OUT) {
+      log.warn('profile.orchestrator.recovery_cleanup_timeout');
+      return false;
+    }
+
+    // Two steps, with the phrase as the point of no return between them.
+    //
+    // 1. Prepare: record that a restore is owed and, during onboarding, drop
+    //    the throwaway profile. Written before the phrase so a restart can
+    //    never find the new phrase without the restore decision. If the phrase
+    //    then cannot be stored, both are put back as they were.
+    const lifecycle = useWalletLifecycleStore.persist.getOptions();
+    const profiles = useProfileStore.persist.getOptions();
+    // A record that cannot be read (damaged JSON) must not stop a recovery:
+    // it is simply not something that can be put back.
+    type Saved = { readable: true; value: unknown } | { readable: false };
+    const NOT_SAVED: Saved = { readable: false };
+    const read = async (options: typeof lifecycle | typeof profiles): Promise<Saved> => {
+      try {
+        return { readable: true, value: await options.storage!.getItem(options.name!) };
+      } catch {
+        return { readable: false };
+      }
+    };
+    const restore = async (options: typeof lifecycle | typeof profiles, previous: Saved) => {
+      if (!previous.readable) return;
+      if (previous.value) await options.storage!.setItem(options.name!, previous.value as never);
+      else await options.storage!.removeItem(options.name!);
+    };
+    const before = {
+      lifecycle: await read(lifecycle),
+      profiles: onboarding ? await read(profiles) : NOT_SAVED,
+    };
+    const putBack = async () => {
+      await restore(lifecycle, before.lifecycle);
+      await restore(profiles, before.profiles);
+    };
+    let phraseStored = false;
+    try {
+      await lifecycle.storage!.setItem(lifecycle.name!, {
+        version: lifecycle.version,
+        state: {
+          seedCreatedAt: null,
+          recoveryPhraseVerifiedAt: null,
+          recoveryPhraseVerifiedRevision: null,
+          restoreStatus: 'pending',
+          lastRestoreAt: null,
+          lastRestoreError: null,
+        },
+      });
+      if (onboarding) {
+        // The carousel's auto-generated account is disposable. Its row must not
+        // point at the new mnemonic on restart; no wallet operation is available here.
+        await profiles.storage!.setItem(profiles.name!, {
+          version: profiles.version,
+          state: { activeAccountIndex: 0, profiles: [] },
+        });
+      }
+      phraseStored = await storeMnemonic(mnemonic);
+    } finally {
+      if (!phraseStored) {
+        await putBack().catch(() => nostrLog.warn('secure.mnemonic.recovery_rollback_failed'));
+      }
+    }
+    if (!phraseStored) return false;
+
+    // 2. The phrase is replaced. This runtime still holds keys from the old
+    //    one, so the only endings are a restart or a hold.
+    try {
+      const settings = useSettingsStore.persist.getOptions();
+      await settings.storage!.setItem(settings.name!, {
+        version: settings.version,
+        state: { ...settings.partialize!(useSettingsStore.getState()), hasSeenOnboarding: true },
+      });
+      nostrLog.info('secure.mnemonic.recovered');
+      if (restartApp()) return true;
+    } catch (error) {
+      log.error('profile.orchestrator.recovery_finish_failed', { error: redactError(error) });
+    }
+    held = true;
+    await holdUntilReopened('Your recovery phrase is saved. Please close and reopen the app.');
+    return true;
   } catch {
     nostrLog.warn('secure.mnemonic.recovery_failed');
     return false;
   } finally {
-    transitionInFlight = false;
+    if (!held) await lock.release();
   }
 }
 
@@ -400,29 +591,37 @@ export async function deleteAllProfiles(opts?: {
   resetStages?: TransitionControls['resetStages'];
   cancelResetStages?: TransitionControls['cancelResetStages'];
 }): Promise<boolean> {
-  const resetStages = opts?.resetStages ?? registeredControls?.resetStages;
-  const cancelResetStages = opts?.cancelResetStages ?? registeredControls?.cancelResetStages;
-
-  if (transitionInFlight) return false;
-  transitionInFlight = true;
-
-  if (!(await beginTransition())) {
-    transitionInFlight = false;
+  const lock = acquireTransition();
+  if (!lock) return false;
+  if (!(await lock.takeDiskGuard())) {
+    await lock.release();
     return false;
   }
+  // Set once the first irreversible deletion starts.
+  let erasing = false;
   try {
-    resetStages?.({ holdUntilCancel: true });
+    lock.holdSplash(splashControls(opts));
     usePopupStore.getState().close();
 
     const profiles = useProfileStore.getState().profiles;
     const accountIndexes = Array.from(new Set([0, ...profiles.map((p) => p.accountIndex)]));
     const importedPubkeys = profiles.filter((p) => p.source === 'imported').map((p) => p.pubkey);
 
+    const clearSecureData = await prepareSecureDataReset(accountIndexes, importedPubkeys);
+
+    // If the wipe stops after the databases are gone, reopening must not take
+    // their absence for a loss and ask for a restore. Waited for, but a list
+    // that cannot be saved does not stop the wipe: Delete All is also the way
+    // out when storage is unreadable, and it clears the list itself at the end.
+    await forgetWalletDatabases(accountIndexes).catch((error: unknown) => {
+      log.warn('profile.orchestrator.forget_not_saved', { error: redactError(error) });
+    });
     // 1. Close SQLite and destroy all Coco databases
+    erasing = true;
     await CocoManager.completeReset(accountIndexes);
 
     // 2. Clear ALL secure storage (mnemonic, derived keys, cashu mnemonics, imported nsecs)
-    if (!(await clearAllSecureData(accountIndexes, importedPubkeys))) {
+    if (!(await clearSecureData())) {
       throw new Error('Secure data reset incomplete');
     }
 
@@ -435,6 +634,16 @@ export async function deleteAllProfiles(opts?: {
       await wipeWhitenoiseStorageForAccounts(accountIndexes);
     } catch (e) {
       log.warn('profile.orchestrator.wipe_whitenoise_failed', { error: redactError(e) });
+    }
+
+    // The Nostr cache databases are named by account index, like the wallet
+    // ones. Left behind, the next identity created at index 0 would open the
+    // deleted identity's cache.
+    try {
+      const { deleteNostrCaches } = await import('./profileRemovalStorage');
+      await deleteNostrCaches(accountIndexes);
+    } catch (e) {
+      log.warn('profile.orchestrator.wipe_nostr_cache_failed', { error: redactError(e) });
     }
 
     // 3b. Nuclear AsyncStorage wipe — every key, every store, everything.
@@ -454,22 +663,21 @@ export async function deleteAllProfiles(opts?: {
     // the in-flight closure rechecks before commit.
     useBTCMapStore.getState().reset();
 
-    const restarted = await teardownAndRestart();
-    if (!restarted) {
-      cancelResetStages?.();
-      transitionInFlight = false;
-      await endTransition();
-      const { Alert } = await import('react-native');
-      Alert.alert('Restart Required', 'Please close and reopen the app to complete the reset.', [
-        { text: 'OK' },
-      ]);
+    if (!(await teardownAndRestart())) {
+      await holdUntilReopened('Please close and reopen the app to complete the reset.');
     }
     return true;
   } catch (error) {
-    log.error('profile.orchestrator.delete_all_failed', { error: redactError(error) });
-    cancelResetStages?.();
-    transitionInFlight = false;
-    await endTransition();
+    log.error('profile.orchestrator.delete_all_failed', { erasing, error: redactError(error) });
+    if (!erasing) {
+      await lock.release();
+      return false;
+    }
+    // Part of the installation is gone. The account providers must not come
+    // back over it, so the lock is kept and the app waits to be reopened.
+    await holdUntilReopened(
+      'The reset did not finish. Please close and reopen the app, then try again.'
+    );
     return false;
   }
 }

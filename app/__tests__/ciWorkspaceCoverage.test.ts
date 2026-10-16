@@ -1,8 +1,17 @@
 /**
  * @jest-environment node
  */
-import { execFileSync } from 'node:child_process';
-import { readFileSync, readdirSync, existsSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import {
+  readFileSync,
+  readdirSync,
+  existsSync,
+  mkdtempSync,
+  mkdirSync,
+  writeFileSync,
+  rmSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 /**
@@ -15,11 +24,12 @@ import path from 'node:path';
  * vitest tests and nostr's 259 ran nowhere on a push. A change to either could
  * break every one of its own tests and still merge green.
  *
- * The fix is one canonical aggregate — the root scripts fan out with
- * `bun run --filter '*'` — used by both CI and humans. These tests fail if the
+ * The fix is one canonical aggregate — the root scripts cover all workspaces —
+ * used by both CI and humans. These tests fail if the
  * aggregate is narrowed back to a single package, or if a gate re-pins itself
- * to `app/`. The `--filter '*'` form is asserted specifically because naming
- * packages explicitly is what rots when a fifth workspace is added.
+ * to `app/`. A disposable extra workspace catches explicit package lists that
+ * would silently omit a future package. Real Bun execution allows sequential
+ * and parallel aggregates without pinning one command spelling.
  */
 
 const REPO_ROOT = path.resolve(__dirname, '../..');
@@ -42,6 +52,63 @@ function packagesDefining(script: string): string[] {
     ).scripts;
     return typeof scripts?.[script] === 'string';
   });
+}
+
+/** Run the actual aggregate against cheap stand-in suites, not the suites recursively. */
+function aggregate(script: string, failingWorkspace?: string) {
+  const fixture = mkdtempSync(path.join(tmpdir(), 'sovran-workspace-coverage-'));
+  const workspaces = [...rootManifest.workspaces, 'future-package'];
+  try {
+    writeFileSync(
+      path.join(fixture, 'package.json'),
+      JSON.stringify({
+        private: true,
+        workspaces,
+        scripts: rootManifest.scripts,
+      })
+    );
+    writeFileSync(
+      path.join(fixture, 'record.cjs'),
+      `
+      const fs = require('node:fs');
+      const path = require('node:path');
+      const workspace = path.basename(process.cwd());
+      fs.appendFileSync('../executed.txt', workspace + '\\n');
+      if (workspace === process.env.FAIL_WORKSPACE) process.exit(7);
+    `
+    );
+    for (const workspace of workspaces) {
+      const name: unknown =
+        workspace === 'future-package'
+          ? '@sovran/future-package'
+          : JSON.parse(readFileSync(path.join(REPO_ROOT, workspace, 'package.json'), 'utf8')).name;
+      if (typeof name !== 'string') throw new Error(`Missing package name: ${workspace}`);
+      mkdirSync(path.join(fixture, workspace));
+      writeFileSync(
+        path.join(fixture, workspace, 'package.json'),
+        JSON.stringify({
+          name,
+          scripts: { [script]: 'node ../record.cjs' },
+        })
+      );
+    }
+    const result = spawnSync('bun', ['run', script], {
+      cwd: fixture,
+      encoding: 'utf8',
+      timeout: 10_000,
+      env: { ...process.env, FAIL_WORKSPACE: failingWorkspace ?? '' },
+    });
+    if (result.error) throw result.error;
+    const recorded = path.join(fixture, 'executed.txt');
+    return {
+      status: result.status,
+      signal: result.signal,
+      executed: existsSync(recorded) ? readFileSync(recorded, 'utf8').trim().split('\n') : [],
+      expected: workspaces,
+    };
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
 }
 
 interface Step {
@@ -121,12 +188,25 @@ describe('CI covers every workspace package', () => {
   it.each(['test', 'type-check'])(
     'root `%s` fans out over the workspace rather than delegating to one package',
     (script) => {
-      const command = rootManifest.scripts[script];
-      expect(command).toBe(`bun run --filter '*' ${script}`);
-      // The delegate form is exactly the regression this guards.
-      expect(command).not.toContain('cd app');
+      const result = aggregate(script);
+      expect(result.status).toBe(0);
+      expect(result.executed.toSorted()).toEqual(result.expected.toSorted());
     }
   );
+
+  it('a failed harness stops the root test before starting other suites', () => {
+    const result = aggregate('test', 'harness');
+    expect(result.signal).toBeNull();
+    expect(result.status).not.toBe(0);
+    expect(result.executed).toEqual(['harness']);
+  });
+
+  it.each(['test', 'type-check'])('root `%s` preserves a workspace failure', (script) => {
+    const result = aggregate(script, 'wallet');
+    expect(result.signal).toBeNull();
+    expect(result.status).not.toBe(0);
+    expect(result.executed).toContain('wallet');
+  });
 
   it.each(['test', 'type-check'])(
     'more than one package defines `%s`, so the fan-out is load-bearing',

@@ -353,6 +353,7 @@ describe('Design System exact structural snapshots', () => {
 
   it('keeps the wallet-facing control catalog complete', () => {
     expect(WALLET_CONTROLS_FAMILY.scenarios.map((scenario) => scenario.id)).toEqual([
+      'message-ecash-review',
       'amount-sat-modes',
       'amount-direction-and-fiat',
       'keypad-sats',

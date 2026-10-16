@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from 'react';
+import { useEffect, useSyncExternalStore } from 'react';
 
 // Holds the QR button's screen rect so the boot splash overlay can morph
 // into it on first paint. Module-level state + subscribe APIs — the QRButton
@@ -178,4 +178,49 @@ export function shouldFastForwardBootOverlay(
   anchor: QRButtonAnchor | null
 ): boolean {
   return focused === false && anchor !== null;
+}
+
+// Whether the app is showing a page in place of the wallet home: Terms, the
+// onboarding carousel and the restore prompt (AppGate), key recovery and a
+// stopped account (the keys provider). No QR button will be laid out while
+// one of those is up, so the boot splash gate stops waiting for an anchor and
+// fades to show the page.
+let pagesInsteadOfWallet = 0;
+const insteadOfWalletListeners = new Set<() => void>();
+
+/** Call when such a page mounts; call the returned function when it unmounts. */
+function showingPageInsteadOfWallet(): () => void {
+  pagesInsteadOfWallet += 1;
+  insteadOfWalletListeners.forEach((cb) => cb());
+  let left = false;
+  return () => {
+    if (left) return;
+    left = true;
+    pagesInsteadOfWallet -= 1;
+    insteadOfWalletListeners.forEach((cb) => cb());
+  };
+}
+
+function getPageInsteadOfWallet(): boolean {
+  return pagesInsteadOfWallet > 0;
+}
+
+function subscribePageInsteadOfWallet(cb: () => void): () => void {
+  insteadOfWalletListeners.add(cb);
+  return () => {
+    insteadOfWalletListeners.delete(cb);
+  };
+}
+
+export function usePageInsteadOfWallet(): boolean {
+  return useSyncExternalStore(
+    subscribePageInsteadOfWallet,
+    getPageInsteadOfWallet,
+    getPageInsteadOfWallet
+  );
+}
+
+/** For a page shown in place of the app: says so for as long as it is mounted. */
+export function useShownInsteadOfWallet(shown = true): void {
+  useEffect(() => (shown ? showingPageInsteadOfWallet() : undefined), [shown]);
 }

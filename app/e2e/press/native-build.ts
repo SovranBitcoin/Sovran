@@ -7,18 +7,27 @@
  * resolves a native build whose Expo fingerprint matches the current source:
  * a matching stamped build is reused, anything else is rebuilt locally. The
  * stamp is recorded on every promoted screenshot.
+ *
+ * The same steps build the end-to-end test app (`--bundled`): the Release
+ * configuration, with its JavaScript inside it and logging left on, so it
+ * launches without a bundler (ADR 0033). Its JavaScript is part of the
+ * artifact, so it is current only for the commit it was built from. On iOS,
+ * when only JavaScript has changed, the native part is kept and the bundle
+ * inside the app is replaced. Android rebuilds the signed APK through Gradle.
  */
 import { execFileSync, spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
   closeSync,
   copyFileSync,
+  cpSync,
   createWriteStream,
   existsSync,
   mkdirSync,
   lstatSync,
   openSync,
   readlinkSync,
+  realpathSync,
   readdirSync,
   readFileSync,
   readSync,
@@ -26,10 +35,13 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
-import { join } from 'node:path';
+import { createRequire } from 'node:module';
+import { dirname, join } from 'node:path';
+import { z } from 'zod';
 import { ROOT, type Platform } from './plan';
 import type { NativeBuildSummary } from './promote';
 import { resolveAndroidSdkRoot } from '../drivers/android/adb';
+import { captureGitInfo, captureSourceFingerprint } from '../core/git';
 
 const APP_DIR = join(ROOT, 'app');
 const NATIVE_BUILDS = join(APP_DIR, 'e2e/artifacts/native-builds');
@@ -38,17 +50,51 @@ const BUNDLE_ID = 'com.sovranbitcoin.dev';
 // they are outputs of the fingerprinted inputs, never inputs themselves.
 const GENERATED_NATIVE_DIRS = ['ios/**', 'android/**'];
 
-export type NativeBuildStamp = NativeBuildSummary & {
-  version: 1;
-  platform: Platform;
-  appVariant: 'development';
-  gitDirty: boolean;
-  bundleId: string;
-  artifact: string;
-  toolchain: string;
-};
+/** `dev` loads its JavaScript from a bundler; `bundled` carries it. */
+export type BuildKind = 'dev' | 'bundled';
+
+const nativeBuildStampSchema = z.object({
+  version: z.literal(1),
+  platform: z.enum(['ios', 'android']),
+  kind: z.enum(['dev', 'bundled']).optional(),
+  appVariant: z.literal('development'),
+  gitDirty: z.boolean(),
+  bundleId: z.string().min(1),
+  artifact: z.string().min(1),
+  toolchain: z.string(),
+  fingerprint: z.string().min(1),
+  appVersion: z.string(),
+  buildNumber: z.string(),
+  gitSha: z.string().regex(/^[a-f0-9]{40}$/),
+  builtAt: z.string(),
+  artifactSha256: z
+    .string()
+    .regex(/^[a-f0-9]{64}$/)
+    .optional(),
+  // Older cache records remain readable, but cannot certify bundled source.
+  sourceFingerprint: z.string().optional(),
+  edition: z.string().optional(),
+});
+export type NativeBuildStamp = z.infer<typeof nativeBuildStampSchema>;
 
 export type RebuildPolicy = 'auto' | 'force' | 'never';
+
+/** A bundled story observes ordinary app timing without inherited fixture controls. */
+export function nativeBuildEnvironment(
+  kind: BuildKind,
+  source: NodeJS.ProcessEnv = process.env
+): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = { ...source, CI: '1', APP_VARIANT: 'development' };
+  // EAS takes precedence over APP_VARIANT in app.config.js.
+  delete env.EAS_BUILD_PROFILE;
+  if (kind === 'bundled') {
+    for (const key of Object.keys(env)) if (key.startsWith('EXPO_PUBLIC_E2E_')) delete env[key];
+    delete env.DEBUG_MNEMONIC;
+    env.EXPO_NO_DOTENV = '1';
+    env.EXPO_PUBLIC_E2E_LOGS = '1';
+  }
+  return env;
+}
 
 /** Fixed-size reads, not stream async-iteration: iterating a read stream under
  * Bun took over five minutes on the 385 MB debug APK that `shasum` hashes in
@@ -80,7 +126,116 @@ export function nativeArtifactHash(artifact: string): string {
   return hash.digest('hex');
 }
 
-export async function nativeFingerprint(platform: Platform): Promise<string> {
+/** Compare installed contents without weakening the stamped artifact hash. CoreSimulator
+ * was observed to remove execute permission from embedded framework binaries only. */
+export function inspectInstalledIosApp(selected: string, installed: string) {
+  const selectedPath = realpathSync(selected);
+  const installedPath = realpathSync(installed);
+  if (selectedPath === installedPath) throw new Error('Installed app must be a separate payload');
+  const mismatches: string[] = [];
+  const normalizedModes: { path: string; selected: number; installed: number }[] = [];
+  const buffer = Buffer.allocUnsafe(HASH_CHUNK);
+  const fileHash = (path: string) => {
+    const hash = createHash('sha256');
+    const file = openSync(path, 'r');
+    try {
+      for (let n = readSync(file, buffer); n > 0; n = readSync(file, buffer))
+        hash.update(buffer.subarray(0, n));
+      return hash.digest('hex');
+    } finally {
+      closeSync(file);
+    }
+  };
+  const visit = (path: string) => {
+    const a = join(selectedPath, path),
+      b = join(installedPath, path);
+    // lstat distinguishes dangling links from absent entries; never follow links.
+    const left = lstatSync(a, { throwIfNoEntry: false });
+    const right = lstatSync(b, { throwIfNoEntry: false });
+    if (!left || !right) {
+      mismatches.push(`${path}: missing entry`);
+      return;
+    }
+    if (left.mode !== right.mode) {
+      if (
+        left.isFile() &&
+        right.isFile() &&
+        left.mode === 0o100755 &&
+        right.mode === 0o100644 &&
+        /^Frameworks\/([^/]+)\.framework\/\1$/.test(path)
+      )
+        normalizedModes.push({ path, selected: left.mode, installed: right.mode });
+      else mismatches.push(`${path}: mode or type differs`);
+    }
+    if (left.isDirectory() && right.isDirectory()) {
+      for (const child of [...new Set([...readdirSync(a), ...readdirSync(b)])].sort())
+        visit(path ? `${path}/${child}` : child);
+    } else if (left.isFile() && right.isFile()) {
+      if (fileHash(a) !== fileHash(b)) mismatches.push(`${path}: bytes differ`);
+    } else if (left.isSymbolicLink() && right.isSymbolicLink()) {
+      if (readlinkSync(a) !== readlinkSync(b)) mismatches.push(`${path}: link target differs`);
+    } else mismatches.push(`${path}: unsupported or different entry types`);
+  };
+  visit('');
+  return {
+    selectedPath,
+    installedPath,
+    selectedSha256: nativeArtifactHash(selectedPath),
+    installedSha256: nativeArtifactHash(installedPath),
+    normalizedModes,
+    mismatches,
+  };
+}
+
+/** Read-only selection: never rebuild or silently select a different edition. */
+export async function selectBundledIosStoryApp(artifact: string) {
+  const build = nativeBuildStampSchema.parse(
+    JSON.parse(readFileSync(join(dirname(artifact), 'build.json'), 'utf8'))
+  );
+  if (
+    build.platform !== 'ios' ||
+    build.kind !== 'bundled' ||
+    build.bundleId !== BUNDLE_ID ||
+    !build.artifactSha256 ||
+    realpathSync(build.artifact) !== realpathSync(artifact)
+  )
+    throw new Error('Selected app is not the stamped bundled iOS development build');
+  const assertCurrent = async () => {
+    if (
+      !bundledJavaScriptIsCurrent(build) ||
+      nativeArtifactHash(artifact) !== build.artifactSha256 ||
+      (await nativeFingerprint('ios', 'bundled')) !== build.fingerprint ||
+      !bundledJavaScriptIsCurrent(build)
+    )
+      throw new Error(
+        'Selected iOS build no longer matches current clean source or stamped artifact'
+      );
+  };
+  await assertCurrent();
+  let baseline: ReturnType<typeof inspectInstalledIosApp> | undefined;
+  return {
+    build,
+    async inspect(installed: string) {
+      await assertCurrent();
+      const payload = inspectInstalledIosApp(artifact, installed);
+      if (payload.selectedSha256 !== build.artifactSha256)
+        payload.mismatches.push('Selected artifact changed during inspection');
+      if (
+        baseline &&
+        (payload.installedPath !== baseline.installedPath ||
+          payload.installedSha256 !== baseline.installedSha256)
+      )
+        payload.mismatches.push('Installed app changed since the pre-launch inspection');
+      if (!baseline && payload.mismatches.length === 0) baseline = payload;
+      return payload;
+    },
+  };
+}
+
+export async function nativeFingerprint(
+  platform: Platform,
+  kind: BuildKind = 'dev'
+): Promise<string> {
   // Keep Expo's config loader outside Bun's capture/import module graph and put
   // a hard deadline around it: a stuck config must not hang an entire campaign.
   const output = execFileSync(
@@ -95,7 +250,7 @@ export async function nativeFingerprint(platform: Platform): Promise<string> {
     ],
     {
       cwd: APP_DIR,
-      env: { ...process.env, APP_VARIANT: 'development' },
+      env: nativeBuildEnvironment(kind),
       encoding: 'utf8',
       // Bounded so a stuck config cannot hang a campaign, but generous: under
       // campaign load (emulator + Metro + simulator) this loader has exceeded
@@ -106,14 +261,22 @@ export async function nativeFingerprint(platform: Platform): Promise<string> {
     }
   ).trim();
   if (!/^[a-f0-9]{40,64}$/.test(output)) throw new Error('Invalid native fingerprint output');
-  return output;
+  // The same native sources can select a different Release network policy.
+  return platform === 'android' && kind === 'bundled'
+    ? createHash('sha256').update(`${output}\0android-bundled-e2e`).digest('hex')
+    : output;
 }
 
-const stampPath = (platform: Platform) => join(NATIVE_BUILDS, platform, 'build.json');
+const buildDir = (platform: Platform, kind: BuildKind) =>
+  join(NATIVE_BUILDS, kind === 'bundled' ? `${platform}-bundled` : platform);
+const stampPath = (platform: Platform, kind: BuildKind) =>
+  join(buildDir(platform, kind), 'build.json');
 
-function readStamp(platform: Platform): NativeBuildStamp | undefined {
+function readStamp(platform: Platform, kind: BuildKind = 'dev'): NativeBuildStamp | undefined {
   try {
-    const stamp = JSON.parse(readFileSync(stampPath(platform), 'utf8')) as NativeBuildStamp;
+    const stamp = nativeBuildStampSchema.parse(
+      JSON.parse(readFileSync(stampPath(platform, kind), 'utf8'))
+    );
     return stamp.version === 1 && stamp.platform === platform ? stamp : undefined;
   } catch {
     return undefined;
@@ -139,6 +302,26 @@ export function nativeEnv(stamp: NativeBuildStamp): Record<string, string> {
 }
 
 const git = (args: string[]) => execFileSync('git', args, { cwd: ROOT, encoding: 'utf8' }).trim();
+
+/** Build outputs cannot be attributed to a commit observed only after compilation. */
+export async function withStableBuildSource<T extends object>(
+  root: string,
+  build: () => Promise<T>
+): Promise<T & { sourceFingerprint: string }> {
+  const before = captureGitInfo(root);
+  const source = captureSourceFingerprint(root);
+  if (!before || !source) throw new Error('Build source identity unavailable');
+  const result = await build();
+  const after = captureGitInfo(root);
+  if (
+    !after ||
+    before.sha !== after.sha ||
+    before.dirty !== after.dirty ||
+    source !== captureSourceFingerprint(root)
+  )
+    throw new Error('Source changed during the build; refusing to stamp it');
+  return { ...result, sourceFingerprint: source };
+}
 
 /** Run a long build step, streaming its full output to a log file. */
 function step(
@@ -173,7 +356,7 @@ function step(
 }
 
 function writeStamp(stamp: NativeBuildStamp) {
-  const path = stampPath(stamp.platform);
+  const path = stampPath(stamp.platform, stamp.kind ?? 'dev');
   writeFileSync(`${path}.tmp`, `${JSON.stringify(stamp, null, 2)}\n`);
   renameSync(`${path}.tmp`, path);
 }
@@ -184,8 +367,8 @@ function plistValue(app: string, key: string) {
   }).trim();
 }
 
-function retainIosApp(out: string) {
-  const products = join(out, 'DerivedData/Build/Products/Debug-iphonesimulator');
+function retainIosApp(out: string, configuration: 'Debug' | 'Release') {
+  const products = join(out, `DerivedData/Build/Products/${configuration}-iphonesimulator`);
   const app = existsSync(products)
     ? readdirSync(products).find((name) => name.endsWith('.app'))
     : undefined;
@@ -198,12 +381,13 @@ function retainIosApp(out: string) {
   return retained;
 }
 
-function iosStamp(artifact: string, fingerprint: string): NativeBuildStamp {
+function iosStamp(artifact: string, fingerprint: string, kind: BuildKind): NativeBuildStamp {
   const bundleId = plistValue(artifact, 'CFBundleIdentifier');
   if (bundleId !== BUNDLE_ID) throw new Error(`Built ${bundleId}, expected ${BUNDLE_ID}`);
   return {
     version: 1,
     platform: 'ios',
+    ...(kind === 'bundled' ? { kind } : {}),
     appVariant: 'development',
     fingerprint,
     appVersion: plistValue(artifact, 'CFBundleShortVersionString'),
@@ -217,12 +401,13 @@ function iosStamp(artifact: string, fingerprint: string): NativeBuildStamp {
   };
 }
 
-async function buildIos(fingerprint: string): Promise<NativeBuildStamp> {
-  const out = join(NATIVE_BUILDS, 'ios');
+async function buildIos(fingerprint: string, kind: BuildKind): Promise<NativeBuildStamp> {
+  const out = buildDir('ios', kind);
   mkdirSync(out, { recursive: true });
   const log = join(out, 'build.log');
   writeFileSync(log, '');
-  const env = { ...process.env, CI: '1', APP_VARIANT: 'development' };
+  const configuration = kind === 'bundled' ? 'Release' : 'Debug';
+  const env = nativeBuildEnvironment(kind);
   if (git(['ls-files', '--', 'app/ios']).length)
     throw new Error('Refusing to clean tracked iOS sources');
   await step(
@@ -237,7 +422,7 @@ async function buildIos(fingerprint: string): Promise<NativeBuildStamp> {
   if (!workspace) throw new Error('expo prebuild produced no .xcworkspace');
   const scheme = workspace.replace(/\.xcworkspace$/, '');
   await step(
-    'xcodebuild (Debug, iOS Simulator)',
+    `xcodebuild (${configuration}, iOS Simulator)`,
     'xcodebuild',
     [
       '-workspace',
@@ -245,7 +430,7 @@ async function buildIos(fingerprint: string): Promise<NativeBuildStamp> {
       '-scheme',
       scheme,
       '-configuration',
-      'Debug',
+      configuration,
       '-sdk',
       'iphonesimulator',
       '-destination',
@@ -262,7 +447,7 @@ async function buildIos(fingerprint: string): Promise<NativeBuildStamp> {
     env,
     log
   );
-  return iosStamp(retainIosApp(out), fingerprint);
+  return iosStamp(retainIosApp(out, configuration), fingerprint, kind);
 }
 
 function apkBadging(apk: string) {
@@ -310,8 +495,10 @@ function resolveJdk17(): string {
   return home;
 }
 
-async function buildAndroid(fingerprint: string): Promise<NativeBuildStamp> {
-  const out = join(NATIVE_BUILDS, 'android');
+async function buildAndroid(fingerprint: string, kind: BuildKind): Promise<NativeBuildStamp> {
+  const out = buildDir('android', kind);
+  const configuration = kind === 'bundled' ? 'release' : 'debug';
+  const task = kind === 'bundled' ? 'assembleRelease' : 'assembleDebug';
   mkdirSync(out, { recursive: true });
   const log = join(out, 'build.log');
   writeFileSync(log, '');
@@ -319,9 +506,7 @@ async function buildAndroid(fingerprint: string): Promise<NativeBuildStamp> {
   // prebuild regenerates android/ without local.properties, so gradle needs the SDK path here.
   const sdk = resolveAndroidSdkRoot();
   const env = {
-    ...process.env,
-    CI: '1',
-    APP_VARIANT: 'development',
+    ...nativeBuildEnvironment(kind),
     JAVA_HOME: javaHome,
     ANDROID_HOME: sdk,
     ANDROID_SDK_ROOT: sdk,
@@ -334,16 +519,20 @@ async function buildAndroid(fingerprint: string): Promise<NativeBuildStamp> {
     env,
     log
   );
-  await step(
-    'gradle assembleDebug',
-    './gradlew',
-    ['assembleDebug'],
-    join(APP_DIR, 'android'),
-    env,
-    log
+  // Gradle's app-local JS inputs omit sibling workspace code and some assets.
+  // Once this owner requires a rebuild, Metro must traverse its actual graph.
+  const tasks = [
+    ...(kind === 'bundled'
+      ? ['-PsovranBundledE2e=true', ':app:createBundleReleaseJsAndAssets', '--rerun']
+      : []),
+    task,
+  ];
+  await step(`gradle ${task}`, './gradlew', tasks, join(APP_DIR, 'android'), env, log);
+  const built = join(
+    APP_DIR,
+    `android/app/build/outputs/apk/${configuration}/app-${configuration}.apk`
   );
-  const built = join(APP_DIR, 'android/app/build/outputs/apk/debug/app-debug.apk');
-  const artifact = join(out, 'app-debug.apk');
+  const artifact = join(out, `app-${configuration}.apk`);
   copyFileSync(built, artifact);
   const badging = apkBadging(artifact);
   if (badging.bundleId !== BUNDLE_ID)
@@ -351,6 +540,7 @@ async function buildAndroid(fingerprint: string): Promise<NativeBuildStamp> {
   return {
     version: 1,
     platform: 'android',
+    ...(kind === 'bundled' ? { kind } : {}),
     appVariant: 'development',
     fingerprint,
     ...badging,
@@ -362,23 +552,149 @@ async function buildAndroid(fingerprint: string): Promise<NativeBuildStamp> {
   };
 }
 
+/** The JavaScript inside a bundled build is the tree it was built from, so it
+ *  stands only for a clean tree at that same commit. */
+export function bundledJavaScriptIsCurrent(
+  stamp: Pick<NativeBuildStamp, 'gitSha' | 'gitDirty' | 'sourceFingerprint'>,
+  head = git(['rev-parse', 'HEAD']),
+  dirty = git(['status', '--porcelain']).length > 0,
+  source = captureSourceFingerprint(ROOT)
+): boolean {
+  return (
+    !stamp.gitDirty &&
+    !dirty &&
+    stamp.gitSha === head &&
+    source !== undefined &&
+    stamp.sourceFingerprint === source
+  );
+}
+
+/**
+ * Replace the JavaScript inside a bundled build whose native part still matches,
+ * with the two commands Xcode's bundling phase runs: Metro's embed export, then
+ * the Hermes compiler. The app is signed again because its contents changed;
+ * the entitlements SecureStore needs are kept.
+ */
+/** The Hermes compiler React Native itself depends on and Xcode's bundling phase runs. */
+function hermesCompiler(): string {
+  const fromReactNative = createRequire(require.resolve('react-native/package.json'));
+  const packageJson = fromReactNative.resolve(['hermes-compiler', 'package.json'].join('/'));
+  return join(dirname(packageJson), 'hermesc/osx-bin/hermesc');
+}
+
+async function refreshBundledJavaScript(
+  stamp: NativeBuildStamp,
+  other?: { out: string; edition: string }
+): Promise<NativeBuildStamp> {
+  return withStableBuildSource(ROOT, async () => {
+    const out = other?.out ?? buildDir('ios', 'bundled');
+    const log = join(out, 'build.log');
+    const plain = join(out, 'main.js');
+    // Metro's cache does not know which edition a file was transformed for: the
+    // default edition's cached copy would be used again. Another edition keeps its own.
+    const cache = other ? join(out, 'metro-cache') : undefined;
+    if (cache) mkdirSync(cache, { recursive: true });
+    const env = {
+      ...nativeBuildEnvironment('bundled'),
+      ...(other ? { EXPO_PUBLIC_SOVRAN_EDITION: other.edition, TMPDIR: cache } : {}),
+    };
+    try {
+      await step(
+        'expo export:embed (ios)',
+        'node',
+        [
+          require.resolve('expo/bin/cli'),
+          'export:embed',
+          '--entry-file',
+          join(APP_DIR, 'index.js'),
+          '--platform',
+          'ios',
+          '--dev',
+          'false',
+          '--minify',
+          'false',
+          '--bundle-output',
+          plain,
+          '--assets-dest',
+          stamp.artifact,
+        ],
+        APP_DIR,
+        env,
+        log
+      );
+      await step(
+        'hermesc',
+        hermesCompiler(),
+        ['-emit-binary', '-O', '-out', join(stamp.artifact, 'main.jsbundle'), plain],
+        APP_DIR,
+        env,
+        log
+      );
+    } finally {
+      rmSync(plain, { force: true });
+      if (cache) rmSync(cache, { recursive: true, force: true });
+    }
+    await step(
+      'codesign',
+      'codesign',
+      ['--force', '--sign', '-', '--preserve-metadata=entitlements', stamp.artifact],
+      APP_DIR,
+      env,
+      log
+    );
+    return {
+      ...stamp,
+      gitSha: git(['rev-parse', 'HEAD']),
+      gitDirty: git(['status', '--porcelain']).length > 0,
+      builtAt: new Date().toISOString(),
+      artifactSha256: nativeArtifactHash(stamp.artifact),
+    };
+  });
+}
+
+/**
+ * The bundled iOS test build with another edition's JavaScript in it
+ * (ADR 0021): a copy beside it, `ios-bundled-<edition>`, for the stories about
+ * pages the default edition leaves out. The native part is the same app.
+ */
+async function bundledEdition(edition: string): Promise<NativeBuildStamp> {
+  const stamp = readStamp('ios', 'bundled');
+  if (!stamp) throw new Error('Build the bundled test build first: native-build.ts ios --bundled');
+  const out = join(NATIVE_BUILDS, `ios-bundled-${edition}`);
+  const artifact = join(out, 'Sovran.app');
+  rmSync(out, { recursive: true, force: true });
+  mkdirSync(out, { recursive: true });
+  cpSync(stamp.artifact, artifact, { recursive: true });
+  const made = await refreshBundledJavaScript({ ...stamp, artifact }, { out, edition });
+  writeFileSync(join(out, 'build.json'), `${JSON.stringify({ ...made, edition }, null, 2)}\n`);
+  return made;
+}
+
 /** Reuse a stamped build whose fingerprint matches current source, else rebuild. */
 export async function ensureNativeBuild(
   platform: Platform,
-  policy: RebuildPolicy = 'auto'
+  policy: RebuildPolicy = 'auto',
+  kind: BuildKind = 'dev'
 ): Promise<NativeBuildStamp> {
-  const fingerprint = await nativeFingerprint(platform);
-  const stamp = readStamp(platform);
-  const current =
+  const fingerprint = await nativeFingerprint(platform, kind);
+  const stamp = readStamp(platform, kind);
+  const nativeCurrent =
     stamp?.fingerprint === fingerprint &&
     existsSync(stamp.artifact) &&
     Boolean(stamp.artifactSha256) &&
     nativeArtifactHash(stamp.artifact) === stamp.artifactSha256;
+  const current = nativeCurrent && (kind === 'dev' || bundledJavaScriptIsCurrent(stamp));
   if (current && policy !== 'force') {
     console.log(
       `${platform}: reusing native build ${stamp.appVersion} (${stamp.buildNumber}) from ${stamp.builtAt}`
     );
     return stamp;
+  }
+  if (nativeCurrent && platform === 'ios' && kind === 'bundled' && policy !== 'force') {
+    console.log(`${platform}: native part unchanged; replacing the JavaScript inside the build`);
+    const refreshed = await refreshBundledJavaScript(stamp);
+    writeStamp(refreshed);
+    return refreshed;
   }
   if (policy === 'never')
     throw new Error(
@@ -387,9 +703,11 @@ export async function ensureNativeBuild(
   console.log(
     `${platform}: ${stamp ? 'native inputs changed' : 'no stamped native build'}; building locally (this takes a while)`
   );
-  const built = platform === 'ios' ? await buildIos(fingerprint) : await buildAndroid(fingerprint);
+  const built = await withStableBuildSource(ROOT, () =>
+    platform === 'ios' ? buildIos(fingerprint, kind) : buildAndroid(fingerprint, kind)
+  );
   // Source must not change under the build, or the stamp would lie.
-  if ((await nativeFingerprint(platform)) !== fingerprint)
+  if ((await nativeFingerprint(platform, kind)) !== fingerprint)
     throw new Error(`${platform}: native inputs changed during the build; rerun once edits settle`);
   built.artifactSha256 = nativeArtifactHash(built.artifact);
   writeStamp(built);
@@ -398,12 +716,25 @@ export async function ensureNativeBuild(
 
 if (import.meta.main) {
   try {
-    const [platform, flag] = process.argv.slice(2);
+    const [platform, ...flags] = process.argv.slice(2);
+    const kind: BuildKind = flags.includes('--bundled') ? 'bundled' : 'dev';
+    const editionAt = flags.indexOf('--edition');
+    const edition = editionAt === -1 ? undefined : flags[editionAt + 1];
+    const [flag] = flags.filter(
+      (value, index) => value !== '--bundled' && index !== editionAt && index !== editionAt + 1
+    );
     if (platform !== 'ios' && platform !== 'android')
-      throw new Error('Usage: bun app/e2e/press/native-build.ts ios|android [--force|--status]');
-    if (flag === '--status') {
-      const fingerprint = await nativeFingerprint(platform);
-      const stamp = readStamp(platform);
+      throw new Error(
+        'Usage: bun app/e2e/press/native-build.ts ios|android [--bundled [--edition full]] [--force|--status]'
+      );
+    if (edition !== undefined) {
+      if (platform !== 'ios' || kind !== 'bundled' || flag !== undefined)
+        throw new Error('--edition goes with `ios --bundled` and nothing else');
+      await ensureNativeBuild('ios', 'auto', 'bundled');
+      console.log(JSON.stringify(await bundledEdition(edition), null, 2));
+    } else if (flag === '--status') {
+      const fingerprint = await nativeFingerprint(platform, kind);
+      const stamp = readStamp(platform, kind);
       console.log(
         JSON.stringify(
           {
@@ -412,7 +743,8 @@ if (import.meta.main) {
             current:
               stamp?.fingerprint === fingerprint &&
               Boolean(stamp?.artifactSha256) &&
-              nativeArtifactHash(stamp!.artifact) === stamp!.artifactSha256,
+              nativeArtifactHash(stamp!.artifact) === stamp!.artifactSha256 &&
+              (kind === 'dev' || bundledJavaScriptIsCurrent(stamp!)),
           },
           null,
           2
@@ -420,7 +752,7 @@ if (import.meta.main) {
       );
     } else {
       if (flag !== undefined && flag !== '--force') throw new Error('Choose --force or --status');
-      const stamp = await ensureNativeBuild(platform, flag === '--force' ? 'force' : 'auto');
+      const stamp = await ensureNativeBuild(platform, flag === '--force' ? 'force' : 'auto', kind);
       console.log(JSON.stringify(stamp, null, 2));
     }
   } catch (error) {

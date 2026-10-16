@@ -1,0 +1,232 @@
+{
+  "id": "copy-a-token-and-redeem-it",
+  "purpose": "A person makes a 20 sat ecash token, copies it, and redeems it through Paste in Receive, as the person they sent it to would.",
+  "startsFrom": "take-back-unclaimed-ecash",
+  "steps": [
+    {
+      "name": "the wallet opens",
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-send"
+          }
+        },
+        {
+          "logged": "splash.gone"
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "open Send",
+      "tap": {
+        "id": "wallet-send"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "send-method-createEcash"
+          }
+        }
+      ]
+    },
+    {
+      "name": "create ecash",
+      "tap": {
+        "id": "send-method-createEcash"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "keypad-key-2"
+          }
+        }
+      ]
+    },
+    {
+      "name": "press 2",
+      "tap": {
+        "id": "keypad-key-2"
+      },
+      "expect": [
+        {
+          "visible": {
+            "label": "Amount 2 sat"
+          }
+        }
+      ]
+    },
+    {
+      "name": "press 0",
+      "tap": {
+        "id": "keypad-key-0"
+      },
+      "expect": [
+        {
+          "visible": {
+            "label": "Amount 20 sat"
+          }
+        }
+      ]
+    },
+    {
+      "name": "create the ecash",
+      "tap": {
+        "id": "amount-next"
+      },
+      "expect": [
+        {
+          "page": "SendTokenScreen"
+        },
+        {
+          "visible": {
+            "id": "send-token-copy"
+          }
+        }
+      ],
+      "withinMs": 20000
+    },
+    {
+      "name": "copy",
+      "tap": {
+        "id": "send-token-copy"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "send-token-copy-menu-text"
+          }
+        }
+      ]
+    },
+    {
+      "name": "copy it as text, and let the notice go",
+      "tap": {
+        "id": "send-token-copy-menu-text"
+      },
+      "expect": [
+        {
+          "logged": "popup.toast.shown"
+        },
+        {
+          "logged": "popup.toast.hidden"
+        },
+        {
+          "visible": {
+            "id": "send-token-copy"
+          }
+        }
+      ],
+      "withinMs": 10000
+    },
+    {
+      "name": "go back to the amount",
+      "tap": {
+        "id": "flow-header-back"
+      },
+      "expect": [
+        {
+          "gone": {
+            "id": "send-token-copy"
+          }
+        },
+        {
+          "visible": {
+            "id": "amount-next"
+          }
+        }
+      ]
+    },
+    {
+      "name": "go back to Send",
+      "tap": {
+        "id": "flow-header-back"
+      },
+      "expect": [
+        {
+          "gone": {
+            "id": "amount-next"
+          }
+        },
+        {
+          "visible": {
+            "id": "send-destination-input"
+          }
+        }
+      ]
+    },
+    {
+      "name": "close Send",
+      "tap": {
+        "id": "flow-header-close"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-receive"
+          }
+        },
+        {
+          "gone": {
+            "id": "send-destination-input"
+          }
+        }
+      ]
+    },
+    {
+      "name": "open Receive",
+      "tap": {
+        "id": "wallet-receive"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "receive-method-paste"
+          }
+        }
+      ]
+    },
+    {
+      "name": "paste the token",
+      "tap": {
+        "id": "receive-method-paste"
+      },
+      "expect": [
+        {
+          "page": "ReceiveTokenScreen"
+        },
+        {
+          "visible": {
+            "id": "receive-token-redeem"
+          }
+        },
+        {
+          "visible": {
+            "label": "Incoming 20 sat transaction, prepared"
+          }
+        },
+        {
+          "logged": "ui.touch"
+        }
+      ],
+      "withinMs": 15000
+    },
+    {
+      "name": "redeem",
+      "tap": {
+        "id": "receive-token-redeem"
+      },
+      "expect": [
+        {
+          "logged": "payment.receive.confirmed"
+        },
+        {
+          "gone": {
+            "id": "receive-token-redeem"
+          }
+        }
+      ],
+      "withinMs": 30000
+    }
+  ]
+}

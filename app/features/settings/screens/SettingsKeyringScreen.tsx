@@ -208,7 +208,7 @@ const KeyItem: React.FC<{
         </View>
         <ListGroup.ItemContent>
           <Text size={11} style={{ color: foreground }}>
-            {truncateMiddle(displayKey, 7)}
+            {truncateMiddle(displayKey)}
           </Text>
           <Text size={10} className="mt-0.5" style={{ color: withAlpha(foreground, 0.4) }}>
             {isDerived ? `Derived Key ${keypair.derivationIndex}` : 'Imported'}

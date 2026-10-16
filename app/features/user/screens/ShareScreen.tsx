@@ -15,7 +15,7 @@ import { copyPopup } from '@/shared/lib/popup';
 import { withAlpha } from '@/shared/lib/color';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { UnderlineTabs } from '@/shared/ui/composed/UnderlineTabs';
-import { GradientCard } from '@/shared/ui/composed/GradientCard';
+import { Surface } from '@/shared/ui/composed/Surface';
 import { ListGroup } from 'heroui-native';
 import { CopyRequestRow } from '@/shared/ui/composed/CopyRequestCard';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -160,7 +160,7 @@ export function ShareScreen({ type, data, npub, lud16, onTitleChange }: ShareScr
       <PaymentInfo copyTarget={config.copyTarget} data={activeData} unit={config.unit} />
 
       <Section title={config.sectionTitle}>
-        <GradientCard>
+        <Surface>
           <ListGroup variant="transparent">
             <CopyRequestRow
               icon={
@@ -186,7 +186,7 @@ export function ShareScreen({ type, data, npub, lud16, onTitleChange }: ShareScr
               accessibilityLabel={`Copy ${config.sectionTitle.toLowerCase()}`}
             />
           </ListGroup>
-        </GradientCard>
+        </Surface>
       </Section>
     </Screen>
   );

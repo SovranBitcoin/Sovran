@@ -1,0 +1,94 @@
+{
+  "id": "read-the-notification-tabs",
+  "purpose": "A person looks through the All, Mentions, Mints and App tabs of their notifications.",
+  "startsFrom": "onboarded",
+  "steps": [
+    {
+      "name": "the wallet opens",
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-send"
+          }
+        },
+        {
+          "logged": "splash.gone"
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "go to notifications",
+      "tap": {
+        "label": "Notifications"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "notifications-tab-mentions"
+          }
+        },
+        {
+          "visible": {
+            "id": "notifications-tab-app"
+          }
+        }
+      ],
+      "withinMs": 12000
+    },
+    {
+      "name": "look at Mentions",
+      "tap": {
+        "id": "notifications-tab-mentions"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "notifications-tab-mentions"
+          }
+        },
+        {
+          "visible": {
+            "id": "screen-notifications"
+          }
+        }
+      ]
+    },
+    {
+      "name": "look at Mints",
+      "tap": {
+        "id": "notifications-tab-mints"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "notifications-tab-mints"
+          }
+        },
+        {
+          "visible": {
+            "id": "screen-notifications"
+          }
+        }
+      ]
+    },
+    {
+      "name": "look at App",
+      "tap": {
+        "id": "notifications-tab-app"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "notifications-tab-app"
+          }
+        },
+        {
+          "visible": {
+            "id": "screen-notifications"
+          }
+        }
+      ]
+    }
+  ]
+}

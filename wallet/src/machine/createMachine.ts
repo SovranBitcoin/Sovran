@@ -5,7 +5,12 @@ import { isValidSatAmount } from "../guards";
 import { defaultDetectors } from "../detectors";
 import type { P2pkLockSpec } from "../p2pk";
 import { createMintRowRules } from "../mint-list-rows";
-import { isMeltUserCancelledError, isMintOfflineError } from "../errors";
+import {
+  failureText,
+  isMeltUserCancelledError,
+  isMintOfflineError,
+} from "../errors";
+import { isLockedSend } from "../p2pk";
 import { t } from "../formatting/locales";
 import { compareMintDisplayOrder } from "../mint-capabilities";
 import { errField, logger, mintUrlFields } from "../logger";
@@ -36,6 +41,7 @@ import type {
   ExecutionState,
   FlowContext,
   FlowStep,
+  SendFallbackId,
   MeltQuoteMethod,
   MintQuoteMethod,
   MintSelectorScope,
@@ -80,6 +86,7 @@ function deriveExecutionState(
       };
 
     case "chooseFallbackOption":
+    case "chooseSendFallback":
       return {
         status: "needsInput",
         code: "FALLBACK_OPTION_REQUIRED",
@@ -183,6 +190,7 @@ const INPUT_STEPS = new Set<FlowStep>([
   "selectMint",
   "chooseOption",
   "chooseFallbackOption",
+  "chooseSendFallback",
   "chooseProofs",
   "enterSendMemo",
 ]);
@@ -502,6 +510,98 @@ export function createPaymentMachine(
     }
   }
 
+  /**
+   * The retry behind a `chooseSendFallback` step, kept off the step data so
+   * the app renders only what the user chooses between.
+   */
+  let sendFallback: {
+    amount: number;
+    unit: string;
+    mintUrl: string;
+    npcTarget?: string;
+    error: StepDataMap["error"];
+  } | null = null;
+
+  /** Plain ecash for a lock the user added themselves; never for a required one. */
+  function lockFallbackFor(
+    data: { mintUrl: string; amount: number; unit: string },
+    error: StepDataMap["error"],
+  ): StepDataMap["chooseSendFallback"] | null {
+    if (
+      flowCtx.destination !== "sendEcash" ||
+      !isLockedSend(flowCtx) ||
+      !flowCtx.lockIsOptional
+    ) {
+      return null;
+    }
+    sendFallback = { ...data, error };
+    return {
+      amount: data.amount,
+      unit: data.unit,
+      failed: {
+        label: "as Locked Ecash",
+        message: error.message,
+        authored: error.data?.authored === true,
+      },
+      alternatives: [
+        {
+          id: "ecash",
+          label: "as Ecash",
+          description:
+            "Send it unlocked. Anyone holding the token can claim it, so share it only with them.",
+        },
+      ],
+    };
+  }
+
+  /**
+   * Their npub.cash address when their own Lightning address failed. Not when
+   * the mint was the problem: npub.cash needs the same mint to pay.
+   */
+  function npcFallbackFor(
+    err: unknown,
+    data: { mintUrl: string; amount: number; unit: string; meltTarget?: string },
+  ): StepDataMap["chooseSendFallback"] | null {
+    const target = data.meltTarget ?? flowCtx.meltTarget ?? "";
+    if (
+      isMintOfflineError(err) ||
+      !flowCtx.recipientPubkey ||
+      !target.includes("@") ||
+      /@npubx?\.cash$/i.test(target.trim()) ||
+      meltMethodForTarget(target) === "onchain"
+    ) {
+      return null;
+    }
+    const npcTarget = operations?.npcAddressForPubkey?.(flowCtx.recipientPubkey);
+    if (!npcTarget) return null;
+    const { message, authored } = failureText(err, "Lightning payment failed");
+    sendFallback = {
+      amount: data.amount,
+      unit: data.unit,
+      mintUrl: data.mintUrl,
+      npcTarget,
+      error: {
+        code: "MELT_FAILED",
+        message,
+        ...(authored ? { data: { authored: true } } : {}),
+      },
+    };
+    return {
+      amount: data.amount,
+      unit: data.unit,
+      failed: { label: `as Lightning (${target.trim()})`, message, authored },
+      alternatives: [
+        {
+          id: "lightning-npc",
+          label: "as Lightning (npub.cash)",
+          description:
+            "They haven't published this address. npub.cash accepts payments for any Nostr key, but only they can claim it, so check they use it.",
+          isCaution: true,
+        },
+      ],
+    };
+  }
+
   // Helper: route an operation failure to BIP321 fallback or error.
   /**
    * Route an operation failure. For BIP321 multi-option flows, marks the
@@ -530,11 +630,12 @@ export function createPaymentMachine(
       return;
     }
 
-    const message = isMintOfflineError(err)
-      ? t("MINT_UNREACHABLE", getLocale?.() ?? "en")
-      : err instanceof Error
-        ? err.message
-        : `${variant === "melt" ? "Melt" : "Payment request"} failed`;
+    const { message, authored } = isMintOfflineError(err)
+      ? { message: t("MINT_UNREACHABLE", getLocale?.() ?? "en"), authored: true }
+      : failureText(
+          err,
+          `${variant === "melt" ? "Melt" : "Payment request"} failed`,
+        );
 
     // Always notify failure so the processing notification is dismissed.
     void notifications?.onPaymentFailed?.({
@@ -543,6 +644,7 @@ export function createPaymentMachine(
       amount: data.amount,
       unit: data.unit,
       message,
+      authored,
       rolledBack: opts?.rolledBack,
     });
 
@@ -570,6 +672,7 @@ export function createPaymentMachine(
           unit: flowCtx.unit,
           failedOptionValues: failedValues,
           lastFailedMessage: message,
+          lastFailedAuthored: authored,
         });
         return;
       }
@@ -579,6 +682,15 @@ export function createPaymentMachine(
         message: "All payment options have failed",
       });
       return;
+    }
+
+    if (variant === "melt") {
+      const fallback = npcFallbackFor(err, { ...data, meltTarget: failedValue });
+      if (fallback) {
+        logger.info("machine.sendFallback.offered", { failed: "lightning", id: "lightning-npc" });
+        setStep("chooseSendFallback", fallback);
+        return;
+      }
     }
 
     // Single-option: stay on the current step so the user can retry.
@@ -777,6 +889,46 @@ export function createPaymentMachine(
     ) {
       const originalStep = step;
       const data = stepData as StepDataMap["navigateToMeltPreview"];
+      if (
+        data.meltQuote?.expiresAt != null &&
+        data.meltQuote.expiresAt <= Date.now() / 1000 &&
+        operations.quoteMelt
+      ) {
+        // The previous approval expired. Show the new quote and require a
+        // second tap, even when the fee happens to be unchanged.
+        handlerExecuting = true;
+        notify();
+        try {
+          const refreshed = await runMeltQuotePreviewEffect({
+            data,
+            operation: operations.quoteMelt,
+            isStale: (op) => isStaleGeneration(sendGeneration, op),
+          });
+          if (refreshed.isOk()) {
+            if (refreshed.value.kind === "stale") return;
+            flowCtx = { ...flowCtx, meltQuotePreview: refreshed.value.quote };
+            setStep("navigateToMeltPreview", {
+              ...data,
+              meltQuote: refreshed.value.quote,
+            });
+          } else {
+            routeOperationFailure(
+              refreshed.error.cause,
+              "melt",
+              data.meltTarget,
+              data,
+            );
+          }
+          await dispatchHandler(step, stepData);
+        } finally {
+          if (!isStaleGeneration(sendGeneration, "confirmMelt.refreshQuote")) {
+            handlerExecuting = false;
+            sendLocked = false;
+            notify();
+          }
+        }
+        return;
+      }
       logger.info("machine.confirmMelt.start", {
         ...mintUrlFields(data.mintUrl),
         amount: data.amount,
@@ -814,7 +966,10 @@ export function createPaymentMachine(
 
         for (const link of effect.value.links) {
           if (link.type === "linkTransaction") {
-            operations.linkTransaction?.(link.input, link.transactionId);
+            operations.linkTransaction?.({
+              scannedInput: link.input,
+              transactionId: link.transactionId,
+            });
           }
         }
 
@@ -934,7 +1089,10 @@ export function createPaymentMachine(
 
           for (const link of effect.value.links) {
             if (link.type === "linkTransaction") {
-              operations.linkTransaction?.(link.input, link.transactionId);
+              operations.linkTransaction?.({
+              scannedInput: link.input,
+              transactionId: link.transactionId,
+            });
             }
           }
 
@@ -994,6 +1152,20 @@ export function createPaymentMachine(
       // Set when the NFC branch switched the host unit; a failed or abandoned tap
       // must restore the user's unit instead of leaving a terminal's choice behind.
       let revertNfcUnit: (() => Promise<void>) | null = null;
+      // The unit an NFC request switched the host to, for the rest of this
+      // dispatch. Every read of the wallet context below goes through
+      // `readContext`, which keeps the balances in that unit.
+      let nfcSwitchedUnit: string | null = null;
+      const readContext = (): ReturnType<typeof getContext> => {
+        const ctx = getContext();
+        if (!nfcSwitchedUnit) return ctx;
+        // No balances for the unit after all: no mint can pay, rather than
+        // the old unit's balances standing in for them.
+        return {
+          ...ctx,
+          mintBalances: ctx.unitBalances?.[nfcSwitchedUnit.trim().toLowerCase()] ?? {},
+        };
+      };
       // A terminal chooses one unit. Switch the host's whole cached view before
       // the ordinary transition can reject a cross-unit request (including BIP21).
       if (event.type === "EXECUTE" && lastScanSource === "nfc" && nfcAdapter) {
@@ -1052,8 +1224,13 @@ export function createPaymentMachine(
                 };
               }
               if (isStaleGeneration(sendGeneration, "nfc.switchUnit")) return;
-              walletCtx = getContext();
               unit = getUnit?.() ?? configUnit;
+              // A bound context catches up with the unit only when React next
+              // re-runs its binding, so its `mintBalances` may still be the old
+              // unit's here. `unitBalances` holds every unit and does not lag:
+              // it is what found this request funded above.
+              if (switched.isOk()) nfcSwitchedUnit = unit;
+              walletCtx = readContext();
               // A missing/unsupported host switch keeps the existing unit hard-stop.
             }
           }
@@ -1253,7 +1430,7 @@ export function createPaymentMachine(
                 optionCount: options.length,
                 hasInvoiceFallback: !!invoiceAlternative,
               });
-              const walletCtxInner = getContext();
+              const walletCtxInner = readContext();
               const unitInner = getUnit?.() ?? configUnit;
               const r = transition(
                 step,
@@ -1278,7 +1455,7 @@ export function createPaymentMachine(
             nfcResolved = true;
           } else if (step === "selectMint") {
             const data = stepData as StepDataMap["selectMint"];
-            const walletCtxInner = getContext();
+            const walletCtxInner = readContext();
             const info = flowCtx.paymentRequest
               ? detectors.getPaymentRequestInfo(flowCtx.paymentRequest)
               : null;
@@ -1312,10 +1489,10 @@ export function createPaymentMachine(
             let refusal: string | undefined = [...nfcRefusedMints.values()].at(-1);
             for (const candidate of ranked) {
               const payability = operations?.paymentRequestPayabilityFrom
-                ? await operations.paymentRequestPayabilityFrom(
-                    candidate.mintUrl,
-                    flowCtx.unit,
-                  )
+                ? await operations.paymentRequestPayabilityFrom({
+                    mintUrl: candidate.mintUrl,
+                    unit: flowCtx.unit,
+                  })
                 : { payable: true as const };
               if (isStaleGeneration(sendGeneration, "nfc.payability")) return;
               if (payability.payable) {
@@ -1422,10 +1599,10 @@ export function createPaymentMachine(
               !nfcRefusedMints.has(data.mintUrl) &&
               !nfcPayableMints.has(data.mintUrl)
             ) {
-              const payability = await operations.paymentRequestPayabilityFrom(
-                data.mintUrl,
-                data.unit,
-              );
+              const payability = await operations.paymentRequestPayabilityFrom({
+                mintUrl: data.mintUrl,
+                unit: data.unit,
+              });
               if (isStaleGeneration(sendGeneration, "nfc.payability")) return;
               if (!payability.payable) {
                 nfcRefusedMints.set(data.mintUrl, payability.reason);
@@ -1433,7 +1610,7 @@ export function createPaymentMachine(
                   ...mintUrlFields(data.mintUrl),
                   reason: payability.reason,
                 });
-                const walletCtxInner = getContext();
+                const walletCtxInner = readContext();
                 const unitInner = getUnit?.() ?? configUnit;
                 const r = transition(
                   step,
@@ -1479,7 +1656,10 @@ export function createPaymentMachine(
 
               for (const link of effect.value.links) {
                 if (link.type === "linkTransaction") {
-                  operations.linkTransaction?.(link.input, link.transactionId);
+                  operations.linkTransaction?.({
+              scannedInput: link.input,
+              transactionId: link.transactionId,
+            });
                 }
               }
 
@@ -1585,7 +1765,16 @@ export function createPaymentMachine(
                 error: errField(effect.error.fallbackFailure),
               });
             }
-            setStep("error", effect.error.data);
+            const lockFallback = lockFallbackFor(
+              { ...data, unit: flowCtx.unit },
+              effect.error.data,
+            );
+            if (lockFallback) {
+              logger.info("machine.sendFallback.offered", { failed: "locked-ecash", id: "ecash" });
+              setStep("chooseSendFallback", lockFallback);
+            } else {
+              setStep("error", effect.error.data);
+            }
           }
           handlerExecuting = false;
           notify();
@@ -1995,6 +2184,37 @@ export function createPaymentMachine(
   const chooseProofs = (amount: number) =>
     send({ type: "PROOFS_CHOSEN", amount });
 
+  const chooseSendFallback = async (id: SendFallbackId | null) => {
+    const retry = sendFallback;
+    sendFallback = null;
+    logger.info("machine.sendFallback.chosen", { id, hasRetry: !!retry });
+    if (!retry || step !== "chooseSendFallback") return;
+    if (id === null) {
+      setStep("error", retry.error);
+      notify();
+      return;
+    }
+    const recipient = {
+      ...(flowCtx.recipientPubkey ? { recipientPubkey: flowCtx.recipientPubkey } : {}),
+      ...(flowCtx.recipientProfile ? { recipientProfile: flowCtx.recipientProfile } : {}),
+    };
+    const amount = { value: retry.amount, unit: retry.unit };
+    if (id === "ecash") {
+      await enterAmount(amount, retry.mintUrl, {
+        destination: "sendEcash",
+        p2pkLock: null,
+        ...recipient,
+      });
+    } else if (retry.npcTarget) {
+      await enterAmount(amount, retry.mintUrl, {
+        destination: "meltQuote",
+        meltQuoteMethod: "bolt11",
+        meltTarget: retry.npcTarget,
+        ...recipient,
+      });
+    }
+  };
+
   const submitSendMemo = (memo?: string) =>
     send({ type: "SEND_MEMO_SUBMITTED", memo });
 
@@ -2077,6 +2297,7 @@ export function createPaymentMachine(
     enterAmount,
     chooseOption,
     chooseProofs,
+    chooseSendFallback,
     submitSendMemo,
     changeMint,
     requestMintSelector,

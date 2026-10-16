@@ -1,3 +1,4 @@
+import { useProfile } from '@/shared/lib/nostr/useEntityCache';
 /**
  * Bottom panel components for the image overlay:
  * - ImageOverlayBottomPanelContent: scrollable author, content (with inline images), metrics
@@ -9,7 +10,7 @@
  * - InlinePanelImage: image with blurred letterbox for aspect ratio mismatch
  */
 
-import { avatarStateFor } from '@/shared/lib/imageLoadState';
+import { profileAvatarStateFor } from '@/shared/lib/imageLoadState';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
@@ -154,6 +155,7 @@ function OverlayAuthorRow({
   nameColor: string;
   timeColor: string;
 }) {
+  const { profile: cachedAuthor, status: authorStatus } = useProfile(event.pubkey);
   const displayName = profile?.name ?? `${event.pubkey.slice(0, 8)}…`;
   const shortTime = formatRelativeUnixSeconds(event.created_at);
   return (
@@ -169,8 +171,8 @@ function OverlayAuthorRow({
       }}
       style={styles.authorRow}>
       <Avatar
-        state={avatarStateFor(profile?.picture, profile !== undefined)}
-        picture={profile?.picture}
+        state={profileAvatarStateFor(cachedAuthor?.picture ?? profile?.picture, authorStatus)}
+        picture={cachedAuthor?.picture ?? profile?.picture}
         seed={event.pubkey}
         size={avatarSize}
         name={displayName}

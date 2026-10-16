@@ -70,6 +70,7 @@ const mockStatus = {
   setLegSkipped: jest.fn(),
   setLegFailed: jest.fn(),
   complete: jest.fn(),
+  settleUnknown: jest.fn(),
   fail: jest.fn(),
   cancel: jest.fn(),
 };
@@ -256,6 +257,28 @@ test('recipient verification keeps the existing 15-second timeout and never repe
   expect(cashuLog.warn).toHaveBeenCalledWith('mint.rebalance.balance_timeout');
 });
 
+test('a destination that has not issued within the wait is settling, never done', async () => {
+  keepRecipientPending();
+  const { result } = mount();
+  await act(async () => result.current.handleStart());
+  await act(async () => {
+    await jest.advanceTimersByTimeAsync(15500);
+  });
+  expect(result.current.runStatus).toBe('finished');
+  expect(result.current.stepStates['step-1']).toMatchObject({
+    status: 'settling',
+    routingDetail: expect.stringContaining('has not credited it yet'),
+  });
+  expect(mockTransactions.setLegStatus).toHaveBeenLastCalledWith(
+    'group-1',
+    'leg-1',
+    expect.objectContaining({ localStatus: 'settling' })
+  );
+  expect(mockStatus.setLegDone).not.toHaveBeenCalled();
+  expect(mockStatus.complete).not.toHaveBeenCalled();
+  expect(mockStatus.settleUnknown).toHaveBeenCalled();
+});
+
 test('a finalized recipient operation with unrecovered-proof error cannot release verification', async () => {
   mockManager.ops.mint.get.mockImplementation(async () => ({
     ...operation(),
@@ -375,9 +398,20 @@ test('a melt still unsettled after the settle window stays pending instead of fa
   });
   expect(result.current.runStatus).toBe('finished');
   expect(result.current.stepStates['step-1']).toMatchObject({
-    status: 'melting',
+    status: 'paymentPending',
     routingDetail: expect.stringContaining('Payment pending'),
   });
+  expect(mockTransactions.setLegStatus).toHaveBeenLastCalledWith(
+    'group-1',
+    'leg-1',
+    expect.objectContaining({ localStatus: 'paymentPending' })
+  );
+
+  // Retrying what failed must not send a payment whose outcome is unknown again.
+  await act(async () => {
+    await result.current.handleRetryFailed();
+  });
+  expect(mockManager.ops.melt.execute).toHaveBeenCalledTimes(1);
   expect(mockManager.ops.melt.execute).toHaveBeenCalledTimes(1);
   expect(mockRestore).not.toHaveBeenCalled();
   expect(mockStatus.setLegFailed).not.toHaveBeenCalled();
@@ -500,8 +534,10 @@ test.each([0, 1])(
     expect(receipts.get(replacement)?.amount.toNumber()).toBe(
       receipts.get(abandoned)!.amount.toNumber() - 2
     );
+    // The replacement's operation is saved too: a settling leg is reconciled from it.
     expect(mockTransactions.tagMintQuote).toHaveBeenCalledWith('group-1', 'leg-1', {
       quoteId: replacement,
+      operationId: `mint-${replacement}`,
     });
     expect(setTransactionAnnotation).toHaveBeenCalledWith(
       `quote:${replacement}`,

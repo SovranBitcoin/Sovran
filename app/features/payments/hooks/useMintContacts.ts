@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Mint } from '@cashu/coco-core';
 import type { GetInfoResponse } from '@cashu/cashu-ts';
 import { paymentLog, mintUrlLogFields } from '@/shared/lib/logger';
@@ -25,6 +25,9 @@ export interface MintContact {
   timestamp: number;
 }
 
+/** Mint info requests in flight at once; a miss is an HTTP round trip to the mint. */
+const MINT_INFO_CONCURRENCY = 4;
+
 export function useMintContacts(
   _nostrKeys: NostrKeys | null,
   mints: Mint[],
@@ -35,6 +38,13 @@ export function useMintContacts(
 ) {
   const [mintsWithInfo, setMintsWithInfo] = useState<MintWithInfo[]>([]);
   const [mintInfoLoading, setMintInfoLoading] = useState(false);
+  // Info this hook instance already loaded, per `getMintInfo` (a new wallet
+  // manager brings a new one). Adding or removing a mint then asks only for the
+  // mints it has not seen; a failed mint is not recorded, so it is asked again.
+  const loadedRef = useRef<{
+    getMintInfo: (url: string) => Promise<GetInfoResponse>;
+    byUrl: Map<string, GetInfoResponse>;
+  } | null>(null);
 
   // Coco's mint:* event cascade replaces the `mints` array reference on every
   // event (mint:added / mint:updated / mint:trusted / mint:untrusted), even
@@ -53,23 +63,37 @@ export function useMintContacts(
   useEffect(() => {
     if (mints.length === 0) return;
     let cancelled = false;
+    if (loadedRef.current?.getMintInfo !== getMintInfo) {
+      loadedRef.current = { getMintInfo, byUrl: new Map() };
+    }
+    // Captured, so a run superseded by a new `getMintInfo` fills its own map.
+    const loaded = loadedRef.current.byUrl;
 
     const loadMintInfo = async () => {
       try {
         setMintInfoLoading(true);
-        const results = await Promise.all(
-          mints.map(async (mint) => {
+        const results: { mint: Mint; mintInfo: GetInfoResponse | null }[] = mints.map((mint) => ({
+          mint,
+          mintInfo: loaded.get(mint.mintUrl) ?? null,
+        }));
+        const missing = results.filter((result) => result.mintInfo === null);
+        let next = 0;
+        const worker = async () => {
+          while (next < missing.length) {
+            const result = missing[next++];
             try {
-              const mintInfo = await getMintInfo(mint.mintUrl);
-              return { mint, mintInfo };
+              result.mintInfo = await getMintInfo(result.mint.mintUrl);
+              loaded.set(result.mint.mintUrl, result.mintInfo);
             } catch (err) {
               paymentLog.warn('payment.mint.contacts.info_failed', {
-                ...mintUrlLogFields(mint.mintUrl),
+                ...mintUrlLogFields(result.mint.mintUrl),
                 error: err instanceof Error ? err : new Error(String(err)),
               });
-              return { mint, mintInfo: null };
             }
-          })
+          }
+        };
+        await Promise.all(
+          Array.from({ length: Math.min(MINT_INFO_CONCURRENCY, missing.length) }, worker)
         );
         if (cancelled) return;
 

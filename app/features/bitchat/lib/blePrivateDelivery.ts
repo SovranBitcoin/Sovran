@@ -43,12 +43,7 @@ interface SendBLEPrivateMessageChunksResult extends BLEPrivateSessionTimings {
   sendMs: number;
 }
 
-interface SendBLEPrivateMessageWholeResult extends BLEPrivateSessionTimings {
-  messageId: string;
-  sendMs: number;
-}
-
-const DEFAULT_MAX_BYTES = 255;
+const DEFAULT_MAX_BYTES = 254; // 0xFF selects the Sovran extended TLV.
 const DEFAULT_HANDSHAKE_DELAY_MS = 250;
 const UTF8_ENCODER = new TextEncoder();
 const UTF8_DECODER = new TextDecoder('utf-8', { fatal: false });
@@ -133,7 +128,7 @@ function prepareBLEPrivateSend({
     createMessageId,
     async open() {
       const startupAt = now();
-      await startBLEFn(effectiveNickname, profileScope, identityMaterial);
+      await startBLEFn({ nickname: effectiveNickname, profileScope, identityMaterial });
       const startupMs = now() - startupAt;
 
       const handshakeAt = now();
@@ -147,7 +142,12 @@ function prepareBLEPrivateSend({
       return { startupMs, handshakeMs, ...(handshakeError ? { handshakeError } : {}) };
     },
     send: (content: string, messageId: string) =>
-      sendPrivateMessageFn(peerID, content, effectiveNickname, messageId),
+      sendPrivateMessageFn({
+        peerID,
+        content,
+        nickname: effectiveNickname,
+        messageID: messageId,
+      }),
   };
 }
 
@@ -171,40 +171,6 @@ export async function sendBLEPrivateMessageChunks({
   return {
     chunks: chunks.length,
     messageIds,
-    ...timings,
-    sendMs: session.now() - sendAt,
-  };
-}
-
-/**
- * Send `content` as a SINGLE private Noise DM to `peerID`.
- *
- * Sovran extends the bitchat `PrivateMessagePacket` content length (a 0xFF
- * sentinel + 2-byte length), so a whole multi-KB ecash token fits ONE private
- * message — the 255-byte cap was a message-format limit, not a transport one,
- * and the transport fragments the encrypted packet transparently. Only Sovran
- * peers can decode our >254-byte DMs (stock misparses them), which is
- * acceptable: Nut Drop payments are Sovran↔Sovran, and a Noise DM is encrypted
- * to the recipient, so the token (locked or bearer) stays private and safe —
- * no public-mesh broadcast of payment metadata.
- *
- * `startBLE` here is defensive (BLE is already up from the radar) and passes no
- * creq, so it never clears the advertised creq — only `stop()` does.
- */
-export async function sendBLEPrivateMessageWhole({
-  content,
-  messageIdPrefix = 'nutdrop',
-  ...target
-}: BLEPrivateSendOptions): Promise<SendBLEPrivateMessageWholeResult> {
-  const session = prepareBLEPrivateSend({ ...target, messageIdPrefix });
-  const timings = await session.open();
-
-  const sendAt = session.now();
-  const messageId = session.createMessageId();
-  await session.send(content, messageId);
-
-  return {
-    messageId,
     ...timings,
     sendMs: session.now() - sendAt,
   };

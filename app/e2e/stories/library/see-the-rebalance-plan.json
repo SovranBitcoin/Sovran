@@ -1,0 +1,68 @@
+{
+  "id": "see-the-rebalance-plan",
+  "purpose": "A person with nothing to move opens the balance split, asks for a plan, and is told there is nothing to do.",
+  "startsFrom": "onboarded",
+  "steps": [
+    {
+      "name": "the wallet opens",
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-send"
+          }
+        },
+        {
+          "logged": "splash.gone"
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "open Split",
+      "tap": {
+        "id": "wallet-split"
+      },
+      "expect": [
+        {
+          "page": "MintDistributionScreen"
+        },
+        {
+          "visible": {
+            "id": "mint-distribution-next"
+          }
+        }
+      ]
+    },
+    {
+      "name": "ask for the plan",
+      "tap": {
+        "id": "mint-distribution-next"
+      },
+      "expect": [
+        {
+          "page": "MintRebalancePlanScreen"
+        },
+        {
+          "visible": {
+            "id": "rebalance-done-noop"
+          }
+        }
+      ],
+      "withinMs": 10000
+    },
+    {
+      "name": "done",
+      "tap": {
+        "id": "rebalance-done-noop"
+      },
+      "expect": [
+        {
+          "gone": {
+            "id": "rebalance-done-noop"
+          }
+        }
+      ],
+      "withinMs": 8000
+    }
+  ]
+}

@@ -1,23 +1,23 @@
 {
-  "$comment": "Production Expo export ceilings. References remain the 2026-09-01 measurements. The 2026-09-11 asset review added exactly the measured 14,916,733-byte product increase to each prior asset ceiling; the 2026-09-13 review adds exactly the measured 329,932-byte Artemis story demo video. JS ceilings and original headroom remain unchanged.",
+  "$comment": "Production Expo export ceilings. References remain the 2026-09-01 measurements. The 2026-09-11 asset review added exactly the measured 14,916,733-byte product increase to each prior asset ceiling; the 2026-09-13 review adds exactly the measured 329,932-byte Artemis story demo video. JS ceilings and original headroom remain unchanged. The 2026-09-28 review re-bases the JS references on the measured bundle after @routstr/sdk and keeps the original JS headroom.",
   "platforms": {
     "ios": {
       "referenceBytes": {
-        "bundle": 20374496,
+        "bundle": 24229424,
         "assets": 1791416
       },
       "maximumBytes": {
-        "bundle": 21400000,
+        "bundle": 25254928,
         "assets": 17146665
       }
     },
     "android": {
       "referenceBytes": {
-        "bundle": 20550160,
+        "bundle": 24302506,
         "assets": 2753722
       },
       "maximumBytes": {
-        "bundle": 21600000,
+        "bundle": 25352346,
         "assets": 18146665
       }
     }
@@ -40,6 +40,18 @@
       "bundledDemoVideoBytes": 329932,
       "otherAssetDeltaBytes": 0,
       "reason": "Offline Mock Mode Artemis story demo video (app/assets/demo/story-artemis/video.mp4, added in ae7e1cc3). Measured iOS 17,038,081 and Android 18,000,387 asset bytes, both exactly 329,932 over the 2026-09-11 references. Keep the original headroom and remeasure future additions."
+    }
+  ],
+  "bundleBudgetReviews": [
+    {
+      "date": "2026-09-28",
+      "sourceCommit": "55d13b6c",
+      "evidence": "https://github.com/SovranBitcoin/Sovran/actions/runs/36481173779",
+      "measuredBytes": {
+        "ios": 24229424,
+        "android": 24302506
+      },
+      "reason": "@routstr/sdk (with tinfoil, applesauce and its own cashu-ts) added ~2.8 MB of JS from 2026-09-26. Re-based the references on this measurement with the original headroom; trimming the SDK's dependency tree is the way to win it back."
     }
   ]
 }

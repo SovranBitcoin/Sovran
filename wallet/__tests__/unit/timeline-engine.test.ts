@@ -3,60 +3,48 @@ import { describe, expect, it } from 'vitest';
 import { buildTimeline, buildTimelineModel } from '../../src/history';
 
 const CREATED_AT = 1_700_000_000_000;
+const base = {
+  mintUrl: 'https://mint.example.com',
+  unit: 'sat',
+  createdAt: CREATED_AT,
+  updatedAt: CREATED_AT,
+  operationId: 'op-1',
+};
 
 const meltEntry = (state: string) =>
   ({
+    ...base,
     id: 'melt-op-1',
     type: 'melt',
     state,
-    mintUrl: 'https://mint.example.com',
     amount: 5_000,
-    unit: 'sat',
-    createdAt: CREATED_AT,
-    updatedAt: CREATED_AT,
-    operationId: 'op-1',
     quoteId: 'mq-1',
     metadata: { method: 'onchain', onchainAddress: 'bc1qexample' },
   }) as never;
 
-const mintEntry = (state: string) =>
+const mintEntry = (state: string, extra: Record<string, unknown> = {}) =>
   ({
+    ...base,
     id: 'mint-op-1',
     type: 'mint',
     state,
-    mintUrl: 'https://mint.example.com',
     amount: 21_000,
-    unit: 'sat',
-    createdAt: CREATED_AT,
-    updatedAt: CREATED_AT,
     quoteId: 'q1',
     paymentRequest: '',
+    ...extra,
   }) as never;
 
-const sendEntry = (state: string) =>
-  ({
-    id: 'send-op-1',
-    type: 'send',
-    state,
-    mintUrl: 'https://mint.example.com',
-    amount: 100,
-    unit: 'sat',
-    createdAt: CREATED_AT,
-    updatedAt: CREATED_AT,
-    operationId: 'op-1',
-  }) as never;
+const sendEntry = (state: string, extra: Record<string, unknown> = {}) =>
+  ({ ...base, id: 'send-op-1', type: 'send', state, amount: 100, ...extra }) as never;
 
-const receiveEntry = (state: string) =>
+const receiveEntry = (state: string, error?: string) =>
   ({
+    ...base,
     id: 'receive-op-1',
     type: 'receive',
     state,
-    mintUrl: 'https://mint.example.com',
     amount: 100,
-    unit: 'sat',
-    createdAt: CREATED_AT,
-    updatedAt: CREATED_AT,
-    operationId: 'op-1',
+    ...(error ? { error } : {}),
   }) as never;
 
 const progress = (over: Record<string, unknown> = {}) => ({
@@ -69,11 +57,46 @@ const progress = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
-describe('timeline engine — monotonicity (max reached index)', () => {
-  // The onchain-melt "Sent" row must be complete whenever ANY later milestone
-  // has been reached, even when the melt-state string itself is stale or
-  // unrecognised (out-of-order live observations can only advance the flow).
-  it('stale UNPAID melt state + confirmed watcher → Sent and network both complete', () => {
+const shape = (model: ReturnType<typeof buildTimelineModel>) =>
+  model.steps.map((step) => [step.rowKey, step.id, step.stepType]);
+
+describe('timeline engine — the shape of every timeline', () => {
+  it('is every finished event plus exactly one open slot', () => {
+    const model = buildTimelineModel({
+      historyEntry: mintEntry('PAID'),
+      currentTime: CREATED_AT,
+    });
+    expect(shape(model)).toEqual([
+      ['created', 'created', 'complete'],
+      ['paid', 'paid', 'complete'],
+      ['issued', 'issued', 'current'],
+    ]);
+    expect(model.outcome.kind).toBe('pending');
+    expect(model.doneRowKeys).toEqual(['created', 'paid']);
+  });
+
+  it('previews nothing beyond the open slot', () => {
+    const model = buildTimelineModel({
+      historyEntry: mintEntry('UNPAID'),
+      currentTime: CREATED_AT,
+    });
+    expect(model.steps.map((step) => step.rowKey)).toEqual(['created', 'paid']);
+  });
+
+  it('a flow that ran to its end closes on a success row and reads as settled', () => {
+    const model = buildTimelineModel({
+      historyEntry: mintEntry('ISSUED'),
+      currentTime: CREATED_AT,
+    });
+    expect(model.steps.map((step) => step.stepType)).toEqual(['complete', 'complete', 'success']);
+    expect(model.outcome.kind).toBe('settled');
+  });
+});
+
+describe('timeline engine — monotonicity (furthest finished event wins)', () => {
+  // A later observation arriving first must still mark everything before it
+  // as having happened, even when the state string is stale or unrecognised.
+  it('stale UNPAID melt state + a deep transaction → every earlier event complete, the last left to the mint', () => {
     const model = buildTimelineModel({
       historyEntry: meltEntry('UNPAID'),
       currentTime: CREATED_AT,
@@ -83,143 +106,120 @@ describe('timeline engine — monotonicity (max reached index)', () => {
         isSatisfied: true,
       }),
     });
-    expect(model.steps.map((s) => [s.id, s.stepType])).toEqual([
-      ['sending', 'complete'],
-      ['network', 'complete'],
-      ['confirmed', 'success'],
+    expect(shape(model)).toEqual([
+      ['created', 'created', 'complete'],
+      ['submitted', 'submitted', 'complete'],
+      ['broadcast', 'broadcast', 'complete'],
+      ['confirmed', 'confirmed', 'next-pending'],
     ]);
-    expect(model.outcome.kind).toBe('settled');
   });
 
-  it('broadcast without a state advance still marks Sent complete', () => {
+  it('broadcast without a state advance still marks the hand-over complete', () => {
     const model = buildTimelineModel({
       historyEntry: meltEntry('UNPAID'),
       currentTime: CREATED_AT,
-      onchainConfirmationProgress: progress({ hasPayment: true, currentConfirmations: 0 }),
+      onchainConfirmationProgress: progress({ hasPayment: true, hasUnconfirmedPayment: true }),
     });
-    expect(model.steps.map((s) => [s.id, s.stepType])).toEqual([
-      ['sending', 'complete'],
-      ['network', 'current'],
-      ['confirmed', 'future-small'],
-    ]);
-    expect(model.steps[1].confirmationRing).toBe(true);
-    expect(model.outcome.kind).toBe('pending');
-  });
-
-  it('onchain mint: observed deposit advances past "requested" while the quote is UNPAID', () => {
-    const model = buildTimelineModel({
-      historyEntry: {
-        ...(mintEntry('UNPAID') as object),
-        metadata: { method: 'onchain', onchainAddress: 'bc1qexample' },
-      } as never,
-      currentTime: CREATED_AT,
-      onchainConfirmationProgress: progress({ hasPayment: true, currentConfirmations: 3 }),
-    });
-    expect(model.steps.map((s) => [s.id, s.stepType])).toEqual([
-      ['requested', 'complete'],
-      ['paid', 'current'],
-      ['issued', 'future-small'],
+    expect(model.steps.map((step) => step.stepType)).toEqual([
+      'complete',
+      'complete',
+      'complete',
+      'current',
     ]);
   });
 });
 
-describe('timeline engine — rowKey identity', () => {
-  it('milestone steps use their milestone id as rowKey', () => {
-    const model = buildTimelineModel({
-      historyEntry: mintEntry('PAID'),
+describe('timeline engine — outcomes land in the open slot', () => {
+  it('the outcome inherits the rowKey of the slot that was waiting', () => {
+    const waiting = buildTimelineModel({
+      historyEntry: sendEntry('pending'),
       currentTime: CREATED_AT,
     });
-    expect(model.steps.map((s) => s.id)).toEqual(['requested', 'paid', 'issued']);
-    expect(model.steps.map((s) => s.rowKey)).toEqual(['requested', 'paid', 'issued']);
+    const reversed = buildTimelineModel({
+      historyEntry: sendEntry('rolled_back'),
+      currentTime: CREATED_AT,
+      doneRowKeys: waiting.doneRowKeys,
+    });
+    expect(shape(waiting)).toEqual([
+      ['created', 'created', 'complete'],
+      ['claimed', 'claimed', 'next-pending'],
+    ]);
+    expect(shape(reversed)).toEqual([
+      ['created', 'created', 'complete'],
+      ['claimed', 'rolled-back', 'rolled-back'],
+    ]);
+    expect(reversed.outcome.kind).toBe('rolled-back');
   });
 
-  it('mint failed terminal inherits the displaced "paid" slot rowKey', () => {
+  it('receive: a rejection takes the "added" slot', () => {
     const model = buildTimelineModel({
-      historyEntry: mintEntry('failed'),
+      historyEntry: receiveEntry('rolled_back', 'Token already spent'),
       currentTime: CREATED_AT,
     });
-    expect(model.steps.map((s) => [s.id, s.rowKey])).toEqual([
-      ['requested', 'requested'],
-      ['failed', 'paid'],
-    ]);
-    expect(model.outcome.kind).toBe('failed');
-  });
-
-  it('lightning melt expired terminal inherits the displaced "pending" slot rowKey', () => {
-    const expiredQuote = {
-      quote: 'mq-1',
-      request: 'lnbc1...',
-      amount: 100,
-      fee_reserve: 0,
-      state: 'UNPAID',
-      expiry: Math.floor(CREATED_AT / 1000) - 60,
-      unit: 'sat',
-      payment_preimage: null,
-    } as never;
-    const model = buildTimelineModel({
-      historyEntry: {
-        ...(meltEntry('UNPAID') as object),
-        metadata: undefined,
-      } as never,
-      meltQuote: expiredQuote,
-      currentTime: CREATED_AT,
-    });
-    expect(model.steps.map((s) => [s.id, s.rowKey])).toEqual([
-      ['unpaid', 'unpaid'],
-      ['expired', 'pending'],
-    ]);
-    expect(model.outcome.kind).toBe('expired');
-    expect(model.expiresAt).toBe((Math.floor(CREATED_AT / 1000) - 60) * 1000);
-  });
-
-  it('send rolled-back terminal displaces the slot after the last kept row', () => {
-    const plain = buildTimelineModel({
-      historyEntry: sendEntry('rolledBack'),
-      currentTime: CREATED_AT,
-    });
-    expect(plain.steps.map((s) => [s.id, s.rowKey])).toEqual([
-      ['prepared', 'prepared'],
-      ['rolled-back', 'pending'],
-    ]);
-
-    const delivered = buildTimelineModel({
-      historyEntry: sendEntry('rolledBack'),
-      currentTime: CREATED_AT,
-      nostrSent: true,
-    });
-    expect(delivered.steps.map((s) => [s.id, s.rowKey])).toEqual([
-      ['prepared', 'prepared'],
-      ['nostr-sent', 'nostr-sent'],
-      ['rolled-back', 'finalized'],
-    ]);
-  });
-
-  it('receive already-spent terminal inherits the "redeemed" slot rowKey', () => {
-    const model = buildTimelineModel({
-      historyEntry: receiveEntry('rolledBack'),
-      currentTime: CREATED_AT,
-    });
-    expect(model.steps.map((s) => [s.id, s.rowKey])).toEqual([
-      ['pending', 'pending'],
-      ['already-spent', 'redeemed'],
+    expect(shape(model)).toEqual([
+      ['received', 'received', 'complete'],
+      ['added', 'already-spent', 'already-spent'],
     ]);
     expect(model.outcome.kind).toBe('already-spent');
   });
-});
 
-describe('timeline engine — off-chain settlement collapse', () => {
-  it('the settled-offchain step shares the network slot rowKey', () => {
+  it('off-chain settlement takes the slot that was waiting for the broadcast', () => {
     const model = buildTimelineModel({
       historyEntry: meltEntry('PAID'),
       currentTime: CREATED_AT,
       onchainConfirmationProgress: progress(),
       onchainSettledInternally: true,
     });
-    expect(model.steps.map((s) => [s.id, s.rowKey, s.stepType])).toEqual([
-      ['sending', 'sending', 'complete'],
-      ['settled-offchain', 'network', 'success'],
+    expect(shape(model)).toEqual([
+      ['created', 'created', 'complete'],
+      ['submitted', 'submitted', 'complete'],
+      ['broadcast', 'settled-offchain', 'success'],
     ]);
     expect(model.outcome.kind).toBe('settled');
+  });
+});
+
+describe('timeline engine — rows already drawn are never taken back', () => {
+  // A terminal state forgets how far the flow got. The entry is asked first;
+  // what the renderer already drew is the witness of last resort.
+  it('a rollback seen live keeps the rows the entry can no longer prove', () => {
+    const cold = buildTimelineModel({
+      historyEntry: mintEntry('failed'),
+      currentTime: CREATED_AT,
+    });
+    expect(cold.steps.map((step) => step.rowKey)).toEqual(['created', 'paid']);
+
+    const live = buildTimelineModel({
+      historyEntry: mintEntry('failed'),
+      currentTime: CREATED_AT,
+      doneRowKeys: ['created', 'paid'],
+    });
+    expect(shape(live)).toEqual([
+      ['created', 'created', 'complete'],
+      ['paid', 'paid', 'complete'],
+      ['issued', 'failed', 'expired'],
+    ]);
+  });
+
+  it('coco stepping a mint back from executing to pending does not un-receive the payment', () => {
+    const model = buildTimelineModel({
+      historyEntry: mintEntry('pending'),
+      currentTime: CREATED_AT,
+      doneRowKeys: ['created', 'paid'],
+    });
+    expect(shape(model)).toEqual([
+      ['created', 'created', 'complete'],
+      ['paid', 'paid', 'complete'],
+      ['issued', 'issued', 'current'],
+    ]);
+  });
+
+  it('the open slot is not reported as drawn-and-finished', () => {
+    const model = buildTimelineModel({
+      historyEntry: sendEntry('rolled_back', { token: { proofs: [{ secret: 'x' }] } }),
+      currentTime: CREATED_AT,
+    });
+    expect(model.doneRowKeys).toEqual(['created']);
   });
 });
 
@@ -238,12 +238,15 @@ describe('timeline engine — legacy buildTimeline contract', () => {
     }
   });
 
-  it('unknown states produce an empty model with the "empty" outcome', () => {
+  it('a state the flow does not know gets one honest row, not a blank card or a guess', () => {
     const model = buildTimelineModel({
       historyEntry: sendEntry('exploded'),
       currentTime: CREATED_AT,
     });
-    expect(model.steps).toEqual([]);
-    expect(model.outcome.kind).toBe('empty');
+    expect(model.steps.map((step) => [step.id, step.displayLabel, step.stepType])).toEqual([
+      ['unknown', 'Status unavailable', 'waiting'],
+    ]);
+    expect(model.outcome.kind).toBe('pending');
+    expect(model.doneRowKeys).toEqual([]);
   });
 });

@@ -24,7 +24,7 @@ jest.mock('@/features/payments/hooks/useContactSearch', () => ({
   }),
 }));
 jest.mock('@/shared/hooks/useNostrProfileMetadata', () => ({
-  useNostrProfileMetadataMany: () => ({ metadata: new Map() }),
+  useNostrProfileMetadataMany: () => ({ metadata: new Map(), loadingPubkeys: new Set() }),
 }));
 const A = 'a'.repeat(64);
 const B = 'b'.repeat(64);

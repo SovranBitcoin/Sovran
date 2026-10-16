@@ -18,8 +18,7 @@ import { supportsLiquidGlass } from '@/shared/lib/version';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { usePresentationPubkey } from '@/shared/hooks/usePresentationPubkey';
 import { useProfileDisplay } from '@/shared/hooks/useProfileDisplay';
-import { withAlpha } from '@/shared/lib/color';
-import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { useControlChrome } from '@/shared/styles/appStyle';
 import { headerButtonSize } from '@/shared/styles/tokens';
 
 const HEADER_BUTTON_HIT_SLOP = { top: 12, bottom: 12, left: 12, right: 12 };
@@ -35,7 +34,7 @@ export function HeaderProfileButton({ onPress, style }: HeaderProfileButtonProps
   const { keys } = useNostrKeysContext();
   const pubkey = usePresentationPubkey(keys?.pubkey ?? '');
   const { displayName, picture, pictureResolved } = useProfileDisplay(pubkey);
-  const [flatSurface, muted] = useThemeColor(['surface-secondary', 'muted'] as const);
+  const chrome = useControlChrome();
   // Drives in lockstep with the drawer overlay + scene border-shadow:
   // 0 = closed (visible), 1 = open (hidden).
   const progress = useDrawerProgress();
@@ -54,9 +53,7 @@ export function HeaderProfileButton({ onPress, style }: HeaderProfileButtonProps
           width: ANDROID_BUTTON_SIZE,
           height: ANDROID_BUTTON_SIZE,
           borderRadius: ANDROID_BUTTON_SIZE / 2,
-          backgroundColor: flatSurface,
-          borderWidth: 1,
-          borderColor: withAlpha(muted, 0.3),
+          ...chrome,
           alignItems: 'center' as const,
           justifyContent: 'center' as const,
         }

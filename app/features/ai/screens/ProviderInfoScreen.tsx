@@ -357,7 +357,7 @@ export function ProviderInfoScreen() {
                   ? []
                   : [
                       {
-                        text: 'Use this provider',
+                        text: 'Use provider',
                         variant: 'primary' as const,
                         onPress: onUse,
                         testID: 'ai-provider-info-use',

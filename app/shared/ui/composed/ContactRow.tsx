@@ -43,7 +43,7 @@ import {
   type RowStat,
 } from '@/shared/ui/composed/RowStatsAccent';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { formatCompact } from '@/shared/lib/number';
+import { formatCompact, formatRate } from '@/shared/lib/number';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { formatRelative } from '@/shared/lib/date';
 import { BLUETOOTH_ACCENT, CONNECTED_ACCENT } from '@/shared/lib/brandColors';
@@ -706,19 +706,19 @@ function buildStats(
         break;
       case 'audit':
         if (typeof mintStats?.auditScore === 'number') {
-          const pct = Math.round((mintStats.auditScore / 5) * 100);
+          const pct = formatRate(mintStats.auditScore / 5);
           const total = mintStats.auditTotalOps;
           out.push({
             icon: STAT_ICONS.audit,
-            value: `${pct}%`,
+            value: pct,
             // Mirrors the score case: show the operation count in brackets so
             // the user knows whether the % comes from 12 ops or 12,000.
             meta: typeof total === 'number' && total > 0 ? formatCompact(total) : undefined,
             color: mintStats.auditState === 'ERROR' ? STAT_COLOR_ERROR : tints.success,
             accessibilityLabel:
               typeof total === 'number'
-                ? `Audit success ${pct}% across ${total} operations`
-                : `Audit success ${pct}%`,
+                ? `Audit success ${pct} across ${total} operations`
+                : `Audit success ${pct}`,
           });
         }
         break;
@@ -1057,7 +1057,7 @@ export function ContactRow({
 
   const nip05 =
     showNip05 && !hideMetadata && !resolvedLoading && nostr?.profile?.nip05
-      ? { handle: nostr.profile.nip05 }
+      ? { handle: nostr.profile.nip05, pubkey: nostr.pubkey }
       : undefined;
   const hasNip05 = !!nip05;
 

@@ -191,7 +191,7 @@ describe('selection follows the lineup', () => {
 
 describe('a selection carried across a switch the user made', () => {
   // The rule above holds when the lineup moves UNDER the user. When the user
-  // moves themselves — "Use this provider" on a page that has just told them,
+  // moves themselves — "Use provider" on a page that has just told them,
   // at the top, whether the node can read their messages — a selection carried
   // from the old node is re-fitted like any other, sealed or not. Leaving it
   // pinned to a vendor the new node does not serve is the "changing provider

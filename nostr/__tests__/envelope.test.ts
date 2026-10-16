@@ -25,6 +25,7 @@ import {
   orderedEnvelopeEvents,
 } from '../src/envelope';
 import { bundleFromDmEnvelope } from '../src/facade/dm';
+import { bundleFromNotifications } from '../src/facade/notifications';
 import { searchHitsFromEnvelope } from '../src/facade/search';
 import { bundleFromFeedPage, statsFromMetrics } from '../src/facade/feed';
 
@@ -466,7 +467,21 @@ describe('DM envelopes', () => {
 
   test('an empty DM envelope (no order, no cursor) yields an empty bundle', () => {
     const envelope = NaggEnvelopeSchema.parse({ order: [], orderBy: 'created_at', events: [], aggregates: {} });
-    expect(bundleFromDmEnvelope(envelope)).toEqual({ envelopes: [], cursor: null });
+    expect(bundleFromDmEnvelope(envelope)).toEqual({ envelopes: [], cursor: null, received: 0 });
+  });
+
+  test('counts a wrap that did not parse, so a full page is still known to be full', () => {
+    const good = event('8'.repeat(64), { kind: 1059, pubkey: ACTOR, content: 'ciphertext' });
+    const bad = event('9'.repeat(64), { kind: 1059, pubkey: 'not a key', content: 'ciphertext' });
+    const envelope = NaggEnvelopeSchema.parse({
+      order: ['9'.repeat(64), '8'.repeat(64)],
+      orderBy: 'created_at',
+      events: [bad, good],
+      aggregates: {},
+    });
+    const bundle = bundleFromDmEnvelope(envelope);
+    expect(bundle.envelopes.map((wrap) => wrap.id)).toEqual(['8'.repeat(64)]);
+    expect(bundle.received).toBe(2);
   });
 });
 
@@ -670,5 +685,155 @@ describe('feed continuation capability', () => {
   });
   test('rejects malformed continuation hints', () => {
     expect(NaggEnvelopeSchema.safeParse({ hasMore: 'false' }).success).toBe(false);
+  });
+});
+
+describe('events that arrive from the network are checked one by one', () => {
+  const good = {
+    id: 'a'.repeat(64),
+    kind: 1,
+    pubkey: 'b'.repeat(64),
+    content: 'hello',
+    tags: [['e', 'c'.repeat(64)]],
+    created_at: 1_700_000_000,
+  };
+  const ids = (events: unknown[]) => {
+    const parsed = NaggEnvelopeSchema.safeParse({ events });
+    expect(parsed.success).toBe(true);
+    return parsed.success ? parsed.data.events.map((event) => event.id) : [];
+  };
+
+  test('one event that does not parse does not cost the page it came on', () => {
+    expect(ids([good, { ...good, id: 'not-an-id' }, 'garbage', null])).toEqual([good.id]);
+  });
+
+  test.each([
+    ['an id that is not 64 lowercase hex characters', { id: 'A'.repeat(64) }],
+    ['a public key that is too short', { pubkey: 'b'.repeat(63) }],
+    ['content past the ceiling', { content: 'x'.repeat(1_000_001) }],
+    ['more tags than any real event carries', { tags: Array.from({ length: 20_001 }, () => ['t']) }],
+    ['a tag with too many elements', { tags: [Array.from({ length: 65 }, () => 'x')] }],
+    ['a tag element past the ceiling', { tags: [['imeta', 'x'.repeat(65_537)]] }],
+  ])('leaves out an event with %s', (_name, change) => {
+    expect(ids([{ ...good, ...change }, good])).toEqual([good.id]);
+  });
+
+  test('keeps a large but real event: a follow list of five thousand', () => {
+    const follows = Array.from({ length: 5_000 }, (_, i) => ['p', i.toString(16).padStart(64, '0')]);
+    expect(ids([{ ...good, kind: 3, tags: follows }])).toEqual([good.id]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Bounds on what one response may carry: a field that does not fit costs that
+// field or that item, never the page.
+// ---------------------------------------------------------------------------
+
+describe('bounded envelope fields', () => {
+  test('an order element or a pubkey that cannot be one is left out; the rest stay', () => {
+    const envelope = NaggProfilesEnvelopeSchema.parse({
+      order: [NOTE_ID, 'x'.repeat(513), 7, ROOT_ID],
+      orderBy: 'rank',
+      events: [],
+      aggregates: {},
+      pubkeys: [PUBKEY, 'npub1notHex', PUBKEY.toUpperCase(), VIEWER],
+    });
+    expect(envelope.order).toEqual([NOTE_ID, ROOT_ID]);
+    expect(envelope.pubkeys).toEqual([PUBKEY, VIEWER]);
+  });
+
+  test('a cursor too long to be one is read as no cursor', () => {
+    const parse = (cursor: unknown) =>
+      NaggEnvelopeSchema.parse({ order: [], orderBy: 'created_at', events: [], aggregates: {}, cursor });
+    expect(parse('1700000000|20').cursor).toBe('1700000000|20');
+    expect(parse('c'.repeat(2049)).cursor).toBeNull();
+  });
+
+  test('counts are read one id at a time', () => {
+    const envelope = NaggEnvelopeSchema.parse({
+      order: [],
+      orderBy: 'created_at',
+      events: [],
+      aggregates: {
+        [NOTE_ID]: { k7_e: { count: 3 } },
+        [ROOT_ID]: { k7_e: { count: 'three' } },
+        ['i'.repeat(129)]: { k7_e: { count: 1 } },
+        [QUOTED_ID]: 'not counts',
+      },
+    });
+    expect(envelope.aggregates).toEqual({ [NOTE_ID]: { k7_e: { count: 3 } } });
+  });
+
+  test('a notification entry or actor without hex ids is left out; a bad target is read as none', () => {
+    const entry = { id: NOTE_ID, kind: 7, actor: ACTOR, target: ROOT_ID };
+    const envelope = NaggNotificationsEnvelopeSchema.parse({
+      order: [],
+      orderBy: 'created_at',
+      events: [],
+      aggregates: {},
+      entries: [
+        {
+          ...entry,
+          actors: [
+            { pubkey: ACTOR, eventId: NOTE_ID, createdAt: 5 },
+            { pubkey: 'not-a-key', eventId: NOTE_ID, createdAt: 6 },
+          ],
+        },
+        { ...entry, id: 'not-an-id' },
+        { ...entry, id: REPOST_ID, actor: 'npub1notHex' },
+        { ...entry, id: ORIGINAL_ID, target: 'naddr1notAnEventId' },
+      ],
+    });
+    expect(envelope.entries.map((each) => each.id)).toEqual([NOTE_ID, ORIGINAL_ID]);
+    expect(envelope.entries[0]?.actors).toEqual([{ pubkey: ACTOR, eventId: NOTE_ID, createdAt: 5 }]);
+    expect(envelope.entries[1]?.target).toBeUndefined();
+  });
+});
+
+describe('a notifications page whose events were all left out', () => {
+  const entry = (id: string, createdAt: number) => ({
+    id,
+    kind: 7,
+    actor: ACTOR,
+    target: ROOT_ID,
+    actors: [{ pubkey: ACTOR, eventId: id, createdAt }],
+  });
+  const envelope = (hasNext: boolean) =>
+    NaggNotificationsEnvelopeSchema.parse({
+      order: [],
+      orderBy: 'created_at',
+      // Both triggering events are malformed and left out by the parse.
+      events: [event(NOTE_ID, { pubkey: 'not-a-key' }), event(REPOST_ID, { pubkey: 'not-a-key' })],
+      aggregates: {},
+      entries: [entry(NOTE_ID, 200), entry(REPOST_ID, 100)],
+      hasNext,
+    });
+
+  test('still says where the page ends, so the next page is asked for', () => {
+    const page = notificationsPageFromEnvelope(envelope(true));
+    expect(page.notifications.nodes).toEqual([]);
+    expect(page.notifications.pageInfo).toEqual({
+      hasNextPage: true,
+      endCursor: { createdAt: 100, id: REPOST_ID },
+    });
+    expect(bundleFromNotifications(page, true).cursor).toEqual({ createdAt: 100, id: REPOST_ID });
+  });
+
+  test('ends paging when the backend says there is no more', () => {
+    expect(bundleFromNotifications(notificationsPageFromEnvelope(envelope(false)), true).cursor).toBeNull();
+  });
+
+  test('a page with readable events still ends at its last row', () => {
+    const page = notificationsPageFromEnvelope(
+      NaggNotificationsEnvelopeSchema.parse({
+        order: [],
+        orderBy: 'created_at',
+        events: [event(NOTE_ID, { kind: 7, tags: [['e', ROOT_ID], ['p', VIEWER]], created_at: 150 })],
+        aggregates: {},
+        entries: [entry(NOTE_ID, 150)],
+        hasNext: true,
+      }),
+    );
+    expect(bundleFromNotifications(page, true).cursor).toEqual({ createdAt: 150, id: NOTE_ID });
   });
 });

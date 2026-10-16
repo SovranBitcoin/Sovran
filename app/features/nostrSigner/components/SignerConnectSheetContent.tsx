@@ -1,3 +1,4 @@
+import { profileAvatarStateFor } from '@/shared/lib/imageLoadState';
 /**
  * @fileoverview 'signer-connect' sheet body + 'signer-profile-picker' page
  *
@@ -742,7 +743,7 @@ function ConnectReview({
       {/* App identity (app-supplied metadata — bounded, untrusted) */}
       <HStack gap={12} align="center">
         <Avatar
-          state={parsed.image !== undefined ? 'image' : 'fallback'}
+          state={profileAvatarStateFor(parsed.image, 'cached')}
           picture={parsed.image}
           seed={parsed.clientPubkey}
           size={44}

@@ -13,7 +13,7 @@ const FILTERS_OPTIONS = { title: 'Filters' };
 
 export default function FilterFlowLayout() {
   return (
-    <AndroidSheetFlowStack>
+    <AndroidSheetFlowStack flow="(filter-flow)">
       <Stack.Screen name="filters" options={FILTERS_OPTIONS} />
     </AndroidSheetFlowStack>
   );

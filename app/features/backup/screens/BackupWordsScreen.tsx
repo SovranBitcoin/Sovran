@@ -5,7 +5,7 @@ import { useIsFocused } from 'expo-router/react-navigation';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { log } from '@/shared/lib/logger';
 import { Screen } from '@/shared/ui/composed/Screen';
-import { GradientCard } from '@/shared/ui/composed/GradientCard';
+import { Surface } from '@/shared/ui/composed/Surface';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -44,7 +44,7 @@ export function BackupWordsScreen() {
         {loading ? (
           <Text loading placeholder="Loading recovery words" />
         ) : revealed ? (
-          <GradientCard>
+          <Surface>
             <View className="flex-row flex-wrap px-2 py-1">
               {words.map((word, index) => (
                 <View
@@ -63,7 +63,7 @@ export function BackupWordsScreen() {
                 </View>
               ))}
             </View>
-          </GradientCard>
+          </Surface>
         ) : active && focused ? (
           <Text>Could not load your recovery phrase. Close this screen and try again.</Text>
         ) : null}

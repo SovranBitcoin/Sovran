@@ -1,0 +1,59 @@
+{
+  "id": "read-the-app-notifications",
+  "purpose": "A person opens the App tab of their notifications and finds the welcome note and the record of the Terms they accepted.",
+  "startsFrom": "onboarded",
+  "steps": [
+    {
+      "name": "the wallet opens",
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-send"
+          }
+        },
+        {
+          "logged": "splash.gone"
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "go to notifications",
+      "tap": {
+        "label": "Notifications"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "notifications-tab-mentions"
+          }
+        },
+        {
+          "visible": {
+            "id": "notifications-tab-app"
+          }
+        }
+      ],
+      "withinMs": 12000
+    },
+    {
+      "name": "look at App",
+      "tap": {
+        "id": "notifications-tab-app"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "notification-app-welcome"
+          }
+        },
+        {
+          "visible": {
+            "id": "notification-app-legal"
+          }
+        }
+      ],
+      "withinMs": 8000
+    }
+  ]
+}

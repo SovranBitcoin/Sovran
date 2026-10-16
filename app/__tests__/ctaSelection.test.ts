@@ -8,6 +8,7 @@ const ctx: CtaContext = {
   latest: { version: '2.0.0', fetchedAt: 10 * DAY_MS },
   lifecycle: { seedCreatedAt: 0, recoveryPhraseVerifiedAt: null, restoreStatus: 'complete' },
   balanceTotalSat: 1,
+  oldEcash: null,
   dismissed: {},
   mockMode: false,
   automation: false,

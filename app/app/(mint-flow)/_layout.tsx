@@ -27,7 +27,7 @@ const USER_MESSAGES_OPTIONS = { headerShown: true };
 
 export default function MintFlowLayout() {
   return (
-    <AndroidSheetFlowStack>
+    <AndroidSheetFlowStack flow="(mint-flow)">
       <Stack.Screen name="add" options={ADD_OPTIONS} />
       <Stack.Screen name="info" options={INFO_OPTIONS} />
       <Stack.Screen name="reviews" options={REVIEWS_OPTIONS} />

@@ -1,0 +1,157 @@
+{
+  "id": "redeem-ecash-locked-to-my-key",
+  "purpose": "Someone sends the person 16 sats of ecash locked to a key their wallet shows; they open the link and redeem it.",
+  "startsFrom": "receive-100-sats-on-the-private-mint",
+  "steps": [
+    {
+      "name": "the wallet opens with 100 sats",
+      "expect": [
+        {
+          "visible": {
+            "label": "Balance, 100 BTC"
+          }
+        },
+        {
+          "logged": "splash.gone"
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "open the drawer",
+      "tap": {
+        "id": "header-profile-avatar"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "drawer-menu-settings"
+          }
+        }
+      ]
+    },
+    {
+      "name": "open Settings",
+      "tap": {
+        "id": "drawer-menu-settings"
+      },
+      "expect": [
+        {
+          "page": "SettingsScreen"
+        },
+        {
+          "visible": {
+            "id": "settings-profile-row"
+          }
+        }
+      ]
+    },
+    {
+      "name": "open P2PK Keys",
+      "tap": {
+        "id": "settings-keyring-row"
+      },
+      "expect": [
+        {
+          "page": "SettingsKeyringScreen"
+        },
+        {
+          "visible": {
+            "id": "keyring-active-qr"
+          }
+        },
+        {
+          "visible": {
+            "id": "keyring-active-copy"
+          }
+        }
+      ],
+      "withinMs": 8000,
+      "remember": [
+        {
+          "as": "myKey",
+          "idAfter": "keyring-key-copy-"
+        }
+      ]
+    },
+    {
+      "name": "go back to Settings",
+      "tap": {
+        "id": "keyring-close"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "settings-keyring-row"
+          }
+        },
+        {
+          "gone": {
+            "id": "keyring-active-qr"
+          }
+        }
+      ]
+    },
+    {
+      "name": "close Settings",
+      "tap": {
+        "id": "flow-header-close"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-send"
+          }
+        },
+        {
+          "gone": {
+            "id": "settings-keyring-row"
+          }
+        }
+      ]
+    },
+    {
+      "name": "open a link to 16 sats locked to that key",
+      "handed": {
+        "token": {
+          "sats": 16,
+          "lockTo": "{{myKey}}"
+        }
+      },
+      "open": "cashu:{{token}}",
+      "expect": [
+        {
+          "page": "ReceiveTokenScreen"
+        },
+        {
+          "visible": {
+            "id": "receive-token-redeem"
+          }
+        },
+        {
+          "visible": {
+            "label": "Incoming 16 sat transaction, prepared"
+          }
+        }
+      ],
+      "withinMs": 20000
+    },
+    {
+      "name": "redeem",
+      "tap": {
+        "id": "receive-token-redeem"
+      },
+      "expect": [
+        {
+          "logged": "payment.receive.confirmed"
+        },
+        {
+          "gone": {
+            "id": "receive-token-redeem"
+          }
+        }
+      ],
+      "withinMs": 30000
+    }
+  ]
+}

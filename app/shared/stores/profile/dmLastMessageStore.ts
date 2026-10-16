@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { persist } from 'zustand/middleware';
 import { z } from 'zod';
 
@@ -41,7 +41,10 @@ interface DmLastMessageStore {
 }
 
 /** Bounded, profile-owned transport metadata; no message text is retained. */
-export const useDmLastMessageStore = create<DmLastMessageStore>()(
+export const useDmLastMessageStore = create<DmLastMessageStore>({
+  name: 'dm-last-message-store',
+  scope: 'profile',
+})(
   persist(
     (set, get) => ({
       byPeer: {},

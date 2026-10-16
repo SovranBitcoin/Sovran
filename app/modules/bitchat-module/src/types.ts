@@ -67,22 +67,10 @@ export interface BLEPeer {
    */
   hasDirectLink: boolean;
   lastSeen: number;
-  /**
-   * The peer's x-only Nostr pubkey (64-hex), learned via bitchat's native
-   * favorite-notification exchange (`[FAVORITED]:<npub>:<creq>`). THIS is the peer's
-   * Sovran identity: use it directly for the kind-0 profile lookup, and
-   * "02"-prefix it for the NUT-11 P2PK lock target. Present only once the peer
-   * has favorited us back (Sovran ↔ Sovran); absent for stock/vanilla clients
-   * and peers we haven't exchanged identity with, which are not eligible for
-   * Nut Drop token DMs.
-   */
+  /** Native values are unverified favorites. The wallet directory replaces
+   * these fields with signed, Noise-bound capability values before payment use. */
   nostrPubkeyHex?: string;
-  /**
-   * The peer's standing NUT-18 payment request (`creq…`) from its favorite —
-   * advertises the mints it accepts + its P2PK lock key. Decode it (cashu-ts)
-   * to gate lockability (its `nut10` key must match `02`+`nostrPubkeyHex`) and
-   * to pick a mint the receiver actually accepts. Absent ⇒ not lockable.
-   */
+  /** NUT-18 request; payment use also requires walletCapabilityExpiresAt. */
   creq?: string;
   /**
    * The peer's announced Curve25519 noise static key (64-hex) — bitchat's
@@ -93,6 +81,10 @@ export interface BLEPeer {
    * identity); this is the fallback identicon seed otherwise.
    */
   noisePublicKeyHex?: string;
+  /** SHA256 of the remote static key from an established Noise session. */
+  authenticatedNoiseFingerprint?: string;
+  /** Set only by the signed wallet capability verifier, never native announces. */
+  walletCapabilityExpiresAt?: number;
 }
 
 /**
@@ -101,7 +93,7 @@ export interface BLEPeer {
  * (`[FAVORITED]:<npub>:<creq>`). `nostrPubkeyHex` is the peer's x-only pubkey (64-hex,
  * absent on an `[UNFAVORITED]` or an unparseable npub). iOS emits this for
  * immediacy; on both platforms the same value also appears on the polled
- * `BLEPeer.nostrPubkeyHex`, which NearPay treats as the source of truth.
+ * `BLEPeer.nostrPubkeyHex`, which the payment directory ignores until cryptographically verified.
  */
 export interface BLEPeerIdentityEvent {
   peerID: string;
@@ -128,6 +120,7 @@ export interface BLEMessageEvent {
  * prefix if we haven't seen an announce from this peer yet).
  */
 export interface BLEPrivateMessageEvent {
+  profileScope?: string;
   id: string;
   peerID: string;
   sender: string;
@@ -147,12 +140,7 @@ export interface BLEPrivateMessageEvent {
  *   - `partiallyDelivered` — group/room broadcast where some recipients missed
  */
 export type BLEDeliveryStatus =
-  | 'sending'
-  | 'sent'
-  | 'delivered'
-  | 'read'
-  | 'failed'
-  | 'partiallyDelivered';
+  'sending' | 'sent' | 'delivered' | 'read' | 'failed' | 'partiallyDelivered';
 
 /**
  * Payload of the `onBLEDeliveryStatus` event. Use `messageID` to look up the
@@ -185,8 +173,7 @@ export interface BLEDmContact {
  * A list event does not carry a `peerID`; read getBLEPeers() for full records.
  */
 export type BLEPeerEvent =
-  | { type: 'list'; peers: string[] }
-  | { type: 'connected' | 'disconnected'; peerID: string };
+  { type: 'list'; peers: string[] } | { type: 'connected' | 'disconnected'; peerID: string };
 
 // --- Nostr bridge payloads ---
 

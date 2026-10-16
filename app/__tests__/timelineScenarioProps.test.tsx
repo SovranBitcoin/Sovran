@@ -1,12 +1,11 @@
 /**
  * @jest-environment node
  *
- * Structural pin of the CURRENT timeline renderer across every Design System
- * scenario frame — the acceptance surface for the timeline redesign. Each
- * frame snapshots the ordered text content, every dot indicator's resolved
- * props (phase/result, ring progress, stroke targeting, chrome colors), and
- * every connector rail's fill/gradient. The redesign must reproduce these
- * resolved props exactly (only test-key fields may change).
+ * Structural pin of the timeline renderer across every Design System scenario
+ * frame. Each frame snapshots the ordered text content, every dot indicator's
+ * resolved props (phase/result, ring progress, stroke targeting, chrome
+ * colors), and every connector rail's fill/gradient. A second pass plays each
+ * scenario through one mounted timeline and checks rows are only ever added.
  */
 
 import React from 'react';
@@ -51,11 +50,11 @@ jest.mock('@/shared/lib/logger', () => {
   };
 });
 
-jest.mock('@/shared/ui/composed/GradientCard', () => {
+jest.mock('@/shared/ui/composed/Surface', () => {
   const ReactActual = jest.requireActual<typeof import('react')>('react');
   const { View } = jest.requireActual<typeof import('react-native')>('react-native');
   return {
-    GradientCard: ({ children }: { children?: React.ReactNode }) =>
+    Surface: ({ children }: { children?: React.ReactNode }) =>
       ReactActual.createElement(View, null, children),
   };
 });
@@ -245,7 +244,7 @@ describe('timeline scenario pins (redesign acceptance surface)', () => {
 
   it('covers every showcase group', () => {
     expect(new Set(scenarios.map((s) => s.group))).toEqual(
-      new Set(['Cashu', 'Lightning', 'Onchain', 'Request'])
+      new Set(['Cashu', 'Locked', 'Lightning', 'Onchain', 'Request'])
     );
   });
 
@@ -263,6 +262,7 @@ describe('timeline scenario pins (redesign acceptance surface)', () => {
                 nostrSent={frame.nostrSent}
                 onchainConfirmationProgress={frame.onchainConfirmationProgress}
                 onchainSettledInternally={frame.onchainSettledInternally}
+                cancelling={frame.cancelling}
               />
             );
           });
@@ -276,7 +276,82 @@ describe('timeline scenario pins (redesign acceptance surface)', () => {
       });
     });
   }
-  it('morphs the existing send checkpoint through cancellation, failure, retry and authoritative rollback', () => {
+  // The promise the whole design rests on, checked on the mounted component
+  // rather than the model: stepping a scenario from its first frame to its
+  // last never takes a dot away, and never turns a finished dot back.
+  it.each(scenarios.map((scenario) => [scenario.id, scenario] as const))(
+    '%s only ever adds rows as it plays',
+    (_id, scenario) => {
+      const element = (frame: (typeof scenario.frames)[number]) => (
+        <HistoryEntryTimeline
+          historyEntry={frame.historyEntry}
+          meltQuote={frame.meltQuote}
+          tokenCreated={frame.tokenCreated}
+          nostrSent={frame.nostrSent}
+          onchainConfirmationProgress={frame.onchainConfirmationProgress}
+          onchainSettledInternally={frame.onchainSettledInternally}
+          cancelling={frame.cancelling}
+        />
+      );
+      let renderer!: TestRenderer.ReactTestRenderer;
+      act(() => {
+        renderer = TestRenderer.create(element(scenario.frames[0]));
+      });
+      let before = pinFrame(renderer.toJSON() as unknown as JsonNode).indicators.map(
+        (dot) => dot.id
+      );
+      expect(before.length).toBeGreaterThan(0);
+      for (const frame of scenario.frames.slice(1)) {
+        act(() => renderer.update(element(frame)));
+        const after = pinFrame(renderer.toJSON() as unknown as JsonNode).indicators.map(
+          (dot) => dot.id
+        );
+        expect(after.length).toBeGreaterThanOrEqual(before.length);
+        before.forEach((dot, index) => {
+          if (dot === 'indicator-done-success') expect(after[index]).toBe(dot);
+        });
+        before = after;
+      }
+      act(() => renderer.unmount());
+    }
+  );
+
+  // One melt reaches the card under two ids: `melt:<op>` from the history
+  // stream and `<op>` from the operation stream, alternating. The card must
+  // remember what it drew across the flip, or the rollback takes a row away.
+  it('keeps its rows when the same payment arrives under a different id', () => {
+    const base = {
+      type: 'melt' as const,
+      source: 'legacy' as const,
+      legacyHistoryId: 'op-9',
+      createdAt: FIXED_TS,
+      updatedAt: FIXED_TS,
+      mintUrl: 'https://mint.example',
+      unit: 'sat',
+      amount: 100,
+      quoteId: 'quote-9',
+      operationId: 'op-9',
+    };
+    const fromHistory = { ...base, id: 'melt:op-9', state: 'PENDING' };
+    const fromOperation = { ...base, id: 'op-9', state: 'rolled_back' };
+    let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      renderer = TestRenderer.create(<HistoryEntryTimeline historyEntry={fromHistory as never} />);
+    });
+    const before = pinFrame(renderer.toJSON() as unknown as JsonNode);
+    expect(before.indicators).toHaveLength(3);
+    act(() => renderer.update(<HistoryEntryTimeline historyEntry={fromOperation as never} />));
+    const after = pinFrame(renderer.toJSON() as unknown as JsonNode);
+    expect(after.indicators.map((dot) => dot.id)).toEqual([
+      'indicator-done-success',
+      'indicator-done-success',
+      'indicator-done-reverted',
+    ]);
+    expect(after.texts).toContain('Ecash sent to mint');
+    act(() => renderer.unmount());
+  });
+
+  it('morphs the open slot through cancellation, a failed cancel, a retry and the authoritative rollback', () => {
     const historyEntry = scenarios
       .flatMap((scenario) => scenario.frames)
       .find(
@@ -289,6 +364,7 @@ describe('timeline scenario pins (redesign acceptance surface)', () => {
       renderer = TestRenderer.create(<HistoryEntryTimeline historyEntry={historyEntry} />);
     });
     const before = pinFrame(renderer.toJSON() as unknown as JsonNode);
+    expect(before.indicators).toHaveLength(2);
     act(() => renderer.update(<HistoryEntryTimeline historyEntry={historyEntry} cancelling />));
     const pending = pinFrame(renderer.toJSON() as unknown as JsonNode);
     expect(pending.texts).toContain('Cancelling');

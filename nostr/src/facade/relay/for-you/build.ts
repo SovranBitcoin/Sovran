@@ -357,3 +357,8 @@ function mergeProfiles(
     if (!into[pubkey]) into[pubkey] = profile;
   }
 }
+
+/** Drop every viewer's cached For You corpus (account teardown). */
+export function clearForYouCache(): void {
+  cacheByViewer.clear();
+}

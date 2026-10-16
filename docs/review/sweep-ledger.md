@@ -1,8 +1,16 @@
 # Hunch conformance sweep — ledger
 
+**Historical.** The reviewer this ledger records was replaced by the [semantic checks](README.md)
+on 2026-10-12. The verdicts below still stand.
+
 The durable record of the autonomous rule-conformance sweep. Procedure:
 [sweep-protocol.md](sweep-protocol.md). Read this first; it outlives any one
 session. Never delete a row.
+
+Read against the code on 2026-10-12: findings that were left without an entry and are still true are now
+follow-ups F125 (no kind 10050 list published), F126 (controls without a `testID`), F127 (small type and import
+findings) and F130 (findings that were counted and never read). The amount schemas that accepted fractions and
+the replaceable-event tie-break were fixed the same day. Rows that name another follow-up are tracked there.
 
 Branch: `feat/receive-nut-drop`.
 
@@ -165,7 +173,7 @@ Real findings:
 
 Intentional (verified, not fixed):
 
-- [secrets/disclosure] app/scripts/gen-giveaway-key.mjs, app/scripts/find-vanity-giveaway-key.mjs — operator CLI scripts whose stated purpose is printing a keypair they just generated, to stdout, for the operator to paste into `.env`/EAS. Both carry an explicit SECURITY note about bundle extractability and point at `skills/sovran-security/references/secure-storage-key-derivation.md`. No log, analytics or persistent sink.
+- [secrets/disclosure] app/scripts/gen-giveaway-key.mjs, app/scripts/find-vanity-giveaway-key.mjs — operator CLI scripts whose stated purpose is printing a keypair they just generated, to stdout, for the operator to paste into `.env`/EAS. Both carry an explicit SECURITY note about bundle extractability. No log, analytics or persistent sink.
 - [secrets/disclosure] app/scripts/generate-test-vectors.ts — prints derived values from the *published* NIP-06 spec mnemonics (`leader monkey parrot …`). Printing them is the script's purpose and they are public.
 - [secrets/disclosure] app/e2e/funded/custody.ts, app/e2e/funded-runtime/* — the funded-E2E custody handoff. `e2eSeedExport.ts` gates it on `__DEV__`, requires both an endpoint and a 64-hex token, and `assertOwnedLoopbackEndpoint` pins the target to `http://127.0.0.1:<port>/seed` with no credentials, query or fragment.
 
@@ -238,7 +246,7 @@ confidence (0.16–0.23), all verified in source.
 - [money/amount-meaning] wallet/src/amount.ts:1-67 and wallet/src/balance/breakdown.ts:1-67 — `amountToNumber` loses the unknown-versus-zero distinction, and disagrees with itself across copies
   verdict: defect
   evidence: five implementations, four behaviours for bad input. `app/shared/lib/cashu/amount.ts` (24 importers) and `wallet/src/amount.ts` return `NaN` for an unparseable string with a warn/debug log; `wallet/src/balance/breakdown.ts:36` (`Number(value) || 0`) and `wallet/src/history/timeline/context.ts:44` silently return `0`; `app/e2e/funded-runtime/payment-request-payer.ts:64` throws. All five map `null` to `0`. Blame says incidental: `breakdown.ts` was last touched by `4b4b5020` "delete three pass-through wrappers" and `wallet/src/amount.ts` by `1911f46f` "remove dead code, assets, and duplicate implementations" — two cleanup passes that both missed it. No ADR, test or contract pins the divergence.
-  action: blocked — F03 extended in `c574b780` to name all five and the disagreement, and to take the e2e copy's refusal as the model. Converging them across ~35 call sites is a refactor, which the protocol forbids inside a fix commit.
+  action: fixed — one implementation in `wallet/src/amount.ts`: `amountToNumber` for display (missing or unreadable shows 0), `amountToNumberOrUndefined` where unknown must differ from zero, and `requireAmount`, which throws, for melt quotes, fee reserves, fee comparison, rebalance fees and incoming proof amounts.
 
 - [money/amount-meaning] nostr/src/facade/noteStatsContract.ts:1-58 — flagged for flooring `satsZapped`
   verdict: intentional
@@ -269,9 +277,9 @@ Both abstentions hand-verified, no defects:
 Rule gap found and closed (the domain's real result):
 
 - [state/persisted-compatibility] app/shared/lib/persist/createMergeWithSchema.ts:24 — not flagged, but the defect is there
-  verdict: defect (pre-existing, registered as F05)
+  verdict: defect (pre-existing, registered as F113)
   evidence: `if (!r.success) return current;` discards the entire persisted blob on any `safeParse` failure, for 16 call sites including `settingsStore` (terms acceptance, onboarding) and `profileStore`. This is the shape behind the Balance-split enum rename wiping settings.
-  action: blocked as code (F05 is an existing entry; fixing it is a persisted-data change the protocol hands back). But the *rule* gap is closed: `persisted-compatibility` asks whether a **change** breaks stored data, so on `--all` there is no change and it correctly says nothing — nothing asked the standing question. Added `state/all-or-nothing-rehydrate` in `ab791089`, which asks what happens to the user's other fields when one fails to decode. Measured on `app/shared/lib/persist`, `settingsStore`, `routstrStore` and `createPubkeyScopedCache`: flags `createMergeWithSchema.ts` at 0.49 and `persistConfig.ts` at 0.12, and leaves the three stores alone — they consume the merge, they do not implement the discard.
+  action: blocked as code (F113 is an existing entry; fixing it is a persisted-data change the protocol hands back). But the *rule* gap is closed: `persisted-compatibility` asks whether a **change** breaks stored data, so on `--all` there is no change and it correctly says nothing — nothing asked the standing question. Added `state/all-or-nothing-rehydrate` in `ab791089`, which asks what happens to the user's other fields when one fails to decode. Measured on `app/shared/lib/persist`, `settingsStore`, `routstrStore` and `createPubkeyScopedCache`: flags `createMergeWithSchema.ts` at 0.49 and `persistConfig.ts` at 0.12, and leaves the three stores alone — they consume the merge, they do not implement the discard.
 
 Standing lesson for the rest of the sweep: a rule phrased around "does this
 **change** …" contributes nothing to a `--all` conformance pass. Several
@@ -433,7 +441,7 @@ Findings triaged (all verified in source):
 - [nip01/single-connection-per-relay] nostr/src/facade/relay/protocol.ts:86 (0.80)
   verdict: defect
   evidence: `openWebSocket` at :163 and :220 opens a fresh socket per relay per request. NIP-01 asks for one connection per relay with subscriptions multiplexed over it. Unlike its sibling, this file's header documents the tier and the REQ/EVENT/EOSE wire but says nothing about socket lifecycle, so there is no recorded decision behind it. Blame `cdc8b5a4` is a JSON-parsing fix, unrelated.
-  action: blocked — recorded as **F43**. Connection pooling is an architectural change to the `nostr` package, not the smallest correct fix, and the protocol forbids a refactor inside a fix commit.
+  action: done on 2026-10-12 as its own change. One socket per relay, subscriptions told apart by id (`nostr/src/facade/relay/socket-pool.ts`); the follow-up that recorded it is closed.
 
 - [nip01/single-connection-per-relay] nostr/src/facade/primal/protocol.ts:1,87 (0.94, 0.95)
   verdict: intentional
@@ -649,12 +657,12 @@ nothing and exits 2 — my first attempt did exactly that.
 
 - [money-integer-schema] wallet/src/operations/historyEntry.ts (via the amount union), routstr/api.ts (0.84, 0.75), ReceivePaymentRequestQuoteScreen (0.93)
   verdict: intentional (historyEntry), recorded (the rest)
-  evidence: `historyEntry.ts:21` is `amount: z.union([z.number(), z.string()]).optional()`, the rule's exact named shape, but the docstring explains it: "`amount` is a plain number in colada's own entries but a serialized coco `Amount` (a string) when the row comes straight from coco's history." The union is deliberate. The missing integer check is downstream in `amountToNumber`, which is already **F03**.
+  evidence: `historyEntry.ts:21` is `amount: z.union([z.number(), z.string()]).optional()`, the rule's exact named shape, but the docstring explains it: "`amount` is a plain number in colada's own entries but a serialized coco `Amount` (a string) when the row comes straight from coco's history." The union is deliberate. The integer check is downstream: `requireAmount` in `wallet/src/amount.ts` where the amount is a price or fee, and display coercion through `amountToNumber` elsewhere.
 
 - [hex-ids] 13 findings and [input-size-caps] 14 findings — `nostr/src/schemas.ts`, `envelope.ts`, `facade/mint-reviews.ts`, `facade/primal/schemas.ts`, `recipes/wallpapers.ts`, plus app-side stores
   verdict: defect
   evidence: read in source after the first write-up marked them unverified. `nostr/src/schemas.ts` parses relay and Nagg responses, and `id` (:29) and `pubkey` (:31) are bare `z.string()` rather than 64-hex, `content` (:32) is unbounded, and `tags` (:33) is `z.array(z.array(z.string()))` with no cap. The same file caps one array at `:22` with `.max(5000)`, so the intent exists and is applied in exactly one place. `nostr/src` has no hex primitive of its own and cannot import the app's `NostrPubkeyHexSchema` from `protocolIds.ts`, because `nostr` must not import from `app`.
-  action: blocked — recorded as **F45**. The caps are a policy decision on the untrusted-input boundary, where too low rejects legitimate events, so they want choosing against real event sizes rather than by reflex at the end of a sweep.
+  action: done on 2026-10-12 as its own change. `nostr/src/schemas.ts` has `NostrHexId` and `NOSTR_EVENT_LIMITS`, with the ceilings and their reasons beside them; the envelope, the events read off relay and cache sockets, the mint, Primal and wallpaper schemas are bounded, most of them one item at a time so a wrong ceiling costs an item and not a page. The follow-up that recorded it is closed.
 
 - remaining 20 findings — `nostr-event-schema-bounds` (4), `route-json-param-unbounded` (4), `url-scheme` (3), `branded-id-as-cast` (2), `default-nested-container`, `use-parsed-output`, and the app-side members of the two clusters above
   verdict: recorded, not verified
@@ -755,8 +763,8 @@ confirmation of its members, it says so.
 
 - [wallet-logic-in-app] 5 and [payment-logic-in-app-layer] 6 — concentrated in `app/features/send/lib/sovranPaymentConfig.ts` (:133, :255, :405, :555), 0.78-0.94
   verdict: defect (pre-existing, already registered)
-  evidence: not newly diagnosed — **F26** already records exactly this: "Receive and mint-quote sequencing, and history reconciliation by polling, live in `app/features/send/lib/sovranPaymentConfig.ts` … Move them beside the `wallet/` operations they override." Both rules independently rediscovered the same file and the same lines, which is corroboration of F26 rather than a new finding.
-  action: none. F26 stands as written.
+  evidence: not newly diagnosed — a follow-up already recorded exactly this: "Receive and mint-quote sequencing, and history reconciliation by polling, live in `app/features/send/lib/sovranPaymentConfig.ts` … Move them beside the `wallet/` operations they override." Both rules independently rediscovered the same file and the same lines.
+  action: done on 2026-10-12. The sequencing moved to `wallet/src/operations/receiveOperations.ts` and the follow-up was closed.
 
 - 44 rules firing, largest clusters: `shared-value-dot-value` (32), `error-passed-on-lossily` (26), `data-mirrored-between-owners` (16), `clock-read-inside-freshness-helper` (15), `runonjs-added` (12), `test-mocks-owned-logic` (11), `restates-owned-values` (9), `route-param-not-identifier` (8)
   verdict: recorded, not verified
@@ -801,6 +809,6 @@ Two were previously recorded unverified and are now read:
   verdict: false-positive
   evidence: the engine does exactly what NIP-46 requires, just not in the flagged chunk. `:865-869` answers an unrecognised method with `NIP46_ERRORS.unsupportedMethod` through `respondDetached`, and `isKnownMethod` at `:873` is `method === 'connect' || Object.hasOwn(methodHandlers, method)` — already prototype-safe, which is the guard `interpret.ts` was missing in `a789dbc6`. The rule fired on the `createNip46Engine` factory at `:244`, which contains no dispatch.
 
-**F43 stands.** `relay/protocol.ts`'s one-socket-per-request did not reappear
+**The relay socket finding stood at this sweep.** `relay/protocol.ts`'s one-socket-per-request did not reappear
 here, but 15 requests still went unanswered, so absence is not evidence — the
-finding was read in source on attempt 3 and the code is unchanged.
+finding was read in source on attempt 3. It was fixed on 2026-10-12 (one socket per relay).

@@ -1,0 +1,83 @@
+{
+  "id": "share-remote-login",
+  "purpose": "A person opens Share Remote Login and sees the link another app can use to sign in with their key, with its relays and secret.",
+  "startsFrom": "onboarded",
+  "steps": [
+    {
+      "name": "the wallet opens",
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-send"
+          }
+        },
+        {
+          "logged": "splash.gone"
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "open the drawer",
+      "tap": {
+        "id": "header-profile-avatar"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "drawer-menu-settings"
+          }
+        }
+      ]
+    },
+    {
+      "name": "open Remote Login",
+      "tap": {
+        "id": "drawer-menu-remote-login"
+      },
+      "expect": [
+        {
+          "page": "SignerHubScreen"
+        },
+        {
+          "visible": {
+            "id": "signer-hub-scan-row"
+          }
+        },
+        {
+          "visible": {
+            "id": "signer-hub-paste-row"
+          }
+        },
+        {
+          "visible": {
+            "id": "signer-hub-share-row"
+          }
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "open Share Remote Login",
+      "tap": {
+        "id": "signer-hub-share-row"
+      },
+      "expect": [
+        {
+          "page": "ShareSignerScreen"
+        },
+        {
+          "visible": {
+            "id": "share-signer-copy-link"
+          }
+        },
+        {
+          "visible": {
+            "id": "share-signer-rotate-secret"
+          }
+        }
+      ],
+      "withinMs": 10000
+    }
+  ]
+}

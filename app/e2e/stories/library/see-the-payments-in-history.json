@@ -1,0 +1,106 @@
+{
+  "id": "see-the-payments-in-history",
+  "purpose": "A person who received 100 sats and sent 40 sees both in their history, with the balance and the pending amount, and opens the details of the one they received.",
+  "startsFrom": "send-40-sats-as-ecash",
+  "steps": [
+    {
+      "name": "the wallet shows what is left and what is pending",
+      "expect": [
+        {
+          "visible": {
+            "label": "Balance, 59 tBTC"
+          }
+        },
+        {
+          "visible": {
+            "label": "PENDING: 40 SAT"
+          }
+        },
+        {
+          "visible": {
+            "idPrefix": "transaction-send-"
+          }
+        },
+        {
+          "visible": {
+            "idPrefix": "transaction-mint-"
+          }
+        },
+        {
+          "logged": "splash.gone"
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "view all transactions",
+      "tap": {
+        "id": "transactions-view-all"
+      },
+      "expect": [
+        {
+          "page": "TransactionsScreen"
+        },
+        {
+          "visible": {
+            "idPrefix": "transaction-mint-"
+          }
+        },
+        {
+          "visible": {
+            "id": "transactions-filter-open"
+          }
+        }
+      ]
+    },
+    {
+      "name": "open the 100 sats received",
+      "tap": {
+        "idPrefix": "transaction-mint-"
+      },
+      "expect": [
+        {
+          "visible": {
+            "label": "Added to wallet"
+          }
+        },
+        {
+          "visible": {
+            "id": "lightning-receive-details"
+          }
+        }
+      ]
+    },
+    {
+      "name": "open its details",
+      "tap": {
+        "id": "lightning-receive-details"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "details-sheet-done"
+          }
+        }
+      ]
+    },
+    {
+      "name": "close the details",
+      "tap": {
+        "id": "details-sheet-done"
+      },
+      "expect": [
+        {
+          "gone": {
+            "id": "details-sheet-done"
+          }
+        },
+        {
+          "visible": {
+            "id": "lightning-receive-details"
+          }
+        }
+      ]
+    }
+  ]
+}

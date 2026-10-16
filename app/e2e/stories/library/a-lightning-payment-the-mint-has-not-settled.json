@@ -1,0 +1,100 @@
+{
+  "id": "a-lightning-payment-the-mint-has-not-settled",
+  "purpose": "A person pays a Lightning invoice that the mint holds as pending; the wallet takes the sats out of the balance and keeps saying it is sending.",
+  "startsFrom": "receive-100-sats-on-the-private-mint",
+  "given": {
+    "invoice": {
+      "mint": "local",
+      "sats": 10,
+      "paying": "pending"
+    }
+  },
+  "steps": [
+    {
+      "name": "the wallet opens with 100 sats",
+      "expect": [
+        {
+          "visible": {
+            "label": "Balance, 100 BTC"
+          }
+        },
+        {
+          "logged": "splash.gone"
+        }
+      ],
+      "withinMs": 20000
+    },
+    {
+      "name": "open Send",
+      "tap": {
+        "id": "wallet-send"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "send-destination-input"
+          }
+        }
+      ]
+    },
+    {
+      "name": "enter the invoice",
+      "type": {
+        "into": {
+          "id": "send-destination-input"
+        },
+        "text": "{{invoice}}"
+      },
+      "expect": [
+        {
+          "visible": {
+            "label": "Pay 10 sats"
+          }
+        }
+      ],
+      "withinMs": 90000
+    },
+    {
+      "name": "choose to pay it",
+      "tap": {
+        "id": "send-detected-lightningInvoice"
+      },
+      "expect": [
+        {
+          "page": "LightningSendScreen"
+        },
+        {
+          "visible": {
+            "id": "melt-pay"
+          }
+        }
+      ],
+      "withinMs": 15000
+    },
+    {
+      "name": "pay, and the wallet keeps sending",
+      "tap": {
+        "id": "melt-pay"
+      },
+      "expect": [
+        {
+          "visible": {
+            "label": "Sending..."
+          }
+        },
+        {
+          "visible": {
+            "id": "payment-status-melt-processing"
+          }
+        },
+        {
+          "logged": "coco.manager.MeltOperationService.sending_melt_request_to_mint"
+        },
+        {
+          "logged": "ui.touch"
+        }
+      ],
+      "withinMs": 30000
+    }
+  ]
+}

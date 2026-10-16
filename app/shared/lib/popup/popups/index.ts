@@ -10,6 +10,7 @@ export { copyPopup } from './copy';
 export { profileSwitcherPopup } from './actionSheets';
 export { paymentOptionsPopup, paymentFallbackPopup } from './paymentOptionsSheet';
 export { proofSelectorPopup } from './proofSelectorSheet';
+export { sendFallbackPopup } from './sendFallbackSheet';
 export { sendMemoPopup } from './sendMemoSheet';
 export { emojiPickerPopup } from './emojiPicker';
 export { modelPickerPopup } from './modelPicker';
@@ -76,13 +77,6 @@ const STATIC_POPUPS = {
     text: 'An error occurred during recovery.',
     icon: 'icon:mdi:shield-remove',
     type: 'error',
-  },
-
-  'crypto-benchmark-complete': {
-    message: 'Benchmark complete',
-    text: 'Per-operation results are in the log.',
-    icon: 'icon:mdi:shield-check',
-    type: 'success',
   },
 
   // general

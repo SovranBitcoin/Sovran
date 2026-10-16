@@ -1,0 +1,39 @@
+{
+  "id": "first-launch-accept-terms",
+  "purpose": "A person opening the app for the first time reads and accepts the Terms and then the Privacy Policy, and is taken on into setup.",
+  "startsFrom": "fresh",
+  "steps": [
+    {
+      "name": "the Terms are shown first",
+      "expect": [{ "page": "LegalDocumentScreen" }, { "visible": { "id": "terms-acceptance" } }],
+      "withinMs": 7000
+    },
+    {
+      "name": "agree to the Terms",
+      "tap": { "id": "terms-acceptance" },
+      "expect": [{ "enabled": { "id": "terms-continue" } }]
+    },
+    {
+      "name": "continue to Privacy",
+      "tap": { "id": "terms-continue" },
+      "expect": [
+        { "visible": { "id": "privacy-acknowledgment" } },
+        { "gone": { "id": "terms-acceptance" } }
+      ]
+    },
+    {
+      "name": "acknowledge the Privacy Policy",
+      "tap": { "id": "privacy-acknowledgment" },
+      "expect": [{ "enabled": { "id": "privacy-confirm" } }]
+    },
+    {
+      "name": "confirm and enter setup",
+      "tap": { "id": "privacy-confirm" },
+      "expect": [
+        { "gone": { "id": "privacy-confirm" } },
+        { "gone": { "id": "screen-legal-document" } },
+        { "page": "OnboardingScreen" }
+      ]
+    }
+  ]
+}

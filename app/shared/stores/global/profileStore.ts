@@ -9,7 +9,7 @@
  * and which one is currently active.
  */
 
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { persist } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { z } from 'zod';
@@ -42,6 +42,24 @@ export interface ProfileEntry {
   cachedDisplayName?: string;
   /** Cached Nostr kind-0 profile picture URL */
   cachedPicture?: string;
+  /**
+   * True once this install has opened this account's wallet database. Absent
+   * on a row written by a release that did not record it, and on a new row.
+   * See `walletDatabaseRecord.ts`.
+   */
+  walletDatabaseCreated?: boolean;
+  /**
+   * Imported accounts only: `hashMnemonic` of the recovery phrase this
+   * account's wallet was made from. An imported account's identity is its own
+   * key, but its wallet is derived from the phone's recovery phrase, and
+   * nothing else records which one. Without it, a recovery with a different
+   * phrase would quietly give the account a different wallet. Kept here and
+   * not in the keychain because it is needed exactly when the keychain cannot
+   * be read. It is 64 bits of a hash, not the phrase. It does let someone who
+   * already holds most of the phrase confirm a guess, as the public key of
+   * any account made from the phrase already does.
+   */
+  walletPhraseFingerprint?: string;
 }
 
 interface ProfileState {
@@ -67,6 +85,12 @@ interface ProfileActions {
     externalChain?: number
   ) => boolean;
   repairDerivedSource: (accountIndex: number, verifiedPubkey: string) => boolean;
+  /**
+   * Record which recovery phrase an imported account's wallet was made from.
+   * Written once: a fingerprint already recorded is evidence and is never
+   * replaced.
+   */
+  recordWalletPhraseFingerprint: (pubkey: string, fingerprint: string) => void;
   /** Set the active account index (caller is responsible for cleanup/resetStages before this) */
   switchProfile: (accountIndex: number) => boolean;
   /** Get the next available account index (only considers derived profiles) */
@@ -75,6 +99,8 @@ interface ProfileActions {
   updateProfileBalance: (accountIndex: number, balanceSats: number) => void;
   /** Update cached Nostr kind-0 metadata for a profile */
   updateProfileMetadata: (accountIndex: number, displayName?: string, picture?: string) => void;
+  /** Record, or forget, that these accounts' wallet databases exist on this install. */
+  setWalletDatabaseCreated: (accountIndexes: readonly number[], created: boolean) => void;
   /** Check if a pubkey is already used by any profile */
   hasPubkey: (pubkey: string) => boolean;
   /** Get the active profile entry */
@@ -100,23 +126,28 @@ const PersistedProfileEntry = z.looseObject({
   externalChain: z.number().int().nonnegative().optional(),
   cachedDisplayName: z.string().max(512).optional(),
   cachedPicture: z.string().max(2048).optional(),
+  // Absent means not recorded, which never asks for a restore. An unreadable
+  // value is read the same way; rejecting it would discard the whole store.
+  walletDatabaseCreated: z.boolean().optional().catch(undefined),
+  // Absent means not recorded, which checks nothing. An unreadable value is
+  // read the same way; rejecting it would discard the whole store.
+  walletPhraseFingerprint: z.string().max(64).optional().catch(undefined),
 });
 
 /**
- * Profile ceiling, shared by the schema and by `addProfile`.
+ * Profile ceiling, enforced by `addProfile` and nowhere else.
  *
- * One constant used at both ends. The schema declared 64 and `addProfile`
- * appended without a cap, so a 65th profile made the blob unparseable — and
- * `createMergeWithSchema` is all-or-nothing, so the next launch discarded the
- * GLOBAL profile store: every profile the user has, and the active index with
- * them. Refusing the 65th costs one profile; the old behaviour cost all
- * sixty-four.
+ * The schema must not carry it. `createMergeWithSchema` is all-or-nothing, so a
+ * list the schema rejects costs the GLOBAL profile store: every profile the
+ * user has, and the active index with them. Early releases appended without a
+ * cap, so a stored list may already be longer than this; it has to load.
+ * Refusing one more profile costs one profile.
  */
 export const MAX_PROFILES = 64;
 
 const PersistedProfileStore = z.object({
   activeAccountIndex: z.number().int().default(0),
-  profiles: z.array(PersistedProfileEntry).max(MAX_PROFILES).default([]),
+  profiles: z.array(PersistedProfileEntry).default([]),
 });
 
 /**
@@ -147,7 +178,32 @@ function migrateProfileStore(state: unknown, version: number): V2Persisted {
   return state as V2Persisted;
 }
 
-export const useProfileStore = create<ProfileStore>()(
+// One-slot memo for `selectActiveProfile`, keyed on the two inputs it reads.
+let memoProfiles: ProfileEntry[] | undefined;
+let memoActiveAccountIndex: number | undefined;
+let memoActiveProfile: ProfileEntry | undefined;
+
+/**
+ * The active profile entry, as a selector: `useProfileStore(selectActiveProfile)`.
+ *
+ * A zustand selector runs on every store update, so it must not walk the list
+ * each time. This scans only when the list or the active index is a different
+ * value from the last call, and otherwise hands back the entry it already
+ * found — the same reference, since the store's writers keep an untouched
+ * entry's identity.
+ */
+export function selectActiveProfile(
+  state: Pick<ProfileState, 'profiles' | 'activeAccountIndex'>
+): ProfileEntry | undefined {
+  if (state.profiles !== memoProfiles || state.activeAccountIndex !== memoActiveAccountIndex) {
+    memoProfiles = state.profiles;
+    memoActiveAccountIndex = state.activeAccountIndex;
+    memoActiveProfile = state.profiles.find((p) => p.accountIndex === state.activeAccountIndex);
+  }
+  return memoActiveProfile;
+}
+
+export const useProfileStore = create<ProfileStore>({ name: 'profile-store', scope: 'global' })(
   persist(
     (set, get) => ({
       activeAccountIndex: 0,
@@ -214,6 +270,17 @@ export const useProfileStore = create<ProfileStore>()(
         return true;
       },
 
+      recordWalletPhraseFingerprint: (pubkey, fingerprint) => {
+        const profile = get().profiles.find((p) => p.pubkey === pubkey);
+        if (profile?.source !== 'imported' || profile.walletPhraseFingerprint) return;
+        set((state) => ({
+          profiles: state.profiles.map((p) =>
+            p === profile ? { ...p, walletPhraseFingerprint: fingerprint } : p
+          ),
+        }));
+        storeLog.info('profile.wallet_phrase_fingerprint.recorded');
+      },
+
       switchProfile: (accountIndex: number) => {
         const { profiles } = get();
         // Only switch if the profile exists
@@ -254,14 +321,24 @@ export const useProfileStore = create<ProfileStore>()(
         }));
       },
 
+      setWalletDatabaseCreated: (accountIndexes, created) => {
+        const changes = (p: ProfileEntry) =>
+          accountIndexes.includes(p.accountIndex) && (p.walletDatabaseCreated === true) !== created;
+        // Nothing to change is the usual case at startup, and every `set` is
+        // a save of the whole list.
+        if (!get().profiles.some(changes)) return;
+        set((state) => ({
+          profiles: state.profiles.map((p) =>
+            changes(p) ? { ...p, walletDatabaseCreated: created } : p
+          ),
+        }));
+      },
+
       hasPubkey: (pubkey: string) => {
         return get().profiles.some((p) => p.pubkey === pubkey);
       },
 
-      getActiveProfile: () => {
-        const { profiles, activeAccountIndex } = get();
-        return profiles.find((p) => p.accountIndex === activeAccountIndex);
-      },
+      getActiveProfile: () => selectActiveProfile(get()),
     }),
     persistConfig({
       name: 'profile-store',

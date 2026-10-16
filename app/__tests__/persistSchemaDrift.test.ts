@@ -42,6 +42,7 @@ import '@/shared/stores/profile/aiProviderDirectoryStore';
 import '@/shared/stores/global/profileStore';
 import '@/shared/stores/global/walletLifecycleStore';
 import '@/shared/stores/global/ctaStore';
+import '@/shared/stores/global/legacyEcashStore';
 import '@/shared/stores/profile/mintDistributionStore';
 import '@/shared/stores/profile/npcMintStore';
 import '@/shared/stores/profile/nutDropRedeemQueueStore';

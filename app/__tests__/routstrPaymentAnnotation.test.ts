@@ -34,7 +34,10 @@ jest.mock('@/shared/lib/logger', () => {
   return { apiLog: noop, aiLog: noop, storeLog: noop, log: noop, applyFileLogging: jest.fn() };
 });
 
+// The rest stays real: `wallet`, which the annotation loads, reads the
+// library's constants as it is imported.
 jest.mock('@cashu/cashu-ts', () => ({
+  ...jest.requireActual<typeof import('@cashu/cashu-ts')>('@cashu/cashu-ts'),
   getEncodedToken: () => 'cashuB-minted',
   getTokenMetadata: () => mockTokenMetadata(),
 }));

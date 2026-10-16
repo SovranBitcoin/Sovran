@@ -1,0 +1,32 @@
+{
+  "id": "redeem-ecash-from-a-link",
+  "purpose": "Someone sends the person a link to 32 sats of ecash; they open it, redeem it, and their balance goes from 100 to 132.",
+  "startsFrom": "receive-100-sats-on-the-private-mint",
+  "steps": [
+    {
+      "name": "the wallet opens with 100 sats",
+      "expect": [{ "visible": { "label": "Balance, 100 BTC" } }, { "logged": "splash.gone" }],
+      "withinMs": 8000
+    },
+    {
+      "name": "open a link to 32 sats someone sent",
+      "handed": { "token": { "sats": 32 } },
+      "open": "cashu:{{token}}",
+      "expect": [
+        { "page": "ReceiveTokenScreen" },
+        { "visible": { "id": "receive-token-redeem" } },
+        { "visible": { "label": "Incoming 32 sat transaction, prepared" } }
+      ],
+      "withinMs": 20000
+    },
+    {
+      "name": "redeem",
+      "tap": { "id": "receive-token-redeem" },
+      "expect": [
+        { "logged": "payment.receive.confirmed" },
+        { "gone": { "id": "receive-token-redeem" } }
+      ],
+      "withinMs": 30000
+    }
+  ]
+}

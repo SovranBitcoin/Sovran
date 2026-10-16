@@ -101,6 +101,12 @@ export interface ActionVariant {
   reason?: string;
   /** Marks destructive variants (red styling). */
   isDestructive?: boolean;
+  /**
+   * Marks a variant that works but carries a caveat the user must weigh
+   * (yellow styling), e.g. paying an npub.cash address the recipient never
+   * advertised.
+   */
+  isCaution?: boolean;
 }
 
 export interface ActionAvailability {
@@ -186,6 +192,12 @@ export interface ScreenActionManager<S extends ScreenType> {
   inspect: () => Record<ScreenActionName[S], ActionState>;
   /** Subscribe to state changes. Returns unsubscribe function. */
   subscribe: (listener: () => void) => () => void;
+  /**
+   * Recompute availability and tell subscribers. For a change in something the
+   * actions read through a getter (network, wallet context), which no entry
+   * update announces.
+   */
+  refresh: () => void;
 }
 
 // ---------------------------------------------------------------------------

@@ -23,21 +23,72 @@ function summarizeError(err: unknown): Record<string, unknown> {
   };
 }
 
-/**
- * Returns true when the error indicates the mint could not be reached —
- * either a raw network failure, a server error (5xx), or a MintFetchError
- * (coco-core wraps network failures when refreshing mint info/keysets).
- */
-export function isMintOfflineError(err: unknown): boolean {
-  const result =
+/** Coco's wrappers for a mint that could not be read while refreshing it. */
+const MINT_UNREACHABLE_ERROR_NAMES = new Set([
+  "MintFetchError",
+  "KeysetSyncError",
+]);
+/** Enough for coco's wrapper around cashu-ts's around fetch's. */
+const MAX_CAUSE_DEPTH = 4;
+
+function isMintUnreachableCause(err: unknown): boolean {
+  return (
     err instanceof NetworkError ||
     (err instanceof HttpResponseError && err.status >= 500) ||
-    (err instanceof Error && err.name === "MintFetchError");
+    (err instanceof Error && MINT_UNREACHABLE_ERROR_NAMES.has(err.name))
+  );
+}
+
+/**
+ * Returns true when the error indicates the mint could not be reached —
+ * either a raw network failure, a server error (5xx), or coco's
+ * MintFetchError / KeysetSyncError from refreshing mint info or keysets —
+ * directly or as the `cause` of the error that was thrown.
+ */
+export function isMintOfflineError(err: unknown): boolean {
+  let current: unknown = err;
+  let result = false;
+  for (let depth = 0; depth <= MAX_CAUSE_DEPTH && current != null; depth += 1) {
+    if (isMintUnreachableCause(current)) {
+      result = true;
+      break;
+    }
+    current = current instanceof Error ? current.cause : undefined;
+  }
   logger.debug("errors.mintOffline.classify", {
     ...summarizeError(err),
     result,
   });
   return result;
+}
+
+/**
+ * An error whose message this package wrote for the person using the app.
+ * Everything else that can be thrown here (a mint's reply, a library's
+ * exception) carries someone else's wording: the app shows its own copy for
+ * that instead of the text.
+ */
+export class AuthoredError extends Error {
+  readonly authored = true;
+  constructor(message: string, options?: { cause?: unknown }) {
+    super(message, options);
+    this.name = "AuthoredError";
+  }
+}
+
+export interface FailureText {
+  message: string;
+  /** True when `message` was written by this package and can be shown as is. */
+  authored: boolean;
+}
+
+/** The message a failure is reported with, and whether this package wrote it. */
+export function failureText(cause: unknown, fallback: string): FailureText {
+  if (!(cause instanceof Error)) return { message: fallback, authored: true };
+  return {
+    message: cause.message,
+    authored: (cause as { authored?: unknown }).authored === true,
+  };
 }
 
 /**

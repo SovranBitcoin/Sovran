@@ -1,0 +1,259 @@
+{
+  "id": "move-money-between-two-mints",
+  "purpose": "A person with 100 sats on one mint adds a second, asks for an even split between the two, and the wallet moves half across with a swap.",
+  "startsFrom": "receive-100-sats-on-the-private-mint",
+  "steps": [
+    {
+      "name": "the wallet opens with 100 sats",
+      "expect": [
+        {
+          "visible": {
+            "label": "Balance, 100 BTC"
+          }
+        },
+        {
+          "logged": "splash.gone"
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "open the mint selector",
+      "tap": {
+        "id": "wallet-mint-selector"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "mint-select-add"
+          }
+        },
+        {
+          "page": "MintListScreen"
+        }
+      ]
+    },
+    {
+      "name": "add a mint",
+      "tap": {
+        "id": "mint-select-add"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "mint-add-search-toggle"
+          }
+        }
+      ]
+    },
+    {
+      "name": "open search",
+      "tap": {
+        "id": "mint-add-search-toggle"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "mint-add-search-input"
+          }
+        }
+      ]
+    },
+    {
+      "name": "type the second mint's address",
+      "type": {
+        "into": {
+          "id": "mint-add-search-input"
+        },
+        "text": "{{mint2}}"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "contact-row:mint:{{mint2}}"
+          }
+        }
+      ],
+      "withinMs": 15000
+    },
+    {
+      "name": "pick the mint",
+      "tap": {
+        "id": "contact-row:mint:{{mint2}}"
+      },
+      "expect": [
+        {
+          "visible": {
+            "label": "Add (1)"
+          }
+        }
+      ]
+    },
+    {
+      "name": "add it",
+      "tap": {
+        "id": "mint-add-confirm"
+      },
+      "expect": [
+        {
+          "logged": "mint.add.item.added"
+        },
+        {
+          "logged": "mint.add.restore.success"
+        }
+      ],
+      "withinMs": 30000
+    },
+    {
+      "name": "go back to the mints",
+      "tap": {
+        "id": "mint-import-done"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "mint-currency-tab-ALL"
+          }
+        },
+        {
+          "gone": {
+            "id": "mint-import-done"
+          }
+        }
+      ]
+    },
+    {
+      "name": "close the mint list",
+      "tap": {
+        "id": "flow-header-close"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-split"
+          }
+        }
+      ],
+      "withinMs": 10000
+    },
+    {
+      "name": "open Split",
+      "tap": {
+        "id": "wallet-split"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "mint-distribution-next"
+          }
+        },
+        {
+          "visible": {
+            "id": "mint-distribution-toggle:{{mint}}"
+          }
+        }
+      ],
+      "withinMs": 10000
+    },
+    {
+      "name": "leave Minibits out",
+      "tap": {
+        "id": "mint-distribution-toggle:https://mint.minibits.cash/Bitcoin"
+      },
+      "expect": [
+        {
+          "logged": "ui.touch"
+        }
+      ]
+    },
+    {
+      "name": "leave macadamia out",
+      "tap": {
+        "id": "mint-distribution-toggle:https://mint.macadamia.cash"
+      },
+      "expect": [
+        {
+          "logged": "ui.touch"
+        }
+      ]
+    },
+    {
+      "name": "leave antifiat out",
+      "tap": {
+        "id": "mint-distribution-toggle:https://antifiat.cash"
+      },
+      "expect": [
+        {
+          "logged": "ui.touch"
+        }
+      ]
+    },
+    {
+      "name": "leave Cuba Bitcoin out",
+      "tap": {
+        "id": "mint-distribution-toggle:https://mint.cubabitcoin.org"
+      },
+      "expect": [
+        {
+          "logged": "ui.touch"
+        }
+      ]
+    },
+    {
+      "name": "ask for the plan",
+      "tap": {
+        "id": "mint-distribution-next"
+      },
+      "expect": [
+        {
+          "page": "MintRebalancePlanScreen"
+        },
+        {
+          "visible": {
+            "id": "rebalance-start"
+          }
+        }
+      ],
+      "withinMs": 15000
+    },
+    {
+      "name": "rebalance",
+      "tap": {
+        "id": "rebalance-start"
+      },
+      "expect": [
+        {
+          "logged": "swap.batch.start"
+        },
+        {
+          "logged": "hook.payment_status.mint_quote_redeemed"
+        },
+        {
+          "visible": {
+            "id": "rebalance-done"
+          }
+        },
+        {
+          "visible": {
+            "id": "rebalance-view-swap"
+          }
+        }
+      ],
+      "withinMs": 40000
+    },
+    {
+      "name": "done",
+      "tap": {
+        "id": "rebalance-done"
+      },
+      "expect": [
+        {
+          "gone": {
+            "id": "rebalance-done"
+          }
+        }
+      ],
+      "withinMs": 10000
+    }
+  ]
+}

@@ -1,7 +1,9 @@
-import { createContext, useEffect, useState, ReactNode, useRef } from 'react';
+import { StartupFailedScreen } from '@/shared/blocks/StartupFailedScreen';
+import { useEffect, useState, ReactNode, useRef } from 'react';
 import { CocoCashuProvider } from '@cashu/coco-react';
 import { Manager } from '@cashu/coco-core';
 import { CocoManager } from '@/shared/lib/cashu/manager';
+import { startLegacyEcashClaim } from '@/shared/lib/cashu/legacyEcashClaim';
 import { reclaimRoutstrBalances, recoverPendingPayments } from '@/shared/lib/routstr/reclaim';
 import { sweepUnsettledPayments } from '@/shared/lib/routstr/sdk/client';
 import { reportCocoApiFailure } from '@/shared/lib/cashu/cocoFeedback';
@@ -13,24 +15,11 @@ import { attachMintMetadataToManager } from '@/shared/stores/global/mintMetadata
 import { log, initLog, initPhase, useInitMount, deferWork } from '@/shared/lib/logger';
 import { getBootMorphCompleted, subscribeBootMorphCompleted } from '@/shared/lib/qrButtonAnchor';
 import { awaitRestoreReady } from '@/shared/providers/awaitRestoreReady';
+import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { useWalletLifecycleStore } from '@/shared/stores/global/walletLifecycleStore';
 import { initializeDefaultMints } from '@/shared/lib/cashu/initializeDefaultMints';
 
 initLog('Module', 'CocoProvider loaded');
-
-interface CocoContextValue {
-  manager: Manager | null;
-  isReady: boolean;
-  isMigrating: boolean;
-  migrationError: Error | null;
-}
-
-const CocoContext = createContext<CocoContextValue>({
-  manager: null,
-  isReady: false,
-  isMigrating: false,
-  migrationError: null,
-});
 
 interface CocoProviderProps {
   children: ReactNode;
@@ -51,7 +40,10 @@ type CocoPhase1Args = {
   privateKey: Uint8Array | undefined;
   onManager: (manager: Manager) => void;
   onReady: () => void;
-  onFailure: (error: Error) => void;
+  /** The wallet could not be opened; the provider shows a retry. */
+  onFailure: () => void;
+  /** False once the effect that started this phase has been cleaned up. */
+  isCurrent: () => boolean;
 };
 
 /**
@@ -69,6 +61,7 @@ async function runCocoPhase1({
   onManager,
   onReady,
   onFailure,
+  isCurrent,
 }: CocoPhase1Args): Promise<void> {
   try {
     stage.log('Initializing Coco...');
@@ -83,6 +76,13 @@ async function runCocoPhase1({
     }
 
     const mgr = await initPhase('Coco.managerInit', () => CocoManager.initialize());
+    // The effect that started this was cleaned up while the wallet was opening.
+    // Its cleanup tears the manager down; publishing it here would hand a
+    // disposed wallet to a provider that is gone or already re-running.
+    if (!isCurrent()) {
+      log.info('coco.phase1.stale');
+      return;
+    }
     onManager(mgr);
     log.info('coco.phase1.manager_ready');
 
@@ -92,6 +92,7 @@ async function runCocoPhase1({
     initLog('Coco', 'Phase 1 complete');
     log.info('coco.phase1.done');
   } catch (caught) {
+    if (!isCurrent()) return;
     const failure = caught instanceof Error ? caught : new Error('Initialization failed');
     initLog('Coco', `Phase 1 ERROR: ${caught}`);
     // Log what was actually thrown, not the substituted message — a non-Error
@@ -99,8 +100,8 @@ async function runCocoPhase1({
     log.error('coco.phase1.failed', {
       error: caught instanceof Error ? caught.message : String(caught),
     });
-    onFailure(failure);
     stage.error(failure.message);
+    onFailure();
   }
 }
 
@@ -195,6 +196,9 @@ async function runCocoPhase2({ bgStage, chainManager, isLive }: CocoPhase2Args):
     }
 
     if (!isLive()) return;
+    // Ecash that releases before 0.0.45 stored themselves. Not awaited: it
+    // waits on mints that may be gone, and nothing after it depends on it.
+    void startLegacyEcashClaim(chainManager, isLive);
     bgStage.complete();
     initLog('Coco-bg', 'Phase 2 complete');
     log.info('coco.phase2.done');
@@ -205,6 +209,19 @@ async function runCocoPhase2({ bgStage, chainManager, isLive }: CocoPhase2Args):
     });
     bgStage.complete();
   }
+}
+
+/**
+ * Stage the account's credentials again for a retry. Closing the attempt that
+ * failed cleared the wallet phrase and the imported flag, and the keys
+ * provider, which staged them, does not run again for a retry. Without this an
+ * imported account's retry is opened as a derived one, which the wallet-open
+ * check refuses, so every retry fails until the app is restarted.
+ */
+function restageWalletCredentials(cashuMnemonic: string | null): void {
+  const profile = useProfileStore.getState().getActiveProfile();
+  if (profile) CocoManager.setAccountIndex(profile.accountIndex, profile.source === 'imported');
+  if (cashuMnemonic) CocoManager.setCashuMnemonic(cashuMnemonic);
 }
 
 export function CocoProvider({ children }: CocoProviderProps) {
@@ -219,16 +236,18 @@ export function CocoProvider({ children }: CocoProviderProps) {
     dependsOn: ['coco'],
     blocking: false,
   });
-  const { keys } = useNostrKeysContext();
+  const { keys, cashuMnemonic } = useNostrKeysContext();
   // Mirrored, not depended on: `privateKey` is a fresh `Uint8Array` on every
   // derivation, so making it a trigger would tear down and re-initialise
   // CocoManager whenever the keys context re-derived the SAME identity.
   // `pubkey` is the stable identity of the keypair and the real trigger.
   const privateKeyRef = useLatestRef(keys?.privateKey);
+  const cashuMnemonicRef = useLatestRef(cashuMnemonic);
   const [manager, setManager] = useState<Manager | null>(null);
   const [isReady, setIsReady] = useState(false);
-  const isMigrating = false;
-  const [migrationError, setMigrationError] = useState<Error | null>(null);
+  // A failed open is shown with a retry; each retry is a new attempt.
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   const hasStarted = useRef(false);
   const bgStarted = useRef(false);
 
@@ -238,16 +257,20 @@ export function CocoProvider({ children }: CocoProviderProps) {
     if (hasStarted.current) return;
     hasStarted.current = true;
 
+    if (attempt > 0) restageWalletCredentials(cashuMnemonicRef.current);
+    const run = { current: true };
     void runCocoPhase1({
       stage,
       hasPubkey: !!keys?.pubkey,
       privateKey: privateKeyRef.current,
       onManager: setManager,
       onReady: () => setIsReady(true),
-      onFailure: setMigrationError,
+      onFailure: () => setFailed(true),
+      isCurrent: () => run.current,
     });
 
     return () => {
+      run.current = false;
       // Reset the start-guard so a deps change (e.g. profile switch flipping
       // keys.pubkey) re-runs init for the new identity. Without this, the
       // cleanup tears down the singleton but the re-run sees hasStarted=true
@@ -261,7 +284,7 @@ export function CocoProvider({ children }: CocoProviderProps) {
       });
     };
     // (`stage` is memoised — it moves only when `canStart` flips.)
-  }, [stage, keys?.pubkey, privateKeyRef]);
+  }, [stage, keys?.pubkey, privateKeyRef, cashuMnemonicRef, attempt]);
 
   // Phase 2: Non-blocking — Default mints + recovery (runs after app is visible)
   useEffect(() => {
@@ -358,20 +381,18 @@ export function CocoProvider({ children }: CocoProviderProps) {
     return attachMintTestnutToManager(manager);
   }, [manager]);
 
-  const contextValue: CocoContextValue = {
-    manager,
-    isReady,
-    isMigrating,
-    migrationError,
-  };
-
-  if (!isReady || !manager) {
-    return <CocoContext.Provider value={contextValue}>{null}</CocoContext.Provider>;
+  if (failed) {
+    return (
+      <StartupFailedScreen
+        step="wallet"
+        onRetry={() => {
+          setFailed(false);
+          setAttempt((current) => current + 1);
+        }}
+      />
+    );
   }
+  if (!isReady || !manager) return null;
 
-  return (
-    <CocoContext.Provider value={contextValue}>
-      <CocoCashuProvider manager={manager}>{children}</CocoCashuProvider>
-    </CocoContext.Provider>
-  );
+  return <CocoCashuProvider manager={manager}>{children}</CocoCashuProvider>;
 }

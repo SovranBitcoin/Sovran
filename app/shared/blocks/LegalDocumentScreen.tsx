@@ -1,10 +1,12 @@
 import type { ReactNode } from 'react';
 import { ScrollView } from 'react-native';
-import { Card } from 'heroui-native';
 import { Screen } from '@/shared/ui/composed/Screen';
+import { Surface } from '@/shared/ui/composed/Surface';
 import { Text } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { legalDocuments, type LegalDocumentId } from '@/shared/lib/legal/legalDocuments';
+
+const FILL = { flex: 1 } as const;
 
 /** Bundled plain text: works offline and cannot run HTML from a remote policy. */
 export function LegalDocumentScreen({
@@ -35,7 +37,7 @@ export function LegalDocumentScreen({
           </Text>
           {step && <Text className="text-muted text-center">{step}</Text>}
         </VStack>
-        <Card variant="secondary" className="flex-1 p-0">
+        <Surface style={FILL} contentStyle={FILL}>
           <ScrollView
             key={documentId}
             testID={`legal-document-${documentId}`}
@@ -82,7 +84,7 @@ export function LegalDocumentScreen({
               ))}
             </VStack>
           </ScrollView>
-        </Card>
+        </Surface>
         {children}
         {navigation}
       </VStack>

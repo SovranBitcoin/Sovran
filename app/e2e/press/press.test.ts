@@ -323,10 +323,11 @@ test('disambiguates ai occurrence 2 and all eight wallpapers by scenario, page a
   ]);
 }, 15000);
 
-test.each(['fake', 'orchestration-smoke', 'fingerprint', 'full-extra'])(
+test.each(['fake', 'orchestration-smoke', 'fingerprint', 'full-extra', 'manual-review', 'stories'])(
   'rejects invalid manifest: %s',
   async (bad) => {
     const run = fixture();
+    if (bad === 'manual-review' || bad === 'stories') Object.assign(run.manifest, { kind: bad });
     if (bad === 'fake') run.manifest.driver = 'fake';
     if (bad === 'orchestration-smoke') run.manifest.proof = bad;
     if (bad === 'fingerprint') run.manifest.sourceFingerprint = '';

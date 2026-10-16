@@ -11,6 +11,7 @@ import { LoadingIndicator } from '@/shared/blocks/status';
 import { useWhitenoiseSetup } from '../hooks/useWhitenoiseSetup';
 import { useWhitenoise } from '../WhitenoiseContext';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
+import { hasFeature } from '@/shared/config/features';
 import Icon from 'assets/icons';
 
 /**
@@ -89,7 +90,10 @@ export function WhitenoiseSetupBanner({
   // Render gates — idle state hides when there's nothing to set up.
   // Once the user starts, we keep rendering through the full sequence
   // even if upstream `isReady` flips during the animation.
+  // A build without DM pages has nowhere for the messenger to open, and no
+  // setting left to turn it off with (ADR 0021).
   const shouldRenderCard =
+    hasFeature('directMessages') &&
     whitenoiseEnabled &&
     phase !== 'gone' &&
     (phase !== 'idle' || (pathname.includes('/contacts') && !!client && !isLoading && !isReady));

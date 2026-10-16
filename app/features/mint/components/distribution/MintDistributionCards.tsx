@@ -1,7 +1,10 @@
 import { useCallback, useState } from 'react';
 import { View } from 'react-native';
 import type { GetInfoResponse } from '@cashu/cashu-ts';
-import { Card, Slider, Switch as HeroSwitch } from 'heroui-native';
+import { Slider } from 'heroui-native';
+import { Surface } from '@/shared/ui/composed/Surface';
+import { useStylePaint } from '@/shared/styles/appStyle';
+import { Switch as HeroSwitch } from '@/shared/ui/primitives/Switch';
 import { Text } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -25,7 +28,7 @@ interface MintDistributionCardsProps {
 }
 
 /**
- * The Balance-split body: one secondary Card per mint, mirroring the Swap
+ * The Balance-split body: one Surface per mint, mirroring the Swap
  * routing settings cards (label + value header row over a heroui Slider).
  * A mint at 0% reads as disabled — its switch is off and the slider collapses;
  * the switch is the enable/disable control.
@@ -84,6 +87,7 @@ function MintDistributionCard({
   onToggleMint,
 }: MintDistributionCardProps) {
   const [muted] = useThemeColor(['muted'] as const);
+  const { pad, item } = useStylePaint().style.space;
   const displayName = mintInfo?.name || extractDomain(mintUrl) || 'Unknown Mint';
   const enabled = distributionBp > 0;
 
@@ -114,58 +118,56 @@ function MintDistributionCard({
   );
 
   return (
-    <Card variant="secondary">
-      <Card.Body className="gap-2">
-        <View className="flex-row items-center justify-between gap-3">
-          <HStack
-            align="center"
-            gap={10}
-            flex={1}
-            style={enabled ? undefined : DISABLED_IDENTITY_STYLE}>
-            <MintIcon
-              iconUrl={mintInfo?.icon_url}
-              size={28}
-              name={displayName}
-              alt={`${displayName} icon`}
-            />
-            <Text size={16} numberOfLines={1} className="flex-1">
-              {displayName}
-            </Text>
-          </HStack>
-          {enabled ? (
-            <Text overpass heavy size={18}>
-              {bpToPercent(displayBp)}%
-            </Text>
-          ) : (
-            <Text size={14} style={{ color: muted, opacity: 0.6 }}>
-              Off
-            </Text>
-          )}
-          <HeroSwitch
-            isSelected={enabled}
-            isDisabled={isLastActive}
-            onSelectedChange={handleToggle}
-            aria-label={`${displayName} enabled`}
-            testID={`mint-distribution-toggle:${mintUrl}`}
+    <Surface contentStyle={{ padding: pad, gap: item }}>
+      <View className="flex-row items-center justify-between gap-3">
+        <HStack
+          align="center"
+          gap={10}
+          flex={1}
+          style={enabled ? undefined : DISABLED_IDENTITY_STYLE}>
+          <MintIcon
+            iconUrl={mintInfo?.icon_url}
+            size={28}
+            name={displayName}
+            alt={`${displayName} icon`}
           />
-        </View>
+          <Text size={16} numberOfLines={1} className="flex-1">
+            {displayName}
+          </Text>
+        </HStack>
         {enabled ? (
-          <Slider
-            value={displayBp / 100}
-            minValue={0}
-            maxValue={100}
-            step={1}
-            isDisabled={sliderDisabled}
-            aria-label={`${displayName} share`}
-            onChange={handleChange}
-            onChangeEnd={handleChangeEnd}>
-            <Slider.Track>
-              <Slider.Fill />
-              <Slider.Thumb />
-            </Slider.Track>
-          </Slider>
-        ) : null}
-      </Card.Body>
-    </Card>
+          <Text overpass heavy size={18}>
+            {bpToPercent(displayBp)}%
+          </Text>
+        ) : (
+          <Text size={14} style={{ color: muted, opacity: 0.6 }}>
+            Off
+          </Text>
+        )}
+        <HeroSwitch
+          isSelected={enabled}
+          isDisabled={isLastActive}
+          onSelectedChange={handleToggle}
+          aria-label={`${displayName} enabled`}
+          testID={`mint-distribution-toggle:${mintUrl}`}
+        />
+      </View>
+      {enabled ? (
+        <Slider
+          value={displayBp / 100}
+          minValue={0}
+          maxValue={100}
+          step={1}
+          isDisabled={sliderDisabled}
+          aria-label={`${displayName} share`}
+          onChange={handleChange}
+          onChangeEnd={handleChangeEnd}>
+          <Slider.Track>
+            <Slider.Fill />
+            <Slider.Thumb />
+          </Slider.Track>
+        </Slider>
+      ) : null}
+    </Surface>
   );
 }

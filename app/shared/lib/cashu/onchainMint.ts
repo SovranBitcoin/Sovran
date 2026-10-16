@@ -7,7 +7,7 @@ import {
   looksLikeBitcoinAddress,
 } from 'wallet';
 
-import { amountToNumber, type AmountValue } from '@/shared/lib/cashu/amount';
+import { amountToNumber, type AmountValue } from 'wallet/amount';
 import { cashuLog } from '@/shared/lib/logger';
 
 type EntryRecord = Record<string, unknown>;
@@ -260,6 +260,23 @@ export function getOnchainRequiredConfirmations(mintInfo: unknown, unit = 'sat')
     confirmations,
   });
   return confirmations;
+}
+
+/**
+ * Whether the confirmation depth for this deposit came from the mint (on the
+ * quote, or in its published method settings) rather than from our fallback.
+ * Only a depth the mint stated can be held against it.
+ */
+export function isOnchainMintRequirementFromMint(
+  entry: HistoryEntry | null | undefined,
+  mintInfo: unknown,
+  unit = 'sat'
+): boolean {
+  return (
+    getOnchainConfirmationsFromQuoteLike(entry) != null ||
+    getOnchainConfirmationsFromQuoteLike(getMetadata(entry)) != null ||
+    getOnchainRequiredConfirmationsFromMintInfo(mintInfo, unit) != null
+  );
 }
 
 export function getOnchainMintQuoteRequiredConfirmations(

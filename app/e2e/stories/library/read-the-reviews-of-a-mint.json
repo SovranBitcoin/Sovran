@@ -1,0 +1,108 @@
+{
+  "id": "read-the-reviews-of-a-mint",
+  "purpose": "A person opens the reviews of the mint their wallet uses, sees the summary, and closes them.",
+  "startsFrom": "testnut-mint",
+  "steps": [
+    {
+      "name": "the wallet opens on the test mint",
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-selected-mint:testnut.cashu.space"
+          }
+        },
+        {
+          "logged": "splash.gone"
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "open the mint list",
+      "tap": {
+        "id": "wallet-mint-selector"
+      },
+      "expect": [
+        {
+          "page": "MintListScreen"
+        },
+        {
+          "visible": {
+            "id": "mint-currency-tab-TSAT"
+          }
+        }
+      ]
+    },
+    {
+      "name": "show the test mints",
+      "tap": {
+        "id": "mint-currency-tab-TSAT"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "mint-inspect:https://testnut.cashu.space"
+          }
+        }
+      ]
+    },
+    {
+      "name": "open the mint's page",
+      "tap": {
+        "id": "mint-inspect:https://testnut.cashu.space"
+      },
+      "expect": [
+        {
+          "page": "MintInfoScreen"
+        },
+        {
+          "visible": {
+            "id": "mint-info-close"
+          }
+        }
+      ],
+      "withinMs": 10000
+    },
+    {
+      "name": "open the reviews",
+      "tap": {
+        "id": "mint-info-reviews"
+      },
+      "expect": [
+        {
+          "page": "MintReviewsScreen"
+        },
+        {
+          "visible": {
+            "id": "mint-reviews-summary"
+          }
+        },
+        {
+          "visible": {
+            "id": "mint-reviews-close"
+          }
+        }
+      ],
+      "withinMs": 10000
+    },
+    {
+      "name": "close the reviews",
+      "tap": {
+        "id": "mint-reviews-close"
+      },
+      "expect": [
+        {
+          "gone": {
+            "id": "mint-reviews-summary"
+          }
+        },
+        {
+          "visible": {
+            "id": "mint-info-reviews"
+          }
+        }
+      ],
+      "withinMs": 8000
+    }
+  ]
+}

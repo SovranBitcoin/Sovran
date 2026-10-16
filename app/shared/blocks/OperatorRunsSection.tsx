@@ -19,6 +19,7 @@ import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { buildMintInfoHref } from '@/shared/lib/nav/mintInfoRoutes';
 import { buildProviderInfoHref } from '@/shared/lib/nav/providerInfoRoutes';
+import { hasFeature } from '@/shared/config/features';
 import { useCachedProfileStats } from '@/shared/lib/nostr/useEntityCache';
 import { extractDomain, normalizeMintUrlKey } from '@/shared/lib/url';
 import { useCachedMintMetadata } from '@/shared/stores/global/mintMetadataStore';
@@ -50,7 +51,7 @@ export function OperatorRunsSection({
   const mints = (stats?.operatesMints ?? []).filter(
     (url) => !excludeMintUrl || !sameUrl(url, excludeMintUrl)
   );
-  const providers = (stats?.operatesAiProviders ?? []).filter(
+  const providers = (hasFeature('ai') ? (stats?.operatesAiProviders ?? []) : []).filter(
     (url) => !excludeProviderUrl || !sameUrl(url, excludeProviderUrl)
   );
   if (!pubkey || mints.length + providers.length === 0) return null;

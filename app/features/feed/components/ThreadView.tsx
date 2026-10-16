@@ -23,7 +23,8 @@ import { Spinner } from '@/shared/ui/primitives/Spinner';
 import Icon from 'assets/icons';
 
 import { type FeedEvent, type NoteMetrics, DEFAULT_METRICS } from './nostr/feedTypes';
-import { PostCard, PostCardSkeleton } from './nostr/PostCard';
+import { LivePostCard } from './nostr/LivePostCard';
+import { PostCardSkeleton } from './nostr/PostCard';
 import { ImageOverlayProvider, useImageOverlay, AnimatedImageOverlay } from './nostr/image-overlay';
 import {
   ThreadEmbedProvider,
@@ -41,6 +42,7 @@ import { useQuotePost } from '@/features/feed/lib/useQuotePost';
 import { ThreadReplyBar } from '@/features/feed/components/ThreadReplyBar';
 import type { ThreadReplySort } from '@/features/feed/data/feedClient';
 import { useNostrEngagement } from '@/features/feed/hooks/useNostrEngagement';
+import { useNoteEngagement } from '@/features/feed/hooks/useNoteEngagement';
 import { useZap } from '@/features/feed/hooks/useZap';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import {
@@ -251,6 +253,38 @@ function ReplySortPicker({
   );
 }
 
+/**
+ * The floating action bar for the thread's target note. It follows that note's
+ * engagement itself, so a like does not re-render the thread around it.
+ */
+function TargetEmbedActionBar({
+  eventId,
+  fallbackMetrics,
+  ...actions
+}: {
+  eventId: string;
+  /** The thread's own counts, shown until the shared cache has the note. */
+  fallbackMetrics: NoteMetrics;
+} & Pick<
+  React.ComponentProps<typeof EmbedActionBar>,
+  'onCommentPress' | 'onRepostPress' | 'onQuotePress' | 'onLikePress' | 'onZapPress'
+>) {
+  const { metrics, state, zap } = useNoteEngagement(eventId, fallbackMetrics);
+  return (
+    <EmbedActionBar
+      metrics={metrics}
+      liked={state.liked}
+      replied={state.replied}
+      reposted={state.reposted}
+      zapped={zap.zapped}
+      likePending={state.likePending}
+      repostPending={state.repostPending}
+      zapPending={zap.zapPending}
+      {...actions}
+    />
+  );
+}
+
 function ThreadViewInner({ eventId, focusReplyOnOpen = false }: ThreadViewProps) {
   const [foreground, surface, defaultColor, surfaceTertiary] = useThemeColor([
     'foreground',
@@ -436,14 +470,10 @@ function ThreadViewInner({ eventId, focusReplyOnOpen = false }: ThreadViewProps)
     () => items.flatMap((item) => (item.type === 'spam-separator' ? [] : [item.event])),
     [items]
   );
-  const {
-    getDisplayMetrics,
-    getEngagementState,
-    getZapState,
-    toggleLike,
-    toggleRepost,
-    engagementRevision,
-  } = useNostrEngagement(actionableEvents, getMetrics);
+  const { getDisplayMetrics, toggleLike, toggleRepost } = useNostrEngagement(
+    actionableEvents,
+    getMetrics
+  );
   const { openZapMenu } = useZap();
 
   // ── Instrumentation ───────────────────────────────────────────────────────
@@ -487,7 +517,6 @@ function ThreadViewInner({ eventId, focusReplyOnOpen = false }: ThreadViewProps)
       replySort,
       replyBarHeight,
       focusReserve,
-      engagementRevision,
       embedOpen,
     },
     feedLog
@@ -574,9 +603,6 @@ function ThreadViewInner({ eventId, focusReplyOnOpen = false }: ThreadViewProps)
       const isParent = item.type === 'parent';
       const isTarget = item.type === 'target';
 
-      const metrics = getDisplayMetrics(item.event.id);
-      const engagement = getEngagementState(item.event.id);
-
       // The spam separator draws its own full-width borders, and nothing
       // follows the section's last card — suppress the adjacent per-card
       // footer borders so the divider doesn't double up.
@@ -585,11 +611,13 @@ function ThreadViewInner({ eventId, focusReplyOnOpen = false }: ThreadViewProps)
         (item.type === 'reply' && nextItem?.type === 'spam-separator') ||
         (item.type === 'spam-reply' && index === displayItems.length - 1);
 
+      // The card follows its own note's likes, reposts and zaps, so nothing
+      // here changes when some other note in the thread is liked.
       const card = (
-        <PostCard
+        <LivePostCard
           variant={isTarget ? 'thread-target' : 'thread-reply'}
           event={item.event}
-          metrics={metrics}
+          fallbackMetrics={getMetrics(item.event.id)}
           quotedEvents={quotedEventsRef.current}
           profiles={profilesRef.current}
           getMetrics={getMetrics}
@@ -599,18 +627,10 @@ function ThreadViewInner({ eventId, focusReplyOnOpen = false }: ThreadViewProps)
           identityStyle={isTarget ? morph.contentStyle : undefined}
           showLineAbove={isParent ? index > 0 : isTarget ? hasParents : false}
           showLineBelow={isParent}
-          liked={engagement.liked}
-          replied={engagement.replied}
-          reposted={engagement.reposted}
-          likePending={engagement.likePending}
-          repostPending={engagement.repostPending}
-          likePendingDirection={engagement.likePendingDirection}
-          repostPendingDirection={engagement.repostPendingDirection}
-          zapped={getZapState(item.event.id).zapped}
-          zapPending={getZapState(item.event.id).zapPending}
-          onLikePress={() => toggleLike(item.event)}
-          onRepostPress={() => toggleRepost(item.event)}
-          onZapPress={() => openZapMenu(item.event, metrics.satsZapped)}
+          onLike={toggleLike}
+          onRepost={toggleRepost}
+          onZap={openZapMenu}
+          onMore={openPostActions}
           onCommentPress={
             // The reply bar already replies to the target, so its button focuses
             // the bar; a reply row's button opens the composer for that reply.
@@ -622,7 +642,6 @@ function ThreadViewInner({ eventId, focusReplyOnOpen = false }: ThreadViewProps)
                     parentProfile: profilesRef.current.get(item.event.pubkey),
                   })
           }
-          onMorePress={() => openPostActions(item.event)}
           getThreadContext={getThreadContext}
         />
       );
@@ -644,9 +663,6 @@ function ThreadViewInner({ eventId, focusReplyOnOpen = false }: ThreadViewProps)
       embedOpen,
       targetFooterOpacity,
       morph.contentStyle,
-      getDisplayMetrics,
-      getEngagementState,
-      getZapState,
       getMetrics,
       hasParents,
       profilesRef,
@@ -671,19 +687,19 @@ function ThreadViewInner({ eventId, focusReplyOnOpen = false }: ThreadViewProps)
   }, [loadMoreReplies, isFetching]);
 
   // FlashList re-renders rows when `data` changes by reference or when `extraData`
-  // changes. Engagement (likes/reposts), pagination flags and the sort live outside
+  // changes. Thread data arriving, pagination flags and the sort live outside
   // `displayItems`, so fold them into extraData so those updates repaint the rows.
+  // Engagement is not here: each card follows its own note (`LivePostCard`).
   const threadExtraData = useMemo(
     () =>
       [
         dataVersion,
-        engagementRevision,
         isFetching ? 1 : 0,
         isLoadingMoreReplies ? 1 : 0,
         hasMoreReplies ? 1 : 0,
         replySort,
       ].join(':'),
-    [dataVersion, engagementRevision, isFetching, isLoadingMoreReplies, hasMoreReplies, replySort]
+    [dataVersion, isFetching, isLoadingMoreReplies, hasMoreReplies, replySort]
   );
 
   // Target-post actions for the floating embed action bar (mirrors the
@@ -727,9 +743,7 @@ function ThreadViewInner({ eventId, focusReplyOnOpen = false }: ThreadViewProps)
   return (
     <Log name="ThreadView">
       {morph.probe}
-      <ImageOverlayProvider
-        getDisplayMetrics={getDisplayMetrics}
-        getEngagementState={getEngagementState}>
+      <ImageOverlayProvider getBaseMetrics={getMetrics}>
         <View style={[styles.container, { backgroundColor: surface }]}>
           {embed?.embedUrl ? (
             <LinkEmbedView
@@ -817,15 +831,9 @@ function ThreadViewInner({ eventId, focusReplyOnOpen = false }: ThreadViewProps)
             />
           </ThreadEmbedSheet>
           {embed && targetEvent ? (
-            <EmbedActionBar
-              metrics={getDisplayMetrics(targetEvent.id)}
-              liked={getEngagementState(targetEvent.id).liked}
-              replied={getEngagementState(targetEvent.id).replied}
-              reposted={getEngagementState(targetEvent.id).reposted}
-              zapped={getZapState(targetEvent.id).zapped}
-              likePending={getEngagementState(targetEvent.id).likePending}
-              repostPending={getEngagementState(targetEvent.id).repostPending}
-              zapPending={getZapState(targetEvent.id).zapPending}
+            <TargetEmbedActionBar
+              eventId={targetEvent.id}
+              fallbackMetrics={getMetrics(targetEvent.id)}
               onCommentPress={onTargetComment}
               onRepostPress={onTargetRepost}
               onQuotePress={onTargetQuote}

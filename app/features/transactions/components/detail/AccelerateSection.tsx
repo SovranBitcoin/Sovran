@@ -27,7 +27,7 @@ import { withAlpha } from '@/shared/lib/color';
 import { formatAmount } from '@/shared/lib/currency';
 import { paymentLog } from '@/shared/lib/logger';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { GradientCard } from '@/shared/ui/composed/GradientCard';
+import { Surface } from '@/shared/ui/composed/Surface';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -83,7 +83,7 @@ export function AccelerateSection({ offer, accelerating, onAccelerate }: Acceler
   const sats = offer ? formatAmount({ amount: offer.totalSats, unit: 'sat' }) : null;
 
   return (
-    <GradientCard style={styles.card} contentStyle={styles.cardContent} variant="right">
+    <Surface style={styles.card} contentStyle={styles.cardContent} variant="right">
       <Pressable
         haptics
         accessibilityRole="button"
@@ -122,7 +122,7 @@ export function AccelerateSection({ offer, accelerating, onAccelerate }: Acceler
         </HStack>
       </Pressable>
       <AccelerateSheen color={accent} />
-    </GradientCard>
+    </Surface>
   );
 }
 

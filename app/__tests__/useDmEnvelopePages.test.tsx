@@ -69,6 +69,19 @@ describe('useDmEnvelopePages', () => {
     expect(result.current.error).toBeNull();
   });
 
+  it('keeps paging when a full page lost a wrap that did not parse', async () => {
+    const short = { ...page(['a', 'b']), received: PAGE_LIMIT };
+    const { result } = setup({ fetchPage: jest.fn(async () => short) });
+    await waitFor(() => expect(result.current.hasLoadedOnce).toBe(true));
+    expect(result.current.hasMore).toBe(true);
+  });
+
+  it('stops when the backend itself sent a short page', async () => {
+    const { result } = setup({ fetchPage: jest.fn(async () => page(['a', 'b'])) });
+    await waitFor(() => expect(result.current.hasLoadedOnce).toBe(true));
+    expect(result.current.hasMore).toBe(false);
+  });
+
   it('reports loading only on a cold start; a snapshot revalidates instead', async () => {
     let finish!: (p: DmEnvelopePage) => void;
     const fetchPage = jest.fn(() => new Promise<DmEnvelopePage>((r) => (finish = r)));

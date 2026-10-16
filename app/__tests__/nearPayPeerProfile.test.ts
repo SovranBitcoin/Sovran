@@ -1,11 +1,18 @@
+import { PaymentRequest } from '@cashu/cashu-ts';
 import type { BLEPeer } from 'bitchat-module';
 
 import { peerAvatarState, peerDisplayName, toLayoutPeer } from '@/features/nearPay/lib/peerProfile';
 import { cashuP2pkPubkeyFromNostrHex } from '@/shared/lib/protocolIds';
-import { buildStandingCreq } from '@/shared/lib/nutCreq';
+
+const fixtureRequest = ({ mints, pubkey33 }: { mints: string[]; pubkey33: string }) =>
+  new PaymentRequest(undefined, 'fixture-request', undefined, 'sat', mints, undefined, false, {
+    kind: 'P2PK',
+    data: pubkey33,
+    tags: [],
+  }).toEncodedRequest();
 
 const NOSTR_HEX = 'ab'.repeat(32);
-const CREQ = buildStandingCreq({
+const CREQ = fixtureRequest({
   mints: ['https://mint.example'],
   pubkey33: cashuP2pkPubkeyFromNostrHex(NOSTR_HEX),
 })!;
@@ -57,8 +64,8 @@ describe('toLayoutPeer', () => {
 });
 
 describe('peerAvatarState', () => {
-  it('never flashes the identicon while the profile fetch is in flight', () => {
-    expect(peerAvatarState({ avatarUrl: null, profileLoading: true })).toBe('loading');
+  it('shows a stable fallback immediately and retains known pictures during enrichment', () => {
+    expect(peerAvatarState({ avatarUrl: null, profileLoading: true })).toBe('fallback');
     expect(peerAvatarState({ avatarUrl: 'https://x/p.png', profileLoading: false })).toBe('image');
     // Image wins even mid-refetch — never regress a known picture to a bar.
     expect(peerAvatarState({ avatarUrl: 'https://x/p.png', profileLoading: true })).toBe('image');

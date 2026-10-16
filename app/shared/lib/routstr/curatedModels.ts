@@ -4,7 +4,6 @@ import { z } from 'zod';
 
 import { aiLog } from '@/shared/lib/logger';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
-export { curatedIdSet, normalizeModelId } from './lineup';
 
 /**
  * Routstr's curated model list, published on Nostr.
@@ -31,14 +30,13 @@ export { curatedIdSet, normalizeModelId } from './lineup';
  * some nodes prefix a vendor slug.
  */
 
-export const CURATED_MODELS_KIND = 38423;
-export const CURATED_MODELS_IDENTIFIER = 'routstr-21-models';
+const CURATED_MODELS_KIND = 38423;
+const CURATED_MODELS_IDENTIFIER = 'routstr-21-models';
 /** Routstr's publishing key, the same one `@routstr/sdk` defaults to. */
-export const ROUTSTR_MODELS_PUBKEY =
-  '4ad6fa2d16e2a9b576c863b4cf7404a70d4dc320c0c447d10ad6ff58993eacc8';
+const ROUTSTR_MODELS_PUBKEY = '4ad6fa2d16e2a9b576c863b4cf7404a70d4dc320c0c447d10ad6ff58993eacc8';
 
 /** How long a fetched list is trusted before the relays are asked again. */
-export const CURATED_MODELS_TTL_MS = 6 * 60 * 60 * 1000;
+const CURATED_MODELS_TTL_MS = 6 * 60 * 60 * 1000;
 
 const CuratedModelsSchema = z.object({
   models: z.array(z.string().max(128)).max(512),
@@ -46,7 +44,7 @@ const CuratedModelsSchema = z.object({
   'whitelisted-nodes': z.array(z.string().max(512)).max(256).optional(),
 });
 
-export interface CuratedModels {
+interface CuratedModels {
   /** Model ids as published, unnormalised. */
   ids: string[];
   blacklistedNodes: string[];
@@ -79,7 +77,7 @@ export function parseCuratedModels(
  *
  * NDK dedupes replaceable events to the newest, so one event is the answer.
  */
-export async function fetchCuratedModels(ndk: NDK): Promise<CuratedModels | null> {
+async function fetchCuratedModels(ndk: NDK): Promise<CuratedModels | null> {
   const event = await ndk.fetchEvent({
     // A Routstr-specific kind NDK's enum does not name.
     kinds: [CURATED_MODELS_KIND as NDKKind],

@@ -16,11 +16,12 @@
 
 import React, { memo, useCallback, useEffect, useState } from 'react';
 
-import { ListGroup, PressableFeedback, Separator, Switch as HeroSwitch } from 'heroui-native';
+import { ListGroup, PressableFeedback, Separator } from 'heroui-native';
+import { Switch as HeroSwitch } from '@/shared/ui/primitives/Switch';
 import { setStringAsync } from 'expo-clipboard';
 
 import type { CreqMintSelection } from '@/features/receive/lib/creqMintSelection';
-import { GradientCard } from '@/shared/ui/composed/GradientCard';
+import { Surface } from '@/shared/ui/composed/Surface';
 import { CopyRequestRow } from '@/shared/ui/composed/CopyRequestCard';
 import { Section } from '@/shared/ui/composed/Section';
 import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
@@ -114,7 +115,7 @@ export const CreqCustomizationCard = memo(function CreqCustomizationCard({
   );
 
   const card = (
-    <GradientCard>
+    <Surface>
       <ListGroup variant="transparent">
         <CopyRequestRow
           icon="ph:coins"
@@ -233,7 +234,7 @@ export const CreqCustomizationCard = memo(function CreqCustomizationCard({
           </View>
         ) : null}
       </ListGroup>
-    </GradientCard>
+    </Surface>
   );
 
   return (

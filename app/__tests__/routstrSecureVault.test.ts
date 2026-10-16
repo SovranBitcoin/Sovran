@@ -12,7 +12,7 @@ jest.mock('@/shared/lib/nostr/secureStorage', () => ({
   }),
 }));
 
-import { createSecureVault } from '@/shared/lib/routstr/secureVault';
+import { createSecureVault } from '@/shared/lib/persist/secureVault';
 
 describe('Routstr secure recovery vault', () => {
   beforeEach(() => {

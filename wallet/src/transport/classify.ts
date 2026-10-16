@@ -15,7 +15,7 @@ import {
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
 
-import { amountToNumber } from "../amount";
+import { requireAmount } from "../amount";
 import { hasDuplicateProofSecrets } from "../ecash";
 import { samePubkey } from "../p2pk";
 import { logger, mintUrlFields } from "../logger";
@@ -127,7 +127,10 @@ export function classifyMeshToken(
     }
 
     for (const proof of token.proofs) {
-      amount += amountToNumber(proof.amount);
+      amount += requireAmount(proof.amount);
+      if (!Number.isSafeInteger(amount)) {
+        throw new TypeError("token total is too large to hold exactly");
+      }
       let secret: ReturnType<typeof parseP2PKSecret>;
       try {
         secret = parseP2PKSecret(proof.secret);

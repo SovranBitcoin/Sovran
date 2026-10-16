@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { persist } from 'zustand/middleware';
 import { z } from 'zod';
 
@@ -92,7 +92,10 @@ interface AiProviderDirectoryActions {
 
 type AiProviderDirectoryStore = AiProviderDirectoryState & AiProviderDirectoryActions;
 
-export const useAiProviderDirectoryStore = create<AiProviderDirectoryStore>()(
+export const useAiProviderDirectoryStore = create<AiProviderDirectoryStore>({
+  name: 'ai-provider-directory-store',
+  scope: 'profile',
+})(
   persist(
     (set) => ({
       providers: [],

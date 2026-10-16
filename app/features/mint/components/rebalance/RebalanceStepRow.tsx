@@ -41,6 +41,10 @@ export type StepStatus =
   | 'melting'
   | 'verifying'
   | 'routing'
+  /** The payment was sent and its outcome is not known yet. */
+  | 'paymentPending'
+  /** Sent; the receiving mint has not credited it yet. */
+  | 'settling'
   | 'done'
   | 'failed'
   | 'skipped';

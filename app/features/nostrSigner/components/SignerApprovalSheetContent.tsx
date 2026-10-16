@@ -29,7 +29,8 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
-import { BottomSheet, Button as HerouiButton } from 'heroui-native';
+import { BottomSheet } from 'heroui-native';
+import { Button } from '@/shared/ui/primitives/Button';
 import Animated, { SlideInRight } from 'react-native-reanimated';
 
 import Icon from 'assets/icons';
@@ -613,35 +614,39 @@ export function SignerApprovalSheetContent({
             escalating severity. Self-decrypt keeps maximum friction:
             Approve (once) / Deny / Block only. */}
         <VStack gap={10}>
-          <HerouiButton
+          <Button
             testID="signer-approval-approve"
             variant="primary"
-            className="bg-foreground"
-            onPress={approvePrimary}>
-            <HerouiButton.Label className="text-background">
-              {approveOnceOnly
+            text={
+              approveOnceOnly
                 ? APPROVAL_BUTTON_LABELS.approveOnce
-                : APPROVAL_BUTTON_LABELS.allowSession}
-            </HerouiButton.Label>
-          </HerouiButton>
+                : APPROVAL_BUTTON_LABELS.allowSession
+            }
+            onPress={approvePrimary}
+          />
           {offerAlways ? (
-            <HerouiButton
+            <Button
               testID="signer-approval-always-allow"
-              variant="tertiary"
-              onPress={approveAlways}>
-              <HerouiButton.Label>{APPROVAL_BUTTON_LABELS.alwaysAllow}</HerouiButton.Label>
-            </HerouiButton>
+              variant="secondary"
+              text={APPROVAL_BUTTON_LABELS.alwaysAllow}
+              onPress={approveAlways}
+            />
           ) : null}
-          <HerouiButton testID="signer-approval-deny" variant="danger-soft" onPress={denyOnce}>
-            <HerouiButton.Label>{APPROVAL_BUTTON_LABELS.deny}</HerouiButton.Label>
-          </HerouiButton>
-          <HerouiButton
+          <Button
+            testID="signer-approval-deny"
+            // Declining once ends nothing; only Block is destructive, and only
+            // it is drawn as such.
+            variant="secondary"
+            text={APPROVAL_BUTTON_LABELS.deny}
+            onPress={denyOnce}
+          />
+          <Button
             testID="signer-approval-block"
-            variant="danger"
+            variant="dangerous"
+            text={BLOCK_APP_LABEL}
             accessibilityLabel={BLOCK_APP_LABEL}
-            onPress={confirmBlock}>
-            <HerouiButton.Label>{BLOCK_APP_LABEL}</HerouiButton.Label>
-          </HerouiButton>
+            onPress={confirmBlock}
+          />
         </VStack>
       </VStack>
     </Animated.View>

@@ -37,7 +37,7 @@
  *    transitions to PAID/ISSUED and no source has been recorded yet.
  */
 
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { persist, subscribeWithSelector } from 'zustand/middleware';
 import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
@@ -98,7 +98,10 @@ const PersistedTransactionDistributionStore = z.object({
   distributions: tolerantRecord(z.string().max(256), PersistedDistributionEntry),
 });
 
-export const useTransactionDistributionStore = create<TransactionDistributionStore>()(
+export const useTransactionDistributionStore = create<TransactionDistributionStore>({
+  name: 'transaction-distribution-store',
+  scope: 'profile',
+})(
   subscribeWithSelector(
     persist(
       (set, get) => ({

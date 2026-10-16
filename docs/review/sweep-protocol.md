@@ -1,5 +1,9 @@
 # Hunch conformance sweep — protocol
 
+**Historical.** Hunch and its `hunch.config.ts` were replaced by the [semantic checks](README.md)
+on 2026-10-12, so the commands below no longer run. The procedure for verifying a finding in
+source still applies to what a check returns.
+
 The procedure behind the `/goal` condition for the autonomous rule-conformance
 sweep. The goal states *when to stop*; this states *how to work*. The running
 record is `docs/review/sweep-ledger.md`.

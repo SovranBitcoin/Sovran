@@ -38,7 +38,8 @@ public class BitChatModule: Module {
                 noisePrivateKeyHex: String,
                 signingPrivateKeyHex: String,
                 p2pkPubkeyHex: String,
-                creq: String?
+                creq: String?,
+                walletDiscovery: Bool
             ) in
             try await BitChatBLEBridge.shared.start(
                 nickname: nickname,
@@ -46,8 +47,13 @@ public class BitChatModule: Module {
                 noisePrivateKeyHex: noisePrivateKeyHex,
                 signingPrivateKeyHex: signingPrivateKeyHex,
                 p2pkPubkeyHex: p2pkPubkeyHex,
-                creq: creq
+                creq: creq,
+                walletDiscovery: walletDiscovery
             )
+        }
+
+        AsyncFunction("stopBLE") {
+            await BitChatBLEBridge.shared.stop()
         }
 
         AsyncFunction("sendBLEMessage") { (content: String) in

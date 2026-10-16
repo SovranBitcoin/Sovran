@@ -1,11 +1,15 @@
 import React, { useState } from 'react';
 import { avatarStateFor } from '@/shared/lib/imageLoadState';
 import { RefreshControl } from 'react-native';
-import { Button, Card, Input, Label, ListGroup, Separator, Switch, TextField } from 'heroui-native';
+import { Input, Label, ListGroup, Separator, TextField } from 'heroui-native';
+import { Button } from '@/shared/ui/primitives/Button';
+import { Switch } from '@/shared/ui/primitives/Switch';
 import { npubEncode } from 'nostr-tools/nip19';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { ScreenScrollView } from '@/shared/ui/composed/ScreenScrollView';
 import { Section } from '@/shared/ui/composed/Section';
+import { Surface } from '@/shared/ui/composed/Surface';
+import { useStylePaint } from '@/shared/styles/appStyle';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -58,13 +62,13 @@ function BlockedPerson({
         </View>
         {blocked && (
           <Button
-            variant="ghost"
-            size="sm"
+            variant="secondary"
+            size="compact"
+            text="Unblock"
             onPress={() => onChange(false)}
             testID={`moderation-unblock-${pubkey}`}
-            accessibilityLabel={`Unblock ${name}`}>
-            <Button.Label>Unblock</Button.Label>
-          </Button>
+            accessibilityLabel={`Unblock ${name}`}
+          />
         )}
       </View>
       {pending && (
@@ -75,13 +79,13 @@ function BlockedPerson({
               : 'Unblocked on this device. Not synced yet.'}
           </Text>
           <Button
-            variant="ghost"
-            size="sm"
+            variant="secondary"
+            size="compact"
+            text={syncing ? 'Syncing…' : 'Retry sync'}
             testID={`moderation-retry-${pubkey}`}
             onPress={retry}
-            isDisabled={syncing}>
-            <Button.Label>{syncing ? 'Syncing…' : 'Retry sync'}</Button.Label>
-          </Button>
+            disabled={syncing}
+          />
         </View>
       )}
     </View>
@@ -89,6 +93,7 @@ function BlockedPerson({
 }
 
 export function SettingsModerationScreen() {
+  const { pad, item } = useStylePaint().style.space;
   const people = useFeedIgnoreStore((s) => s.ignoredPubkeys);
   const overrides = useFeedIgnoreStore((s) => s.blockOverrides);
   const enabled = useFeedIgnoreStore((s) => s.dmFilterEnabled);
@@ -193,8 +198,8 @@ export function SettingsModerationScreen() {
             </ListGroup.Item>
           </ListGroup>
           {enabled && (
-            <Card variant="secondary" className="mt-3">
-              <Card.Body className="gap-3">
+            <View className="mt-3">
+              <Surface contentStyle={{ padding: pad, gap: item }}>
                 <TextField>
                   <Label>Filtered words</Label>
                   <Input
@@ -218,14 +223,14 @@ export function SettingsModerationScreen() {
                 </Text>
                 <Button
                   variant="secondary"
-                  size="sm"
+                  size="compact"
+                  text="Save words"
                   testID="moderation-filter-save"
                   onPress={saveWords}
-                  isDisabled={draft === words.join('\n')}>
-                  <Button.Label>Save words</Button.Label>
-                </Button>
-              </Card.Body>
-            </Card>
+                  disabled={draft === words.join('\n')}
+                />
+              </Surface>
+            </View>
           )}
           <Text size={13} className="text-muted mt-2 px-3">
             This filter is off by default. Your words stay on this device, separately for each

@@ -1,7 +1,7 @@
 /**
  * Layer-4 pairing entry points — pure parts only. Covers the +native-intent
- * system-path rewrite (nostrconnect:// → /(signer-flow)/connect?uri=…, never
- * throws, everything else passes through) and the shared openPairingFromUri
+ * system-path rewrite (nostrconnect:// → /(signer-flow)/connect?ticket=…, the
+ * link held in memory, never throws, everything else passes through) and the shared openPairingFromUri
  * dispatch (camera scan / hub paste / deep link) with the engine and popup
  * bridge mocked. Fixture URIs carry fake secrets only; the redaction test
  * asserts no log call ever sees the secret-bearing URI.
@@ -33,6 +33,7 @@ import { redirectSystemPath, rewriteSystemPath } from '@/app/+native-intent';
 import { useNip46RequestsStore } from '@/features/nostrSigner/data/nip46RequestsStore';
 import { nip46Engine } from '@/features/nostrSigner/lib/nip46Engine';
 import { openPairingFromUri } from '@/features/nostrSigner/lib/openPairingFromUri';
+import { takePairingUri } from '@/features/nostrSigner/lib/pendingPairingUri';
 import { nostrLog, storeLog } from '@/shared/lib/logger';
 import { showActionSheet } from '@/shared/lib/popup';
 import { usePopupStore } from '@/shared/stores/runtime/popupStore';
@@ -56,17 +57,54 @@ beforeEach(() => {
 // ── +native-intent rewrite ──────────────────────────────────────
 
 describe('redirectSystemPath', () => {
-  it('rewrites nostrconnect:// system URLs to the signer connect route', () => {
-    expect(redirectSystemPath({ path: VALID_URI, initial: false })).toBe(
-      '/(signer-flow)/connect?uri=' + encodeURIComponent(VALID_URI)
-    );
+  it('holds the link in memory and routes with a ticket, not the link', () => {
+    const route = redirectSystemPath({ path: VALID_URI, initial: false });
+
+    expect(route).toMatch(/^\/\(signer-flow\)\/connect\?ticket=[a-z0-9]+$/);
+    expect(route).not.toContain(SECRET);
+    expect(route).not.toContain(CLIENT_PUBKEY);
+    expect(takePairingUri(route.split('=')[1])).toBe(VALID_URI);
   });
 
-  it('rewrites regardless of scheme casing and initial flag', () => {
+  it('redeems a ticket once, and only the newest link', () => {
+    const first = redirectSystemPath({ path: VALID_URI, initial: true }).split('=')[1];
     const mixedCase = `NostrConnect://${CLIENT_PUBKEY}?relay=${encodeURIComponent(RELAY)}&secret=${SECRET}`;
-    expect(redirectSystemPath({ path: mixedCase, initial: true })).toBe(
-      '/(signer-flow)/connect?uri=' + encodeURIComponent(mixedCase)
-    );
+    const second = redirectSystemPath({ path: mixedCase, initial: false }).split('=')[1];
+
+    expect(takePairingUri(first)).toBeNull();
+    expect(takePairingUri(second)).toBe(mixedCase);
+    expect(takePairingUri(second)).toBeNull();
+  });
+
+  it('gives the same link the same ticket while it is still held', () => {
+    const first = redirectSystemPath({ path: VALID_URI, initial: true });
+    expect(redirectSystemPath({ path: VALID_URI, initial: false })).toBe(first);
+    expect(takePairingUri(first.split('=')[1])).toBe(VALID_URI);
+  });
+
+  it('lets a held link lapse', () => {
+    jest.useFakeTimers();
+    try {
+      const ticket = redirectSystemPath({ path: VALID_URI, initial: false }).split('=')[1];
+      jest.advanceTimersByTime(5 * 60_000 + 1);
+      expect(takePairingUri(ticket)).toBeNull();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it.each(['sovran:///connect?uri=', '/(signer-flow)/connect?x=1&uri='])(
+    'takes a link carried as a param of %s out of the route',
+    (prefix) => {
+      const route = rewriteSystemPath(prefix + encodeURIComponent(VALID_URI));
+
+      expect(route).toMatch(/^\/\(signer-flow\)\/connect\?ticket=[a-z0-9]+$/);
+      expect(takePairingUri(route.split('=')[1])).toBe(VALID_URI);
+    }
+  );
+
+  it('drops a carried link it cannot decode', () => {
+    expect(rewriteSystemPath('sovran:///connect?uri=%E0%A4%A')).toBe('/(signer-flow)/connect');
   });
 
   it.each(['/', '/camera?action=signer-pair', 'sovran://pay', 'https://example.com', BUNKER_URI])(

@@ -113,6 +113,14 @@ describe('the truncation record', () => {
 });
 
 describe('the bubble for a truncated answer', () => {
+  it('names a model switch alongside the saved answer', () => {
+    const r = render(
+      <AiMessageBubble message={{ ...answer, modelSwitch: { from: 'GPT', to: 'GLM' } }} />
+    );
+    expect(texts(r)).toContain('Switched from GPT to GLM.');
+    expect(texts(r).some((t) => t.includes('Here is the first half of the answer'))).toBe(true);
+  });
+
   it('keeps the answer and says what stopped it', () => {
     recordTurnTruncation(MESSAGE_ID, { budgetTokens: 2000 });
     const r = render(<AiMessageBubble message={answer} onContinue={jest.fn()} />);
@@ -136,6 +144,7 @@ describe('the bubble for a truncated answer', () => {
   it('says nothing on an answer that finished on its own', () => {
     const r = render(<AiMessageBubble message={answer} onContinue={jest.fn()} />);
     expect(texts(r).some((t) => t.includes('answer limit'))).toBe(false);
+    expect(texts(r).some((t) => t.includes('Switched from'))).toBe(false);
     expect(r.root.findAllByProps({ testID: `ai-message-continue-${MESSAGE_ID}` })).toHaveLength(0);
   });
 });

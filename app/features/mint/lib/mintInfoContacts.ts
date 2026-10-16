@@ -64,12 +64,12 @@ export function resolveMintInfoNostrContactPubkey(
 export function formatMintInfoNostrFallback(info: string, pubkey?: string): string {
   const trimmed = info.trim();
   if (nip19.NostrTypeGuard.isNPub(trimmed)) {
-    return truncateMiddle(trimmed, 10);
+    return truncateMiddle(trimmed);
   }
   if (pubkey) {
-    return truncateMiddle(nip19.npubEncode(pubkey), 10);
+    return truncateMiddle(nip19.npubEncode(pubkey));
   }
-  return truncateMiddle(trimmed, 10);
+  return truncateMiddle(trimmed);
 }
 
 export function getMintInfoNostrDisplayName(

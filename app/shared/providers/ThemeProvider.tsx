@@ -1,3 +1,5 @@
+import { useProfileStore } from '@/shared/stores/global/profileStore';
+import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { useWallpaperStore } from '@/shared/stores/global/wallpaperStore';
@@ -62,6 +64,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   // `resolvedTheme` until the overlay covers the swap; on carousel-driven
   // changes it applies immediately (the page stack already shows the
   // wallpaper, so there is nothing to hide).
+  // The account only changes under a mounted provider during an in-process
+  // profile switch. With that setting off it is not tracked at all, so the
+  // profile store hydrating its index at boot cannot change how a theme applies.
+  const inProcessSwitch = useSettingsStore((state) => state.inProcessProfileSwitch);
+  const activeAccountIndex = useProfileStore((state) => state.activeAccountIndex);
+  const accountIndex = inProcessSwitch ? activeAccountIndex : null;
+  const lastAccount = useRef(accountIndex);
   const [currentTheme, setCurrentTheme] = useState(resolvedTheme);
   const lastApplied = useRef<string | null>(null);
   const lastAppliedUnit = useRef<string | null>(null);
@@ -77,6 +86,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
 
     const applyVars = () => {
+      if (
+        (accountIndex !== null && useProfileStore.getState().activeAccountIndex !== accountIndex) ||
+        lastApplied.current !== resolvedTheme
+      )
+        return;
       const t0 = performance.now();
       const vars = themeVariables[resolvedTheme] ?? getThemeVariables(resolvedTheme);
       Uniwind.updateCSSVariables('light', vars);
@@ -96,7 +110,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     const unitChanged = lastAppliedUnit.current !== activeUnit;
     lastAppliedUnit.current = activeUnit;
 
-    if (lastApplied.current === null) {
+    if (lastApplied.current === null || lastAccount.current !== accountIndex) {
+      lastAccount.current = accountIndex;
       // Boot apply — no transition, no fade.
       lastApplied.current = resolvedTheme;
       primeThemeSurface(surfaceOf);
@@ -132,7 +147,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     // glides between the themes.
     log.info('theme.transition.start', { to: resolvedTheme, kind: 'fade' });
     runThemeTransition(surfaceOf, applyVars);
-  }, [resolvedTheme, activeUnit]);
+  }, [resolvedTheme, activeUnit, accountIndex]);
 
   // Wait for the wallpaper store to finish registering downloaded themes —
   // without this the first paint would render against unregistered THEMES

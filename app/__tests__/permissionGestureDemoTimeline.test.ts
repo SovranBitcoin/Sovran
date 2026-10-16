@@ -9,10 +9,8 @@
 import {
   CYCLE_MS,
   DEMO_TRACKS,
-  valueAt,
-  type EasingMap,
-  type Track,
 } from '@/features/nostrSigner/components/permissionGestureDemo.timeline';
+import { valueAt, type EasingMap, type Track } from '@/shared/lib/motion/keyframes';
 
 const identity = (x: number): number => x;
 const IDENTITY_EASINGS: EasingMap = {

@@ -39,6 +39,11 @@ type PaymentOptionsPayload = {
 type PaymentFallbackPayload = PaymentOptionsPayload & {
   failedOptionValues: readonly string[];
   lastFailedMessage?: string;
+  lastFailedAuthored?: boolean;
+};
+
+type SendFallbackPayload = StepDataMap['chooseSendFallback'] & {
+  machine: PaymentMachine;
 };
 
 type ProofSelectorPayload = StepDataMap['chooseProofs'] & {
@@ -130,6 +135,12 @@ type BaseActionSheetPayloads = {
    * same above-modal stacking reason.
    */
   'payment-fallback': PaymentFallbackPayload;
+  /**
+   * "Send another way" — a send picked from the amount screen failed (an
+   * optional lock, or the recipient's own Lightning address) and an
+   * alternative can still pay them. Above-modal for the same reason.
+   */
+  'send-fallback': SendFallbackPayload;
   /**
    * "Choose amount" — round-up / round-down / change-mint suggestions when
    * the entered amount doesn't compose exactly from available proofs. Fires

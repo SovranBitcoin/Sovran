@@ -12,18 +12,28 @@ import type {
   NostrMessageEvent,
   NostrPrivateMessageEvent,
 } from './types';
+import {
+  readBLEBackgroundTaskExpiring,
+  readBLEDeliveryStatus,
+  readBLEMessage,
+  readBLEPeerIdentity,
+  readBLEPeerUpdate,
+  readBLEPrivateMessage,
+  readBLEState,
+  readNostrMessage,
+  readNostrPrivateMessage,
+} from './nativeEvents';
 
-interface BitChatEvents {
-  onBLEMessage: BLEMessageEvent;
-  onBLEPrivateMessage: BLEPrivateMessageEvent;
-  onBLEPeerIdentity: BLEPeerIdentityEvent;
-  onBLEDeliveryStatus: BLEDeliveryStatusEvent;
-  onBLEPeerUpdate: BLEPeerEvent;
-  onBLEStateChanged: { state: string };
-  onBLEBackgroundTaskExpiring: { handle: number };
-  onNostrMessage: NostrMessageEvent;
-  onNostrPrivateMessage: NostrPrivateMessageEvent;
-}
+type BitChatEventName =
+  | 'onBLEMessage'
+  | 'onBLEPrivateMessage'
+  | 'onBLEPeerIdentity'
+  | 'onBLEDeliveryStatus'
+  | 'onBLEPeerUpdate'
+  | 'onBLEStateChanged'
+  | 'onBLEBackgroundTaskExpiring'
+  | 'onNostrMessage'
+  | 'onNostrPrivateMessage';
 
 interface BitChatNativeModule {
   // BLE
@@ -33,8 +43,10 @@ interface BitChatNativeModule {
     noisePrivateKeyHex: string,
     signingPrivateKeyHex: string,
     p2pkPubkeyHex: string,
-    creq: string | null
+    creq: string | null,
+    walletDiscovery: boolean
   ): Promise<void>;
+  stopBLE(): Promise<void>;
   sendBLEMessage(content: string): Promise<void>;
   startBLEPrivateChat(peerID: string): Promise<void>;
   resetBLEPrivateChat(peerID: string): Promise<void>;
@@ -61,12 +73,9 @@ interface BitChatNativeModule {
   leaveGeohash(): Promise<void>;
   sendGeohashMessage(content: string, nickname: string): Promise<void>;
   sendGeohashPrivateMessage(recipientNostrPubkeyHex: string, content: string): Promise<void>;
-  // Events — the payload each native event dispatches, declared once here like
-  // the method signatures above.
-  addListener<K extends keyof BitChatEvents>(
-    eventName: K,
-    listener: (event: BitChatEvents[K]) => void
-  ): EventSubscription;
+  // Events. A payload is whatever the native side sent: it is `unknown` here
+  // and only reaches app code through a reader in `nativeEvents.ts`.
+  addListener(eventName: BitChatEventName, listener: (event: unknown) => void): EventSubscription;
   removeListeners(count: number): void;
 }
 
@@ -86,6 +95,19 @@ class BitChatUnavailableError extends Error {
 }
 
 const NOOP_SUBSCRIPTION: EventSubscription = { remove: () => {} };
+
+/** Subscribe to a native event; a payload its reader turns down is dropped. */
+function listen<T>(
+  eventName: BitChatEventName,
+  read: (raw: unknown) => T | null,
+  listener: (event: T) => void
+): EventSubscription {
+  if (!NativeModule) return NOOP_SUBSCRIPTION;
+  return NativeModule.addListener(eventName, (raw) => {
+    const event = read(raw);
+    if (event !== null) listener(event);
+  });
+}
 
 function unavailable(): Promise<never> {
   return Promise.reject(new BitChatUnavailableError());
@@ -115,12 +137,21 @@ function validateBLEIdentityMaterial(
   }
 }
 
-export function startBLE(
-  nickname: string,
-  profileScope: string,
-  identityMaterial: BitchatBLEIdentityMaterial,
-  creq?: string | null
-): Promise<void> {
+/** What a BLE start needs. Named, so a nickname, a scope and a request cannot be swapped. */
+interface StartBLERequest {
+  nickname: string;
+  profileScope: string;
+  identityMaterial: BitchatBLEIdentityMaterial;
+  /** Our standing NUT-18 payment request; null or absent until mints load. */
+  creq?: string | null;
+}
+
+function startNativeBLE({
+  nickname,
+  profileScope,
+  identityMaterial,
+  creq,
+}: StartBLERequest): Promise<void> {
   try {
     validateBLEIdentityMaterial(identityMaterial);
   } catch (err) {
@@ -132,17 +163,46 @@ export function startBLE(
         profileScope,
         identityMaterial.noisePrivateKeyHex,
         identityMaterial.signingPrivateKeyHex,
-        // Our identity / P2PK lock target: "02" + the profile's x-only Nostr
-        // pubkey (NUT-11 / Minibits convention — BIP340 signing ignores Y
-        // parity). The native bridge derives our bech32 npub from this and
-        // sends it (plus `creq`) via bitchat's native `[FAVORITED]:<npub>:<creq>`
-        // favorite notification — there is no custom announce TLV.
+        // Native favorite identity supports explicit chat interaction only.
+        // Payment eligibility is proved by signed capabilities in JS.
         `02${identityMaterial.nostrPubkey}`,
         // Our standing NUT-18 payment request (accepted mints + P2PK lock key),
         // built in JS from the user's trusted mints. null until mints load.
-        creq ?? null
+        creq ?? null,
+        publicMeshLeases.size === 0
       )
     : unavailable();
+}
+
+// Serialize ownership changes. A profile teardown cannot stop a newer start.
+let lifecycle: Promise<void> = Promise.resolve();
+let currentStart: StartBLERequest | null = null;
+const publicMeshLeases = new Set<symbol>();
+function enqueueLifecycle(action: () => Promise<void>): Promise<void> {
+  const next = lifecycle.catch(() => undefined).then(action);
+  lifecycle = next;
+  return next;
+}
+export function startBLE(request: StartBLERequest): Promise<void> {
+  currentStart = request;
+  return enqueueLifecycle(() => startNativeBLE(request));
+}
+export function stopBLE(): Promise<void> {
+  currentStart = null;
+  return enqueueLifecycle(() => NativeModule?.stopBLE() ?? Promise.resolve());
+}
+export function isPublicBLEMesh(): boolean {
+  return publicMeshLeases.size > 0;
+}
+/** Public chat is an explicit lease; ordinary wallet discovery never joins it. */
+export function acquirePublicBLEMesh(): () => void {
+  const lease = Symbol('public mesh');
+  publicMeshLeases.add(lease);
+  if (currentStart) void startBLE(currentStart).catch(() => undefined);
+  return () => {
+    publicMeshLeases.delete(lease);
+    if (currentStart) void startBLE(currentStart).catch(() => undefined);
+  };
 }
 
 export function sendBLEMessage(content: string): Promise<void> {
@@ -177,12 +237,17 @@ export function resetBLEPrivateChat(peerID: string): Promise<void> {
  * (sending / sent / delivered / failed) can be correlated on a single key.
  * Returns the same messageID for ergonomic chaining.
  */
-export function sendBLEPrivateMessage(
-  peerID: string,
-  content: string,
-  nickname: string,
-  messageID: string
-): Promise<string> {
+export function sendBLEPrivateMessage({
+  peerID,
+  content,
+  nickname,
+  messageID,
+}: {
+  peerID: string;
+  content: string;
+  nickname: string;
+  messageID: string;
+}): Promise<string> {
   return NativeModule
     ? NativeModule.sendBLEPrivateMessage(peerID, content, nickname, messageID)
     : unavailable();
@@ -191,15 +256,15 @@ export function sendBLEPrivateMessage(
 export function addBLEPrivateMessageListener(
   listener: (event: BLEPrivateMessageEvent) => void
 ): EventSubscription {
-  if (!NativeModule) return NOOP_SUBSCRIPTION;
-  return NativeModule.addListener('onBLEPrivateMessage', listener);
+  return listen('onBLEPrivateMessage', readBLEPrivateMessage, (event) => {
+    if (event.profileScope && event.profileScope === currentStart?.profileScope) listener(event);
+  });
 }
 
 /**
  * Hand a peer our Nostr identity via bitchat's native favorite notification
- * (`[FAVORITED]:<npub>:<creq>`). NearPay calls this eagerly for each discovered
- * peer; Sovran peers reciprocate and we learn theirs (surfaced as
- * `BLEPeer.nostrPubkeyHex` + `BLEPeer.creq` / `onBLEPeerIdentity`). If no Noise
+ * (`[FAVORITED]:<npub>:<creq>`). This is an explicit chat action, never
+ * wallet discovery or evidence that a peer controls the advertised key. If no Noise
  * session exists yet the native side defers the send until the handshake
  * completes.
  */
@@ -216,8 +281,7 @@ export function sendBLEFavorite(peerID: string, isFavorite: boolean): Promise<vo
 export function addBLEPeerIdentityListener(
   listener: (event: BLEPeerIdentityEvent) => void
 ): EventSubscription {
-  if (!NativeModule) return NOOP_SUBSCRIPTION;
-  return NativeModule.addListener('onBLEPeerIdentity', listener);
+  return listen('onBLEPeerIdentity', readBLEPeerIdentity, listener);
 }
 
 /**
@@ -229,8 +293,7 @@ export function addBLEPeerIdentityListener(
 export function addBLEDeliveryStatusListener(
   listener: (event: BLEDeliveryStatusEvent) => void
 ): EventSubscription {
-  if (!NativeModule) return NOOP_SUBSCRIPTION;
-  return NativeModule.addListener('onBLEDeliveryStatus', listener);
+  return listen('onBLEDeliveryStatus', readBLEDeliveryStatus, listener);
 }
 
 export function getBLEPeers(): BLEPeer[] {
@@ -265,20 +328,17 @@ export function bitchatVendorVersion(): string {
 export function addBLEMessageListener(
   listener: (event: BLEMessageEvent) => void
 ): EventSubscription {
-  if (!NativeModule) return NOOP_SUBSCRIPTION;
-  return NativeModule.addListener('onBLEMessage', listener);
+  return listen('onBLEMessage', readBLEMessage, listener);
 }
 
 export function addBLEPeerListener(listener: (event: BLEPeerEvent) => void): EventSubscription {
-  if (!NativeModule) return NOOP_SUBSCRIPTION;
-  return NativeModule.addListener('onBLEPeerUpdate', listener);
+  return listen('onBLEPeerUpdate', readBLEPeerUpdate, listener);
 }
 
 export function addBLEStateListener(
   listener: (event: { state: string }) => void
 ): EventSubscription {
-  if (!NativeModule) return NOOP_SUBSCRIPTION;
-  return NativeModule.addListener('onBLEStateChanged', listener);
+  return listen('onBLEStateChanged', readBLEState, listener);
 }
 
 // --- Background execution ---
@@ -307,8 +367,7 @@ export function endBLEBackgroundTask(handle: number): Promise<void> {
 export function addBLEBackgroundTaskExpiringListener(
   listener: (event: { handle: number }) => void
 ): EventSubscription {
-  if (!NativeModule) return NOOP_SUBSCRIPTION;
-  return NativeModule.addListener('onBLEBackgroundTaskExpiring', listener);
+  return listen('onBLEBackgroundTaskExpiring', readBLEBackgroundTaskExpiring, listener);
 }
 
 // --- Bluetooth helpers ---
@@ -363,7 +422,10 @@ export function sendGeohashMessage(content: string, nickname: string): Promise<v
  * observed on their public geohash messages (`senderPubkey` from
  * `onNostrMessage` events).
  */
-export function sendGeohashPrivateMessage(recipientNostrPubkeyHex: string, content: string): Promise<void> {
+export function sendGeohashPrivateMessage(
+  recipientNostrPubkeyHex: string,
+  content: string
+): Promise<void> {
   return NativeModule
     ? NativeModule.sendGeohashPrivateMessage(recipientNostrPubkeyHex, content)
     : unavailable();
@@ -372,13 +434,11 @@ export function sendGeohashPrivateMessage(recipientNostrPubkeyHex: string, conte
 export function addNostrMessageListener(
   listener: (event: NostrMessageEvent) => void
 ): EventSubscription {
-  if (!NativeModule) return NOOP_SUBSCRIPTION;
-  return NativeModule.addListener('onNostrMessage', listener);
+  return listen('onNostrMessage', readNostrMessage, listener);
 }
 
 export function addNostrPrivateMessageListener(
   listener: (event: NostrPrivateMessageEvent) => void
 ): EventSubscription {
-  if (!NativeModule) return NOOP_SUBSCRIPTION;
-  return NativeModule.addListener('onNostrPrivateMessage', listener);
+  return listen('onNostrPrivateMessage', readNostrPrivateMessage, listener);
 }

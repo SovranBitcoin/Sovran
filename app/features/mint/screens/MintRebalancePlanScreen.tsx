@@ -18,7 +18,7 @@ import { Screen } from '@/shared/ui/composed/Screen';
 import { useMints, useBalanceContext } from '@cashu/coco-react';
 import type { GetInfoResponse } from '@cashu/cashu-ts';
 import { useMintManagement } from '@/features/mint/hooks/useMintManagement';
-import { amountToNumber } from '@/shared/lib/cashu/amount';
+import { amountToNumber } from 'wallet/amount';
 import { useMintKeysetUnits } from '@/features/wallet/hooks/useMintKeysetUnits';
 import { useIsTestnutMint } from '@/shared/stores/global/mintTestnutStore';
 import { deriveSupportedUnitsFromInfo, isTestnutUnit, toRealUnit } from 'wallet';
@@ -281,7 +281,8 @@ export function MintRebalancePlanScreen() {
               ...(stepCounts.hasFailedStep
                 ? [
                     {
-                      text: 'Retry failed',
+                      text: 'Retry',
+                      accessibilityLabel: 'Retry failed transfers',
                       variant: 'secondary' as const,
                       testID: 'rebalance-retry-failed',
                       onPress: async () => {
@@ -317,7 +318,7 @@ export function MintRebalancePlanScreen() {
                 },
               },
               {
-                text: 'Start rebalancing',
+                text: 'Rebalance',
                 variant: 'primary' as const,
                 testID: 'rebalance-start',
                 onPress: async () => {

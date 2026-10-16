@@ -1,0 +1,34 @@
+{
+  "id": "open-an-empty-wallet",
+  "purpose": "A person who has already set the app up opens it and lands on their wallet, with the splash shrinking into the scan button.",
+  "startsFrom": "onboarded",
+  "steps": [
+    {
+      "name": "the wallet opens",
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-receive"
+          }
+        },
+        {
+          "visible": {
+            "id": "wallet-send"
+          }
+        },
+        {
+          "visible": {
+            "id": "qr-scan-button"
+          }
+        },
+        {
+          "logged": "splash.gone",
+          "with": {
+            "by": "morph"
+          }
+        }
+      ],
+      "withinMs": 8000
+    }
+  ]
+}

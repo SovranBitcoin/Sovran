@@ -195,9 +195,14 @@ const LEVEL_CONSOLE_METHOD: Record<LogLevel, 'debug' | 'info' | 'warn' | 'error'
 
 const IS_DEV = typeof __DEV__ !== 'undefined' ? __DEV__ : process.env.NODE_ENV !== 'production';
 
-// Master switch: dev-only. Production builds short-circuit at the top of
-// `emit` and skip the JS-thread heartbeat side-effect entirely.
-export const SHOW_LOGS = IS_DEV;
+/** Set when the end-to-end test build is bundled. That build has no bundler to
+ *  print to, and its runner reads the app's log, so logging stays on in it. */
+export const IS_E2E_LOG_BUILD = process.env.EXPO_PUBLIC_E2E_LOGS === '1';
+
+// Master switch: development builds and the end-to-end test build. Store builds
+// short-circuit at the top of `emit` and skip the JS-thread heartbeat
+// side-effect entirely.
+export const SHOW_LOGS = IS_DEV || IS_E2E_LOG_BUILD;
 
 // ─── Monotonic Clock ────────────────────────────────────────────────────────
 //
@@ -211,9 +216,11 @@ export const monotonicNow: () => number =
 
 const _t0 = monotonicNow();
 const LOG_SESSION_ID = `${Date.now().toString(36)}-${Math.round(_t0).toString(36)}`;
-function now(): number {
+/** Milliseconds since the logger loaded: the clock every entry's `_t` is on. */
+export function logClockMs(): number {
   return Math.round((monotonicNow() - _t0) * 100) / 100;
 }
+const now = logClockMs;
 
 // ─── Expo Device Info (lazy-loaded) ──────────────────────────────────────────
 
@@ -457,6 +464,28 @@ function compactSensitiveField(value: unknown, fieldName: string | undefined): u
   return { _kind: kind };
 }
 
+/**
+ * Fields that name a screen or component. A long PascalCase name, or a path of
+ * them, is made only of letters and slashes, which is also what base64 and
+ * base58 look like, so the opaque-encoding rule was hiding the one value these
+ * entries exist to carry. Only that rule is lifted, only for these fields, and
+ * only for a value that is an identifier path: anything recognised as a secret
+ * is still summarised.
+ */
+const COMPONENT_NAME_FIELDS: ReadonlySet<string> = new Set(['screen', 'component']);
+const COMPONENT_PATH_MAX_LENGTH = 400;
+const COMPONENT_PATH =
+  /^[A-Z][A-Za-z0-9]*(?:\([A-Za-z0-9]+\))?(?:\/[A-Z][A-Za-z0-9]*(?:\([A-Za-z0-9]+\))?)*$/;
+
+function isComponentName(value: string, fieldName: string | undefined): boolean {
+  return (
+    fieldName !== undefined &&
+    COMPONENT_NAME_FIELDS.has(fieldName) &&
+    COMPONENT_PATH.test(value) &&
+    secretStringKind(value) === null
+  );
+}
+
 function compactValue(
   value: unknown,
   opts: { maxStringLength: number; maxArrayItems: number; maxDepth: number; maxObjectKeys: number },
@@ -472,7 +501,15 @@ function compactValue(
     typeof value === 'number'
   )
     return value;
-  if (typeof value === 'string') return summarizeString(value, opts.maxStringLength);
+  if (typeof value === 'string') {
+    if (isComponentName(value, fieldName)) {
+      // A nested screen path runs past the general limit and is useless cut short.
+      return value.length <= COMPONENT_PATH_MAX_LENGTH
+        ? value
+        : { _kind: 'long_string', len: value.length, preview: value.slice(0, 32) + '…' };
+    }
+    return summarizeString(value, opts.maxStringLength);
+  }
   if (value instanceof Error) {
     return {
       _kind: 'error',
@@ -707,7 +744,7 @@ function flushSuppressedDedup(core: LoggerCore): void {
 
 export function createLogger(options: LoggerOptions = {}): Logger {
   const {
-    level = IS_DEV ? 'debug' : 'warn',
+    level = SHOW_LOGS ? 'debug' : 'warn',
     context = {},
     maxStringLength = 120,
     maxArrayItems = 5,
@@ -737,6 +774,29 @@ export function createLogger(options: LoggerOptions = {}): Logger {
   return makeLogger(core, context);
 }
 
+/**
+ * Events exempt from the dedup window. Each entry is a separate measurement —
+ * its own method, screen or batch, with its own numbers — and these arrive in
+ * bursts under one event name, so a `_suppressed: N` summary would discard
+ * exactly the data they exist to record.
+ */
+const MEASUREMENT_EVENTS: ReadonlySet<string> = new Set([
+  'coco.call',
+  'cache.store.write',
+  // A step mark, a touch, and each page's slide beginning or ending are single
+  // facts a test runner counts: two pages slide at once, and a step's two marks
+  // are a few milliseconds apart.
+  'e2e.step',
+  'nav.action',
+  'nav.transition',
+  'nav.transition.end',
+  'nav.transition.start',
+  'screen.mount',
+  'screen.shell',
+  'store.set',
+  'ui.touch',
+]);
+
 function makeLogger(core: LoggerCore, context: Record<string, unknown>): Logger {
   function emit(logLevel: LogLevel, event: string, lazyParams?: LogParams): void {
     if (!SHOW_LOGS || !core.enabled) return;
@@ -752,6 +812,7 @@ function makeLogger(core: LoggerCore, context: Record<string, unknown>): Logger 
     if (
       core.dedupWindowMs > 0 &&
       !event.startsWith('visual.') &&
+      !MEASUREMENT_EVENTS.has(event) &&
       logLevel !== 'warn' &&
       logLevel !== 'error' &&
       logLevel !== 'fatal'

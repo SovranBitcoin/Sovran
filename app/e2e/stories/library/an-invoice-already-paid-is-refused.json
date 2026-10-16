@@ -1,0 +1,99 @@
+{
+  "id": "an-invoice-already-paid-is-refused",
+  "purpose": "A person tries to pay a Lightning invoice that someone has already paid; the mint refuses, the wallet says the payment was cancelled, and their money stays.",
+  "startsFrom": "pay-a-lightning-invoice",
+  "given": {
+    "invoice": {
+      "mint": "https://testnut.cashu.space",
+      "sats": 10
+    }
+  },
+  "steps": [
+    {
+      "name": "the wallet opens with its sats",
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-send"
+          }
+        },
+        {
+          "logged": "splash.gone"
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "open Send",
+      "tap": {
+        "id": "wallet-send"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "send-destination-input"
+          }
+        }
+      ]
+    },
+    {
+      "name": "enter the invoice",
+      "type": {
+        "into": {
+          "id": "send-destination-input"
+        },
+        "text": "{{invoice}}"
+      },
+      "expect": [
+        {
+          "visible": {
+            "label": "Pay 10 sats"
+          }
+        }
+      ],
+      "withinMs": 45000
+    },
+    {
+      "name": "choose to pay it",
+      "tap": {
+        "id": "send-detected-lightningInvoice"
+      },
+      "expect": [
+        {
+          "page": "LightningSendScreen"
+        },
+        {
+          "visible": {
+            "id": "melt-pay"
+          }
+        }
+      ],
+      "withinMs": 15000
+    },
+    {
+      "name": "pay, and be refused",
+      "tap": {
+        "id": "melt-pay"
+      },
+      "expect": [
+        {
+          "logged": "hook.payment_status.melt_failed"
+        },
+        {
+          "logged": "coco.manager.MeltOperationService.melt_operation_rolled_back"
+        },
+        {
+          "visible": {
+            "label": "Cancelled payment"
+          }
+        },
+        {
+          "gone": {
+            "id": "melt-pay"
+          }
+        }
+      ],
+      "withinMs": 30000
+    }
+  ]
+}

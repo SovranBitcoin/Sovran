@@ -1,0 +1,63 @@
+{
+  "id": "open-history-from-more",
+  "purpose": "A person with no payments yet opens History from the More menu and sees an empty history.",
+  "startsFrom": "onboarded",
+  "steps": [
+    {
+      "name": "the wallet opens",
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-send"
+          }
+        },
+        {
+          "logged": "splash.gone"
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "open More",
+      "tap": {
+        "id": "wallet-more"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-more"
+          }
+        }
+      ]
+    },
+    {
+      "name": "choose History",
+      "tap": {
+        "label": "History, Every payment in and out"
+      },
+      "expect": [
+        {
+          "page": "TransactionsScreen"
+        },
+        {
+          "visible": {
+            "id": "transactions-filter-open"
+          }
+        }
+      ]
+    },
+    {
+      "name": "close history",
+      "tap": {
+        "id": "flow-header-close"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-send"
+          }
+        }
+      ]
+    }
+  ]
+}

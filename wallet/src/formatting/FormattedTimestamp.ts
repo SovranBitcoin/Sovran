@@ -43,8 +43,11 @@ function getDatetime(locale: string): Intl.DateTimeFormat {
   if (!f) {
     f = new Intl.DateTimeFormat(locale, {
       year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
+      // The month as a word: "10/06/2026" is October to one reader and June
+      // to the next, and this string is what payment details and timelines
+      // print.
+      month: 'short',
+      day: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
       second: '2-digit',
@@ -122,7 +125,7 @@ export class FormattedTimestamp extends Number {
     return getFull(this._locale).format(this.valueOf());
   }
 
-  /** Datetime string: "03/16/2026 15:45:00". */
+  /** Date and time to the second: "Mar 16, 2026, 15:45:00". */
   get datetime(): string {
     return getDatetime(this._locale).format(this.valueOf());
   }

@@ -9,7 +9,11 @@ import {
   cachedProfileToMetadata,
   type NostrProfileMetadata,
 } from '@/shared/stores/global/nostrMetadataCache';
-import { useCachedNostrProfile, useProfileRecordsMany } from '@/shared/lib/nostr/useEntityCache';
+import {
+  useCachedNostrProfile,
+  useProfileRecordsMany,
+  useProfileFetchSettlements,
+} from '@/shared/lib/nostr/useEntityCache';
 import { fetchProfilesViaFacade } from '@/shared/lib/nostr/fetchProfiles';
 import { newReadId, readEvents, readKeyHash } from '@/shared/lib/read/readLog';
 import { useQueryResultLogger } from '@/shared/lib/logger';
@@ -251,6 +255,8 @@ interface UseNostrProfileMetadataManyResult {
   metadata: ReadonlyMap<string, NostrProfileMetadata>;
   /** True while the initial fetch for any pubkey hasn't returned EOSE. */
   isLoading: boolean;
+  /** Picture-less rows stay grey only until their first fetch attempt settles. */
+  loadingPubkeys: ReadonlySet<string>;
 }
 
 /**
@@ -267,6 +273,7 @@ export function useNostrProfileMetadataMany(
   // Read the single owner (entity cache) for this set; the returned Map is
   // referentially stable across renders that don't change these keys' records.
   const records = useProfileRecordsMany(pubkeys);
+  const sharedSettlements = useProfileFetchSettlements(pubkeys);
   const mockMode = useSettingsStore((state) => state.mockMode);
 
   // Keyed on the pubkey LIST, not the array identity. Callers build this set
@@ -308,11 +315,12 @@ export function useNostrProfileMetadataMany(
       if (attemptedAt !== undefined && now - attemptedAt < RETRY_ATTEMPT_WINDOW_MS) continue;
       if (mockMode && getMockProfileMetadata(pk)) continue;
       const record = records.get(pk);
-      if (!record || now - (record.seenAt ?? 0) > STALE_TTL_MS) out.push(pk);
+      if (!record || now - (record.fetchedAt ?? 0) > STALE_TTL_MS) out.push(pk);
     }
     return out;
   }, [pubkeys, records, mockMode]);
 
+  const [settledPubkeys, setSettledPubkeys] = useState<ReadonlySet<string>>(() => new Set());
   const [pendingPubkeys, setPendingPubkeys] = useState<ReadonlySet<string>>(() => new Set());
   const toFetchKey = toFetch.join(',');
   useEffect(() => {
@@ -330,6 +338,7 @@ export function useNostrProfileMetadataMany(
     // request settles, so effect cleanup cannot own the loading flag. Track the
     // pending keys themselves: an old batch never clears a newer batch's work.
     const finish = () => {
+      setSettledPubkeys((settled) => new Set([...settled, ...batch]));
       setPendingPubkeys((pending) => {
         const remaining = new Set(pending);
         for (const pk of batch) remaining.delete(pk);
@@ -364,5 +373,18 @@ export function useNostrProfileMetadataMany(
     },
   });
 
-  return { metadata, isLoading };
+  const loadingPubkeys = useMemo(
+    () =>
+      new Set(
+        (pubkeysKey ? pubkeysKey.split('\u0000') : []).filter(
+          (pk) =>
+            !metadata.get(pk)?.picture &&
+            !metadata.get(pk)?.fetchedAt &&
+            !settledPubkeys.has(pk) &&
+            !sharedSettlements.has(pk)
+        )
+      ),
+    [pubkeysKey, metadata, settledPubkeys, sharedSettlements]
+  );
+  return { metadata, isLoading, loadingPubkeys };
 }

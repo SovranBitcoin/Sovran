@@ -8,11 +8,16 @@
  * read as selected at once.
  */
 
+import { hasFeature, type Feature } from '@/shared/config/features';
+
 /** Stable scope identifiers shared across all surfaces. */
 export type SearchScopeId = 'All' | 'People' | 'Posts' | 'Mints' | 'Groups';
 
 /** The full scope set, identical on every surface. Empty scopes are hidden. */
 export const ALL_SCOPES: readonly SearchScopeId[] = ['All', 'People', 'Posts', 'Mints', 'Groups'];
+
+/** The module a scope belongs to (ADR 0021); unlisted scopes always ship. */
+const SCOPE_FEATURE: Partial<Record<SearchScopeId, Feature>> = { Posts: 'feed' };
 
 export type SearchScopeCounts = {
   people: number;
@@ -26,9 +31,17 @@ export type SearchScopeCounts = {
  * rest appear only when they have results. An empty query shows the full row
  * (recents render beneath it).
  */
-export function computeVisibleScopes(query: string, counts: SearchScopeCounts): SearchScopeId[] {
-  if (!query) return [...ALL_SCOPES];
-  return ALL_SCOPES.filter((scope) => {
+export function computeVisibleScopes(
+  query: string,
+  counts: SearchScopeCounts,
+  enabled: (feature: Feature) => boolean = hasFeature
+): SearchScopeId[] {
+  const shipped = ALL_SCOPES.filter((scope) => {
+    const feature = SCOPE_FEATURE[scope];
+    return !feature || enabled(feature);
+  });
+  if (!query) return shipped;
+  return shipped.filter((scope) => {
     switch (scope) {
       case 'All':
         return true;

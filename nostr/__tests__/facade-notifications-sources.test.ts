@@ -10,6 +10,7 @@ import type { NaggError } from '../src/errors';
 const ME = 'f'.repeat(64);
 const ACTOR = '1'.repeat(64);
 const MYPOST = 'a'.repeat(64);
+const LIKE = 'b1'.padEnd(64, '0');
 
 function primalNotification(content: Record<string, unknown>): RawPrimalEvent {
   return { kind: 10_000_132, content: JSON.stringify(content) };
@@ -131,8 +132,8 @@ describe('relay notificationsLiveSubscribe', () => {
     tier.notificationsLiveSubscribe!({ viewerPubkey: ME, tab: 'ALL' }, undefined, (items) => {
       received.push(...items.map((i) => `${i.reason}:${i.event.id}`));
     });
-    connection.emit({ id: 'like1', pubkey: ACTOR, kind: 7, tags: [['e', MYPOST], ['p', ME]], created_at: 10, content: '+' });
-    connection.emit({ id: 'mine', pubkey: ME, kind: 1, tags: [['p', ME]], created_at: 11, content: 'self' });
-    expect(received).toEqual(['reaction:like1']);
+    connection.emit({ id: LIKE, pubkey: ACTOR, kind: 7, tags: [['e', MYPOST], ['p', ME]], created_at: 10, content: '+' });
+    connection.emit({ id: 'b2'.padEnd(64, '0'), pubkey: ME, kind: 1, tags: [['p', ME]], created_at: 11, content: 'self' });
+    expect(received).toEqual([`reaction:${LIKE}`]);
   });
 });

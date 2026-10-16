@@ -1,3 +1,5 @@
+import { FOOTER_GAP } from '@/shared/ui/composed/footerInset';
+import { useAppStyle } from '@/shared/styles/appStyle';
 import { ReactNode, useCallback, useMemo } from 'react';
 import { LayoutChangeEvent, StyleSheet, ViewStyle, StyleProp } from 'react-native';
 import { useScreenInsets } from '@/shared/hooks/useScreenInsets';
@@ -68,6 +70,9 @@ const { colors: MASK_COLORS, locations: MASK_LOCATIONS } = easeGradient({
   },
 });
 
+/** Clearance below the buttons on a device with no bottom safe-area inset. */
+const MIN_BOTTOM_INSET = 8;
+
 /**
  * A lightweight wrapper for positioning buttons at the bottom of a screen.
  * Adds bottom safe-area inset internally so callers never need to compute
@@ -87,6 +92,7 @@ export function BottomButtons({
   onLayout,
 }: BottomButtonsProps) {
   const insets = useScreenInsets();
+  const { gutter } = useAppStyle().space;
   const themeBackground = useThemeColor('surface');
   // The screen this footer sits inside publishes its actual background via
   // context — falls back to the theme token when no provider is mounted
@@ -124,7 +130,10 @@ export function BottomButtons({
         style={[
           styles.container,
           {
-            paddingBottom: insets.bottom + paddingBottom,
+            paddingBottom: Math.max(insets.bottom, MIN_BOTTOM_INSET) + FOOTER_GAP + paddingBottom,
+            // The bar sits on the screen gutter, so its buttons share an edge
+            // with the header controls and the content above.
+            paddingHorizontal: gutter,
           },
           style,
         ]}>
@@ -170,5 +179,8 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     width: '100%',
+    // Stacked children (a keypad over a row, two buttons one above the other)
+    // are spaced by the bar, not by margins of their own.
+    gap: FOOTER_GAP,
   },
 });

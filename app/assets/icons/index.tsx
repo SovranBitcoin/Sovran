@@ -249,7 +249,6 @@ export const icons: string[] = [
   'mdi:refresh',
   'mdi:send',
   'mdi:broadcast',
-  'mdi:wifi',
   'mdi:wrench',
   'mingcute:bank-fill',
   'mdi:shield',

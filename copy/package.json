@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     "./onboarding": "./src/onboarding.ts",
+    "./prompts": "./src/prompts.ts",
     "./legal": "./legal/documents.json",
     "./site": "./src/site.ts",
     "./claims": "./claims.json"

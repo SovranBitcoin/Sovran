@@ -1,7 +1,10 @@
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 
-/** A read failure is sticky for this session; only explicit recovery may replace keys. */
+/** Keep failures sticky until recovery or a successful read restarts initialization. */
 export const useSecureStoreState = create<{
   secureStoreState: 'available' | 'locked';
   errorName: string | null;
-}>()(() => ({ secureStoreState: 'available', errorName: null }));
+}>({ name: 'useSecureStoreState', scope: 'session' })(() => ({
+  secureStoreState: 'available',
+  errorName: null,
+}));

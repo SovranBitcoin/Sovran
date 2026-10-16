@@ -16,7 +16,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Icon from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { INVARIANT_WHITE, SPLASH_QR_BASE } from '@/shared/lib/brandColors';
-import { initLog, useInitMount } from '@/shared/lib/logger';
+import { initLog, log, useInitMount } from '@/shared/lib/logger';
 import { useInitializationState } from '@/shared/providers/InitializationProvider';
 import {
   getQRButtonAnchor,
@@ -27,6 +27,7 @@ import {
   shouldFastForwardBootOverlay,
   subscribeQRButtonAnchor,
   subscribeWalletTabFocused,
+  usePageInsteadOfWallet,
   type QRButtonAnchor,
 } from '@/shared/lib/qrButtonAnchor';
 
@@ -45,8 +46,8 @@ const MORPH_TIMING = 'ease-out';
 // Generous wait for the QR anchor to publish. The morph overlay covers the
 // screen for the entire window, so the user sees a continuous splash — this
 // budget just bounds how long we hold before falling back to a plain fade
-// when the user lands on a non-wallet screen (e.g. onboarding) where no QR
-// button will ever publish. Sized to comfortably cover cold-start init on a
+// when the wallet home never arrives and nothing said so (the pages AppGate
+// shows in its place do say so, and fade at once). Sized to comfortably cover cold-start init on a
 // first launch (legacy migration + global migration + nostr + coco) plus
 // WalletScreen mount.
 const MORPH_FALLBACK_TIMEOUT_MS = 8000;
@@ -122,7 +123,8 @@ type SplashPhase = 'await_init' | 'await_anchor' | 'morphing' | 'fading' | 'unmo
 
 export function NativeSplashLayoutGate({ children }: { children: React.ReactNode }) {
   useInitMount('NativeSplashLayoutGate');
-  const { isInitializing } = useInitializationState();
+  const { isInitializing, hasFailedStage } = useInitializationState();
+  const pageInsteadOfWallet = usePageInsteadOfWallet();
   const splash = useSplashGeometry();
   const [surfaceTertiary] = useThemeColor(['surface-tertiary'] as const);
   const rootViewRef = useRef<View>(null);
@@ -133,6 +135,8 @@ export function NativeSplashLayoutGate({ children }: { children: React.ReactNode
   // Absolute deadline for the overlay's current cycle; armed on await_anchor
   // entry, consulted by the (restartable) morphing timer.
   const overlayDeadlineRef = useRef<number | null>(null);
+  // How the overlay left, for the log: shrinking into the QR button, or fading.
+  const leavingBy = useRef<'morph' | 'fade'>('fade');
   const [hasRootLaidOut, setHasRootLaidOut] = useState(false);
   // Window-relative offset of the splash overlay's parent View. The QRButton
   // publishes its anchor in window coords (pageX/pageY); to position the
@@ -160,7 +164,7 @@ export function NativeSplashLayoutGate({ children }: { children: React.ReactNode
   // from a prior cycle — during boot the same `isInitializing=true` signal
   // fires (gates registering) and we don't want it to bounce us back to
   // await_init from a later phase. Profile switches go through resetStages()
-  // which sets forceReinitialize=true, so the unmount→isInitializing=true
+  // which makes isInitializing true again, so the unmount→isInitializing=true
   // transition is the unambiguous "switch happened" signal.
   useEffect(() => {
     if (!isInitializing) return;
@@ -184,6 +188,25 @@ export function NativeSplashLayoutGate({ children }: { children: React.ReactNode
     overlayDeadlineRef.current = Date.now() + OVERLAY_LIFETIME_CAP_MS;
     setPhase('await_anchor');
   }, [phase, hasRootLaidOut]);
+
+  // A blocking stage failed: its recovery screen is what the app has to show,
+  // and the wallet screen's anchor will never be published. Waiting out the
+  // anchor fallback would keep that screen behind the splash for eight seconds.
+  useEffect(() => {
+    if (phase !== 'await_anchor' || !hasFailedStage) return;
+    initLog('SplashMorph', 'a blocking stage failed — fading out');
+    setPhase('fading');
+  }, [phase, hasFailedStage]);
+
+  // The same for a page the app shows in place of the wallet home: Terms on a
+  // first launch, onboarding, key recovery, the restore prompt. On a first
+  // launch the Terms page was ready after two seconds and stayed behind the
+  // splash for nine.
+  useEffect(() => {
+    if (phase !== 'await_anchor' || !pageInsteadOfWallet) return;
+    initLog('SplashMorph', 'a page is shown in place of the wallet home — fading out');
+    setPhase('fading');
+  }, [phase, pageInsteadOfWallet]);
 
   // Phase 2 — await_anchor: wait for the QR button to publish a stable
   // anchor. We poll `measureInWindow` for `LAYOUT_SETTLE_DELAY_MS` ms because
@@ -282,6 +305,7 @@ export function NativeSplashLayoutGate({ children }: { children: React.ReactNode
   // docking into the button.
   useEffect(() => {
     if (phase !== 'morphing') return;
+    leavingBy.current = 'morph';
     setBootSplashHandoff(true);
     // Clamp the (restartable) completion timer to the overlay's absolute
     // deadline so anchor-republish restarts can't extend its life forever.
@@ -348,8 +372,16 @@ export function NativeSplashLayoutGate({ children }: { children: React.ReactNode
   // Phase 3b — fading: same duration mirror, but the fade's target values
   // never depend on the anchor, so an anchor republish must NOT restart it.
   // The overlay is at opacity 0 when the timer fires, so unmount directly.
+  // The moment the app is first seen without anything over it: the end of
+  // start-up as a person experiences it, and what a test runner waits for
+  // before it treats what is underneath as on screen.
+  useEffect(() => {
+    if (phase === 'unmounted') log.info('splash.gone', { by: leavingBy.current });
+  }, [phase]);
+
   useEffect(() => {
     if (phase !== 'fading') return;
+    leavingBy.current = 'fade';
     setBootSplashHandoff(true);
     const id = setTimeout(() => {
       setBootMorphCompleted(true);
@@ -486,7 +518,11 @@ export function NativeSplashLayoutGate({ children }: { children: React.ReactNode
       onLayout={onLayoutRootView}>
       {children}
       {showSplash ? (
-        <Animated.View ref={splashOverlayRef} pointerEvents="none" style={overlayStyle}>
+        <Animated.View
+          ref={splashOverlayRef}
+          testID="boot-splash-overlay"
+          pointerEvents="none"
+          style={overlayStyle}>
           {/* Content layer — solid white fill + all visuals. Self-fades on the
               UI thread after the tween docks (see contentFadeStyle). */}
           <Animated.View pointerEvents="none" style={contentFadeStyle}>

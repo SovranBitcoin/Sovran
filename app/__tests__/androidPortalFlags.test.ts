@@ -81,11 +81,11 @@ describe('Android portal flags', () => {
     const source = readFileSync(resolve(ROOT, 'shared/blocks/HeaderProfileButton.tsx'), 'utf8');
 
     // Mint-selector chrome: shared headerButtonSize token (54 on Android via
-    // Platform.select) with the surface-secondary circle and muted border.
+    // Platform.select), painted by the one shared control-chrome recipe.
     expect(source).toContain("Platform.OS === 'android'");
     expect(source).toContain('ANDROID_BUTTON_SIZE = headerButtonSize');
-    expect(source).toContain('backgroundColor: flatSurface');
-    expect(source).toContain('borderColor: withAlpha(muted, 0.3)');
+    expect(source).toContain('useControlChrome()');
+    expect(source).toContain('...chrome');
   });
 
   it('keeps Android bottom footers out of the masked blur native path', () => {

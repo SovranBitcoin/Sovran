@@ -49,6 +49,40 @@ describe('createNostrMintEnrichment', () => {
     expect(fetchMock.mock.calls[0][1]).toMatchObject({ method: 'GET' });
   });
 
+  it('leaves out a review or a reviewer profile that does not parse and keeps the rest', async () => {
+    const mintUrl = 'https://mint.example.com';
+    const good = {
+      eventId: EVENT_ID,
+      reviewerPubkey: REVIEWER,
+      mintUrl,
+      score: 4,
+      content: '[4/5] fast and reliable',
+      createdAt: 1780000000,
+    };
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse({
+        summary: { mintUrl, averageScore: 4, reviewCount: 5 },
+        reviews: [
+          { ...good, eventId: 'not-an-event-id' },
+          { ...good, eventId: 'E'.repeat(64) },
+          { ...good, eventId: 'f'.repeat(64), reviewerPubkey: 'npub1notHex' },
+          { ...good, eventId: 'a'.repeat(64), content: 'x'.repeat(1_000_001) },
+          'not a review',
+          good,
+        ],
+        profiles: { [REVIEWER]: 'not a profile', ['d'.repeat(64)]: { name: 'kept' } },
+      }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const enrichment = createNostrMintEnrichment({ appViewBaseUrl: BASE_URL });
+
+    const summary = await enrichment.fetchMintReviews(mintUrl);
+
+    expect(summary?.recommendations.map((review) => review.eventId)).toEqual([EVENT_ID]);
+    // The server's count of every review it holds is still what is shown.
+    expect(summary?.reviewCount).toBe(5);
+  });
+
   it('keeps every server review (scored + score-less), trusts the server score, and attaches reviewer identity', async () => {
     const mintUrl = 'https://mint.example.com';
     const reviewerB = 'd'.repeat(64);

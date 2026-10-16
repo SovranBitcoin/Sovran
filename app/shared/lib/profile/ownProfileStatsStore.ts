@@ -12,6 +12,7 @@ interface OwnProfileStats {
 }
 
 export const ownProfileStatsCache = createQueryCacheStore<OwnProfileStats>({
+  scope: 'global',
   name: 'own-profile-stats-cache',
   logKey: 'own_profile_stats',
   staleTtlMs: 6 * 60 * 60 * 1000, // 6h

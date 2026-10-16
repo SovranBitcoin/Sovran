@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { storeLog } from '@/shared/lib/logger';
 
 type RoutstrTopUpResult = 'success' | 'failed';
@@ -20,7 +20,10 @@ interface RoutstrTopUpActions {
   reset: () => void;
 }
 
-export const useRoutstrTopUpStore = create<RoutstrTopUpState & RoutstrTopUpActions>()((set) => ({
+export const useRoutstrTopUpStore = create<RoutstrTopUpState & RoutstrTopUpActions>({
+  name: 'useRoutstrTopUpStore',
+  scope: 'session',
+})((set) => ({
   phase: 'idle',
   pendingMessage: null,
 

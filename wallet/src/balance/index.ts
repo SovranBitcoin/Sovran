@@ -1,5 +1,4 @@
 export {
-  amountToNumber,
   emptyBalanceBreakdown,
   sumAmounts,
   sumReservedSends,

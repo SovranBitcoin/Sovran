@@ -1,10 +1,12 @@
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { persist } from 'zustand/middleware';
 import { z } from 'zod';
 
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
 import { storeLog } from '@/shared/lib/logger';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
+import { tolerantArray, tolerantRecord } from '@/shared/lib/persist/tolerant';
+import { NostrEventIdSchema, NostrPubkeyHexSchema } from '@/shared/lib/protocolIds';
 import {
   isNewerMuteList,
   mutedValues,
@@ -70,24 +72,38 @@ function normalizeHexList(values: readonly string[], max: number): string[] {
   return Array.from(out);
 }
 
+// A saved list is never turned down for one bad entry: the entry is left out
+// and the rest of what the person muted and blocked is kept. Ids use the
+// app's shared hex schemas (`shared/lib/protocolIds.ts`), which read either
+// case; every lookup in this store is by lowercase id, so ids are lowered as
+// they are read.
+const lower = (id: string) => id.toLowerCase();
+const SavedPubkey = NostrPubkeyHexSchema.transform(lower);
+const SavedEventId = NostrEventIdSchema.transform(lower);
+
 export const PersistedFeedIgnoreStore = z.object({
-  ignoredPubkeys: z.array(z.string().regex(HEX64_RE)).max(MAX_IGNORED_PUBKEYS).default([]),
-  ignoredEventIds: z.array(z.string().regex(HEX64_RE)).max(MAX_IGNORED_EVENT_IDS).default([]),
+  ignoredPubkeys: tolerantArray(SavedPubkey, MAX_IGNORED_PUBKEYS).default([]),
+  ignoredEventIds: tolerantArray(SavedEventId, MAX_IGNORED_EVENT_IDS).default([]),
+  // A copy of the published list. One that cannot be read is fetched again.
   muteList: z
     .object({
-      id: z.string().regex(HEX64_RE),
+      id: SavedEventId,
       createdAt: z.number().int().nonnegative(),
       tags: z.array(z.array(z.string())),
       privateTags: z.array(z.array(z.string())),
     })
     .nullable()
-    .default(null),
-  blockOverrides: z.record(z.string().regex(HEX64_RE), z.boolean()).default({}),
+    .default(null)
+    .catch(null),
+  blockOverrides: tolerantRecord(SavedPubkey, z.boolean()),
   dmFilterEnabled: z.boolean().default(false),
   dmFilterWords: z.array(z.string().max(100)).max(100).default([]),
 });
 
-export const useFeedIgnoreStore = create<FeedIgnoreStore>()(
+export const useFeedIgnoreStore = create<FeedIgnoreStore>({
+  name: 'feed-ignore-store',
+  scope: 'profile',
+})(
   persist(
     (set, get) => ({
       ignoredPubkeys: [],

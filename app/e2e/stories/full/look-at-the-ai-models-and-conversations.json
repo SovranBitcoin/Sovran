@@ -1,0 +1,156 @@
+{
+  "id": "look-at-the-ai-models-and-conversations",
+  "purpose": "A person with no money opens the AI tab, sees that each model tier needs a top-up, looks at another family of models, and finds they have no conversations yet.",
+  "startsFrom": "onboarded",
+  "steps": [
+    {
+      "name": "the wallet opens",
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-send"
+          }
+        },
+        {
+          "logged": "splash.gone"
+        }
+      ],
+      "withinMs": 20000
+    },
+    {
+      "name": "go to AI",
+      "tap": {
+        "label": "AI"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "screen-ai"
+          }
+        },
+        {
+          "visible": {
+            "id": "ai-model-chip"
+          }
+        },
+        {
+          "gone": {
+            "id": "wallet-send"
+          }
+        }
+      ],
+      "withinMs": 20000
+    },
+    {
+      "name": "open the models",
+      "tap": {
+        "id": "ai-model-chip"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "model-tab-openai"
+          }
+        },
+        {
+          "visible": {
+            "id": "ai-model-openai-auto"
+          }
+        },
+        {
+          "visible": {
+            "id": "ai-model-openai-max"
+          }
+        },
+        {
+          "logged": "ui.touch"
+        }
+      ],
+      "withinMs": 10000
+    },
+    {
+      "name": "look at Venice's models",
+      "tap": {
+        "id": "model-tab-venice"
+      },
+      "expect": [
+        {
+          "gone": {
+            "id": "ai-model-openai-auto"
+          }
+        },
+        {
+          "visible": {
+            "id": "model-tab-venice"
+          }
+        },
+        {
+          "logged": "ui.touch"
+        }
+      ],
+      "withinMs": 10000
+    },
+    {
+      "name": "close the models",
+      "tap": {
+        "id": "popup-sheet-overlay"
+      },
+      "tapAt": [0.5, 0.12],
+      "expect": [
+        {
+          "gone": {
+            "id": "model-tab-venice"
+          }
+        },
+        {
+          "visible": {
+            "id": "ai-history-button"
+          }
+        }
+      ],
+      "withinMs": 10000
+    },
+    {
+      "name": "open the conversations",
+      "tap": {
+        "id": "ai-history-button"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "ai-sessions-empty"
+          }
+        },
+        {
+          "visible": {
+            "id": "ai-sessions-new"
+          }
+        },
+        {
+          "logged": "ui.touch"
+        }
+      ],
+      "withinMs": 10000
+    },
+    {
+      "name": "close them",
+      "tap": {
+        "id": "action-menu-dismiss"
+      },
+      "tapAt": [0.5, 0.12],
+      "expect": [
+        {
+          "gone": {
+            "id": "ai-sessions-new"
+          }
+        },
+        {
+          "visible": {
+            "id": "ai-model-chip"
+          }
+        }
+      ],
+      "withinMs": 10000
+    }
+  ]
+}

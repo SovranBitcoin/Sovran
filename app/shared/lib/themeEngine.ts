@@ -263,6 +263,21 @@ function getGradientVars(themeName: string): SemanticVars {
 }
 
 /**
+ * Add the `--color-*` form beside each `--*` var. Uniwind's runtime does not
+ * follow `var()` chains, so `useThemeColor('dominant-300')` only resolves when
+ * the Tailwind-token form is registered directly — the same reason
+ * `STATIC_COLORS` carries both.
+ */
+function withColorTokens(vars: SemanticVars): SemanticVars {
+  return Object.fromEntries(
+    Object.entries(vars).flatMap(([name, value]) => [
+      [name, value],
+      [`--color-${name.slice(2)}`, value],
+    ])
+  );
+}
+
+/**
  * Build the full set of CSS variables for a given theme.
  * Includes static color scales + HeroUI semantic vars + wallpaper vars.
  * All values are registered with Uniwind so both className and useColor work.
@@ -276,8 +291,8 @@ export function getThemeVariables(themeName: string): SemanticVars {
   return {
     ...STATIC_COLORS,
     ...buildSemanticVars(palette),
-    ...getDominantVars(themeName),
-    ...getGradientVars(themeName),
+    ...withColorTokens(getDominantVars(themeName)),
+    ...withColorTokens(getGradientVars(themeName)),
   };
 }
 

@@ -1,3 +1,5 @@
+import { useNavigationContainerRef } from 'expo-router';
+import { captureNearbyDelivery } from '@/features/nearPay/lib/nearbyPayments';
 /**
  * @fileoverview Sovran ColadaProvider — wires colada to the app
  *
@@ -7,6 +9,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { npcAddressForPubkey } from '@/shared/lib/cashu/npc';
 import { Share } from 'react-native';
 
 import * as Clipboard from 'expo-clipboard';
@@ -22,6 +25,11 @@ import { Metadata } from 'nostr-tools/kinds';
 import { getPublicKey } from 'nostr-tools/pure';
 
 import type { MachineOperations, NavigationCallbacks, RecipientProfile } from 'wallet';
+import { createExecuteMintQuote, createExecuteReceive } from 'wallet/operations';
+import { prepareBolt11MintQuote, prepareOnchainMintQuote } from '@/shared/lib/cashu/cocoOperations';
+import { requirePreparedOfflineReceiveDleq } from '@/shared/lib/cashu/offlineReceiveDleq';
+import { mintLocalId } from '@/shared/lib/id';
+import { RECEIVE_PENDING_TOAST_COPY } from '@/shared/lib/popup/paymentStatusCopy';
 import {
   createColada,
   createMempoolSpaceChainAdapter,
@@ -46,7 +54,7 @@ import { parseRawMetadata } from '@/shared/hooks/useNostrProfileMetadata';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { paymentLog, mintUrlLogFields } from '@/shared/lib/logger';
 import { actionMenuSheet } from '@/shared/lib/popup/popups/actionMenuSheet';
-import { amountToNumber } from '@/shared/lib/cashu/amount';
+import { requireAmount } from 'wallet/amount';
 import { sendDirectMessageToRelays } from '@/shared/lib/nostr/sendDirectMessage';
 import { getOwnWriteRelays } from '@/shared/lib/nostr/outbox/relayListStore';
 import { buildSignedZapRequestJson, lnurlBech32 } from '@/shared/lib/nostr/zap/buildZapRequest';
@@ -54,14 +62,11 @@ import { markPendingZapReceipt, peekPendingZap } from '@/shared/stores/runtime/p
 import { publishGiftWrappedDM } from '@/shared/lib/nostr/publishGiftWrappedDM';
 import { ingestResolvedProfiles } from '@/shared/lib/nostr/useEntityCache';
 import {
-  createSovranExecuteMintQuote,
-  createSovranExecuteReceive,
   createSovranHandlers,
   createSovranNotifications,
   createSovranScanSources,
   createSovranScreenActionHandlers,
 } from '@/features/send/lib/sovranPaymentConfig';
-import { deriveBitchatBLEIdentityMaterial } from '@/features/bitchat/lib/bleIdentity';
 import {
   createSovranScreenActionsBridge,
   getSovranMintEnrichment,
@@ -81,6 +86,7 @@ import { usePricelistStore } from '@/shared/stores/global/pricelistStore';
 import { useSettingsStore, type DisplayCurrency } from '@/shared/stores/global/settingsStore';
 import { clearPaymentContext } from '@/shared/stores/runtime/clearPaymentContext';
 import { useDmEchoStore } from '@/shared/stores/runtime/dmEchoStore';
+import { buildDetectors } from '@/shared/config/featureDetectors';
 import { isPaymentRequestFailureMockEnabled } from '@/features/send/lib/paymentRequestFailureMock';
 
 // Per-mint NUT-06 deadline used by `fetchMintInfo` below. Only matters on a
@@ -176,7 +182,6 @@ type ColadaIdentity = {
   getNpub: () => string | undefined;
   getPubkey: () => string | undefined;
   getPrivateKey: () => Uint8Array | undefined;
-  getBitchatIdentityMaterial: () => ReturnType<typeof deriveBitchatBLEIdentityMaterial> | null;
   /** Register a receive surface for p2pk-keypair regeneration. Returns an unsubscribe. */
   subscribeP2pkKeyRefreshed: (listener: (newKey: string | null) => void) => () => void;
   notifyP2pkKeyRefreshed: (newKey: string | null) => void;
@@ -213,12 +218,6 @@ function useColadaIdentity(
       getNpub: () => npubRef.current,
       getPubkey: () => pubkeyRef.current,
       getPrivateKey: () => privateKeyRef.current,
-      getBitchatIdentityMaterial: () => {
-        const privateKey = privateKeyRef.current;
-        const pubkey = pubkeyRef.current;
-        if (!privateKey || !pubkey) return null;
-        return deriveBitchatBLEIdentityMaterial({ privateKey, pubkey });
-      },
       subscribeP2pkKeyRefreshed: (listener: (newKey: string | null) => void) => {
         subscribersRef.current.add(listener);
         return () => {
@@ -235,12 +234,32 @@ function useColadaIdentity(
 
 export function SovranColadaProvider({ children }: { children: React.ReactNode }) {
   const manager = useManager();
+  // The payment handlers navigate, and one of them has to know what is under
+  // the screen it is leaving (features/send/lib/amountReturn.ts).
+  const navigationRef = useNavigationContainerRef();
   const { keys } = useNostrKeysContext();
   const { ndk } = useNDK();
   const { isOffline: contextOffline } = useOfflineStatus();
   const mockOffline = useSettingsStore((state) => state.mockOffline);
   const isOffline = mockOffline || contextOffline;
   const getOffline = useLatestGetter(isOffline);
+
+  // Coco serves stored mint data without a request while offline, and sends
+  // default to exact-only, so nothing waits on a mint that cannot answer.
+  const [offlineListeners] = useState(() => new Set<() => void>());
+  const subscribeOfflineChanged = useCallback(
+    (listener: () => void) => {
+      offlineListeners.add(listener);
+      return () => {
+        offlineListeners.delete(listener);
+      };
+    },
+    [offlineListeners]
+  );
+  useEffect(() => {
+    manager?.setOffline(isOffline);
+    for (const listener of offlineListeners) listener();
+  }, [manager, isOffline, offlineListeners]);
 
   // Camera permission lives here rather than behind a (receive-flow)-scoped
   // context provider so it's reachable from this provider's navigation /
@@ -284,7 +303,7 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
   // `() => manager` inline, so every render handed the engine, the operations
   // override and the notifications factory a fresh function identity.
   const getManager = useCallback(() => manager, [manager]);
-  const { getNpub, getBitchatIdentityMaterial } = identity;
+  const { getNpub } = identity;
 
   const getBtcPrice = useCallback(() => {
     const currency = useSettingsStore.getState().displayCurrency;
@@ -310,7 +329,8 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
     () =>
       createColada({
         manager,
-        sendNostrDM: async (nprofile, message) => {
+        captureSendDelivery: captureNearbyDelivery,
+        sendNostrDM: async ({ nprofile, message }) => {
           paymentLog.info('colada.adapter.send_nostr_dm.start', {
             hasPrivateKey: !!identity.getPrivateKey(),
             nprofileLength: nprofile.length,
@@ -401,7 +421,7 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
               },
               buttons: options.map((option) => ({
                 text: `~${option.estimated_blocks} block${option.estimated_blocks === 1 ? '' : 's'}`,
-                description: `${amountToNumber(option.fee_reserve)} sat fee reserve`,
+                description: `${requireAmount(option.fee_reserve)} sat fee reserve`,
                 testID: `onchain-fee-${option.fee_index}`,
                 onPress: () => {
                   paymentLog.info('send.onchain.fee_selected', {
@@ -509,18 +529,19 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
     void runDataMigrations();
   }, []);
 
-  // Override colada's default executeReceive and executeMintQuote so
-  // they always return entries with coco's REAL persisted history ids — never
-  // synthesized fallbacks (`redeemed-${Date.now()}`) or unverified operation
-  // ids. This guarantees the location stamp + scan-history link captured
-  // downstream are keyed to the same id `usePaginatedHistory` returns later,
-  // so reopening the transaction from the list resolves them correctly.
-  // See sovranPaymentConfig.createSovranExecuteReceive / createSovranExecuteMintQuote
-  // for the full rationale. Spreading instance.operations preserves all other defaults.
+  // Use the wallet's receive and mint-quote operations that follow Coco's own
+  // records (`wallet/src/operations/receiveOperations.ts`), so they always
+  // return entries with coco's REAL persisted history ids — never synthesized
+  // fallbacks or unverified operation ids. This guarantees the location stamp
+  // + scan-history link captured downstream are keyed to the same id
+  // `usePaginatedHistory` returns later, so reopening the transaction from the
+  // list resolves them correctly. Spreading instance.operations preserves all
+  // other defaults.
   const operationsOverride = useMemo<MachineOperations>(
     () =>
       ({
         ...instance.operations,
+        npcAddressForPubkey,
         // The machine asks for a REAL unit; stay on the active account's side
         // of the testnut split.
         switchUnit: (unit: string) => {
@@ -530,8 +551,20 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
             store.setActiveUnit(next as ActiveUnit);
           }
         },
-        executeReceive: createSovranExecuteReceive(getManager, getOffline),
-        executeMintQuote: createSovranExecuteMintQuote(getManager),
+        executeReceive: createExecuteReceive({
+          getManager,
+          getOffline,
+          verifyOfflineReceive: requirePreparedOfflineReceiveDleq,
+          pendingMessage: RECEIVE_PENDING_TOAST_COPY.subtitle,
+          newLocalId: mintLocalId,
+        }),
+        executeMintQuote: createExecuteMintQuote({
+          getManager,
+          prepareMintQuote: (manager, method, mintUrl, amount, unit) =>
+            method === 'onchain'
+              ? prepareOnchainMintQuote(manager, mintUrl, amount, unit)
+              : prepareBolt11MintQuote(manager, mintUrl, amount, unit),
+        }),
         // Stage 2 of recipient resolution: hex pubkey → Nostr kind-0 profile.
         // Stage 1 (NIP-05 → pubkey) is shipped by colada's default
         // operation set; this one has no default because NDK / cache wiring
@@ -607,8 +640,9 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
         manager,
         requestCameraPermission,
         subscribeP2pkKeyRefreshed: identity.subscribeP2pkKeyRefreshed,
+        subscribeOfflineChanged,
       }),
-    [manager, requestCameraPermission, identity]
+    [manager, requestCameraPermission, identity, subscribeOfflineChanged]
   );
 
   // Deliver a bearer ecash token to a remote Nostr contact over an encrypted
@@ -655,10 +689,11 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
         onOptionDismiss: () => refs.getOptionDismiss()?.(),
         getManager,
         getNpub,
-        getBitchatIdentityMaterial,
         deliverContactEcashDm,
+        getRootNavigationState: () =>
+          navigationRef.isReady() ? navigationRef.getRootState() : undefined,
       }),
-    [getManager, getNpub, getBitchatIdentityMaterial, deliverContactEcashDm]
+    [getManager, getNpub, deliverContactEcashDm, navigationRef]
   );
 
   // Built once per manager, not per render: it lands in Colada's context, so a
@@ -677,6 +712,7 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
   return (
     <ColadaProviderBase
       handlers={handlers}
+      detectors={buildDetectors}
       instance={instance}
       getManager={getManager}
       annotationStore={transactionAnnotationAdapter}

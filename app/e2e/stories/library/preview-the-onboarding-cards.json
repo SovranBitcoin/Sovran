@@ -1,0 +1,102 @@
+{
+  "id": "preview-the-onboarding-cards",
+  "purpose": "A person who has already finished setup previews every onboarding card and can go back or close without changing their wallet.",
+  "startsFrom": "onboarded",
+  "steps": [
+    {
+      "name": "open the onboarding preview",
+      "open": "sovran://design-system-prompt?id=onboarding-carousel",
+      "expect": [
+        {
+          "visible": {
+            "label": "Small payments on your phone"
+          }
+        },
+        {
+          "visible": {
+            "id": "onboarding-next"
+          }
+        }
+      ],
+      "withinMs": 20000
+    },
+    {
+      "name": "read carry your profile with you",
+      "tap": {
+        "id": "onboarding-next"
+      },
+      "expect": [
+        {
+          "visible": {
+            "label": "Carry your profile with you"
+          }
+        }
+      ]
+    },
+    {
+      "name": "read understand your privacy",
+      "tap": {
+        "id": "onboarding-next"
+      },
+      "expect": [
+        {
+          "visible": {
+            "label": "Understand your privacy"
+          }
+        }
+      ]
+    },
+    {
+      "name": "read start small",
+      "tap": {
+        "id": "onboarding-next"
+      },
+      "expect": [
+        {
+          "visible": {
+            "label": "Start small"
+          }
+        }
+      ]
+    },
+    {
+      "name": "go back to the privacy card",
+      "tap": {
+        "id": "onboarding-back"
+      },
+      "expect": [
+        {
+          "visible": {
+            "label": "Understand your privacy"
+          }
+        }
+      ]
+    },
+    {
+      "name": "return to the final card",
+      "tap": {
+        "id": "onboarding-next"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "onboarding-get-started"
+          }
+        }
+      ]
+    },
+    {
+      "name": "finish the preview",
+      "tap": {
+        "id": "onboarding-get-started"
+      },
+      "expect": [
+        {
+          "gone": {
+            "id": "onboarding-get-started"
+          }
+        }
+      ]
+    }
+  ]
+}

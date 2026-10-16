@@ -81,6 +81,7 @@ import { useNip46RequestsStore } from '@/features/nostrSigner/data/nip46Requests
 import { mintSecret } from '@/features/nostrSigner/lib/bunkerSecrets';
 import { clearAllSignerData } from '@/features/nostrSigner/lib/clearSignerData';
 import {
+  LEGACY_PAIRING_INTENT_STORAGE_KEY,
   PAIRING_INTENT_STORAGE_KEY,
   setPairingIntent,
 } from '@/features/nostrSigner/lib/pairingIntentStorage';
@@ -165,7 +166,7 @@ beforeEach(() => {
 describe('clearAllSignerData', () => {
   it('wipes all three stores, the pairing intent, and the bunker secrets', async () => {
     await seedEverything();
-    expect(asyncBacking.has(PAIRING_INTENT_STORAGE_KEY)).toBe(true);
+    expect(secureBacking.has(PAIRING_INTENT_STORAGE_KEY)).toBe(true);
     expect(secureBacking.has(SECRETS_KEY)).toBe(true);
 
     expect((await clearAllSignerData(USER)).isOk()).toBe(true);
@@ -176,7 +177,7 @@ describe('clearAllSignerData', () => {
     const requests = useNip46RequestsStore.getState();
     expect(requests.pending).toEqual([]);
     expect(requests.throttledApps).toEqual({});
-    expect(asyncBacking.has(PAIRING_INTENT_STORAGE_KEY)).toBe(false);
+    expect(secureBacking.has(PAIRING_INTENT_STORAGE_KEY)).toBe(false);
     expect(secureBacking.has(SECRETS_KEY)).toBe(false);
 
     // The persisted blobs were rewritten as empty shells, not left behind.
@@ -200,11 +201,12 @@ describe('clearAllSignerData', () => {
     const removedAsyncKeys = (AsyncStorage.removeItem as jest.Mock).mock.calls.map(
       ([key]) => key as string
     );
-    expect(removedAsyncKeys).toEqual([PAIRING_INTENT_STORAGE_KEY]);
+    // The plain-storage row older builds kept the intent in.
+    expect(removedAsyncKeys).toEqual([LEGACY_PAIRING_INTENT_STORAGE_KEY]);
     const removedSecureKeys = (SecureStore.deleteItemAsync as jest.Mock).mock.calls.map(
       ([key]) => key as string
     );
-    expect(removedSecureKeys).toEqual([SECRETS_KEY]);
+    expect(removedSecureKeys.sort()).toEqual([PAIRING_INTENT_STORAGE_KEY, SECRETS_KEY].sort());
     expect(asyncBacking.get('unrelated-store')).toBe('untouched');
     expect(secureBacking.get('unrelated-secret')).toBe('untouched');
   });
@@ -215,7 +217,7 @@ describe('clearAllSignerData', () => {
     expect((await clearAllSignerData(undefined)).isOk()).toBe(true);
 
     expect(useNip46ConnectionsStore.getState().apps).toEqual({});
-    expect(asyncBacking.has(PAIRING_INTENT_STORAGE_KEY)).toBe(false);
+    expect(secureBacking.has(PAIRING_INTENT_STORAGE_KEY)).toBe(false);
     // No pubkey → the per-pubkey secrets key is not addressable; left alone.
     expect(secureBacking.has(SECRETS_KEY)).toBe(true);
   });

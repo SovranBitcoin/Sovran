@@ -14,6 +14,7 @@ import {
   inputVariants,
 } from "./normalize";
 import { logger } from "./logger";
+import { canonicalizePaymentRequest } from "./payment-request-canonical";
 import { normalizeNostrPubkey } from "./recipient";
 import type {
   Detectors,
@@ -235,7 +236,12 @@ function extractOptions(
     if (cashuCandidate && detectors.isPaymentRequest(cashuCandidate)) {
       pushOption(
         options,
-        { kind: "paymentRequest", value: cashuCandidate, source, paramKey },
+        {
+          kind: "paymentRequest",
+          value: canonicalizePaymentRequest(cashuCandidate),
+          source,
+          paramKey,
+        },
         seen,
       );
     }

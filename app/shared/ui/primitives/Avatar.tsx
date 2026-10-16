@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { withAlpha } from '@/shared/lib/color';
@@ -183,18 +183,34 @@ export const Avatar = ({
     void prefetchImage(picture);
   }, [picture]);
 
-  const [imageStatus, setImageStatus] = useState<ImageStatus>('loading');
-  const [loadedPicture, setLoadedPicture] = useState<string | null>(null);
-
-  useEffect(() => {
-    setImageStatus('loading');
-  }, [picture]);
-
-  const handleImageLoad = () => {
-    if (picture) setLoadedPicture(picture);
-    setImageStatus('loaded');
-  };
-  const handleImageError = () => setImageStatus('failed');
+  const [imageLoad, setImageLoad] = useState<{
+    picture: string | null | undefined;
+    seed: string | undefined;
+    status: ImageStatus;
+    /** The same identity's last loaded picture, kept behind a changing URL. */
+    previous: string | null;
+  }>({ picture, seed, status: 'loading', previous: null });
+  const imageStatus =
+    imageLoad.picture === picture && imageLoad.seed === seed ? imageLoad.status : 'loading';
+  if (imageLoad.picture !== picture || imageLoad.seed !== seed) {
+    setImageLoad({
+      picture,
+      seed,
+      status: 'loading',
+      previous:
+        imageLoad.seed === seed && imageLoad.status === 'loaded' && imageLoad.picture
+          ? imageLoad.picture
+          : null,
+    });
+  }
+  const previousPicture =
+    imageLoad.picture === picture && imageLoad.seed === seed ? imageLoad.previous : null;
+  const updateImageStatus = (status: ImageStatus) =>
+    setImageLoad((current) =>
+      current.picture === picture && current.seed === seed ? { ...current, status } : current
+    );
+  const handleImageLoad = () => updateImageStatus('loaded');
+  const handleImageError = () => updateImageStatus('failed');
 
   const borderRadius = size / 2;
   const statusIconSize = size * 0.33;
@@ -219,13 +235,12 @@ export const Avatar = ({
 
   const defaultAlt = 'Avatar';
   const imageAlt = alt || defaultAlt;
-  const previousPicture = loadedPicture && loadedPicture !== picture ? loadedPicture : null;
   const pictureSource = { uri: picture };
   const previousPictureSource = previousPicture ? { uri: previousPicture } : null;
   const overlayImageStyle = [StyleSheet.absoluteFill, avatarStyle];
   const showsLoadingPlaceholder =
     state === 'loading' ||
-    (state === 'image' && !!picture && imageStatus !== 'loaded' && !previousPicture);
+    (state === 'image' && !!picture && imageStatus === 'loading' && !previousPicture);
   // Per-instance key via useId — the previous module-counter + lazy-ref-init
   // pattern was a render side effect the React Compiler refuses to compile
   // (the whole component rendered unmemoized).
@@ -243,7 +258,6 @@ export const Avatar = ({
       state,
       hasPicture: !!picture,
       hasStatus: !!status,
-      hasPreviousPicture: !!previousPicture,
       ...(typeof visualExtra === 'function' ? visualExtra() : (visualExtra ?? {})),
     }),
   });
@@ -253,6 +267,33 @@ export const Avatar = ({
   // Both are `undefined` in a release build, so the view attaches no ref and
   // dispatches no layout event for measurement that cannot run.
   const { ref: visualHostRef, onLayout: reportVisualLayout } = visualLayout;
+
+  const branch =
+    state === 'loading'
+      ? 'loading'
+      : state === 'fallback' || !picture || imageStatus === 'failed'
+        ? 'fallback'
+        : imageStatus === 'loaded'
+          ? 'image'
+          : 'loading';
+  const lastSequence = useRef<{ seed: string; branch: AvatarState } | null>(null);
+  useEffect(() => {
+    if (!__DEV__) return;
+    if (lastSequence.current?.seed === fallbackSeed && lastSequence.current.branch === branch)
+      return;
+    lastSequence.current = { seed: fallbackSeed, branch };
+    log.debug('visual.avatar.sequence', () => ({
+      instance: visualInstanceKey,
+      // Named `subject`, and a prefix: the logger treats any field called
+      // `seed` as key material and a whole pubkey as opaque hex, and either
+      // would hide the one thing a sequence is grouped by.
+      subject: fallbackSeed.slice(0, 12),
+      branch,
+      state,
+      imageStatus,
+      hasPicture: !!picture,
+    }));
+  }, [branch, fallbackSeed, visualInstanceKey, state, imageStatus, picture]);
 
   // 1. Loading state — 50% foreground fill, no image, no gradient.
   if (state === 'loading') {
@@ -294,16 +335,16 @@ export const Avatar = ({
   // 5. Image state — the picture fades in over a placeholder via expo-image's
   // native transition. The transition is skipped for memory-cached images, so it
   // only smooths a real load (network/disk) and never re-fades when an avatar
-  // recycles back into view while scrolling. Behind it sits the previous decoded
-  // image (while the URL is changing) or the loading fill, so the fade crossfades
-  // from a placeholder rather than from empty space.
+  // recycles back into view while scrolling. Behind it sits the same identity's
+  // previous picture (while its URL is changing) or the loading fill — never
+  // another identity's image.
   return (
     <View
       ref={visualHostRef}
       collapsable={false}
       style={avatarFrameStyle}
       onLayout={reportVisualLayout}>
-      {previousPicture ? (
+      {previousPictureSource ? (
         <ExpoImage
           source={previousPictureSource}
           cachePolicy="memory-disk"
@@ -316,6 +357,7 @@ export const Avatar = ({
         </View>
       )}
       <ExpoImage
+        key={`${seed ?? fallbackSeed}:${picture}`}
         source={pictureSource}
         cachePolicy="memory-disk"
         transition={AVATAR_IMAGE_FADE_MS}

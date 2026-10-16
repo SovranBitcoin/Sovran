@@ -20,6 +20,12 @@ describe('appDataOperationFor — verb_object heuristic (live Primal payloads)',
     expect(op.risk).toBeUndefined();
   });
 
+  it('reads a word like constructor as a word, not as something on Object.prototype', () => {
+    const op = appDataOperationFor(PRIMAL_D('get_constructor_tostring'), '{}');
+    expect(op.verbPhrase).toBe('load constructor tostring');
+    expect(op.headline).toBe('Load Constructor Tostring');
+  });
+
   it('humanizes set_app_settings', () => {
     const op = appDataOperationFor(PRIMAL_D('set_app_settings'), '{}');
     expect(op.headline).toBe('Save App Settings');

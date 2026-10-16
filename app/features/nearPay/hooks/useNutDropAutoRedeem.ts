@@ -85,7 +85,7 @@ export function useNutDropAutoRedeem(): void {
     const subscription = addBLEPrivateMessageListener((event) => {
       if (event.isOwn) return;
       const token = extractCashuToken(event.content);
-      if (!token) return;
+      if (!token || token.trim() !== event.content.trim()) return;
 
       const classified = classifyMeshToken(token, myPubkey33);
       // A private DM is addressed to us, so redeem locked-to-me OR bearer; only
@@ -94,6 +94,11 @@ export function useNutDropAutoRedeem(): void {
         paymentLog.debug('near_pay.redeem.ignored_locked_to_other', {
           senderPeerID: event.peerID,
         });
+        return;
+      }
+      if (classified.classification === 'invalid') {
+        // Its amount could not be read, and a bad amount fails the whole stored queue.
+        paymentLog.warn('near_pay.redeem.ignored_invalid', { senderPeerID: event.peerID });
         return;
       }
       if (!classified.mintUrl) {

@@ -8,6 +8,7 @@ import TestRenderer, { act } from 'react-test-renderer';
 import { sanitizeAvatarFallbackSeed } from '@/shared/lib/avatarFallback';
 import { generateClayAvatarTheme, generateSeededGradient } from '@/shared/lib/avatarGradient';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
+import { log } from '@/shared/lib/logger';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -194,5 +195,82 @@ describe('avatar fallback rendering', () => {
     };
 
     expect(collectStops(24)).toEqual(collectStops(80));
+  });
+});
+
+it('does not reuse a failed status or loaded picture when a cell changes identity', () => {
+  let renderer: TestRenderer.ReactTestRenderer;
+  act(() => {
+    renderer = TestRenderer.create(<Avatar state="image" picture="old.png" seed="old" />);
+  });
+  act(() => {
+    renderer!.root.findByProps({ testID: 'expo-image' }).props.onError();
+  });
+  expect(
+    renderer!.root.findAllByProps({ testID: 'clay-silhouette-avatar' }).length
+  ).toBeGreaterThan(0);
+  act(() => {
+    renderer!.update(<Avatar state="image" picture="new.png" seed="new" />);
+  });
+  expect(renderer!.root.findAllByProps({ testID: 'clay-silhouette-avatar' })).toHaveLength(0);
+  act(() => {
+    renderer!.root.findByProps({ testID: 'expo-image' }).props.onLoad();
+  });
+  act(() => {
+    renderer!.update(<Avatar state="image" picture="third.png" seed="third" />);
+  });
+  const pictures = renderer!.root
+    .findAllByProps({ testID: 'expo-image' })
+    .map((node) => node.props.source.uri);
+  expect(new Set(pictures)).toEqual(new Set(['third.png']));
+  act(() => {
+    renderer!.unmount();
+  });
+});
+
+it('keeps the same identity\u2019s loaded picture behind a changing URL', () => {
+  let renderer: TestRenderer.ReactTestRenderer;
+  const uris = () =>
+    renderer!.root.findAllByProps({ testID: 'expo-image' }).map((node) => node.props.source.uri);
+  act(() => {
+    renderer = TestRenderer.create(<Avatar state="image" picture="first.png" seed="same" />);
+  });
+  act(() => {
+    renderer!.root.findByProps({ testID: 'expo-image' }).props.onLoad();
+  });
+  act(() => {
+    renderer!.update(<Avatar state="image" picture="second.png" seed="same" />);
+  });
+  expect(new Set(uris())).toEqual(new Set(['first.png', 'second.png']));
+  act(() => {
+    renderer!.unmount();
+  });
+});
+
+it('logs visual branch transitions with lazy params and no duplicate branch entries', () => {
+  const debug = jest.mocked(log.debug);
+  debug.mockClear();
+  let renderer: TestRenderer.ReactTestRenderer;
+  act(() => {
+    renderer = TestRenderer.create(<Avatar state="loading" seed="sequence" />);
+  });
+  act(() => {
+    renderer!.update(<Avatar state="image" picture="real.png" seed="sequence" />);
+  });
+  act(() => {
+    renderer!.root.findByProps({ testID: 'expo-image' }).props.onLoad();
+  });
+  act(() => {
+    renderer!.update(<Avatar state="image" picture="real.png" seed="sequence" size={40} />);
+  });
+  const branches = debug.mock.calls
+    .filter(([event]) => event === 'visual.avatar.sequence')
+    .map(([, params]) => {
+      expect(typeof params).toBe('function');
+      return typeof params === 'function' ? params()?.branch : undefined;
+    });
+  expect(branches).toEqual(['loading', 'image']);
+  act(() => {
+    renderer!.unmount();
   });
 });

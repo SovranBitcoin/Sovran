@@ -10,6 +10,7 @@ import {
   createScreenActionSession,
   type ScreenActionsBridge,
 } from '../../src/screen-actions';
+import { deriveMintMethodCapabilityMapFromTrustedMints } from '../../src/mint-capabilities';
 import { createSubscriptionBus } from '../../src/subscriptions';
 import type { ColadaSubscriptionEvent } from '../../src';
 
@@ -106,6 +107,33 @@ describe('createScreenActionSession', () => {
     session.dispose();
   });
 
+  it('recomputes cached action states when the bus says screen actions changed', () => {
+    const bus = createSubscriptionBus();
+    let offline = false;
+    const session = createScreenActionSession({
+      screenType: 'amountEntry',
+      handlers: {},
+      entrySeed: { destination: 'sendEcash', unit: 'sat' },
+      subscriptionBus: bus,
+      amountConfig: {
+        getMintUrl: () => undefined,
+        getProofAmounts: () => [],
+        getBtcPrice: () => 0,
+        offlineOptimization: false,
+        unit: 'sat',
+        getNetwork: () => ({ offline, mintUnreachable: false }),
+      },
+    });
+    const before = session.inspect().actions;
+
+    offline = true;
+    bus.publish({ type: 'screenActions.changed', reason: 'offline' });
+
+    // A new object: the manager rebuilt them instead of handing back its cache.
+    expect(session.inspect().actions).not.toBe(before);
+    session.dispose();
+  });
+
   it('refreshes source labels when screen actions change', () => {
     const bus = createSubscriptionBus();
     let source = 'Clipboard';
@@ -131,6 +159,62 @@ describe('createScreenActionSession', () => {
     expect(notified).toBeGreaterThan(0);
     expect(session.inspect().source).toBe('QR Code');
     session.dispose();
+  });
+
+  it('gates the amount screen from the live wallet context, not the entry it opened with', () => {
+    const bus = createSubscriptionBus();
+    const MINT = 'https://mint.example';
+    const walletWith = (methods: { method: string; unit: string }[]) => ({
+      trustedMintUrls: [MINT],
+      mintBalances: { [MINT]: 1_000_000 },
+      mintMethodCapabilities: deriveMintMethodCapabilityMapFromTrustedMints([
+        { mintUrl: MINT, mintInfo: { nuts: { '5': { methods } } } },
+      ]),
+    });
+    const opened = walletWith([{ method: 'bolt11', unit: 'sat' }]);
+    let live = opened;
+    const session = createScreenActionSession({
+      screenType: 'amountEntry',
+      handlers: {},
+      entrySeed: {
+        destination: 'meltQuote',
+        meltTarget: 'bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4',
+        unit: 'sat',
+        methodContext: opened,
+      },
+      subscriptionBus: bus,
+      amountConfig: {
+        getMintUrl: () => MINT,
+        getProofAmounts: () => [],
+        getBtcPrice: () => 0,
+        offlineOptimization: false,
+        unit: 'sat',
+        getMethodContext: () => live,
+      },
+    });
+    const changed = vi.fn();
+    session.subscribe(changed);
+    const onchain = () =>
+      session.inspect().actions.next.variants?.find((variant) => variant.id === 'onchain');
+
+    expect(onchain()?.reason).toBe('No trusted mint supports onchain sending');
+
+    // The mint's capabilities arrive, or another mint is trusted, while the screen is open.
+    live = walletWith([{ method: 'onchain', unit: 'sat' }]);
+    session.refresh();
+
+    expect(changed).toHaveBeenCalledTimes(1);
+    expect(onchain()).toBeDefined();
+    expect(onchain()?.reason).not.toBe('No trusted mint supports onchain sending');
+
+    // And back, so the first reading was not just the entry's own copy.
+    live = opened;
+    session.refresh();
+    expect(onchain()?.reason).toBe('No trusted mint supports onchain sending');
+
+    session.dispose();
+    session.refresh();
+    expect(changed).toHaveBeenCalledTimes(2);
   });
 
   it('applies mint info enrichment updates through the session bridge', () => {

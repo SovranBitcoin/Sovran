@@ -1,5 +1,12 @@
 import { z } from 'zod';
 
+import { NostrHexId } from '../../schemas';
+
+/** An id Primal names in passing: one that is not an id is read as absent. */
+const optionalId = NostrHexId.optional().catch(undefined);
+/** A user-authored display field: dropped on its own when too long. */
+const displayText = (max: number) => z.string().max(max).optional().catch(undefined);
+
 // ---------------------------------------------------------------------------
 // Primal synthetic-kind wire shapes
 //
@@ -13,7 +20,7 @@ import { z } from 'zod';
 
 /** kind 10000100 — viewer-independent counts. */
 export const PrimalNoteStatsContent = z.object({
-  event_id: z.string(),
+  event_id: NostrHexId,
   likes: z.number().optional(),
   replies: z.number().optional(),
   reposts: z.number().optional(),
@@ -24,7 +31,7 @@ export type PrimalNoteStatsContent = z.infer<typeof PrimalNoteStatsContent>;
 
 /** kind 10000115 — per-viewer action overlay. */
 export const PrimalNoteActionsContent = z.object({
-  event_id: z.string(),
+  event_id: NostrHexId,
   replied: z.boolean().optional(),
   liked: z.boolean().optional(),
   reposted: z.boolean().optional(),
@@ -35,16 +42,21 @@ export type PrimalNoteActionsContent = z.infer<typeof PrimalNoteActionsContent>;
 
 /** kind 10000113 — the ordering manifest (FeedRange). */
 export const PrimalFeedRangeContent = z.object({
-  order_by: z.string().optional(),
+  order_by: z.string().max(64).optional(),
   since: z.number().optional(),
   until: z.number().optional(),
-  elements: z.array(z.string()),
+  // Event ids, read one by one: one that is not an id is left out of the order.
+  elements: z
+    .array(z.unknown())
+    .transform((items) =>
+      items.slice(0, 5000).filter((item): item is string => NostrHexId.safeParse(item).success),
+    ),
 });
 export type PrimalFeedRangeContent = z.infer<typeof PrimalFeedRangeContent>;
 
 /** kind 10000105 — USER_PROFILE aggregate stats (counts + `time_joined`). */
 export const PrimalUserProfileContent = z.object({
-  pubkey: z.string().optional(),
+  pubkey: optionalId,
   follows_count: z.number().optional(),
   followers_count: z.number().optional(),
   note_count: z.number().optional(),
@@ -55,10 +67,10 @@ export type PrimalUserProfileContent = z.infer<typeof PrimalUserProfileContent>;
 /** kind 0 — profile metadata (the standard NIP-01 content JSON). */
 export const PrimalProfileContent = z
   .object({
-    name: z.string().optional(),
-    display_name: z.string().optional(),
-    displayName: z.string().optional(),
-    picture: z.string().optional(),
+    name: displayText(256),
+    display_name: displayText(256),
+    displayName: displayText(256),
+    picture: displayText(2048),
   })
   .passthrough();
 export type PrimalProfileContent = z.infer<typeof PrimalProfileContent>;
@@ -77,18 +89,18 @@ export type PrimalProfileContent = z.infer<typeof PrimalProfileContent>;
  */
 export const PrimalNotificationContent = z
   .object({
-    pubkey: z.string(), // the notified viewer
+    pubkey: NostrHexId, // the notified viewer
     created_at: z.number(),
     type: z.number(), // primal-server notification type code
-    follower: z.string().optional(),
-    your_post: z.string().optional(),
-    who_liked_it: z.string().optional(),
-    who_reposted_it: z.string().optional(),
-    who_zapped_it: z.string().optional(),
-    who_replied_to_it: z.string().optional(),
-    reply: z.string().optional(),
-    you_were_mentioned_in: z.string().optional(),
-    your_post_were_mentioned_in: z.string().optional(),
+    follower: optionalId,
+    your_post: optionalId,
+    who_liked_it: optionalId,
+    who_reposted_it: optionalId,
+    who_zapped_it: optionalId,
+    who_replied_to_it: optionalId,
+    reply: optionalId,
+    you_were_mentioned_in: optionalId,
+    your_post_were_mentioned_in: optionalId,
     satszapped: z.number().optional(),
   })
   .passthrough();

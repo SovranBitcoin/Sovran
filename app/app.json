@@ -110,6 +110,7 @@
       "./plugins/withLowerPodDeploymentTarget",
       "./plugins/withNeutralAndroidTextColors",
       "./plugins/withAndroidPackagingFixes",
+      "./plugins/withAndroidE2ERunner",
       [
         "expo-font",
         {

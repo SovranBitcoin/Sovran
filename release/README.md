@@ -1,14 +1,34 @@
 # Production releases
 
-**Implemented but not executed or enabled.** This pipeline requires the operator's
-account checks and validation below before activation. Static review cannot prove
-store credentials, historical signing continuity, hosting limits or live APIs work.
+**Executed for 0.1.3; publication is enabled as of 2026-09-28.** The release
+checkpoint records all five channels complete. That first run included manual
+Play submission and controller fixes; it does not prove the next release will
+finish unattended. See [0.1.4 preparation](preparations/0.1.4.md) for the current
+evidence and pre-merge blockers. Recheck mutable account settings before merging.
 
 ## Day-to-day operation
 
 After setup, change `app/app.json` → `expo.version`, run `bun run assets:generate`,
 review the brand gallery, and commit the generated artwork with the version bump
 before merging to protected `main`.
+
+The version bump also needs a release fixture, in the same commit. Every earlier release is
+upgraded to the tree under test by `app/__tests__/releaseFixtures.test.ts`, one fixture per
+run of releases that wrote the same things to disk. If this release changes nothing on disk,
+add its version to the newest fixture's `versions`. If it adds, removes, renames or
+re-versions a store, a SecureStore key or a database, write a new fixture; the
+[fixtures guide](../app/__tests__/releaseFixtures/README.md) has the four steps.
+`releaseFixturesCompleteness.test.ts` fails, naming what is missing, until one of the two is
+done, and again when a store changes after the fixture was written. After the release is
+published, run `python3 .agents/skills/persistence-release-safety/epochs.py builds` and commit
+the updated `docs/architecture/persistence/store-builds.tsv`, so the builds that shipped are
+the ones the fixtures are checked against.
+
+The wallet's own databases have the same guard. `app/__tests__/cocoDatabaseUpgrade.test.ts`
+opens a database written by every Coco version that shipped and fails when `app/package.json`
+names a Coco that has none; a release that keeps the Coco version adds its name to the last
+entry of `app/__tests__/cocoDatabases/manifest.json`. `cd app && bun run test:upgrade` runs
+every upgrade test in one command.
 
 Refresh the marketing material in that same pre-merge step. Once a release is
 decided, run the full native capture campaign and commit its output: the website's

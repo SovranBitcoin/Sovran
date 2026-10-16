@@ -65,7 +65,7 @@ describe('AndroidSheetFlowStack', () => {
     let renderer: TestRenderer.ReactTestRenderer;
     await act(async () => {
       renderer = TestRenderer.create(
-        <AndroidSheetFlowStack>
+        <AndroidSheetFlowStack flow="(filter-flow)">
           <Stack.Screen name="example" />
         </AndroidSheetFlowStack>
       );
@@ -88,13 +88,34 @@ describe('AndroidSheetFlowStack', () => {
     expect(stack.findByType(Stack.Screen).props.name).toBe('example');
   });
 
+  it('renders a pushed flow as a plain stack with the native header, outside any sheet frame', async () => {
+    let renderer: TestRenderer.ReactTestRenderer;
+    await act(async () => {
+      renderer = TestRenderer.create(
+        <AndroidSheetFlowStack flow="(send-flow)">
+          <Stack.Screen name="example" />
+        </AndroidSheetFlowStack>
+      );
+    });
+
+    expect(renderer!.root.findAllByType(AndroidSheetRoot)).toHaveLength(0);
+    const stack = renderer!.root.findByType(Stack);
+    expect(stack.props.screenLayout).toBeUndefined();
+    const options = stack.props.screenOptions({
+      navigation: { getState: () => ({ index: 0 }) },
+    });
+    // No JS sheet header: the native one draws.
+    expect(options.header).toBeUndefined();
+    expect(options.headerShown).toBe(true);
+  });
+
   // Fabric sorts an un-isolated page's zIndex layers (ScrollEdgeFade at 50)
   // against the header wrapper's zIndex 1, drawing the gradient over the title.
   it('isolates each page so its layers stay under the sheet header', async () => {
     let renderer: TestRenderer.ReactTestRenderer;
     await act(async () => {
       renderer = TestRenderer.create(
-        <AndroidSheetFlowStack>
+        <AndroidSheetFlowStack flow="(filter-flow)">
           <Stack.Screen name="example" />
         </AndroidSheetFlowStack>
       );

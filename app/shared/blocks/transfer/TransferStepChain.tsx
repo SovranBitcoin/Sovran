@@ -40,6 +40,8 @@ type StepStatus =
   | 'melting'
   | 'verifying'
   | 'routing'
+  | 'paymentPending'
+  | 'settling'
   | 'done'
   | 'failed'
   | 'skipped';
@@ -84,6 +86,8 @@ function buildChain(status: StepStatus, middleLabel: string): ChainNode[] {
     case 'melting':
     case 'verifying':
     case 'routing':
+    case 'paymentPending':
+    case 'settling':
       currentIdx = 1;
       break;
     case 'done':
@@ -130,6 +134,8 @@ function statusToCurrentIdx(status: StepStatus): number {
     case 'melting':
     case 'verifying':
     case 'routing':
+    case 'paymentPending':
+    case 'settling':
       return 1;
     case 'done':
       return 2;

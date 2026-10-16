@@ -58,7 +58,7 @@ Scope: `**/*.tsx`
 
 FlashList v2 enables `maintainVisibleContentPosition` by default; a top-anchored list whose header grows after mount or whose data arrives in waves drifts away from the top on first paint.
 
-Does `hunk` add a `List`/`FlashList` that is a plain top-anchored list and has a `ListHeaderComponent` whose height changes after mount (a measured header/sticky-tab spacer, a header that loads content) or data that is merged in from several sources after first render, without `maintainVisibleContentPosition={{ disabled: true }}`?
+Does `hunk` add a `List`/`FlashList` that is a plain top-anchored list and has a `ListHeaderComponent` whose height changes after mount (a measured header/sticky-tab spacer, a header that loads content) or data that is merged in from several sources after first render, without setting `maintainVisibleContentPosition` to `{ disabled: true }`?
 
 Allowed cases: Chat, thread and feed lists that want anchoring (new items prepended above the viewport, `startRenderingFromBottom`, `autoscrollToBottomThreshold`); lists with no header or a fixed-height header and data delivered in one piece; lists that already pass a module-level `{ disabled: true }` constant.
 
@@ -88,7 +88,7 @@ Scope: `**/*.tsx`
 
 `expo-image` decodes whatever scheme it is given — `file:`, `data:`, SVG — so a relay- or mint-supplied string must be scheme-checked before it becomes an image source.
 
-Does `hunk` pass a string that comes from untrusted metadata (a Nostr kind-0 `picture`/`banner`, NIP-11 `icon`, mint `icon_url`, a URL parsed out of note content, link-preview or BTCMap fields) to `source={{ uri }}` of an image component, or to `Image.prefetch`, without first restricting it to `http(s):` (and, where intended, `data:image/` raster) as `RelayCard` and `prefetchImage` do?
+Does `hunk` pass a string that comes from untrusted metadata (a Nostr kind-0 `picture`/`banner`, NIP-11 `icon`, mint `icon_url`, a URL parsed out of note content, link-preview or BTCMap fields) to the `uri` of an image component's `source` prop, or to `Image.prefetch`, without first restricting it to `http(s):` (and, where intended, `data:image/` raster) as `RelayCard` and `prefetchImage` do?
 
 Allowed cases: URIs produced on the device (image picker, camera, `localUri`, file-system paths the app wrote, blob descriptors from the app's own upload); URLs already passed through a scheme allowlist (`prefetchImage`'s gate, `RelayCard`'s `safeUri`, a shared sanitizer); bundled `require()` assets; blurhash/thumbhash placeholders.
 

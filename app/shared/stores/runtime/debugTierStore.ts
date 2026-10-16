@@ -1,5 +1,5 @@
 import type { NostrTier } from '@sovranbitcoin/schemas';
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 
 /**
  * Dev-only map of note id → the facade tier that served it (nagg / primal / relay).
@@ -20,7 +20,10 @@ type DebugTierStore = {
 
 // Exported only for the dev-gated e2e state mirror; app code goes through the
 // function API below.
-export const useDebugTierStore = create<DebugTierStore>((set, get) => ({
+export const useDebugTierStore = create<DebugTierStore>({
+  name: 'useDebugTierStore',
+  scope: 'global',
+})((set, get) => ({
   tiers: new Map(),
   recordTiers: (eventIds, tier) => {
     if (!__DEV__ || eventIds.length === 0) return;

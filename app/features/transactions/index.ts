@@ -21,6 +21,7 @@ export {
   stateDetailItem,
   quoteIdDetailItem,
   mintDetailItem,
+  entryDetailItems,
 } from './components/detail/transactionDetailRows';
 export {
   TransactionsFilterProvider,

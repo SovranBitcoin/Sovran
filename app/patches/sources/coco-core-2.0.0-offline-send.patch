@@ -1,0 +1,894 @@
+diff --git a/.changeset/offline-exact-send.md b/.changeset/offline-exact-send.md
+new file mode 100644
+index 00000000..04aaaa70
+--- /dev/null
++++ b/.changeset/offline-exact-send.md
+@@ -0,0 +1,10 @@
++---
++'@cashu/coco-core': minor
++---
++
++Add `offline` to `ops.send.prepare` and `Manager.setOffline`. An offline send is prepared from the
++mint's stored keysets without contacting it, and succeeds only when held proofs exactly match the
++amount (found by an exact subset search, not the randomized selector); otherwise it fails before
++reserving anything. A failed refresh of
++stale mint data now falls back to the stored data instead of throwing, and no refresh is attempted
++while offline; a swap send checks the mint is reachable before reserving anything. Executing an exact-match send no longer refreshes mint data.
+diff --git a/packages/core/Manager.ts b/packages/core/Manager.ts
+index 7279a501..bfccfeba 100644
+--- a/packages/core/Manager.ts
++++ b/packages/core/Manager.ts
+@@ -294,6 +294,7 @@ export class Manager {
+   private disposed = false;
+   private disposePromise?: Promise<void>;
+   private readonly outputDataCreator?: OutputDataCreator;
++  private offline = false;
+   constructor(
+     repositories: Repositories,
+     seedGetter: () => Promise<Uint8Array>,
+@@ -687,6 +688,15 @@ export class Manager {
+     return { reconciled, skipped };
+   }
+ 
++  /**
++   * Tell coco whether the device has network. While offline, stale mint data is used from storage
++   * without a request, and work that must reach the mint (a swap) fails with `MintFetchError`
++   * before anything is reserved. Online, a failed refresh still falls back to stored data.
++   */
++  setOffline(offline: boolean): void {
++    this.offline = offline;
++  }
++
+   async pauseSubscriptions(): Promise<void> {
+     if (this.subscriptionsPaused) {
+       this.logger.debug('Subscriptions already paused');
+@@ -884,6 +894,7 @@ export class Manager {
+       this.mintAdapter,
+       mintLogger,
+       this.eventBus,
++      { isOffline: () => this.offline },
+     );
+     const seedService = new SeedService(seedGetter);
+     const keyRingService = new KeyRingService(
+diff --git a/packages/core/api/SendOpsApi.ts b/packages/core/api/SendOpsApi.ts
+index 521f4859..51079cb3 100644
+--- a/packages/core/api/SendOpsApi.ts
++++ b/packages/core/api/SendOpsApi.ts
+@@ -27,6 +27,12 @@ export interface PrepareSendInput {
+   unit?: string;
+   /** Optional non-default send target, for example a P2PK recipient. */
+   target?: SendTarget;
++  /**
++   * Prepare from the mint's stored keysets without contacting it. Only proofs that exactly match
++   * the amount can be sent; otherwise preparation fails and nothing is reserved. Cannot be
++   * combined with `target`.
++   */
++  offline?: boolean;
+ }
+ 
+ export interface SendRecoveryApi {
+@@ -77,7 +83,7 @@ export class SendOpsApi {
+       parsed,
+       this.getCreateOptions(input.target),
+     );
+-    return this.sendOperationService.prepare(initOp);
++    return this.sendOperationService.prepare(initOp, { offline: input.offline });
+   }
+ 
+   /**
+diff --git a/packages/core/infra/handlers/send/DefaultSendHandler.ts b/packages/core/infra/handlers/send/DefaultSendHandler.ts
+index 1bfec9c2..f4b4c6c9 100644
+--- a/packages/core/infra/handlers/send/DefaultSendHandler.ts
++++ b/packages/core/infra/handlers/send/DefaultSendHandler.ts
+@@ -23,6 +23,7 @@ import {
+ } from '../../../utils';
+ import type { CoreProof } from '../../../types';
+ import { ProofValidationError } from '../../../models/Error';
++import { selectExactSubset } from './exactSubset';
+ 
+ /**
+  * Default send handler for standard (unlocked) token sends.
+@@ -33,11 +34,19 @@ export class DefaultSendHandler implements SendMethodHandler<'default'> {
+    * Prepare the send operation by selecting proofs and creating outputs.
+    */
+   async prepare(ctx: BasePrepareContext): Promise<PreparedSendOperation> {
+-    const { operation, wallet, proofService, logger } = ctx;
++    const { operation, wallet, proofService, logger, offline } = ctx;
+     const { mintUrl, amount, unit } = operation;
+ 
+-    // Try exact match first (no swap needed)
+-    const exactProofs = await proofService.selectProofsToSend(mintUrl, { amount, unit }, false);
++    // Try exact match first (no swap needed). The randomized selector can miss an exact match that
++    // exists, so an exact send never depends on it: a subset search backs it up, and is all an
++    // offline send uses.
++    const available = await ctx.proofRepository.getAvailableProofs(mintUrl, { unit });
++    let exactProofs: Proof[] = offline
++      ? []
++      : await proofService.selectProofsToSend(mintUrl, { amount, unit }, false, wallet);
++    if (!sumProofs(exactProofs).equals(amount)) {
++      exactProofs = selectExactSubset(available, amount) ?? [];
++    }
+     const exactAmount = sumProofs(exactProofs);
+     const needsSwap = !exactAmount.equals(amount);
+ 
+@@ -53,10 +62,21 @@ export class DefaultSendHandler implements SendMethodHandler<'default'> {
+         amount,
+         proofCount: selectedProofs.length,
+       });
++    } else if (offline) {
++      throw new ProofValidationError(
++        `Offline send needs proofs that add up to exactly ${amount.toString()} ${unit}`,
++      );
+     } else {
+-      // Need to swap - select proofs including fees
++      // Need to swap - select proofs including fees. A swap needs the mint, so confirm it answers
++      // before anything is reserved.
++      await ctx.mintService.ensureMintReachable(mintUrl);
+ 
+-      const selected = await proofService.selectProofsToSend(mintUrl, { amount, unit }, true);
++      const selected = await proofService.selectProofsToSend(
++        mintUrl,
++        { amount, unit },
++        true,
++        wallet,
++      );
+       selectedProofs = selected;
+       const selectedAmount = sumProofs(selectedProofs);
+       fee = wallet.getFeesForProofs(selectedProofs);
+diff --git a/packages/core/infra/handlers/send/P2pkSendHandler.ts b/packages/core/infra/handlers/send/P2pkSendHandler.ts
+index 29e8a6fc..c77d8651 100644
+--- a/packages/core/infra/handlers/send/P2pkSendHandler.ts
++++ b/packages/core/infra/handlers/send/P2pkSendHandler.ts
+@@ -54,6 +54,7 @@ export class P2pkSendHandler implements SendMethodHandler<'p2pk'> {
+     const { mintUrl, amount, unit } = operation;
+ 
+     const p2pkOptions = this.getP2pkOptions(operation.methodData as SendMethodData<'p2pk'>);
++    await mintService.ensureMintReachable(mintUrl);
+     await mintService.assertNutSupported(mintUrl, 11, 'P2PK send');
+ 
+     // P2PK always requires a swap to lock proofs to the pubkey
+diff --git a/packages/core/infra/handlers/send/exactSubset.ts b/packages/core/infra/handlers/send/exactSubset.ts
+new file mode 100644
+index 00000000..ba57cf15
+--- /dev/null
++++ b/packages/core/infra/handlers/send/exactSubset.ts
+@@ -0,0 +1,51 @@
++import { Amount, type Proof } from '@cashu/cashu-ts';
++
++/** Largest exact-match target searched by dynamic programming; larger sums rely on greedy. */
++const EXACT_SEARCH_LIMIT = 2_000_000;
++
++/**
++ * An exact subset of `available` summing to `amount`, or null when none exists. The randomized
++ * selector can miss an exact match; a wallet that promised the user an exact amount must not
++ * depend on chance. Largest-first is exact for power-of-two denominations; other denominations
++ * get a subset-sum search up to {@link EXACT_SEARCH_LIMIT}.
++ */
++export function selectExactSubset(available: readonly Proof[], amount: Amount): Proof[] | null {
++  const sorted = [...available].sort((a, b) => {
++    const left = Amount.from(a.amount);
++    const right = Amount.from(b.amount);
++    return left.equals(right) ? 0 : left.greaterThan(right) ? -1 : 1;
++  });
++  const greedy: Proof[] = [];
++  let remaining = amount;
++  for (const proof of sorted) {
++    if (remaining.isZero()) break;
++    const value = Amount.from(proof.amount);
++    if (value.greaterThan(remaining)) continue;
++    greedy.push(proof);
++    remaining = remaining.subtract(value);
++  }
++  if (remaining.isZero()) return greedy;
++
++  const target = Number(amount.toString());
++  if (!Number.isSafeInteger(target) || target > EXACT_SEARCH_LIMIT) return null;
++  // from[s] is the index of the proof that first reached sum s; a reached sum's predecessor was
++  // always reached by an earlier proof, so walking back never reuses one.
++  const from = new Int32Array(target + 1).fill(-1);
++  const values = sorted.map((proof) => Number(Amount.from(proof.amount).toString()));
++  from[0] = values.length;
++  for (let index = 0; index < values.length && from[target] === -1; index++) {
++    const value = values[index]!;
++    if (value <= 0 || value > target) continue;
++    for (let sum = target; sum >= value; sum--) {
++      if (from[sum] === -1 && from[sum - value] !== -1) from[sum] = index;
++    }
++  }
++  if (from[target] === -1) return null;
++  const selected: Proof[] = [];
++  for (let sum = target; sum > 0; ) {
++    const index = from[sum]!;
++    selected.push(sorted[index]!);
++    sum -= values[index]!;
++  }
++  return selected;
++}
+diff --git a/packages/core/operations/send/SendMethodHandler.ts b/packages/core/operations/send/SendMethodHandler.ts
+index e860263c..95d57b26 100644
+--- a/packages/core/operations/send/SendMethodHandler.ts
++++ b/packages/core/operations/send/SendMethodHandler.ts
+@@ -93,6 +93,11 @@ export interface BaseHandlerDeps {
+ export interface BasePrepareContext extends BaseHandlerDeps {
+   operation: InitSendOperation;
+   wallet: Wallet;
++  /**
++   * The wallet was built from stored mint data and the mint must not be contacted. Only proofs
++   * that exactly match the amount can be sent.
++   */
++  offline?: boolean;
+ }
+ 
+ export interface PreparedContext extends BaseHandlerDeps {
+diff --git a/packages/core/operations/send/SendOperationService.ts b/packages/core/operations/send/SendOperationService.ts
+index 7816df52..e5f23ebe 100644
+--- a/packages/core/operations/send/SendOperationService.ts
++++ b/packages/core/operations/send/SendOperationService.ts
+@@ -36,6 +36,18 @@ import { MintScopedLock } from '../MintScopedLock';
+ import { OperationIdLock } from '../OperationIdLock';
+ import { normalizeUnitAmount, type UnitAmount } from '../../amounts.ts';
+ 
++/**
++ * Options applied when a send operation is prepared.
++ */
++export interface PrepareSendOptions {
++  /**
++   * Prepare from the Known Mint's stored keysets without contacting the mint. Only proofs that
++   * exactly match the amount can be sent; otherwise preparation fails and nothing is reserved.
++   * Only the default send method supports it, because every other method swaps at the mint.
++   */
++  offline?: boolean;
++}
++
+ /**
+  * Options applied when a prepared send operation is executed.
+  */
+@@ -168,8 +180,12 @@ export class SendOperationService {
+    * Throws if the operation is already in progress.
+    *
+    * Delegates to the appropriate handler based on the operation method.
++   * With `options.offline`, the mint is not contacted; see {@link PrepareSendOptions}.
+    */
+-  async prepare(operation: InitSendOperation): Promise<PreparedSendOperation> {
++  async prepare(
++    operation: InitSendOperation,
++    options: PrepareSendOptions = {},
++  ): Promise<PreparedSendOperation> {
+     if (!this.handlerProvider) {
+       throw new Error('SendHandlerProvider is required');
+     }
+@@ -184,13 +200,25 @@ export class SendOperationService {
+           throw new Error(`No handler registered for method: ${operation.method}`);
+         }
+ 
+-        const { wallet } = await this.walletService.getWalletWithActiveKeysetId(
+-          operation.mintUrl,
+-          operation.unit,
+-        );
++        const offline = options.offline === true;
++        if (offline && operation.method !== 'default') {
++          throw new ProofValidationError(
++            `Send method ${operation.method} requires the mint and cannot be prepared offline`,
++          );
++        }
++
++        const wallet = offline
++          ? await this.walletService.getOfflineWallet(operation.mintUrl, operation.unit)
++          : (
++              await this.walletService.getWalletWithActiveKeysetId(
++                operation.mintUrl,
++                operation.unit,
++              )
++            ).wallet;
+         const ctx = {
+           operation,
+           wallet,
++          offline,
+           proofRepository: this.proofRepository,
+           proofService: this.proofService,
+           walletService: this.walletService,
+@@ -261,10 +289,15 @@ export class SendOperationService {
+           throw new Error(`No handler registered for method: ${operation.method}`);
+         }
+ 
+-        const { wallet } = await this.walletService.getWalletWithActiveKeysetId(
+-          operation.mintUrl,
+-          operation.unit,
+-        );
++        // An exact match hands over proofs the wallet already holds, so it needs no mint.
++        const wallet = operation.needsSwap
++          ? (
++              await this.walletService.getWalletWithActiveKeysetId(
++                operation.mintUrl,
++                operation.unit,
++              )
++            ).wallet
++          : await this.walletService.getOfflineWallet(operation.mintUrl, operation.unit);
+         const reservedProofs = await this.proofRepository.getProofsByOperationId(
+           operation.mintUrl,
+           operation.id,
+diff --git a/packages/core/services/MintService.ts b/packages/core/services/MintService.ts
+index dde4f33a..6346049d 100644
+--- a/packages/core/services/MintService.ts
++++ b/packages/core/services/MintService.ts
+@@ -129,6 +129,7 @@ export class MintService {
+     mintAdapter: MintAdapter,
+     logger?: Logger,
+     eventBus?: EventBus<CoreEvents>,
++    private readonly connectivity: { isOffline(): boolean } = { isOffline: () => false },
+   ) {
+     this.mintRepo = mintRepo;
+     this.keysetRepo = keysetRepo;
+@@ -230,17 +231,56 @@ export class MintService {
+     }
+ 
+     const now = Math.floor(Date.now() / 1000);
++    const keysets = excludeBlsKeysets(await this.keysetRepo.getKeysetsByMintUrl(mint.mintUrl));
+     if (mint.updatedAt < now - MINT_REFRESH_TTL_S) {
++      // Stale data stays usable: keyset ids commit to their keys, and the mint rejects an outdated
++      // keyset or fee when a request does reach it. Only a never-synced mint needs the network.
++      const usable = keysets.length > 0;
++      if (usable && this.connectivity.isOffline()) return { mint, keysets };
+       this.logger?.debug('Refreshing stale mint', { mintUrl });
+-      const updated = await this.updateMint(mint);
++      let updated: { mint: Mint; keysets: Keyset[] };
++      try {
++        updated = await this.updateMint(mint);
++      } catch (error) {
++        if (!usable) throw error;
++        this.logger?.warn('Mint refresh failed; using stored data', { mintUrl, error });
++        return { mint, keysets };
++      }
+       await this.eventBus?.emit('mint:updated', updated);
+       return updated;
+     }
+ 
++    return { mint, keysets };
++  }
++
++  /**
++   * The Known Mint's stored info and keysets, however old. Never contacts the mint.
++   * Returns null when the mint is not known.
++   */
++  async getStoredMint(mintUrl: string): Promise<{ mint: Mint; keysets: Keyset[] } | null> {
++    mintUrl = normalizeMintUrl(mintUrl);
++    const mint = await this.mintRepo.getMintByUrl(mintUrl).catch(() => null);
++    if (!mint) return null;
+     const keysets = excludeBlsKeysets(await this.keysetRepo.getKeysetsByMintUrl(mint.mintUrl));
+     return { mint, keysets };
+   }
+ 
++  /**
++   * Refresh stale mint data and throw when the mint cannot be reached, with no fallback to stored
++   * data. Work that must reach the mint anyway, such as a swap, calls this before reserving
++   * anything, so an unreachable mint fails cleanly instead of partway through the swap.
++   */
++  async ensureMintReachable(mintUrl: string): Promise<void> {
++    mintUrl = normalizeMintUrl(mintUrl);
++    const mint = await this.mintRepo.getMintByUrl(mintUrl).catch(() => null);
++    const now = Math.floor(Date.now() / 1000);
++    if (mint && mint.updatedAt >= now - MINT_REFRESH_TTL_S) return;
++    if (this.connectivity.isOffline()) {
++      throw new MintFetchError(mintUrl, `Mint ${mintUrl} cannot be reached while offline`);
++    }
++    await this.updateMintData(mintUrl);
++  }
++
+   async deleteMint(mintUrl: string): Promise<void> {
+     mintUrl = normalizeMintUrl(mintUrl);
+     const mint = await this.mintRepo.getMintByUrl(mintUrl).catch(() => null);
+diff --git a/packages/core/services/ProofService.ts b/packages/core/services/ProofService.ts
+index 2ca74237..5b3c7775 100644
+--- a/packages/core/services/ProofService.ts
++++ b/packages/core/services/ProofService.ts
+@@ -8,6 +8,7 @@ import {
+   type OutputDataCreator,
+   type OutputDataLike,
+   type SerializedBlindedSignature,
++  type Wallet,
+ } from '@cashu/cashu-ts';
+ import type {
+   BalanceBreakdown,
+@@ -760,6 +761,7 @@ export class ProofService {
+    * @param mintUrl - The mint URL to select proofs from
+    * @param amount - The amount to send
+    * @param includeFees - Whether to include fees in the selection (default: true)
++   * @param wallet - Wallet Instance to select with; defaults to the cached one for the mint and unit
+    * @returns The selected proofs
+    * @throws ProofValidationError if insufficient balance to cover the amount
+    */
+@@ -767,6 +769,7 @@ export class ProofService {
+     mintUrl: string,
+     intent: UnitAmount,
+     includeFees: boolean = true,
++    wallet?: Wallet,
+   ): Promise<Proof[]> {
+     const { amount: requestedAmount, unit } = normalizeUnitAmount(intent);
+     const proofs = await this.proofRepository.getAvailableProofs(mintUrl, { unit });
+@@ -774,8 +777,8 @@ export class ProofService {
+     if (totalAmount.lessThan(requestedAmount)) {
+       throw new ProofValidationError('Not enough proofs to send');
+     }
+-    const wallet = await this.walletService.getWallet(mintUrl, unit);
+-    const selectedProofs = wallet.selectProofsToSend(proofs, requestedAmount, includeFees);
++    const selector = wallet ?? (await this.walletService.getWallet(mintUrl, unit));
++    const selectedProofs = selector.selectProofsToSend(proofs, requestedAmount, includeFees);
+     this.logger?.debug('Selected proofs to send', {
+       mintUrl,
+       unit,
+diff --git a/packages/core/services/WalletService.ts b/packages/core/services/WalletService.ts
+index 2b4808c5..028edaa8 100644
+--- a/packages/core/services/WalletService.ts
++++ b/packages/core/services/WalletService.ts
+@@ -15,6 +15,9 @@ import type { SeedService } from './SeedService.ts';
+ import type { MintRequestProvider } from '../infra/MintRequestProvider.ts';
+ import { DEFAULT_UNIT, normalizeUnit } from '../amounts.ts';
+ import { normalizeMintUrl } from '../utils.ts';
++import { UnknownMintError } from '../models/Error';
++import type { Mint as KnownMint } from '../models/Mint';
++import type { Keyset } from '../models/Keyset';
+ 
+ interface CachedWallet {
+   wallet: Wallet;
+@@ -115,6 +118,22 @@ export class WalletService {
+     };
+   }
+ 
++  /**
++   * Build a Wallet Instance from the Known Mint's stored info and keysets, without contacting the
++   * mint. The instance is not cached, so online callers still refresh stale mint data.
++   *
++   * Use it only for work that needs no mint, such as handing over proofs the wallet already holds.
++   */
++  async getOfflineWallet(mintUrl: string, unit: string): Promise<Wallet> {
++    const normalizedMintUrl = normalizeMintUrl(mintUrl);
++    const normalizedUnit = normalizeUnit(unit);
++    const stored = await this.mintService.getStoredMint(normalizedMintUrl);
++    if (!stored) {
++      throw new UnknownMintError(`Mint ${normalizedMintUrl} is not known`);
++    }
++    return this.createWallet(stored.mint, stored.keysets, normalizedUnit);
++  }
++
+   /**
+    * Clear cached wallet for a specific mint URL
+    */
+@@ -178,19 +197,28 @@ export class WalletService {
+     const normalizedMintUrl = normalizeMintUrl(mintUrl);
+     const normalizedUnit = normalizeUnit(unit);
+     const { mint, keysets } = await this.mintService.ensureUpdatedMint(normalizedMintUrl);
++    const wallet = await this.createWallet(mint, keysets, normalizedUnit);
+ 
++    this.walletCache.set(this.getWalletCacheKey(normalizedMintUrl, normalizedUnit), {
++      wallet,
++      lastCheck: Date.now(),
++    });
++    return wallet;
++  }
++
++  /** Build a Wallet Instance from mint info and keysets the caller already holds. */
++  private async createWallet(mint: KnownMint, keysets: Keyset[], unit: string): Promise<Wallet> {
++    const { mintUrl } = mint;
+     const validKeysets = keysets.filter(
+       (keyset) =>
+         !isBlsKeyset(keyset.id) &&
+         keyset.keypairs &&
+         Object.keys(keyset.keypairs).length > 0 &&
+-        this.normalizeKeysetUnit(keyset.unit) === normalizedUnit,
++        this.normalizeKeysetUnit(keyset.unit) === unit,
+     );
+ 
+     if (validKeysets.length === 0) {
+-      throw new Error(
+-        `No valid keysets found for mint ${normalizedMintUrl} and unit ${normalizedUnit}`,
+-      );
++      throw new Error(`No valid keysets found for mint ${mintUrl} and unit ${unit}`);
+     }
+ 
+     const keysetCache = validKeysets.map((keyset) => ({
+@@ -202,35 +230,27 @@ export class WalletService {
+     }));
+ 
+     const cache: KeyChainCache = {
+-      mintUrl: mint.mintUrl,
++      mintUrl,
+       keysets: keysetCache,
+     };
+ 
+     const seed = await this.seedService.getSeed();
+ 
+-    const requestFn = this.requestProvider.getRequestFn(normalizedMintUrl);
+-    const authProvider = this.authProviderGetter?.(normalizedMintUrl);
+-    const wallet = new Wallet(
+-      new Mint(normalizedMintUrl, { customRequest: requestFn, authProvider }),
+-      {
+-        unit: normalizedUnit,
+-        // @ts-ignore
+-        logger:
+-          this.logger && this.logger.child ? this.logger.child({ module: 'Wallet' }) : undefined,
+-        bip39seed: seed,
+-        outputDataCreator: this.outputDataCreator,
+-      },
+-    );
+-    wallet.loadMintFromCache(mint.mintInfo, cache);
+-
+-    this.walletCache.set(this.getWalletCacheKey(normalizedMintUrl, normalizedUnit), {
+-      wallet,
+-      lastCheck: Date.now(),
++    const requestFn = this.requestProvider.getRequestFn(mintUrl);
++    const authProvider = this.authProviderGetter?.(mintUrl);
++    const wallet = new Wallet(new Mint(mintUrl, { customRequest: requestFn, authProvider }), {
++      unit,
++      // @ts-ignore
++      logger:
++        this.logger && this.logger.child ? this.logger.child({ module: 'Wallet' }) : undefined,
++      bip39seed: seed,
++      outputDataCreator: this.outputDataCreator,
+     });
++    wallet.loadMintFromCache(mint.mintInfo, cache);
+ 
+     this.logger?.info('Wallet built', {
+-      mintUrl: normalizedMintUrl,
+-      unit: normalizedUnit,
++      mintUrl,
++      unit,
+       keysetCount: validKeysets.length,
+     });
+     return wallet;
+diff --git a/packages/core/test/unit/DefaultSendHandler.test.ts b/packages/core/test/unit/DefaultSendHandler.test.ts
+index 1c7eac5e..fdf92543 100644
+--- a/packages/core/test/unit/DefaultSendHandler.test.ts
++++ b/packages/core/test/unit/DefaultSendHandler.test.ts
+@@ -204,6 +204,7 @@ describe('DefaultSendHandler', () => {
+ 
+     mintService = {
+       isTrustedMint: mock(() => Promise.resolve(true)),
++      ensureMintReachable: mock(() => Promise.resolve()),
+     } as unknown as MintService;
+ 
+     walletService = {
+@@ -323,7 +324,26 @@ describe('DefaultSendHandler', () => {
+       );
+     });
+ 
++    it('fails a swap send before reserving anything when the mint cannot be reached', async () => {
++      (proofRepository.getAvailableProofs as Mock<any>).mockImplementation(() =>
++        Promise.resolve([makeCoreProof('input-1', 60), makeCoreProof('input-2', 50)]),
++      );
++      (mintService.ensureMintReachable as Mock<any>).mockImplementation(() =>
++        Promise.reject(new Error('mint unreachable')),
++      );
++
++      await expect(handler.prepare(buildPrepareContext(makeInitOp('op-down')))).rejects.toThrow(
++        'mint unreachable',
++      );
++      expect(proofService.reserveProofs).not.toHaveBeenCalled();
++      expect(proofService.createOutputsAndIncrementCounters).not.toHaveBeenCalled();
++    });
++
+     it('throws ProofValidationError when selected proofs do not cover fees', async () => {
++      // No held subset matches the amount, so the exact-subset fallback finds nothing either.
++      (proofRepository.getAvailableProofs as Mock<any>).mockImplementation(() =>
++        Promise.resolve([makeCoreProof('input-1', 60), makeCoreProof('input-2', 50)]),
++      );
+       (proofService.selectProofsToSend as Mock<any>).mockImplementation(
+         (
+           _mintUrl: string,
+diff --git a/packages/core/test/unit/MintService.test.ts b/packages/core/test/unit/MintService.test.ts
+index 106d6973..3278524e 100644
+--- a/packages/core/test/unit/MintService.test.ts
++++ b/packages/core/test/unit/MintService.test.ts
+@@ -50,6 +50,8 @@ describe('MintService', () => {
+     '8': 'key-8',
+   };
+ 
++  let offline = false;
++
+   beforeEach(() => {
+     mintRepo = new MemoryMintRepository();
+     keysetRepo = new MemoryKeysetRepository();
+@@ -65,7 +67,10 @@ describe('MintService', () => {
+       checkProofStates: mock(() => Promise.resolve([])),
+     } as unknown as MintAdapter;
+ 
+-    service = new MintService(mintRepo, keysetRepo, mockAdapter, undefined, eventBus);
++    offline = false;
++    service = new MintService(mintRepo, keysetRepo, mockAdapter, undefined, eventBus, {
++      isOffline: () => offline,
++    });
+   });
+ 
+   describe('trust management', () => {
+@@ -193,6 +198,83 @@ describe('MintService', () => {
+     });
+   });
+ 
++  describe('stale mint data without the mint', () => {
++    const makeStale = async () => {
++      const mint = await mintRepo.getMintByUrl(testMintUrl);
++      mint.updatedAt = 0;
++      await mintRepo.updateMint(mint);
++    };
++
++    it('uses stored data when the refresh fails', async () => {
++      await service.addMintByUrl(testMintUrl);
++      await makeStale();
++      (mockAdapter.fetchMintInfo as ReturnType<typeof mock>).mockImplementation(() =>
++        Promise.reject(new Error('network down')),
++      );
++
++      const result = await service.ensureUpdatedMint(testMintUrl);
++
++      expect(result.mint.updatedAt).toBe(0);
++      expect(result.keysets.map((keyset) => keyset.id)).toEqual(['keyset-1']);
++    });
++
++    it('uses stored data without a request while offline', async () => {
++      await service.addMintByUrl(testMintUrl);
++      await makeStale();
++      (mockAdapter.fetchMintInfo as ReturnType<typeof mock>).mockClear();
++      offline = true;
++
++      const result = await service.ensureUpdatedMint(testMintUrl);
++
++      expect(mockAdapter.fetchMintInfo).not.toHaveBeenCalled();
++      expect(result.keysets.map((keyset) => keyset.id)).toEqual(['keyset-1']);
++    });
++
++    it('still requires the mint for work that must reach it', async () => {
++      await service.addMintByUrl(testMintUrl);
++      await makeStale();
++      (mockAdapter.fetchMintInfo as ReturnType<typeof mock>).mockImplementation(() =>
++        Promise.reject(new Error('network down')),
++      );
++
++      await expect(service.ensureMintReachable(testMintUrl)).rejects.toThrow();
++      offline = true;
++      await expect(service.ensureMintReachable(testMintUrl)).rejects.toThrow('while offline');
++    });
++
++    it('still needs the mint for a mint it has never synced', async () => {
++      offline = true;
++      (mockAdapter.fetchMintInfo as ReturnType<typeof mock>).mockImplementation(() =>
++        Promise.reject(new Error('network down')),
++      );
++
++      await expect(service.ensureUpdatedMint(testMintUrl)).rejects.toThrow();
++    });
++  });
++
++  describe('getStoredMint', () => {
++    it('returns stale stored mint data without contacting the mint', async () => {
++      await service.addMintByUrl(testMintUrl);
++      const mint = await mintRepo.getMintByUrl(testMintUrl);
++      mint.updatedAt = Math.floor(Date.now() / 1000) - 600;
++      await mintRepo.updateMint(mint);
++      (mockAdapter.fetchMintInfo as ReturnType<typeof mock>).mockClear();
++      (mockAdapter.fetchKeysets as ReturnType<typeof mock>).mockClear();
++
++      const stored = await service.getStoredMint(testMintUrl);
++
++      expect(stored?.mint.updatedAt).toBe(mint.updatedAt);
++      expect(stored?.keysets.map((keyset) => keyset.id)).toEqual(['keyset-1']);
++      expect(mockAdapter.fetchMintInfo).not.toHaveBeenCalled();
++      expect(mockAdapter.fetchKeysets).not.toHaveBeenCalled();
++    });
++
++    it('returns null for a mint that is not known', async () => {
++      expect(await service.getStoredMint(testMintUrl)).toBeNull();
++      expect(mockAdapter.fetchMintInfo).not.toHaveBeenCalled();
++    });
++  });
++
+   describe('ensureUpdatedMint', () => {
+     it('should create mint if it does not exist', async () => {
+       const result = await service.ensureUpdatedMint(testMintUrl);
+diff --git a/packages/core/test/unit/P2pkSendHandler.test.ts b/packages/core/test/unit/P2pkSendHandler.test.ts
+index 4d35212b..16145363 100644
+--- a/packages/core/test/unit/P2pkSendHandler.test.ts
++++ b/packages/core/test/unit/P2pkSendHandler.test.ts
+@@ -222,6 +222,7 @@ describe('P2pkSendHandler', () => {
+     // Mock MintService
+     mintService = {
+       isTrustedMint: mock(() => Promise.resolve(true)),
++      ensureMintReachable: mock(() => Promise.resolve()),
+       assertNutSupported: mock(() => Promise.resolve()),
+     } as unknown as MintService;
+ 
+diff --git a/packages/core/test/unit/SendOperationService.test.ts b/packages/core/test/unit/SendOperationService.test.ts
+index f412747e..b93cbb71 100644
+--- a/packages/core/test/unit/SendOperationService.test.ts
++++ b/packages/core/test/unit/SendOperationService.test.ts
+@@ -96,6 +96,7 @@ describe('SendOperationService', () => {
+         keys: { keys: { 1: 'pubkey' }, id: keysetId },
+       })),
+       getWallet: mock(async () => wallet),
++      getOfflineWallet: mock(async () => wallet),
+     } as unknown as WalletService;
+ 
+     proofService = {
+@@ -104,9 +105,10 @@ describe('SendOperationService', () => {
+           selectedMintUrl: string,
+           intent: { amount: Amount; unit: string },
+           includeFees: boolean = true,
++          selector: typeof wallet = wallet,
+         ) => {
+           const proofs = await proofRepo.getAvailableProofs(selectedMintUrl, { unit: intent.unit });
+-          return wallet.selectProofsToSend(proofs, intent.amount, includeFees).send;
++          return selector.selectProofsToSend(proofs, intent.amount, includeFees).send;
+         },
+       ),
+       reserveProofs: mock((selectedMintUrl: string, secrets: string[], operationId: string) =>
+@@ -231,6 +233,78 @@ describe('SendOperationService', () => {
+     expect(lockedDuringEvent).toBe(true);
+   });
+ 
++  it('prepares an offline exact-match send without refreshing mint data', async () => {
++    await proofRepo.saveProofs(mintUrl, [makeProof('proof-100', 100), makeProof('proof-50', 50)]);
++
++    const initOp = await service.init(mintUrl, unitAmount(100));
++    const preparedOp = await service.prepare(initOp, { offline: true });
++
++    expect(preparedOp.needsSwap).toBe(false);
++    expect(preparedOp.inputProofSecrets).toEqual(['proof-100']);
++    expect(walletService.getOfflineWallet).toHaveBeenCalledWith(mintUrl, 'sat');
++    expect(walletService.getWalletWithActiveKeysetId).not.toHaveBeenCalled();
++    expect(proofService.createOutputsAndIncrementCounters).not.toHaveBeenCalled();
++  });
++
++  it('sends an exact match of non-binary denominations offline', async () => {
++    await proofRepo.saveProofs(mintUrl, [
++      makeProof('proof-5', 5),
++      makeProof('proof-3a', 3),
++      makeProof('proof-3b', 3),
++    ]);
++
++    const preparedOp = await service.prepare(await service.init(mintUrl, unitAmount(6)), {
++      offline: true,
++    });
++
++    expect(preparedOp.needsSwap).toBe(false);
++    expect([...preparedOp.inputProofSecrets].sort()).toEqual(['proof-3a', 'proof-3b']);
++  });
++
++  it('refuses an offline send that needs a swap and reserves nothing', async () => {
++    await proofRepo.saveProofs(mintUrl, [makeProof('proof-100', 100)]);
++
++    const initOp = await service.init(mintUrl, unitAmount(60));
++
++    await expect(service.prepare(initOp, { offline: true })).rejects.toThrow(
++      'Offline send needs proofs that add up to exactly 60 sat',
++    );
++    expect(proofService.reserveProofs).not.toHaveBeenCalled();
++    expect(proofService.createOutputsAndIncrementCounters).not.toHaveBeenCalled();
++    expect(walletService.getWalletWithActiveKeysetId).not.toHaveBeenCalled();
++    expect(await sendOpRepo.getById(initOp.id)).toBeNull();
++    expect((await proofRepo.getProofBySecret(mintUrl, 'proof-100'))?.usedByOperationId).toBe(
++      undefined,
++    );
++  });
++
++  it('refuses to prepare a P2PK send offline', async () => {
++    await proofRepo.saveProofs(mintUrl, [makeProof('proof-100', 100)]);
++
++    const initOp = await service.init(mintUrl, unitAmount(100), {
++      method: 'p2pk',
++      methodData: { pubkey: `02${'ab'.repeat(32)}` },
++    });
++
++    await expect(service.prepare(initOp, { offline: true })).rejects.toThrow(
++      'Send method p2pk requires the mint and cannot be prepared offline',
++    );
++    expect(walletService.getOfflineWallet).not.toHaveBeenCalled();
++    expect(proofService.reserveProofs).not.toHaveBeenCalled();
++  });
++
++  it('executes an exact-match send without refreshing mint data', async () => {
++    await proofRepo.saveProofs(mintUrl, [makeProof('proof-100', 100)]);
++
++    const initOp = await service.init(mintUrl, unitAmount(100));
++    const preparedOp = await service.prepare(initOp, { offline: true });
++    const result = await service.execute(preparedOp);
++
++    expect(result.operation.state).toBe('pending');
++    expect(result.token.proofs.map((proof) => proof.secret)).toEqual(['proof-100']);
++    expect(walletService.getWalletWithActiveKeysetId).not.toHaveBeenCalled();
++  });
++
+   it('prepares and executes a custom-unit send without selecting sat proofs', async () => {
+     await proofRepo.saveProofs(mintUrl, [
+       makeProof('sat-proof', 100, 'sat'),
+@@ -244,6 +318,7 @@ describe('SendOperationService', () => {
+     expect(preparedOp.unit).toBe('usd');
+     expect(preparedOp.inputProofSecrets).toEqual(['usd-proof']);
+     expect(walletService.getWalletWithActiveKeysetId).toHaveBeenCalledWith(mintUrl, 'usd');
++    expect(walletService.getOfflineWallet).toHaveBeenCalledWith(mintUrl, 'usd');
+     expect(result.token.unit).toBe('usd');
+     expect(result.operation.unit).toBe('usd');
+     expect(result.token.proofs.map((proof) => proof.secret)).toEqual(['usd-proof']);
+diff --git a/packages/core/test/unit/SendOpsApi.test.ts b/packages/core/test/unit/SendOpsApi.test.ts
+index 2418f8b5..d04f3aeb 100644
+--- a/packages/core/test/unit/SendOpsApi.test.ts
++++ b/packages/core/test/unit/SendOpsApi.test.ts
+@@ -85,6 +85,12 @@ describe('SendOpsApi', () => {
+     expect(result).toBe(preparedOperation);
+   });
+ 
++  it('prepare passes the offline option to the service', async () => {
++    await api.prepare({ mintUrl, amount: Amount.from(20), offline: true });
++
++    expect(sendOperationService.prepare).toHaveBeenCalledWith({ id: 'op-1' }, { offline: true });
++  });
++
+   it('prepare maps p2pk target to send method options', async () => {
+     await api.prepare({
+       mintUrl,
+diff --git a/packages/core/test/unit/WalletService.test.ts b/packages/core/test/unit/WalletService.test.ts
+index 0dde9f70..b0677538 100644
+--- a/packages/core/test/unit/WalletService.test.ts
++++ b/packages/core/test/unit/WalletService.test.ts
+@@ -61,6 +61,10 @@ function makeService(keysets: Keyset[], outputDataCreator?: OutputDataCreator) {
+     mint: makeMint(url),
+     keysets: keysets.map((keyset) => ({ ...keyset, mintUrl: url })),
+   }));
++  const getStoredMint = mock(async (url: string) => ({
++    mint: makeMint(url),
++    keysets: keysets.map((keyset) => ({ ...keyset, mintUrl: url })),
++  }));
+   const updateMintData = mock(async (url: string) => ({
+     mint: makeMint(url),
+     keysets: keysets.map((keyset) => ({ ...keyset, mintUrl: url })),
+@@ -73,7 +77,7 @@ function makeService(keysets: Keyset[], outputDataCreator?: OutputDataCreator) {
+   );
+ 
+   const service = new WalletService(
+-    { ensureUpdatedMint, updateMintData } as any,
++    { ensureUpdatedMint, updateMintData, getStoredMint } as any,
+     { getSeed } as any,
+     { getRequestFn } as any,
+     undefined,
+@@ -81,7 +85,7 @@ function makeService(keysets: Keyset[], outputDataCreator?: OutputDataCreator) {
+     outputDataCreator,
+   );
+ 
+-  return { service, ensureUpdatedMint, updateMintData, getRequestFn };
++  return { service, ensureUpdatedMint, updateMintData, getStoredMint, getRequestFn };
+ }
+ 
+ describe('WalletService unit scoping', () => {
+@@ -188,6 +192,35 @@ describe('WalletService unit scoping', () => {
+     expect(result.keys.unit).toBe('usd');
+   });
+ 
++  it('builds an offline Wallet Instance from stored mint data without refreshing it', async () => {
++    const { service, ensureUpdatedMint, getStoredMint } = makeService([makeKeyset('sat')]);
++
++    const wallet = await service.getOfflineWallet(mintUrl, 'SAT');
++
++    expect(wallet.unit).toBe('sat');
++    expect(getStoredMint).toHaveBeenCalledWith(mintUrl);
++    expect(ensureUpdatedMint).not.toHaveBeenCalled();
++  });
++
++  it('does not cache an offline Wallet Instance for online callers', async () => {
++    const { service, ensureUpdatedMint } = makeService([makeKeyset('sat')]);
++
++    const offlineWallet = await service.getOfflineWallet(mintUrl, 'sat');
++    const onlineWallet = await service.getWallet(mintUrl, 'sat');
++
++    expect(onlineWallet).not.toBe(offlineWallet);
++    expect(ensureUpdatedMint).toHaveBeenCalledTimes(1);
++  });
++
++  it('rejects an offline Wallet Instance for a mint that is not known', async () => {
++    const { service, getStoredMint } = makeService([makeKeyset('sat')]);
++    getStoredMint.mockImplementationOnce(async () => null as never);
++
++    await expect(service.getOfflineWallet(mintUrl, 'sat')).rejects.toThrow(
++      'Mint https://mint.test is not known',
++    );
++  });
++
+   it('throws when the requested unit has no keysets', async () => {
+     const { service } = makeService([makeKeyset('sat')]);
+ 

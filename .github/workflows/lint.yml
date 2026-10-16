@@ -19,6 +19,12 @@ jobs:
       - name: Checkout app
         uses: actions/checkout@v6
 
+      - name: Follow-ups
+        run: node --test scripts/followups.test.mjs && node scripts/followups.mjs check
+
+      - name: Agent guide and skills
+        run: python3 .agents/skills/manage.py check
+
       - name: Setup Sovran
         uses: ./.github/actions/setup-sovran
         with:

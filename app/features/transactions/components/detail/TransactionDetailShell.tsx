@@ -1,3 +1,5 @@
+import { PaymentIdentity } from '@/shared/ui/composed/Nip05Identity';
+import { useAppStyle } from '@/shared/styles/appStyle';
 import React, { useCallback, useEffect, useRef } from 'react';
 import { StyleSheet, type ScrollView, type View as NativeView } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
@@ -132,6 +134,7 @@ export function TransactionDetailShell({
   timeline,
   children,
 }: TransactionDetailShellProps): React.ReactElement {
+  const style = useAppStyle();
   const entryIdentity = useTransactionIdentity(entry);
   const namedIdentity = headerIdentity ?? entryIdentity;
   // One phrase names the screen and the person: the collapsed bar shows the
@@ -175,7 +178,8 @@ export function TransactionDetailShell({
   }, []);
   // Other transactions with the same nostr counterparty (Nut Drop / lightning-
   // address-to-nostr). Rendered before technical details as a mini relationship view.
-  const counterpartyPubkey = transactionIdentitySnapshot(entry)?.pubkey;
+  const counterpartySnapshot = transactionIdentitySnapshot(entry);
+  const counterpartyPubkey = counterpartySnapshot?.pubkey;
   const { metadata: counterpartyProfile } = useNostrProfileMetadata(counterpartyPubkey);
   // The scroll mode picks its container, so it must not flip once mounted: it
   // follows the pubkey the entry carries (known synchronously), not the name
@@ -209,7 +213,7 @@ export function TransactionDetailShell({
         style={styles.routeReadyProbe}
       />
       <View>
-        <VStack gap={12}>
+        <VStack gap={style.space.item}>
           {entry ? (
             <>
               <TransactionProbe
@@ -227,6 +231,13 @@ export function TransactionDetailShell({
               />
             </>
           ) : null}
+          {/* The domain claim captured when the payment was made, and only
+              that: the bare key lives on the Details page. */}
+          <PaymentIdentity
+            pubkey={counterpartyPubkey}
+            address={counterpartySnapshot?.nip05 ?? counterpartyProfile?.nip05}
+            showKey={false}
+          />
           {beforeStatus}
           {entry
             ? (statusRow ?? <HistoryEntryRefresh historyEntry={entry} mintInfo={mintInfo} />)

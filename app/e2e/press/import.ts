@@ -37,6 +37,8 @@ export async function importPressRuns(
       throw new Error('Candidate press directory already exists; no replacement is allowed');
     const manifestBytes = readFileSync(contained(root, 'manifest.json'));
     const manifest = object(JSON.parse(manifestBytes.toString()));
+    if (manifest.kind !== undefined)
+      throw new Error('Story and manual evidence are not publication attestations');
     const platform =
       manifest.driver === 'sim' ? 'ios' : manifest.driver === 'android' ? 'android' : undefined;
     const scenarioFilter = object(manifest.filters).scenario;

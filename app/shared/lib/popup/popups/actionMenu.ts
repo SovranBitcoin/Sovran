@@ -118,6 +118,8 @@ export interface ActionMenuItem {
   reason?: string;
   /** Secondary caption rendered below the label when the button is enabled. */
   description?: string;
+  /** Tints the row yellow: the option works but carries a caveat worth reading first. */
+  isCaution?: boolean;
   /** Marks this item as failed — disables tap and forces danger styling on the description. */
   isFailed?: boolean;
   /** Render a thin divider above this item. Use for trailing actions like "Change Mint". */

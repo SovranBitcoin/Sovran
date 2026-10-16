@@ -462,7 +462,7 @@ describe('lightning melt — confirmMelt notification sequence', () => {
 
     const meltCall = tm.operationCalls.find((c) => c.name === 'executeMelt');
     expect(meltCall).toBeTruthy();
-    expect(meltCall!.args).toEqual([MINT1, INPUTS.lightningAddress, 200, 'sat']);
+    expect(meltCall!.args).toEqual([{ mintUrl: MINT1, meltTarget: INPUTS.lightningAddress, amount: 200, unit: 'sat' }]);
   });
 
   it('onPaymentConfirmed historyEntry contains quoteId for store correlation', async () => {

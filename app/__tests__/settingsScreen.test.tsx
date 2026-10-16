@@ -7,6 +7,11 @@ import { Section } from '@/shared/ui/composed/Section';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 // These isolated screen tests omit the app's SafeAreaProvider.
+// This suite covers every settings row, so it runs as the `full` edition.
+jest.mock('@/shared/config/features', () => ({
+  ...jest.requireActual('@/shared/config/features'),
+  hasFeature: () => true,
+}));
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 24, bottom: 34, left: 0, right: 0 }),
 }));
@@ -49,7 +54,10 @@ jest.mock('@/shared/lib/contentShiftLog', () => ({
   useVisualLayoutLogger: () => ({}),
   VISUAL_LOGGING_ENABLED: false,
 }));
-jest.mock('@/shared/lib/color', () => ({ withAlpha: (color: string) => color }));
+jest.mock('@/shared/lib/color', () => ({
+  ...jest.requireActual('@/shared/lib/color'),
+  withAlpha: (color: string) => color,
+}));
 jest.mock('@/shared/hooks/useThemeColor', () => ({ useThemeColor: () => 'rgb(128, 128, 128)' }));
 jest.mock('@react-native-masked-view/masked-view', () => ({ __esModule: true, default: 'View' }));
 jest.mock('expo-linear-gradient', () => ({ LinearGradient: 'View' }));

@@ -16,7 +16,7 @@
  * Not persisted — progress is per-session and tied to in-memory orchestrators.
  */
 
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 
 type LegLogger = {
   info: (message: string, fields?: Record<string, unknown>) => void;
@@ -75,7 +75,7 @@ export function createLegProgressStore<Meta extends object>(opts: {
 }) {
   const { name, log } = opts;
 
-  return create<LegProgressStore<Meta>>((set, get) => {
+  return create<LegProgressStore<Meta>>({ name: 'legProgress', scope: 'session' })((set, get) => {
     const setLeg = (legId: string, status: LegStatus, errorMessage?: string) =>
       set((s) => {
         if (!s.active) return s;

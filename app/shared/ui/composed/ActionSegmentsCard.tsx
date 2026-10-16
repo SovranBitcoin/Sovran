@@ -1,5 +1,5 @@
 /**
- * A row of equal-width tappable segments in a GradientCard — the same visual
+ * A row of equal-width tappable segments in a Surface — the same visual
  * contract as the animated-QR speed/density controls (icon + 13pt label at
  * 50% foreground, hairline dividers, 44pt min height), generalized so other
  * surfaces (e.g. the onchain "New address / View all" row) render identical
@@ -11,7 +11,7 @@ import { withAlpha } from '@/shared/lib/color';
 import { PressableFeedback } from 'heroui-native';
 
 import Icon from 'assets/icons';
-import { GradientCard } from '@/shared/ui/composed/GradientCard';
+import { Surface } from '@/shared/ui/composed/Surface';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -43,7 +43,7 @@ export const ActionSegmentsCard = memo(function ActionSegmentsCard({
     segment.active ? foreground : withAlpha(foreground, segment.dimmed ? 0.25 : 0.5);
 
   return (
-    <GradientCard style={{ marginHorizontal: 16 }}>
+    <Surface style={{ marginHorizontal: 16 }}>
       <HStack style={{ minHeight: 44 }}>
         {segments.map((segment, index) => (
           <React.Fragment key={segment.testID ?? segment.label}>
@@ -80,6 +80,6 @@ export const ActionSegmentsCard = memo(function ActionSegmentsCard({
           </React.Fragment>
         ))}
       </HStack>
-    </GradientCard>
+    </Surface>
   );
 });

@@ -58,7 +58,8 @@ export interface ColadaConfig {
    */
   annotationStore?: AnnotationStoreAdapter;
 
-  sendNostrDM?: (nprofile: string, message: string) => Promise<void>;
+  captureSendDelivery?: DefaultOperationsConfig["captureSendDelivery"];
+  sendNostrDM?: (dm: { nprofile: string; message: string }) => Promise<void>;
 
   /**
    * Onchain melt fee picker (NUT-30 fee_options). Called BEFORE prepare (no
@@ -225,6 +226,7 @@ export function createColada(config: ColadaConfig): ColadaInstance {
     getProofAmounts: () => tracker.getContext().proofAmounts,
     getPreferredMintUrl: config.getPreferredMintUrl,
     sendNostrDM,
+    captureSendDelivery: config.captureSendDelivery,
     enrichMintReviewInfo,
     fetchMintCatalog: config.fetchMintCatalog,
     isTestnutMint: config.isTestnutMint,

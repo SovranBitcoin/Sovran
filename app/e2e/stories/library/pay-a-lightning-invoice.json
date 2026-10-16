@@ -1,0 +1,115 @@
+{
+  "id": "pay-a-lightning-invoice",
+  "purpose": "A person holding test sats pays a 10 sat Lightning invoice by entering it in Send, and the wallet says the payment was sent.",
+  "startsFrom": "send-40-sats-as-ecash",
+  "given": {
+    "invoice": {
+      "mint": "local",
+      "sats": 10
+    }
+  },
+  "steps": [
+    {
+      "name": "the wallet opens with its sats",
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-send"
+          }
+        },
+        {
+          "logged": "splash.gone"
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "open Send",
+      "tap": {
+        "id": "wallet-send"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "send-destination-input"
+          }
+        }
+      ]
+    },
+    {
+      "name": "enter the invoice",
+      "type": {
+        "into": {
+          "id": "send-destination-input"
+        },
+        "text": "{{invoice}}"
+      },
+      "expect": [
+        {
+          "visible": {
+            "label": "Pay 10 sats"
+          }
+        }
+      ],
+      "withinMs": 45000
+    },
+    {
+      "name": "choose to pay it",
+      "tap": {
+        "id": "send-detected-lightningInvoice"
+      },
+      "expect": [
+        {
+          "page": "LightningSendScreen"
+        },
+        {
+          "visible": {
+            "id": "melt-pay"
+          }
+        }
+      ],
+      "withinMs": 15000
+    },
+    {
+      "name": "pay",
+      "tap": {
+        "id": "melt-pay"
+      },
+      "expect": [
+        {
+          "logged": "hook.payment_status.melt_finalized"
+        },
+        {
+          "visible": {
+            "label": "Payment sent"
+          }
+        },
+        {
+          "visible": {
+            "id": "melt-close"
+          }
+        }
+      ],
+      "withinMs": 30000
+    },
+    {
+      "name": "close",
+      "tap": {
+        "id": "melt-close"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-send"
+          }
+        },
+        {
+          "gone": {
+            "id": "melt-close"
+          }
+        }
+      ],
+      "withinMs": 8000
+    }
+  ]
+}

@@ -23,7 +23,13 @@ export const SwapTransactionRow = React.memo(({ group }: Props) => {
   const aggregate = useMemo(() => {
     const anyFailed = group.legs.some((l) => l.localStatus === 'failed');
     if (anyFailed) return { text: 'Failed', color: danger };
-    if (group.state === 'running') return { text: 'Pending', color: withAlpha(foreground, 0.5) };
+    // A leg whose money has left but has not been seen to arrive keeps the swap pending.
+    const anyUnsettled = group.legs.some(
+      (l) => l.localStatus === 'settling' || l.localStatus === 'paymentPending'
+    );
+    if (group.state === 'running' || anyUnsettled) {
+      return { text: 'Pending', color: withAlpha(foreground, 0.5) };
+    }
     return { text: 'Completed', color: success };
   }, [group.legs, group.state, foreground, danger, success]);
 

@@ -18,6 +18,7 @@ import { decodeEcashTokenMetadata, defaultDetectors, type AnnotatedOption } from
 
 import Icon from 'assets/icons';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
+import { describeWalletFailure } from '@/shared/lib/errors';
 import { cashuLog } from '@/shared/lib/logger';
 
 import { getMethodIcon, getMethodLabel } from './paymentMethodPresentation';
@@ -82,7 +83,7 @@ interface OptionRowProps {
   annotated: AnnotatedOption;
   unit: string;
   isFailed: boolean;
-  failedReason?: string;
+  failedReason?: { message: string; authored?: boolean };
   onPress: () => void;
 }
 
@@ -92,7 +93,9 @@ function OptionRow({ annotated, unit, isFailed, failedReason, onPress }: OptionR
   const hasAmount = amount != null && amount > 0;
   const disabled = status === 'disabled' || isFailed;
   const descriptionText = isFailed
-    ? (failedReason ?? 'Failed')
+    ? failedReason
+      ? describeWalletFailure(failedReason)
+      : 'Failed'
     : disabled
       ? annotated.reason?.message
       : status === 'recommended'
@@ -136,6 +139,8 @@ export function PaymentOptionsContent({ payload, close, isFallback }: PaymentOpt
       : new Set<string>();
   const lastFailedMessage =
     isFallback && 'lastFailedMessage' in payload ? payload.lastFailedMessage : undefined;
+  const lastFailedAuthored =
+    isFallback && 'lastFailedAuthored' in payload && payload.lastFailedAuthored;
 
   // Distinguish user-pick close (machine.chooseOption already fired) from
   // overlay-tap / swipe-down close (machine still needs `onDismiss`).
@@ -183,7 +188,11 @@ export function PaymentOptionsContent({ payload, close, isFallback }: PaymentOpt
             annotated={annotated}
             unit={unit}
             isFailed={failedSet.has(annotated.option.value)}
-            failedReason={lastFailedMessage}
+            failedReason={
+              lastFailedMessage
+                ? { message: lastFailedMessage, authored: lastFailedAuthored }
+                : undefined
+            }
             onPress={() => {
               pickedRef.current = true;
               cashuLog.info('payment.options.choice', {

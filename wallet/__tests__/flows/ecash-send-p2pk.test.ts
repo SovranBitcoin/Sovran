@@ -40,6 +40,13 @@ const LOCKTIME_SEC = 1_800_003_600;
 
 afterEach(() => setLogger(null));
 
+/** The lock fields of a recorded `executeSend` request, or undefined when it carried none. */
+function lockOf(call: { args: unknown[] } | undefined): unknown {
+  const { p2pkLockPubkey, p2pkLock } = (call?.args[0] ?? {}) as Record<string, unknown>;
+  if (p2pkLockPubkey === undefined && p2pkLock === undefined) return undefined;
+  return { p2pkLockPubkey, p2pkLock };
+}
+
 describe('ecash send — P2PK locked', () => {
   // A raw compressed key is what cashu.me / Macadamia / Minibits publish for
   // receiving locked ecash. It is NOT a nostr identity, so it must never stop
@@ -67,10 +74,7 @@ describe('ecash send — P2PK locked', () => {
 
       tm.assertStep('sendComplete');
       expect(tm.operationCalls.find((call) => call.name === 'executeSend')?.args).toEqual([
-        MINT1,
-        100,
-        undefined,
-        { p2pkLockPubkey: key, p2pkLock: { pubkey: key } },
+        { mintUrl: MINT1, amount: 100, p2pkLockPubkey: key, p2pkLock: { pubkey: key } },
       ]);
     }
   );
@@ -99,11 +103,8 @@ describe('ecash send — P2PK locked', () => {
     // The terms are what the operation acts on; the bare key rides along for
     // the many call sites that only ask "is this locked".
     expect(sendCall?.args).toEqual([
-      MINT1,
-      100,
-      undefined,
-      { p2pkLockPubkey: LOCK_PUBKEY, p2pkLock: { pubkey: LOCK_PUBKEY } },
-    ]);
+        { mintUrl: MINT1, amount: 100, p2pkLockPubkey: LOCK_PUBKEY, p2pkLock: { pubkey: LOCK_PUBKEY } },
+      ]);
 
     const lastHandler = tm.handlerCalls[tm.handlerCalls.length - 1];
     expect(lastHandler).toMatchObject({
@@ -218,7 +219,7 @@ describe('ecash send — P2PK locked', () => {
     await tm.machine.enterAmount({ value: 100, unit: 'sat' }, MINT1);
     tm.assertStep('sendComplete');
     const sendCall = tm.operationCalls.find((call) => call.name === 'executeSend');
-    expect(sendCall?.args[3]).toEqual({
+    expect(lockOf(sendCall)).toEqual({
       p2pkLockPubkey: LOCK_PUBKEY,
       p2pkLock: { pubkey: LOCK_PUBKEY },
     });
@@ -237,7 +238,7 @@ describe('ecash send — P2PK locked', () => {
 
     tm.assertStep('sendComplete');
     const sendCall = tm.operationCalls.find((call) => call.name === 'executeSend');
-    expect(sendCall?.args[3]).toMatchObject({
+    expect(lockOf(sendCall)).toMatchObject({
       p2pkLock: {
         pubkey: LOCK_PUBKEY,
         locktimeSec: LOCKTIME_SEC,
@@ -279,7 +280,7 @@ describe('ecash send — P2PK locked', () => {
 
     tm.assertStep('sendComplete');
     const sendCall = tm.operationCalls.find((call) => call.name === 'executeSend');
-    expect(sendCall?.args[3]).toMatchObject({
+    expect(lockOf(sendCall)).toMatchObject({
       p2pkLock: { pubkey: LOCK_PUBKEY, locktimeSec: LOCKTIME_SEC },
     });
   });
@@ -310,7 +311,7 @@ describe('ecash send — P2PK locked', () => {
     const sendCall = tm.operationCalls.find((call) => call.name === 'executeSend');
     // Both fields must clear together: leaving the mirrored key behind would
     // keep every "is this locked" check true while the terms were gone.
-    expect(sendCall?.args[3]).toBeUndefined();
+    expect(lockOf(sendCall)).toBeUndefined();
   });
 
   it('leaves a seeded lock alone when the screen says nothing about it', async () => {
@@ -319,11 +320,11 @@ describe('ecash send — P2PK locked', () => {
     await tm.machine.enterAmount({ value: 100, unit: 'sat' }, MINT1);
 
     const sendCall = tm.operationCalls.find((call) => call.name === 'executeSend');
-    expect(sendCall?.args[3]).toMatchObject({ p2pkLockPubkey: LOCK_PUBKEY });
+    expect(lockOf(sendCall)).toMatchObject({ p2pkLockPubkey: LOCK_PUBKEY });
   });
 
-  it('unlocked sends are unaffected: localFirst still used with exact proofs', async () => {
-    const tm = createTestMachine();
+  it('unlocked sends are unaffected: offline, exact proofs still make a local token', async () => {
+    const tm = createTestMachine({ offline: true });
     await tm.machine.startSendEcash();
     await tm.machine.enterAmount({ value: 100, unit: 'sat' }, MINT1);
 

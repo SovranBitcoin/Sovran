@@ -22,6 +22,7 @@ import { accountUnitLabel, isAccountUnit, isTestnutUnit, toRealUnit } from 'wall
 import { useColadaBalance } from 'wallet/react';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { walletLog, Log } from '@/shared/lib/logger';
+import { useStylePaint } from '@/shared/styles/appStyle';
 
 interface Account {
   /** The ACCOUNT unit this page shows (`usd`, `tusd`, …). */
@@ -209,6 +210,14 @@ export function PrimaryBalance({
   onPillVisibilityChange,
 }: PrimaryBalanceProps): React.ReactElement {
   const router = useGuardedRouter();
+  const { style: appStyle, text: inkText } = useStylePaint();
+  // The glass style keeps the original pill stack and its metrics. Every other
+  // style sets the figure from its own type scale and pulls the account label
+  // and the conversion in tight, so the three lines read as one object.
+  const glass = appStyle.surface === 'glass';
+  const balanceSize = glass ? BALANCE_TEXT_SIZE : appStyle.type.balance;
+  const balanceLineHeight = glass ? BALANCE_TEXT_LINE_HEIGHT : Math.round(balanceSize * 1.15);
+  const sectionGap = glass ? BALANCE_SECTION_GAP : appStyle.space.related;
   const displayBtc = useSettingsStore((state) => state.getDisplayBtc());
   const setDisplayBtc = useSettingsStore((state) => state.setDisplayBtc);
   const displayCurrency = useSettingsStore((state) => state.displayCurrency);
@@ -326,7 +335,7 @@ export function PrimaryBalance({
 
   return (
     <Log name="PrimaryBalance">
-      <VStack align="center" gap={BALANCE_SECTION_GAP} className="z-9">
+      <VStack align="center" gap={sectionGap} className="z-9">
         {/* Wallet unit above the balance: the unit is the structural choice
             (what the balance IS); the display-currency pill below only
             re-prices it. */}
@@ -342,16 +351,20 @@ export function PrimaryBalance({
           accessibilityLabel={`Balance, ${balance.toLocaleString()} ${accountUnitLabel(account.unit)}`}
           accessibilityHint={isSatUnit ? 'Cycles the balance display format' : undefined}
           accessibilityState={{ disabled: !isSatUnit }}
-          style={styles.balancePressable}>
+          style={[
+            styles.balancePressable,
+            { height: Math.max(BALANCE_TAP_HEIGHT, balanceLineHeight) },
+          ]}>
           <AmountFormatter
             amount={balance}
             unit={realUnit}
-            size={BALANCE_TEXT_SIZE}
-            lineHeight={BALANCE_TEXT_LINE_HEIGHT}
-            weight="heavy"
-            liquid
+            size={balanceSize}
+            lineHeight={balanceLineHeight}
+            weight={glass ? 'heavy' : 'bold'}
+            liquid={glass}
             glassVariant={LIQUID_GLASS_BALANCE_VARIANT}
-            color={balanceTint}
+            // The paint's ink, so the figure follows a colour block it sits on.
+            color={glass ? balanceTint : inkText.primary}
           />
         </Pressable>
         {/* Fiat conversion of a sat balance is meaningless when the wallet

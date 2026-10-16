@@ -2,6 +2,8 @@ import type { LocalizedReason } from "../formatting/locales";
 import { logger } from "../logger";
 import { isLockedSend } from "../p2pk";
 import {
+  accountMintCandidates,
+  accountMintUrls,
   buildMethodAwareMintCandidates,
   createAmountEntryMethodContext,
   getCapabilityUnavailableReason,
@@ -800,16 +802,17 @@ export function resolveNext(
         enableEcashSendMemo,
       );
     }
-    if (!requirement && walletCtx.trustedMintUrls.length === 1) {
+    const accountMints = accountMintUrls(walletCtx);
+    if (!requirement && accountMints.length === 1) {
       logger.info("resolveNext.mint.selected", {
         reason: "single-trusted-mint",
         destination,
         amount,
         unit,
-        mintUrlLength: walletCtx.trustedMintUrls[0].length,
+        mintUrlLength: accountMints[0].length,
       });
       return resolveWithMint(
-        walletCtx.trustedMintUrls[0],
+        accountMints[0],
         destination,
         amount,
         unit,
@@ -838,7 +841,7 @@ export function resolveNext(
         },
       );
     }
-    const candidates = walletCtx.trustedMintUrls.map((mintUrl) => ({
+    const candidates = accountMintUrls(walletCtx).map((mintUrl) => ({
       mintUrl,
       balance: walletCtx.mintBalances[mintUrl] ?? 0,
     }));
@@ -847,7 +850,10 @@ export function resolveNext(
       {
         step: "selectMint",
         data: {
-          candidates: methodCandidates ?? candidates,
+          candidates: accountMintCandidates(
+            walletCtx,
+            methodCandidates ?? candidates,
+          ),
           supportedMintUrls,
           amount,
           unit,

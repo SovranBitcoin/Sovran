@@ -50,8 +50,6 @@ export function useFeedInteractions({
     });
 
   return {
-    getDisplayMetrics,
-    getEngagementState,
     getZapState,
     toggleLikeRef,
     toggleRepostRef,

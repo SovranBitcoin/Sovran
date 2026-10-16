@@ -343,3 +343,5 @@ the roadmap — deleting it now would break log-doctor.
   seed/P2PK custody → NUT-13 host recovery → typed cocod effects and exact
   accounting → scenario/coverage inventory. cocod isolation is explicitly not
   claimed, and live/physical lanes remain outside the accepted funded boundary.
+
+Generated evidence and the shared viewer follow [E2E results ownership](../e2e/README.md).

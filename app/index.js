@@ -11,5 +11,10 @@ import './shared/lib/e2e/mintFaults/install';
 // real system clipboard.
 import './shared/lib/e2e/clipboard/install';
 
+// E2e-only map of the controls on screen (inert outside the test build). It
+// reads React's tree through the hook a renderer reports to at start-up, so it
+// must be in place before expo-router loads the renderer.
+import './shared/lib/e2e/elementMap';
+
 // Now load expo-router
 import 'expo-router/entry';

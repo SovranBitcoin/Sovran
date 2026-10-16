@@ -2,19 +2,20 @@
 // Flow definitions — pure data
 // ---------------------------------------------------------------------------
 //
-// One FlowDef per flow variant: an ordered milestone list plus the terminal
-// outcomes that displace the tail of the timeline. `reached` predicates are
-// MONOTONE over the resolved state — the engine takes the max reached index,
-// which is what makes milestone-skipping subtleties (e.g. onchain melt "Paid
-// is complete if ANY later milestone reached") fall out for free.
+// One FlowDef per flow variant: the ordered EVENTS of the flow plus the
+// terminal outcomes that can end it early. Each event carries the two tenses
+// it is ever shown in: `active` while it is the one thing being waited on,
+// `completed` once it has happened. The engine draws every completed event and
+// exactly one open slot, so a flow can only ever gain rows (engine.ts).
 //
-// Copy resolution stays on the PaymentCopyResolver groups (ctx.copy); every
-// label/info/timestamp branch reproduces the old switch field-for-field.
+// `done` predicates are MONOTONE over the resolved state — the engine takes
+// the furthest done event, so a later observation arriving first (a confirmed
+// transaction before the melt state catches up) still marks everything before
+// it as having happened.
 
 import { MintQuoteState, MeltQuoteState } from "@cashu/cashu-ts";
-import type { MintHistoryEntry } from "@cashu/coco-core";
 
-import { isTerminalFailureState } from "../states";
+import { isTerminalFailureState, receiveFailedAsSpent } from "../states";
 import {
   EXPIRED_STATE,
   FAILED_STATE,
@@ -27,445 +28,610 @@ import type {
   FlowDef,
   MilestoneDef,
   OutcomeDef,
-  OutcomeRow,
   TimelineContext,
   TimelineFlowVariant,
 } from "./types";
+
+const ROLLING_BACK = "rolling_back";
+
+/** How long a Lightning payment may be in flight before the row says it is
+ *  slow. A stuck HTLC can hold a payment until its timelock, which is hours,
+ *  and the mint will not release the ecash either way until it resolves. */
+const PAYMENT_SLOW_AFTER_MS = 2 * 60_000;
+/** Blocks our explorer may run past the mint's requirement before the row
+ *  stops assuming the mint is merely a block or two behind us. */
+const CREDIT_OVERDUE_BLOCKS = 3;
+
+/** Wording that turns once the entry has sat in its state past `afterMs`. */
+function slowAfter(
+  ctx: TimelineContext,
+  afterMs: number,
+): { slow: boolean; recheckAt?: number } {
+  // Without a known moment the state began there is nothing to measure from:
+  // the entry's creation is when the quote was made, which can be long before
+  // the payment was sent.
+  if (ctx.since === null) return { slow: false };
+  const at = ctx.since + afterMs;
+  return ctx.currentTime >= at ? { slow: true } : { slow: false, recheckAt: at };
+}
+
+const isRolledBack = (state: string) =>
+  state === "rolledBack" || state === "rolled_back";
+
+/** What the entry recorded about why it ended, when it recorded anything. */
+const entryError = (ctx: TimelineContext): string | undefined => {
+  const error = (ctx.entry as { error?: unknown }).error;
+  return typeof error === "string" && error.trim() ? error : undefined;
+};
+
+/** When the entry last changed: the only timestamp an ending can honestly
+ *  carry. Absent on app-built entries, so the row then shows none. */
+const endedAt = (ctx: TimelineContext): { timestamp?: number } => {
+  const updatedAt = (ctx.entry as { updatedAt?: unknown }).updatedAt;
+  return typeof updatedAt === "number" && updatedAt > ctx.createdAt
+    ? { timestamp: updatedAt }
+    : {};
+};
 
 // ---------------------------------------------------------------------------
 // Mint (lightning + onchain deposit)
 // ---------------------------------------------------------------------------
 
-function makeMintFlow(onchain: boolean): FlowDef {
-  const known = (ctx: TimelineContext) =>
-    ctx.mintState === MintQuoteState.UNPAID ||
-    ctx.mintState === MintQuoteState.PAID ||
-    ctx.mintState === MintQuoteState.ISSUED;
-  // "Payment received" = the MINT credited the quote — except for onchain
-  // deposits, where an observed (still-confirming) deposit advances the flow
-  // to the middle step without claiming the mint saw it (label differs).
-  const paidReached = (ctx: TimelineContext) =>
-    ctx.mintState === MintQuoteState.PAID ||
-    ctx.mintState === MintQuoteState.ISSUED ||
-    (onchain && !!ctx.progress?.hasPayment);
-  const issuedReached = (ctx: TimelineContext) =>
-    ctx.mintState === MintQuoteState.ISSUED;
+const mintPaid = (ctx: TimelineContext) =>
+  ctx.mintState === MintQuoteState.PAID ||
+  ctx.mintState === MintQuoteState.ISSUED;
+const mintIssued = (ctx: TimelineContext) =>
+  ctx.mintState === MintQuoteState.ISSUED;
+/** coco's own verdict that an issued quote left nothing in the wallet. Matched
+ *  on its wording because nothing else marks it, and matched narrowly: a
+ *  live entry can still be carrying an error from an attempt that later
+ *  succeeded, and any-error-at-all would call that success a failure. */
+const mintNothingRestored = (ctx: TimelineContext) =>
+  /no proofs could be restored/i.test(entryError(ctx) ?? "");
+/** Issued AND in the wallet (see `mintUnrestoredOutcome`). */
+const mintCredited = (ctx: TimelineContext) =>
+  mintIssued(ctx) && !mintNothingRestored(ctx);
 
-  const milestones: MilestoneDef[] = [
-    {
-      id: "requested",
-      reached: known,
-      activeStyle: () => "next-pending",
-      copy: (ctx) => {
-        const { MINT_COPY } = ctx.copy;
-        if (paidReached(ctx)) {
-          return {
-            state: MintQuoteState.UNPAID,
-            label: MINT_COPY.UNPAID.label,
-            timestamp: ctx.createdAt,
-          };
-        }
-        return {
-          state: MintQuoteState.UNPAID,
-          label: MINT_COPY.UNPAID.label,
-          info: onchain ? MINT_COPY.UNPAID.onchainInfo : MINT_COPY.UNPAID.info,
-        };
-      },
-    },
-    {
-      id: "paid",
-      reached: paidReached,
-      activeStyle: (ctx) =>
-        onchain ? onchainPaidStepType(ctx.progress) : "next-pending",
-      // The onchain deposit's middle row owns the segmented block-confirmation
-      // ring (the renderer still gates on progress actually being present).
-      ...(onchain ? { ring: (ctx: TimelineContext) => !!ctx.progress } : {}),
-      copy: (ctx) => {
-        const { MINT_COPY } = ctx.copy;
-        if (issuedReached(ctx)) {
-          return {
-            state: MintQuoteState.PAID,
-            label: MINT_COPY.PAID.label,
-            timestamp: ctx.createdAt,
-          };
-        }
-        if (!paidReached(ctx)) {
-          return { state: MintQuoteState.PAID, label: MINT_COPY.PAID.label };
-        }
-        const progress = ctx.progress;
-        if (
-          onchain &&
-          ctx.mintState === MintQuoteState.UNPAID &&
-          progress?.hasPayment
-        ) {
-          // The deposit is visible on-chain (our own explorer), but the mint
-          // has NOT credited the quote yet (state still UNPAID). Do not claim
-          // "Payment received" here — that milestone is the mint marking the
-          // quote PAID. Until then the middle step reports the on-chain
-          // confirmation phase and, once confirmations are satisfied, that
-          // we're waiting on the mint to credit.
-          const satisfied = progress.isSatisfied;
-          return {
-            state: MintQuoteState.PAID,
-            label: satisfied
-              ? ctx.paymentCopy.text("timeline.onchain.confirmedLabel")
-              : ctx.paymentCopy.text("timeline.onchain.confirmingLabel"),
-            info: satisfied
-              ? ctx.paymentCopy.text("timeline.onchain.waitingForMint")
-              : getOnchainConfirmationInfo(progress, ctx.paymentCopy),
-          };
-        }
-        return {
-          state: MintQuoteState.PAID,
-          label: MINT_COPY.PAID.label,
-          info:
-            onchain && progress
-              ? getOnchainConfirmationInfo(progress, ctx.paymentCopy)
-              : MINT_COPY.PAID.info,
-        };
-      },
-    },
-    {
-      id: "issued",
-      reached: issuedReached,
-      copy: (ctx) => {
-        const { MINT_COPY } = ctx.copy;
-        if (issuedReached(ctx)) {
-          return {
-            state: MintQuoteState.ISSUED,
-            label: MINT_COPY.ISSUED.label,
-            info: MINT_COPY.ISSUED.info(ctx.amount),
-          };
-        }
-        return { state: MintQuoteState.ISSUED, label: MINT_COPY.ISSUED.label };
-      },
-    },
-  ];
+const mintKnown = (ctx: TimelineContext) =>
+  ctx.mintState === MintQuoteState.UNPAID ||
+  mintPaid(ctx) ||
+  ctx.mintState === FAILED_STATE;
 
-  const requestedComplete = (ctx: TimelineContext): OutcomeRow => ({
-    slot: "requested",
-    state: MintQuoteState.UNPAID,
-    label: ctx.copy.MINT_COPY.UNPAID.label,
-    stepType: "complete",
-    timestamp: ctx.createdAt,
-  });
+/** The mint took the payment before the receive failed. coco keeps the quote's
+ *  last remote state on the entry, which is the one witness left. */
+const mintFailedAfterPayment = (ctx: TimelineContext) => {
+  const remote = (ctx.entry as { remoteState?: unknown }).remoteState;
+  return remote === MintQuoteState.PAID || remote === MintQuoteState.ISSUED;
+};
 
-  const outcomes: OutcomeDef[] = [
+const issuedMilestone: MilestoneDef = {
+  id: "issued",
+  state: MintQuoteState.ISSUED,
+  done: mintCredited,
+  active: (ctx) => ({
+    label: ctx.paymentCopy.text("timeline.mint.issuing.label"),
+    info: ctx.paymentCopy.text("timeline.mint.issuing.info"),
+  }),
+  completed: (ctx) => ({
+    label: ctx.copy.RECEIVE_COPY.redeemed.label,
+    info: ctx.copy.MINT_COPY.ISSUED.info(ctx.amount),
+    ...endedAt(ctx),
+  }),
+};
+
+// coco can finish a mint with nothing to show for it: the quote was already
+// issued and the outputs could not be restored. It records why. A finished
+// operation carrying a reason is therefore not a credit.
+const mintUnrestoredOutcome = (paidId: string): OutcomeDef => ({
+  id: "unrestored",
+  kind: "failed",
+  when: (ctx) => mintIssued(ctx) && mintNothingRestored(ctx),
+  doneThrough: () => paidId,
+  row: (ctx) => ({
+    state: FAILED_STATE,
+    label: ctx.copy.RECEIVE_COPY.rejected.label,
+    stepType: "expired",
+    info: ctx.paymentCopy.text("timeline.mint.unrestored.info"),
+    ...endedAt(ctx),
+  }),
+});
+
+const mintFailedOutcome = (paidId: string): OutcomeDef => ({
+  id: "failed",
+  kind: "failed",
+  when: (ctx) => ctx.mintState === FAILED_STATE,
+  doneThrough: (ctx) => (mintFailedAfterPayment(ctx) ? paidId : null),
+  row: (ctx) => ({
+    state: FAILED_STATE,
+    label: ctx.copy.MINT_COPY.failed.label,
+    stepType: "expired",
+    info:
+      entryError(ctx) ??
+      (mintFailedAfterPayment(ctx)
+        ? ctx.paymentCopy.text("timeline.mint.failed.afterPaymentInfo")
+        : ctx.copy.MINT_COPY.failed.info),
+    ...endedAt(ctx),
+  }),
+});
+
+const lightningMintFlow: FlowDef = {
+  variant: "lightning-mint",
+  known: mintKnown,
+  outcomes: [
     {
       id: "expired",
       kind: "expired",
-      // Expiry only ever applies to a still-UNPAID Lightning invoice; onchain
-      // deposit addresses do not expire.
+      // Expiry only ever applies to a still-UNPAID invoice.
       when: (ctx) =>
-        !onchain &&
         ctx.mintState === MintQuoteState.UNPAID &&
         mintHistoryEntryExpired(
           ctx.entry as Extract<typeof ctx.entry, { type: "mint" }>,
+          ctx.currentTime,
         ),
-      rows: (ctx) => [
-        requestedComplete(ctx),
-        {
-          slot: "paid",
-          id: "expired",
-          state: EXPIRED_STATE,
-          label: ctx.copy.MINT_COPY.expired.label,
-          stepType: "expired",
-          info: ctx.copy.MINT_COPY.expired.info,
-        },
-      ],
+      row: (ctx) => ({
+        state: EXPIRED_STATE,
+        label: ctx.copy.MINT_COPY.expired.label,
+        stepType: "expired",
+        info: ctx.copy.MINT_COPY.expired.info,
+      }),
     },
-    {
-      id: "failed",
-      kind: "failed",
-      when: (ctx) => ctx.mintState === FAILED_STATE,
-      rows: (ctx) => [
-        requestedComplete(ctx),
-        {
-          slot: "paid",
-          id: "failed",
-          state: FAILED_STATE,
-          label: ctx.copy.MINT_COPY.failed.label,
-          stepType: "expired",
-          info:
-            (ctx.entry as MintHistoryEntry & { error?: string }).error ??
-            ctx.copy.MINT_COPY.failed.info,
-        },
-      ],
-    },
-  ];
-
-  return {
-    variant: onchain ? "onchain-mint" : "lightning-mint",
-    outcomes,
-    milestones,
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Melt (lightning send)
-// ---------------------------------------------------------------------------
-
-// A failed/reversed melt returns the ecash to the balance. coco v2 spells
-// this `rolled_back`/`rolling_back`/`failed` (normalized to `rolledBack`);
-// without this the state falls to the UNPAID default and a cancelled send
-// renders as if it were still waiting to be sent. Both melt variants render
-// the SAME rows (the old switch short-circuited before the onchain branch);
-// only the rowKey slots map onto each variant's own milestone list.
-const meltRolledBackOutcome = (slots: {
-  kept: string;
-  terminal: string;
-}): OutcomeDef => ({
-  id: "rolled-back",
-  kind: "rolled-back",
-  when: (ctx) => isTerminalFailureState(ctx.state),
-  rows: (ctx) => [
-    {
-      slot: slots.kept,
-      state: MeltQuoteState.PENDING,
-      label: ctx.copy.MELT_COPY.PENDING.label,
-      stepType: "complete",
-      timestamp: ctx.createdAt,
-    },
-    {
-      slot: slots.terminal,
-      id: "rolled-back",
-      state: "rolledBack",
-      label: ctx.copy.MELT_COPY.rolledBack.label,
-      stepType: "rolled-back",
-      info: ctx.copy.MELT_COPY.rolledBack.info,
-    },
-  ],
-});
-
-// Expiry only ever applies from a still-UNPAID quote.
-const meltExpiredOutcome = (slots: {
-  kept: string;
-  terminal: string;
-}): OutcomeDef => ({
-  id: "expired",
-  kind: "expired",
-  when: (ctx) =>
-    !!ctx.meltQuote &&
-    ctx.meltState === MeltQuoteState.UNPAID &&
-    meltQuoteExpired(ctx.meltQuote, ctx.currentTime),
-  rows: (ctx) => [
-    {
-      slot: slots.kept,
-      state: MeltQuoteState.UNPAID,
-      label: ctx.copy.MELT_COPY.UNPAID.label,
-      stepType: "complete",
-      timestamp: ctx.createdAt,
-    },
-    {
-      slot: slots.terminal,
-      id: "expired",
-      state: EXPIRED_STATE,
-      label: ctx.copy.MELT_COPY.expired.label,
-      stepType: "expired",
-      info: ctx.copy.MELT_COPY.expired.info,
-    },
-  ],
-});
-
-const lightningMeltFlow: FlowDef = {
-  variant: "lightning-melt",
-  outcomes: [
-    meltRolledBackOutcome({ kept: "pending", terminal: "paid" }),
-    meltExpiredOutcome({ kept: "unpaid", terminal: "pending" }),
+    mintFailedOutcome("paid"),
+    mintUnrestoredOutcome("paid"),
   ],
   milestones: [
     {
-      id: "unpaid",
-      reached: () => true,
-      activeStyle: () => "next-pending",
-      copy: (ctx) => {
-        const { MELT_COPY } = ctx.copy;
-        if (ctx.meltState !== MeltQuoteState.UNPAID) {
-          return {
-            state: MeltQuoteState.UNPAID,
-            label: MELT_COPY.UNPAID.label,
-            timestamp: ctx.createdAt,
-          };
-        }
-        return {
-          state: MeltQuoteState.UNPAID,
-          label: MELT_COPY.UNPAID.label,
-          info: MELT_COPY.UNPAID.info,
-        };
-      },
-    },
-    {
-      id: "pending",
-      reached: (ctx) =>
-        ctx.meltState === MeltQuoteState.PENDING ||
-        ctx.meltState === MeltQuoteState.PAID,
-      activeStyle: () => "current",
-      copy: (ctx) => {
-        const { MELT_COPY } = ctx.copy;
-        if (ctx.meltState === MeltQuoteState.PAID) {
-          return {
-            state: MeltQuoteState.PENDING,
-            label: MELT_COPY.PENDING.label,
-            timestamp: ctx.createdAt,
-          };
-        }
-        if (ctx.meltState === MeltQuoteState.PENDING) {
-          return {
-            state: MeltQuoteState.PENDING,
-            label: MELT_COPY.PENDING.label,
-            info: MELT_COPY.PENDING.info,
-          };
-        }
-        return { state: MeltQuoteState.PENDING, label: MELT_COPY.PENDING.label };
-      },
+      id: "created",
+      state: MintQuoteState.UNPAID,
+      done: () => true,
+      active: (ctx) => ({
+        label: ctx.paymentCopy.text("timeline.mint.created.label"),
+      }),
+      completed: (ctx) => ({
+        label: ctx.paymentCopy.text("timeline.mint.created.label"),
+        timestamp: ctx.createdAt,
+      }),
     },
     {
       id: "paid",
-      reached: (ctx) => ctx.meltState === MeltQuoteState.PAID,
-      copy: (ctx) => {
-        const { MELT_COPY } = ctx.copy;
-        if (ctx.meltState === MeltQuoteState.PAID) {
+      state: MintQuoteState.PAID,
+      done: mintPaid,
+      active: (ctx) => ({
+        label: ctx.copy.MINT_COPY.UNPAID.label,
+        info: ctx.copy.MINT_COPY.UNPAID.info,
+        style: "next-pending",
+      }),
+      completed: (ctx) => ({ label: ctx.copy.MINT_COPY.PAID.label }),
+    },
+    issuedMilestone,
+  ],
+};
+
+// An on-chain deposit has two witnesses that disagree about timing: our own
+// explorer sees the transaction first and counts its blocks, and the mint only
+// credits the quote once it is deep enough. So the chain events (`deposit`,
+// `confirmed`) follow the explorer, and anything the mint has already credited
+// proves them too.
+const depositSeen = (ctx: TimelineContext) =>
+  !!ctx.progress?.hasPayment || mintPaid(ctx);
+const depositConfirmed = (ctx: TimelineContext) =>
+  !!ctx.progress?.isSatisfied || mintPaid(ctx);
+
+/** The mint decides when a deposit is credited, from its own node. Our
+ *  explorer's count is a hint about how close that is, and the only way to
+ *  notice it is not happening: our count running well past the requirement. */
+const creditOverdue = (ctx: TimelineContext) => {
+  const progress = ctx.progress;
+  const observed = progress?.observedConfirmations;
+  return (
+    !!progress &&
+    progress.isSatisfied &&
+    // Only against a depth the MINT published. Against our fallback guess, a
+    // mint that simply wants more blocks would be reported to the user as one
+    // that lost their money.
+    progress.requirementFromMint === true &&
+    typeof observed === "number" &&
+    observed >= progress.requiredConfirmations + CREDIT_OVERDUE_BLOCKS
+  );
+};
+
+/** We drew the deposit as seen, and the explorer no longer reports it: the
+ *  transaction left the mempool (replaced, evicted or reorganised out). */
+const depositDropped = (ctx: TimelineContext) =>
+  ctx.doneRowKeys.includes("deposit") && !depositSeen(ctx);
+
+const onchainMintFlow: FlowDef = {
+  variant: "onchain-mint",
+  known: mintKnown,
+  outcomes: [mintFailedOutcome("confirmed"), mintUnrestoredOutcome("confirmed")],
+  milestones: [
+    {
+      id: "created",
+      state: MintQuoteState.UNPAID,
+      done: () => true,
+      active: (ctx) => ({
+        label: ctx.paymentCopy.text("timeline.onchain.created.label"),
+      }),
+      completed: (ctx) => ({
+        label: ctx.paymentCopy.text("timeline.onchain.created.label"),
+        timestamp: ctx.createdAt,
+      }),
+    },
+    {
+      id: "deposit",
+      state: MintQuoteState.UNPAID,
+      done: depositSeen,
+      active: (ctx) => ({
+        label: ctx.paymentCopy.text("timeline.onchain.deposit.waitingLabel"),
+        info: ctx.copy.MINT_COPY.UNPAID.onchainInfo,
+        style: "next-pending",
+      }),
+      completed: (ctx) => ({
+        label: ctx.paymentCopy.text("timeline.onchain.deposit.seenLabel"),
+      }),
+    },
+    {
+      id: "confirmed",
+      state: MintQuoteState.PAID,
+      done: depositConfirmed,
+      // Owns the segmented block-confirmation ring, in both tenses, so the
+      // ring fills and then stays full rather than vanishing at the last block.
+      ring: (ctx) => !!ctx.progress,
+      active: (ctx) => {
+        if (depositDropped(ctx)) {
           return {
-            state: MeltQuoteState.PAID,
-            label: MELT_COPY.PAID.label,
-            info: MELT_COPY.PAID.info,
+            label: ctx.paymentCopy.text("timeline.onchain.confirmingLabel"),
+            info: ctx.paymentCopy.text("timeline.onchain.droppedInfo"),
+            style: "waiting",
           };
         }
-        return { state: MeltQuoteState.PAID, label: MELT_COPY.PAID.label };
+        return {
+          label: ctx.paymentCopy.text("timeline.onchain.confirmingLabel"),
+          ...(ctx.progress
+            ? { info: getOnchainConfirmationInfo(ctx.progress, ctx.paymentCopy) }
+            : {}),
+          // Spins from the first block on; before that nothing has moved yet.
+          style:
+            onchainPaidStepType(ctx.progress) === "current"
+              ? "current"
+              : "next-pending",
+        };
       },
+      completed: (ctx) => ({
+        label: ctx.paymentCopy.text("timeline.onchain.confirmedLabel"),
+      }),
+    },
+    {
+      ...issuedMilestone,
+      active: (ctx) =>
+        // Deep enough by our count, and the mint has not credited it yet. We
+        // are waiting on the mint, not minting: say so rather than spin.
+        mintPaid(ctx)
+          ? issuedMilestone.active(ctx)
+          : !ctx.progress?.isSatisfied
+            ? {
+                // This slot is open because "Confirmed" was drawn earlier, but
+                // our explorer does not say so now: it lost the transaction,
+                // or the mint turned out to want more blocks than we assumed.
+                // Say only what is still true.
+                label: ctx.paymentCopy.text("timeline.onchain.waitingForMint"),
+                info: ctx.paymentCopy.text("timeline.onchain.waitingForMintPlainInfo"),
+                style: "next-pending",
+              }
+            : creditOverdue(ctx)
+            ? {
+                // Our count is well past what the mint asks for and it has
+                // still not credited. That is no longer lag. NUT-30 names the
+                // two deposits a mint never credits: one below its minimum,
+                // and one it first saw after the request expired.
+                label: ctx.paymentCopy.text("timeline.onchain.notCredited.label"),
+                info: ctx.paymentCopy.text("timeline.onchain.notCredited.info"),
+                style: "waiting",
+              }
+            : {
+                label: ctx.paymentCopy.text("timeline.onchain.waitingForMint"),
+                info: ctx.paymentCopy.text("timeline.onchain.waitingForMintInfo"),
+                style: "next-pending",
+              },
     },
   ],
 };
 
 // ---------------------------------------------------------------------------
-// Onchain melt (NUT-30 send)
+// Melt (lightning send + onchain send)
 // ---------------------------------------------------------------------------
-//
-// Three milestones: "Sending" (submitting the melt to the mint; completes as
-// "Sent" once the mint accepts) → the bitcoin network phase ("Broadcasting…"
-// then "In mempool · N/6 blocks" with the segmented confirmation ring) →
-// "Confirmed". If the mint settles off-chain (PAID, no outpoint) the network
-// phase collapses to a single "Settled off-chain" row — the shared "Sent" row
-// keeps its identity so the 3→2 change fades smoothly.
 
-// The tx is in the mempool once the confirmation watcher sees it; before that
-// the mint is still broadcasting.
-const onchainBroadcast = (ctx: TimelineContext) => !!ctx.progress?.hasPayment;
-const onchainConfirmed = (ctx: TimelineContext) => !!ctx.progress?.isSatisfied;
-// "Sent" = the mint accepted the melt (the ecash has left the wallet). That
-// is true past UNPAID, but ALSO whenever a later milestone has been reached —
-// a broadcast tx, an on-chain confirmation, or an off-chain settlement.
-// Keying only on the melt-state string let the first row render as
-// still-pending under a completed terminal when a mint reported a settled
-// state the mapping didn't recognise (e.g. the cdk-ldk-bdk off-chain settle):
-// a grey idle row above a green "Settled off-chain". Deriving it from "have
-// we reached a later step" makes that impossible.
-const onchainSent = (ctx: TimelineContext) =>
+const meltSubmitted = (ctx: TimelineContext) =>
   ctx.meltState === MeltQuoteState.PENDING ||
-  ctx.meltState === MeltQuoteState.PAID ||
+  ctx.meltState === MeltQuoteState.PAID;
+const meltPaid = (ctx: TimelineContext) =>
+  ctx.meltState === MeltQuoteState.PAID;
+
+/** `rolling_back` is the reversal in flight, not its result. */
+const meltReversing = (ctx: TimelineContext) => ctx.state === ROLLING_BACK;
+const meltReversed = (ctx: TimelineContext) =>
+  ctx.state !== ROLLING_BACK && isTerminalFailureState(ctx.state);
+
+// A reversed melt returns the ecash to the balance. Whether the user backed
+// out or the payment failed is not in the state; it is in the reason. The
+// wallet writes exactly one reason itself when the user backs out, and coco
+// has several for a payment that did not go through ("Recovered: …",
+// "Rollback requested by handler", whatever a later version adds). So the
+// known thing is the cancellation, and every other reason is a failure:
+// guessing the other way round calls a failed payment a choice the user made.
+const USER_CANCELLED = /user cancel|rolled back by user/i;
+const meltPaymentFailed = (ctx: TimelineContext) => {
+  const reason = entryError(ctx);
+  return reason !== undefined && !USER_CANCELLED.test(reason);
+};
+
+const meltRolledBackOutcome: OutcomeDef = {
+  id: "rolled-back",
+  kind: "rolled-back",
+  when: (ctx) => meltReversed(ctx) && !meltPaymentFailed(ctx),
+  row: (ctx) => ({
+    state: "rolledBack",
+    label: ctx.copy.MELT_COPY.rolledBack.label,
+    stepType: "rolled-back",
+    info: ctx.copy.MELT_COPY.rolledBack.info,
+    ...endedAt(ctx),
+  }),
+};
+
+// Its own outcome, so the header can tell a failed payment from a
+// cancellation without reading the row's wording.
+const meltPaymentFailedOutcome: OutcomeDef = {
+  id: "payment-failed",
+  kind: "rolled-back",
+  when: (ctx) => meltReversed(ctx) && meltPaymentFailed(ctx),
+  row: (ctx) => ({
+    state: "rolledBack",
+    label: ctx.paymentCopy.text("timeline.melt.failed.label"),
+    stepType: "rolled-back",
+    info: ctx.copy.MELT_COPY.rolledBack.info,
+    ...endedAt(ctx),
+  }),
+};
+
+// Expiry only ever applies from a still-UNPAID quote.
+const meltExpiredOutcome: OutcomeDef = {
+  id: "expired",
+  kind: "expired",
+  when: (ctx) =>
+    !!ctx.meltQuote &&
+    ctx.meltState === MeltQuoteState.UNPAID &&
+    !meltReversing(ctx) &&
+    meltQuoteExpired(ctx.meltQuote, ctx.currentTime),
+  row: (ctx) => ({
+    state: EXPIRED_STATE,
+    label: ctx.copy.MELT_COPY.expired.label,
+    stepType: "expired",
+    info: ctx.copy.MELT_COPY.expired.info,
+  }),
+};
+
+const meltCreatedMilestone: MilestoneDef = {
+  id: "created",
+  state: MeltQuoteState.UNPAID,
+  done: () => true,
+  active: (ctx) => ({
+    label: ctx.paymentCopy.text("timeline.melt.created.label"),
+  }),
+  completed: (ctx) => ({
+    label: ctx.paymentCopy.text("timeline.melt.created.label"),
+    timestamp: ctx.createdAt,
+  }),
+};
+
+const MELT_STATES = new Set([
+  "UNPAID",
+  "PENDING",
+  "PAID",
+  "prepared",
+  "executing",
+  "pending",
+  "finalized",
+  ROLLING_BACK,
+  "rolled_back",
+  "rolledBack",
+  "failed",
+]);
+const meltKnown = (ctx: TimelineContext) => MELT_STATES.has(ctx.state);
+
+const lightningMeltFlow: FlowDef = {
+  variant: "lightning-melt",
+  known: meltKnown,
+  reversing: meltReversing,
+  outcomes: [meltRolledBackOutcome, meltPaymentFailedOutcome, meltExpiredOutcome],
+  milestones: [
+    meltCreatedMilestone,
+    {
+      id: "submitted",
+      state: MeltQuoteState.UNPAID,
+      done: meltSubmitted,
+      active: (ctx) => ({
+        label: ctx.copy.MELT_COPY.UNPAID.label,
+        info: ctx.copy.MELT_COPY.UNPAID.info,
+        style: "next-pending",
+      }),
+      completed: (ctx) => ({
+        label: ctx.paymentCopy.text("timeline.melt.submitted.label"),
+      }),
+    },
+    {
+      id: "paid",
+      state: MeltQuoteState.PAID,
+      done: meltPaid,
+      active: (ctx) => {
+        const { slow, recheckAt } = slowAfter(ctx, PAYMENT_SLOW_AFTER_MS);
+        return slow
+          ? {
+              label: ctx.copy.MELT_COPY.PENDING.label,
+              info: ctx.paymentCopy.text("timeline.melt.pending.slowInfo"),
+              style: "waiting",
+            }
+          : {
+              label: ctx.copy.MELT_COPY.PENDING.label,
+              info: ctx.copy.MELT_COPY.PENDING.info,
+              ...(recheckAt !== undefined ? { recheckAt } : {}),
+            };
+      },
+      completed: (ctx) => ({
+        label: ctx.copy.MELT_COPY.PAID.label,
+        info: ctx.copy.MELT_COPY.PAID.info,
+        ...endedAt(ctx),
+      }),
+    },
+  ],
+};
+
+// Onchain send (NUT-30). The mint's own state stays PENDING from "accepted"
+// through "confirmed", so the network phase is read off our explorer instead:
+// the transaction appearing is `broadcast`, its depth is `confirmed`.
+//
+// The two are separate observers and do not agree on timing. Our explorer can
+// count the last block before the mint marks the quote PAID, and the mint can
+// mark it PAID while our explorer is still a few blocks behind (a different
+// node, a different threshold, or simply lag). Either one saying "deep
+// enough" is the event; the timeline never waits for the slower of the two.
+const onchainBroadcast = (ctx: TimelineContext) => !!ctx.progress?.hasPayment;
+// "Confirmed" ends the payment, so it is the mint's to say: PAID, for a
+// transaction we can see. Our own count reaching the depth does not finish
+// it — the transaction we are counting may be a heuristic match, and the mint
+// can still reverse a melt it has not settled. (PAID with nothing on the
+// explorer is not this either: that is an off-chain settle, or one still
+// being told apart from it.)
+const onchainConfirmed = (ctx: TimelineContext) =>
+  meltPaid(ctx) && onchainBroadcast(ctx);
+/** Deep enough by our own count, and the mint has not said PAID yet. */
+const onchainDeepByOurCount = (ctx: TimelineContext) =>
+  !!ctx.progress?.isSatisfied && !meltPaid(ctx);
+// The mint accepted the melt (the ecash has left the wallet). True past
+// UNPAID, and also whenever anything later has been observed: keying on the
+// melt-state string alone left this row waiting under a finished network
+// phase when a mint reported a settled state the mapping did not recognise.
+const onchainSubmitted = (ctx: TimelineContext) =>
+  meltSubmitted(ctx) ||
   onchainBroadcast(ctx) ||
   onchainConfirmed(ctx) ||
   !!ctx.onchainSettledInternally;
 
+const broadcastDropped = (ctx: TimelineContext) =>
+  ctx.doneRowKeys.includes("broadcast") && !onchainBroadcast(ctx);
+
 const onchainMeltFlow: FlowDef = {
   variant: "onchain-melt",
+  // An unreadable state is still a known payment once the chain or the mint's
+  // settlement has been observed for it.
+  known: (ctx) =>
+    meltKnown(ctx) || onchainBroadcast(ctx) || !!ctx.onchainSettledInternally,
+  reversing: meltReversing,
   outcomes: [
-    meltRolledBackOutcome({ kept: "network", terminal: "confirmed" }),
-    meltExpiredOutcome({ kept: "sending", terminal: "network" }),
-    // Off-chain settlement: PAID with no outpoint — the mint paid without a
-    // transaction, so there is no network phase to show. The terminal row
-    // shares the 'network' slot's rowKey (it collapses that phase in place).
+    meltRolledBackOutcome,
+    meltPaymentFailedOutcome,
+    meltExpiredOutcome,
+    // PAID with no outpoint: the mint paid without a transaction, so there is
+    // no network phase to wait through. Lands in the slot that was waiting
+    // for the broadcast.
     {
       id: "settled-offchain",
       kind: "settled",
-      when: (ctx) => !!ctx.onchainSettledInternally,
-      rows: (ctx) => [
-        {
-          slot: "sending",
-          state: MeltQuoteState.UNPAID,
-          label: ctx.copy.MELT_COPY.onchain.sent.label,
-          stepType: "complete",
-          timestamp: ctx.createdAt,
-        },
-        {
-          slot: "network",
-          id: "settled-offchain",
-          state: MeltQuoteState.PAID,
-          label: ctx.copy.MELT_COPY.onchain.offchain.label,
-          stepType: "success",
-          info: ctx.copy.MELT_COPY.onchain.offchain.info,
-          timestamp: ctx.createdAt,
-        },
-      ],
+      // The verdict is an inference from an absent outpoint, so a transaction
+      // we have seen (now, or earlier on this card) outranks it.
+      when: (ctx) =>
+        !!ctx.onchainSettledInternally &&
+        !onchainBroadcast(ctx) &&
+        !ctx.doneRowKeys.includes("broadcast"),
+      doneThrough: () => "submitted",
+      row: (ctx) => ({
+        state: MeltQuoteState.PAID,
+        // Says what the mint said, and no more: PAID is the mint's word and
+        // is final; "no transaction" is what its answer left out.
+        label: ctx.paymentCopy.text("timeline.melt.onchain.settling.label"),
+        stepType: "success",
+        info: ctx.copy.MELT_COPY.onchain.offchain.info,
+        ...endedAt(ctx),
+      }),
     },
   ],
   milestones: [
+    meltCreatedMilestone,
     {
-      // Entry milestone: always shown (the timeline only exists once the user
-      // taps Pay). It spins as "Sending" while the melt is being submitted to
-      // the mint and completes as "Sent" once the mint accepts (PENDING+).
-      id: "sending",
-      reached: () => true,
-      activeStyle: () => "current",
-      copy: (ctx) => {
-        const { MELT_COPY } = ctx.copy;
-        if (onchainSent(ctx)) {
-          return {
-            state: MeltQuoteState.UNPAID,
-            label: MELT_COPY.onchain.sent.label,
-            timestamp: ctx.createdAt,
-          };
-        }
-        return {
-          state: MeltQuoteState.UNPAID,
-          label: MELT_COPY.onchain.sending.label,
-          info: MELT_COPY.onchain.sending.info,
-        };
-      },
+      // The timeline only exists once the user taps Pay, so this slot spins
+      // from the start rather than waiting on a tap.
+      id: "submitted",
+      state: MeltQuoteState.UNPAID,
+      done: onchainSubmitted,
+      active: (ctx) => ({
+        label: ctx.copy.MELT_COPY.onchain.sending.label,
+        info: ctx.copy.MELT_COPY.onchain.sending.info,
+      }),
+      completed: (ctx) => ({
+        label: ctx.paymentCopy.text("timeline.melt.submitted.label"),
+      }),
     },
     {
-      id: "network",
-      reached: onchainSent,
-      activeStyle: () => "current",
-      ring: (ctx) => onchainBroadcast(ctx) && !!ctx.progress,
-      copy: (ctx) => {
-        const { MELT_COPY } = ctx.copy;
-        const progress = ctx.progress;
-        if (onchainBroadcast(ctx) && progress) {
-          return {
-            state: MeltQuoteState.PENDING,
-            label: MELT_COPY.onchain.mempool.label,
-            info: ctx.paymentCopy.text("timeline.melt.onchain.blocks", {
-              current: String(progress.currentConfirmations ?? 0),
-              required: String(progress.requiredConfirmations),
-            }),
-            ...(onchainConfirmed(ctx) ? { timestamp: ctx.createdAt } : {}),
-          };
-        }
-        return {
-          state: MeltQuoteState.PENDING,
-          label: MELT_COPY.onchain.broadcasting.label,
-          info: MELT_COPY.onchain.broadcasting.info,
-        };
-      },
+      id: "broadcast",
+      state: MeltQuoteState.PENDING,
+      done: onchainBroadcast,
+      active: (ctx) =>
+        // PAID, and nothing on the explorer yet: the mint is done, and whether
+        // there is a transaction to find is still being told apart from an
+        // off-chain settle. "Broadcasting" would be a claim about a
+        // transaction that may not exist.
+        meltPaid(ctx)
+          ? {
+              label: ctx.paymentCopy.text("timeline.melt.onchain.settling.label"),
+              info: ctx.paymentCopy.text("timeline.melt.onchain.settling.info"),
+            }
+          : {
+              label: ctx.copy.MELT_COPY.onchain.broadcasting.label,
+              info: ctx.copy.MELT_COPY.onchain.broadcasting.info,
+            },
+      completed: (ctx) => ({
+        label: ctx.paymentCopy.text("timeline.melt.onchain.broadcast.label"),
+      }),
     },
     {
       id: "confirmed",
-      reached: onchainConfirmed,
-      copy: (ctx) => {
-        const { MELT_COPY } = ctx.copy;
-        if (onchainConfirmed(ctx)) {
+      state: MeltQuoteState.PAID,
+      done: onchainConfirmed,
+      ring: (ctx) => !!ctx.progress,
+      active: (ctx) => {
+        const progress = ctx.progress;
+        if (broadcastDropped(ctx)) {
           return {
-            state: MeltQuoteState.PAID,
-            label: MELT_COPY.onchain.confirmed.label,
-            timestamp: ctx.createdAt,
+            label: ctx.copy.MELT_COPY.onchain.mempool.label,
+            info: ctx.paymentCopy.text("timeline.onchain.droppedInfo"),
+            style: "waiting",
+          };
+        }
+        if (onchainDeepByOurCount(ctx)) {
+          return {
+            label: ctx.paymentCopy.text("timeline.melt.onchain.awaitingMint.label"),
+            info: ctx.paymentCopy.text("timeline.melt.onchain.awaitingMint.info"),
+            style: "next-pending",
           };
         }
         return {
-          state: MeltQuoteState.PAID,
-          label: MELT_COPY.onchain.confirmed.label,
+          // In the mempool until the first block, counting blocks after it.
+          label:
+            (progress?.currentConfirmations ?? 0) >= 1
+              ? ctx.paymentCopy.text("timeline.melt.onchain.confirming.label")
+              : ctx.copy.MELT_COPY.onchain.mempool.label,
+          ...(progress
+            ? {
+                info: ctx.paymentCopy.text("timeline.melt.onchain.blocks", {
+                  current: String(progress.currentConfirmations ?? 0),
+                  required: String(progress.requiredConfirmations),
+                }),
+              }
+            : {}),
         };
       },
+      completed: (ctx) => ({
+        label: ctx.copy.MELT_COPY.onchain.confirmed.label,
+        ...endedAt(ctx),
+      }),
     },
   ],
 };
@@ -474,251 +640,209 @@ const onchainMeltFlow: FlowDef = {
 // Send (bearer ecash)
 // ---------------------------------------------------------------------------
 
-const sendKnown = (ctx: TimelineContext) =>
-  ctx.state === "prepared" || ctx.state === "pending" || ctx.state === "finalized";
+const SEND_STATES = new Set([
+  "prepared",
+  "executing",
+  "pending",
+  "finalized",
+  ROLLING_BACK,
+  "rolledBack",
+  "rolled_back",
+]);
+const sendKnown = (ctx: TimelineContext) => SEND_STATES.has(ctx.state);
+const sendReversing = (ctx: TimelineContext) => ctx.state === ROLLING_BACK;
 
-const lockedUnlockReached = (ctx: TimelineContext) =>
-  ctx.lock?.reclaim.kind === "now" ||
-  (ctx.lock?.reclaim.kind !== "at" && ctx.lock?.unlockAt != null &&
-    ctx.currentTime >= ctx.lock.unlockAt);
+/** coco attaches the token at execute, so its presence proves one was made —
+ *  the one thing a rolled-back send still says about how far it got. */
+const sendHasToken = (ctx: TimelineContext) =>
+  !!(ctx.entry as { token?: unknown }).token;
+const sendTokenCreated = (ctx: TimelineContext) =>
+  ctx.state === "pending" || ctx.state === "finalized" || sendHasToken(ctx);
 
-function reclaimedAfterUnlock(ctx: TimelineContext): boolean {
-  return ctx.lock?.unlockAt != null && "updatedAt" in ctx.entry &&
-    typeof ctx.entry.updatedAt === "number" && ctx.entry.updatedAt >= ctx.lock.unlockAt;
-}
+const sendCreatedMilestone: MilestoneDef = {
+  id: "created",
+  state: "prepared",
+  done: sendTokenCreated,
+  active: (ctx) => ({
+    label: ctx.paymentCopy.text("timeline.send.creating.label"),
+    info: ctx.paymentCopy.text("timeline.send.creating.info"),
+  }),
+  completed: (ctx) => ({
+    label: ctx.copy.SEND_COPY.prepared.label,
+    timestamp: ctx.createdAt,
+  }),
+};
 
-/**
- * A send that is locked to somebody.
- *
- * Its own flow rather than five conditionals inside `sendFlow`: the rows are
- * different (what it is locked to, and when that opens), and the terminal
- * states differ too. Built from the same milestones so the two cannot drift
- * apart on the shared parts.
- */
-const lockedSendFlow: FlowDef = {
-  variant: "locked-send",
+const sendClaimedCompleted: MilestoneDef["completed"] = (ctx) => ({
+  label: ctx.copy.SEND_COPY.finalized.label,
+  info: ctx.copy.SEND_COPY.finalized.info,
+  ...endedAt(ctx),
+});
+
+const sendRolledBackRow = (
+  ctx: TimelineContext,
+  label: string,
+): ReturnType<OutcomeDef["row"]> => ({
+  state: "rolledBack",
+  label,
+  stepType: "rolled-back",
+  info: ctx.copy.SEND_COPY.rolledBack.info,
+  ...endedAt(ctx),
+});
+
+const sendFlow: FlowDef = {
+  variant: "send",
+  known: sendKnown,
+  reversing: sendReversing,
   outcomes: [
     {
       id: "rolled-back",
       kind: "rolled-back",
-      when: (ctx) => ctx.state === "rolledBack" || ctx.state === "rolled_back",
-      rows: (ctx) => [
-        {
-          slot: "prepared",
-          state: "prepared",
-          label: ctx.copy.SEND_COPY.prepared.label,
-          stepType: "complete",
-          timestamp: ctx.createdAt,
-        },
-        ...(reclaimedAfterUnlock(ctx) ? [{
-          slot: "unlock",
-          state: "pending",
-          label: ctx.copy.SEND_COPY.unlock.reachedLabel,
-          stepType: "complete" as const,
-          timestamp: ctx.lock?.unlockAt ?? undefined,
-        }] : []),
-        {
-          slot: "reclaimed",
-          id: "rolled-back",
-          state: "rolledBack",
-          label: reclaimedAfterUnlock(ctx) ? ctx.copy.SEND_COPY.rolledBack.reclaimedLabel : ctx.copy.SEND_COPY.rolledBack.label,
-          stepType: "rolled-back",
-          info: ctx.copy.SEND_COPY.rolledBack.info,
-        },
-      ],
-    },
-    {
-      // Claimed is an OUTCOME, not a milestone. As a milestone, a send claimed
-      // before its locktime would draw a checkmark on "Reclaimable" — a moment
-      // that never happened. Outcomes are matched first and own their rows, so
-      // a claimed lock simply never shows an unlock row.
-      id: "claimed",
-      kind: "settled",
-      when: (ctx) => ctx.state === "finalized",
-      rows: (ctx) => [
-        {
-          slot: "prepared",
-          state: "prepared",
-          label: ctx.copy.SEND_COPY.prepared.label,
-          stepType: "complete",
-          timestamp: ctx.createdAt,
-        },
-        {
-          slot: "locked",
-          state: "pending",
-          label: ctx.copy.SEND_COPY.locked.label,
-          stepType: "complete",
-        },
-        {
-          slot: "unlock",
-          id: "finalized",
-          state: "finalized",
-          label: ctx.copy.SEND_COPY.finalized.label,
-          stepType: "success",
-          info: ctx.copy.SEND_COPY.finalized.info,
-        },
-      ],
+      when: (ctx) => isRolledBack(ctx.state),
+      row: (ctx) => sendRolledBackRow(ctx, ctx.copy.SEND_COPY.rolledBack.label),
     },
   ],
   milestones: [
+    sendCreatedMilestone,
     {
-      id: "prepared",
-      reached: sendKnown,
-      activeStyle: () => "current",
-      copy: (ctx) => ({
-        state: "prepared",
-        label: ctx.copy.SEND_COPY.prepared.label,
-        ...(ctx.state === "prepared"
-          ? { info: ctx.copy.SEND_COPY.prepared.info }
-          : { timestamp: ctx.createdAt }),
+      id: "claimed",
+      state: "pending",
+      done: (ctx) => ctx.state === "finalized",
+      active: (ctx) => ({
+        label: ctx.copy.SEND_COPY.pending.label,
+        info: ctx.copy.SEND_COPY.pending.info,
+        style: "next-pending",
       }),
-    },
-    {
-      id: "locked",
-      included: (ctx) => !lockedUnlockReached(ctx),
-      reached: (ctx) => ctx.state === "pending" || ctx.state === "finalized",
-      activeStyle: () => "next-pending",
-      upcomingStyle: () => "next-pending",
-      copy: (ctx) => ({
-        state: "pending",
-        label: ctx.copy.SEND_COPY.locked.label,
-        info: ctx.copy.SEND_COPY.locked.info,
-      }),
-    },
-    {
-      id: "unlock",
-      included: (ctx) => ctx.lock?.unlockAt != null,
-      // Monotone in time, which is what the engine requires: once the clock
-      // passes the locktime it never goes back.
-      reached: lockedUnlockReached,
-      activeStyle: () => "current",
-      copy: (ctx) => {
-        const { SEND_COPY } = ctx.copy;
-        const unlockAt = ctx.lock?.unlockAt ?? null;
-        const reclaim = ctx.lock?.reclaim;
-        const label =
-          lockedUnlockReached(ctx) ? SEND_COPY.unlock.reachedLabel : reclaim?.kind === "at"
-            ? SEND_COPY.unlock.label
-            : "Unlocks";
-        if (reclaim?.kind === "now") {
-          return {
-            state: "pending",
-            label,
-            // Who can take it, now that it is open. A lock with no refund tag
-            // opens to whoever holds the token, not to us.
-            info:
-              reclaim.via === "refund"
-                ? SEND_COPY.unlock.infoRefund
-                : SEND_COPY.unlock.infoPublic,
-          };
-        }
-        return {
-          state: "pending",
-          label,
-          // An ABSOLUTE date, because this row rebuilds only at the boundary:
-          // a live "in 3 hours" would be wrong for the three hours after it.
-          ...(unlockAt !== null
-            ? {
-                info:
-                  reclaim?.kind === "at"
-                    ? SEND_COPY.unlock.infoUpcoming
-                    : "Refund signatures are required",
-                timestamp: unlockAt,
-              }
-            : {}),
-        };
-      },
+      completed: sendClaimedCompleted,
     },
   ],
 };
 
-const sendFlow: FlowDef = {
-  variant: "send",
+// A send locked to somebody. Its own flow rather than conditionals inside
+// `sendFlow`: there is one more event (the lock opening) and it is a clock
+// event, so it can happen, or never happen, independently of the claim.
+//
+// That independence is why claiming is an OUTCOME here and not the last
+// event. As an event, a send claimed before its locktime would have to mark
+// "Unlocked" as happened to reach "Claimed" — a moment that never occurred.
+
+const lockOpen = (ctx: TimelineContext) =>
+  ctx.lock?.reclaim.kind === "now" ||
+  (ctx.lock?.reclaim.kind !== "at" &&
+    ctx.lock?.unlockAt != null &&
+    ctx.currentTime >= ctx.lock.unlockAt);
+
+/** The send ended after its lock had opened. The clock keeps running after a
+ *  send ends, so an ended send is judged by when it ended, not by now. */
+function endedAfterUnlock(ctx: TimelineContext): boolean {
+  const updatedAt = (ctx.entry as { updatedAt?: unknown }).updatedAt;
+  return (
+    ctx.lock?.unlockAt != null &&
+    typeof updatedAt === "number" &&
+    updatedAt >= ctx.lock.unlockAt
+  );
+}
+
+/** Who the lock opens to, said from the lock's own terms rather than from
+ *  what this wallet happens to be able to sign. */
+const lockOpensTo = (ctx: TimelineContext) =>
+  ctx.lock?.refund == null
+    ? ctx.copy.SEND_COPY.unlock.infoPublic
+    : ctx.paymentCopy.text("timeline.send.unlock.infoRefundSignatures");
+
+const lockedSendEnded = (ctx: TimelineContext) =>
+  ctx.state === "finalized" || isRolledBack(ctx.state);
+
+const lockedSendFlow: FlowDef = {
+  variant: "locked-send",
+  known: sendKnown,
+  reversing: sendReversing,
   outcomes: [
     {
       id: "rolled-back",
       kind: "rolled-back",
-      when: (ctx) => ctx.state === "rolledBack" || ctx.state === "rolled_back",
-      rows: (ctx) => [
-        {
-          slot: "prepared",
-          state: "prepared",
-          label: ctx.copy.SEND_COPY.prepared.label,
-          stepType: "complete",
-          timestamp: ctx.createdAt,
-        },
-        {
-          slot: "pending",
-          id: "rolled-back",
-          state: "rolledBack",
-          label: ctx.copy.SEND_COPY.rolledBack.label,
-          stepType: "rolled-back",
-          info: ctx.copy.SEND_COPY.rolledBack.info,
-        },
-      ],
+      when: (ctx) => isRolledBack(ctx.state),
+      doneThrough: (ctx) => (endedAfterUnlock(ctx) ? "unlock" : null),
+      row: (ctx) =>
+        sendRolledBackRow(
+          ctx,
+          endedAfterUnlock(ctx)
+            ? ctx.copy.SEND_COPY.rolledBack.reclaimedLabel
+            : ctx.copy.SEND_COPY.rolledBack.label,
+        ),
+    },
+    {
+      id: "claimed",
+      kind: "settled",
+      when: (ctx) => ctx.state === "finalized",
+      doneThrough: (ctx) => (endedAfterUnlock(ctx) ? "unlock" : "created"),
+      row: (ctx) => ({
+        state: "finalized",
+        stepType: "success",
+        ...sendClaimedCompleted(ctx),
+      }),
     },
   ],
   milestones: [
+    sendCreatedMilestone,
     {
-      id: "prepared",
-      reached: sendKnown,
-      activeStyle: () => "current",
-      copy: (ctx) => {
-        const { SEND_COPY } = ctx.copy;
-        if (ctx.state === "prepared") {
+      id: "unlock",
+      state: "pending",
+      included: (ctx) => ctx.lock?.unlockAt != null,
+      done: (ctx) => !lockedSendEnded(ctx) && lockOpen(ctx),
+      active: (ctx) => ({
+        label: ctx.copy.SEND_COPY.locked.label,
+        // An ABSOLUTE date on the row, because it rebuilds only at the
+        // boundary: a live "in 3 hours" would be wrong for the next three.
+        info:
+          ctx.lock?.reclaim.kind === "at"
+            ? ctx.copy.SEND_COPY.unlock.infoUpcoming
+            : lockOpensTo(ctx),
+        style: "next-pending",
+        ...(ctx.lock?.unlockAt != null ? { timestamp: ctx.lock.unlockAt } : {}),
+      }),
+      completed: (ctx) => ({
+        label: ctx.copy.SEND_COPY.unlock.reachedLabel,
+        ...(ctx.lock?.unlockAt != null ? { timestamp: ctx.lock.unlockAt } : {}),
+      }),
+    },
+    {
+      id: "claimed",
+      state: "pending",
+      // Only the outcome above ends this slot.
+      done: () => false,
+      active: (ctx) => {
+        const reclaim = ctx.lock?.reclaim;
+        if (reclaim?.kind === "now") {
+          // Who can take it, now that it is open. A lock with no refund tag
+          // opens to whoever holds the token, not to us.
+          return reclaim.via === "refund"
+            ? {
+                label: ctx.copy.SEND_COPY.unlock.label,
+                info: ctx.copy.SEND_COPY.unlock.infoRefund,
+                style: "next-pending",
+              }
+            : {
+                label: ctx.copy.SEND_COPY.pending.label,
+                info: ctx.copy.SEND_COPY.unlock.infoPublic,
+                style: "next-pending",
+              };
+        }
+        if (ctx.lock?.unlockAt != null && lockOpen(ctx)) {
+          // Open, but not to a key this wallet can sign with on its own.
           return {
-            state: "prepared",
-            label: SEND_COPY.prepared.label,
-            info: SEND_COPY.prepared.info,
+            label: ctx.copy.SEND_COPY.pending.label,
+            info: lockOpensTo(ctx),
+            style: "next-pending",
           };
         }
         return {
-          state: "prepared",
-          label: SEND_COPY.prepared.label,
-          timestamp: ctx.createdAt,
+          label: ctx.copy.SEND_COPY.locked.label,
+          info: ctx.copy.SEND_COPY.locked.info,
+          style: "next-pending",
         };
       },
-    },
-    {
-      id: "pending",
-      reached: (ctx) => ctx.state === "pending" || ctx.state === "finalized",
-      activeStyle: () => "next-pending",
-      // A freshly-prepared send already previews the "Sent" step as the
-      // (bare) next step rather than a small future dot.
-      upcomingStyle: () => "next-pending",
-      copy: (ctx) => {
-        const { SEND_COPY } = ctx.copy;
-        if (ctx.state === "finalized") {
-          return {
-            state: "pending",
-            label: SEND_COPY.pending.label,
-            timestamp: ctx.createdAt,
-          };
-        }
-        if (ctx.state === "pending") {
-          return {
-            state: "pending",
-            label: SEND_COPY.pending.label,
-            info: SEND_COPY.pending.info,
-          };
-        }
-        return { state: "pending", label: SEND_COPY.pending.label };
-      },
-    },
-    {
-      id: "finalized",
-      reached: (ctx) => ctx.state === "finalized",
-      copy: (ctx) => {
-        const { SEND_COPY } = ctx.copy;
-        if (ctx.state === "finalized") {
-          return {
-            state: "finalized",
-            label: SEND_COPY.finalized.label,
-            info: SEND_COPY.finalized.info,
-          };
-        }
-        return { state: "finalized", label: SEND_COPY.finalized.label };
-      },
+      completed: sendClaimedCompleted,
     },
   ],
 };
@@ -727,125 +851,78 @@ const sendFlow: FlowDef = {
 // Payment-request send (outgoing "pay this request" ecash)
 // ---------------------------------------------------------------------------
 
-// Delivery over nostr happened (the milestone is complete) once the caller
-// reports nostrSent; the claim milestone becomes the active waiting step.
+const prSendCreated = (ctx: TimelineContext) =>
+  !!ctx.tokenCreated || sendTokenCreated(ctx);
 const prSendDelivered = (ctx: TimelineContext) =>
-  ctx.state === "finalized" || (ctx.state === "pending" && !!ctx.nostrSent);
+  ctx.state === "finalized" || !!ctx.nostrSent;
 
 const paymentRequestSendFlow: FlowDef = {
   variant: "payment-request-send",
+  known: sendKnown,
+  reversing: sendReversing,
   outcomes: [
     {
       id: "rolled-back",
       kind: "rolled-back",
-      when: (ctx) => ctx.state === "rolledBack" || ctx.state === "rolled_back",
-      rows: (ctx) => {
-        const { PAYMENT_REQUEST_COPY } = ctx.copy;
-        const rows: OutcomeRow[] = [
-          {
-            slot: "prepared",
-            state: "prepared",
-            label: PAYMENT_REQUEST_COPY.prepared.label,
-            stepType: "complete",
-            timestamp: ctx.createdAt,
-          },
-        ];
-        if (ctx.nostrSent) {
-          rows.push({
-            slot: "nostr-sent",
-            state: "nostrSent",
-            label: PAYMENT_REQUEST_COPY.nostrSent.label,
-            stepType: "complete",
-            timestamp: ctx.createdAt,
-          });
-        }
-        rows.push({
-          slot: ctx.nostrSent ? "finalized" : "nostr-sent",
-          id: "rolled-back",
-          state: "rolledBack",
-          label: PAYMENT_REQUEST_COPY.rolledBack.label,
-          stepType: "rolled-back",
-          info: PAYMENT_REQUEST_COPY.rolledBack.info,
-        });
-        return rows;
-      },
+      when: (ctx) => isRolledBack(ctx.state),
+      doneThrough: (ctx) =>
+        ctx.nostrSent ? "delivered" : ctx.tokenCreated ? "created" : null,
+      row: (ctx) => ({
+        state: "rolledBack",
+        label: ctx.copy.PAYMENT_REQUEST_COPY.rolledBack.label,
+        stepType: "rolled-back",
+        info: ctx.copy.PAYMENT_REQUEST_COPY.rolledBack.info,
+        ...endedAt(ctx),
+      }),
     },
   ],
   milestones: [
     {
-      id: "prepared",
-      reached: sendKnown,
-      activeStyle: (ctx) => (ctx.tokenCreated ? "complete" : "next-pending"),
-      copy: (ctx) => {
-        const { PAYMENT_REQUEST_COPY } = ctx.copy;
-        if (ctx.state === "prepared") {
-          return {
-            state: "prepared",
-            label: PAYMENT_REQUEST_COPY.prepared.label,
-            info: PAYMENT_REQUEST_COPY.prepared.info,
-            ...(ctx.tokenCreated ? { timestamp: ctx.createdAt } : {}),
-          };
-        }
-        return {
-          state: "prepared",
-          label: PAYMENT_REQUEST_COPY.prepared.label,
-          timestamp: ctx.createdAt,
-        };
-      },
+      ...sendCreatedMilestone,
+      done: prSendCreated,
+      active: (ctx) =>
+        // Still a preview: the user has not confirmed, so nothing is being
+        // built. A spinner here would say work is under way.
+        ctx.preview
+          ? {
+              label: ctx.paymentCopy.text("timeline.paymentRequest.ready.label"),
+              info: ctx.paymentCopy.text("timeline.paymentRequest.ready.info"),
+              style: "next-pending",
+            }
+          : sendCreatedMilestone.active(ctx),
     },
     {
-      id: "nostr-sent",
-      reached: (ctx) => ctx.state === "pending" || ctx.state === "finalized",
-      activeStyle: () => "next-pending",
-      copy: (ctx) => {
-        const { PAYMENT_REQUEST_COPY } = ctx.copy;
-        if (prSendDelivered(ctx)) {
-          return {
-            state: "nostrSent",
-            label: PAYMENT_REQUEST_COPY.nostrSent.label,
-            timestamp: ctx.createdAt,
-            info: PAYMENT_REQUEST_COPY.nostrSent.infoSent,
-          };
-        }
-        if (ctx.state === "pending") {
-          return {
-            state: "nostrSent",
-            label: PAYMENT_REQUEST_COPY.nostrSent.label,
-            info: PAYMENT_REQUEST_COPY.nostrSent.infoSending,
-          };
-        }
-        return {
-          state: "nostrSent",
-          label: PAYMENT_REQUEST_COPY.nostrSent.label,
-        };
-      },
+      id: "delivered",
+      state: "nostrSent",
+      done: prSendDelivered,
+      active: (ctx) => ({
+        label: ctx.paymentCopy.text("timeline.paymentRequest.delivering.label"),
+        info: ctx.paymentCopy.text("timeline.paymentRequest.delivering.info"),
+      }),
+      completed: (ctx) => ({
+        label: ctx.copy.PAYMENT_REQUEST_COPY.nostrSent.label,
+        info:
+          ctx.requestTransport === "nostr"
+            ? ctx.paymentCopy.text("timeline.paymentRequest.delivered.nostrInfo")
+            : ctx.requestTransport === "http"
+              ? ctx.paymentCopy.text("timeline.paymentRequest.delivered.httpInfo")
+              : ctx.copy.PAYMENT_REQUEST_COPY.nostrSent.infoSent,
+      }),
     },
     {
-      id: "finalized",
-      reached: prSendDelivered,
-      activeStyle: (ctx) =>
-        ctx.state === "finalized" ? "success" : "next-pending",
-      copy: (ctx) => {
-        const { PAYMENT_REQUEST_COPY, SEND_COPY } = ctx.copy;
-        if (ctx.state === "finalized") {
-          return {
-            state: "finalized",
-            label: PAYMENT_REQUEST_COPY.finalized.label,
-            info: PAYMENT_REQUEST_COPY.finalized.info,
-          };
-        }
-        if (prSendDelivered(ctx)) {
-          return {
-            state: "finalized",
-            label: PAYMENT_REQUEST_COPY.finalized.label,
-            info: SEND_COPY.pending.info,
-          };
-        }
-        return {
-          state: "finalized",
-          label: PAYMENT_REQUEST_COPY.finalized.label,
-        };
-      },
+      id: "claimed",
+      state: "finalized",
+      done: (ctx) => ctx.state === "finalized",
+      active: (ctx) => ({
+        label: ctx.copy.SEND_COPY.pending.label,
+        info: ctx.copy.SEND_COPY.pending.info,
+        style: "next-pending",
+      }),
+      completed: (ctx) => ({
+        label: ctx.copy.PAYMENT_REQUEST_COPY.finalized.label,
+        info: ctx.copy.PAYMENT_REQUEST_COPY.finalized.info,
+        ...endedAt(ctx),
+      }),
     },
   ],
 };
@@ -854,106 +931,70 @@ const paymentRequestSendFlow: FlowDef = {
 // Receive (token redemption)
 // ---------------------------------------------------------------------------
 
+/**
+ * What a rolled-back receive may claim. "Already spent" is a statement about
+ * someone else's action, so it needs the mint to have said so; every other
+ * rejection says only what is known: the token was not added.
+ */
+const receiveRejectedOutcome = (doneThrough?: string): OutcomeDef => ({
+  id: "already-spent",
+  kind: "already-spent",
+  when: (ctx) => !ctx.prPendingFlag && isRolledBack(ctx.state),
+  ...(doneThrough ? { doneThrough: () => doneThrough } : {}),
+  row: (ctx) => {
+    const { alreadySpent, rejected } = ctx.copy.RECEIVE_COPY;
+    const reason = (ctx.entry as { error?: unknown }).error;
+    return {
+      state: "alreadySpent",
+      ...(receiveFailedAsSpent(reason) ? alreadySpent : rejected),
+      stepType: "already-spent",
+      ...endedAt(ctx),
+    };
+  },
+});
+
+const addedCompleted: MilestoneDef["completed"] = (ctx) => ({
+  label: ctx.copy.RECEIVE_COPY.redeemed.label,
+  info: ctx.copy.RECEIVE_COPY.redeemed.info(ctx.amount),
+  ...endedAt(ctx),
+});
+
 const receiveFlow: FlowDef = {
   variant: "receive",
-  outcomes: [
-    {
-      id: "already-spent",
-      kind: "already-spent",
-      when: (ctx) => ctx.state === "rolledBack" || ctx.state === "rolled_back",
-      rows: (ctx) => [
-        {
-          slot: "pending",
-          state: "pending",
-          label: ctx.copy.RECEIVE_COPY.pending.label,
-          stepType: "complete",
-          timestamp: ctx.createdAt,
-        },
-        {
-          slot: "redeemed",
-          id: "already-spent",
-          state: "alreadySpent",
-          label: ctx.copy.RECEIVE_COPY.alreadySpent.label,
-          stepType: "already-spent",
-          info: ctx.copy.RECEIVE_COPY.alreadySpent.info,
-        },
-      ],
-    },
-  ],
+  outcomes: [receiveRejectedOutcome()],
   milestones: [
     {
-      id: "pending",
-      reached: () => true,
-      activeStyle: () => "next-pending",
-      copy: (ctx) => {
-        const { RECEIVE_COPY } = ctx.copy;
-        if (ctx.state === "prepared") {
-          return {
-            state: "pending",
-            label: RECEIVE_COPY.pending.label,
-            info: RECEIVE_COPY.pending.info,
-          };
-        }
-        return {
-          state: "pending",
-          label: RECEIVE_COPY.pending.label,
-          timestamp: ctx.createdAt,
-        };
-      },
-    },
-    {
-      id: "redeemed",
-      // Any non-prepared state (finalized or otherwise) renders the settled
-      // arm — the old switch's catch-all default.
-      reached: (ctx) => ctx.state !== "prepared",
-      copy: (ctx) => {
-        const { RECEIVE_COPY } = ctx.copy;
-        if (ctx.state !== "prepared") {
-          return {
-            state: "redeemed",
-            label: RECEIVE_COPY.redeemed.label,
-            info: RECEIVE_COPY.redeemed.info(ctx.amount),
-          };
-        }
-        return { state: "redeemed", label: RECEIVE_COPY.redeemed.label };
-      },
-    },
-  ],
-};
-
-// A receive stuck in `executing` is a received-but-not-yet-redeemed token
-// (e.g. accepted while the mint was unreachable): a fixed three-row waiting
-// timeline.
-const receiveRecoveryFlow: FlowDef = {
-  variant: "receive-recovery",
-  outcomes: [],
-  milestones: [
-    {
-      id: "accepted",
-      reached: () => true,
-      copy: (ctx) => ({
-        state: "accepted",
+      id: "received",
+      state: "accepted",
+      done: () => true,
+      active: (ctx) => ({ label: ctx.copy.RECEIVE_COPY.accepted.label }),
+      completed: (ctx) => ({
         label: ctx.copy.RECEIVE_COPY.accepted.label,
         timestamp: ctx.createdAt,
       }),
     },
     {
-      id: "waiting",
-      reached: () => true,
-      activeStyle: () => "waiting",
-      copy: (ctx) => ({
-        state: "executing",
-        label: ctx.copy.RECEIVE_COPY.waiting.label,
-        info: ctx.copy.RECEIVE_COPY.waiting.info,
-      }),
-    },
-    {
-      id: "redeemed",
-      reached: () => false,
-      copy: (ctx) => ({
-        state: "redeemed",
-        label: ctx.copy.RECEIVE_COPY.redeemed.label,
-      }),
+      id: "added",
+      state: "redeemed",
+      // Only a finalized receive has added anything. A state this flow does
+      // not know (a newer coco, a corrupt row) stays open: claiming "Added to
+      // wallet" for it would be inventing a credit.
+      done: (ctx) => ctx.state === "finalized",
+      active: (ctx) =>
+        // `executing` is a token accepted but not yet redeemed (taken while
+        // the mint was unreachable): the same slot, stalled.
+        ctx.state === "executing"
+          ? {
+              label: ctx.copy.RECEIVE_COPY.waiting.label,
+              info: ctx.copy.RECEIVE_COPY.waiting.info,
+              style: "waiting",
+            }
+          : {
+              label: ctx.copy.RECEIVE_COPY.pending.label,
+              info: ctx.copy.RECEIVE_COPY.pending.info,
+              style: "next-pending",
+            },
+      completed: addedCompleted,
     },
   ],
 };
@@ -962,99 +1003,51 @@ const receiveRecoveryFlow: FlowDef = {
 // Payment-request receive (incoming "Fixed Amount → as Ecash")
 // ---------------------------------------------------------------------------
 //
-// A distinct milestone timeline that leads with "waiting for payment on
-// nostr" — the step a normal token receive lacks. The list pending row is
-// `state:executing` + paymentRequestPending — it must ALWAYS read "waiting
-// for payment", never the generic "redeeming", so the pending flag pins the
-// flow to the first milestone regardless of state.
+// Leads with the step a plain token receive lacks: waiting for the payer. The
+// list's pending row is `state:executing` + paymentRequestPending and must
+// ALWAYS read "waiting for payment", never "redeeming", so the pending flag
+// pins the flow to that slot regardless of state.
 
 const prReceivePaid = (ctx: TimelineContext) => !ctx.prPendingFlag;
-const prReceiveAdded = (ctx: TimelineContext) =>
-  !ctx.prPendingFlag && ctx.state === "finalized";
 
 const paymentRequestReceiveFlow: FlowDef = {
   variant: "payment-request-receive",
-  outcomes: [
-    {
-      id: "already-spent",
-      kind: "already-spent",
-      when: (ctx) =>
-        !ctx.prPendingFlag &&
-        (ctx.state === "rolledBack" || ctx.state === "rolled_back"),
-      rows: (ctx) => [
-        {
-          slot: "requested",
-          state: "requested",
-          label: ctx.copy.RECEIVE_COPY.paymentRequest.requested.label,
-          stepType: "complete",
-          timestamp: ctx.createdAt,
-        },
-        {
-          slot: "paid",
-          id: "already-spent",
-          state: "alreadySpent",
-          label: ctx.copy.RECEIVE_COPY.alreadySpent.label,
-          stepType: "already-spent",
-          info: ctx.copy.RECEIVE_COPY.alreadySpent.info,
-        },
-      ],
-    },
-  ],
+  outcomes: [receiveRejectedOutcome("paid")],
   milestones: [
     {
       id: "requested",
-      reached: () => true,
-      activeStyle: () => "next-pending",
-      copy: (ctx) => {
-        const PR = ctx.copy.RECEIVE_COPY.paymentRequest;
-        if (prReceivePaid(ctx)) {
-          return {
-            state: "requested",
-            label: PR.requested.label,
-            timestamp: ctx.createdAt,
-          };
-        }
-        return {
-          state: "requested",
-          label: PR.requested.label,
-          info: PR.requested.info,
-        };
-      },
+      state: "requested",
+      done: () => true,
+      active: (ctx) => ({
+        label: ctx.copy.RECEIVE_COPY.paymentRequest.requested.label,
+      }),
+      completed: (ctx) => ({
+        label: ctx.copy.RECEIVE_COPY.paymentRequest.requested.label,
+        timestamp: ctx.createdAt,
+      }),
     },
     {
       id: "paid",
-      reached: prReceivePaid,
-      activeStyle: () => "current",
-      copy: (ctx) => {
-        const PR = ctx.copy.RECEIVE_COPY.paymentRequest;
-        if (prReceiveAdded(ctx)) {
-          return {
-            state: "paid",
-            label: PR.paid.label,
-            timestamp: ctx.createdAt,
-          };
-        }
-        if (prReceivePaid(ctx)) {
-          // prepared / executing: the payer paid, the claim is running.
-          return { state: "paid", label: PR.paid.label, info: PR.paid.info };
-        }
-        return { state: "paid", label: PR.paid.label };
-      },
+      state: "paid",
+      done: prReceivePaid,
+      active: (ctx) => ({
+        label: ctx.copy.MINT_COPY.UNPAID.label,
+        info: ctx.copy.RECEIVE_COPY.paymentRequest.requested.info,
+        style: "next-pending",
+      }),
+      completed: (ctx) => ({
+        label: ctx.copy.RECEIVE_COPY.paymentRequest.paid.label,
+      }),
     },
     {
       id: "added",
-      reached: prReceiveAdded,
-      copy: (ctx) => {
-        const { RECEIVE_COPY } = ctx.copy;
-        if (prReceiveAdded(ctx)) {
-          return {
-            state: "added",
-            label: RECEIVE_COPY.redeemed.label,
-            info: RECEIVE_COPY.redeemed.info(ctx.amount),
-          };
-        }
-        return { state: "added", label: RECEIVE_COPY.redeemed.label };
-      },
+      state: "added",
+      done: (ctx) => prReceivePaid(ctx) && ctx.state === "finalized",
+      active: (ctx) => ({
+        label: ctx.paymentCopy.text("timeline.mint.issuing.label"),
+        info: ctx.copy.RECEIVE_COPY.paymentRequest.paid.info,
+      }),
+      completed: addedCompleted,
     },
   ],
 };
@@ -1064,14 +1057,13 @@ const paymentRequestReceiveFlow: FlowDef = {
 // ---------------------------------------------------------------------------
 
 export const TIMELINE_FLOWS: Partial<Record<TimelineFlowVariant, FlowDef>> = {
-  "lightning-mint": makeMintFlow(false),
-  "onchain-mint": makeMintFlow(true),
+  "lightning-mint": lightningMintFlow,
+  "onchain-mint": onchainMintFlow,
   "lightning-melt": lightningMeltFlow,
   "onchain-melt": onchainMeltFlow,
   send: sendFlow,
   "locked-send": lockedSendFlow,
   "payment-request-send": paymentRequestSendFlow,
   receive: receiveFlow,
-  "receive-recovery": receiveRecoveryFlow,
   "payment-request-receive": paymentRequestReceiveFlow,
 };

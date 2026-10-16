@@ -11,7 +11,7 @@
  * profile-A's contact metadata doesn't leak into profile-B's view.
  */
 
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { persist } from 'zustand/middleware';
 import { z } from 'zod';
 import type { facade } from 'nostr';
@@ -112,7 +112,10 @@ const PersistedNostrMetadataCache = z.object({
   byPubkey: z.record(z.string().max(128), PersistedNostrMetadataEntry).default({}),
 });
 
-export const useNostrMetadataCache = create<NostrMetadataCacheState>()(
+export const useNostrMetadataCache = create<NostrMetadataCacheState>({
+  name: 'nostr-metadata-cache',
+  scope: 'profile',
+})(
   persist(
     (set) => ({
       byPubkey: {},
@@ -133,7 +136,7 @@ export const useNostrMetadataCache = create<NostrMetadataCacheState>()(
 
 /**
  * Map the single owner's CachedProfile (nagg-ts entity cache) to this module's
- * NostrProfileMetadata. `seenAt` plays `fetchedAt`'s staleness role. One place,
+ * NostrProfileMetadata. Fetch time is independent of the merge rank. One place,
  * so the non-feed hooks and the persistence sidecar agree on the shape.
  */
 export function cachedProfileToMetadata(
@@ -149,7 +152,7 @@ export function cachedProfileToMetadata(
     lud16: record.lud16,
     website: record.website,
     about: record.about,
-    fetchedAt: record.seenAt ?? 0,
+    fetchedAt: record.fetchedAt ?? 0,
   };
 }
 

@@ -16,6 +16,9 @@ function setup({
   switchEnabled = true,
   mintsPreferred = false,
   hasSpendingCondition = false,
+  contextLags = false,
+  satBalances = { [accepted]: 500, [other]: 1000, [third]: 2000 },
+  unitSwitchTakes = true,
   operations = {},
 }: {
   unit?: string;
@@ -25,6 +28,11 @@ function setup({
   switchEnabled?: boolean;
   mintsPreferred?: boolean;
   hasSpendingCondition?: boolean;
+  /** The bound wallet context still shows the old unit's balances after a switch. */
+  contextLags?: boolean;
+  satBalances?: Record<string, number>;
+  /** Whether the host's unit actually changes when asked to. */
+  unitSwitchTakes?: boolean;
   operations?: Partial<MachineOperations>;
 } = {}) {
   let activeUnit = "sat";
@@ -36,17 +44,17 @@ function setup({
     hasSpendingCondition,
   };
   const unitBalances: Record<string, Record<string, number>> = {
-    sat: { [accepted]: 500, [other]: 1000, [third]: 2000 },
+    sat: satBalances,
     [unit]: balances,
   };
   const getContext = (): WalletContext => ({
     trustedMintUrls: [accepted, other, third],
-    mintBalances: unitBalances[activeUnit] ?? {},
+    mintBalances: unitBalances[contextLags ? "sat" : activeUnit] ?? {},
     unitBalances,
     proofAmounts: {},
   });
   const switchUnit = vi.fn(async (next: string) => {
-    activeUnit = next;
+    if (unitSwitchTakes) activeUnit = next;
   });
   const adapter = {
     readPaymentRequest: vi.fn(async () => INPUTS.paymentRequestBasic),
@@ -92,13 +100,48 @@ describe("NFC terminal unit and mints", () => {
     await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
     expect(switchUnit).toHaveBeenCalledWith("usd");
     tm.assertStep("sendComplete");
-    expect(sentMint(tm)?.args).toEqual([other, 50, "usd"]);
+    expect(sentMint(tm)?.args).toEqual([{ mintUrl: other, amount: 50, unit: "usd" }]);
+  });
+  it("chooses by the new unit's balances when the wallet context has not caught up", async () => {
+    // `accepted` holds nothing in sat and the whole usd balance. A context
+    // still showing sat balances would find no mint able to pay.
+    const { tm } = setup({
+      unit: "usd",
+      mints: [accepted],
+      balances: { [accepted]: 100 },
+      satBalances: { [other]: 1000 },
+      contextLags: true,
+    });
+    await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
+    tm.assertStep("sendComplete");
+    expect(sentMint(tm)?.args).toEqual([{ mintUrl: accepted, amount: 50, unit: "usd" }]);
+  });
+  it("keeps the new unit's balances when it has to choose between several mints", async () => {
+    // Two accepted mints funded in usd; in sat only `third` holds anything.
+    // The choice between them is made after another read of the context.
+    const { tm } = setup({
+      unit: "usd",
+      mints: [accepted, other],
+      balances: { [accepted]: 60, [other]: 100 },
+      satBalances: { [third]: 2000 },
+      contextLags: true,
+    });
+    await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
+    tm.assertStep("sendComplete");
+    expect(sentMint(tm)?.args).toEqual([{ mintUrl: other, amount: 50, unit: "usd" }]);
+  });
+  it("stops when the host reports a switch that did not change the unit", async () => {
+    const { tm, adapter } = setup({ unit: "usd", unitSwitchTakes: false });
+    await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
+    expect(tm.machine.getStep()).not.toBe("sendComplete");
+    expect(sentMint(tm)).toBeUndefined();
+    expect(adapter.writeToken).not.toHaveBeenCalled();
   });
   it("honours strict m even when a different trusted mint holds more", async () => {
     const { tm } = setup({ balances: { [accepted]: 100, [other]: 1000 } });
     await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
     tm.assertStep("sendComplete");
-    expect(sentMint(tm)?.args).toEqual([accepted, 50, "sat"]);
+    expect(sentMint(tm)?.args).toEqual([{ mintUrl: accepted, amount: 50, unit: "sat" }]);
   });
   it("ranks accepted candidates by balance, not trusted order", async () => {
     const { tm } = setup({
@@ -107,7 +150,7 @@ describe("NFC terminal unit and mints", () => {
     });
     await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
     tm.assertStep("sendComplete");
-    expect(sentMint(tm)?.args).toEqual([other, 50, "sat"]);
+    expect(sentMint(tm)?.args).toEqual([{ mintUrl: other, amount: 50, unit: "sat" }]);
   });
   it.each([
     INPUTS.paymentRequestBasic,
@@ -120,7 +163,7 @@ describe("NFC terminal unit and mints", () => {
       expect(switchUnit).toHaveBeenCalledWith("usd");
       tm.assertStep("sendComplete");
       tm.assertContext({ unit: "usd", amount: 50, mintUrl: accepted });
-      expect(sentMint(tm)?.args).toEqual([accepted, 50, "usd"]);
+      expect(sentMint(tm)?.args).toEqual([{ mintUrl: accepted, amount: 50, unit: "usd" }]);
       expect(tm.notificationCalls).toContainEqual({
         key: "onNfcPaymentProgress",
         data: { phase: "selecting" },
@@ -155,7 +198,7 @@ describe("NFC terminal unit and mints", () => {
     });
     await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
     tm.assertStep("sendComplete");
-    expect(sentMint(tm)?.args).toEqual([other, 50, "usd"]);
+    expect(sentMint(tm)?.args).toEqual([{ mintUrl: other, amount: 50, unit: "usd" }]);
   });
   it("retains the existing hard-stop without a host switch operation", async () => {
     const { tm } = setup({ unit: "usd", switchEnabled: false });
@@ -249,12 +292,15 @@ describe("NFC-scanned invoice stays interactive after the tap", () => {
 });
 
 const refuseFees = (reason = "This payment request needs a mint without ecash redemption fees.") =>
-  vi.fn(async (_mintUrl: string, _unit: string) => ({ payable: false as const, reason }));
+  vi.fn(async (_request: { mintUrl: string; unit: string }) => ({
+    payable: false as const,
+    reason,
+  }));
 
 describe("NFC mint choice honours the payment-request gate", () => {
   it("skips a mint the send would refuse and pays from the next one", async () => {
     // `other` outranks `accepted` on balance, but its keysets charge fees.
-    const payability = vi.fn(async (mintUrl: string) =>
+    const payability = vi.fn(async ({ mintUrl }: { mintUrl: string; unit: string }) =>
       mintUrl === other
         ? { payable: false as const, reason: "fees" }
         : { payable: true as const },
@@ -266,8 +312,8 @@ describe("NFC mint choice honours the payment-request gate", () => {
     });
     await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
     tm.assertStep("sendComplete");
-    expect(sentMint(tm)?.args).toEqual([accepted, 50, "sat"]);
-    expect(payability.mock.calls.map(([mintUrl]) => mintUrl)).toEqual([other, accepted]);
+    expect(sentMint(tm)?.args).toEqual([{ mintUrl: accepted, amount: 50, unit: "sat" }]);
+    expect(payability.mock.calls.map(([{ mintUrl }]) => mintUrl)).toEqual([other, accepted]);
     expect(adapter.writeToken).toHaveBeenCalledTimes(1);
   });
 
@@ -322,7 +368,12 @@ describe("NFC mint choice honours the payment-request gate", () => {
     expect(adapter.writeToken).not.toHaveBeenCalled();
     expect(tm.notificationCalls).toContainEqual({
       key: "onNfcWriteFailed",
-      data: { message: "mint offline", rolledBack: false, stage: "prepare" },
+      data: {
+        message: "mint offline",
+        authored: false,
+        rolledBack: false,
+        stage: "prepare",
+      },
     });
   });
 });

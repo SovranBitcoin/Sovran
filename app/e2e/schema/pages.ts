@@ -18,8 +18,7 @@ export const CANONICAL_PAGES = [
   'splash', // boot splash before the Terms gate on a fresh install
   'terms', // Terms & Conditions gate
   'privacy', // Privacy review step
-  'onboarding-carousel', // the four intro slides (occurrences 1-4)
-  'welcome', // "Welcome to Sovran" + Get Started reveal
+  'onboarding-carousel', // the four intro cards (occurrences 1-4)
   // shell
   'wallet', // wallet home (WalletScreen)
   'drawer', // profile drawer (drawer-profile-name)
@@ -50,6 +49,8 @@ export const CANONICAL_PAGES = [
   'mint-history', // one mint's NUT-06 update history from its details page (MintChangesScreen)
   'profile', // nostr user profile (UserProfileScreen)
   'dm-chat', // 1:1 DM conversation (UserMessagesScreen, dm-chat-probe)
+  'details', // every fact about one payment, as a table (details-sheet, details-sheet-done)
+  'note-picker', // held ecash by denomination, from the amount screen's notes key (note-picker, note-picker-use)
   'camera', // QR scan camera screen (CameraScreen, incl. its permission-required state)
   'search', // header search overlay with results (SearchOverlay)
   'settings', // settings root screen ((settings-flow), SettingsScreen)
@@ -86,6 +87,7 @@ export const CANONICAL_PAGES = [
   'onchain-send',
   'payment-request',
   'profile-share',
+  'receive-message-ecash',
   'receive-rails',
   'settings-delete',
   'settings-design-system',
@@ -94,6 +96,10 @@ export const CANONICAL_PAGES = [
   'settings-design-system-foundations',
   'settings-design-system-loading',
   'settings-design-system-posts',
+  'settings-design-system-screens',
+  'settings-design-system-prompts', // every prompt and blocking screen, listed
+  'settings-design-system-prompt', // one of them, opened on sample data
+  'settings-design-system-variations',
   'settings-design-system-segmented',
   'settings-design-system-skeleton-crossfade',
   'settings-design-system-timeline',

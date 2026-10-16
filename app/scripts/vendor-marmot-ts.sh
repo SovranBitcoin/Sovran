@@ -1,41 +1,49 @@
 #!/usr/bin/env bash
 #
-# Sync the vendored copy of marmot-ts at vendor/marmot-ts/ from the sibling
-# checkout at ../marmot-ts/. Vendored because EAS only sees the sovran-app
-# tree, so a `file:../marmot-ts` install path would break CI builds.
+# Refresh the vendored copy of marmot-ts at app/vendor/marmot-ts/ from a
+# checkout of it. Vendored because an EAS build only sees this repository, so a
+# `file:` path to a sibling checkout would break it.
 #
-# When you change anything in ../marmot-ts/, run this from sovran-app/:
+#   cd app && bun run vendor:marmot-ts && bun install
 #
-#   bun run vendor:marmot-ts && bun install
-#
-# Then commit vendor/marmot-ts/ alongside sovran-app changes that depend
-# on the new marmot-ts behaviour.
+# The checkout is looked for beside this repository (../marmot-ts from the
+# repository root); set MARMOT_TS_DIR to use another. It must be a clean git
+# checkout: the commit it is at is written to vendor/marmot-ts/UPSTREAM, and a
+# copy that cannot name its commit is refused. Commit vendor/marmot-ts/ with the
+# change that needs the new behaviour.
 #
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-SIBLING="$REPO_ROOT/../marmot-ts"
-TARGET="$REPO_ROOT/vendor/marmot-ts"
+APP_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+SOURCE="${MARMOT_TS_DIR:-$APP_ROOT/../../marmot-ts}"
+TARGET="$APP_ROOT/vendor/marmot-ts"
 
-if [ ! -d "$SIBLING" ]; then
-  echo "error: sibling checkout not found at $SIBLING" >&2
+fail() {
+  echo "error: $*" >&2
   exit 1
-fi
+}
 
-echo "→ building marmot-ts at $SIBLING"
-(cd "$SIBLING" && pnpm install --ignore-workspace --silent && pnpm build)
+[ -d "$SOURCE/.git" ] || [ -f "$SOURCE/.git" ] ||
+  fail "no git checkout of marmot-ts at $SOURCE (set MARMOT_TS_DIR)"
+[ -f "$SOURCE/LICENSE" ] || fail "$SOURCE has no LICENSE; a copy cannot be vendored without one"
+[ -z "$(git -C "$SOURCE" status --porcelain)" ] ||
+  fail "$SOURCE has uncommitted changes; the vendored copy must match a commit"
 
-if [ ! -d "$SIBLING/dist" ]; then
-  echo "error: marmot-ts build did not produce dist/" >&2
-  exit 1
-fi
+REVISION="$(git -C "$SOURCE" rev-parse HEAD)"
+ORIGIN="$(git -C "$SOURCE" remote get-url origin 2>/dev/null || echo unknown)"
 
-echo "→ syncing dist + package.json into $TARGET"
+echo "→ building marmot-ts $REVISION at $SOURCE"
+(cd "$SOURCE" && pnpm install --ignore-workspace --frozen-lockfile --silent && pnpm build)
+[ -d "$SOURCE/dist" ] || fail "the marmot-ts build did not produce dist/"
+
+echo "→ copying dist, package.json and LICENSE into $TARGET"
 rm -rf "$TARGET/dist"
 mkdir -p "$TARGET/dist"
-cp -R "$SIBLING/dist/." "$TARGET/dist/"
-cp "$SIBLING/package.json" "$TARGET/package.json"
-cp "$SIBLING/LICENSE" "$TARGET/LICENSE" 2>/dev/null || true
-cp "$SIBLING/README.md" "$TARGET/README.md" 2>/dev/null || true
+cp -R "$SOURCE/dist/." "$TARGET/dist/"
+cp "$SOURCE/package.json" "$TARGET/package.json"
+cp "$SOURCE/LICENSE" "$TARGET/LICENSE"
+[ ! -f "$SOURCE/README.md" ] || cp "$SOURCE/README.md" "$TARGET/README.md"
+printf 'source: %s\nrevision: %s\nrefresh: cd app && bun run vendor:marmot-ts\n' \
+  "$ORIGIN" "$REVISION" >"$TARGET/UPSTREAM"
 
-echo "✓ marmot-ts vendored. Run 'bun install' to refresh node_modules."
+echo "✓ marmot-ts $REVISION vendored. Run 'bun install' to refresh node_modules."

@@ -128,10 +128,45 @@ export function catalogRunRef(detail: RunDetail, scenarioId: string): CatalogRun
     status: detail.status,
     proof: detail.proof,
     driver: detail.driver,
-    ok: timeline?.ok,
+    ok: detail.proof === 'manual-review' ? undefined : timeline?.ok,
   };
-  if (scenarioStatus) ref.scenarioStatus = scenarioStatus;
+  if (scenarioStatus && detail.proof !== 'manual-review') ref.scenarioStatus = scenarioStatus;
   return ref;
+}
+
+/** Recorded stories and manual reviews stay browsable after their authoring files change. */
+export function recordedCatalogEntries(runs: readonly RunDetail[]): ScenarioCatalogEntry[] {
+  const entries = new Map<string, ScenarioCatalogEntry>();
+  for (const run of runs) {
+    if (run.origin !== 'stories' && run.origin !== 'manual') continue;
+    for (const timeline of run.scenarios) {
+      let entry = entries.get(timeline.scenarioId);
+      if (!entry) {
+        entry = {
+          id: timeline.scenarioId,
+          name: timeline.name,
+          description: timeline.description ?? '',
+          lane: timeline.lane,
+          tags: [],
+          facets: parseFacets([]),
+          platforms: [],
+          suites: [],
+          runs: [],
+          runDisabledReason:
+            run.origin === 'manual'
+              ? 'Manual review evidence cannot be rerun.'
+              : 'Run stories with the e2e:story or e2e:stories command.',
+        };
+        entries.set(entry.id, entry);
+      }
+      const platform =
+        run.driver === 'sim' ? 'ios' : run.driver === 'android' ? 'android' : undefined;
+      if (platform && !entry.platforms.includes(platform)) entry.platforms.push(platform);
+      const ref = catalogRunRef(run, timeline.scenarioId);
+      if (ref) entry.runs.push(ref);
+    }
+  }
+  return [...entries.values()];
 }
 
 export async function buildCatalog(): Promise<ScenarioCatalogEntry[]> {
@@ -140,11 +175,13 @@ export async function buildCatalog(): Promise<ScenarioCatalogEntry[]> {
     loadSuiteMembership(),
     listRuns(),
   ]);
-  return files.map((file) => ({
+  const legacy = files.map((file) => ({
     ...file,
     suites: membership.get(file.id) ?? [],
     runs: runs
       .map((run) => catalogRunRef(run, file.id))
       .filter((run): run is CatalogRunRef => run !== undefined),
   }));
+  const legacyIds = new Set(legacy.map((entry) => entry.id));
+  return [...legacy, ...recordedCatalogEntries(runs).filter((entry) => !legacyIds.has(entry.id))];
 }

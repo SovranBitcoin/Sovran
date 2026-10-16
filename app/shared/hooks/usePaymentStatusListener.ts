@@ -20,11 +20,12 @@ import {
   standingPaymentRequestKey,
 } from 'wallet';
 import { paymentStatusPopup } from '@/shared/lib/popup';
+import { describeError } from '@/shared/lib/errors';
 import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
 import { isSwapStatusActive } from '@/shared/stores/runtime/swapStatusStore';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { setTransactionAnnotation } from '@/shared/stores/profile/transactionAnnotationStore';
-import { amountToNumber } from '@/shared/lib/cashu/amount';
+import { amountToNumber } from 'wallet/amount';
 import { paymentLog, mintUrlLogFields } from '@/shared/lib/logger';
 
 const NPC_RECEIVE_POPUP_MAX_AGE_MS = 5 * 60 * 1000;
@@ -818,7 +819,9 @@ export function usePaymentStatusListener(): void {
         amount,
         unit,
         state: 'failed',
-        errorMessage: operation.error ?? 'Payment was rolled back',
+        errorMessage: operation.error
+          ? describeError({ message: operation.error }, 'cashu').text
+          : 'Payment was rolled back',
       });
       paymentStatusPopup({ variant: 'melt', id, mintUrl, amount, unit });
     });

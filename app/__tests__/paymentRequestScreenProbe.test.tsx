@@ -65,6 +65,7 @@ jest.mock('@/shared/ui/composed/ButtonHandler', () => {
 });
 jest.mock('@/features/wallet', () => ({ MintSelector: () => null }));
 jest.mock('@/features/transactions', () => ({
+  entryDetailItems: () => [],
   HistoryEntryHeader: () => null,
   HistoryEntryRefresh: () => null,
   HistoryEntryTimeline: () => null,

@@ -5,7 +5,7 @@ import type { AnimatedRef } from 'react-native-reanimated';
 
 import { initLog } from '@/shared/lib/logger';
 import { registerQRButtonRemeasure, setQRButtonAnchor } from '@/shared/lib/qrButtonAnchor';
-import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { useStylePaint } from '@/shared/styles/appStyle';
 import { qrButtonGeometry } from './qrButtonGeometry';
 import { useQRButtonPressFeedback } from './useQRButtonPressFeedback';
 import { useQRButtonReveal } from './useQRButtonReveal';
@@ -31,14 +31,29 @@ export const DEFAULT_SIZE = 64;
  * is the foreground (black) with a soft black gradient and a light icon.
  */
 export function useQRButtonChrome(size: number) {
-  const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
-  const { borderRadius, containerStyle, pressableStyle } = qrButtonGeometry(size, foreground);
+  const paint = useStylePaint();
+  // The scan control is the home's one filled control, so it wears the
+  // style's primary paint: the foreground in a monochrome style, the accent in
+  // an accent style. The glass style keeps its original foreground tile.
+  const glassStyle = paint.style.surface === 'glass';
+  const fill = paint.primary.container.backgroundColor;
+  const foreground = glassStyle || typeof fill !== 'string' ? paint.text.primary : fill;
+  const background = glassStyle ? paint.canvas : paint.primary.content;
+  // The glass style keeps the original glossy tile and its glow. Every other
+  // style draws a plain foreground fill in the style's own control radius.
+  const glass = glassStyle;
+  const { borderRadius, containerStyle, pressableStyle } = qrButtonGeometry(
+    size,
+    glass ? size * 0.18 : paint.style.radius.control,
+    glass ? foreground : null
+  );
   const animatedRef = useAnimatedRef<Animated.View>();
   const visibilityStyle = useQRButtonReveal();
   const pressFeedback = useQRButtonPressFeedback();
   return {
     foreground,
     background,
+    glass,
     borderRadius,
     containerStyle,
     pressableStyle,

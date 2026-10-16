@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { persist } from 'zustand/middleware';
 import { z } from 'zod';
 
@@ -45,7 +45,20 @@ interface NutDropRedeemEntry {
    * for public-broadcast drops.
    */
   paymentId?: string;
+  /**
+   * How the token reached us. Absent means `ble` (every entry written before
+   * this field existed came over the mesh). A `nostr` entry arrived as a
+   * direct message while online, so it is received like any pasted token: the
+   * mint's swap is the verification, and the offline-proof requirement that
+   * guards mesh drops does not apply.
+   */
+  source?: RedeemSource;
+  /** Hex pubkey of the Nostr sender, for the history row's counterparty. */
+  senderPubkey?: string;
 }
+
+const REDEEM_SOURCES = ['ble', 'nostr'] as const;
+type RedeemSource = (typeof REDEEM_SOURCES)[number];
 
 interface NutDropRedeemQueueState {
   byTokenHash: Record<string, NutDropRedeemEntry>;
@@ -57,17 +70,29 @@ interface NutDropRedeemQueueActions {
     tokenHash: string,
     entry: Pick<
       NutDropRedeemEntry,
-      'token' | 'mintUrl' | 'amount' | 'unit' | 'senderPeerID' | 'paymentId'
+      | 'token'
+      | 'mintUrl'
+      | 'amount'
+      | 'unit'
+      | 'senderPeerID'
+      | 'paymentId'
+      | 'source'
+      | 'senderPubkey'
     >
   ) => boolean;
   markStatus: (tokenHash: string, status: NutDropRedeemStatus, error?: string) => void;
   scheduleRetry: (tokenHash: string, error: string) => void;
+  /**
+   * Put a parked entry (`untrusted-mint`, `failed`) back in line with a clean
+   * attempt count: its mint has since been trusted, or the person asked to try
+   * again. A terminal entry is never requeued.
+   */
+  requeue: (tokenHash: string) => void;
   prune: () => void;
 }
 
 type NutDropRedeemQueueStore = NutDropRedeemQueueState & NutDropRedeemQueueActions;
 
-const ENTRY_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 /** Terminal entries only need to survive long enough to dedupe re-delivery. */
 const TERMINAL_TTL_MS = 24 * 60 * 60 * 1000;
 const MAX_ATTEMPTS = 5;
@@ -83,15 +108,32 @@ const STATUS_VALUES = [
   'failed',
 ] as const;
 
+/**
+ * The stored limits a queued entry must fit. One entry over a limit fails the
+ * whole blob's parse on the next launch and takes every other queued token
+ * with it, so a writer checks these before it enqueues.
+ */
+export const NUT_DROP_QUEUE_LIMITS = {
+  tokenHash: 64,
+  token: 60_000,
+  mintUrl: 2048,
+  unit: 16,
+  lastError: 500,
+} as const;
+
+/** An error as the queue stores it. A mint or proxy can answer with a whole
+ *  page, and one entry past its limit fails the stored queue on next launch. */
+const clipError = (error: string) => error.slice(0, NUT_DROP_QUEUE_LIMITS.lastError);
+
 const PersistedNutDropRedeemQueueStore = z.object({
   byTokenHash: z
     .record(
-      z.string().max(64),
+      z.string().max(NUT_DROP_QUEUE_LIMITS.tokenHash),
       z.looseObject({
-        token: z.string().min(1).max(60_000),
-        mintUrl: z.string().min(1).max(2048),
+        token: z.string().min(1).max(NUT_DROP_QUEUE_LIMITS.token),
+        mintUrl: z.string().min(1).max(NUT_DROP_QUEUE_LIMITS.mintUrl),
         amount: z.number().int().nonnegative(),
-        unit: z.string().max(16),
+        unit: z.string().max(NUT_DROP_QUEUE_LIMITS.unit),
         // Forward-compatible persisted status: an older build that opens a
         // queue written by a newer build must keep the locked ecash and retry
         // it, not reject the whole profile-scoped blob. Mint redemption is
@@ -100,19 +142,30 @@ const PersistedNutDropRedeemQueueStore = z.object({
         attempts: z.number().int().nonnegative(),
         nextAttemptAt: z.number().int().nonnegative(),
         receivedAt: z.number().int().nonnegative(),
-        lastError: z.string().max(500).optional(),
+        lastError: z.string().max(NUT_DROP_QUEUE_LIMITS.lastError).optional(),
         senderPeerID: z.string().max(128).optional(),
         paymentId: z.string().max(128).optional(),
+        // Additive and tolerant: an unknown source from a newer build reads as
+        // absent (the mesh default, the stricter path), never a rejected blob.
+        source: z.enum(REDEEM_SOURCES).optional().catch(undefined),
+        senderPubkey: z
+          .string()
+          .regex(/^[a-f0-9]{64}$/)
+          .optional()
+          .catch(undefined),
       })
     )
     .default({}),
 });
 
 function isTerminal(status: NutDropRedeemStatus): boolean {
-  return status === 'redeemed' || status === 'spent' || status === 'failed';
+  return status === 'redeemed' || status === 'spent';
 }
 
-export const useNutDropRedeemQueueStore = create<NutDropRedeemQueueStore>()(
+export const useNutDropRedeemQueueStore = create<NutDropRedeemQueueStore>({
+  name: 'nut-drop-redeem-queue',
+  scope: 'profile',
+})(
   persist(
     (set, get) => ({
       byTokenHash: {},
@@ -150,7 +203,23 @@ export const useNutDropRedeemQueueStore = create<NutDropRedeemQueueStore>()(
         set((state) => ({
           byTokenHash: {
             ...state.byTokenHash,
-            [tokenHash]: { ...existing, status, ...(error ? { lastError: error } : {}) },
+            [tokenHash]: { ...existing, status, ...(error ? { lastError: clipError(error) } : {}) },
+          },
+        }));
+      },
+
+      requeue: (tokenHash) => {
+        const existing = get().byTokenHash[tokenHash];
+        if (!existing || isTerminal(existing.status)) return;
+        storeLog.info('store.nut_drop_queue.requeue', {
+          tokenHash: tokenHash.slice(0, 12),
+          from: existing.status,
+        });
+        const { lastError: _lastError, ...rest } = existing;
+        set((state) => ({
+          byTokenHash: {
+            ...state.byTokenHash,
+            [tokenHash]: { ...rest, status: 'pending', attempts: 0, nextAttemptAt: 0 },
           },
         }));
       },
@@ -168,7 +237,7 @@ export const useNutDropRedeemQueueStore = create<NutDropRedeemQueueStore>()(
           set((state) => ({
             byTokenHash: {
               ...state.byTokenHash,
-              [tokenHash]: { ...existing, status: 'failed', attempts, lastError: error },
+              [tokenHash]: { ...existing, status: 'failed', attempts, lastError: clipError(error) },
             },
           }));
           return;
@@ -190,7 +259,7 @@ export const useNutDropRedeemQueueStore = create<NutDropRedeemQueueStore>()(
               status: 'pending',
               attempts,
               nextAttemptAt,
-              lastError: error,
+              lastError: clipError(error),
             },
           },
         }));
@@ -201,8 +270,8 @@ export const useNutDropRedeemQueueStore = create<NutDropRedeemQueueStore>()(
         set((state) => ({
           byTokenHash: Object.fromEntries(
             Object.entries(state.byTokenHash).filter(([, entry]) => {
-              const ttl = isTerminal(entry.status) ? TERMINAL_TTL_MS : ENTRY_TTL_MS;
-              return entry.receivedAt >= now - ttl;
+              // Retry exhaustion and age do not prove that ecash was spent.
+              return !isTerminal(entry.status) || entry.receivedAt >= now - TERMINAL_TTL_MS;
             })
           ),
         }));

@@ -404,7 +404,7 @@ EXECUTE (melt* intent) / AMOUNT_ENTERED(destination=meltQuote)
    -> enterAmount? -> selectMint? (balance + method-aware) -> navigateToMeltPreview
         [quote-first: operations.quoteMelt creates the melt quote BEFORE the
          preview dispatches; its fee_reserve + quoted amount ride the step data]
-   -> CONFIRM_MELT -- in place --> operations.executeMelt(…, { quoteId })
+   -> CONFIRM_MELT -- in place --> operations.executeMelt({ …, quoteId })
         success: setStep('navigateToMeltPreview', {...data, historyEntry})  (step STAYS)
         failure: routeOperationFailure -> chooseFallbackOption | ALL_OPTIONS_DISABLED | stay
 ```
@@ -1081,6 +1081,8 @@ during verification and the invariant rests on source review.
 | `src/history/timeline.ts` | settled-before-confirmed timeline copy |
 
 ## 11. Cross-flow expectations and known gaps
+
+Which of the gaps below to build is follow-up F135, which also lists the four that the code has since closed.
 
 This section records intended payment-flow behavior and how the shipped code
 currently meets it. Each item tags a status: `shipped` (code already does this),

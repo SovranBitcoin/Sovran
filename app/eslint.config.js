@@ -17,6 +17,37 @@ const REACT_COMPILER_BAILING_TSX = (() => {
   }
 })();
 
+// Store creation must go through the scope-requiring registry factory.
+const storeRegistryPlugin = {
+  rules: {
+    'require-factory': {
+      meta: {
+        type: 'problem',
+        schema: [],
+        messages: {
+          factory: 'Use defineStore/defineVanillaStore with an explicit scope.',
+        },
+      },
+      create(context) {
+        return {
+          ImportDeclaration(node) {
+            if (!['zustand', 'zustand/vanilla'].includes(node.source.value)) return;
+            for (const specifier of node.specifiers) {
+              if (
+                specifier.type === 'ImportNamespaceSpecifier' ||
+                specifier.type === 'ImportDefaultSpecifier' ||
+                ['create', 'createStore'].includes(specifier.imported?.name)
+              ) {
+                context.report({ node: specifier, messageId: 'factory' });
+              }
+            }
+          },
+        };
+      },
+    },
+  },
+};
+
 module.exports = defineConfig([
   // Global ignores — apply to every config below. Listed first because a
   // flat-config block with only `ignores` (no `files`) is treated as a
@@ -341,8 +372,7 @@ module.exports = defineConfig([
             "Use `openExternalUrl(raw)` from '@/shared/lib/url'. It enforces an http/https/mailto/tel scheme allowlist and returns a `ResultAsync` so rejection paths surface. Raw `Linking.openURL` opens any scheme the OS recognises — `javascript:`, `file:`, `intent:` — which is a privilege-escalation surface for untrusted input.",
         },
         // `borderWidth: 0.5` (and the directional variants) rounds DOWN
-        // to 0 on DPR=1 devices — the border vanishes. Documented in
-        // `skills/sovran-ui/references/responsive-scaling.md`.
+        // to 0 on DPR=1 devices — the border vanishes.
         // Use `StyleSheet.hairlineWidth`
         // (== `1 / PixelRatio.get()`, guaranteed to render as exactly
         // one physical pixel on every density). 1pt is also fine if the
@@ -351,11 +381,10 @@ module.exports = defineConfig([
           selector:
             "Property[key.name=/^border(Top|Bottom|Left|Right|Start|End)?Width$/][value.type='Literal'][value.value=0.5]",
           message:
-            '`borderWidth: 0.5` rounds to 0 on DPR=1 devices and the border disappears. Use `StyleSheet.hairlineWidth` (1 physical pixel on every density) or a literal `1`. See skills/sovran-ui/references/responsive-scaling.md.',
+            '`borderWidth: 0.5` rounds to 0 on DPR=1 devices and the border disappears. Use `StyleSheet.hairlineWidth` (1 physical pixel on every density) or a literal `1`.',
         },
         // `Date#toLocaleDateString` / `Date#toLocaleTimeString` bypass the
-        // canonical date pipeline in `shared/lib/date.ts` (rule:
-        // `skills/sovran-data/references/dates.md`). The shared
+        // canonical date pipeline in `shared/lib/date.ts`. The shared
         // `formatDate(input, style)` and
         // `formatRelative(input, style)` resolve locale automatically
         // (in-app language override → device locale → `'en'`) and lock the
@@ -367,7 +396,7 @@ module.exports = defineConfig([
         {
           selector: 'MemberExpression[property.name=/^toLocale(Date|Time)String$/]',
           message:
-            "Use `formatDate(input, style)` from '@/shared/lib/date' (or `formatRelative` for relative timestamps). The shared helpers resolve locale automatically and lock the style vocabulary. See skills/sovran-data/references/dates.md for the catalog of styles.",
+            "Use `formatDate(input, style)` from '@/shared/lib/date' (or `formatRelative` for relative timestamps). The shared helpers resolve locale automatically and lock the style vocabulary. The styles are listed in shared/lib/date.ts.",
         },
       ],
     },
@@ -465,5 +494,11 @@ module.exports = defineConfig([
     rules: {
       'no-restricted-syntax': 'off',
     },
+  },
+  {
+    files: ['**/*.ts', '**/*.tsx'],
+    ignores: ['shared/lib/persist/defineStore.ts', '**/__tests__/**'],
+    plugins: { 'store-registry': storeRegistryPlugin },
+    rules: { 'store-registry/require-factory': 'error' },
   },
 ]);

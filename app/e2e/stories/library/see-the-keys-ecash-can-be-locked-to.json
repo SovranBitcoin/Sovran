@@ -1,0 +1,108 @@
+{
+  "id": "see-the-keys-ecash-can-be-locked-to",
+  "purpose": "A person opens P2PK Keys in Settings, sees the code for their key, switches it to their Nostr key, and goes back.",
+  "startsFrom": "onboarded",
+  "steps": [
+    {
+      "name": "the wallet opens",
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-send"
+          }
+        },
+        {
+          "logged": "splash.gone"
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "open the drawer",
+      "tap": {
+        "id": "header-profile-avatar"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "drawer-menu-settings"
+          }
+        }
+      ]
+    },
+    {
+      "name": "open Settings",
+      "tap": {
+        "id": "drawer-menu-settings"
+      },
+      "expect": [
+        {
+          "page": "SettingsScreen"
+        },
+        {
+          "visible": {
+            "id": "settings-profile-row"
+          }
+        }
+      ]
+    },
+    {
+      "name": "open P2PK Keys",
+      "tap": {
+        "id": "settings-keyring-row"
+      },
+      "expect": [
+        {
+          "page": "SettingsKeyringScreen"
+        },
+        {
+          "visible": {
+            "id": "keyring-active-qr"
+          }
+        },
+        {
+          "visible": {
+            "id": "keyring-active-tab-npub"
+          }
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "show the Nostr key instead",
+      "tap": {
+        "id": "keyring-active-tab-npub"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "keyring-active-qr"
+          }
+        },
+        {
+          "visible": {
+            "id": "keyring-active-copy"
+          }
+        }
+      ]
+    },
+    {
+      "name": "go back to Settings",
+      "tap": {
+        "id": "keyring-close"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "settings-keyring-row"
+          }
+        },
+        {
+          "gone": {
+            "id": "keyring-active-qr"
+          }
+        }
+      ]
+    }
+  ]
+}

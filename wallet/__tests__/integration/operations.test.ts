@@ -91,7 +91,7 @@ describe('Operations — real Manager', () => {
   });
 
   it('executeMintQuote creates a quote with bolt11 invoice', async () => {
-    const result = await instance.operations.executeMintQuote!(TEST_MINT, 64, 'sat');
+    const result = await instance.operations.executeMintQuote!({ mintUrl: TEST_MINT, amount: 64, unit: 'sat' });
 
     expect(result.historyEntry).toBeDefined();
     const entry = JSON.parse(result.historyEntry);
@@ -179,7 +179,7 @@ describe('Operations — real Manager', () => {
     });
 
     it('executeSend creates a send history entry', async () => {
-      const result = await instance.operations.executeSend!(TEST_MINT, 10);
+      const result = await instance.operations.executeSend!({ mintUrl: TEST_MINT, amount: 10 });
       expect(result.historyEntry).toBeDefined();
       const entry = JSON.parse(result.historyEntry);
       expect(entry.type).toBe('send');
@@ -193,12 +193,12 @@ describe('Operations — real Manager', () => {
     });
 
     it('executeReceive accepts a token and creates history', async () => {
-      const sendResult = await instance.operations.executeSend!(TEST_MINT, 5);
+      const sendResult = await instance.operations.executeSend!({ mintUrl: TEST_MINT, amount: 5 });
       const sendEntry = JSON.parse(sendResult.historyEntry);
       const token = sendEntry.token || sendEntry.metadata?.token;
       expect(token).toBeTruthy();
 
-      const result = await instance.operations.executeReceive!(token, TEST_MINT, 5);
+      const result = await instance.operations.executeReceive!({ tokenString: token, mintUrl: TEST_MINT, amount: 5 });
       expect(result.historyEntry).toBeDefined();
       const entry = JSON.parse(result.historyEntry);
       expect(entry.type).toBe('receive');

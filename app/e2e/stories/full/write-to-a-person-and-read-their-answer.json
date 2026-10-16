@@ -1,0 +1,216 @@
+{
+  "id": "write-to-a-person-and-read-their-answer",
+  "purpose": "A person finds someone by their public key, opens a chat with them, writes hello, and after opening the chat again reads the answer that came back.",
+  "startsFrom": "onboarded",
+  "steps": [
+    {
+      "name": "the wallet opens",
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-send"
+          }
+        },
+        {
+          "logged": "splash.gone"
+        }
+      ],
+      "withinMs": 20000
+    },
+    {
+      "name": "open search",
+      "tap": {
+        "id": "wallet-search-toggle"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-search-input"
+          }
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "type their key",
+      "type": {
+        "into": {
+          "id": "wallet-search-input"
+        },
+        "text": "{{person}}"
+      },
+      "expect": [
+        {
+          "visible": {
+            "idPrefix": "contact-row:nostr:"
+          }
+        }
+      ],
+      "withinMs": 30000
+    },
+    {
+      "name": "open them",
+      "tap": {
+        "idPrefix": "contact-row:nostr:",
+        "matchIndex": 0
+      },
+      "expect": [
+        {
+          "page": "UserProfileScreen"
+        },
+        {
+          "visible": {
+            "id": "send-message-menu"
+          }
+        }
+      ],
+      "withinMs": 15000
+    },
+    {
+      "name": "open the message menu",
+      "tap": {
+        "id": "send-message-menu"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "send-message-menu-nostr"
+          }
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "choose a Nostr message",
+      "tap": {
+        "id": "send-message-menu-nostr"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "dm-chat-probe"
+          }
+        }
+      ],
+      "withinMs": 15000
+    },
+    {
+      "name": "tap the composer",
+      "tap": {
+        "label": "Message composer"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "dm-chat-probe"
+          }
+        }
+      ],
+      "withinMs": 15000
+    },
+    {
+      "name": "write hello",
+      "type": {
+        "text": "hello from a story"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "dm-chat-probe"
+          }
+        }
+      ],
+      "withinMs": 15000
+    },
+    {
+      "name": "send it",
+      "tap": {
+        "label": "Send message"
+      },
+      "expect": [
+        {
+          "logged": "dm.send.complete"
+        },
+        {
+          "logged": "chat.list.history_change",
+          "with": {
+            "count": 1,
+            "lastIsOwn": true
+          }
+        }
+      ],
+      "withinMs": 30000
+    },
+    {
+      "name": "they answer, and it reaches the app",
+      "handed": {
+        "reply": {
+          "text": "hello back"
+        }
+      },
+      "expect": [
+        {
+          "logged": "nostr.nip17.unwrap_gift_wrap.success",
+          "with": {
+            "contentLen": 10
+          }
+        }
+      ],
+      "withinMs": 90000
+    },
+    {
+      "name": "leave the chat",
+      "tap": {
+        "id": "dm-header-back"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "send-message-menu"
+          }
+        },
+        {
+          "gone": {
+            "id": "dm-chat-probe"
+          }
+        }
+      ],
+      "withinMs": 10000
+    },
+    {
+      "name": "open the message menu",
+      "tap": {
+        "id": "send-message-menu"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "send-message-menu-nostr"
+          }
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "open the chat again, and both messages are there",
+      "tap": {
+        "id": "send-message-menu-nostr"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "dm-chat-probe"
+          }
+        },
+        {
+          "logged": "chat.list.history_change",
+          "with": {
+            "count": 2,
+            "lastIsOwn": false
+          }
+        }
+      ],
+      "withinMs": 20000
+    }
+  ]
+}

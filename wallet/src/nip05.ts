@@ -1,182 +1,166 @@
-// ---------------------------------------------------------------------------
-// NIP-05 resolution — lightning address → Nostr hex pubkey
-//
-// When a payment target is a Lightning Address (`<name>@<domain>`), the
-// recipient often publishes a Nostr identity at the same well-known path.
-// Fetching that lets the wallet show the recipient's avatar + display name
-// on the amount-entry screen instead of an anonymous mint pill.
-//
-// Spec: https://github.com/nostr-protocol/nips/blob/master/05.md
-//   • GET `https://<domain>/.well-known/nostr.json?name=<local>`
-//   • Body: `{ names: { <local>: <hex_pubkey> }, relays?: { <hex>: string[] } }`
-//   • Pubkey is 32-byte lowercase hex (64 chars).
-//
-// Hardening mirrors `lnurl.ts`:
-//   • timeouts via `safeFetch`,
-//   • `.onion` short-circuit so the OS resolver doesn't stall the flow,
-//   • silent fallback to `null` on anything but a clean success — this is a
-//     cosmetic enrichment, never a melt blocker.
-// ---------------------------------------------------------------------------
-
-import { z } from 'zod';
-
-import { errField, logger } from './logger';
-import { parseLightningAddress } from './lnurl';
-import { isAbortError, safeFetch, type RequestControls } from './safeFetch';
+import { z } from "zod";
+import { safeFetch, withTimeout, type RequestControls } from "./safeFetch";
 
 const HEX_PUBKEY = /^[0-9a-f]{64}$/;
+const Nip05Response = z.object({ names: z.record(z.string(), z.string()) });
+const MAX_RESPONSE_LENGTH = 32_768;
 
-/**
- * Minimal NIP-05 response shape. `relays` is documented by the spec but
- * unused by the recipient-header flow, so it is accepted-but-ignored to
- * keep the schema strict enough to reject obvious junk.
- */
-const Nip05Response = z.looseObject({
-  names: z.record(z.string(), z.string()),
-});
-
-function isOnionHost(host: string): boolean {
-  return host.toLowerCase().endsWith('.onion');
+/** NIP-05 identifiers are ASCII; a bare domain denotes its `_` name. */
+export function parseNip05Identifier(input: string): {
+  identifier: string;
+  username: string;
+  domain: string;
+} | null {
+  const value = input.trim().toLowerCase();
+  if (!value || value.length > 256) return null;
+  const parts = value.includes("@") ? value.split("@") : ["_", value];
+  if (parts.length !== 2) return null;
+  const [username, domain] = parts;
+  if (!username || !domain || !/^[a-z0-9._-]+$/.test(username)) return null;
+  // Public DNS names only: no credentials, ports, IP literals or URL syntax.
+  const labels = domain.split(".");
+  if (
+    labels.length < 2 ||
+    domain.length > 253 ||
+    !/^[a-z]{2,63}$/.test(labels[labels.length - 1] ?? "") ||
+    labels.some(
+      (label) => !/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(label),
+    ) ||
+    domain.endsWith(".onion") ||
+    domain.endsWith(".local")
+  )
+    return null;
+  return { identifier: `${username}@${domain}`, username, domain };
 }
 
-function loggableAddress(address: string): Record<string, unknown> {
-  const parsed = parseLightningAddress(address);
+export type Nip05Verification =
+  | { status: "verified"; identifier: string }
+  | { status: "mismatch"; identifier: string }
+  | { status: "error"; reason: "invalid" | "response" | "missing" | "network" };
+
+type Lookup =
+  | { status: "found"; pubkey: string; identifier: string }
+  | Extract<Nip05Verification, { status: "error" }>;
+
+/** Stream-cap the response where supported (including Expo's native fetch). */
+async function readIdentityResponse(
+  response: Response,
+): Promise<string | null> {
+  const reader = response.body?.getReader();
+  if (!reader) {
+    const text = await response.text();
+    return text.length <= MAX_RESPONSE_LENGTH ? text : null;
+  }
+  const decoder = new TextDecoder();
+  let length = 0;
+  let text = "";
+  try {
+    for (;;) {
+      const chunk = await reader.read();
+      if (chunk.done) return text + decoder.decode();
+      length += chunk.value.byteLength;
+      if (length > MAX_RESPONSE_LENGTH) return null;
+      text += decoder.decode(chunk.value, { stream: true });
+    }
+  } finally {
+    // Cancellation is best effort; the enclosing request also aborts on exit.
+    void reader.cancel().catch(() => undefined);
+    reader.releaseLock();
+  }
+}
+
+async function lookupNip05(
+  address: string,
+  controls: RequestControls,
+): Promise<Lookup> {
+  const parsed = parseNip05Identifier(address);
+  if (!parsed) return { status: "error", reason: "invalid" };
+  const controller = new AbortController();
+  const abort = () => controller.abort();
+  if (controls.signal?.aborted) return { status: "error", reason: "network" };
+  controls.signal?.addEventListener("abort", abort, { once: true });
+  const timeoutMs = controls.timeoutMs ?? 5_000;
+  const url = `https://${parsed.domain}/.well-known/nostr.json?name=${encodeURIComponent(parsed.username)}`;
+  try {
+    return await withTimeout(
+      (async (): Promise<Lookup> => {
+        const response = await safeFetch(
+          url,
+          { signal: controller.signal, timeoutMs },
+          {
+            redirect: "error",
+            credentials: "omit",
+            cache: "no-store",
+          },
+        );
+        // Also reject followed redirects on native transports that ignore redirect:error.
+        if (
+          !response.ok ||
+          response.redirected ||
+          (response.url && response.url !== url)
+        )
+          return { status: "error", reason: "response" };
+        const length = Number(response.headers.get("content-length"));
+        if (length > MAX_RESPONSE_LENGTH)
+          return { status: "error", reason: "response" };
+        const text = await readIdentityResponse(response);
+        if (text === null || controller.signal.aborted)
+          return { status: "error", reason: "response" };
+        let raw: unknown;
+        try {
+          raw = JSON.parse(text);
+        } catch {
+          return { status: "error", reason: "response" };
+        }
+        const result = Nip05Response.safeParse(raw);
+        if (!result.success) return { status: "error", reason: "response" };
+        const names = result.data.names;
+        // Local names are case-insensitive. Reject conflicting case variants
+        // rather than choosing whichever key the server happened to order first.
+        const matches = Object.entries(names).filter(
+          ([name]) => name.toLowerCase() === parsed.username,
+        );
+        const keys = new Set(matches.map(([, key]) => key));
+        if (keys.size > 1) return { status: "error", reason: "response" };
+        const pubkey = matches[0]?.[1];
+        if (!pubkey) return { status: "error", reason: "missing" };
+        if (!HEX_PUBKEY.test(pubkey))
+          return { status: "error", reason: "response" };
+        return { status: "found", pubkey, identifier: parsed.identifier };
+      })(),
+      timeoutMs,
+      "nip05",
+    );
+  } catch {
+    // Domain-controlled responses/errors must not leak credential-bearing URLs.
+    return { status: "error", reason: "network" };
+  } finally {
+    controller.abort();
+    controls.signal?.removeEventListener("abort", abort);
+  }
+}
+
+/** Verify the domain's mapping against the selected key; never replace that key. */
+export async function verifyNip05(
+  address: string,
+  expectedPubkey: string,
+  controls: RequestControls = {},
+): Promise<Nip05Verification> {
+  if (!HEX_PUBKEY.test(expectedPubkey))
+    return { status: "error", reason: "invalid" };
+  const result = await lookupNip05(address, controls);
+  if (result.status === "error") return result;
   return {
-    inputLength: address.length,
-    parsed: !!parsed,
-    usernameLength: parsed?.username.length ?? 0,
-    domain: parsed?.domain ?? null,
+    status: result.pubkey === expectedPubkey ? "verified" : "mismatch",
+    identifier: result.identifier,
   };
 }
 
-/**
- * Resolve a Lightning Address to a Nostr hex pubkey via NIP-05.
- *
- * Returns `null` on:
- *   • input that is not a Lightning Address,
- *   • `.onion` domain (RN/iOS/Android can't resolve at OS level),
- *   • network failure, non-2xx response, malformed JSON,
- *   • schema mismatch,
- *   • missing entry for the requested name,
- *   • a `names[<name>]` value that is not 32-byte lowercase hex.
- *
- * Lookup is case-insensitive against the `names` map: the spec lowercases
- * the local-part, but a non-trivial number of providers ship mixed-case
- * keys (`Alice`, `_Root`). Probing both forms costs nothing and avoids a
- * missed match.
- */
+/** Optional payment-recipient enrichment; lookup failure is not a payment failure. */
 export async function fetchNip05Pubkey(
   address: string,
   controls: RequestControls = {},
 ): Promise<string | null> {
-  logger.info('nip05.resolve.start', {
-    ...loggableAddress(address),
-    hasSignal: !!controls.signal,
-    signalAborted: controls.signal?.aborted === true,
-    timeoutMs: controls.timeoutMs ?? null,
-  });
-  const parsed = parseLightningAddress(address);
-  if (!parsed) {
-    logger.debug('nip05.resolve.skipped', {
-      reason: 'not_lightning_address',
-      inputLength: address.length,
-    });
-    return null;
-  }
-  const { username, domain } = parsed;
-  if (isOnionHost(domain)) {
-    logger.info('nip05.resolve.skipped', {
-      reason: 'onion_host',
-      domain,
-      usernameLength: username.length,
-    });
-    return null;
-  }
-
-  const url = `https://${domain}/.well-known/nostr.json?name=${encodeURIComponent(username)}`;
-
-  let response: Response;
-  try {
-    logger.debug('nip05.fetch.start', {
-      domain,
-      usernameLength: username.length,
-    });
-    response = await safeFetch(url, controls);
-  } catch (e) {
-    if (isAbortError(e)) {
-      logger.warn('nip05.fetch.timeout', {
-        domain,
-        usernameLength: username.length,
-      });
-      return null;
-    }
-    logger.warn('nip05.fetchFailed', {
-      domain,
-      usernameLength: username.length,
-      error: errField(e),
-    });
-    return null;
-  }
-  if (!response.ok) {
-    logger.warn('nip05.httpError', {
-      domain,
-      usernameLength: username.length,
-      status: response.status,
-    });
-    return null;
-  }
-
-  let raw: unknown;
-  try {
-    raw = await response.json();
-  } catch (e) {
-    logger.warn('nip05.invalidJson', {
-      domain,
-      usernameLength: username.length,
-      error: errField(e),
-    });
-    return null;
-  }
-
-  const result = Nip05Response.safeParse(raw);
-  if (!result.success) {
-    logger.warn('nip05.invalidShape', {
-      domain,
-      usernameLength: username.length,
-      issueCount: result.error.issues.length,
-      issues: result.error.issues.map((issue) => ({
-        path: issue.path.join('.'),
-        code: issue.code,
-      })),
-    });
-    return null;
-  }
-
-  const names = result.data.names;
-  const pick = (key: string) => (Object.hasOwn(names, key) ? names[key] : undefined);
-  const hex = pick(username) ?? pick(username.toLowerCase()) ?? null;
-  if (!hex) {
-    logger.info('nip05.resolve.empty', {
-      domain,
-      usernameLength: username.length,
-      namesCount: Object.keys(names).length,
-    });
-    return null;
-  }
-
-  const lower = hex.toLowerCase();
-  if (!HEX_PUBKEY.test(lower)) {
-    logger.warn('nip05.invalidHex', {
-      domain,
-      usernameLength: username.length,
-      pubkeyLength: hex.length,
-    });
-    return null;
-  }
-  logger.info('nip05.resolve.done', {
-    domain,
-    usernameLength: username.length,
-    pubkeyLength: lower.length,
-  });
-  return lower;
+  const result = await lookupNip05(address, controls);
+  return result.status === "found" ? result.pubkey : null;
 }

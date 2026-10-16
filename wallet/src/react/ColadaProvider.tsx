@@ -21,6 +21,7 @@ import React, {
 } from "react";
 
 import { useLatestRef } from "./useLatestRef";
+import { createUnitPins } from "./unitPins";
 import {
   createInMemoryAnnotationStore,
   encodeAnnotation,
@@ -35,23 +36,14 @@ import { registerLocale } from "../formatting/locales";
 import { errField, logger, setLogger } from "../logger";
 import { createPaymentMachine } from "../machine/createMachine";
 import type {
-  BleAdapter,
-  CameraAdapter,
   ChainAdapter,
   ClipboardAdapter,
-  ClockAdapter,
-  HapticsAdapter,
   ImagePickerAdapter,
   LoggerAdapter,
   NfcAdapter,
-  NotificationsAdapter as SideEffectNotificationsAdapter,
   NostrAdapter,
   QrDecoderAdapter,
-  QrEncoderAdapter,
-  RandomAdapter,
-  SecureStorageAdapter,
   ShareAdapter,
-  StorageAdapter,
   ColadaAdapters,
 } from "../adapters/types";
 import type { Manager } from "@cashu/coco-core";
@@ -167,20 +159,11 @@ export interface ColadaProviderProps {
   paymentCopyOverrides?: Partial<PaymentCopyCatalog>;
   clipboardAdapter?: ClipboardAdapter;
   shareAdapter?: ShareAdapter;
-  cameraAdapter?: CameraAdapter;
   imagePickerAdapter?: ImagePickerAdapter;
-  hapticsAdapter?: HapticsAdapter;
-  notificationsAdapter?: SideEffectNotificationsAdapter;
   nostrAdapter?: NostrAdapter;
-  bleAdapter?: BleAdapter;
   nfcAdapter?: NfcAdapter;
   chainAdapter?: ChainAdapter;
-  storageAdapter?: StorageAdapter;
-  secureStorageAdapter?: SecureStorageAdapter;
-  qrEncoderAdapter?: QrEncoderAdapter;
   qrDecoderAdapter?: QrDecoderAdapter;
-  clockAdapter?: ClockAdapter;
-  randomAdapter?: RandomAdapter;
   loggerAdapter?: LoggerAdapter;
   /** Explicit scan sources override adapter-derived scan sources. */
   scanSources?: ScanSources;
@@ -203,9 +186,12 @@ export interface ColadaProviderProps {
  */
 interface ColadaBindings {
   setWalletContext: (walletContext: WalletContext) => void;
-  setUnitOverride: (unit: string) => void;
-  /** Clears the override only if it is still the one `unit` set. */
-  clearUnitOverride: (unit: string) => void;
+  /**
+   * Pin the machine's unit for as long as the caller is bound. Returns the
+   * release for this pin and no other: two binders may pin the same unit, and
+   * one of them leaving must not unpin the other.
+   */
+  setUnitOverride: (unit: string) => () => void;
   setOptionDismiss: (onOptionDismiss: (() => void) | undefined) => void;
   /** Clears only if still the same callback; returns whether it cleared. */
   clearOptionDismiss: (onOptionDismiss: (() => void) | undefined) => boolean;
@@ -439,8 +425,8 @@ function buildProviderMachine(
  * handing a mutable ref across a context boundary is the reason it can. The
  * provider owns the mutation now; consumers ask for it.
  *
- * Every clear is compare-and-clear, exactly as the assignments were: a binder
- * unmounting must never wipe a newer screen's override.
+ * Every release is the binder's own: a binder unmounting must never wipe
+ * another screen's override, whether newer or pinning the same unit.
  */
 function buildProviderBindings(refs: {
   walletContextRef: React.MutableRefObject<WalletContext | null>;
@@ -448,16 +434,12 @@ function buildProviderBindings(refs: {
   optionDismissRef: React.MutableRefObject<(() => void) | undefined>;
 }): ColadaBindings {
   const { walletContextRef, unitRef, optionDismissRef } = refs;
+  const pinUnit = createUnitPins(unitRef);
   return {
     setWalletContext: (walletContext) => {
       walletContextRef.current = walletContext;
     },
-    setUnitOverride: (unit) => {
-      unitRef.current = unit;
-    },
-    clearUnitOverride: (unit) => {
-      if (unitRef.current === unit) unitRef.current = undefined;
-    },
+    setUnitOverride: pinUnit,
     setOptionDismiss: (onOptionDismiss) => {
       optionDismissRef.current = onOptionDismiss;
     },
@@ -491,20 +473,11 @@ export function ColadaProvider({
   paymentCopyOverrides,
   clipboardAdapter,
   shareAdapter,
-  cameraAdapter,
   imagePickerAdapter,
-  hapticsAdapter,
-  notificationsAdapter,
   nostrAdapter,
-  bleAdapter,
   nfcAdapter: nfcAdapterProp,
   chainAdapter,
-  storageAdapter,
-  secureStorageAdapter,
-  qrEncoderAdapter,
   qrDecoderAdapter,
-  clockAdapter,
-  randomAdapter,
   loggerAdapter,
   scanSources: scanSourcesProp,
   deepLinks,
@@ -514,39 +487,21 @@ export function ColadaProvider({
     () => ({
       clipboardAdapter,
       shareAdapter,
-      cameraAdapter,
       imagePickerAdapter,
-      hapticsAdapter,
-      notificationsAdapter,
       nostrAdapter,
-      bleAdapter,
       nfcAdapter: nfcAdapterProp,
       chainAdapter,
-      storageAdapter,
-      secureStorageAdapter,
-      qrEncoderAdapter,
       qrDecoderAdapter,
-      clockAdapter,
-      randomAdapter,
       loggerAdapter,
     }),
     [
       clipboardAdapter,
       shareAdapter,
-      cameraAdapter,
       imagePickerAdapter,
-      hapticsAdapter,
-      notificationsAdapter,
       nostrAdapter,
-      bleAdapter,
       nfcAdapterProp,
       chainAdapter,
-      storageAdapter,
-      secureStorageAdapter,
-      qrEncoderAdapter,
       qrDecoderAdapter,
-      clockAdapter,
-      randomAdapter,
       loggerAdapter,
     ],
   );
@@ -1097,8 +1052,8 @@ interface UsePaymentFlowMachineConfig {
    * Explicit unit override for flows started while this screen is bound
    * (e.g. NearPay pins 'sat'). Omit to use the provider's `getUnit` — the
    * app's live active unit. Do NOT pass the active unit redundantly: the
-   * override is last-binder-wins across mounted screens, so redundant
-   * bindings can clobber each other.
+   * most recently bound screen's pin is the one in force, so a redundant
+   * binding can put a stale unit over a newer screen's.
    */
   unit?: string;
   onOptionDismiss?: () => void;
@@ -1125,13 +1080,10 @@ export function usePaymentFlowMachine({
       ...summarizeWalletContext(walletContext),
     });
     if (unit === undefined) return;
-    ctx.bindings.setUnitOverride(unit);
-    return () => {
-      // Release the override when this binder unmounts (or changes unit) so
-      // a stale explicit unit can't leak into a later flow's reset. Guarded
-      // so we never clear a different screen's newer override.
-      ctx.bindings.clearUnitOverride(unit);
-    };
+    // Released when this binder unmounts (or changes unit), so a stale
+    // explicit unit can't leak into a later flow's reset. The release is this
+    // binder's own: it never clears another screen's pin.
+    return ctx.bindings.setUnitOverride(unit);
   }, [ctx, walletContext, unit]);
 
   useEffect(() => {

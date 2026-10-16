@@ -11,7 +11,7 @@
  * the flow.
  */
 
-import NfcManager, { NfcTech } from 'react-native-nfc-manager';
+import NfcManager, { NfcAdapter, NfcTech } from 'react-native-nfc-manager';
 
 import { nfcLog } from '../logger';
 import { NfcError } from './errors';
@@ -70,8 +70,13 @@ export async function acquireSession(): Promise<void> {
     await Promise.race([
       // alertMessage shows in iOS's system "Ready to Scan" sheet; Android
       // ignores it (the app's own nfc-tap sheet is the UI there).
+      // Android reader mode (as Minibits and the native Cashu wallet do) gives
+      // this app exclusive use of the field, so the OS tag chooser or another
+      // wallet can't take the tap. Ignored on iOS.
       NfcManager.requestTechnology(NfcTech.IsoDep, {
         alertMessage: 'Hold near the payment terminal',
+        isReaderModeEnabled: true,
+        readerModeFlags: NfcAdapter.FLAG_READER_NFC_A | NfcAdapter.FLAG_READER_NFC_B,
       }),
       new Promise<never>((_resolve, reject) => {
         timeout = setTimeout(() => {

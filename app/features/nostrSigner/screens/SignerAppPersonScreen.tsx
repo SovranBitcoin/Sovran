@@ -13,7 +13,8 @@
 import React from 'react';
 import { useLocalSearchParams } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
-import { ListGroup, PressableFeedback, Switch as HeroSwitch } from 'heroui-native';
+import { ListGroup, PressableFeedback } from 'heroui-native';
+import { Switch as HeroSwitch } from '@/shared/ui/primitives/Switch';
 import { z } from 'zod';
 
 import Icon from 'assets/icons';
@@ -80,7 +81,12 @@ export function SignerAppPersonScreen(): React.ReactElement {
     }
     let failed = 0;
     for (const method of ['nip04_decrypt', 'nip44_decrypt'] as const) {
-      const result = setPeerDecryptGrant(clientPubkey, peer, method, { peerIsSelf: false });
+      const result = setPeerDecryptGrant({
+        clientPubkey,
+        peerPubkey: peer,
+        method,
+        peerIsSelf: false,
+      });
       if (result.isErr()) failed += 1;
     }
     if (failed > 0) {

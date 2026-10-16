@@ -55,10 +55,10 @@ export function useOverlaidContactSearch(query: string): {
   // metadata cache is layered on top. Cache hits paint immediately; missing or
   // stale entries trigger a fetch.
   const pubkeys = useMemo(() => results.map((r) => r.pubkey), [results]);
-  const { metadata: cachedMetadata } = useNostrProfileMetadataMany(pubkeys);
+  const { metadata: cachedMetadata, loadingPubkeys } = useNostrProfileMetadataMany(pubkeys);
 
   const contactRows = useMemo<ContactSearchRow[]>(() => {
-    // `isLoadingProfile` reflects whether *this row's* profile is absent — not
+    // `isLoadingProfile` lasts until *this row's* first fetch settles — not
     // whether *some* query is in flight. Prior results stay visible during a
     // refinement (stale-while-revalidate), so flagging every row loading on
     // every keystroke would re-skeleton real results.
@@ -85,11 +85,11 @@ export function useOverlaidContactSearch(query: string): {
         id: `contact:${r.pubkey}`,
         pubkey: r.pubkey,
         profile,
-        isLoadingProfile: false,
+        isLoadingProfile: !profile.picture && loadingPubkeys.has(r.pubkey),
         score: SCORE_CONTACT_BASE - i, // preserve order from API
       };
     });
-  }, [results, cachedMetadata]);
+  }, [results, cachedMetadata, loadingPubkeys]);
 
   return { contactRows, loading: searchLoading, status, retry };
 }

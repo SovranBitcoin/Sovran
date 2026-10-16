@@ -13,7 +13,9 @@
  *      inbox for NUT-18 payloads via TWO paths sharing one unwrap→ingest body
  *      (`handleEnvelope`): a LIVE relay subscription (`subscribeDmEnvelopes`) so
  *      a paid request is claimed the instant the wrap arrives, plus a 15s poll
- *      (nagg DM index → relay floor) as the offline/reconnect backstop. Each
+ *      (nagg DM index → relay floor) as the offline/reconnect backstop. The
+ *      poll stops while the app is backgrounded and runs once immediately on
+ *      return to the foreground. Each
  *      kind-1059 envelope is unwrapped and NUT-18-looking rumor contents fed to
  *      `paymentRequestReceiveService.ingestPayload` with the wrap event id as
  *      `transportMessageId` (coco's idempotency key, so poll+live can't
@@ -25,6 +27,7 @@
  * so polling resumes automatically after restart.
  */
 
+import { AppState, type AppStateStatus } from 'react-native';
 import { getPublicKey } from 'nostr-tools/pure';
 import * as nip19 from 'nostr-tools/nip19';
 import { PaymentRequestTransportType, type PaymentRequestTransport } from '@cashu/cashu-ts';
@@ -41,14 +44,33 @@ import { reportCocoIssue } from '@/shared/lib/cashu/cocoFeedback';
  *  (nagg stores wraps), so payments received while offline are caught on the
  *  next tick — no live socket to babysit. */
 const POLL_INTERVAL_MS = 15_000;
+/** Ceiling for one tier's answer. The facade tries its tiers in sequence and
+ *  applies this to each, so a hung nagg hands over to the relay floor inside
+ *  the same tick instead of holding the default 30s across two of them. */
+const POLL_TIER_TIMEOUT_MS = 6_000;
+/** Ceiling for the whole read, below the cadence whatever the tier count, so a
+ *  slow tick has always settled before the next one is due. */
+const POLL_DEADLINE_MS = 13_000;
 const POLL_LIMIT = 50;
-const SEEN_CAP = 1000;
+const GIFT_WRAP_OVERLAP_SEC = 2 * 24 * 60 * 60;
 const GIFT_WRAP_KIND = 1059;
 
+type InboxLayer = Pick<
+  NonNullable<
+    ReturnType<(typeof import('@/shared/lib/nostr/buildNostrDataLayer'))['buildNostrDataLayer']>
+  >,
+  'getDmEnvelopes' | 'subscribeDmEnvelopes'
+>;
 interface NostrTransportPluginConfig {
+  loadDataLayer?: () => Promise<InboxLayer | null>;
   /** Profile Nostr secret key (same key the P2PK import uses); captured per
    *  manager init so one profile's key never serves another's manager. */
   getSignerKey: () => Uint8Array | null;
+  /** Foreground signal; injected by tests. */
+  appState?: {
+    currentState: AppStateStatus;
+    addEventListener(type: 'change', listener: (state: AppStateStatus) => void): { remove(): void };
+  };
 }
 
 /** Structural match for coco's PaymentRequestReceiveTransportHandler (the
@@ -66,6 +88,23 @@ function looksLikePaymentRequestPayload(content: string): boolean {
   return trimmed.startsWith('{') && trimmed.includes('"proofs"') && trimmed.includes('"mint"');
 }
 
+/**
+ * NUT-18 makes `unit` default to sat, but coco rejects a payload without one.
+ * Fill it in rather than drop a payer's ecash; otherwise pass the raw string
+ * through untouched so coco's integer-safe parse and payload hash still apply.
+ */
+export function withDefaultUnit(content: string): string {
+  try {
+    const raw: unknown = JSON.parse(content);
+    if (raw && typeof raw === 'object' && !('unit' in raw && (raw as { unit?: unknown }).unit)) {
+      return JSON.stringify({ ...raw, unit: 'sat' });
+    }
+  } catch {
+    // Not JSON: coco reports it.
+  }
+  return content;
+}
+
 export function createPaymentRequestNostrTransportPlugin(
   config: NostrTransportPluginConfig
 ): Plugin {
@@ -74,23 +113,50 @@ export function createPaymentRequestNostrTransportPlugin(
     required: ['paymentRequestReceiveService', 'logger'] as const,
     onInit(ctx) {
       const service = ctx.services.paymentRequestReceiveService;
+      const loadDataLayer =
+        config.loadDataLayer ??
+        (async () => {
+          const { buildNostrDataLayer } = await import('@/shared/lib/nostr/buildNostrDataLayer');
+          return buildNostrDataLayer();
+        });
 
       const activeOps = new Set<string>();
-      const seenWraps = new Set<string>();
+      // Terminal wraps stay deduplicated for the whole manager/profile session.
+      let inboxSession: {
+        viewerPubkey: string;
+        newestCreatedAtSec: number | undefined;
+        seenWraps: Set<string>;
+        inFlightWraps: Set<string>;
+      } = {
+        viewerPubkey: '',
+        newestCreatedAtSec: undefined,
+        seenWraps: new Set<string>(),
+        inFlightWraps: new Set<string>(),
+      };
+      const sessionFor = (viewerPubkey: string) => {
+        if (inboxSession.viewerPubkey !== viewerPubkey) {
+          inboxSession = {
+            viewerPubkey,
+            newestCreatedAtSec: undefined,
+            seenWraps: new Set<string>(),
+            inFlightWraps: new Set<string>(),
+          };
+        }
+        return inboxSession;
+      };
+      const appState = config.appState ?? AppState;
       let timer: ReturnType<typeof setInterval> | null = null;
       let polling = false;
+      /** A poll was asked for while one was in flight; run it when that settles. */
+      let pollQueued = false;
+      let backgrounded = appState.currentState === 'background';
+      let recoveryNeeded = false;
+      let recovering = false;
       let disposed = false;
       let liveUnsub: (() => void) | null = null;
       let liveStarting = false;
       /** Monotonic per-tick counter, so a `reads` report can order the poll's ticks. */
       let pollGeneration = 0;
-
-      const capSeenWraps = (): void => {
-        if (seenWraps.size <= SEEN_CAP) return;
-        for (const id of [...seenWraps].slice(0, seenWraps.size - SEEN_CAP)) {
-          seenWraps.delete(id);
-        }
-      };
 
       /**
        * Unwrap + ingest a single gift-wrap envelope. Shared by the poll and the
@@ -101,59 +167,73 @@ export function createPaymentRequestNostrTransportPlugin(
        */
       const handleEnvelope = async (
         envelope: { id: string; kind: number; content: string; pubkey: string },
-        source: 'poll' | 'live'
+        source: 'poll' | 'live',
+        expectedViewerPubkey: string
       ): Promise<boolean> => {
-        if (envelope.kind !== GIFT_WRAP_KIND || seenWraps.has(envelope.id)) return false;
+        if (disposed || activeOps.size === 0 || envelope.kind !== GIFT_WRAP_KIND) return false;
         const secretKey = config.getSignerKey();
         if (!secretKey) return false;
         const viewerPubkey = getPublicKey(secretKey);
-        seenWraps.add(envelope.id);
-        capSeenWraps();
-        const rumor = giftWrapCache.unwrap(
-          viewerPubkey,
-          { id: envelope.id, content: envelope.content, pubkey: envelope.pubkey },
-          secretKey
-        );
-        if (!rumor || !looksLikePaymentRequestPayload(rumor.content)) return false;
+        if (viewerPubkey !== expectedViewerPubkey) return false;
+        const { seenWraps, inFlightWraps } = sessionFor(viewerPubkey);
+        if (seenWraps.has(envelope.id) || inFlightWraps.has(envelope.id)) return false;
+        inFlightWraps.add(envelope.id);
         try {
-          await service.ingestPayload(rumor.content, {
+          const rumor = giftWrapCache.unwrap(
+            viewerPubkey,
+            { id: envelope.id, content: envelope.content, pubkey: envelope.pubkey },
+            secretKey
+          );
+          if (!rumor || !looksLikePaymentRequestPayload(rumor.content)) {
+            inFlightWraps.delete(envelope.id);
+            seenWraps.add(envelope.id);
+            return false;
+          }
+          if (disposed) return false;
+          const result = await service.ingestPayload(withDefaultUnit(rumor.content), {
             transport: 'nostr',
             transportMessageId: envelope.id,
             senderPubkey: rumor.senderPubkey,
           });
+          if (result.attempt.state !== 'finalized' && result.attempt.state !== 'rejected') {
+            recoveryNeeded = true;
+            return false;
+          }
+          seenWraps.add(envelope.id);
           cashuLog.info('cashu.creq.transport.payload_ingested', {
             source,
             wrapIdLength: envelope.id.length,
             contentLength: rumor.content.length,
           });
-          return true;
+          return result.attempt.state === 'finalized';
         } catch (error) {
-          // Payloads for unknown/cancelled requests (or plain chat DMs that
-          // happened to look like payloads) are expected — log and move on; the
-          // wrap is marked seen so we never retry it.
+          recoveryNeeded = true;
+          // A concurrent BLE claim or transient mint failure must remain
+          // retryable. Only Coco terminal attempts enter the seen set.
           cashuLog.debug('cashu.creq.transport.payload_rejected', {
             source,
             error: error instanceof Error ? error.message : String(error),
           });
           return false;
+        } finally {
+          inFlightWraps.delete(envelope.id);
         }
       };
 
-      const pollOnce = async (): Promise<void> => {
-        if (polling || disposed) return;
+      const pollInbox = async (): Promise<void> => {
+        if (disposed) return;
         const secretKey = config.getSignerKey();
         if (!secretKey) return;
         const viewerPubkey = getPublicKey(secretKey);
+        const session = sessionFor(viewerPubkey);
         // Lazy import: the data-layer chain pulls native-only modules
         // (ndk-mobile) that must not load at manager-module import time
         // (node-side tests import the manager).
-        const { buildNostrDataLayer } = await import('@/shared/lib/nostr/buildNostrDataLayer');
-        const layer = buildNostrDataLayer();
+        const layer = await loadDataLayer();
         if (!layer) {
           cashuLog.debug('cashu.creq.transport.poll_no_tiers');
           return;
         }
-        polling = true;
         // This poll reads the viewer's whole gift-wrap inbox on a timer. It
         // carries the standard read lifecycle under its OWN surface so
         // log-doctor's `reads` mode can price it: without these, the poll shows
@@ -186,19 +266,37 @@ export function createPaymentRequestNostrTransportPlugin(
           // switch / reload), and re-unwrapping ~50 envelopes serially costs
           // ~8-10s of JS-thread NIP-44 crypto per re-init without it.
           await giftWrapCache.cache.hydrate(viewerPubkey);
-          const outcome = await layer.getDmEnvelopes({
-            viewerPubkey,
-            limit: POLL_LIMIT,
-            refresh: true,
-          });
+          const deadline = new AbortController();
+          const deadlineTimer = setTimeout(() => deadline.abort(), POLL_DEADLINE_MS);
+          const outcome = await layer
+            .getDmEnvelopes({
+              viewerPubkey,
+              limit: POLL_LIMIT,
+              ...(session.newestCreatedAtSec !== undefined
+                ? { since: session.newestCreatedAtSec - GIFT_WRAP_OVERLAP_SEC }
+                : {}),
+              refresh: true,
+              timeoutMs: POLL_TIER_TIMEOUT_MS,
+              signal: deadline.signal,
+            })
+            .finally(() => clearTimeout(deadlineTimer));
           const envelopes = outcome.match(
             (resolved) => resolved.envelopes,
             () => []
           );
+          const currentKey = config.getSignerKey();
+          if (disposed || !currentKey || getPublicKey(currentKey) !== viewerPubkey) return;
           let ingested = 0;
           for (const envelope of envelopes) {
-            if (disposed || activeOps.size === 0) break;
-            if (await handleEnvelope(envelope, 'poll')) ingested += 1;
+            if (disposed || activeOps.size === 0 || inboxSession !== session) break;
+            // Never advance from the clock: late wraps may be two days older.
+            session.newestCreatedAtSec = Math.max(
+              session.newestCreatedAtSec ?? envelope.createdAtSec,
+              envelope.createdAtSec
+            );
+            if (session.seenWraps.has(envelope.id) || session.inFlightWraps.has(envelope.id))
+              continue;
+            if (await handleEnvelope(envelope, 'poll', viewerPubkey)) ingested += 1;
           }
           cashuLog.debug('cashu.creq.transport.poll_done', {
             envelopeCount: envelopes.length,
@@ -239,15 +337,54 @@ export function createPaymentRequestNostrTransportPlugin(
             // next one is the backstop.
             retained: false,
           });
-        } finally {
-          polling = false;
         }
       };
 
+      const pollOnce = async () => {
+        if (polling || disposed) return;
+        polling = true;
+        // Re-ingestion alone returns a stored receiving attempt. Ask Coco to
+        // reconcile its child operation, without blocking inbox discovery on a
+        // stalled mint. Its operation locks serialize this with live claims.
+        if (recoveryNeeded && !recovering) {
+          recovering = true;
+          recoveryNeeded = false;
+          void service
+            .recoverPendingAttempts()
+            .catch(() => {
+              recoveryNeeded = true;
+            })
+            .finally(() => {
+              recovering = false;
+            });
+        }
+        try {
+          await pollInbox();
+        } catch (error) {
+          cashuLog.debug('cashu.creq.transport.poll_unavailable', {
+            error: error instanceof Error ? error.name : 'unknown',
+          });
+        } finally {
+          polling = false;
+          if (pollQueued) {
+            pollQueued = false;
+            if (timer) void pollOnce();
+          }
+        }
+      };
+
+      /** The immediate poll on start. One already in flight began before this
+       *  was asked for (before the app came back, say), so it cannot stand in
+       *  for it: queue a fresh one behind it rather than drop the request. */
+      const pollNow = () => {
+        if (polling) pollQueued = true;
+        else void pollOnce();
+      };
+
       const startPolling = () => {
-        if (timer || disposed) return;
+        if (timer || disposed || backgrounded) return;
         timer = setInterval(() => void pollOnce(), POLL_INTERVAL_MS);
-        void pollOnce();
+        pollNow();
         cashuLog.info('cashu.creq.transport.polling_started', { activeOps: activeOps.size });
       };
 
@@ -271,14 +408,15 @@ export function createPaymentRequestNostrTransportPlugin(
             const secretKey = config.getSignerKey();
             if (!secretKey) return;
             const viewerPubkey = getPublicKey(secretKey);
-            const { buildNostrDataLayer } = await import('@/shared/lib/nostr/buildNostrDataLayer');
-            const layer = buildNostrDataLayer();
+            const layer = await loadDataLayer();
             // Deactivated / disposed / lost the key while the layer resolved.
             if (!layer || disposed || activeOps.size === 0) return;
             await giftWrapCache.cache.hydrate(viewerPubkey);
             if (disposed || activeOps.size === 0 || liveUnsub) return;
             liveUnsub = layer.subscribeDmEnvelopes({ viewerPubkey }, (env) => {
-              void handleEnvelope(env, 'live');
+              const currentKey = config.getSignerKey();
+              if (!currentKey || getPublicKey(currentKey) !== viewerPubkey) return;
+              void handleEnvelope(env, 'live', viewerPubkey);
             });
             cashuLog.info('cashu.creq.transport.live_started', { activeOps: activeOps.size });
           } catch (error) {
@@ -347,11 +485,28 @@ export function createPaymentRequestNostrTransportPlugin(
         },
       };
 
+      // Nothing can be claimed while the app is backgrounded that the first
+      // poll back in the foreground does not find, so the timer only runs in
+      // the foreground. `inactive` (iOS app switcher, a system sheet) keeps
+      // polling: the app is still on screen. The live subscription is left
+      // alone; the relay socket's fate in the background is the OS's.
+      const appStateSubscription = appState.addEventListener('change', (state) => {
+        if (state === 'background') {
+          backgrounded = true;
+          stopPolling();
+        } else if (state === 'active' && backgrounded) {
+          backgrounded = false;
+          if (activeOps.size > 0) startPolling();
+        }
+      });
+
       const unregister = service.registerTransportHandler(handler);
       cashuLog.info('cashu.creq.transport.registered');
 
       return () => {
         disposed = true;
+        // Jest's react-native mock hands back no subscription.
+        appStateSubscription?.remove();
         stopPolling();
         stopLive();
         activeOps.clear();

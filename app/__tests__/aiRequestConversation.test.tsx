@@ -40,12 +40,17 @@ jest.mock('@/shared/stores/profile/routstrStore', () => ({
 jest.mock('@/features/transactions/lib/openAiSession', () => ({
   openAiSession: (...args: unknown[]) => mockOpenAiSession(...args),
 }));
+// The build's modules (ADR 0021). Every module is on unless a case narrows it.
+const mockHasFeature = jest.fn((_feature: string) => true);
+jest.mock('@/shared/config/features', () => ({
+  hasFeature: (feature: string) => mockHasFeature(feature),
+}));
 jest.mock('@/shared/hooks/useThemeColor', () => ({ useThemeColor: () => 'c' }));
 jest.mock('@/shared/lib/logger', () => ({
   log: { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() },
   Log: ({ children }: { children: React.ReactNode }) => children,
 }));
-jest.mock('@/shared/ui/composed/GradientCard', () => ({ GradientCard: stub('GradientCard') }));
+jest.mock('@/shared/ui/composed/Surface', () => ({ Surface: stub('Surface') }));
 jest.mock('@/shared/ui/primitives/Pressable', () => ({ Pressable: stub('Pressable') }));
 jest.mock('@/shared/ui/primitives/Text', () => ({ Text: stub('Text') }));
 jest.mock('@/shared/ui/primitives/View/HStack', () => ({ HStack: stub('HStack') }));
@@ -82,6 +87,7 @@ const card = (r: TestRenderer.ReactTestRenderer) =>
   r.root.findAllByProps({ testID: 'ai-request-conversation' })[0];
 
 beforeEach(() => {
+  mockHasFeature.mockImplementation(() => true);
   mockSessions = [{ id: 's1', title: 'Cashu questions', messages: [...EXCHANGE] }];
   mockOpenAiSession.mockClear();
 });
@@ -136,6 +142,14 @@ describe('AiConversationSection', () => {
       (pressable.props.onPress as () => void)();
     });
     expect(mockOpenAiSession).toHaveBeenCalledWith('s1');
+  });
+
+  it('renders nothing in a build without the AI tab', () => {
+    mockHasFeature.mockImplementation((feature) => feature !== 'ai');
+    const r = render(
+      <AiConversationSection group={{ sessionId: 's1', messageId: 'a1', model: 'm' }} />
+    );
+    expect(r.toJSON()).toBeNull();
   });
 
   it('renders nothing when the conversation was cleared', () => {

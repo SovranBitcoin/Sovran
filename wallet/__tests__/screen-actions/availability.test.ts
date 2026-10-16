@@ -902,7 +902,7 @@ describe("amountEntryAvailability — next gate (sat-rounded fiat input)", () =>
     expect(actions.next.available).toBe(false);
   });
 
-  it('labels the Lightning variant "to npub.cash" for npc melt targets', () => {
+  it('labels the Lightning variant "as Lightning (npub.cash)" for npc melt targets', () => {
     // The npub.cash fallback (recipient without a lud16) must say where the
     // money actually goes; a real lud16 keeps the generic label.
     const entryFor = (meltTarget: string) => ({
@@ -929,8 +929,8 @@ describe("amountEntryAvailability — next gate (sat-rounded fiat input)", () =>
         (variant) => variant.id === "lightning",
       )?.label;
 
-    expect(labelFor("npub1example@npubx.cash")).toBe("to npub.cash");
-    expect(labelFor("npub1example@npub.cash")).toBe("to npub.cash");
+    expect(labelFor("npub1example@npubx.cash")).toBe("as Lightning (npub.cash)");
+    expect(labelFor("npub1example@npub.cash")).toBe("as Lightning (npub.cash)");
     expect(labelFor("alice@example.com")).toBe("as Lightning");
   });
 });
@@ -1336,14 +1336,14 @@ describe("amountEntryAvailability — required locks", () => {
     ...over,
   });
 
-  it("offers only Lock Ecash when the flow arrived with a lock key", () => {
+  it("offers only as Locked Ecash when the flow arrived with a lock key", () => {
     const actions = getAvailableActions(
       "amountEntry",
       lockedEntry({ p2pkLockPubkey: LOCK_KEY })
     );
     expect(actions.next.variants?.map((v) => v.id)).toEqual(["locked-ecash"]);
     expect(actions.next.variants?.[0]).toMatchObject({
-      label: "Lock Ecash",
+      label: "as Locked Ecash",
       available: true,
     });
   });
@@ -1409,7 +1409,7 @@ describe("amountEntryAvailability — npub.cash fallback", () => {
   it("names the destination and truncates the npub so the caveat fits", () => {
     const actions = getAvailableActions("amountEntry", npcEntry);
     const lightning = actions.next.variants?.find((v) => v.id === "lightning");
-    expect(lightning?.label).toBe("to npub.cash");
+    expect(lightning?.label).toBe("as Lightning (npub.cash)");
     // The bech32 is middle-truncated; the domain — the part that carries the
     // meaning — stays whole.
     expect(lightning?.description).toContain("…");
@@ -1420,7 +1420,27 @@ describe("amountEntryAvailability — npub.cash fallback", () => {
   it("warns that npub.cash was our choice, not theirs", () => {
     const actions = getAvailableActions("amountEntry", npcEntry);
     const lightning = actions.next.variants?.find((v) => v.id === "lightning");
-    expect(lightning?.description).toContain("check they use it first");
+    expect(lightning?.description).toContain("haven't published a Lightning address");
+    expect(lightning?.isCaution).toBe(true);
+  });
+
+  it("disables everything that needs the mint while offline, keeping plain ecash", () => {
+    const actions = getAvailableActions("amountEntry", { ...npcEntry, offline: true });
+    const lightning = actions.next.variants?.find((v) => v.id === "lightning");
+    expect(lightning?.available).toBe(false);
+    expect(lightning?.reason).toBe("Needs the mint, and you're offline");
+    const sendEntry = {
+      ...npcEntry,
+      destination: "sendEcash",
+      meltTarget: undefined,
+      mintUnreachable: true,
+    };
+    const send = getAvailableActions("amountEntry", sendEntry).next.variants ?? [];
+    expect(send.find((v) => v.id === "ecash")?.available).toBe(true);
+    const locked = send.find((v) => v.id === "locked-ecash");
+    expect(locked?.label).toBe("as Locked Ecash");
+    expect(locked?.available).toBe(false);
+    expect(locked?.reason).toBe("Needs the mint, which isn't responding");
   });
 
   it("leaves an advertised Lightning address unwarned", () => {

@@ -11,7 +11,7 @@ import {
 
 import { useMintStore, type ActiveUnit } from '@/shared/stores/profile/mintStore';
 import { walletLog } from '@/shared/lib/logger';
-import { amountToNumber } from '@/shared/lib/cashu/amount';
+import { amountToNumber } from 'wallet/amount';
 import { useIsTestnutMint } from '@/shared/stores/global/mintTestnutStore';
 
 import { useMintKeysetUnits } from './useMintKeysetUnits';

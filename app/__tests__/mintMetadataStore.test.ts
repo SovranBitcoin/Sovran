@@ -254,3 +254,38 @@ describe('discovery audit metrics', () => {
     expect(useMintMetadataStore.getState().getCached(MINT)?.auditData).toBeUndefined();
   });
 });
+
+it('keeps a freshly read score and timestamp when discovery has no score', () => {
+  const store = useMintMetadataStore.getState();
+  store.setReviewsAggregate(MINT, 4.5, 90);
+  const reviewsAt = store.getCached(MINT)?.reviewsAt;
+  store.upsertFromDiscover([discoverRow({ averageScore: null, reviewCount: 90 })]);
+  expect(store.getCached(MINT)).toMatchObject({ averageScore: 4.5, reviewCount: 90, reviewsAt });
+  store.mergeCached(MINT, { reviewsAt: 123 }, []);
+  store.upsertFromDiscover([discoverRow({ averageScore: null, reviewCount: 90 })]);
+  expect(store.getCached(MINT)).toMatchObject({
+    averageScore: 4.5,
+    reviewCount: 90,
+    reviewsAt: 123,
+  });
+  expect(store.isStale(MINT, 'reviews')).toBe(true);
+});
+
+it('leaves scoreless discovery stale when no aggregate was read', () => {
+  const store = useMintMetadataStore.getState();
+  store.upsertFromDiscover([discoverRow({ averageScore: null, reviewCount: 90 })]);
+  expect(store.getCached(MINT)?.reviewsAt).toBeUndefined();
+  expect(store.isStale(MINT, 'reviews')).toBe(true);
+});
+
+it('lets discovery refresh a stale scored aggregate and clear an explicit zero count', () => {
+  const store = useMintMetadataStore.getState();
+  store.setReviewsAggregate(MINT, 2, 3);
+  store.mergeCached(MINT, { reviewsAt: 1 }, []);
+  store.upsertFromDiscover([discoverRow({ averageScore: 4.5, reviewCount: 90 })]);
+  expect(store.getCached(MINT)).toMatchObject({ averageScore: 4.5, reviewCount: 90 });
+  expect(store.isStale(MINT, 'reviews')).toBe(false);
+  store.upsertFromDiscover([discoverRow({ averageScore: null, reviewCount: 0 })]);
+  expect(store.getCached(MINT)).toMatchObject({ averageScore: null, reviewCount: 0 });
+  expect(store.isStale(MINT, 'reviews')).toBe(false);
+});

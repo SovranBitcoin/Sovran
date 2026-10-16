@@ -6,7 +6,7 @@
  * Works with all transaction types: send, receive, mint, melt.
  */
 
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { persist } from 'zustand/middleware';
 import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
@@ -50,7 +50,10 @@ const PersistedTransactionLocationStore = z.object({
     .default({}),
 });
 
-export const useTransactionLocationStore = create<TransactionLocationStore>()(
+export const useTransactionLocationStore = create<TransactionLocationStore>({
+  name: 'transaction-location-store',
+  scope: 'profile',
+})(
   persist(
     (set) => ({
       // Initial state

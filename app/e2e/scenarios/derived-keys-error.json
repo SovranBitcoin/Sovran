@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "id": "recovery.derived-keys-error",
+  "name": "Open derived-account phrase recovery",
+  "description": "Open the recovery form from a prepared disposable device error state.",
+  "details": "Manual prerequisite: the device is already at this boot gate for a seed-derived account. No real funds; no state injection or recovery phrase is provided by this scenario.",
+  "lane": "physical",
+  "tags": ["flow:recovery"],
+  "requires": [],
+  "setup": [],
+  "steps": [
+    {"action":"waitFor","selector":{"id":"profile-keys-error"},"timeoutMs":30000},
+    {"action":"screenshot","name":"profile-keys-error"},
+    {"action":"tap","selector":{"id":"profile-keys-recover-phrase"}},
+    {"action":"waitFor","selector":{"id":"secure-recovery-submit"}},
+    {"action":"tap","selector":{"id":"key-recovery-cancel"}}
+  ],
+  "verify": [
+    {"action":"waitFor","selector":{"id":"profile-keys-recover-phrase"}}
+  ],
+  "finally": [],
+  "endState": "onboarding"
+}

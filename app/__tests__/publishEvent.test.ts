@@ -5,23 +5,19 @@
  */
 /* eslint-disable import/first */
 
-// virtual: ndk-mobile ships ESM-only exports jest-expo cannot resolve.
-jest.mock(
-  '@nostr-dev-kit/ndk-mobile',
-  () => ({
-    __esModule: true,
-    default: class NDK {},
-    NDKEvent: class NDKEvent {},
-    NDKRelaySet: {
-      // Resolve an explicit url set against the fake pool (mirrors NDK).
-      fromRelayUrls: jest.fn((urls: string[], ndk: { pool: { relays: Map<string, unknown> } }) => ({
-        relays: urls.map((u) => ndk.pool.relays.get(u)).filter(Boolean),
-      })),
-    },
-    normalizeRelayUrl: (url: string) => url,
-  }),
-  { virtual: true }
-);
+// Match the configured ndk-mobile module mapper so this suite uses its own double.
+jest.mock('@nostr-dev-kit/ndk-mobile', () => ({
+  __esModule: true,
+  default: class NDK {},
+  NDKEvent: class NDKEvent {},
+  NDKRelaySet: {
+    // Resolve an explicit url set against the fake pool (mirrors NDK).
+    fromRelayUrls: jest.fn((urls: string[], ndk: { pool: { relays: Map<string, unknown> } }) => ({
+      relays: urls.map((u) => ndk.pool.relays.get(u)).filter(Boolean),
+    })),
+  },
+  normalizeRelayUrl: (url: string) => url,
+}));
 
 jest.mock('@/shared/lib/logger', () => ({
   nostrLog: { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() },

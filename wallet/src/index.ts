@@ -241,6 +241,11 @@ export type {
 // Balance breakdown read model (framework-agnostic)
 export {
   amountToNumber,
+  amountToNumberOrUndefined,
+  requireAmount,
+} from "./amount";
+export type { AmountValue } from "./amount";
+export {
   emptyBalanceBreakdown,
   sumAmounts,
   sumReservedSends,
@@ -249,8 +254,6 @@ export type { WalletBalanceBreakdown } from "./balance";
 
 // Adapter contracts
 export type {
-  BleAdapter,
-  CameraAdapter,
   ChainAddressCounter,
   ChainAddressFundingTx,
   ChainAddressStats,
@@ -260,9 +263,7 @@ export type {
   ChainNetwork,
   ChainTransactionStatus,
   ClipboardAdapter,
-  ClockAdapter,
   ColadaAdapters,
-  HapticsAdapter,
   ImagePickerAdapter,
   JsonPrimitive,
   JsonRecord,
@@ -270,13 +271,8 @@ export type {
   LoggerAdapter,
   NfcAdapter,
   NostrAdapter,
-  NotificationsAdapter,
   QrDecoderAdapter,
-  QrEncoderAdapter,
-  RandomAdapter,
-  SecureStorageAdapter,
   ShareAdapter,
-  StorageAdapter,
 } from "./adapters";
 
 // Subscription bus
@@ -307,6 +303,9 @@ export type {
 
 // Errors
 export {
+  AuthoredError,
+  failureText,
+  type FailureText,
   isMeltUserCancelledError,
   MeltUserCancelledError,
   isUnitRateUnavailableError,
@@ -317,8 +316,10 @@ export {
 // re-preparation, reconciliation, error classification)
 export {
   classifyRebalanceError,
+  createChainSteps,
   createRebalanceEngine,
   createRebalanceLock,
+  insertStepsAfter,
   RebalanceMeltRolledBackError,
   RebalanceRoutesExhaustedError,
 } from "./rebalance";
@@ -410,6 +411,7 @@ export {
   getMintMethodCapability,
   hasCompatibleMintForMethod,
   hasMintSupportingMethod,
+  configureEnabledPaymentMethods,
   isMethodImplemented,
   isMintMethodCompatible,
   methodContextHasCompatibleMint,
@@ -493,6 +495,8 @@ export type {
   NfcIOAdapter,
   RecipientProfile,
   SendEntrySource,
+  SendFallbackAlternative,
+  SendFallbackId,
 } from "./machine/types";
 
 export type { MintAvailability } from "./machine/selectMintContext";
@@ -575,7 +579,7 @@ export {
 } from "./lnurl";
 
 // Recipient identity resolution (Lightning Address → Nostr hex pubkey)
-export { fetchNip05Pubkey } from "./nip05";
+export { fetchNip05Pubkey, parseNip05Identifier, verifyNip05, type Nip05Verification } from "./nip05";
 export { normalizeNostrPubkey, resolveRecipientPubkey } from "./recipient";
 
 // Cancellable-fetch primitives (timeout + AbortSignal). Hermes lacks
@@ -651,3 +655,11 @@ export type {
 // auto-redeem orchestrator. Ecash is locked to the recipient's announced
 // P2PK key and broadcast on the public mesh — no in-band handshake.
 export * from "./transport";
+
+export { disposeReusableQuoteFlights } from "./quotes/reusable";
+export { resetMeltTarget } from "./melt-target";
+export { disposeCashuSeedGetter } from "./wallet-seed";
+
+// Ecash the redux-era releases stored themselves: read from the old row and
+// received through the open wallet.
+export * from "./legacy-ecash";

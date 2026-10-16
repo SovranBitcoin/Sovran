@@ -29,13 +29,15 @@ before switching delivery or retiring the old website repository.
 
 ## Documentation map
 
+The [task harness](harness/README.md) owns the persistent agent workflow and its evidence gates.
+
 This README is the entry point; every other document in the repository hangs off
 this table.
 
 | Document | What it covers |
 |----------|----------------|
 | [`AGENTS.md`](AGENTS.md) · [`CLAUDE.md`](CLAUDE.md) | Contributor and agent entry point: layout, commands, testing and skills. CLAUDE.md imports AGENTS.md. |
-| [`hunch.config.ts`](hunch.config.ts) | Code rules that linting and type checks can't enforce, checked on each change with `npx @kelbie/hunch check`. |
+| [`.jevlint/checks`](docs/review/README.md) | Questions about what the code does that linting and type checks can't decide, run with `jevlint check`. |
 | [`CLAIMS.md`](CLAIMS.md) | What the product may claim, and the scoped source review behind each claim. |
 | [`FEEDBACK.md`](FEEDBACK.md) | Upstream feedback ledger for the coco v2 integration. |
 | [`app/README.md`](app/README.md) | The Expo / React Native application package. |

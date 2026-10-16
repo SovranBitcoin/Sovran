@@ -148,7 +148,7 @@ describe("back-nav re-entry — supersedes in-flight resolve work", () => {
     let calls = 0;
     const tm = createTestMachine({
       operations: {
-        executeMintQuote: async (_mint, amount) => {
+        executeMintQuote: async ({ mintUrl: _mint, amount }) => {
           calls += 1;
           if (calls === 1) return first.promise; // slow mint
           return quoteEntry(`q${calls}`, amount as number);
@@ -189,7 +189,7 @@ describe("back-nav re-entry — supersedes in-flight resolve work", () => {
     let calls = 0;
     const tm = createTestMachine({
       operations: {
-        executeMintQuote: async (_mint, amount) => {
+        executeMintQuote: async ({ mintUrl: _mint, amount }) => {
           calls += 1;
           if (calls === 1) return first.promise;
           return quoteEntry(`q${calls}`, amount as number);
@@ -222,7 +222,7 @@ describe("back-nav re-entry — supersedes in-flight resolve work", () => {
     let calls = 0;
     const tm = createTestMachine({
       operations: {
-        executeMintQuote: async (mint, amount) => {
+        executeMintQuote: async ({ mintUrl: mint, amount }) => {
           calls += 1;
           if (calls === 1) return first.promise;
           return quoteEntry(`q${calls}`, amount as number, mint as string);
@@ -473,7 +473,7 @@ describe("back-nav re-entry — commits stay locked", () => {
         metadata: {},
       }),
     });
-    const executeSend = async (_mintUrl: string, amount: number) => {
+    const executeSend = async ({ mintUrl: _mintUrl, amount }: { mintUrl: string; amount: number }) => {
       sendCalls += 1;
       if (sendCalls === 1) return firstGate.promise;
       if (sendCalls === 2) return secondGate.promise;

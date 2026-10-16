@@ -1,5 +1,6 @@
+import { useProfile } from '@/shared/lib/nostr/useEntityCache';
 import { useFeedIgnoreStore } from '@/features/feed/stores/ignoreStore';
-import { avatarStateFor } from '@/shared/lib/imageLoadState';
+import { profileAvatarStateFor } from '@/shared/lib/imageLoadState';
 import { parseImetaTags } from '@/shared/lib/nostr/media/imeta';
 import React, { useCallback, useMemo } from 'react';
 import { useRecyclingState } from '@shopify/flash-list';
@@ -327,6 +328,7 @@ export const QuotedPostCard = React.memo(function QuotedPostCard({
     'surface-tertiary',
   ] as const);
 
+  const { profile: cachedAuthor, status: authorStatus } = useProfile(event?.pubkey);
   const suppressQuotedTapStart = useCallback(() => {
     onPressIn?.();
   }, [onPressIn]);
@@ -379,8 +381,8 @@ export const QuotedPostCard = React.memo(function QuotedPostCard({
         ]}>
         <HStack align="flex-end" gap={spacing.xs} style={sharedStyles.mb6}>
           <Avatar
-            state={avatarStateFor(profile?.picture, profile !== undefined)}
-            picture={profile?.picture}
+            state={profileAvatarStateFor(cachedAuthor?.picture ?? profile?.picture, authorStatus)}
+            picture={cachedAuthor?.picture ?? profile?.picture}
             seed={event.pubkey}
             size={24}
             name={displayName}

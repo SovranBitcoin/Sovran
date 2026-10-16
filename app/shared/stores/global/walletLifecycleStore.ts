@@ -1,6 +1,6 @@
 import { BACKUP_FLOW_REVISION } from '@/shared/lib/backup/revision';
 import * as React from 'react';
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { persist } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { z } from 'zod';
@@ -47,7 +47,10 @@ const PersistedWalletLifecycleStore = z.object({
   lastRestoreError: z.string().max(500).nullable().default(null),
 });
 
-export const useWalletLifecycleStore = create<WalletLifecycleState>()(
+export const useWalletLifecycleStore = create<WalletLifecycleState>({
+  name: 'wallet-lifecycle',
+  scope: 'global',
+})(
   persist(
     (set) => ({
       seedCreatedAt: null,

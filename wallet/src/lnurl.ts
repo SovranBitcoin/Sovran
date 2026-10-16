@@ -22,6 +22,7 @@
 //     would otherwise reach `mgr.ops.melt.prepare` and drain the user.
 // ---------------------------------------------------------------------------
 
+import { AuthoredError } from './errors';
 import {
   LnurlInvoiceCallback,
   LnurlPayParams as LnurlPayParamsSchema,
@@ -132,7 +133,7 @@ export type LnurlPayExtrasProvider = (
   ctx: LnurlPayExtrasContext,
 ) => Promise<{ nostr?: string; comment?: string } | null>;
 
-export class LnurlError extends Error {
+export class LnurlError extends AuthoredError {
   readonly code: LnurlErrorCode;
   constructor(code: LnurlErrorCode, message: string) {
     super(message);

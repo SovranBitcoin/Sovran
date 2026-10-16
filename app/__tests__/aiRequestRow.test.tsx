@@ -1,3 +1,4 @@
+import { StyleSheet } from 'react-native';
 /**
  * @jest-environment node
  *
@@ -43,7 +44,10 @@ jest.mock('@/shared/hooks/useThemeColor', () => ({
   useThemeColor: (token: string | readonly string[]) =>
     typeof token === 'string' ? 'c' : token.map(() => 'c'),
 }));
-jest.mock('@/shared/lib/color', () => ({ withAlpha: (c: string) => c }));
+jest.mock('@/shared/lib/color', () => ({
+  ...jest.requireActual('@/shared/lib/color'),
+  withAlpha: (c: string) => c,
+}));
 jest.mock('@/shared/lib/date', () => ({ formatDate: () => 'today' }));
 jest.mock('@/shared/lib/currency', () => ({
   formatAmount: ({ amount }: { amount: number }) => `$${amount}`,
@@ -135,14 +139,14 @@ describe('Transaction — grouped AI request', () => {
     const refunded = render(<Transaction historyEntry={sendLeg()} returned />);
     const cancelled = render(<Transaction historyEntry={sendLeg({ state: 'rolledBack' })} />);
 
-    expect(row(refunded).props.style).toEqual({ opacity: 0.33 });
+    expect(StyleSheet.flatten(row(refunded).props.style)).toMatchObject({ opacity: 0.33 });
     expect(row(refunded).props.style).toEqual(row(cancelled).props.style);
     expect(icon(refunded).props.cancelled).toBe(true);
   });
 
   it('leaves an ordinary settled send undimmed', () => {
     const r = render(<Transaction historyEntry={sendLeg()} />);
-    expect(row(r).props.style).toBeUndefined();
+    expect(StyleSheet.flatten(row(r).props.style).opacity).toBeUndefined();
     expect(icon(r).props.cancelled).toBe(false);
   });
 });
@@ -219,7 +223,7 @@ describe.each([
     // Direction survives the outcome — this is the payment leg, so it is a send.
     expect(amount(r).props.sign).toBe('-');
     // ...under the dimming, which is what says the money is back.
-    expect(row(r).props.style).toEqual({ opacity: 0.33 });
+    expect(StyleSheet.flatten(row(r).props.style)).toMatchObject({ opacity: 0.33 });
     expect(icon(r).props.cancelled).toBe(true);
   });
 });

@@ -11,7 +11,7 @@
  * - show a detail view with per-leg local status/errors
  */
 
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { persist } from 'zustand/middleware';
 import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
@@ -23,7 +23,17 @@ import { tolerantRecord } from '@/shared/lib/persist/tolerant';
 type SwapGroupState = 'running' | 'finished' | 'cancelled';
 
 export type SwapLegLocalStatus =
-  'pending' | 'creatingInvoice' | 'invoiceReady' | 'melting' | 'verifying' | 'done' | 'failed';
+  | 'pending'
+  | 'creatingInvoice'
+  | 'invoiceReady'
+  | 'melting'
+  | 'verifying'
+  /** The melt was sent and its outcome is not yet known. */
+  | 'paymentPending'
+  /** The melt settled; the destination mint has not issued yet. */
+  | 'settling'
+  | 'done'
+  | 'failed';
 
 export interface SwapLeg {
   id: string;
@@ -33,6 +43,8 @@ export interface SwapLeg {
 
   // Correlation / recovery ids
   mintQuoteId?: string;
+  /** Coco's operation for this leg's mint quote; a settling leg is reconciled from it. */
+  mintOperationId?: string;
   meltQuoteId?: string;
   meltOperationId?: string;
 
@@ -103,7 +115,11 @@ interface SwapTransactionsActions {
     leg: Omit<SwapLeg, 'id' | 'mintQuoteId' | 'meltQuoteId' | 'meltOperationId'>
   ) => string;
 
-  tagMintQuote: (groupId: string, legId: string, params: { quoteId: string }) => void;
+  tagMintQuote: (
+    groupId: string,
+    legId: string,
+    params: { quoteId: string; operationId?: string }
+  ) => void;
   tagMelt: (
     groupId: string,
     legId: string,
@@ -123,7 +139,17 @@ type SwapTransactionsStore = SwapTransactionsState & SwapTransactionsActions;
 
 // Persisted-shape schema (defensive rehydrate validation).
 const SwapLegLocalStatusSchema = z
-  .enum(['pending', 'creatingInvoice', 'invoiceReady', 'melting', 'verifying', 'done', 'failed'])
+  .enum([
+    'pending',
+    'creatingInvoice',
+    'invoiceReady',
+    'melting',
+    'verifying',
+    'paymentPending',
+    'settling',
+    'done',
+    'failed',
+  ])
   .catch('failed');
 const SwapGroupStateSchema = z.enum(['running', 'finished', 'cancelled']).catch('cancelled');
 
@@ -133,6 +159,7 @@ const PersistedLeg = z.looseObject({
   toMintUrl: z.string().max(2048),
   amount: z.number().int().nonnegative(),
   mintQuoteId: z.string().max(256).optional(),
+  mintOperationId: z.string().max(256).optional(),
   meltQuoteId: z.string().max(256).optional(),
   meltOperationId: z.string().max(256).optional(),
   chainId: z.string().max(128).optional(),
@@ -171,7 +198,10 @@ const PersistedSwapStore = z.object({
   quoteIdToGroup: PersistedQuoteIndex,
 });
 
-export const useSwapTransactionsStore = create<SwapTransactionsStore>()(
+export const useSwapTransactionsStore = create<SwapTransactionsStore>({
+  name: 'swap-transactions-store',
+  scope: 'profile',
+})(
   persist(
     (set, get) => ({
       groups: {},
@@ -238,12 +268,16 @@ export const useSwapTransactionsStore = create<SwapTransactionsStore>()(
         return legId;
       },
 
-      tagMintQuote: (groupId, legId, { quoteId }) => {
+      tagMintQuote: (groupId, legId, { quoteId, operationId }) => {
         if (!quoteId) return;
         storeLog.debug('store.swap_tx.tag_mint_quote', { groupId, legId, quoteId });
 
         set((state) => {
-          const next = patchLeg(state, groupId, legId, (leg) => ({ ...leg, mintQuoteId: quoteId }));
+          const next = patchLeg(state, groupId, legId, (leg) => ({
+            ...leg,
+            mintQuoteId: quoteId,
+            ...(operationId ? { mintOperationId: operationId } : {}),
+          }));
           if (next === state) return state;
           return {
             ...next,

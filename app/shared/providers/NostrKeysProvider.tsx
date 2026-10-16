@@ -1,3 +1,4 @@
+import { AccountMismatchScreen } from '@/shared/blocks/AccountMismatchScreen';
 import { KeyRecoveryScreen } from '@/shared/blocks/KeyRecoveryScreen';
 import { useSecureStoreState } from '@/shared/stores/runtime/secureStoreState';
 import {
@@ -10,42 +11,29 @@ import {
   useMemo,
   useRef,
 } from 'react';
-import { InteractionManager } from 'react-native';
+import { InteractionManager, View } from 'react-native';
 import {
   ensureMnemonicExists,
-  clearAccountDerivedCache,
   retrieveMnemonic,
-  retrieveDerivedKeys,
-  storeDerivedKeys,
-  retrieveCashuMnemonic,
-  storeCashuMnemonic,
-  retrieveImportedNsec,
-  hashMnemonic,
   useMnemonic,
-  type CachedDerivedKeys,
 } from '@/shared/lib/nostr/secureStorage';
 import {
   deriveNostrKeys,
   deriveCashuMnemonic as deriveCashuMnemonicPure,
-  deriveCashuMnemonicForImported,
-  pubkeyToAccountNumber,
 } from '@/shared/lib/nostr/keyDerivation';
-import { getPublicKey } from 'nostr-tools/pure';
-import * as nip19 from 'nostr-tools/nip19';
+import { loadAccountKeys, type NostrKeys } from '@/shared/lib/nostr/loadAccountKeys';
+import {
+  reportIntegrityFailure,
+  useIntegrityFailures,
+  verifyOtherAccountsInBackground,
+} from '@/shared/lib/nostr/accountIntegrity';
+import { AccountIntegrityError } from '@/shared/lib/nostr/derivationIntegrity';
 import { CocoManager } from '@/shared/lib/cashu/manager';
-import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
 import { useInitializationStage } from './InitializationProvider';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { log, initLog, initPhase, redactError, useInitMount } from '@/shared/lib/logger';
 
 initLog('Module', 'NostrKeysProvider loaded');
-
-interface NostrKeys {
-  npub: string;
-  nsec: string;
-  pubkey: string;
-  privateKey: Uint8Array;
-}
 
 interface NostrKeysContextValue {
   keys: NostrKeys | null;
@@ -53,7 +41,6 @@ interface NostrKeysContextValue {
   isReady: boolean;
   isLoading: boolean;
   error: string | null;
-  refresh: () => Promise<void>;
   getKeysForAccount: (accountIndex: number) => Promise<NostrKeys | null>;
   getCashuMnemonicForAccount: (accountIndex: number) => Promise<string | null>;
 }
@@ -103,17 +90,22 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
     message: 'Initializing keys...',
     dependsOn: ['global-migrations'],
   });
-  const {
-    value: mnemonic,
-    loading: mnemonicLoading,
-    error: mnemonicError,
-    refresh: refreshMnemonic,
-  } = useMnemonic();
+  const { value: mnemonic, loading: mnemonicLoading, refresh: refreshMnemonic } = useMnemonic();
   const [keys, setKeys] = useState<NostrKeys | null>(null);
   const [cashuMnemonic, setCashuMnemonic] = useState<string | null>(null);
   const [isReady, setIsReady] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Every account's failure is kept. This account's always wins and stops it;
+  // another account's only covers the app, and closing that one can never
+  // hide this one.
+  const integrityFailures = useIntegrityFailures();
+  const ownFailure = integrityFailures.find(
+    (failure) => failure.accountIndex === defaultAccountIndex
+  );
+  const otherFailure = integrityFailures.find(
+    (failure) => failure.accountIndex !== defaultAccountIndex
+  );
   // Caches are refs, not state: derivation is memoised between calls but is
   // never read in render output. Using state would shake context identity for
   // all 23 consumers on every cache write.
@@ -124,6 +116,16 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
   const inFlightKeys = useRef<Map<number, Promise<NostrKeys>>>(new Map());
   const inFlightCashu = useRef<Map<number, Promise<string>>>(new Map());
   const hasStarted = useRef(false);
+  // Startup outlives the mount that began it: a remount for another account
+  // must not have this one's index and wallet phrase written into the wallet
+  // core, or its profile row added, after the fact.
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
 
   const getMnemonicForDerivation = useCallback(async (): Promise<string | null> => {
     if (mnemonic) {
@@ -241,37 +243,6 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
     [deriveCashuMnemonic]
   );
 
-  const refresh = useCallback(async () => {
-    if (!mnemonic) return;
-
-    try {
-      setIsLoading(true);
-      setError(null);
-
-      // Clear cache and rederive default keys
-      cachedKeys.current.clear();
-      cachedCashuMnemonics.current.clear();
-      const defaultKeys = await deriveKeys(defaultAccountIndex);
-      const defaultCashuMnemonic = await deriveCashuMnemonic(defaultAccountIndex);
-      setKeys(defaultKeys);
-      setCashuMnemonic(defaultCashuMnemonic);
-
-      const refreshProfile = useProfileStore.getState().getActiveProfile();
-      CocoManager.setAccountIndex(defaultAccountIndex, refreshProfile?.source === 'imported');
-      if (defaultCashuMnemonic) {
-        CocoManager.setCashuMnemonic(defaultCashuMnemonic);
-      }
-
-      setIsReady(true);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to refresh keys';
-      setError(errorMessage);
-      log.error('nostr.keys.refresh_failed', { error: redactError(err) });
-    } finally {
-      setIsLoading(false);
-    }
-  }, [mnemonic, defaultAccountIndex, deriveKeys, deriveCashuMnemonic]);
-
   // Initialize default keys when mnemonic is available, or generate one if none exists
   useEffect(() => {
     if (mnemonicLoading || locked) return;
@@ -310,144 +281,18 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
             })
         );
 
-        const mHash = await initPhase('NostrKeys.hashMnemonic', async () =>
-          hashMnemonic(mnemonicToUse!)
-        );
-        let defaultKeys: NostrKeys | null = null;
-        let defaultCashuMnemonic: string | null = null;
-
-        // Check if the active profile is an imported nsec profile
-        const activeProfile = useProfileStore.getState().getActiveProfile();
-        let isImported = activeProfile?.source === 'imported';
-        let repairedSource = false;
-        let nsecValue: string | null = null;
-        if (isImported && activeProfile) {
-          nsecValue = await retrieveImportedNsec(activeProfile.pubkey);
-          if (!nsecValue) {
-            const candidate = deriveNostrKeys(mnemonicToUse, activeProfile.accountIndex);
-            if (
-              candidate.pubkey !== activeProfile.pubkey ||
-              !(await clearAccountDerivedCache(activeProfile.accountIndex)) ||
-              !useProfileStore
-                .getState()
-                .repairDerivedSource(activeProfile.accountIndex, candidate.pubkey)
-            ) {
-              throw new Error('Saved account requires re-import');
-            }
-            defaultKeys = candidate;
-            repairedSource = true;
-            isImported = false;
-          }
+        const loaded = await loadAccountKeys({
+          mnemonic: mnemonicToUse,
+          accountIndex: defaultAccountIndex,
+          onProgress: stage.log,
+          shouldContinue: () => mounted.current,
+        });
+        if (!loaded) return;
+        if (!mounted.current) {
+          log.info('nostr.keys.init_abandoned', { defaultAccountIndex });
+          return;
         }
-
-        if (isImported && activeProfile) {
-          // ── Imported nsec profile: load identity from SecureStore ──
-          stage.log('Loading imported profile...');
-          initLog('NostrKeys', 'imported profile — loading nsec from SecureStore');
-
-          if (!nsecValue) {
-            throw new Error('Imported nsec not found in secure storage');
-          }
-
-          const decoded = nip19.decode(nsecValue);
-          if (decoded.type !== 'nsec') {
-            throw new Error('Stored imported key is not a valid nsec');
-          }
-
-          const privateKey = decoded.data;
-          const pubkeyHex = getPublicKey(privateKey);
-          if (pubkeyHex !== activeProfile.pubkey)
-            throw new Error('Saved account requires re-import');
-
-          defaultKeys = {
-            npub: nip19.npubEncode(pubkeyHex),
-            nsec: nsecValue,
-            pubkey: pubkeyHex,
-            privateKey,
-          };
-
-          const npubNumber = pubkeyToAccountNumber(pubkeyHex);
-          initLog(
-            'NostrKeys',
-            `imported npubNumber=${npubNumber}, deriving Cashu mnemonic (chain 1)...`
-          );
-
-          // Try cached Cashu mnemonic first
-          const cachedCashu = await retrieveCashuMnemonic(defaultAccountIndex);
-          if (cachedCashu?.mnemonicHash === mHash) {
-            defaultCashuMnemonic = cachedCashu.value;
-          } else {
-            defaultCashuMnemonic = deriveCashuMnemonicForImported(mnemonicToUse, npubNumber);
-            storeCashuMnemonic(defaultAccountIndex, defaultCashuMnemonic, mHash).catch((e) =>
-              initLog('NostrKeys', `imported cashu cache write failed: ${e}`)
-            );
-          }
-          initLog('NostrKeys', 'imported profile keys loaded');
-        } else {
-          // ── Derived profile: existing NIP-06 derivation path ──
-          // Try loading cached keys from SecureStore (fast path)
-          const [cachedDerived, cachedCashu] = await initPhase('NostrKeys.cacheRead', () =>
-            Promise.all([
-              retrieveDerivedKeys(defaultAccountIndex),
-              retrieveCashuMnemonic(defaultAccountIndex),
-            ])
-          );
-          initLog(
-            'NostrKeys',
-            `cache read done — derived=${!!cachedDerived} cashu=${!!cachedCashu}`
-          );
-
-          const cacheValid =
-            !repairedSource &&
-            cachedDerived?.mnemonicHash === mHash &&
-            cachedCashu?.mnemonicHash === mHash;
-          initLog('NostrKeys', `cache valid: ${cacheValid}`);
-
-          if (cacheValid && cachedDerived && cachedCashu) {
-            stage.log('Loading cached keys...');
-            initLog('NostrKeys', 'using cached keys (fast path)');
-            defaultKeys = {
-              npub: cachedDerived.npub,
-              nsec: cachedDerived.nsec,
-              pubkey: cachedDerived.pubkey,
-              privateKey: hexToBytes(cachedDerived.privateKeyHex),
-            };
-            defaultCashuMnemonic = cachedCashu.value;
-          } else {
-            stage.log('Deriving keys...');
-            defaultKeys ??= await initPhase('NostrKeys.deriveNip06', async () =>
-              deriveNostrKeys(mnemonicToUse!, defaultAccountIndex)
-            );
-
-            defaultCashuMnemonic = await initPhase('NostrKeys.deriveCashuMnemonic', async () =>
-              deriveCashuMnemonicPure(mnemonicToUse!, defaultAccountIndex)
-            );
-
-            const cachePayload: CachedDerivedKeys = {
-              npub: defaultKeys.npub,
-              nsec: defaultKeys.nsec,
-              pubkey: defaultKeys.pubkey,
-              privateKeyHex: bytesToHex(defaultKeys.privateKey),
-              mnemonicHash: mHash,
-            };
-            Promise.all([
-              storeDerivedKeys(defaultAccountIndex, cachePayload),
-              storeCashuMnemonic(defaultAccountIndex, defaultCashuMnemonic, mHash),
-            ]).catch((e) => initLog('NostrKeys', `cache write failed: ${e}`));
-          }
-        }
-
-        if (activeProfile && defaultKeys?.pubkey !== activeProfile.pubkey) {
-          if (isImported) throw new Error('Saved account requires re-import');
-          // A derived account whose saved row names another key is a state
-          // 0.1.3 produced and then ran in: an Android backup restored the
-          // profile row and the wallet database without the keychain, a new
-          // root was generated, and boot carried on with the keys derived from
-          // it. Refusing here stops that user at a form asking for an nsec
-          // they never held, with their funds behind it. The row is left as
-          // it is, because the account's stored data is filed under its key.
-          log.warn('nostr.keys.profile_pubkey_mismatch', { defaultAccountIndex });
-        }
+        const { keys: defaultKeys, cashuMnemonic: defaultCashuMnemonic, isImported } = loaded;
 
         initLog('NostrKeys', 'setting keys in state...');
         setKeys(defaultKeys);
@@ -475,13 +320,19 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
         stage.complete();
         initLog('NostrKeys', 'stage complete');
       } catch (err) {
+        // The stage is keyed by id, not by mount: reporting a failure after
+        // unmount would mark the remounted provider's stage as failed.
+        if (!mounted.current) return;
+        // A saved account that does not follow from the phrase: the critical
+        // screen takes over. Nothing was written, and nothing is retried.
+        if (err instanceof AccountIntegrityError) reportIntegrityFailure(err.result);
         log.error('nostr.keys.init_failed', { error: redactError(err) });
         // Display text for the init screen and KeyRecoveryScreen.
         const errorMessage = err instanceof Error ? err.message : 'Failed to initialize keys';
         setError(errorMessage);
         stage.error(errorMessage);
       } finally {
-        setIsLoading(false);
+        if (mounted.current) setIsLoading(false);
       }
     };
 
@@ -507,12 +358,18 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
     return () => task.cancel();
   }, [isReady]);
 
-  // Update error state based on mnemonic error
+  // This account was checked in full before it was allowed to become ready.
+  // The others get their check once it is up, off the startup path. It reads
+  // and compares only; a mismatch raises the screen.
+  const integrityCheckedRef = useRef(false);
   useEffect(() => {
-    if (mnemonicError) {
-      setError(mnemonicError);
-    }
-  }, [mnemonicError]);
+    if (!isReady || integrityCheckedRef.current) return;
+    integrityCheckedRef.current = true;
+    const task = InteractionManager.runAfterInteractions(() => {
+      void verifyOtherAccountsInBackground(defaultAccountIndex, () => mounted.current);
+    });
+    return () => task.cancel();
+  }, [isReady, defaultAccountIndex]);
 
   const contextValue = useMemo<NostrKeysContextValue>(
     () => ({
@@ -521,7 +378,6 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
       isReady,
       isLoading: isLoading || mnemonicLoading,
       error,
-      refresh,
       getKeysForAccount,
       getCashuMnemonicForAccount,
     }),
@@ -532,11 +388,20 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
       isLoading,
       mnemonicLoading,
       error,
-      refresh,
       getKeysForAccount,
       getCashuMnemonicForAccount,
     ]
   );
+
+  // A mismatch on this account stops it. Nothing below may run on keys that
+  // are not the row's, so the account's tree is not mounted at all.
+  if (ownFailure) {
+    return (
+      <NostrKeysContext.Provider value={contextValue}>
+        <AccountMismatchScreen failure={ownFailure} stopped />
+      </NostrKeysContext.Provider>
+    );
+  }
 
   if (locked || (error && !isReady)) {
     return (
@@ -552,5 +417,16 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
     return <NostrKeysContext.Provider value={contextValue}>{null}</NostrKeysContext.Provider>;
   }
 
-  return <NostrKeysContext.Provider value={contextValue}>{children}</NostrKeysContext.Provider>;
+  return (
+    <NostrKeysContext.Provider value={contextValue}>
+      {children}
+      {otherFailure && (
+        // Another account failed its check. This one is sound and keeps
+        // running underneath; the screen covers it until it is closed.
+        <View className="absolute inset-0">
+          <AccountMismatchScreen failure={otherFailure} stopped={false} />
+        </View>
+      )}
+    </NostrKeysContext.Provider>
+  );
 }

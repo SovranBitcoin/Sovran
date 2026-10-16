@@ -1,0 +1,308 @@
+/**
+ * An iPhone simulator, as far as a story needs one: start the test build fresh
+ * with its runner's address, touch the glass and inspect system controls.
+ * The native addon supplies simulator input and accessibility; display evidence
+ * is captured separately by the simulator's command-line tool.
+ */
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
+import { spawn, spawnSync } from 'node:child_process';
+import { createRequire } from 'node:module';
+import { resolveServeSimNativeAddon } from '../drivers/simulator-session';
+import { writeRunnerNote } from '../link/appLink';
+import { emptyAppFolders, hasState, restoreState, saveState, type StatePlaces } from './savedState';
+import { keyPresses, SHIFT_KEY } from './keys';
+import { AUTHORITY } from './privateMint';
+import { SIMCTL, simctl } from './simctl';
+import type { TouchDevice } from './play';
+
+const BUNDLE_ID = 'com.sovranbitcoin.dev';
+/** The state of an app that has never been opened. */
+export const FRESH = 'fresh';
+/** Saved states live inside the simulator's own folder, so a clone carries them. */
+const STATES_FOLDER = 'sovran-e2e-states';
+/** The simulator's own mint keeps its database beside the saved states. */
+const MINT_FOLDER = 'sovran-e2e-mint';
+const KEYCHAIN_SERVICE = 'com.apple.securityd';
+const SETTINGS_SERVICE = 'com.apple.cfprefsd.xpc.daemon';
+/** A swipe takes a quarter of a second: quick enough to be a swipe, slow enough to be followed. */
+const SWIPE_FRAMES = 15;
+const FRAME_MS = 16;
+const SWIPE_REST_MS = 120;
+const LIFT_AGAIN_AFTER_MS = 30;
+/**
+ * How long a key is held, and the gap before the next. At 12 ms the second of
+ * two identical letters was sometimes lost ("htps://"); 30 ms has not lost one.
+ */
+const KEY_HOLD_MS = 40;
+/** How long a finger rests for a tap. Shorter than a long press, longer than a frame. */
+const TAP_HOLD_MS = 40;
+
+interface Native {
+  SimHID: new (udid: string) => {
+    touch(type: string, x: number, y: number, width: number, height: number, edge: number): void;
+    key(type: string, usage: number): void;
+  };
+  /** The simulator's accessibility tree, as JSON. */
+  axDescribe(udid: string): Promise<string>;
+}
+
+/** An element of the simulator's accessibility tree. */
+interface SystemElement {
+  AXLabel?: string | null;
+  frame: { x: number; y: number; width: number; height: number };
+  children?: SystemElement[];
+}
+
+/** Something the simulator's accessibility tree names, placed in fractions of the window. */
+interface SystemControl {
+  label: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+interface StorySimulator extends TouchDevice {
+  /** Everything on screen that has a label, as iOS itself sees it: about 0.8 s. */
+  systemControls(): Promise<SystemControl[]>;
+  /**
+   * Stop the app and put it in the state a story starts from. `fresh` is as if
+   * it had never been opened: its files, its settings and the keychain, which
+   * outlives an uninstall. Any other name is a state saved here earlier.
+   * Installs the build only when the simulator does not have it, since
+   * installing takes six seconds.
+   */
+  startFrom(appPath: string, state: string): Promise<void>;
+  /** Answer "yes" ahead of time to what iOS would ask before the app may use this. The app must be stopped. */
+  allow(service: 'camera' | 'location'): void;
+  /** The folder this simulator's own mint keeps its database in. */
+  mintFolder(): string;
+  /** Whether a state of this name, made this way, is saved on this simulator. */
+  hasState(name: string, madeFrom: string): boolean;
+  /** Stop the app and save the state it is in under a name. */
+  saveState(name: string, madeFrom: string): Promise<void>;
+  /** Start the app, telling it where its runner listens. */
+  launch(runner: { url: string; run: string }): void;
+  terminate(): void;
+  /** The installed bundle, not the app's mutable data container. */
+  installedApp(): string;
+}
+
+export function storySimulator(udid: string): StorySimulator {
+  const addon = resolveServeSimNativeAddon();
+  const native = createRequire(import.meta.url)(addon) as Native;
+  const hid = new native.SimHID(udid);
+  /**
+   * Lift the finger, and say so again a moment later. With four simulators
+   * running, the lift was once lost: the app saw the touch begin on a tab and
+   * never end, and the tab bar sat there half pressed. Lifting a finger that
+   * is already up does nothing.
+   */
+  const lift = async (x: number, y: number) => {
+    hid.touch('end', x, y, 1, 1, 0);
+    await new Promise((resolve) => setTimeout(resolve, LIFT_AGAIN_AFTER_MS));
+    hid.touch('end', x, y, 1, 1, 0);
+  };
+  /** Run one of `simctl`'s own commands on this simulator; false when it fails. */
+  const inSimulatorTool = (command: string, ...rest: string[]) => {
+    try {
+      simctl(command, udid, ...rest);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  /** Run a program inside the simulator; false when it fails. */
+  const inSimulator = (...command: string[]) => {
+    try {
+      simctl('spawn', udid, ...command);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  const places = (): StatePlaces => {
+    const appData = simctl('get_app_container', udid, BUNDLE_ID, 'data');
+    const deviceData = appData.slice(0, appData.indexOf('/Containers/'));
+    return {
+      appData,
+      keychains: join(deviceData, 'Library/Keychains'),
+      store: join(deviceData, STATES_FOLDER),
+      mint: join(deviceData, MINT_FOLDER),
+    };
+  };
+  /**
+   * Stop one of the simulator's services and wait until that process has
+   * gone. It is started again the next time something asks for it, which for
+   * a busy service is at once, and reads its files then.
+   */
+  const stopService = async (label: string) => {
+    const service = `user/${process.getuid?.() ?? 501}/${label}`;
+    const running = () => {
+      try {
+        return /\bpid = (\d+)/.exec(simctl('spawn', udid, 'launchctl', 'print', service))?.[1];
+      } catch {
+        // Not known to the simulator at all.
+        return undefined;
+      }
+    };
+    const stopping = running();
+    if (stopping === undefined) return;
+    inSimulator('launchctl', 'kill', 'SIGTERM', service);
+    for (let checks = 0; checks < 20; checks++) {
+      if (running() !== stopping) return;
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    throw new Error(`The simulator's ${label} did not stop.`);
+  };
+  return {
+    installedApp: () => simctl('get_app_container', udid, BUNDLE_ID, 'app'),
+    async startFrom(appPath, state) {
+      simctl('bootstatus', udid, '-b');
+      this.terminate();
+      // A story whose runner died leaves its recorder behind, still attached to this screen.
+      spawnSync('pkill', ['-f', `simctl io ${udid} recordVideo`]);
+      // The wallet home asks for the phone's location a few seconds after it
+      // opens, and iOS's question then takes every touch. Answered "no" ahead of
+      // time, so a story meets the same page whenever it gets there.
+      inSimulatorTool('privacy', 'revoke', 'location', BUNDLE_ID);
+      // The same for the camera, which the scan button asks for.
+      inSimulatorTool('privacy', 'revoke', 'camera', BUNDLE_ID);
+      let installed = true;
+      try {
+        simctl('get_app_container', udid, BUNDLE_ID, 'data');
+      } catch {
+        installed = false;
+        simctl('install', udid, appPath);
+      }
+      // The run's own certificate authority, so the simulator's mint is a mint iOS will talk to.
+      if (existsSync(AUTHORITY)) inSimulatorTool('keychain', 'add-root-cert', AUTHORITY);
+      if (state === FRESH) {
+        if (installed) emptyAppFolders(places().appData, places().mint);
+        // Settings are held by a system service, not only by the files just removed.
+        inSimulator('defaults', 'delete', BUNDLE_ID);
+        simctl('keychain', udid, 'reset');
+        return;
+      }
+      await stopService(KEYCHAIN_SERVICE);
+      restoreState(places(), state);
+      // The settings service would go on answering with what the last story saved.
+      await stopService(SETTINGS_SERVICE);
+    },
+    allow(service) {
+      inSimulatorTool('privacy', 'grant', service, BUNDLE_ID);
+    },
+    mintFolder: () => places().mint,
+    hasState: (name, madeFrom) => hasState(places(), name, madeFrom),
+    async saveState(name, madeFrom) {
+      this.terminate();
+      // Both write through to their files as they stop.
+      await stopService(SETTINGS_SERVICE);
+      await stopService(KEYCHAIN_SERVICE);
+      saveState(places(), name, madeFrom);
+    },
+    launch(runner) {
+      writeRunnerNote(simctl('get_app_container', udid, BUNDLE_ID, 'data'), runner);
+      simctl('launch', udid, BUNDLE_ID);
+    },
+    terminate() {
+      try {
+        simctl('terminate', udid, BUNDLE_ID);
+      } catch {
+        // Not running.
+      }
+    },
+    async systemControls() {
+      let described: string;
+      try {
+        described = await native.axDescribe(udid);
+      } catch {
+        // Just after a simulator boots, iOS can answer that no app is in front
+        // while one plainly is. Nothing is known yet; the caller looks again.
+        return [];
+      }
+      const [window] = JSON.parse(described) as SystemElement[];
+      if (!window) return [];
+      const found: SystemControl[] = [];
+      const queue = [...(window.children ?? [])];
+      for (let element = queue.shift(); element; element = queue.shift()) {
+        // Only what is inside the window: a closed drawer's "Feed" lies off its
+        // left edge, and was found before the tab bar's.
+        const centreX = (element.frame.x + element.frame.width / 2) / window.frame.width;
+        const centreY = (element.frame.y + element.frame.height / 2) / window.frame.height;
+        const inWindow = centreX > 0 && centreX < 1 && centreY > 0 && centreY < 1;
+        if (element.AXLabel && inWindow && element.frame.width > 0 && element.frame.height > 0)
+          found.push({
+            label: element.AXLabel,
+            x: element.frame.x / window.frame.width,
+            y: element.frame.y / window.frame.height,
+            width: element.frame.width / window.frame.width,
+            height: element.frame.height / window.frame.height,
+          });
+        queue.push(...(element.children ?? []));
+      }
+      return found;
+    },
+    async findSystemControl(label) {
+      return (await this.systemControls()).find((control) => control.label === label) ?? null;
+    },
+    async open(url) {
+      // Not waited for: the command returns only once iOS's question is answered.
+      spawn(SIMCTL[0], [...SIMCTL.slice(1), 'openurl', udid, url], {
+        stdio: 'ignore',
+      });
+      // iOS asks before handing a link to an app; the person says Open. The
+      // question takes no touch while it is still appearing, so Open is
+      // pressed until the question has gone.
+      const asked = performance.now();
+      let pressed = false;
+      while (performance.now() - asked < 10_000) {
+        const yes = (await this.systemControls().catch(() => [])).find(
+          (control) => control.label === 'Open'
+        );
+        if (yes) {
+          await this.tap(yes.x + yes.width / 2, yes.y + yes.height / 2);
+          pressed = true;
+        } else if (pressed) return;
+        await new Promise((resolve) => setTimeout(resolve, 300));
+      }
+    },
+    async type(text) {
+      for (const { usage, shift } of keyPresses(text)) {
+        if (shift) hid.key('down', SHIFT_KEY);
+        hid.key('down', usage);
+        await new Promise((resolve) => setTimeout(resolve, KEY_HOLD_MS));
+        hid.key('up', usage);
+        if (shift) hid.key('up', SHIFT_KEY);
+        await new Promise((resolve) => setTimeout(resolve, KEY_HOLD_MS));
+      }
+    },
+    async swipe(from, to) {
+      // A finger moving at a steady pace, a point every frame, then lifted where it stopped.
+      hid.touch('begin', from[0], from[1], 1, 1, 0);
+      for (let frame = 1; frame <= SWIPE_FRAMES; frame++) {
+        await new Promise((resolve) => setTimeout(resolve, FRAME_MS));
+        const along = frame / SWIPE_FRAMES;
+        hid.touch(
+          'move',
+          from[0] + (to[0] - from[0]) * along,
+          from[1] + (to[1] - from[1]) * along,
+          1,
+          1,
+          0
+        );
+      }
+      // The finger rests before it lifts, so the page stops where it was dragged
+      // to instead of coasting on, and the next tap is not spent stopping it.
+      await new Promise((resolve) => setTimeout(resolve, SWIPE_REST_MS));
+      await lift(to[0], to[1]);
+    },
+    async tap(x, y) {
+      // The addon scales by the size it is given; fractions in, so a unit square.
+      hid.touch('begin', x, y, 1, 1, 0);
+      await new Promise((resolve) => setTimeout(resolve, TAP_HOLD_MS));
+      await lift(x, y);
+    },
+  };
+}

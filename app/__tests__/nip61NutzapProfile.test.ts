@@ -130,6 +130,19 @@ describe('createNutzapProfileResolver', () => {
     expect(destroy).toHaveBeenCalledTimes(1);
   });
 
+  it('retries an unconfirmed fallback on the next lookup', async () => {
+    const { resolve, getMock } = resolverOver(async () => {
+      throw new Error('relay unreachable');
+    });
+    await resolve(IDENTITY);
+    getMock.mockResolvedValueOnce(nutzapInfoEvent([['pubkey', `02${WALLET_KEY_X}`]]));
+    await expect(resolve(IDENTITY)).resolves.toMatchObject({
+      lockKey: `02${WALLET_KEY_X}`,
+      source: 'nutzapInfo',
+    });
+    expect(getMock).toHaveBeenCalledTimes(2);
+  });
+
   it('reuses a resolved profile instead of asking again', async () => {
     const { resolve, getMock, destroy } = resolverOver(async () =>
       nutzapInfoEvent([['pubkey', `02${WALLET_KEY_X}`]])

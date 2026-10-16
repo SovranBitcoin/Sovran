@@ -77,12 +77,9 @@ import { readIsUnavailable, type FeedParseResult } from '@/features/feed/data/fe
 import { useCachedRead } from '@/shared/lib/read/useCachedRead';
 import { useNostrSocialStore } from '@/shared/stores/profile/nostrSocialStore';
 import { Button as PrimitiveButton } from '@/shared/ui/primitives/Button';
-import {
-  DEFAULT_ENGAGEMENT_STATE,
-  getFeedRowItemType,
-  type FeedRow,
-} from '@/features/feed/lib/feedRows';
+import { getFeedRowItemType, type FeedRow } from '@/features/feed/lib/feedRows';
 
+import { FeedPostCard } from './nostr/LivePostCard';
 import { PostCard, PostCardSkeleton } from './nostr/PostCard';
 import {
   ImageOverlayProvider,
@@ -93,6 +90,7 @@ import {
 import { useFeedCardProps } from '@/features/feed/hooks/useFeedCardProps';
 import { useFeedContentState } from '@/features/feed/hooks/useFeedContentState';
 import { useFeedInteractions } from '@/features/feed/hooks/useFeedInteractions';
+import { useNoteEngagement } from '@/features/feed/hooks/useNoteEngagement';
 import { useFeedRows } from '@/features/feed/hooks/useFeedRows';
 import { usePostActions } from '@/features/feed/hooks/usePostActions';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -307,6 +305,132 @@ export const RepostCard = React.memo(function RepostCard({
         )}
       </View>
     </GestureDetector>
+  );
+});
+
+type FeedCardWiring = ReturnType<typeof useFeedCardProps>;
+
+/**
+ * A `RepostCard` inside a feed row. Engagement belongs to the reposted
+ * original, so that is the note the card follows.
+ */
+export function FeedRepostCard({
+  row,
+  index,
+  item,
+  cardProps,
+  ...presentation
+}: {
+  row: FeedRow;
+  index: number;
+  item: Extract<FeedItem, { type: 'repost' }>;
+  cardProps: FeedCardWiring['repostCardProps'];
+} & Pick<
+  React.ComponentProps<typeof RepostCard>,
+  'onMorePress' | 'getThreadContext' | 'showLineAbove'
+>) {
+  const { metrics, state } = useNoteEngagement(item.originalEventId, row.metrics);
+  // `cardProps` reads the original's zap state from the store as it is called;
+  // the subscription above is what re-runs it when that state changes.
+  return (
+    <RepostCard
+      {...cardProps({ ...row, metrics, engagement: state }, index, item)}
+      {...presentation}
+    />
+  );
+}
+
+// ============================================================================
+// Feed row
+// ============================================================================
+
+/**
+ * One row of the profile feed. Everything it is handed keeps its identity when
+ * a note is liked, so the like re-renders the card that follows that note and
+ * nothing else in the list.
+ */
+// Memoized at the list boundary; `engagementRowRenders.test` pins the count.
+const UserFeedRow = React.memo(function UserFeedRow({
+  row,
+  index,
+  feedPostCardProps,
+  repostCardProps,
+  getThreadContext,
+  openPostActions,
+}: {
+  row: FeedRow;
+  index: number;
+  feedPostCardProps: FeedCardWiring['feedPostCardProps'];
+  repostCardProps: FeedCardWiring['repostCardProps'];
+  getThreadContext: () => ThreadSeed | null;
+  openPostActions: (event: FeedEvent) => void;
+}) {
+  const item = row.item;
+  const rootEvent = row.rootEvent;
+  const rootCard = rootEvent ? (
+    <FeedPostCard
+      variant="feed"
+      row={row}
+      index={index}
+      event={rootEvent}
+      fallbackMetrics={row.rootMetrics ?? DEFAULT_METRICS}
+      cardProps={feedPostCardProps}
+      showLineBelow
+      getThreadContext={getThreadContext}
+    />
+  ) : null;
+  if (item.type === 'note') {
+    return rootCard ? (
+      <View>
+        {rootCard}
+        <FeedPostCard
+          variant="thread-reply"
+          row={row}
+          index={index}
+          event={item.event}
+          fallbackMetrics={row.metrics}
+          cardProps={feedPostCardProps}
+          showLineAbove
+          getThreadContext={getThreadContext}
+        />
+      </View>
+    ) : (
+      <FeedPostCard
+        variant="feed"
+        row={row}
+        index={index}
+        event={item.event}
+        fallbackMetrics={row.metrics}
+        cardProps={feedPostCardProps}
+        getThreadContext={getThreadContext}
+      />
+    );
+  }
+  const originalEvent = item.originalEvent;
+  if (rootCard && originalEvent) {
+    return (
+      <View>
+        {rootCard}
+        <FeedRepostCard
+          row={row}
+          index={index}
+          item={item}
+          cardProps={repostCardProps}
+          onMorePress={() => openPostActions(originalEvent)}
+          getThreadContext={getThreadContext}
+          showLineAbove
+        />
+      </View>
+    );
+  }
+  return (
+    <FeedRepostCard
+      row={row}
+      index={index}
+      item={item}
+      cardProps={repostCardProps}
+      getThreadContext={getThreadContext}
+    />
   );
 });
 
@@ -530,8 +654,6 @@ export function UserFeed({
   );
 
   const {
-    getDisplayMetrics,
-    getEngagementState,
     getZapState,
     toggleLikeRef,
     toggleRepostRef,
@@ -598,8 +720,7 @@ export function UserFeed({
     profilesMap,
     quotedEventsMap,
     metricsMap,
-    getDisplayMetrics,
-    getEngagementState,
+    getMetrics,
     resolveReposter,
   });
 
@@ -627,73 +748,23 @@ export function UserFeed({
     fallbackReposterPubkey: pubkey,
   });
 
+  const getRowThreadContext = useCallback(
+    () => getThreadContextRef.current(),
+    [getThreadContextRef]
+  );
+
   const renderFeedItem = useCallback(
-    ({ item: row, index }: { item: FeedRow; index: number }) => {
-      const item = row.item;
-      if (item.type === 'note') {
-        const metrics = row.metrics;
-        const engagement = row.engagement;
-        const contextRootEvent = row.rootEvent;
-        if (contextRootEvent) {
-          const rootEvent = contextRootEvent;
-          const rootMetrics = row.rootMetrics ?? DEFAULT_METRICS;
-          const rootEngagement = row.rootEngagement ?? DEFAULT_ENGAGEMENT_STATE;
-          return (
-            <View>
-              <PostCard
-                variant="feed"
-                {...feedPostCardProps(row, index, rootEvent, rootMetrics, rootEngagement)}
-                showLineBelow
-                getThreadContext={() => getThreadContextRef.current()}
-              />
-              <PostCard
-                variant="thread-reply"
-                {...feedPostCardProps(row, index, item.event, metrics, engagement)}
-                showLineAbove
-                getThreadContext={() => getThreadContextRef.current()}
-              />
-            </View>
-          );
-        }
-        return (
-          <PostCard
-            variant="feed"
-            {...feedPostCardProps(row, index, item.event, metrics, engagement)}
-            getThreadContext={() => getThreadContextRef.current()}
-          />
-        );
-      }
-      const originalEvent = item.originalEvent;
-      const contextRootEvent = row.rootEvent;
-      if (contextRootEvent && originalEvent) {
-        const rootEvent = contextRootEvent;
-        const rootMetrics = row.rootMetrics ?? DEFAULT_METRICS;
-        const rootEngagement = row.rootEngagement ?? DEFAULT_ENGAGEMENT_STATE;
-        return (
-          <View>
-            <PostCard
-              variant="feed"
-              {...feedPostCardProps(row, index, rootEvent, rootMetrics, rootEngagement)}
-              showLineBelow
-              getThreadContext={() => getThreadContextRef.current()}
-            />
-            <RepostCard
-              {...repostCardProps(row, index, item)}
-              onMorePress={() => openPostActions(originalEvent)}
-              getThreadContext={() => getThreadContextRef.current()}
-              showLineAbove
-            />
-          </View>
-        );
-      }
-      return (
-        <RepostCard
-          {...repostCardProps(row, index, item)}
-          getThreadContext={() => getThreadContextRef.current()}
-        />
-      );
-    },
-    [feedPostCardProps, repostCardProps, getThreadContextRef, openPostActions]
+    ({ item: row, index }: { item: FeedRow; index: number }) => (
+      <UserFeedRow
+        row={row}
+        index={index}
+        feedPostCardProps={feedPostCardProps}
+        repostCardProps={repostCardProps}
+        getThreadContext={getRowThreadContext}
+        openPostActions={openPostActions}
+      />
+    ),
+    [feedPostCardProps, repostCardProps, getRowThreadContext, openPostActions]
   );
 
   const handleListScroll = useCallback(
@@ -804,8 +875,7 @@ export function UserFeed({
   return (
     <Log name="UserFeed">
       <ImageOverlayProvider
-        getDisplayMetrics={getDisplayMetrics}
-        getEngagementState={getEngagementState}
+        getBaseMetrics={getMetrics}
         onSwipeUpToNextPost={onSwipeUpToNextPost}
         getVideoFeedLayoutsAndIndex={getVideoFeedLayoutsAndIndex}>
         {feedList}

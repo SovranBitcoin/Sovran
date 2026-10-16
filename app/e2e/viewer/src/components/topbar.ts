@@ -2,7 +2,12 @@ import { enterDiffMode, requestClear, requestTrigger, selectVersion } from '../a
 import { state, update } from '../state';
 
 function escapeHtml(value: string): string {
-  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 /** Live progress: `running <scenario> · done/total · m:ss`. Shown for any
@@ -39,7 +44,7 @@ function progressPill(busy: boolean): string {
  * the header's bottom border like a GitHub repo nav. */
 export function renderTopbar(root: HTMLElement): void {
   const entry = state.catalog.find((candidate) => candidate.id === state.selectedScenarioId);
-  const versions = (entry?.runs ?? []).filter((run) => run.proof === 'product-run');
+  const versions = (entry?.runs ?? []).filter((run) => run.proof !== 'orchestration-smoke');
   const busy = state.job?.status === 'running';
   const git = state.runDetail?.git;
 
@@ -47,7 +52,7 @@ export function renderTopbar(root: HTMLElement): void {
     .map(
       (run) =>
         `<option value="${run.runId}"${state.selectedRunId === run.runId ? ' selected' : ''}>` +
-        `${run.label}${run.ok === false ? ' ✗' : run.ok ? ' ✓' : ''}</option>`
+        `${escapeHtml(run.label)}${run.proof === 'manual-review' ? ' · Manual review' : run.ok === false ? ' ✗' : run.ok ? ' ✓' : ''}</option>`
     )
     .join('');
 
@@ -71,7 +76,7 @@ export function renderTopbar(root: HTMLElement): void {
       ? `<select data-action="version" aria-label="run version" title="run version">${versionOptions}</select>`
       : '') +
     (state.mode !== 'store'
-      ? `<button data-action="rerun" ${busy || !state.selectedScenarioId ? 'disabled' : ''} title="${versions.length > 0 ? 'rerun' : 'run'} the selected scenario">${versions.length > 0 ? 'Rerun' : 'Run scenario'}</button>` +
+      ? `<button data-action="rerun" ${busy || !state.selectedScenarioId || entry?.runDisabledReason ? 'disabled' : ''} title="${entry?.runDisabledReason ? escapeHtml(entry.runDisabledReason) : `${versions.length > 0 ? 'rerun' : 'run'} the selected scenario`}">${versions.length > 0 ? 'Rerun' : 'Run scenario'}</button>` +
         `<div class="btn-group" role="group" aria-label="suite runs">` +
         `<span class="btn-group-label">run</span>` +
         `<button data-action="suite-default" ${busy ? 'disabled' : ''} title="run the default suite">Default</button>` +
@@ -113,7 +118,7 @@ export function renderTopbar(root: HTMLElement): void {
       selectVersion((event.target as HTMLSelectElement).value)
     );
   root.querySelector('[data-action=rerun]')?.addEventListener('click', () => {
-    if (state.selectedScenarioId)
+    if (state.selectedScenarioId && !entry?.runDisabledReason)
       requestTrigger(
         { kind: 'scenario', scenarioId: state.selectedScenarioId },
         `Rerun ${state.selectedScenarioId}`

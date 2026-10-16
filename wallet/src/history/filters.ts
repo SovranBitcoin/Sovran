@@ -188,6 +188,7 @@ export function isPendingTransaction(
   if (options.isCollapsingGhost) return true;
 
   if (historyEntry.type === "mint") {
+    if (isMintFailed(historyEntry)) return false;
     const state = String(historyEntry.state).toLowerCase();
     if (isOnchainHistoryEntry(historyEntry)) {
       return state === "pending" || state === "executing" || state === "unpaid";
@@ -217,6 +218,20 @@ export function isPendingTransaction(
 }
 
 /**
+ * A mint coco gave up on. The list contract reads it as UNPAID (it has no word
+ * for failure), with the operation's own verdict beside it — see
+ * `normalizeHistoryEntryState`. Nothing is going to arrive for it, so it is
+ * not pending.
+ */
+function isMintFailed(historyEntry: HistoryEntry): boolean {
+  if (historyEntry.type !== "mint") return false;
+  return (
+    String(historyEntry.state) === "failed" ||
+    (historyEntry as { operationState?: unknown }).operationState === "failed"
+  );
+}
+
+/**
  * True when an entry is an unpaid Lightning/onchain mint quote whose invoice
  * has expired. Used to bucket it under Expired instead of Pending.
  */
@@ -236,7 +251,9 @@ export function bucketTransaction(
   historyEntry: HistoryEntry,
   options: { isCollapsingGhost?: boolean } = {},
 ): TransactionBucket {
-  if (isMintExpired(historyEntry)) return "expired";
+  // A failed mint sits with the expired ones: both are requests that ended
+  // with nothing received.
+  if (isMintExpired(historyEntry) || isMintFailed(historyEntry)) return "expired";
   if (isPendingTransaction(historyEntry, options)) return "pending";
   return "confirmed";
 }

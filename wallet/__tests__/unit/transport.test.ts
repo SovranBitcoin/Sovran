@@ -60,6 +60,16 @@ describe("classifyMeshToken", () => {
     });
   });
 
+  it("is invalid when the proofs add up to more than a number can hold exactly", () => {
+    const big = 2 ** 52;
+    const token = encode([
+      proof("aa".repeat(32), big),
+      proof("bb".repeat(32), big),
+      proof("cc".repeat(32), 1),
+    ]);
+    expect(classifyMeshToken(token, MY_PUBKEY).classification).toBe("invalid");
+  });
+
   it("matches the lock key case-insensitively", () => {
     const token = encode([proof(p2pkSecret(MY_PUBKEY))]);
     expect(
@@ -172,7 +182,9 @@ describe("classifyMeshToken", () => {
   }
 
   it("classifies a token locked to me when its keyset id is a short v2 id", () => {
-    expect(classifyMeshToken(encodeV2(p2pkSecret(MY_PUBKEY), 5), MY_PUBKEY)).toEqual({
+    expect(
+      classifyMeshToken(encodeV2(p2pkSecret(MY_PUBKEY), 5), MY_PUBKEY),
+    ).toEqual({
       classification: "locked-to-me",
       mintUrl: MINT_URL,
       amount: 5,
@@ -243,13 +255,37 @@ function fakeManager(trusted = true) {
 }
 
 describe("createMeshRedeemOrchestrator", () => {
+  it("abandons a profile's drain when the profile changes during trust lookup", async () => {
+    const queue = createQueue({ h1: entry() });
+    const other = fakeManager()();
+    const original = {
+      mint: {
+        isTrustedMint: async () => {
+          current = other;
+          return true;
+        },
+      },
+    } as never;
+    let current = original;
+    const execute = vi.fn(async () => ({ historyEntryId: null }));
+    const orchestrator = createMeshRedeemOrchestrator({
+      getManager: () => current,
+      queue: queue.port,
+      executeAutoRedeem: execute,
+    });
+    await orchestrator.drain();
+    expect(execute).not.toHaveBeenCalled();
+    expect(queue.statuses).toEqual([]);
+    expect(queue.retries).toEqual([]);
+  });
+
   it("redeems due trusted entries through executeAutoRedeem", async () => {
     const queue = createQueue({ h1: entry() });
     const redeemed: string[] = [];
     const orchestrator = createMeshRedeemOrchestrator({
       getManager: fakeManager(),
       queue: queue.port,
-      executeAutoRedeem: async (token) => {
+      executeAutoRedeem: async ({ tokenString: token }) => {
         redeemed.push(token);
         return { historyEntryId: "hist1" };
       },
@@ -292,7 +328,7 @@ describe("createMeshRedeemOrchestrator", () => {
     const orchestrator = createMeshRedeemOrchestrator({
       getManager: fakeManager(),
       queue: queue.port,
-      executeAutoRedeem: async (token) => {
+      executeAutoRedeem: async ({ tokenString: token }) => {
         throw errors[token as keyof typeof errors] ?? new Error("unknown");
       },
     });

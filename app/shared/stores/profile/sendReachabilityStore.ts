@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { persist } from 'zustand/middleware';
 import { z } from 'zod';
 
@@ -75,7 +75,10 @@ function setStatus(
   }));
 }
 
-export const useSendReachabilityStore = create<SendReachabilityStore>()(
+export const useSendReachabilityStore = create<SendReachabilityStore>({
+  name: 'send-reachability-store',
+  scope: 'profile',
+})(
   persist(
     (set) => ({
       byTransactionId: {},

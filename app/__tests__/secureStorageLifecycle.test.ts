@@ -6,9 +6,19 @@
 
 const mockSecureBacking = new Map<string, string>();
 let mockProfileBlob: string | null = null;
+let mockReduxRow: string | null = null;
 
 jest.mock('@react-native-async-storage/async-storage', () => ({
-  getItem: jest.fn(async () => mockProfileBlob),
+  getItem: jest.fn(async (key: string) =>
+    key === 'persist:SOVRAN' ? mockReduxRow : mockProfileBlob
+  ),
+  setItem: jest.fn(),
+  mergeItem: jest.fn(),
+  removeItem: jest.fn(),
+  multiSet: jest.fn(),
+  multiMerge: jest.fn(),
+  multiRemove: jest.fn(),
+  clear: jest.fn(),
 }));
 
 jest.mock('expo-secure-store', () => ({
@@ -24,6 +34,7 @@ jest.mock('expo-secure-store', () => ({
 }));
 
 jest.mock('@/shared/lib/logger', () => ({
+  log: { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() },
   nostrLog: { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() },
   redactError: (error: unknown) => error,
 }));
@@ -32,13 +43,18 @@ import { useSecureStoreState } from '@/shared/stores/runtime/secureStoreState';
 import { nostrLog } from '@/shared/lib/logger';
 import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { bytesToHex } from '@noble/hashes/utils.js';
+import { deriveCashuMnemonic, deriveNostrKeys } from '@/shared/lib/nostr/keyDerivation';
 import {
   clearAllSecureData,
-  clearAccountDerivedCache,
   ensureMnemonicExists,
+  hashMnemonic,
   retrieveCashuSeed,
+  readAccountSecretsUnchanged,
   retrieveMnemonic,
+  storeCashuMnemonic,
   storeCashuSeed,
+  storeDerivedKeys,
   storeImportedNsec,
   storeMnemonic,
 } from '@/shared/lib/nostr/secureStorage';
@@ -47,7 +63,66 @@ const VALID_MNEMONIC =
   'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';
 const INVALID_CHECKSUM =
   'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon';
+const OTHER_MNEMONIC =
+  'legal winner thank year wave sausage worth useful legal winner thank yellow';
 const originalCryptoDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'crypto');
+
+/** A profile as releases 0.0.1 to 0.0.40 saved it (onboard/new.tsx, onboard/animate.tsx). */
+function reduxProfile(id: number, mnemonic: string | undefined, pubkey = `${id}`.repeat(64)) {
+  return {
+    id,
+    name: `profile ${id}`,
+    pubkey,
+    npub: `npub1example${id}`,
+    ...(mnemonic === undefined
+      ? {}
+      : {
+          nsec: `nsec1example${id}`,
+          mnemonic,
+          root: { xpub: 'xpub-example', xpriv: 'xprv-example' },
+          nut13: 'derived wallet words',
+        }),
+  };
+}
+
+/**
+ * The redux-persist row those releases wrote: one JSON string per reducer,
+ * so the phrase is encoded twice. `currentProfile` starts as `{ id: 0 }` and
+ * becomes the chosen profile's fields with `id` set to its position.
+ */
+function reduxRow(nostr: { currentProfile?: unknown; profiles: unknown }): string {
+  return JSON.stringify({
+    settings: JSON.stringify({ settings: { theme: 'dark', termsAccepted: { date: 1 } } }),
+    cashu: JSON.stringify({
+      profiles: [
+        {
+          selectedMint: 'https://mint.example',
+          mints: ['https://mint.example'],
+          proofs: {
+            'https://mint.example': [{ id: '009a1f293253e41e', amount: 8, secret: 's', C: '02ab' }],
+          },
+          counters: { '009a1f293253e41e': 3 },
+          keysets: {},
+          transactions: [],
+        },
+      ],
+    }),
+    nostr: JSON.stringify({
+      search: [],
+      messages: { loaded_messages: [] },
+      follows: {},
+      contacts: [],
+      ...nostr,
+    }),
+    _persist: JSON.stringify({ version: 120, rehydrated: true }),
+  });
+}
+
+function refuseRandomness(): jest.Mock {
+  const getRandomValues = jest.fn();
+  Object.defineProperty(globalThis, 'crypto', { configurable: true, value: { getRandomValues } });
+  return getRandomValues;
+}
 
 async function flushBookkeeping(): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, 0));
@@ -58,6 +133,7 @@ describe('secureStorage mnemonic and seed lifecycle', () => {
     await flushBookkeeping();
     mockSecureBacking.clear();
     mockProfileBlob = null;
+    mockReduxRow = null;
     jest.clearAllMocks();
     useSecureStoreState.setState({ secureStoreState: 'available', errorName: null });
   });
@@ -157,6 +233,331 @@ describe('secureStorage mnemonic and seed lifecycle', () => {
     expect(useSecureStoreState.getState().secureStoreState).toBe('locked');
     expect(getRandomValues).not.toHaveBeenCalled();
     expect(SecureStore.setItemAsync).not.toHaveBeenCalled();
+  });
+
+  describe('a phone coming straight from a redux-era release', () => {
+    it('takes the phrase of the profile that was open as the root, without RNG', async () => {
+      const open = reduxProfile(1, OTHER_MNEMONIC);
+      mockReduxRow = reduxRow({
+        currentProfile: { ...open, id: 1 },
+        profiles: [reduxProfile(0, VALID_MNEMONIC), open],
+      });
+      const row = mockReduxRow;
+      const getRandomValues = refuseRandomness();
+
+      await expect(ensureMnemonicExists()).resolves.toBe(OTHER_MNEMONIC);
+
+      expect(mockSecureBacking.get('user_mnemonic')).toBe(OTHER_MNEMONIC);
+      expect(getRandomValues).not.toHaveBeenCalled();
+      expect(useSecureStoreState.getState().secureStoreState).toBe('available');
+      // The row still holds the old proofs and the other phrase.
+      expect(mockReduxRow).toBe(row);
+      for (const write of ['setItem', 'mergeItem', 'removeItem', 'multiSet', 'multiMerge'] as const)
+        expect(AsyncStorage[write]).not.toHaveBeenCalled();
+      expect(AsyncStorage.multiRemove).not.toHaveBeenCalled();
+      expect(AsyncStorage.clear).not.toHaveBeenCalled();
+      // The next launch reads the stored root and never looks at the row again.
+      jest.mocked(AsyncStorage.getItem).mockClear();
+      await expect(ensureMnemonicExists()).resolves.toBe(OTHER_MNEMONIC);
+      expect(AsyncStorage.getItem).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      [
+        'the open profile is found by key when its position is stale',
+        {
+          currentProfile: { ...reduxProfile(0, undefined, 'b'.repeat(64)), id: 0 },
+          profiles: [
+            reduxProfile(0, VALID_MNEMONIC),
+            reduxProfile(1, OTHER_MNEMONIC, 'b'.repeat(64)),
+          ],
+        },
+        OTHER_MNEMONIC,
+      ],
+      [
+        'a fresh `{ id: 0 }` selection means the first profile',
+        { currentProfile: { id: 0 }, profiles: [reduxProfile(0, VALID_MNEMONIC)] },
+        VALID_MNEMONIC,
+      ],
+      [
+        'an open profile added by public key falls back to the first phrase',
+        {
+          currentProfile: { ...reduxProfile(0, undefined), id: 0 },
+          profiles: [reduxProfile(0, undefined), reduxProfile(1, OTHER_MNEMONIC)],
+        },
+        OTHER_MNEMONIC,
+      ],
+      [
+        'an open profile with a damaged phrase falls back to the first valid one',
+        {
+          currentProfile: { id: 0 },
+          profiles: [reduxProfile(0, INVALID_CHECKSUM), reduxProfile(1, VALID_MNEMONIC)],
+        },
+        VALID_MNEMONIC,
+      ],
+    ])('%s', async (_case, nostr, expected) => {
+      mockReduxRow = reduxRow(nostr);
+      const getRandomValues = refuseRandomness();
+
+      await expect(ensureMnemonicExists()).resolves.toBe(expected);
+
+      expect(mockSecureBacking.get('user_mnemonic')).toBe(expected);
+      expect(getRandomValues).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['is not JSON', '{"nostr":"{\\"profiles'],
+      ['has a nostr slice that is not JSON', JSON.stringify({ nostr: '{"profiles":[' })],
+      ['has no nostr slice', JSON.stringify({ _persist: '{"version":120,"rehydrated":true}' })],
+      ['has profiles that are not a list', reduxRow({ profiles: 'invalid' })],
+      [
+        'holds a phrase with a bad checksum',
+        reduxRow({ currentProfile: { id: 0 }, profiles: [reduxProfile(0, INVALID_CHECKSUM)] }),
+      ],
+      [
+        'holds a phrase with a word missing',
+        reduxRow({
+          profiles: [reduxProfile(0, VALID_MNEMONIC.split(' ').slice(1).join(' '))],
+        }),
+      ],
+      [
+        'holds a phrase that is valid only once tidied',
+        reduxRow({ profiles: [reduxProfile(0, ` ${VALID_MNEMONIC}`)] }),
+      ],
+      [
+        'holds only profiles without a phrase',
+        reduxRow({ profiles: [reduxProfile(0, undefined)] }),
+      ],
+    ])('asks for the phrase when the row %s', async (_case, row) => {
+      mockReduxRow = row;
+      const getRandomValues = refuseRandomness();
+
+      await expect(ensureMnemonicExists()).resolves.toBeNull();
+
+      expect(useSecureStoreState.getState().secureStoreState).toBe('locked');
+      expect(getRandomValues).not.toHaveBeenCalled();
+      expect(SecureStore.setItemAsync).not.toHaveBeenCalled();
+      expect(mockSecureBacking.has('user_mnemonic')).toBe(false);
+      expect(mockReduxRow).toBe(row);
+      expect(AsyncStorage.removeItem).not.toHaveBeenCalled();
+    });
+
+    it('asks for the phrase when the row cannot be read from storage', async () => {
+      jest
+        .mocked(AsyncStorage.getItem)
+        .mockResolvedValueOnce(null)
+        .mockRejectedValueOnce(new Error('storage unavailable'));
+      const getRandomValues = refuseRandomness();
+
+      await expect(ensureMnemonicExists()).resolves.toBeNull();
+
+      expect(useSecureStoreState.getState().secureStoreState).toBe('locked');
+      expect(getRandomValues).not.toHaveBeenCalled();
+      expect(SecureStore.setItemAsync).not.toHaveBeenCalled();
+    });
+
+    it('creates a wallet over a row whose install never made one', async () => {
+      // What the old app wrote on first launch and again after a reset.
+      mockReduxRow = reduxRow({ currentProfile: { id: 0 }, profiles: [] });
+      const getRandomValues = jest.fn((entropy: Uint8Array) => entropy.fill(0));
+      Object.defineProperty(globalThis, 'crypto', {
+        configurable: true,
+        value: { getRandomValues },
+      });
+
+      await expect(ensureMnemonicExists()).resolves.toBe(VALID_MNEMONIC);
+      expect(getRandomValues).toHaveBeenCalledTimes(1);
+    });
+
+    it('creates a wallet over the row 0.0.45 to 0.1.1 wrote before any wallet existed', async () => {
+      // Redux's starting state, as a 0.0.63 build wrote it on an iPhone
+      // simulator: one profile, every secret an empty string.
+      const blank = {
+        id: 0,
+        mnemonic: '',
+        pubkey: '',
+        npub: '',
+        nsec: '',
+        nut13: '',
+        root: { xpub: '', xpriv: '' },
+      };
+      mockReduxRow = reduxRow({ currentProfile: { id: 0 }, profiles: [blank] });
+      const getRandomValues = jest.fn((entropy: Uint8Array) => entropy.fill(0));
+      Object.defineProperty(globalThis, 'crypto', {
+        configurable: true,
+        value: { getRandomValues },
+      });
+
+      await expect(ensureMnemonicExists()).resolves.toBe(VALID_MNEMONIC);
+      expect(getRandomValues).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([
+      ['a key and no phrase', { nsec: 'nsec1notempty' }],
+      ['an extended private key and no phrase', { root: { xpub: '', xpriv: 'xprv9notempty' } }],
+      ['a phrase that does not validate', { mnemonic: 'not a real phrase' }],
+    ])('still locks over a row whose profile holds %s', async (_case, held) => {
+      const profile = { id: 0, mnemonic: '', nsec: '', nut13: '', root: { xpriv: '' }, ...held };
+      mockReduxRow = reduxRow({ currentProfile: { id: 0 }, profiles: [profile] });
+      const getRandomValues = jest.fn();
+      Object.defineProperty(globalThis, 'crypto', {
+        configurable: true,
+        value: { getRandomValues },
+      });
+
+      await expect(ensureMnemonicExists()).resolves.toBeNull();
+      expect(useSecureStoreState.getState().secureStoreState).toBe('locked');
+      expect(getRandomValues).not.toHaveBeenCalled();
+    });
+
+    it('keeps a stored root over the phrase in the row', async () => {
+      mockSecureBacking.set('user_mnemonic', VALID_MNEMONIC);
+      mockReduxRow = reduxRow({ profiles: [reduxProfile(0, OTHER_MNEMONIC)] });
+
+      await expect(ensureMnemonicExists()).resolves.toBe(VALID_MNEMONIC);
+
+      expect(mockSecureBacking.get('user_mnemonic')).toBe(VALID_MNEMONIC);
+      expect(SecureStore.setItemAsync).not.toHaveBeenCalled();
+      expect(AsyncStorage.getItem).not.toHaveBeenCalled();
+    });
+
+    it('does not put the phrase in the row over a stored root that is damaged', async () => {
+      mockSecureBacking.set('user_mnemonic', INVALID_CHECKSUM);
+      mockReduxRow = reduxRow({ profiles: [reduxProfile(0, VALID_MNEMONIC)] });
+
+      await expect(ensureMnemonicExists()).resolves.toBeNull();
+
+      expect(mockSecureBacking.get('user_mnemonic')).toBe(INVALID_CHECKSUM);
+      expect(useSecureStoreState.getState().secureStoreState).toBe('locked');
+    });
+
+    it('does not use the row beneath saved accounts whose root is missing', async () => {
+      mockProfileBlob = JSON.stringify({
+        state: { profiles: [{ accountIndex: 0, pubkey: 'a'.repeat(64) }] },
+      });
+      mockReduxRow = reduxRow({ profiles: [reduxProfile(0, VALID_MNEMONIC)] });
+
+      await expect(ensureMnemonicExists()).resolves.toBeNull();
+
+      expect(useSecureStoreState.getState().secureStoreState).toBe('locked');
+      expect(SecureStore.setItemAsync).not.toHaveBeenCalled();
+    });
+  });
+
+  // The startup reader. It must never delete: in a mismatched account a
+  // damaged cache can be the only copy of a key.
+  describe('a cache that matches the phrase but has the wrong shape', () => {
+    const read = () => readAccountSecretsUnchanged(0, null);
+    const hash = hashMnemonic(VALID_MNEMONIC);
+    const derived = deriveNostrKeys(VALID_MNEMONIC, 0);
+    const good = {
+      npub: derived.npub,
+      nsec: derived.nsec,
+      pubkey: derived.pubkey,
+      privateKeyHex: bytesToHex(derived.privateKey),
+      mnemonicHash: hash,
+    };
+
+    it('reads back the caches this release writes', async () => {
+      const cashu = deriveCashuMnemonic(VALID_MNEMONIC, 0);
+      await storeDerivedKeys(0, good);
+      await storeCashuMnemonic(0, cashu, hash);
+
+      await expect(read()).resolves.toMatchObject({
+        derivedKeys: good,
+        walletPhrase: { value: cashu, mnemonicHash: hash },
+        keptDerivedNsec: good.nsec,
+      });
+      expect(SecureStore.deleteItemAsync).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['no private key', { ...good, privateKeyHex: undefined }],
+      ['a private key that is not hex', { ...good, privateKeyHex: 'z'.repeat(64) }],
+      ['a private key of the wrong length', { ...good, privateKeyHex: 'ab' }],
+      ['no npub', { ...good, npub: undefined }],
+      ['no nsec', { ...good, nsec: undefined }],
+      ['no public key', { ...good, pubkey: undefined }],
+      ['no hash', { ...good, mnemonicHash: undefined }],
+      ['a list', [good]],
+      ['null', null],
+    ])(
+      'treats derived keys with %s as absent and leaves them where they are',
+      async (_case, blob) => {
+        mockSecureBacking.set('derived_keys_0', JSON.stringify(blob));
+
+        expect((await read()).derivedKeys).toBeNull();
+
+        expect(mockSecureBacking.get('derived_keys_0')).toBe(JSON.stringify(blob));
+        expect(SecureStore.deleteItemAsync).not.toHaveBeenCalled();
+      }
+    );
+
+    it.each([
+      ['no phrase', { mnemonicHash: hash }],
+      ['a phrase that is not a string', { value: 7, mnemonicHash: hash }],
+      ['a phrase with a bad checksum', { value: INVALID_CHECKSUM, mnemonicHash: hash }],
+      ['no hash', { value: VALID_MNEMONIC }],
+      ['a bare string', VALID_MNEMONIC],
+    ])(
+      'treats a wallet phrase cache with %s as absent and leaves it where it is',
+      async (_case, blob) => {
+        mockSecureBacking.set('cashu_mnemonic_0', JSON.stringify(blob));
+
+        expect((await read()).walletPhrase).toBeNull();
+
+        expect(mockSecureBacking.get('cashu_mnemonic_0')).toBe(JSON.stringify(blob));
+        expect(SecureStore.deleteItemAsync).not.toHaveBeenCalled();
+      }
+    );
+
+    it.each([
+      ['one byte', '00'],
+      ['63 bytes', 'ab'.repeat(63)],
+      ['65 bytes', 'ab'.repeat(65)],
+      ['not hex', 'zz'.repeat(64)],
+    ])(
+      'treats a wallet seed cache of %s as absent and leaves it where it is',
+      async (_case, hex) => {
+        const blob = JSON.stringify({ hex, mnemonicHash: hash });
+        mockSecureBacking.set('cashu_seed_0', blob);
+
+        expect((await read()).walletSeed).toBeNull();
+
+        expect(mockSecureBacking.get('cashu_seed_0')).toBe(blob);
+        expect(SecureStore.deleteItemAsync).not.toHaveBeenCalled();
+      }
+    );
+
+    it('reads a 64-byte wallet seed cache', async () => {
+      mockSecureBacking.set(
+        'cashu_seed_0',
+        JSON.stringify({ hex: 'ab'.repeat(64), mnemonicHash: hash })
+      );
+      expect((await read()).walletSeed?.seed).toHaveLength(64);
+    });
+
+    it('treats a key cache whose private key is no key as absent', async () => {
+      mockSecureBacking.set(
+        'derived_keys_0',
+        JSON.stringify({ ...good, privateKeyHex: '0'.repeat(64) })
+      );
+      expect((await read()).derivedKeys).toBeNull();
+      expect(mockSecureBacking.has('derived_keys_0')).toBe(true);
+    });
+
+    it('still hands over the nsec of a damaged key cache, and logs none of it', async () => {
+      mockSecureBacking.set('derived_keys_0', JSON.stringify({ ...good, pubkey: 'short' }));
+
+      const stored = await read();
+
+      expect(stored.derivedKeys).toBeNull();
+      // Recovery information can still show it to the person.
+      expect(stored.keptDerivedNsec).toBe(good.nsec);
+      const logged = JSON.stringify(jest.mocked(nostrLog.error).mock.calls);
+      expect(logged).not.toContain(good.nsec);
+      expect(logged).not.toContain(good.privateKeyHex);
+    });
   });
 
   it('fails closed when crypto.getRandomValues is unavailable', async () => {
@@ -261,16 +662,6 @@ describe('secureStorage mnemonic and seed lifecycle', () => {
     expect(deleted.at(-1)).toBe('secure_key_index');
     expect(mockSecureBacking.size).toBe(0);
   });
-});
-
-it('clears every derived cache before source repair, including the PBKDF2 seed', async () => {
-  jest.clearAllMocks();
-  await expect(clearAccountDerivedCache(7)).resolves.toBe(true);
-  expect(jest.mocked(SecureStore.deleteItemAsync).mock.calls.map(([key]) => key)).toEqual([
-    'derived_keys_7',
-    'cashu_mnemonic_7',
-    'cashu_seed_7',
-  ]);
 });
 
 it('retains the key index when any secure deletion fails so retry can enumerate leftovers', async () => {

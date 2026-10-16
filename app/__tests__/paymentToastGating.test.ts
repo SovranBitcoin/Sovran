@@ -9,6 +9,7 @@
  */
 
 import { createSovranNotifications } from '@/features/send/lib/sovranPaymentConfig';
+import { ERROR_COPY } from '@/shared/lib/errors/catalog';
 import { paymentStatusPopup } from '@/shared/lib/popup';
 import { setTransactionAnnotation } from '@/shared/stores/profile/transactionAnnotationStore';
 import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
@@ -21,9 +22,6 @@ jest.mock('expo-camera', () => ({ scanFromURLAsync: jest.fn() }));
 jest.mock('expo-image-picker', () => ({ launchImageLibraryAsync: jest.fn() }));
 jest.mock('expo-clipboard', () => ({ setStringAsync: jest.fn() }));
 jest.mock('react-native', () => ({ Share: { share: jest.fn() } }));
-jest.mock('@/features/bitchat/lib/blePrivateDelivery', () => ({
-  sendBLEPrivateMessageWhole: jest.fn(),
-}));
 jest.mock('@/features/bitchat/hooks/useBitchatNickname', () => ({
   getBitchatNickname: jest.fn(() => 'Self Sender'),
 }));
@@ -124,6 +122,7 @@ describe('payment toast gating (onchain melt)', () => {
     expect(paymentStatusPopup).toHaveBeenCalledTimes(1);
   });
 
+  // The message is the exception's own text, so the toast shows catalogue copy for it.
   it('creates a fresh failed toast when a payment fails with no active toast', () => {
     const notifications = createSovranNotifications();
     void notifications.onPaymentFailed!({
@@ -135,7 +134,7 @@ describe('payment toast gating (onchain melt)', () => {
     expect(activeStatus()).toMatchObject({
       variant: 'melt',
       state: 'failed',
-      errorMessage: 'Mint rejected the melt\nYour funds have been returned.',
+      errorMessage: `${ERROR_COPY['cashu.unknown']}\nYour funds have been returned.`,
     });
     expect(paymentStatusPopup).toHaveBeenCalledTimes(1);
   });
@@ -150,6 +149,35 @@ describe('payment toast gating (onchain melt)', () => {
     });
     expect(activeStatus()).toMatchObject({ id: 'melt-1', state: 'failed' });
     expect(paymentStatusPopup).not.toHaveBeenCalled();
+  });
+
+  it('says the funds came back when the failed payment already had a toast', () => {
+    usePaymentStatusStore.setState({ active: { ...PROCESSING_MELT, ...BASE } });
+    void createSovranNotifications().onPaymentFailed!({
+      variant: 'melt',
+      ...BASE,
+      message: 'Route failed',
+      rolledBack: true,
+    });
+    expect(activeStatus()).toMatchObject({
+      id: 'melt-1',
+      state: 'failed',
+      errorMessage: `${ERROR_COPY['cashu.unknown']}\nYour funds have been returned.`,
+    });
+  });
+
+  it("shows the wallet package's own wording as it is", () => {
+    usePaymentStatusStore.setState({ active: { ...PROCESSING_MELT, ...BASE } });
+    void createSovranNotifications().onPaymentFailed!({
+      variant: 'melt',
+      ...BASE,
+      message: 'Amount must be between 1 and 10 sats',
+      authored: true,
+    });
+    expect(activeStatus()).toMatchObject({
+      state: 'failed',
+      errorMessage: 'Amount must be between 1 and 10 sats',
+    });
   });
 
   it('replaces an unrelated status instead of failing the wrong payment', () => {
@@ -167,6 +195,7 @@ describe('payment toast gating (onchain melt)', () => {
       variant: 'melt',
       ...BASE,
       message: 'This melt failed',
+      authored: true,
     });
     expect(activeStatus()).toMatchObject({
       variant: 'melt',

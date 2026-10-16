@@ -34,6 +34,7 @@ import { CircleActionButton } from '@/shared/ui/composed/CircleActionButton';
 import { ScreenErrorState } from '@/shared/ui/composed/ScreenStates';
 import { E2EToastProbe } from '@/shared/lib/popup/E2EToastProbe';
 import Icon from 'assets/icons';
+import { hasFeature, type Feature } from '@/shared/config/features';
 
 type HubActionName = 'qrDisplay' | 'scanQr' | 'fixedAmount' | 'paste' | 'nutDrop';
 
@@ -45,11 +46,13 @@ interface ReceiveMethod {
   icon: string;
   /** SF Symbol — renders the circle as liquid glass on supported iOS devices. */
   systemIcon: string;
+  /** Module the row belongs to; omitted rows ship in every edition. */
+  feature?: Feature;
 }
 
 // Same option-row grammar as SendScreen's method list — one legible pattern
 // for both front doors.
-const METHODS: ReceiveMethod[] = [
+const ALL_METHODS: ReceiveMethod[] = [
   {
     id: 'qrDisplay',
     title: 'QR Display',
@@ -69,6 +72,7 @@ const METHODS: ReceiveMethod[] = [
     title: 'Fixed Amount',
     subtitle: 'Request a specific amount',
     icon: 'mdi:decimal',
+    feature: 'lightning',
     systemIcon: 'textformat.123',
   },
   {
@@ -76,6 +80,7 @@ const METHODS: ReceiveMethod[] = [
     title: 'Paste',
     subtitle: 'Redeem from your clipboard',
     icon: 'lets-icons:copy',
+    feature: 'ecash',
     systemIcon: 'doc.on.clipboard',
   },
   // Same glyph and name as the Send hub's Nut Drop row, and the same
@@ -84,10 +89,13 @@ const METHODS: ReceiveMethod[] = [
     id: 'nutDrop',
     title: 'Nut Drop',
     subtitle: 'Be paid by someone nearby',
+    feature: 'nutDrop',
     icon: 'mdi:bluetooth',
     systemIcon: 'dot.radiowaves.left.and.right',
   },
 ];
+
+const METHODS = ALL_METHODS.filter((method) => !method.feature || hasFeature(method.feature));
 
 interface ReceiveHubScreenProps {
   receiveHubEntry?: string | Record<string, unknown>;

@@ -2,6 +2,7 @@ export * from './capabilities';
 export * from './envelope';
 export * from './errors';
 export * from './log';
+export * from './replaceable';
 export * from './schemas';
 export * as map from './map';
 export * from './timeout';
@@ -9,3 +10,5 @@ export * from './transport';
 export * as recipes from './recipes';
 export * as tiers from './tiers';
 export * as facade from './facade';
+
+export { clearForYouCache } from './facade/relay/for-you/build';

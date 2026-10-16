@@ -5,7 +5,7 @@
  * are handled by the screen-action system.
  */
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useWindowDimensions } from 'react-native';
 
 import type { MintHistoryEntry } from '@cashu/coco-core';
@@ -26,6 +26,7 @@ import {
   stateDetailItem,
   quoteIdDetailItem,
   mintDetailItem,
+  entryDetailItems,
 } from '@/features/transactions';
 import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
@@ -58,6 +59,7 @@ export function LightningReceiveScreen({
   );
   const mintInfo = useMintInfo(entry?.mintUrl);
   const bip321 = useBip321Info(entry?.id);
+  const [detailsOpen, setDetailsOpen] = useState(false);
 
   useEffect(() => {
     if (error) paymentLog.warn('receive.lightning.error', { error });
@@ -99,12 +101,16 @@ export function LightningReceiveScreen({
         <ButtonHandler
           buttons={[
             {
-              text: isPaid ? 'Close' : 'Cancel',
-              icon: 'ri:close-circle-line',
+              // The header already closes this screen. This slot opens what
+              // the page leaves out: every id and value, each one copyable.
+              text: 'Details',
+              icon: 'mdi:receipt-text-outline',
               variant: 'secondary',
-              testID: 'lightning-receive-back',
-              onPress: () => actions.back.execute(),
-              condition: actions.back.available,
+              testID: 'lightning-receive-details',
+              onPress: () => setDetailsOpen(true),
+              // Copy and Share are what this screen is for; Details waits
+              // behind the dots when both are showing.
+              prefersOverflow: true,
             },
             {
               text: 'Copy',
@@ -173,6 +179,9 @@ export function LightningReceiveScreen({
         </>
       }>
       <DetailsSection
+        trigger="none"
+        open={detailsOpen}
+        onOpenChange={setDetailsOpen}
         items={[
           entry.id && { title: 'ID', value: entry.id },
           ...transactionLeadDetailItems({
@@ -189,6 +198,7 @@ export function LightningReceiveScreen({
             title: 'Invoice',
             value: <MiddleEllipsisValue value={entry.paymentRequest} />,
           },
+          ...entryDetailItems(entry),
         ]}
       />
     </TransactionDetailShell>

@@ -264,3 +264,7 @@ async function resolveReusableMintQuote(
   });
   return created;
 }
+
+export function disposeReusableQuoteFlights(): void {
+  inFlight.clear();
+}

@@ -14,6 +14,9 @@ import { CapsuleButton } from '@/shared/ui/composed/CapsuleButton';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { useStylePaint } from '@/shared/styles/appStyle';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
+import { Text } from '@/shared/ui/primitives/Text';
 import {
   PILL_HEIGHT,
   pillLabel,
@@ -29,6 +32,7 @@ export function UnitSwitcherPillFallback(
     useUnitSwitcherPill(props);
   const selectedUnit = props.header ? shownUnit : unit;
   const success = useThemeColor('success');
+  const paint = useStylePaint();
 
   const openUnitMenu = useCallback(() => {
     actionMenuSheet({
@@ -57,6 +61,31 @@ export function UnitSwitcherPillFallback(
     );
   }
 
+  // Outside the glass style the account is a label over the balance: plain
+  // secondary type, with a chevron only when there is another account to
+  // switch to. With one account it is a caption, not a disabled control.
+  if (paint.style.surface !== 'glass') {
+    const label = paint.style.type.uppercaseLabels
+      ? shownOption.label.toUpperCase()
+      : shownOption.label;
+    return (
+      <Pressable
+        testID="wallet-unit-switcher"
+        accessibilityRole="button"
+        accessibilityLabel="Switch wallet account"
+        accessibilityState={{ disabled: !canSwitch }}
+        disabled={!canSwitch}
+        hitSlop={BARE_HIT_SLOP}
+        onPress={openUnitMenu}
+        style={styles.bare}>
+        <Text medium size={14} family={paint.style.type.family} color={paint.text.secondary}>
+          {label}
+        </Text>
+        {canSwitch ? <Icon name="mdi:chevron-down" size={16} color={paint.text.secondary} /> : null}
+      </Pressable>
+    );
+  }
+
   return (
     // Greyed out when only one unit exists — nothing to switch to.
     <View
@@ -79,7 +108,14 @@ export function UnitSwitcherPillFallback(
   );
 }
 
+const BARE_HIT_SLOP = { top: 16, bottom: 12, left: 24, right: 24 };
+
 const styles = StyleSheet.create({
+  bare: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 2,
+  },
   disabledSlot: {
     opacity: 0.4,
   },

@@ -10,7 +10,7 @@ import { FIAT_UNITS, isFiatUnit, unitMinorDecimals, unitSymbol, type FiatUnit } 
 
 import { usePricelistStore } from '@/shared/stores/global/pricelistStore';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
-import { amountToNumber, type AmountValue } from '@/shared/lib/cashu/amount';
+import { amountToNumber, type AmountValue } from 'wallet/amount';
 import { cashuLog } from '@/shared/lib/logger';
 
 interface AmountWithUnit {

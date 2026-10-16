@@ -36,7 +36,7 @@ is still required before calling this release fully verified.
 3. **Four UI test suites had stale native mocks.** Updated only their navigation
    context and Reanimated `makeMutable` mocks. No production UI or snapshot change.
 
-Decision: [ADR 0018](../../app/docs/adr/0018-recovery-must-not-replace-or-repeat-custody.md).
+Decision: [ADR 0018](https://github.com/SovranBitcoin/Sovran/blob/main/app/docs/adr/0018-recovery-must-not-replace-or-repeat-custody.md).
 
 ## Account identity and the re-import guard
 

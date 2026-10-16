@@ -3,7 +3,7 @@
   "id": "recovery.profile-keys-error",
   "name": "Open profile-keys-error recovery",
   "description": "Open the recovery form from a prepared disposable device error state.",
-  "details": "Manual prerequisite: the device is already at this boot gate. No real funds; no state injection or recovery phrase is provided by this scenario.",
+  "details": "Manual prerequisite: the device is already at this boot gate for an imported Nostr account. No real funds; no state injection or recovery phrase is provided by this scenario.",
   "lane": "physical",
   "tags": ["flow:recovery"],
   "requires": [],

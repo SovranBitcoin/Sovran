@@ -8,6 +8,7 @@
 
 import { localizeReason } from "./formatting/locales";
 import { logger, mintUrlFields } from "./logger";
+import { accountMintUrls } from "./mint-capabilities";
 import type {
   WalletContext,
   MintSelectionResult,
@@ -64,7 +65,10 @@ export function getValidMintCandidates(
     strategy,
   });
 
-  let candidates: MintCandidate[] = ctx.trustedMintUrls
+  // The active account's mints only. A mint across the testnut split is not
+  // a candidate for any flow, funded or not; its balance reading zero from
+  // here is not what keeps it out.
+  let candidates: MintCandidate[] = accountMintUrls(ctx)
     .map((mintUrl) => ({
       mintUrl,
       balance: ctx.mintBalances[mintUrl] ?? 0,

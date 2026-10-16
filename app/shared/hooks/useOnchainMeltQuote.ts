@@ -26,6 +26,12 @@ const MELT_QUOTE_POLL_MS = 12_000;
 // One quick confirm re-check after the FIRST PAID-without-outpoint read — the
 // mint may publish the outpoint a beat after flipping PAID.
 const OFFCHAIN_CONFIRM_REFETCH_MS = 3_000;
+// A failed confirm re-check is tried again a few times, each wait twice the
+// last up to this: a mint that went away is not asked every three seconds for
+// as long as the page stays open. Once the tries are spent the verdict stays
+// open, and the next time the page opens it is asked again.
+const OFFCHAIN_CONFIRM_RETRY_MAX_MS = 60_000;
+const OFFCHAIN_CONFIRM_MAX_RETRIES = 6;
 
 interface MeltQuoteWatchCtx {
   manager: {
@@ -36,6 +42,8 @@ interface MeltQuoteWatchCtx {
   mintUrl: string;
   quoteId: string;
   setQuote: (quote: Record<string, unknown> | null) => void;
+  /** Which quote the hook's state now describes. */
+  setWatched: (key: string) => void;
   setIsLoading: (loading: boolean) => void;
   setOffchainSettled: (settled: boolean) => void;
   persistedVerdictRef: MutableRefObject<boolean>;
@@ -52,6 +60,7 @@ function watchOnchainMeltQuote(ctx: MeltQuoteWatchCtx): () => void {
     mintUrl,
     quoteId,
     setQuote,
+    setWatched,
     setIsLoading,
     setOffchainSettled,
     persistedVerdictRef,
@@ -64,9 +73,18 @@ function watchOnchainMeltQuote(ctx: MeltQuoteWatchCtx): () => void {
   let interval: ReturnType<typeof setInterval> | null = null;
   let confirmTimeout: ReturnType<typeof setTimeout> | null = null;
   let settlement = INITIAL_OFFCHAIN_SETTLEMENT_STATE;
+  // Polling has stopped on PAID and the one follow-up read is what decides
+  // between "no transaction" and "outpoint published late". If that read
+  // fails nothing else is scheduled, so it has to be tried again.
+  let awaitingVerdict = false;
+  let failedVerdictReads = 0;
   // Captured once per quote: an entry that was already finalized needs only
   // one fresh PAID-no-outpoint read (coco's finalize check was the other).
   const requiredVerdictReads = entrySettledRef.current ? 1 : 2;
+  // A different quote starts from nothing: the previous one's state and
+  // outpoint must not be read as this one's for even one render.
+  setQuote(null);
+  setWatched(`${mintUrl}|${quoteId}`);
   setOffchainSettled(persistedVerdictRef.current);
   paymentLog.debug('onchain.melt.quote.watch_start', {
     persistedVerdict: persistedVerdictRef.current,
@@ -84,6 +102,7 @@ function watchOnchainMeltQuote(ctx: MeltQuoteWatchCtx): () => void {
     try {
       const result = await manager.quotes.melt.refresh({ mintUrl, quoteId });
       if (!mounted) return;
+      failedVerdictReads = 0;
       const record = (result as unknown as Record<string, unknown> | null) ?? null;
       setQuote(record);
       const state = typeof record?.state === 'string' ? record.state : null;
@@ -156,10 +175,13 @@ function watchOnchainMeltQuote(ctx: MeltQuoteWatchCtx): () => void {
           !isConfirmedOffchainSettlement(settlement, requiredVerdictReads) &&
           !confirmTimeout
         ) {
+          awaitingVerdict = true;
           confirmTimeout = setTimeout(() => {
             confirmTimeout = null;
             void fetchQuote();
           }, OFFCHAIN_CONFIRM_REFETCH_MS);
+        } else {
+          awaitingVerdict = false;
         }
       } else if (isOnchainMeltQuoteExpired(state, expiry, Date.now())) {
         stopPolling();
@@ -168,6 +190,22 @@ function watchOnchainMeltQuote(ctx: MeltQuoteWatchCtx): () => void {
       paymentLog.warn('onchain.melt.quote.refresh_failed', {
         error: err instanceof Error ? err.message : String(err),
       });
+      if (
+        mounted &&
+        awaitingVerdict &&
+        !confirmTimeout &&
+        failedVerdictReads < OFFCHAIN_CONFIRM_MAX_RETRIES
+      ) {
+        const wait = Math.min(
+          OFFCHAIN_CONFIRM_REFETCH_MS * 2 ** failedVerdictReads,
+          OFFCHAIN_CONFIRM_RETRY_MAX_MS
+        );
+        failedVerdictReads += 1;
+        confirmTimeout = setTimeout(() => {
+          confirmTimeout = null;
+          void fetchQuote();
+        }, wait);
+      }
     } finally {
       if (mounted) setIsLoading(false);
     }
@@ -228,7 +266,14 @@ export function useOnchainMeltQuote(
   isLoading: boolean;
 } {
   const { manager } = useManagerContext();
-  const [quote, setQuote] = useState<Record<string, unknown> | null>(null);
+  const [storedQuote, setQuote] = useState<Record<string, unknown> | null>(null);
+  // State is set from an effect, which runs AFTER the render that first sees
+  // a new quote id. Until the effect has claimed the state for that id, what
+  // is stored belongs to the previous quote and is not exposed at all —
+  // otherwise one payment's PAID and outpoint are drawn on another.
+  const [watched, setWatched] = useState<string | null>(null);
+  const isCurrent = !!mintUrl && !!quoteId && watched === `${mintUrl}|${quoteId}`;
+  const quote = isCurrent ? storedQuote : null;
   const [isLoading, setIsLoading] = useState(false);
   // Persisted verdict (annotation) — believed immediately, no re-derivation.
   // A persisted outpoint always outranks it (the mint may publish late).
@@ -258,6 +303,7 @@ export function useOnchainMeltQuote(
       mintUrl,
       quoteId,
       setQuote,
+      setWatched,
       setIsLoading,
       setOffchainSettled,
       persistedVerdictRef,
@@ -283,7 +329,7 @@ export function useOnchainMeltQuote(
     feeOptions: normalizeOnchainFeeOptions(quote?.fee_options),
     // OR in the persisted verdict so a late-hydrating annotation still lands
     // without waiting on a live read. Callers gate on `!outpoint` themselves.
-    offchainSettled: offchainSettled || persistedVerdict,
+    offchainSettled: (isCurrent && offchainSettled) || persistedVerdict,
     isLoading,
   };
 }

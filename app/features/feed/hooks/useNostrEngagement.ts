@@ -2,45 +2,26 @@ import { useCallback, useEffect, useMemo, useRef } from 'react';
 
 import { NDKEvent, useNDK } from '@nostr-dev-kit/ndk-mobile';
 import { EventDeletion, Reaction, Repost } from 'nostr-tools/kinds';
-import { useShallow } from 'zustand/shallow';
 
 import type { FeedEvent, NoteMetrics } from '@/features/feed/components/nostr/feedTypes';
 import {
   overlayToggleCount,
-  overlayZapSats,
   shouldSettleToggle,
   shouldSettleZap,
 } from '@/features/feed/lib/engagementOverlay';
 import { reconcileToggle } from '@/features/feed/lib/engagementToggle';
-import {
-  feedLog,
-  log,
-  SHOW_LOGS,
-  useQueryResultLogger,
-  useWhyDidRender,
-} from '@/shared/lib/logger';
+import { feedLog, log, SHOW_LOGS, useQueryResultLogger } from '@/shared/lib/logger';
 import { publishEvent } from '@/shared/lib/nostr/publish';
 import { readNoteMetrics } from '@/shared/lib/nostr/useEntityCache';
 import { paramPopup } from '@/shared/lib/popup';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useNostrSocialStore } from '@/shared/stores/profile/nostrSocialStore';
 
-type EngagementState = {
-  liked: boolean;
-  reposted: boolean;
-  replied: boolean;
-  likePending: boolean;
-  repostPending: boolean;
-  likePendingDirection?: 'activating' | 'deactivating';
-  repostPendingDirection?: 'activating' | 'deactivating';
-};
+import { readDisplayMetrics, readEngagementState, readZapState } from './useNoteEngagement';
 
-export type EngagementViewState = EngagementState;
+export type { EngagementViewState } from './useNoteEngagement';
 
 const OPTIMISTIC_STALE_WARN_MS = 30_000;
-
-/** One shared empty array, so "no events" is the same identity every time. */
-const EMPTY_EVENT_IDS: readonly string[] = [];
 
 type Ndk = NonNullable<ReturnType<typeof useNDK>['ndk']>;
 type ToggleKind = 'like' | 'repost';
@@ -182,9 +163,147 @@ function startReconcile(
 }
 
 // ---------------------------------------------------------------------------
+// Settlement — module scope: it reads the store, never a render snapshot.
+// ---------------------------------------------------------------------------
+
+type SettleScope = {
+  eventsById: ReadonlyMap<string, FeedEvent>;
+  ndk: Ndk | null | undefined;
+  viewerPubkey: string | undefined;
+  getSharedBaseMetrics: (eventId: string) => NoteMetrics;
+};
+
+/**
+ * Settle the overlays the sync has caught up with, and resume intents an app
+ * close left mid-publish. Returns how many overlays on these events have gone
+ * stale, for the DEV warning.
+ */
+function settleOverlays({
+  eventsById,
+  ndk,
+  viewerPubkey,
+  getSharedBaseMetrics,
+}: SettleScope): number {
+  const {
+    engagementByEventId,
+    optimisticLikesByEventId,
+    optimisticRepostsByEventId,
+    optimisticZapsByEventId,
+    clearLikeOptimistic,
+    clearRepostOptimistic,
+    clearZapOptimistic,
+  } = useNostrSocialStore.getState();
+  const now = Date.now();
+  let staleCount = 0;
+  // Collected across the whole pass and emitted once: a feed page settling
+  // forty overlays must not cost forty log lines.
+  const settles: {
+    kind: 'like' | 'repost';
+    flipped: boolean;
+    confirmed: boolean;
+    ageMs: number;
+    wasPending: boolean;
+  }[] = [];
+
+  for (const [eventId, target] of eventsById) {
+    const base = getSharedBaseMetrics(eventId);
+    const like = optimisticLikesByEventId[eventId];
+    const repost = optimisticRepostsByEventId[eventId];
+    const confirmedLiked = !!engagementByEventId[eventId]?.liked;
+    const confirmedReposted = !!engagementByEventId[eventId]?.reposted;
+    for (const overlay of [like, repost]) {
+      if (overlay && now - (overlay.updatedAt || 0) >= OPTIMISTIC_STALE_WARN_MS) staleCount++;
+    }
+    if (shouldSettleToggle(like, confirmedLiked, base.likeCount, now)) {
+      // The overlay is coming off, so the control's value is about to become
+      // the confirmed one. `flipped` is the case that matters: the confirmed
+      // answer DISAGREES with what the user has been looking at — the
+      // "already liked it on another client" correction. Nothing logged this,
+      // so a control changing under the user was indistinguishable from a
+      // normal settle.
+      if (SHOW_LOGS)
+        settles.push({
+          kind: 'like',
+          flipped: like.value !== confirmedLiked,
+          confirmed: confirmedLiked,
+          ageMs: Math.round(now - (like.updatedAt || now)),
+          wasPending: !!like.pending,
+        });
+      clearLikeOptimistic(eventId);
+    }
+    if (shouldSettleToggle(repost, confirmedReposted, base.repostCount, now)) {
+      if (SHOW_LOGS)
+        settles.push({
+          kind: 'repost',
+          flipped: repost.value !== confirmedReposted,
+          confirmed: confirmedReposted,
+          ageMs: Math.round(now - (repost.updatedAt || now)),
+          wasPending: !!repost.pending,
+        });
+      clearRepostOptimistic(eventId);
+    }
+    // Zap overlay: clear only when the aggregated 9735 counts have caught
+    // up to what we expect. Deliberately NO age-out — an aged-out clear
+    // would visibly DECREASE satsZapped when a slow/absent LNURL server
+    // never publishes the receipt; the store's recency cap bounds the map.
+    if (shouldSettleZap(optimisticZapsByEventId[eventId], base.satsZapped)) {
+      clearZapOptimistic(eventId);
+    }
+
+    // An intent still pending with no loop running was left by an app close
+    // mid-publish (the overlay persists); pick up converging it.
+    if (!ndk || !viewerPubkey) continue;
+    if (like?.pending && !reconcilingActions.has(actionKey('like', eventId))) {
+      startReconcile(ndk, 'like', target, () => getSharedBaseMetrics(eventId).likeCount);
+    }
+    if (repost?.pending && !reconcilingActions.has(actionKey('repost', eventId))) {
+      startReconcile(ndk, 'repost', target, () => getSharedBaseMetrics(eventId).repostCount);
+    }
+  }
+
+  if (SHOW_LOGS && settles.length > 0) {
+    const flipped = settles.filter((entry) => entry.flipped);
+    // A flip is a visible correction of an already-painted control, so it
+    // escalates; a plain settle is the happy path.
+    feedLog[flipped.length > 0 ? 'info' : 'debug']('feed.engagement.settled', {
+      settled: settles.length,
+      flipped: flipped.length,
+      likes: settles.filter((entry) => entry.kind === 'like').length,
+      reposts: settles.filter((entry) => entry.kind === 'repost').length,
+      stillPending: settles.filter((entry) => entry.wasPending).length,
+      maxAgeMs: Math.max(...settles.map((entry) => entry.ageMs)),
+      // Which way the corrections went — `confirmed: true` with no local
+      // intent is the other-client case.
+      flippedToActive: flipped.filter((entry) => entry.confirmed).length,
+      flippedToInactive: flipped.filter((entry) => !entry.confirmed).length,
+    });
+  }
+  return staleCount;
+}
+
+type SocialState = ReturnType<typeof useNostrSocialStore.getState>;
+
+/** Whether a store write touched anything settlement reads. */
+const settlementInputsChanged = (state: SocialState, previous: SocialState) =>
+  state.engagementByEventId !== previous.engagementByEventId ||
+  state.optimisticLikesByEventId !== previous.optimisticLikesByEventId ||
+  state.optimisticRepostsByEventId !== previous.optimisticRepostsByEventId ||
+  state.optimisticZapsByEventId !== previous.optimisticZapsByEventId;
+
+// ---------------------------------------------------------------------------
 // Hook
 // ---------------------------------------------------------------------------
 
+/**
+ * Engagement for one surface's notes: the togglers, the settlement that hands
+ * an optimistic overlay over to confirmed counts, and readers for callbacks.
+ *
+ * It does not subscribe the surface to the store. A card follows its own note
+ * through `useNoteEngagement`, so a like re-renders one card rather than the
+ * list that holds it; the readers returned here answer from the store at the
+ * moment they are called and keep their identity across engagement changes.
+ * Call them from handlers and callbacks, never to paint.
+ */
 export function useNostrEngagement(
   events: FeedEvent[],
   getBaseMetrics: (eventId: string) => NoteMetrics
@@ -192,25 +311,6 @@ export function useNostrEngagement(
   const { ndk } = useNDK();
   const { keys: nostrKeys } = useNostrKeysContext();
   const viewerPubkey = nostrKeys?.pubkey;
-
-  // State slices — grouped with useShallow to minimise re-subscriptions. The
-  // canonical maps are populated globally by useOwnEventsSync, so this hook only
-  // reads them (no per-screen relay subscription) and owns the optimistic toggle.
-  const {
-    engagementByEventId,
-    optimisticLikesByEventId,
-    optimisticRepostsByEventId,
-    optimisticZapsByEventId,
-    zappedByEventId,
-  } = useNostrSocialStore(
-    useShallow((s) => ({
-      engagementByEventId: s.engagementByEventId,
-      optimisticLikesByEventId: s.optimisticLikesByEventId,
-      optimisticRepostsByEventId: s.optimisticRepostsByEventId,
-      optimisticZapsByEventId: s.optimisticZapsByEventId,
-      zappedByEventId: s.zappedByEventId,
-    }))
-  );
 
   const lastStaleWarningRef = useRef(0);
 
@@ -231,263 +331,66 @@ export function useNostrEngagement(
     return map;
   }, [events]);
 
-  // Identity-stable while the ID SET is unchanged. `events` gets a fresh array
-  // on every data-version bump, so deriving straight off `eventsById` handed
-  // `engagementRevision` a new `eventIds` each time — measured as
-  // `events: 26x new array identity, len 0`, i.e. bumping the revision (and
-  // through it every consumer's FlashList `extraData`) for an EMPTY list that
-  // had not changed. The joined key is the repo's usual shape for this
-  // (`ignoredPubkeysKey` in the feed ignore store).
-  const eventIdsKey = useMemo(() => Array.from(eventsById.keys()).join('\u0000'), [eventsById]);
-  const eventIds = useMemo(
-    () => (eventIdsKey ? eventIdsKey.split('\u0000') : EMPTY_EVENT_IDS),
-    [eventIdsKey]
-  );
-
   // ---- settle overlays once the sync catches up; resume orphaned intents ----
 
+  // Runs for a new set of events or a new base (a surface's metrics map
+  // changing is the moment fresh counts may have landed in the shared cache),
+  // and after every store write that touches an input. The store is listened to
+  // rather than selected: settlement renders nothing, and selecting the maps
+  // re-rendered the whole surface for one like.
   useEffect(() => {
-    const { clearLikeOptimistic, clearRepostOptimistic, clearZapOptimistic } =
-      useNostrSocialStore.getState();
-    const now = Date.now();
-    // Collected across the whole pass and emitted once: a feed page settling
-    // forty overlays must not cost forty log lines.
-    const settles: {
-      kind: 'like' | 'repost';
-      flipped: boolean;
-      confirmed: boolean;
-      ageMs: number;
-      wasPending: boolean;
-    }[] = [];
-
-    for (const [eventId, target] of eventsById) {
-      const base = getSharedBaseMetrics(eventId);
-      const like = optimisticLikesByEventId[eventId];
-      const repost = optimisticRepostsByEventId[eventId];
-      const confirmedLiked = !!engagementByEventId[eventId]?.liked;
-      const confirmedReposted = !!engagementByEventId[eventId]?.reposted;
-      if (shouldSettleToggle(like, confirmedLiked, base.likeCount, now)) {
-        // The overlay is coming off, so the control's value is about to become
-        // the confirmed one. `flipped` is the case that matters: the confirmed
-        // answer DISAGREES with what the user has been looking at — the
-        // "already liked it on another client" correction. Nothing logged this,
-        // so a control changing under the user was indistinguishable from a
-        // normal settle.
-        if (SHOW_LOGS)
-          settles.push({
-            kind: 'like',
-            flipped: like.value !== confirmedLiked,
-            confirmed: confirmedLiked,
-            ageMs: Math.round(now - (like.updatedAt || now)),
-            wasPending: !!like.pending,
-          });
-        clearLikeOptimistic(eventId);
+    let mounted = true;
+    let queued = false;
+    const pass = () => {
+      const staleCount = settleOverlays({ eventsById, ndk, viewerPubkey, getSharedBaseMetrics });
+      const now = Date.now();
+      if (__DEV__ && staleCount > 0 && now - lastStaleWarningRef.current >= 10_000) {
+        lastStaleWarningRef.current = now;
+        log.warn('feed.engagement.stale_optimistic', { staleCount });
       }
-      if (shouldSettleToggle(repost, confirmedReposted, base.repostCount, now)) {
-        if (SHOW_LOGS)
-          settles.push({
-            kind: 'repost',
-            flipped: repost.value !== confirmedReposted,
-            confirmed: confirmedReposted,
-            ageMs: Math.round(now - (repost.updatedAt || now)),
-            wasPending: !!repost.pending,
-          });
-        clearRepostOptimistic(eventId);
-      }
-      // Zap overlay: clear only when the aggregated 9735 counts have caught
-      // up to what we expect. Deliberately NO age-out — an aged-out clear
-      // would visibly DECREASE satsZapped when a slow/absent LNURL server
-      // never publishes the receipt; the store's recency cap bounds the map.
-      if (shouldSettleZap(optimisticZapsByEventId[eventId], base.satsZapped)) {
-        clearZapOptimistic(eventId);
-      }
-
-      // An intent still pending with no loop running was left by an app close
-      // mid-publish (the overlay persists); pick up converging it.
-      if (!ndk || !viewerPubkey) continue;
-      if (like?.pending && !reconcilingActions.has(actionKey('like', eventId))) {
-        startReconcile(ndk, 'like', target, () => getSharedBaseMetrics(eventId).likeCount);
-      }
-      if (repost?.pending && !reconcilingActions.has(actionKey('repost', eventId))) {
-        startReconcile(ndk, 'repost', target, () => getSharedBaseMetrics(eventId).repostCount);
-      }
-    }
-
-    if (SHOW_LOGS && settles.length > 0) {
-      const flipped = settles.filter((entry) => entry.flipped);
-      // A flip is a visible correction of an already-painted control, so it
-      // escalates; a plain settle is the happy path.
-      feedLog[flipped.length > 0 ? 'info' : 'debug']('feed.engagement.settled', {
-        settled: settles.length,
-        flipped: flipped.length,
-        likes: settles.filter((entry) => entry.kind === 'like').length,
-        reposts: settles.filter((entry) => entry.kind === 'repost').length,
-        stillPending: settles.filter((entry) => entry.wasPending).length,
-        maxAgeMs: Math.max(...settles.map((entry) => entry.ageMs)),
-        // Which way the corrections went — `confirmed: true` with no local
-        // intent is the other-client case.
-        flippedToActive: flipped.filter((entry) => entry.confirmed).length,
-        flippedToInactive: flipped.filter((entry) => !entry.confirmed).length,
+    };
+    pass();
+    const unsubscribe = useNostrSocialStore.subscribe((state, previous) => {
+      if (queued || !settlementInputsChanged(state, previous)) return;
+      // After the write, not inside it: a pass clears overlays, and a store
+      // write from within a listener would hand the remaining listeners of the
+      // outer write a state that is already out of date.
+      queued = true;
+      queueMicrotask(() => {
+        queued = false;
+        if (mounted) pass();
       });
-    }
-  }, [
-    eventsById,
-    ndk,
-    viewerPubkey,
-    // Not read directly: a surface's metrics map changing is the moment fresh
-    // counts may have landed in the shared cache, so re-check settlement then.
-    getBaseMetrics,
-    getSharedBaseMetrics,
-    engagementByEventId,
-    optimisticLikesByEventId,
-    optimisticRepostsByEventId,
-    optimisticZapsByEventId,
-  ]);
+    });
+    return () => {
+      mounted = false;
+      unsubscribe();
+    };
+  }, [eventsById, ndk, viewerPubkey, getSharedBaseMetrics]);
 
-  // ---- DEV stale-optimistic warning ----
-
-  useEffect(() => {
-    if (!__DEV__) return;
-    const now = Date.now();
-    if (now - lastStaleWarningRef.current < 10_000) return;
-
-    let staleCount = 0;
-    for (const eventId of eventIds) {
-      for (const opt of [optimisticLikesByEventId[eventId], optimisticRepostsByEventId[eventId]]) {
-        if (opt && now - (opt.updatedAt || 0) >= OPTIMISTIC_STALE_WARN_MS) staleCount++;
-      }
-    }
-    if (staleCount > 0) {
-      lastStaleWarningRef.current = now;
-      log.warn('feed.engagement.stale_optimistic', { staleCount });
-    }
-  }, [eventIds, optimisticLikesByEventId, optimisticRepostsByEventId]);
-
-  // ---- engagement revision (for consumer cache-busting) ----
-
-  const engagementRevisionRef = useRef(0);
-  const engagementRevision = useMemo(() => {
-    engagementRevisionRef.current += 1;
-    return engagementRevisionRef.current;
-    // The deps are TRIGGERS, not inputs — the body reads none of them, which is
-    // why the rule calls them unnecessary. Consumers fold this token into a
-    // FlashList `extraData` string, so it must stay a scalar that changes
-    // whenever any engagement input does.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    eventIds,
-    engagementByEventId,
-    optimisticLikesByEventId,
-    optimisticRepostsByEventId,
-    optimisticZapsByEventId,
-    zappedByEventId,
-  ]);
-
-  // Every consumer folds `engagementRevision` into a FlashList `extraData`
-  // string, so ONE bump invalidates every visible row in the feed and the
-  // thread. Six independent inputs can cause that bump, and until now nothing
-  // said which: a user tapping like, a kind-7 batch landing, and the social
-  // store re-keying were indistinguishable while all three redrew the list.
-  // Emitted on change only, never per render.
-  useWhyDidRender(
-    'useNostrEngagement.revision',
-    () => ({
-      events: eventIds,
-      confirmed: engagementByEventId,
-      optimisticLikes: optimisticLikesByEventId,
-      optimisticReposts: optimisticRepostsByEventId,
-      optimisticZaps: optimisticZapsByEventId,
-      zapped: zappedByEventId,
-    }),
-    feedLog
-  );
   // Thunk, not an object: those four `Object.keys` walk the whole social store
   // (115 confirmed entries in a measured session) and would run on EVERY render
   // of a shipped build, where the logger is a no-op.
-  useQueryResultLogger(
-    () => ({
+  useQueryResultLogger(() => {
+    const state = useNostrSocialStore.getState();
+    return {
       source: 'useNostrEngagement',
       status: 'ready',
-      count: eventIds.length,
+      count: eventsById.size,
       extra: {
-        revision: engagementRevision,
-        confirmed: Object.keys(engagementByEventId).length,
-        pendingLikes: Object.keys(optimisticLikesByEventId).length,
-        pendingReposts: Object.keys(optimisticRepostsByEventId).length,
-        pendingZaps: Object.keys(optimisticZapsByEventId).length,
+        confirmed: Object.keys(state.engagementByEventId).length,
+        pendingLikes: Object.keys(state.optimisticLikesByEventId).length,
+        pendingReposts: Object.keys(state.optimisticRepostsByEventId).length,
+        pendingZaps: Object.keys(state.optimisticZapsByEventId).length,
         reconciling: reconcilingActions.size,
       },
-    }),
-    feedLog
-  );
+    };
+  }, feedLog);
 
-  // ---- public getters ----
-
-  const getEngagementState = useCallback(
-    (eventId: string): EngagementState => {
-      const record = engagementByEventId[eventId];
-      const baseLiked = !!record?.liked;
-      const baseReposted = !!record?.reposted;
-      const optLike = optimisticLikesByEventId[eventId];
-      const optRepost = optimisticRepostsByEventId[eventId];
-
-      return {
-        liked: optLike ? optLike.value : baseLiked,
-        reposted: optRepost ? optRepost.value : baseReposted,
-        replied: !!record?.replied,
-        likePending: !!optLike?.pending,
-        repostPending: !!optRepost?.pending,
-        likePendingDirection: optLike?.pending
-          ? optLike.value
-            ? 'activating'
-            : 'deactivating'
-          : undefined,
-        repostPendingDirection: optRepost?.pending
-          ? optRepost.value
-            ? 'activating'
-            : 'deactivating'
-          : undefined,
-      };
-    },
-    [engagementByEventId, optimisticLikesByEventId, optimisticRepostsByEventId]
-  );
+  // ---- readers ----
 
   const getDisplayMetrics = useCallback(
-    (eventId: string): NoteMetrics => {
-      const baseMetrics = getSharedBaseMetrics(eventId);
-      return {
-        ...baseMetrics,
-        likeCount: overlayToggleCount(baseMetrics.likeCount, optimisticLikesByEventId[eventId]),
-        repostCount: overlayToggleCount(
-          baseMetrics.repostCount,
-          optimisticRepostsByEventId[eventId]
-        ),
-        satsZapped: overlayZapSats(baseMetrics.satsZapped, optimisticZapsByEventId[eventId]),
-      };
-    },
-    [
-      getSharedBaseMetrics,
-      optimisticLikesByEventId,
-      optimisticRepostsByEventId,
-      optimisticZapsByEventId,
-    ]
-  );
-
-  /**
-   * Viewer zap state for the lightning button tint. The durable
-   * `zappedByEventId` record is the authority — the optimistic overlay is
-   * cleared once nagg's counts catch up, so tinting off it alone made the
-   * highlight vanish at settle time.
-   */
-  const getZapState = useCallback(
-    (eventId: string): { zapped: boolean; zapPending: boolean } => {
-      const optZap = optimisticZapsByEventId[eventId];
-      return {
-        zapped: !!zappedByEventId[eventId] || (optZap?.deltaSats ?? 0) > 0,
-        zapPending: !!optZap?.pending,
-      };
-    },
-    [optimisticZapsByEventId, zappedByEventId]
+    (eventId: string): NoteMetrics => readDisplayMetrics(eventId, getSharedBaseMetrics(eventId)),
+    [getSharedBaseMetrics]
   );
 
   // ---- toggle actions ----
@@ -542,10 +445,9 @@ export function useNostrEngagement(
 
   return {
     getDisplayMetrics,
-    getEngagementState,
-    getZapState,
+    getEngagementState: readEngagementState,
+    getZapState: readZapState,
     toggleLike,
     toggleRepost,
-    engagementRevision,
   };
 }

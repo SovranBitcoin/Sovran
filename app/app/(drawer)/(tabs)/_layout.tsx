@@ -6,6 +6,8 @@ import Icon from 'assets/icons';
 import { SovranTabBar } from '@/shared/blocks/SovranTabBar';
 import { Expo55NativeTabs, isExpo55NativeTabsSupported } from '@/navigation/nativeTabs';
 import { TabBarInsetsProvider } from '@/shared/hooks/useScreenInsets';
+import { hasFeature, type Feature } from '@/shared/config/features';
+import { orderTabs, visibleTabState } from '@/navigation/tabOrder';
 
 export const unstable_settings = {
   anchor: 'index',
@@ -21,11 +23,14 @@ type TabDef = {
   sf: { default: SFSymbol; selected: SFSymbol };
   /** Monicon (Iconify) pair for the cross-platform JS tab bar. */
   monicon: { default: string; selected: string };
+  /** Module this tab belongs to; omitted tabs always ship. */
+  feature?: Feature;
 };
 
-const TAB_DEFS: readonly TabDef[] = [
+const ALL_TAB_DEFS: readonly TabDef[] = [
   {
     name: 'feed',
+    feature: 'feed',
     testID: 'tab-feed',
     title: 'Feed',
     sf: { default: 'house', selected: 'house.fill' },
@@ -33,6 +38,7 @@ const TAB_DEFS: readonly TabDef[] = [
   },
   {
     name: 'contacts',
+    feature: 'contacts',
     testID: 'tab-contacts',
     title: 'Contacts',
     sf: { default: 'person.2', selected: 'person.2.fill' },
@@ -47,6 +53,7 @@ const TAB_DEFS: readonly TabDef[] = [
   },
   {
     name: 'notifications',
+    feature: 'feed',
     testID: 'tab-notifications',
     title: 'Notifications',
     sf: { default: 'bell', selected: 'bell.fill' },
@@ -54,12 +61,21 @@ const TAB_DEFS: readonly TabDef[] = [
   },
   {
     name: 'ai',
+    feature: 'ai',
     title: 'AI',
     testID: 'tab-ai',
     sf: { default: 'brain', selected: 'brain' },
     monicon: { default: 'mdi:robot-outline', selected: 'mdi:robot' },
   },
 ];
+
+const TAB_DEFS = orderTabs(ALL_TAB_DEFS, hasFeature);
+
+/** Tab folders this build does not ship; declared hidden so no bar renders them. */
+const HIDDEN_TAB_NAMES = ALL_TAB_DEFS.filter((tab) => !TAB_DEFS.includes(tab)).map(
+  (tab) => tab.name
+);
+const SHOWN_TAB_NAMES: ReadonlySet<string> = new Set(TAB_DEFS.map((tab) => tab.name));
 
 const NATIVE_TAB_PROPS = Object.fromEntries(
   TAB_DEFS.map((tab) => [
@@ -121,8 +137,11 @@ export default function TabLayout() {
       <BackgroundProvider>
         <View style={{ flex: 1 }}>
           <Tabs
+            initialRouteName={TAB_DEFS[0]?.name === 'index' ? 'index' : undefined}
             screenOptions={{ headerShown: false }}
-            tabBar={(props) => <SovranTabBar {...props} />}>
+            tabBar={(props) => (
+              <SovranTabBar {...props} state={visibleTabState(props.state, SHOWN_TAB_NAMES)} />
+            )}>
             {TAB_DEFS.map((tab) => (
               <Tabs.Screen
                 key={tab.name}
@@ -141,6 +160,9 @@ export default function TabLayout() {
                   ),
                 }}
               />
+            ))}
+            {HIDDEN_TAB_NAMES.map((name) => (
+              <Tabs.Screen key={name} name={name} options={{ href: null }} />
             ))}
           </Tabs>
         </View>

@@ -88,7 +88,8 @@ async function readDmPages(ctx: {
     const fresh = ctx.cursor.track(page);
     const visible = ctx.onPage(page, { first, mode: ctx.mode });
     first = false;
-    const hasMore = page.envelopes.length >= ctx.pageLimit && fresh > 0;
+    // A full page from the backend is full even when one of its wraps did not parse.
+    const hasMore = (page.received ?? page.envelopes.length) >= ctx.pageLimit && fresh > 0;
     until = ctx.cursor.nextUntil();
     if (!ctx.continueWhileEmpty || visible !== 0 || !hasMore || until === undefined) return hasMore;
   }

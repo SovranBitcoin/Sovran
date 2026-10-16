@@ -8,7 +8,7 @@ establish protocol constraints, not proof of deployed behavior. Mutable upstream
 documents and services need rechecking when a claim changes. No live store copy,
 mint balance, private data, or server logs were fetched for this review.
 
-Use alongside the code rules in [hunch.config.ts](hunch.config.ts) (including
+Use alongside the [contributor conventions](docs/review/contributor-conventions.md) (including
 `copy/honest` for microcopy), the
 [artwork guide](press/artwork/README.md) for rendered copy,
 [legal guide](docs/legal/README.md) for notices and [glossary](app/CONTEXT.md)
@@ -122,7 +122,7 @@ NIP-17 gift-wrap routing exposes a recipient tag; do not confuse the outer rando
 signing key or randomized timestamp with verified real-sender identity or send time.
 
 **Follow-up:** the memory-only/encrypted-cache target (follow-up F02 in
-[docs/architecture/follow-ups.md](docs/architecture/follow-ups.md)) remains
+[docs/follow-ups/](docs/follow-ups/README.md)) remains
 implementation work. Audit each transport and deployment separately; this review
 did not inspect running Nagg services, device databases, or remote retention.
 
@@ -265,9 +265,9 @@ establish their truth.
 | Lightning | The wallet uses a mint's supported payment operations | Quotes, liquidity, routing and fees can fail or change; no speed or success guarantee. |
 | Multiple mints | Choose issuers and spread exposure | Tokens remain issuer-specific; multiple mints do not guarantee backing or convertibility. |
 | On-chain | Name a capability verified for the installed version and channel | Parsing BIP-321 or finding source screens does not establish a public send/receive release. |
-| Nut Drop | Send to a compatible nearby peer | `deliverNearPayIfActive` in [sovranPaymentConfig](app/features/send/lib/sovranPaymentConfig.ts) uses a recipient-encrypted BLE message and requires advertised capability. This corrects the earlier public-broadcast description. Do not generalize this to public location rooms, Nostr DMs, or every mesh client; offline bearer ecash still carries redemption and key/device risks. |
+| Nut Drop | Send a locked payment to a compatible nearby wallet | [Authenticated capability](app/features/nearPay/lib/nearbyCapability.ts) gates recipients; [durable delivery](app/features/nearPay/lib/nearbyPayments.ts) uses private BLE and Nostr envelopes for one payment. Quiet wallet discovery is separate from stock mesh participation; explicit public participation is visible. No offline bearer downgrade, delivery-success guarantee, or physical interoperability claim follows from source/tests. See [ADR 23](app/docs/adr/0023-quiet-nearby-payments.md). |
 | Routstr | Pay for supported model usage | The selected provider receives plaintext prompts and supplied context. Payment privacy is not prompt confidentiality. |
-| NIP-05 | A domain maps a name to a public key | Do not describe this as verified personal identity or trustworthiness. |
+| NIP-05 | A domain maps a name to the exact selected public key; [ADR 0024](app/docs/adr/0024-verify-domain-identities-against-recipient-keys.md) and the [resolver](wallet/src/nip05.ts) define the check | A blue address check is not verified personal identity or trustworthiness. A red result includes inability to verify, not just a proven mismatch. |
 | Zaps | A provider publishes a receipt | A receipt is provider-attested, not independently conclusive payment or reserve evidence. |
 | Company | Use the operator details in the approved notices | Mint-operator duties and regulatory exposure need qualified advice. App terms cannot cancel issuer or mandatory consumer obligations. |
 | Translations | Identify the locale actually reviewed | English fallback or a translated label is not complete localization. Do not publish unreviewed machine translations of risk/legal qualifications. |

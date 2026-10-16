@@ -3,7 +3,7 @@
   "id": "recovery.secure-locked",
   "name": "Open secure-locked recovery",
   "description": "Open the recovery form from a prepared disposable device error state.",
-  "details": "Manual prerequisite: the device is already at this boot gate. No real funds; no state injection or recovery phrase is provided by this scenario.",
+  "details": "Manual prerequisite: the device is already at this boot gate with a persistently unreadable keychain. No real funds; no state injection or recovery phrase is provided by this scenario.",
   "lane": "physical",
   "tags": ["flow:recovery"],
   "requires": [],
@@ -11,6 +11,8 @@
   "steps": [
     {"action":"waitFor","selector":{"id":"secure-locked-screen"},"timeoutMs":30000},
     {"action":"screenshot","name":"secure-locked"},
+    {"action":"tap","selector":{"id":"key-recovery-retry"}},
+    {"action":"waitFor","selector":{"id":"secure-locked-screen"}},
     {"action":"tap","selector":{"id":"secure-locked-import"}},
     {"action":"waitFor","selector":{"id":"secure-recovery-submit"}},
     {"action":"tap","selector":{"id":"key-recovery-cancel"}}

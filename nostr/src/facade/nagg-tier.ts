@@ -452,8 +452,8 @@ export function createNaggTier(config: NaggTierConfig): NostrTierStrategy {
     },
 
     async getDmEnvelopes(request: DmEnvelopesRequest): Promise<TierOutcome<DmEnvelopesBundle>> {
-      // Index/router only — opaque envelopes, paginated by ingest time. nagg
-      // stores arrival time so an incremental sync CAN bound against it.
+      // Index/router only — opaque envelopes, paginated by event created_at.
+      // Incremental callers supply since with a gift-wrap timestamp overlap.
       const binding = dmEnvelopesAppView({
         viewer: request.viewerPubkey,
         kinds: DM_ENVELOPE_KINDS,
@@ -464,7 +464,10 @@ export function createNaggTier(config: NaggTierConfig): NostrTierStrategy {
       const result = await client.rest<typeof NaggEnvelopeSchema>({
         path: binding.path,
         method: binding.method ?? 'GET',
-        searchParams: binding.searchParams,
+        searchParams: {
+          ...binding.searchParams,
+          ...(request.since !== undefined ? { since: request.since } : {}),
+        },
         responseSchema: NaggEnvelopeSchema,
         operationName: binding.operationName,
         refresh: request.refresh,

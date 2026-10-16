@@ -1,8 +1,9 @@
-import type {
-  RebalanceEventSink,
-  RebalanceLegStatus,
-  RebalanceLegUpdate,
-  RebalanceRoutingInfo,
+import {
+  createChainSteps,
+  type RebalanceEventSink,
+  type RebalanceLegStatus,
+  type RebalanceLegUpdate,
+  type RebalanceRoutingInfo,
 } from 'wallet';
 
 import {
@@ -10,10 +11,7 @@ import {
   type StepState,
   type TransferStep,
 } from '@/features/mint/components/rebalance';
-import {
-  createChainSteps,
-  formatCandidateRoutingDetail,
-} from '@/features/mint/lib/rebalanceRunState';
+import { formatCandidateRoutingDetail } from '@/features/mint/lib/rebalanceRunState';
 import { describeError } from '@/shared/lib/errors';
 import { mintLocalId } from '@/shared/lib/id';
 import { extractDomain } from '@/shared/lib/url';
@@ -26,6 +24,10 @@ import { setTransactionAnnotation } from '@/shared/stores/profile/transactionAnn
 /** Row copy for a melt the wallet sent but could not yet confirm. */
 export const PAYMENT_PENDING_DETAIL =
   'Payment pending. Please wait and reopen later; the app will recover this operation automatically.';
+
+/** Row copy for a transfer whose money has left but has not been seen to arrive. */
+const SETTLING_DETAIL =
+  'Sent. The receiving mint has not credited it yet; this updates when it does.';
 
 function routingToStepState(routing: RebalanceRoutingInfo | null): Partial<StepState> {
   if (!routing) return { routingDetail: undefined };
@@ -64,9 +66,12 @@ function legUpdateToStepState(update: RebalanceLegUpdate): Partial<StepState> {
   if (update.invoice !== undefined) next.invoice = update.invoice;
   if (update.operationId !== undefined) next.operationId = update.operationId;
   if (update.status === 'paymentPending') {
-    // Still in flight: shown as sending, never as failed or retryable.
-    next.status = 'melting';
+    // Still in flight: never failed, and never run again by a retry.
+    next.status = 'paymentPending';
     next.routingDetail = PAYMENT_PENDING_DETAIL;
+  } else if (update.status === 'settling') {
+    next.status = 'settling';
+    next.routingDetail = SETTLING_DETAIL;
   } else if (update.status) {
     next.status = update.status;
   }
@@ -79,8 +84,6 @@ function toSwapLegStatus(status: RebalanceLegStatus): SwapLegLocalStatus | null 
     case 'routing':
     case 'skipped':
       return null;
-    case 'paymentPending':
-      return 'melting';
     default:
       return status;
   }
@@ -142,7 +145,10 @@ export function createRebalanceStepSink({
     mintReceiptCreated(legId, receipt) {
       const swapLegId = swapLegIds[legId];
       if (!groupId || !swapLegId || !receipt.quoteId) return;
-      swapStore().tagMintQuote(groupId, swapLegId, { quoteId: receipt.quoteId });
+      swapStore().tagMintQuote(groupId, swapLegId, {
+        quoteId: receipt.quoteId,
+        operationId: receipt.id,
+      });
       setTransactionAnnotation(`quote:${receipt.quoteId}`, swapAnnotation(groupId, legId, 'mint'));
     },
     meltPrepared(legId, melt) {

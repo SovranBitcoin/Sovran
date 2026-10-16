@@ -1,8 +1,8 @@
 /**
- * @fileoverview User Flow Modal Layout
+ * @fileoverview User Flow Layout
  *
- * This layout creates a nested stack navigator inside a modal presentation.
- * The parent root Stack presents this group as a modal (slides up from bottom).
+ * A nested stack navigator. The root Stack presents this group as a pushed page
+ * (`slideFromRight('(user-flow)')` in config/modalScreens.ts).
  * Screens within this group push horizontally:
  * - profile: Entry point, shows user profile info
  * - userMessages: Chat with user (horizontal push)

@@ -1,6 +1,6 @@
 {
   "$schema": "https://unpkg.com/knip@5/schema.json",
-  "ignore": ["site/**", "hunch.config.ts"],
+  "ignore": ["site/**"],
   "ignoreIssues": {
     "**/*.android.{ts,tsx}": ["files"],
     "**/*.ios.{ts,tsx}": ["files"],
@@ -14,6 +14,10 @@
     "scripts/lib/phone-frame.mjs": ["exports"]
   },
   "workspaces": {
+    "harness": {
+      "entry": ["src/discover-upgrade.ts"],
+      "project": ["src/**/*.ts", "tests/**/*.ts"]
+    },
     "app": {
       "entry": [
         "shim.js",
@@ -35,6 +39,7 @@
       "ignoreDependencies": [
         "buffer",
         "expo-screen-corner-radius",
+        "network-timeouts",
         "react-native-fast-squircle"
       ],
       "ignoreBinaries": ["claude", "eas", "gh", "tsx", "python3"]

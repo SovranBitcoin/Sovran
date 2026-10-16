@@ -46,7 +46,7 @@ function ShareRoute() {
   if (!parsed) return null;
 
   return (
-    <FormSheetChrome title={headerTitle}>
+    <FormSheetChrome route="share" title={headerTitle}>
       <ShareScreen
         type={type}
         data={parsed.data}

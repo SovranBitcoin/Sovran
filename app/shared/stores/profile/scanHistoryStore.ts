@@ -9,7 +9,7 @@
  * - Quick re-access to previously scanned data
  */
 
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { persist, subscribeWithSelector } from 'zustand/middleware';
 import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
@@ -21,6 +21,16 @@ const profileStorage = createProfileScopedStorage();
 
 /** Cap matches `searchHistoryStore`'s MAX_RECENT_SEARCHES convention; tail-evicts oldest. */
 const MAX_SCAN_HISTORY = 500;
+
+/** Longest scanned string that is kept. A longer one is not recorded. */
+const MAX_SCAN_RAW_LENGTH = 16_384;
+
+/** The newest `MAX_SCAN_HISTORY` entries. The same array when it already fits. */
+function newestScans<T extends { scannedAt: number }>(entries: T[]): T[] {
+  return entries.length > MAX_SCAN_HISTORY
+    ? [...entries].sort((a, b) => b.scannedAt - a.scannedAt).slice(0, MAX_SCAN_HISTORY)
+    : entries;
+}
 
 /** What type of data was scanned */
 type ScanType = 'npub' | 'ecash' | 'lightning' | 'mint' | 'paymentRequest' | 'unknown';
@@ -105,7 +115,8 @@ function normaliseForDedupe(raw: string): string {
 // `processed` validate via `looseObject` and the value ages out via the cap.
 const PersistedScanEntry = z.looseObject({
   id: z.string().max(128),
-  raw: z.string().max(16_384),
+  // No length limit on reading: earlier releases saved any length.
+  raw: z.string(),
   // `.catch(...)`: display metadata — an unrecognized value must not fail the
   // parse and discard the whole scan-history blob. Unknown types render as
   // 'unknown'; an unknown source falls back to the plain qr icon.
@@ -120,11 +131,25 @@ const PersistedScanEntry = z.looseObject({
   transactionId: z.string().max(256).optional(),
 });
 
+// Releases before 0.1.3 saved every scan, of any length, and a schema that
+// turns the list down empties the whole history. So reading accepts everything
+// an earlier release wrote and trims nothing: an old scan may carry the only
+// link to its transaction, which the annotation import still has to read. The
+// limits are kept by `addScan`, which brings the list back under them the next
+// time a scan is added. An entry that is not a scan at all costs that entry
+// alone. The entry schema stays inside the array so the drift snapshot still
+// records its shape.
 const PersistedScanHistoryStore = z.object({
-  entries: z.array(PersistedScanEntry).max(MAX_SCAN_HISTORY).default([]),
+  entries: z
+    .array(PersistedScanEntry.optional().catch(undefined))
+    .transform((entries) => entries.filter((entry) => entry !== undefined))
+    .default([]),
 });
 
-export const useScanHistoryStore = create<ScanHistoryStore>()(
+export const useScanHistoryStore = create<ScanHistoryStore>({
+  name: 'scan-history-store',
+  scope: 'profile',
+})(
   subscribeWithSelector(
     persist(
       (set) => ({
@@ -132,6 +157,8 @@ export const useScanHistoryStore = create<ScanHistoryStore>()(
         entriesByTransactionId: {},
 
         addScan: ({ raw, type, source, inputType, container, optionKinds }) => {
+          // Too long to be worth keeping; a history of these fills storage.
+          if (raw.length > MAX_SCAN_RAW_LENGTH) return;
           storeLog.info('store.scan_history.add', { type, source, inputType, container });
           const now = Date.now();
           const key = normaliseForDedupe(raw);
@@ -162,12 +189,8 @@ export const useScanHistoryStore = create<ScanHistoryStore>()(
                 ...(optionKinds != null && { optionKinds }),
                 scannedAt: now,
               };
-              const appended = [...state.entries, newEntry];
               // Tail-evict oldest by scannedAt once the cap is breached. Stable when under cap.
-              nextEntries =
-                appended.length > MAX_SCAN_HISTORY
-                  ? appended.sort((a, b) => b.scannedAt - a.scannedAt).slice(0, MAX_SCAN_HISTORY)
-                  : appended;
+              nextEntries = newestScans([...state.entries, newEntry]);
             }
             return {
               entries: nextEntries,

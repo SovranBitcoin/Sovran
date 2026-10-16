@@ -33,11 +33,9 @@ describe('mint info contacts', () => {
 
   it('falls back to a displayable npub for hex or npub Nostr contacts', () => {
     expect(formatMintInfoNostrFallback(PUBKEY, PUBKEY)).toBe(
-      `${NPUB.slice(0, 10)}...${NPUB.slice(-10)}`
+      `${NPUB.slice(0, 8)}…${NPUB.slice(-8)}`
     );
-    expect(formatMintInfoNostrFallback(NPUB, PUBKEY)).toBe(
-      `${NPUB.slice(0, 10)}...${NPUB.slice(-10)}`
-    );
+    expect(formatMintInfoNostrFallback(NPUB, PUBKEY)).toBe(`${NPUB.slice(0, 8)}…${NPUB.slice(-8)}`);
   });
 
   it('prefers profile display names before fallback text', () => {

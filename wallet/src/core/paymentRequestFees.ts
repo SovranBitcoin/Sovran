@@ -1,4 +1,5 @@
 import type { Manager } from "@cashu/coco-core";
+import { AuthoredError } from "../errors";
 import { getMintKeysets } from "./keysetUnits";
 
 type PaymentRequestFeesUnsupportedCode =
@@ -12,7 +13,7 @@ type PaymentRequestFeesUnsupportedCode =
  * be paid from this mint. `code` says why; `cause` keeps the underlying
  * keyset-load failure for `keysets-unavailable`.
  */
-export class PaymentRequestFeesUnsupportedError extends Error {
+export class PaymentRequestFeesUnsupportedError extends AuthoredError {
   readonly code: PaymentRequestFeesUnsupportedCode;
   readonly mintUrl: string;
   readonly unit: string;

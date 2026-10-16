@@ -1,4 +1,9 @@
-import { createNaggClient, type NaggError } from 'nostr';
+import {
+  createNaggClient,
+  NOSTR_EVENT_LIMITS,
+  NostrHexId,
+  type NaggError,
+} from 'nostr';
 import { z } from 'zod';
 import { errField, logger, mintUrlFields } from './logger';
 import type { RequestControls } from './safeFetch';
@@ -56,13 +61,31 @@ const ProfileResponse = z
 // kind-38000 reviews. The summary average is computed over every review nagg
 // holds, not just this page.
 const MintReviewItem = z.object({
-  eventId: z.string(),
-  reviewerPubkey: z.string(),
-  mintUrl: z.string(),
+  eventId: NostrHexId,
+  reviewerPubkey: NostrHexId,
+  mintUrl: z.string().max(2048),
   score: z.number().nullable(),
-  content: z.string(),
+  content: z.string().max(NOSTR_EVENT_LIMITS.content),
   createdAt: z.number(),
 });
+
+/** More than the largest page asked for (500); anything past it is not read. */
+const MAX_REVIEWS_READ = 1000;
+
+/**
+ * Reviews arrive from the network one by one. One that does not parse (an id
+ * that is not hex, a body over the event ceiling) is left out; the rest of the
+ * page is kept.
+ */
+const MintReviewItems = z
+  .array(z.unknown())
+  .optional()
+  .transform((items) =>
+    (items ?? []).slice(0, MAX_REVIEWS_READ).flatMap((item) => {
+      const parsed = MintReviewItem.safeParse(item);
+      return parsed.success ? [parsed.data] : [];
+    })
+  );
 
 // nagg bundles each reviewer's kind-0 (name/picture) in a profiles map keyed by
 // pubkey, exactly like the feed responses, so the client renders reviewer
@@ -80,8 +103,19 @@ const MintReviewsResponse = z.object({
     averageScore: z.number().nullable(),
     reviewCount: z.number(),
   }),
-  reviews: z.array(MintReviewItem).optional(),
-  profiles: z.record(z.string(), ReviewerProfile).optional(),
+  reviews: MintReviewItems,
+  // One reviewer's malformed profile costs that reviewer their name, not the page.
+  profiles: z
+    .record(z.string(), z.unknown())
+    .optional()
+    .transform((profiles) =>
+      Object.fromEntries(
+        Object.entries(profiles ?? {}).flatMap(([pubkey, profile]) => {
+          const parsed = ReviewerProfile.safeParse(profile);
+          return parsed.success ? [[pubkey, parsed.data] as const] : [];
+        })
+      )
+    ),
 });
 
 function summarizeControls(controls: RequestControls): Record<string, unknown> {
@@ -184,13 +218,13 @@ export function createNostrMintEnrichment(
         throw errorFromNaggError(result.error);
       }
       const data = result.value;
-      const profiles = data.profiles ?? {};
+      const profiles = data.profiles;
       // Trust nagg's server-side parse + dedupe: keep every returned review
       // (scored or score-less), use the server score verbatim, and attach the
       // bundled reviewer identity. This keeps the list 1:1 with summary.reviewCount
       // instead of re-filtering with a stricter regex (the old new-device vs API
       // discrepancy).
-      const recommendations = (data.reviews ?? [])
+      const recommendations = data.reviews
         .map((item) => reviewFromItem(item, profiles[item.reviewerPubkey]))
         .sort((a, b) => b.created_at - a.created_at);
       const lastUpdated =
@@ -201,7 +235,7 @@ export function createNostrMintEnrichment(
       logger.info('nostrMint.mintReviews.result', {
         ...mintUrlFields(mintUrl),
         reviewCount: data.summary.reviewCount,
-        returnedReviews: data.reviews?.length ?? 0,
+        returnedReviews: data.reviews.length,
         recommendationCount: recommendations.length,
         profileCount: Object.keys(profiles).length,
         score: data.summary.averageScore,

@@ -601,7 +601,7 @@ try {
                 avd: session.avd,
                 avdRoot: session.avdRoot,
               },
-              metro: { url: session.metroUrl, port: session.metroPort, pid: session.metroPid },
+              metro: session.runtime.kind === 'dev' ? session.runtime.metro : undefined,
             })
           );
           const android = new AndroidDriver(

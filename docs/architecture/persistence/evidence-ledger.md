@@ -1,0 +1,237 @@
+# Evidence ledger
+
+**Verdict, 2026-10-11, candidate 0.1.4 (`feat/offline-send-just-works`): INCONCLUSIVE.**
+
+- Upgrades from **0.1.3 on Android: PASS.** The released 0.1.3 APK was upgraded in place to a
+  release build of the candidate on an emulator, with nothing lost (below).
+- Upgrades from **0.1.1 on Android: PASS**, with money. A release build of the 0.1.1 source
+  holding 63 test sats was upgraded in place to the candidate; the balance and the history
+  carried over (below). The same was then done from **0.1.0**, onto the candidate with every
+  fix of this audit in it. 0.1.0 and 0.1.1 are the only Android releases below 0.1.3.
+- Upgrades from **0.1.3 on iOS: PASS on the simulator**, with money, on the current code
+  (`22f7ed8c4`): the balance carried over, no identity mismatch was raised, and an old ecash
+  row planted beforehand was claimed on the device. A store build on a phone (TestFlight) is
+  still worth one run before release, for the device keychain.
+- A real **0.0.63** build was upgraded on the iPhone simulator with nothing lost (below).
+- Upgrades from **0.0.45 to 0.0.63** had three defects that lose data or a paid credential.
+  All three are fixed and tested in this run. No real upgrade from those builds was run.
+- Upgrades from **0.0.1 to 0.0.40** (redux era, iOS only) no longer hand the user a new
+  wallet. Their ecash is now claimed through Coco's receive and the old row removed once
+  it is spent (ADR 32, 2026-10-11). Tested on fixtures; no device of that age exists.
+- **99 builds from 2024** predate this repository. What they wrote is unknown.
+
+Third artifact of the [persistence release safety](../../../.agents/skills/persistence-release-safety/SKILL.md)
+procedure. The builds are in [release-provenance.md](release-provenance.md), the durable
+surface in [persistence-map.md](persistence-map.md), the role reports in
+[audit-2026-10-10](audit-2026-10-10/). Tests are under `app/__tests__/`; every one named
+here was run on 2026-10-10 as part of the full suite, and again on 2026-10-11 at `7131591b5`:
+7,441 app tests passed and one is skipped, with the wallet (1,714) and Nostr (352) suites,
+type-check and lint.
+
+## The identity check, the ecash claim and the gallery in a device build
+
+Three changes landed on 2026-10-11 after the binary upgrades recorded further down: every
+stored identity is checked against the recovery phrase before an account becomes ready
+(`c3eb6d2df`), ecash kept by builds before 0.0.45 is claimed through Coco (`3338b70da`), and
+the prompts gallery (`7fa277163`).
+
+**Released 0.1.3 APK to a release build of `7fa277163`, Android emulator, 2026-10-11.**
+
+| | |
+| --- | --- |
+| Old | `sovran-0.1.3.apk` from the GitHub release (same checksum as before), re-signed with the local key; onboarded, one account (`forward-magpie`, `npub1dxc…ps9ezrrj`). A second account could not be added on 0.1.3 this time: its profile sheet did not draw on the emulator |
+| New | `assembleRelease` of `7fa277163`, `versionCode` 25, same key |
+| After the upgrade | Opened straight to the wallet: no mismatch screen, no retry screen, no prompt. Same account, same npub |
+| Then, on the new build | A second and a third account were generated (each passes the check before its row is saved), the app switched back to the first account, and was cold-started four times. Each time the same account opened |
+| Startup time | The wallet was on screen 10 to 11 seconds after launch on this emulator, measured through `uiautomator`, which adds several seconds of its own. No earlier figure was taken the same way, so this is not a before-and-after comparison |
+| The key stretch on the device | Measured in the dev build on the same emulator: the platform's PBKDF2 took **4 ms** and matched the JavaScript stretch, which took 1,036 ms. The check uses the platform's, so it adds a few milliseconds, not a second |
+| Log | No mismatch, failed load, refused write, failed migration or lost-database line across a cold start, a switch and an account creation. One line matched the filter once during the first account creation and was lost when the emulator was shut down; it did not appear again when the same steps were repeated |
+| Not covered | Several accounts made on 0.1.3 and then upgraded (covered by the release fixtures and the earlier two-account run, not by this one); iOS; a real phone's PBKDF2; the mismatch screen itself, which cannot be reached on a healthy install |
+
+**0.1.1 release build, funded, to the same build of `7fa277163`, Android emulator, 2026-10-11.**
+
+| | |
+| --- | --- |
+| Old | A rebuild of `4203ea8ec` (0.1.1), onboarded, a 64 sat test-mint token redeemed (balance 63), test mint trusted |
+| After the upgrade | Asked to accept the updated documents, then the wallet: the receive in the history, the backup offer, the test mint listed with **₿ 63**. No mismatch screen, so the key and wallet caches 0.1.1 wrote pass the check. No mismatch, failed load, refused write, failed migration or lost-database line in the log |
+
+**The ecash claim against the real test mint, 2026-10-11.** The real claim code, mint adapter
+and cashu-ts ran against `testnut.cashu.space` with a real Coco wallet on in-memory storage;
+only AsyncStorage, the stored phrase and the profile list were stand-ins. The mint charged 1
+sat per swap of up to ten proofs.
+
+| Scenario | Held in the old row | Requests to the mint | Result |
+| --- | --- | --- | --- |
+| Trusted mint, nothing spent | 31 sat in 5 proofs | one state check, one swap | Claimed 31; wallet holds 30 after the fee; row removed; a second run made no request |
+| One batch already spent | 21 spent, 10 unspent | one state check, one swap | 21 recorded spent, 10 claimed (9 in the wallet); row removed; a second run made no request |
+| Untrusted mint | 10 sat | one state check | Nothing claimed; the prompt was set; a relaunch made no request. Once the mint was trusted, Coco's own event started the claim: 10 claimed, prompt gone, row removed |
+| Stored phrase differs from the row's | 5 sat | state check, keysets, swap | Claimed; row kept, as the rule requires |
+
+Not exercised live: keyset ids in the 2024 formats (the mint no longer issues them), a proof
+the mint reports pending or rejects, an unreachable mint, a kill between swap and record, old
+invoices, several accounts, Coco's SQLite storage, and any phone.
+
+**Released-source 0.1.3, funded, to a release build of `22f7ed8c4`, with an old ecash row planted, iPhone simulator, 2026-10-11.**
+
+| | |
+| --- | --- |
+| Old | `xcodebuild` Release for the simulator of tag `v0.1.3`, on a simulator whose keychain had been reset; onboarded; a 64 sat test-mint token redeemed (six proofs, 63 sat); test mint trusted |
+| Planted | With the app stopped, a `persist:SOVRAN` row in the shape builds before 0.0.45 wrote was added to the app's AsyncStorage, holding one real, unspent 32 sat proof minted at `testnut.cashu.space` outside any wallet seed. The row held no phrase |
+| New | The same build of `22f7ed8c4`, which includes the identity check, the ecash claim and the fixes for F99 and F100. Installed over the stopped app |
+| After | Opened with no mismatch screen, no restore prompt and no retry screen, to the backup offer. The claim ran by itself: its record shows the one group `settled`, 32 claimed, nothing spent, no failed attempt. The app's `coco.db` went from six proofs summing 63 to eleven summing **94** (63 + 32 less the mint's 1 sat fee) |
+| Second launch | The claim record was byte for byte the same and the wallet still held 94 |
+| The row | Still there, as the rule requires: it held no phrase to match the stored one, so it is not removed |
+| Log | No mismatch, failed load, refused write, failed migration or lost-database line |
+| What this adds | The identity check on iOS over 0.1.3's keychain items and caches; and the ecash claim on a device, against a real mint, through Coco's SQLite storage |
+| Not covered | A real phone; a row from a real 2024 install; removal of the row (needs a row whose phrase is the stored one); the prompt for an untrusted mint on a device |
+
+**The ecash claim's prompt, and removal of the old row, iPhone simulator, 2026-10-11.** A
+fresh install of a release build of `4212c2825` (keychain reset first), with old-format rows
+planted in its AsyncStorage while the app was stopped. Each row held real, unspent proofs
+minted at `testnut.cashu.space`.
+
+| Step | What the device showed |
+| --- | --- |
+| Row with 21 sat at a mint the wallet does not trust, planted before onboarding finished | After onboarding, the prompt "Claim your old ecash: Trust testnut.cashu.space to claim 21 sats". The claim record read `awaiting-trust`, 21 awaiting, nothing claimed; the wallet database was empty |
+| "Review mint", then "Add mint" on the mint page | The claim ran without anything else being pressed: the record read `settled`, 21 claimed; the wallet database held two proofs summing 20 (21 less the mint's 1 sat fee). The row stayed, having no phrase in it |
+| A new row with 16 sat whose phrase is the wallet's own (copied from the app's recovery page), the earlier record cleared | Claimed 16; the wallet held six proofs summing 35. **The row was removed** and the record kept a note: one group, 16 sat claimed, nothing spent |
+| Next launch | Opened normally to the backup offer; still 35; no mismatch, failed load, refused write or failed migration in the log |
+
+So the prompt, the trust step, the claim and the cleanup have each been seen on a device with
+Coco's real storage. Still not seen: a row written by a real 2024 build, and a proof the mint
+rejects or reports pending.
+
+**A real 0.0.63 build to a release build of `4212c2825`, iPhone simulator, 2026-10-11.** The
+first build of this age to be upgraded as a binary.
+
+| | |
+| --- | --- |
+| Old | `xcodebuild` Release for the simulator of `28bf7713a` (0.0.63), dependencies from its frozen lockfile, on a simulator with a reset keychain. Onboarded; Minibits selected. Not funded: pasting a token did nothing in that build on the simulator |
+| What it had written | `profile-store` at version 0 with one row and no `source`; `settings-store` at version 0 with accepted terms and `hasSeenOnboarding`; `wallet-lifecycle` `not-needed`; a bare `theme-store`; three migration ids; a wallet database of 15 tables; and `persist:SOVRAN` as redux's starting state (one profile, every identity and secret an empty string, no proofs) |
+| After | Recognised as an existing user: asked to accept the updated documents and nothing else. Same account and public key, same mint. `profile-store` now version 2, `settings-store` version 4 with the terms record kept, lifecycle still `not-needed`, the theme under the account's key, the fourth migration id recorded, the wallet database migrated to 18 tables. No `:unreadable` key; no mismatch, failed load, refused write or failed migration in the log |
+| What it showed | The empty `persist:SOVRAN` row was left in place: the cleanup only removed a row whose phrase matched the stored one. Every build from 0.0.45 to 0.1.1 writes that row. Fixed afterwards: such a row is now removed, and is no longer read as a wallet whose phrase is lost (`legacyEcashClaim.test.ts`, `secureStorageLifecycle.test.ts`, with the real row as the fixture). The fix itself has not been run on a device |
+| Not covered | Money in the 0.0.63 wallet; builds before 0.0.63, which use older toolchains and were not built |
+
+**The prompts gallery on the emulator, 2026-10-11.** In the same release build the page
+opened at `sovran://design-system-prompts`, listed its entries, and the "Claim your old ecash"
+prompt and the account-mismatch screen each opened and drew correctly with their sample
+data. The other entries were not opened by hand.
+
+## Rows that are not PASS
+
+| Epoch | Durable thing | State that fails | Status | Evidence | Verdict |
+| --- | --- | --- | --- | --- | --- |
+| 0.0.1 … 0.0.40 (exact for most, 151 builds unreadable) | `persist:SOVRAN` phrase | No `user_mnemonic`, no `profile-store`: the candidate generated a **new** phrase over the old wallet | **Fixed.** The phrase in the row is adopted as the root; a row that cannot be read locks instead of generating. The row is never written | `secureStorageLifecycle.test.ts` (redux-era cases); `shared/lib/nostr/reduxEraRoot.ts` | PASS for the phrase |
+| 0.0.1 … 0.0.40 | `persist:SOVRAN` proofs, counters, paid mint quotes | Nothing imported them between 0.1.2 and this candidate | **Fixed on 2026-10-11** ([ADR 32](../../../app/docs/adr/0032-ecash-from-before-coco-is-claimed-then-the-row-is-removed.md)). Unspent proofs are received through Coco into the open wallet; spent ones are recorded; an untrusted mint waits for the person; a mint that fails five spaced attempts is left alone with its proofs still in the row. Counters are not imported and need not be: the wallet derives new outputs. A paid, unminted quote is detected and keeps the row but is not minted (F97). The row is removed only when everything in it is settled and its phrase is the stored one | `app/__tests__/legacyEcashClaim.test.ts`; `app/__tests__/ctaHost.test.tsx` | PASS on fixtures with a faked mint and a faked Coco receive; INCONCLUSIVE on a device and against a real mint |
+| 0.0.1 … 0.0.12 build 3 | Cashu seed | The seed was the raw 32-byte child key; the candidate uses the BIP39 seed of that key's entropy. The same phrase restores a different wallet | **Accepted** for restore from the phrase. Proofs still in the old row no longer depend on it: they are bearer proofs and are claimed whatever seed made them (ADR 32) | `helper/cashu/wallet.ts:37@957eed9ea`; `app/shared/lib/nostr/keyDerivation.ts:78@HEAD` | FAIL |
+| 0.0.45 … 0.0.56 (exact) | Every per-account store under a bare key (`routstr-store` with a paid key, `mint-store`, `scan-history-store`, …) | No `profile-store` existed, so the key migration did nothing and recorded itself; the stores were orphaned | **Fixed.** Account 0's key is derived from the stored phrase and the stores are copied to it; the originals stay until the next launch; an unreadable keychain retries next launch | `preProfileUpgrade.test.ts` (14 cases) | PASS in tests; real upgrade NOT RUN: no build of that age to install |
+| 0.0.45 … 0.0.56 that already upgraded through 0.0.62 … 0.1.3 | The same bare stores | Those releases had the same gap, recorded the migration, and left the bare keys behind | **Fixed for stores the account has not saved since.** A new migration gives a leftover to account 0 when it is the phrase's first account and has none of its own; otherwise the leftover stays on disk (F87) | `preProfileUpgrade.test.ts` (leftover cases); Codex review, two defects found and fixed | PASS in tests; merge case INCONCLUSIVE |
+| 0.0.1 … 0.0.56, and a new install | `routstr-store` on the first launch | The store loaded before account 0 had its row, failed with `Profile storage is not ready`, and saved nothing for that session; it loaded on the second launch | **Fixed on 2026-10-11** (F99). With no account the adapter reports nothing stored and writes nothing; the store loads again when the account appears | `routstrFirstLaunch.test.ts` (5 cases); `releaseFixtures.test.ts`, E1 to E11, first launch no longer set aside | PASS in tests; NOT RUN on a device |
+| 0.0.45 … 0.0.62 | `settings-store` without `hasSeenOnboarding` (to 0.0.61); no `wallet-lifecycle` (to 0.0.62) | Read as onboarding not seen and as a seed this install did not make: onboarding or an unneeded restore prompt. The stamp, where it was written, was replaced by the store's defaults on its next save | **Fixed on 2026-10-11** (F100). Accepted terms without the flag count as onboarding seen; the stamp is read back into the store before the app gate runs. An install that passed through 0.0.63 … 0.1.3 unstamped is unchanged | `migrateThenLoad.test.ts` (5 cases), `lifecycleStampMigration.test.ts` (12), `settingsStorePersistResilience.test.ts`; `releaseFixtures.test.ts`, E7 to E15 | PASS in tests; NOT RUN on a device |
+| 0.0.51 … 0.1.0 (bounded) | `routstr-store` with more than 1,024 sessions or 10,000 messages | The key was moved to the secure vault, the blob was then rejected, and on the same launch defaults were saved over the vault: **the paid key was erased**. Reproduced before the fix | **Fixed.** Old blobs are trimmed, newest kept; and the store saves nothing until a load has been accepted | `routstrOversizedUpgrade.test.ts` (7 cases) | PASS in tests |
+| any | `routstr-store` rejected for another reason | After the fix the key survives, but nothing the user does in that session is saved | **Open, F88** | verifier report, P2 | INCONCLUSIVE |
+| 0.0.52 … 0.1.x | `scan-history-store` over 500 entries or a scan over 16,384 characters | The whole history was rejected, and the annotation import then recorded itself without the transaction links | **Fixed.** Reading accepts everything an earlier release wrote; the limits apply when a scan is added | `scanHistoryUpgrade.test.ts` (6 cases) | PASS in tests |
+| 0.0.63 … 0.1.0 | `split-bill-transactions-store` | No reader since 0.1.1. The row stays on disk; the ecash itself is in Coco and unaffected | **Open, F89.** Already true of 0.1.3 | `persistence-investigator.md` finding 6 | FAIL (data unreachable, not lost) |
+| below theme version 2 | `theme-store` album and wallpaper choices | Replaced by defaults, on purpose, since 0.1.2 | **Accepted**; recorded so it is a decision and not a surprise | `themeStoreMigrate.test.ts` | FAIL against "nothing lost"; accepted |
+| any | `profile-store`, `settings-store`, `wallet-lifecycle` that cannot be read or parsed | Startup waited for ever on a blank screen | **Fixed.** Startup stops on the retry screen, and a retry reads again | `hydrationOutcome.test.ts` (9 cases); Codex review found no deadlock | PASS in tests |
+| any | `profile-store` read but rejected by its schema | Opens on defaults (no accounts); bytes are kept in `:unreadable` but nothing reads them back | **Open, F72** (existing) | Codex review of the gate | INCONCLUSIVE |
+| any | `settings-store` whose `state` is not an object | The theme migration threw, and Retry repeated it for ever | **Fixed** | `themeMigration.test.ts` (4 new cases) | PASS |
+| 0.0.61 + | `derived_keys_<i>`, `cashu_mnemonic_<i>` with the right hash and the wrong shape | Key recovery screen on every launch although the phrase was fine | **Fixed.** A wrong-shaped cache counts as absent and is derived again | `secureStorageLifecycle.test.ts` | PASS |
+| any | Coco restore | Upstream sets the counter to 0 after recovering the signature at counter 0, so the next output reuses it | **Worked around in the app** on 2026-10-10: the write of 0 is stored as 1, and an earlier build's 0 is raised and saved while a proof is held. Remainder in F90 | `cashuCounterSafety.test.ts` (6 cases failed before the fix); Codex review, one defect found and fixed. Live against `testnut.cashu.space` on 2026-10-10, Coco with in-memory repositories: a wallet whose only output was at counter 0 was restored from its seed. Without the wrapper the counter was written as 0 and the next receive failed with `Duplicate outputs`; with the wrapper it was 1 and the next receive succeeded | PASS in tests and against the test mint |
+| any | Wallet database missing while the lifecycle says restored | An empty wallet opened with no restore prompt | **Fixed** on 2026-10-10 for an account this install has opened on this build or later: the row records it (`walletDatabaseCreated`, additive, absent on 0.1.3 rows), and an empty database for a recorded account asks for a restore. Never asks on an upgraded install's first launch, a fresh install or a new account. Unlisted databases remain (F91) | `walletDatabaseRecord.test.ts`, `walletDatabaseLost.test.ts`; Codex review, one defect found and fixed. Android emulator, dev build on `4003e17e4`, 2026-10-10: after one launch the row for account 0 read `walletDatabaseCreated: true` and account 1 had none; with `coco.db` deleted the next launch showed the restore screen and saved `restoreStatus: pending` (it had been `not-needed`). iPhone simulator, release build of `1cf68f149`, same day: installed over the funded install from the earlier run (a second upgrade; six proofs summing 63 still there), one launch recorded account 0, then with `coco.db` deleted from the app's container the next launch saved `pending` and showed the restore screen | PASS in tests, on the Android emulator and on the iPhone simulator |
+| any | Profile removal or delete-all killed partway | No durable record of the step reached; a cold retry of removal refuses | **Open, F92** | `adversarial-and-recovery.md` | INCONCLUSIVE |
+| any | Stored phrase B over account data of phrase A | Accepted with a log line | **Open, F93** | `coco-and-cashu.md` finding 4 | INCONCLUSIVE |
+
+## Rows that pass in tests
+
+Each is a durable thing 0.1.0 to 0.1.3 wrote, read by the candidate with nothing lost. The
+released shape and the candidate reader for every row are in the persistence map.
+
+| Durable thing | Fixture / test | Fault cases | Real upgrade |
+| --- | --- | --- | --- |
+| Store names, scopes and versions of 0.1.3 | `releasedPersistedSurface.test.ts` | n/a | JS-level, below |
+| Whole 0.1.0 / 0.1.3 install through the migration runner | `releaseUpgrade.test.ts`, `globalMigrationsRunner.test.ts` | interrupted copy, corrupt marker, marker read failure, run twice | 0.1.3 binary on Android, below |
+| `settings-store` v0 … v4 | `settingsStorePersistResilience.test.ts`, `persistedEnumTolerance.test.ts` | wrong-shaped state | JS-level |
+| `profile-store` v0 … v2, capacity | `profileStorePersistResilience.test.ts`, `profileStoreCapacity.test.ts` | unknown source, bad active index | JS-level |
+| `wallet-lifecycle` | `lifecycleStampMigration.test.ts`, `migrateThenLoad.test.ts` | pending / failed restore kept; stamp kept through the next save | JS-level |
+| `user_mnemonic`, key caches, `secure_key_index` | `secureStorageLifecycle.test.ts`, `loadAccountKeys.test.ts` | missing, corrupt, unreadable keychain | JS-level |
+| Mint caches merged into `mint-metadata-store` | `mintMetadataStore.test.ts` | n/a | JS-level |
+| Side data into annotations | `dataMigrations.test.ts` | rejected write, wait for durable write | JS-level |
+| `btcmap-store` row to cache file | `fileCacheStorage.test.ts` | unreadable Android row, cut-short write | Android emulator, 5.3 MB row freed |
+| Any store rejected by its schema | `persistUnreadableGuard.test.ts` | read throws, copy fails, second failure | n/a |
+| Every schema against its golden shape | `persistSchemaDrift.test.ts` | n/a | n/a |
+
+## Real upgrades
+
+**Released 0.1.3 binary to a candidate release build, Android, 2026-10-10.**
+
+| | |
+| --- | --- |
+| Old | `sovran-0.1.3.apk` from the GitHub release, SHA-256 `2fca9101…58a941`, the same file the pipeline recorded for Play and Zapstore (`versionCode` 24) |
+| New | `assembleRelease` of commit `3965e66bb`, arm64, `versionCode` 25, version 0.1.4 |
+| Signing | Both re-signed with one local debug key (certificate `204df835…b14588`), because Play holds the real key. Nothing inside either APK was changed. Android ties an app's data and its Keystore entries to the package and its user id, not to the certificate, so this exercises the same storage path as a store update |
+| Device | Android 16 emulator (API 36.1, arm64) |
+| State made on 0.1.3 | Terms accepted, wallet created (`driven-lion`, `npub124a…vsukles6`), a second account generated (`vivid-cheetah`, `npub1ksm…dq5vhlp9`) and left active, Minibits mint selected |
+| Upgrade | `adb install -r` over the stopped app; `firstInstallTime` kept, so the data was not cleared |
+| After, on the candidate | Opened straight to the wallet: no terms, no onboarding, no restore prompt, no retry screen. Same account active with the same npub; both accounts listed; mint still selected. Switched to the first account: same name and npub. Stopped and started again: still there. No error, refusal or recovery line from the app in the device log |
+| Not covered | Funds (both wallets were empty), Routstr, an install older than 0.1.3, iOS |
+
+**0.1.1 release build, funded, to the same candidate build, Android, 2026-10-10.**
+
+| | |
+| --- | --- |
+| Old | `assembleRelease` of `4203ea8ec` (0.1.1, the commit `main` was at when the 0.1.1 builds were made; EAS recorded no commit and its APKs have expired, so this is a rebuild, not the shipped file), `versionCode` 21. It carries Coco 1.0.1 and the storage modules of that release |
+| New | The same candidate APK as above (`3965e66bb`, `versionCode` 25), same local key |
+| State made on 0.1.1 | Terms accepted, wallet created, a 64 sat token from the public test mint (`testnut.cashu.space`, fake payments, no real money) pasted and redeemed, test mint trusted. Balance 63 after the swap fee, one receive in the history |
+| After, on the candidate | Asked to accept the updated terms and privacy documents (they changed after 0.1.1), then opened the wallet. The receive of 64 is in the history; the candidate offered a backup "because you have money here now"; the test mint is listed with **₿ 63**, under test bitcoin where the candidate files test mints. Stopped and started again: history still there. No error, refusal or recovery line from the app in the device log |
+| What this adds | A wallet database written by Coco 1.0.1 is opened and migrated by Coco 2.0.0 with its proofs intact, and the 0.1.1 stores (settings v3, profile v1) are read |
+| Not covered | Spending the migrated proofs; several accounts; Routstr; iOS |
+
+**0.1.3 release build, funded, to a candidate release build, iOS simulator, 2026-10-10.**
+
+| | |
+| --- | --- |
+| Old | `xcodebuild -configuration Release -sdk iphonesimulator` of tag `v0.1.3` (`d9ad12c4b`), with Xcode's normal simulator signing so the keychain works. A rebuild for the simulator: a store build cannot run there |
+| New | The same build of the candidate (`3965e66bb`, version 0.1.4), same bundle id |
+| Device | iPhone 17 Pro Max simulator |
+| State made on 0.1.3 | Terms and privacy accepted, wallet created, a 64 sat token from the public test mint pasted and redeemed (balance 63 after the fee), test mint trusted |
+| Upgrade | App terminated, `simctl install` of the candidate over it |
+| After, on the candidate | Opened with no terms, onboarding or restore prompt, straight to the backup offer "because you have money here now". The receive is in the history; the test mint is listed with **₿ 63** under test bitcoin. Read directly from the app's `coco.db` after the upgrade and again after a cold start: 6 proofs, all `ready`, summing 63. No failed load, refused write or failed migration in the device log |
+| What this adds | The iOS keychain items and the wallet database written by 0.1.3's native code are read by the candidate's, on iOS |
+| Not covered | A store-signed build on a phone; several accounts; spending the proofs |
+
+**0.1.0 release build, funded, to the candidate with this audit's fixes, Android, 2026-10-10.**
+
+| | |
+| --- | --- |
+| Old | `assembleRelease` of tag `v0.1.0` (`d23d07230`), `versionCode` 19; a rebuild, with Coco 1.0.0 |
+| New | `assembleRelease` of `feaead880` (0.1.4, `versionCode` 25): the candidate including the migration, key, Routstr, scan-history, counter and lost-database changes made during this audit. Same local key |
+| State made on 0.1.0 | Terms accepted, wallet created, a 64 sat test-mint token redeemed (balance 63), test mint trusted |
+| After, on the candidate | Asked to accept the updated documents, then the wallet: the receive in the history, the backup offer "because you have money here now", the test mint listed with **₿ 63**. No failed load, refused write, failed migration or lost-database line from the app in the device log |
+| What this adds | Coco 1.0.0's database migrated by 2.0.0; and the first binary upgrade onto a build that contains this audit's fixes, so none of them disturbs a healthy 0.1.0 install |
+| Not covered | Spending the proofs; several accounts; Routstr |
+
+Earlier, weaker runs (in `PERFORMANCE.md`): 0.1.3's JavaScript, then the candidate's, inside
+the candidate's native build, on a fresh Android emulator and a fresh iOS simulator, with
+nothing lost.
+
+To repeat it: download the release APK, `apksigner sign` it and a local `assembleRelease`
+(with a higher `versionCode`) with the same keystore, install the first, make state, then
+`adb install -r` the second.
+
+## Not covered at all
+
+| Gap | Why | Unblocked by |
+| --- | --- | --- |
+| A Coco database written by 0.6.0, rc.11, rc.30, rc.34, rc.47, opened by 2.0.0 (1.0.0 and 1.0.1 are shown above) | No database files from those builds exist to test with | Building one old revision per Coco version in a simulator and keeping its `coco.db` as a fixture |
+| SecureStore on a real iPhone keychain, and across native versions older than 0.1.1 | Shown on Android (0.1.1, 0.1.3) and the iOS simulator (0.1.3) | One TestFlight upgrade on a phone |
+| The 99 builds from 2024 | Source is not in this repository | The earlier repository (F138) |
+| Which builds are still installed | EAS does not record it | App Store Connect and Play Console (questions in the provenance record) |
+| Android signing certificate named in the old release guide differs from 0.1.3's | Probably upload key against Play's signing key; not confirmed | Play Console → App integrity |
+| Two launches at once; a native call that never returns at startup | No test seam | F92, F83 |
+
+## Coco versions covered
+
+`cocoDatabaseUpgrade.test.ts` opens a wallet database written by each Coco storage version that shipped, with the
+candidate's Coco and through the app's own open path: 0.6.0, 1.0.0-rc11, 1.1.2-rc.30, 1.1.2-rc.32, 1.1.2-rc.34, 1.1.2-rc.47, 1.0.0-rc.0, 1.0.0-rc.5, 1.0.0, 1.0.1, 2.0.0. Which releases carried each is in
+[persistence-map.md](persistence-map.md) and in `app/__tests__/cocoDatabases/manifest.json`.

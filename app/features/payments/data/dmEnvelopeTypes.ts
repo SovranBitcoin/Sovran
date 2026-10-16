@@ -21,6 +21,8 @@ export interface DmEnvelope {
 export interface DmEnvelopePage {
   envelopes: DmEnvelope[];
   hasNextPage: boolean;
+  /** Wraps the backend sent, counting any that did not parse. Absent: `envelopes.length`. */
+  received?: number;
 }
 
 /** Which NIP a decrypted DM arrived over. NIP-04 is legacy read-only;

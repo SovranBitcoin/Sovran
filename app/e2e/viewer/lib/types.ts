@@ -2,8 +2,11 @@
  * The frontend must import from here with `import type` only so Bun's
  * bundler never pulls server code into the browser. */
 
+import type { storyReportSchema } from '../../results/runs';
 import type { Platform } from '../../schema/capabilities';
 import type { ScenarioFacets } from '../../schema/facets';
+
+type StoryReport = ReturnType<typeof storyReportSchema.parse>;
 
 export interface GitInfo {
   sha: string;
@@ -24,7 +27,8 @@ export interface RunSummary {
   runId: string;
   suite: string;
   driver: 'fake' | 'sim' | 'android';
-  proof: 'product-run' | 'orchestration-smoke';
+  proof: 'product-run' | 'orchestration-smoke' | 'manual-review';
+  origin?: 'stories' | 'manual';
   startedAt: string;
   scenarioIds: string[];
   git?: GitInfo;
@@ -65,6 +69,18 @@ export interface Frame {
   t?: number;
   /** Relative to the run dir, e.g. "toast.receive-lightning/001-P01-launch.png". */
   file: string;
+  observations?: Pick<
+    StoryReport['steps'][number],
+    | 'wallMs'
+    | 'screenMovedMs'
+    | 'screenKeptMoving'
+    | 'screenCapture'
+    | 'appUnresponsiveMs'
+    | 'touchMadeAgain'
+  > & {
+    screenObservation?: StoryReport['screenObservation'];
+    warnings: { level: string; event: string }[];
+  };
   axFile?: string;
   /** Zustand state-mirror snapshot for this frame. Dedup means consecutive
    * frames with unchanged state share one rel path. */
@@ -96,6 +112,7 @@ export interface ScenarioTimeline {
   description?: string;
   ok?: boolean;
   durationMs?: number;
+  failure?: string;
   deferred?: boolean;
   frames: Frame[];
   named: NamedFrame[];
@@ -141,6 +158,8 @@ export interface ScenarioCatalogEntry {
   /** Structured view of the namespaced facet tags (flow/instrument/io/…). */
   facets: ScenarioFacets;
   deferredReason?: string;
+  /** Recorded evidence cannot be replayed by the legacy scenario runner. */
+  runDisabledReason?: string;
   suites: string[];
   /** Actual non-deferred attempts of this scenario, newest first. */
   runs: CatalogRunRef[];

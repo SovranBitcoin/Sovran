@@ -140,7 +140,7 @@ describe('mint-reviews through the facade', () => {
           json: async () => ({
             summary: { mintUrl: MINT, averageScore: 5, reviewCount: 1 },
             reviews: [
-              { eventId: 'e1', reviewerPubkey: A, mintUrl: MINT, score: 5, content: '[5/5] great', createdAt: 100 },
+              { eventId: 'e1'.padEnd(64, '0'), reviewerPubkey: A, mintUrl: MINT, score: 5, content: '[5/5] great', createdAt: 100 },
             ],
             profiles: { [A]: { name: 'Alice', picture: 'https://a/p.png' } },
           }),

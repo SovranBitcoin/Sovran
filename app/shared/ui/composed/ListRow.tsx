@@ -15,8 +15,8 @@
  *   • accent   — ReactNode rendered as a third line (stats row, etc.)
  *   • trailing — any ReactNode (chevron, icon, checkbox, spinner, amount…)
  *
- * Padding follows the app-wide convention: paddingHorizontal 20, paddingVertical
- * 12, row gap 12. `padding="compact"` drops the vertical to 8 for denser lists.
+ * Horizontal padding is the active style's screen gutter; paddingVertical 12,
+ * row gap 12. `padding="compact"` drops the vertical to 8 for denser lists.
  */
 
 import { ReactNode, useState } from 'react';
@@ -31,6 +31,7 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { useStylePaint } from '@/shared/styles/appStyle';
 import Icon from 'assets/icons';
 
 // ---------------------------------------------------------------------------
@@ -120,13 +121,12 @@ interface ListRowProps {
 
   testID?: string;
 
-  /** Default: `paddingHorizontal: 20, paddingVertical: 12`. Compact: pv 8. */
+  /** Vertical padding. Default 12; compact 8. */
   padding?: 'default' | 'compact';
 
   /**
-   * Horizontal inset of the row content. Defaults to the app-wide 20; pass 16
-   * when the row sits beside heroui `ListGroup.Item` siblings (p-4 = 16) so
-   * adjacent groups align. NOTE: the `style` prop lands on the OUTER wrapper —
+   * Horizontal inset of the row content. Defaults to the style's screen
+   * gutter, which also matches heroui `ListGroup.Item` (p-4 = 16). NOTE: the `style` prop lands on the OUTER wrapper —
    * padding there stacks on top of this inset instead of replacing it.
    */
   paddingHorizontal?: number;
@@ -170,12 +170,16 @@ export function ListRow({
   wrapSubtitle = false,
   testID,
   padding = 'default',
-  paddingHorizontal = 20,
+  paddingHorizontal: paddingHorizontalProp,
   style,
   accessibilityLabel,
   accessibilityHint,
 }: ListRowProps) {
   const foreground = useThemeColor('foreground');
+  const paint = useStylePaint();
+  // The row's inset is the screen gutter, so a row's leading visual sits on
+  // the same line as the header control and the heading above it.
+  const paddingHorizontal = paddingHorizontalProp ?? paint.style.space.gutter;
 
   // Same double-tap guard the project Pressable provided before the press
   // surface moved to heroui PressableFeedback — rows routinely await payment
@@ -263,7 +267,7 @@ export function ListRow({
       <Text
         size={14}
         numberOfLines={wrapSubtitle ? undefined : 1}
-        color={withAlpha(foreground, 0.5)}
+        color={paint.text.secondary}
         loading={loading}
         placeholder={subtitlePlaceholder}>
         {subtitle as string | undefined}

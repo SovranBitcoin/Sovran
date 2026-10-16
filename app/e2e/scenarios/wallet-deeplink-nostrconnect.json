@@ -3,7 +3,7 @@
   "id": "wallet.deeplink.nostrconnect",
   "name": "Open a remote login link from outside the app (not approved)",
   "description": "Tapping a remote-login connection link from outside the app brings the wallet to a review screen asking whether to approve the new connection. The test dismisses it without approving, so nothing gets connected and the wallet is untouched.",
-  "details": "OS-level deep-link entry (simctl openurl) on a warm fresh wallet: a synthetic nostrconnect:// pairing URI must route through +native-intent's rewrite to /(signer-flow)/connect and open the signer-connect review sheet (action-menu probe value signer-connect) — the first proof that a system URL reaches a flow at all. The review is dismissed without approving, so no pairing is granted; back home the wallet is untouched. Same e2e-secret URI convention as signer.hub.paste; no payment payloads can be authored through the scheme-allowlisted openUrl step.",
+  "details": "OS-level deep-link entry (simctl openurl) on a warm fresh wallet: a synthetic nostrconnect:// pairing URI must route through +native-intent, which holds it in memory and sends a ticket to /(signer-flow)/connect, and open the signer-connect review sheet (action-menu probe value signer-connect) — the first proof that a system URL reaches a flow at all. The review is dismissed without approving, so no pairing is granted; back home the wallet is untouched. Same e2e-secret URI convention as signer.hub.paste; no payment payloads can be authored through the scheme-allowlisted openUrl step.",
   "lane": "simulator",
   "tags": ["flow:wallet","io:deeplink","check:navigation"],
   "requires": ["fresh-install"],

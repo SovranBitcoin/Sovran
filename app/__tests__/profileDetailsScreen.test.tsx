@@ -16,11 +16,22 @@ jest.mock('@/shared/ui/primitives/View/View', () => ({ View: 'View' }));
 jest.mock('@/shared/ui/primitives/Avatar', () => ({ Avatar: 'Avatar' }));
 jest.mock('assets/icons', () => 'Icon');
 jest.mock('@/shared/hooks/useThemeColor', () => ({ useThemeColor: () => 'white' }));
-jest.mock('@/shared/lib/color', () => ({ withAlpha: (value: string) => value }));
+jest.mock('@/shared/lib/color', () => ({
+  ...jest.requireActual('@/shared/lib/color'),
+  withAlpha: (value: string) => value,
+}));
 jest.mock('@/shared/lib/popup', () => ({ copyPopup: jest.fn() }));
 jest.mock('@/shared/lib/logger', () => ({ log: { info: jest.fn(), debug: jest.fn() } }));
 jest.mock('@/shared/lib/nostr/keyDerivation', () => ({ pubkeyToAccountNumber: jest.fn() }));
 jest.mock('expo-clipboard', () => ({ setStringAsync: jest.fn().mockResolvedValue(undefined) }));
+jest.mock('@/shared/ui/primitives/Button', () => ({ Button: 'Button' }));
+jest.mock('@/shared/ui/composed/Surface', () => ({ Surface: 'Surface' }));
+jest.mock('@/shared/styles/appStyle', () => ({
+  useStylePaint: () => ({
+    text: { primary: 'white', secondary: 'white' },
+    style: { space: { pad: 16, item: 12 } },
+  }),
+}));
 jest.mock('heroui-native', () => {
   const React = require('react');
   const host = (name: string) =>
@@ -29,7 +40,6 @@ jest.mock('heroui-native', () => {
     };
   return {
     Button: Object.assign(host('Button'), { Label: 'Label' }),
-    Card: Object.assign(host('Card'), { Body: 'Body', Title: 'Title', Description: 'Description' }),
     Input: 'Input',
     Label: 'Label',
     Description: 'Description',
@@ -66,11 +76,7 @@ test('shared Settings recovery fields mask before reveal, hide on background, an
   expect(input().props.value).not.toBe('test-root-placeholder');
   const copy = screen.root
     .findAll((node) => String(node.type) === 'Button')
-    .find((node) =>
-      node
-        .findAll((child) => String(child.type) === 'Label')
-        .some((child) => child.children.includes('Copy'))
-    )!;
+    .find((node) => node.props.text === 'Copy')!;
   await act(async () => copy.props.onPress());
   expect(Clipboard.setStringAsync).toHaveBeenCalledWith('test-root-placeholder');
   void act(() => reveal().props.onPress());

@@ -37,6 +37,7 @@ interface TransactionIdentitySnapshot {
   /** Name captured when the payment was made; beats the live profile. */
   name?: string;
   picture?: string;
+  nip05?: string;
 }
 
 function metadataString(entry: AnnotatedEntry, key: string): string | undefined {
@@ -59,6 +60,7 @@ export function transactionIdentitySnapshot(
       pubkey: recipientPubkey,
       name: metadataString(entry, 'recipientDisplayName'),
       picture: metadataString(entry, 'recipientAvatarUrl'),
+      nip05: metadataString(entry, 'recipientNip05'),
     };
   }
   const counterparty = getCounterparty(entry);
@@ -68,6 +70,7 @@ export function transactionIdentitySnapshot(
       pubkey: counterpartyPubkey,
       name: counterparty?.displayName,
       picture: counterparty?.avatarUrl,
+      nip05: counterparty?.nip05,
     };
   }
   const zap = getZap(entry);

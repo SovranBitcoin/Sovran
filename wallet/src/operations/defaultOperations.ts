@@ -48,9 +48,13 @@ import {
   type LnurlPayExtrasProvider,
 } from "../lnurl";
 import { parsePaymentInput } from "../parse";
-import { MeltUserCancelledError, UnitRateUnavailableError } from "../errors";
+import {
+  AuthoredError,
+  MeltUserCancelledError,
+  UnitRateUnavailableError,
+} from "../errors";
 import { normalizeNostrPubkey, resolveRecipientPubkey } from "../recipient";
-import { amountToNumber, type AmountLike } from "../amount";
+import { amountToNumber, requireAmount, type AmountLike } from "../amount";
 import { toAccountUnit } from "../units/accounts";
 import {
   compareMintDisplayOrder,
@@ -58,6 +62,7 @@ import {
   deriveSupportedUnitsFromInfo,
 } from "../mint-capabilities";
 import { getKeysetUnits } from "../core/keysetUnits";
+import { normalizeMintUrl } from "../transport/plan";
 import { assertPaymentRequestFeesSupported } from "../core/paymentRequestFees";
 import { parseHistoryEntryOnce } from "./historyEntry";
 
@@ -302,8 +307,10 @@ async function executeOnchainMelt(
     feeOptionCount: feeOptions.length,
   });
   if (feeOptions.length === 0) {
-    throw new Error("Mint returned no onchain fee options");
+    throw new AuthoredError("Mint returned no onchain fee options");
   }
+  // Every branch below goes on to pay one of these, so none may carry a fee that cannot be read.
+  for (const option of feeOptions) requireAmount(option.fee_reserve);
 
   let feeIndex: number | null;
   if (feeOptions.length === 1) {
@@ -321,7 +328,7 @@ async function executeOnchainMelt(
     feeIndex = await input.selectFeeIndex(feeOptions);
   } else {
     feeIndex = feeOptions.reduce((cheapest, option) =>
-      amountToNumber(option.fee_reserve) < amountToNumber(cheapest.fee_reserve)
+      requireAmount(option.fee_reserve) < requireAmount(cheapest.fee_reserve)
         ? option
         : cheapest,
     ).fee_index;
@@ -525,6 +532,13 @@ function buildRolledBackResult(
 // ---------------------------------------------------------------------------
 
 export interface DefaultOperationsConfig {
+  /** Capture recipient intent synchronously; persist its operation binding before execution. */
+  captureSendDelivery?: (input: {
+    manager: Manager;
+    mintUrl: string;
+    lockPubkey?: string;
+  }) => ((operationId: string) => Promise<void>) | undefined;
+
   getManager: () => Manager | null;
   /**
    * Onchain melt fee picker (NUT-30 fee_options). Called BEFORE prepare (no
@@ -536,7 +550,7 @@ export interface DefaultOperationsConfig {
   getProofAmounts?: () => Record<string, number[]>;
   getPreferredMintUrl?: () => string | undefined;
   /** Required for Nostr payment request transport. Wallet supplies a NIP-17 publisher bound to the user's private key. */
-  sendNostrDM?: (nprofile: string, message: string) => Promise<void>;
+  sendNostrDM?: (dm: { nprofile: string; message: string }) => Promise<void>;
   /**
    * Bulk catalog fetcher for mint list items. Awaited inside `buildMintListItems`
    * before items are produced, so audit / KYM / operator-profile data flows
@@ -686,13 +700,18 @@ export function createDefaultOperations(
   >();
 
   return {
-    executeSend: async (mintUrl, amount, memo, options) => {
+    executeSend: async ({ mintUrl, amount, memo, p2pkLock, p2pkLockPubkey }) => {
       const mgr = requireManager();
-      const requestedLock = options?.p2pkLock ?? options?.p2pkLockPubkey;
+      const requestedLock = p2pkLock ?? p2pkLockPubkey;
       const lock = normalizeP2pkLock(requestedLock);
       if (requestedLock !== undefined && !lock) {
-        throw new Error("Invalid P2PK lock terms for this send.");
+        throw new AuthoredError("Invalid P2PK lock terms for this send.");
       }
+      const bindDelivery = config.captureSendDelivery?.({
+        manager: mgr,
+        mintUrl,
+        lockPubkey: lock?.pubkey,
+      });
       logger.info("operations.executeSend.prepare", {
         ...mintUrlFields(mintUrl),
         amount,
@@ -725,6 +744,14 @@ export function createDefaultOperations(
             }
           : {}),
       });
+      if (bindDelivery) {
+        try {
+          await bindDelivery(prepared.id);
+        } catch (error) {
+          await mgr.ops.send.cancel(prepared.id);
+          throw error;
+        }
+      }
       logger.info("operations.executeSend.prepared", {
         operationId: prepared.id,
         ...mintUrlFields(mintUrl),
@@ -776,33 +803,25 @@ export function createDefaultOperations(
       };
     },
 
-    executeOfflineSend: async (mintUrl, amount, memo) => {
+    executeOfflineSend: async ({ mintUrl, amount, memo }) => {
       const mgr = requireManager();
       logger.info("operations.executeOfflineSend.prepare", {
         ...mintUrlFields(mintUrl),
         amount,
         hadMemo: !!normalizeMemo(memo),
       });
-      const prepared = await mgr.ops.send.prepare({ mintUrl, amount });
+      // Prepared from the mint's stored keysets without contacting it. Coco
+      // refuses, before reserving anything, when no exact match exists.
+      const prepared = await mgr.ops.send.prepare({
+        mintUrl,
+        amount,
+        offline: true,
+      });
       logger.info("operations.executeOfflineSend.prepared", {
         operationId: prepared.id,
         ...mintUrlFields(mintUrl),
         amount,
-        needsSwap: !!prepared.needsSwap,
       });
-
-      if (prepared.needsSwap) {
-        logger.warn("operations.executeOfflineSend.needsSwap", {
-          operationId: prepared.id,
-          ...mintUrlFields(mintUrl),
-          amount,
-        });
-        await mgr.ops.send.cancel(prepared.id);
-        logger.info("operations.executeOfflineSend.cancelledAfterNeedsSwap", {
-          operationId: prepared.id,
-        });
-        throw new Error("Offline send requires exact proof match");
-      }
 
       const { operation, token } = await executeSendWithRescue(mgr, prepared, {
         logPrefix: "executeOfflineSend",
@@ -838,7 +857,7 @@ export function createDefaultOperations(
       };
     },
 
-    executeMintQuote: async (mintUrl, amount, _unit, method = "bolt11") => {
+    executeMintQuote: async ({ mintUrl, amount, unit: _unit, method = "bolt11" }) => {
       const mgr = requireManager();
       const unit = _unit || "sat";
       logger.info("operations.executeMintQuote.prepare", {
@@ -1194,7 +1213,7 @@ export function createDefaultOperations(
       logger.info("operations.trustMint.done", { ...mintUrlFields(mintUrl) });
     },
 
-    paymentRequestPayabilityFrom: async (mintUrl, unit) => {
+    paymentRequestPayabilityFrom: async ({ mintUrl, unit }) => {
       const mgr = requireManager();
       try {
         await assertPaymentRequestFeesSupported(mgr, mintUrl, unit);
@@ -1210,7 +1229,7 @@ export function createDefaultOperations(
       }
     },
 
-    executeNfcSend: async (mintUrl, amount, unit = "sat") => {
+    executeNfcSend: async ({ mintUrl, amount, unit = "sat" }) => {
       const mgr = requireManager();
       await assertPaymentRequestFeesSupported(mgr, mintUrl, unit);
       logger.info("operations.executeNfcSend.prepare", {
@@ -1328,7 +1347,7 @@ export function createDefaultOperations(
       return { state: operation.state };
     },
 
-    executeReceive: async (tokenString, mintUrl, _amount) => {
+    executeReceive: async ({ tokenString, mintUrl }) => {
       const mgr = requireManager();
       logger.info("operations.executeReceive.start", {
         ...mintUrlFields(mintUrl),
@@ -1401,7 +1420,7 @@ export function createDefaultOperations(
       return trusted;
     },
 
-    quoteMelt: async (mintUrl, meltTarget, amount, _unit) => {
+    quoteMelt: async ({ mintUrl, meltTarget, amount, unit: _unit }) => {
       const mgr = requireManager();
       const unit = _unit || "sat";
 
@@ -1434,8 +1453,9 @@ export function createDefaultOperations(
         });
         return {
           quoteId: quote.quoteId,
-          quoteAmount: amountToNumber(quote.amount),
-          feeReserve: amountToNumber(quote.fee_reserve),
+          quoteAmount: requireAmount(quote.amount),
+          feeReserve: requireAmount(quote.fee_reserve),
+          expiresAt: quote.expiry,
           unit: quote.unit ?? unit,
           method: "bolt12" as const,
           mintUrl,
@@ -1471,8 +1491,9 @@ export function createDefaultOperations(
       });
       return {
         quoteId: quote.quoteId,
-        quoteAmount: amountToNumber(quote.amount),
-        feeReserve: amountToNumber(quote.fee_reserve),
+        quoteAmount: requireAmount(quote.amount),
+        feeReserve: requireAmount(quote.fee_reserve),
+        expiresAt: quote.expiry,
         unit: quote.unit ?? unit,
         method: "bolt11" as const,
         mintUrl,
@@ -1481,7 +1502,7 @@ export function createDefaultOperations(
       };
     },
 
-    executeMelt: async (mintUrl, meltTarget, amount, _unit, options) => {
+    executeMelt: async ({ mintUrl, meltTarget, amount, unit: _unit, quoteId }) => {
       const mgr = requireManager();
       const unit = _unit || "sat";
 
@@ -1504,11 +1525,11 @@ export function createDefaultOperations(
       // as-is — the user approved its fee. Consumed on use; when absent
       // (quote creation failed at preview, or a legacy caller) a fresh quote
       // is created below as before.
-      const precreated = options?.quoteId
-        ? precreatedMeltQuotes.get(options.quoteId)
+      const precreated = quoteId
+        ? precreatedMeltQuotes.get(quoteId)
         : undefined;
-      if (options?.quoteId) {
-        precreatedMeltQuotes.delete(options.quoteId);
+      if (quoteId) {
+        precreatedMeltQuotes.delete(quoteId);
       }
 
       // BOLT-12 offer (`lno1…` or bitcoin:?lno=) — quote-first via coco's
@@ -1759,9 +1780,9 @@ export function createDefaultOperations(
         ...asyncEnrichment,
       };
 
-      // `successRate` is a swap-based measurement and is never fabricated
-      // from the ops-based `auditScore`: an unknown rate stays unknown so the
-      // screen shows a placeholder, not a number that looks measured.
+      // No success rate is derived here from the ops-based `auditScore`: the
+      // app works one out from the audit counts it holds, and an unknown rate
+      // stays unknown so the screen shows a placeholder, not a made-up number.
       logger.info("operations.buildMintReviewInfo.done", {
         ...mintUrlFields(mintUrl),
         balance: result.balance,
@@ -1774,7 +1795,7 @@ export function createDefaultOperations(
       return result;
     },
 
-    executePaymentRequest: async (mintUrl, paymentRequest, amount, unit) => {
+    executePaymentRequest: async ({ mintUrl, paymentRequest, amount, unit }) => {
       const mgr = requireManager();
       logger.info("operations.executePaymentRequest.start", {
         ...mintUrlFields(mintUrl),
@@ -1788,7 +1809,7 @@ export function createDefaultOperations(
         logger.warn("operations.executePaymentRequest.parseFailed", {
           paymentRequestLength: paymentRequest.length,
         });
-        throw new Error("Invalid payment request");
+        throw new AuthoredError("Invalid payment request");
       }
       logger.info("operations.executePaymentRequest.parseDone", {
         ...mintUrlFields(mintUrl),
@@ -1810,7 +1831,7 @@ export function createDefaultOperations(
           requestUnit,
           unit,
         });
-        throw new Error(
+        throw new AuthoredError(
           `Payment request unit (${requestUnit}) does not match the wallet unit (${unit})`,
         );
       }
@@ -1820,9 +1841,18 @@ export function createDefaultOperations(
       let operationId: string;
 
       if (nostrTransport && !httpTransport) {
-        if (info.hasSpendingCondition || info.lockP2pkPubkey) {
-          throw new Error(
-            "This request requires locked ecash, which Nostr payment requests do not support yet.",
+        // Sovran creates plain permanent P2PK requests. Reject conditions we
+        // cannot preserve rather than silently stripping their tags.
+        const nut10 = info.lockP2pkPubkey
+          ? decodePaymentRequest(paymentRequest).nut10
+          : undefined;
+        const lock =
+          nut10?.kind === "P2PK" && !nut10.tags?.length
+            ? normalizeP2pkLock(nut10.data)
+            : null;
+        if ((info.hasSpendingCondition || info.lockP2pkPubkey) && !lock) {
+          throw new AuthoredError(
+            "This request requires locked ecash with unsupported spending conditions.",
           );
         }
         logger.info("operations.executePaymentRequest.transport", {
@@ -1843,13 +1873,53 @@ export function createDefaultOperations(
         // silently override the amount the user approved (BTC-04).
         if (!amount || amount <= 0) {
           logger.warn("operations.executePaymentRequest.nostr.missingAmount");
-          throw new Error("Amount is required for Nostr payment requests");
+          throw new AuthoredError("Amount is required for Nostr payment requests");
+        }
+
+        // The two refusals Coco's payment-request API makes for the HTTP
+        // transport, made here because this branch does not go through it. The
+        // machine checks both earlier; a caller that bypasses it must not pay
+        // from a mint the request does not list, or an amount it did not ask
+        // for. Checked, never substituted: the amount paid is still the one
+        // the user approved.
+        if (
+          !info.mintsPreferred &&
+          info.mints.length > 0 &&
+          !info.mints.some(
+            (accepted) => normalizeMintUrl(accepted) === normalizeMintUrl(mintUrl),
+          )
+        ) {
+          logger.warn("operations.executePaymentRequest.nostr.mintNotAccepted", {
+            ...mintUrlFields(mintUrl),
+            acceptedCount: info.mints.length,
+          });
+          throw new AuthoredError("This payment request does not accept that mint");
+        }
+        // Only a request amount that is itself valid is binding. One that is
+        // not a whole positive number was turned down by the machine, which
+        // had the person type the amount instead (BTC-04).
+        if (
+          info.amount !== undefined &&
+          Number.isSafeInteger(info.amount) &&
+          info.amount > 0 &&
+          info.amount !== amount
+        ) {
+          logger.warn("operations.executePaymentRequest.nostr.amountMismatch", {
+            requestedAmount: info.amount,
+            amount,
+          });
+          throw new AuthoredError(
+            `The payment request asks for ${info.amount}, not ${amount}`,
+          );
         }
 
         const prepared = await mgr.ops.send.prepare({
           mintUrl,
           amount,
           unit,
+          ...(lock
+            ? { target: { type: "p2pk" as const, pubkey: lock.pubkey } }
+            : {}),
         });
         logger.info("operations.executePaymentRequest.nostr.prepared", {
           operationId: prepared.id,
@@ -1865,17 +1935,31 @@ export function createDefaultOperations(
           proofCount: token.proofs.length,
         });
 
+        // Echo the request's own spelling of our mint: Macadamia matches the
+        // payload mint by exact string, so `https://m.x/` ≠ `https://m.x`.
+        const payloadMint =
+          (info.requestedMints ?? info.mints).find(
+            (m) => normalizeMintUrl(m) === normalizeMintUrl(mintUrl),
+          ) ?? mintUrl;
         const payload = {
           id: info.requestId,
-          mint: mintUrl,
+          mint: payloadMint,
           unit,
-          proofs: token.proofs,
+          // cashu-ts `Amount` serializes as a string; NUT-18 wants an integer,
+          // and CDK-based wallets reject the whole payload otherwise.
+          proofs: token.proofs.map((proof) => ({
+            ...proof,
+            amount: proof.amount.toNumber(),
+          })),
         };
         try {
           if (mockFailEnabled("paymentRequest")) {
             throw new Error("Mock delivery failure (dev)");
           }
-          await sendNostrDM(nostrTransport.target, JSON.stringify(payload));
+          await sendNostrDM({
+            nprofile: nostrTransport.target,
+            message: JSON.stringify(payload),
+          });
           logger.info("operations.executePaymentRequest.nostr.sent", {
             operationId,
           });
@@ -2000,84 +2084,26 @@ export function createDefaultOperations(
       return { historyEntry: JSON.stringify(enriched) };
     },
 
-    // Background mesh auto-redeem: receives a token and resolves the REAL
-    // persisted receive-history id by set difference (snapshot ids before,
-    // poll after) — coco's history flush races the receive call, and a
-    // synthesized id would break downstream linkage (location stamps,
-    // scan-history links). Retires the wallet-side direct-coco exception.
-    executeAutoRedeem: async (tokenString, mintUrl) => {
+    // Legacy mesh tokens use an operation-bound history projection. A concurrent
+    // receive from the same mint must never steal this token's annotation.
+    executeAutoRedeem: async ({ tokenString, mintUrl }) => {
       const mgr = requireManager();
-
-      let beforeIds = new Set<string>();
-      try {
-        const beforeHistory = await mgr.history.getPaginatedHistory(0, 100);
-        beforeIds = new Set(
-          beforeHistory
-            .filter((h) => h.type === "receive" && h.mintUrl === mintUrl)
-            .map((h) => h.id)
-            .filter(
-              (id): id is string => typeof id === "string" && id.length > 0,
-            ),
-        );
-      } catch (e) {
-        logger.warn("operations.executeAutoRedeem.snapshotFailed", {
-          ...mintUrlFields(mintUrl),
-          error: errField(e),
-        });
+      if (
+        normalizeMintUrl(getTokenMetadata(tokenString).mint) !==
+        normalizeMintUrl(mintUrl)
+      ) {
+        throw new Error("Receive mint does not match queued token");
       }
-
-      logger.info("operations.executeAutoRedeem.start", {
-        ...mintUrlFields(mintUrl),
-        beforeCount: beforeIds.size,
-        tokenLength: tokenString.length,
-      });
-      await mgr.wallet.receive(tokenString);
-      logger.info("operations.executeAutoRedeem.received", {
-        ...mintUrlFields(mintUrl),
-      });
-
-      // ~10s of polling at 200ms — waits out coco's history flush.
-      const MAX_ATTEMPTS = 50;
-      const DELAY_MS = 200;
-      for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-        try {
-          const after = await mgr.history.getPaginatedHistory(0, 100);
-          const newEntry = after.find(
-            (h) =>
-              h.type === "receive" &&
-              h.mintUrl === mintUrl &&
-              typeof h.id === "string" &&
-              h.id.length > 0 &&
-              !beforeIds.has(h.id),
-          );
-          if (newEntry) {
-            logger.info("operations.executeAutoRedeem.found", {
-              ...mintUrlFields(mintUrl),
-              historyEntryId: newEntry.id,
-              attempts: attempt + 1,
-            });
-            return {
-              historyEntryId: newEntry.id,
-              historyEntry: JSON.stringify(newEntry),
-            };
-          }
-        } catch (e) {
-          logger.warn("operations.executeAutoRedeem.pollFailed", {
-            attempt,
-            error: errField(e),
-          });
-        }
-        await new Promise((resolve) => setTimeout(resolve, DELAY_MS));
-      }
-
-      // The receive itself succeeded (proofs are persisted); only the
-      // history linkage couldn't be resolved. Callers treat null as
-      // "redeemed, unlinked" — loud log so the flush issue gets attention.
-      logger.error("operations.executeAutoRedeem.timeoutFallback", {
-        ...mintUrlFields(mintUrl),
-        polledMs: MAX_ATTEMPTS * DELAY_MS,
-      });
-      return { historyEntryId: null, historyEntry: null };
+      const prepared = await mgr.ops.receive.prepare({ token: tokenString });
+      const received = await mgr.ops.receive.execute(prepared);
+      const historyEntryId = operationHistoryId("receive", received.id);
+      const history = await mgr.history
+        .getHistoryEntryById(historyEntryId)
+        .catch(() => null);
+      return {
+        historyEntryId,
+        historyEntry: history ? JSON.stringify(history) : null,
+      };
     },
 
     // Lightning Address → Nostr hex pubkey via NIP-05. Best-effort. The

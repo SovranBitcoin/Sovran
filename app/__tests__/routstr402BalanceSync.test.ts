@@ -18,9 +18,15 @@ import {
   sendMessage,
   setRoutstrNodeBaseUrl,
 } from '@/shared/lib/routstr/api';
+import { settleRoutstrClient } from '@/shared/lib/routstr/sdk/client';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
 
 const mockMemory: Record<string, string> = {};
+
+// A failed paid request starts recovery sweeps that outlive the test that caused them.
+afterEach(async () => {
+  await settleRoutstrClient();
+});
 
 jest.mock('@/shared/stores/global/profileStore', () => ({
   useProfileStore: {
@@ -34,7 +40,7 @@ jest.mock('@/shared/lib/routstr/securePersistence', () => ({
   createRoutstrPersistence: () =>
     jest.requireMock('@/shared/lib/cashu/profileScopedStorage').createProfileScopedStorage(),
 }));
-jest.mock('@/shared/lib/routstr/secureVault', () => ({
+jest.mock('@/shared/lib/persist/secureVault', () => ({
   createSecureVault: () => ({ read: async () => null, write: async () => {} }),
 }));
 jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({

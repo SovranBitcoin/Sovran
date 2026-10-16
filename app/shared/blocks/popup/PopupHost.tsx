@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Log, log } from '@/shared/lib/logger';
+import { TouchIndicatorLayer } from '@/shared/ui/composed/TouchIndicator';
 import {
   Keyboard,
   Platform,
@@ -9,7 +10,8 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { BottomSheetFooter } from '@gorhom/bottom-sheet';
-import { BottomSheet, Button, useToast } from 'heroui-native';
+import { BottomSheet, Button as HerouiButton, useToast } from 'heroui-native';
+import { Button } from '@/shared/ui/primitives/Button';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -52,6 +54,7 @@ import { EmojiPickerContent } from '@/shared/lib/popup/popups/emojiPicker';
 import { ModelPickerContent } from '@/shared/lib/popup/popups/modelPicker';
 import { useRoutstrFunds } from '@/features/ai/hooks/useRoutstrFunds';
 import { PaymentOptionsContent } from '@/shared/lib/popup/popups/paymentOptionsSheet';
+import { SendFallbackContent } from '@/shared/lib/popup/popups/sendFallbackSheet';
 import { NfcTapContent } from '@/shared/lib/popup/popups/nfcTapSheet';
 import { ProofSelectorContent } from '@/shared/lib/popup/popups/proofSelectorSheet';
 import { SendMemoContent } from '@/shared/lib/popup/popups/sendMemoSheet';
@@ -276,6 +279,7 @@ const CUSTOM_SHEET_CONTENT: Record<keyof ActionSheetPayloads, CustomSheetRendere
   'payment-fallback': ((
     props: CustomSheetContentProps<ActionSheetPayloads['payment-fallback']>
   ) => <PaymentOptionsContent {...props} isFallback={true} />) as CustomSheetRenderer,
+  'send-fallback': SendFallbackContent as CustomSheetRenderer,
   'proof-selector': ProofSelectorContent as CustomSheetRenderer,
   'send-memo': SendMemoContent as CustomSheetRenderer,
   'signer-approval': SignerApprovalSheetContent as CustomSheetRenderer,
@@ -371,15 +375,19 @@ function SheetContent({
     const exiting =
       customNavDirection === 'forward' ? SlideOutLeft.duration(220) : SlideOutRight.duration(220);
     const customContent = (
-      <ContentComponent
-        balanceSats={balanceSats}
-        payload={activeCustomPage.payload}
-        close={close}
-        pushCustomPage={pushCustomPage}
-        popCustomPage={popCustomPage}
-        canPop={canPopCustomPage}
-        setFooterConfig={onCustomFooterConfigChange}
-      />
+      // A sheet draws in its own overlay window, so it carries its own layer
+      // for the "Show taps" recording setting.
+      <TouchIndicatorLayer fill={false}>
+        <ContentComponent
+          balanceSats={balanceSats}
+          payload={activeCustomPage.payload}
+          close={close}
+          pushCustomPage={pushCustomPage}
+          popCustomPage={popCustomPage}
+          canPop={canPopCustomPage}
+          setFooterConfig={onCustomFooterConfigChange}
+        />
+      </TouchIndicatorLayer>
     );
     return (
       <Animated.View
@@ -472,14 +480,14 @@ function SheetActionButton({
   });
 
   return (
-    <Button
+    <HerouiButton
       testID={button.testID ?? (button.page ? `popup-sheet-action-${button.page}` : undefined)}
       variant={variant}
       className={className}
       feedbackVariant={feedbackVariant}
       onPress={handlePress}>
-      <Button.Label className={labelClassName}>{button.text}</Button.Label>
-    </Button>
+      <HerouiButton.Label className={labelClassName}>{button.text}</HerouiButton.Label>
+    </HerouiButton>
   );
 }
 
@@ -867,24 +875,23 @@ function SheetPopup() {
             <View className={customFooterConfig.layout === 'row' ? 'flex-row gap-2.5' : 'gap-2.5'}>
               {customFooterConfig.buttons.map((button, index) => {
                 const variant = button.variant ?? (index === 0 ? 'primary' : 'tertiary');
-                const buttonClassName = getSheetButtonClassName(variant);
-                const className =
-                  customFooterConfig.layout === 'row'
-                    ? [buttonClassName, 'flex-1'].filter(Boolean).join(' ')
-                    : buttonClassName;
-
-                return (
+                const footerButton = (
                   <Button
                     key={`${button.label}-${index}`}
                     testID={button.testID}
-                    variant={variant}
+                    variant={variant === 'primary' ? 'primary' : 'secondary'}
+                    text={button.label}
                     onPress={button.onPress}
-                    className={className}
-                    isDisabled={button.isDisabled}>
-                    <Button.Label className={getSheetButtonLabelClassName(variant)}>
-                      {button.label}
-                    </Button.Label>
-                  </Button>
+                    disabled={button.isDisabled}
+                  />
+                );
+
+                return customFooterConfig.layout === 'row' ? (
+                  <View key={`${button.label}-${index}`} className="flex-1">
+                    {footerButton}
+                  </View>
+                ) : (
+                  footerButton
                 );
               })}
             </View>
@@ -1042,14 +1049,11 @@ function SheetPopup() {
                         <Button
                           key={`${button.label}-${index}`}
                           testID={button.testID}
-                          variant={variant}
-                          className={getSheetButtonClassName(variant)}
+                          variant={variant === 'primary' ? 'primary' : 'secondary'}
+                          text={button.label}
                           onPress={button.onPress}
-                          isDisabled={button.isDisabled}>
-                          <Button.Label className={getSheetButtonLabelClassName(variant)}>
-                            {button.label}
-                          </Button.Label>
-                        </Button>
+                          disabled={button.isDisabled}
+                        />
                       );
                     })}
                   </View>

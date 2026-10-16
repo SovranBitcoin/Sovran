@@ -3,7 +3,9 @@ import { useState } from 'react';
 import { ActivityIndicator, RefreshControl, StyleSheet } from 'react-native';
 import { useNDK } from '@nostr-dev-kit/ndk-mobile';
 import { Image } from 'expo-image';
-import { Button, Card } from 'heroui-native';
+import { Button } from 'heroui-native';
+import { Surface } from '@/shared/ui/composed/Surface';
+import { useStylePaint } from '@/shared/styles/appStyle';
 import { withAlpha } from '@/shared/lib/color';
 import Icon from '@/assets/icons';
 
@@ -157,6 +159,7 @@ function MediaSection({
   colors: StatusColors;
   onDelete: (blob: OwnedBlobEntry) => void;
 }) {
+  const { pad, related } = useStylePaint().style.space;
   return (
     <View testID={testID}>
       <Section title={title}>
@@ -165,18 +168,16 @@ function MediaSection({
             No images yet.
           </Text>
         ) : (
-          <Card variant="secondary">
-            <Card.Body className="gap-1">
-              {blobs.map((blob) => (
-                <BlobRow
-                  key={`${blob.host}|${blob.sha256}`}
-                  blob={blob}
-                  colors={colors}
-                  onDelete={onDelete}
-                />
-              ))}
-            </Card.Body>
-          </Card>
+          <Surface contentStyle={{ padding: pad, gap: related }}>
+            {blobs.map((blob) => (
+              <BlobRow
+                key={`${blob.host}|${blob.sha256}`}
+                blob={blob}
+                colors={colors}
+                onDelete={onDelete}
+              />
+            ))}
+          </Surface>
         )}
       </Section>
     </View>
@@ -193,6 +194,7 @@ function MediaSection({
  */
 export const SettingsMediaScreen = () => {
   useLifecycleLogger('SettingsMediaScreen');
+  const { pad, item } = useStylePaint().style.space;
   const { ndk } = useNDK();
   const server = useMediaServerStore((s) => s.server);
   const currentPicture = useProfileStore(
@@ -305,7 +307,7 @@ export const SettingsMediaScreen = () => {
         className="px-4"
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}>
         <Section title="Upload server">
-          <Card variant="secondary">
+          <Surface contentStyle={{ padding: pad }}>
             <ListRow
               title={hostLabel(server)}
               subtitle="Profile pictures and post images are uploaded here. Location and camera metadata are removed first."
@@ -314,10 +316,10 @@ export const SettingsMediaScreen = () => {
               testID="settings-media-server-row"
               onPress={editServer}
             />
-          </Card>
+          </Surface>
         </Section>
-        <Card variant="secondary" className="mb-4">
-          <Card.Body className="gap-3">
+        <View className="mb-4">
+          <Surface contentStyle={{ padding: pad, gap: item }}>
             <Text bold size={16}>
               My media
             </Text>
@@ -339,8 +341,8 @@ export const SettingsMediaScreen = () => {
                 <Button.Label>{refreshing ? 'Checking…' : 'Refresh status'}</Button.Label>
               </Button>
             </View>
-          </Card.Body>
-        </Card>
+          </Surface>
+        </View>
 
         <MediaSection
           title="Profile pictures"

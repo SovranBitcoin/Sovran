@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { persist } from 'zustand/middleware';
 import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
@@ -48,7 +48,10 @@ const PersistedSearchHistoryStore = z.object({
     .default({}),
 });
 
-export const useSearchHistoryStore = create<SearchHistoryState>()(
+export const useSearchHistoryStore = create<SearchHistoryState>({
+  name: 'search-history-store',
+  scope: 'profile',
+})(
   persist(
     (set) => ({
       recentSearches: {},

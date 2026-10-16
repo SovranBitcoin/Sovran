@@ -39,17 +39,6 @@ export interface ShareAdapter {
 }
 
 /**
- * Camera adapter.
- *
- * JSON-shaped contract: permission is a boolean and scan output is the shared
- * ScanSourceResult discriminated union.
- */
-export interface CameraAdapter {
-  requestPermission?: () => Promise<boolean>;
-  scanQr?: () => Promise<ScanSourceResult>;
-}
-
-/**
  * Gallery/image-picker adapter.
  *
  * JSON-shaped contract: one pick attempt returns a ScanSourceResult. Image
@@ -60,54 +49,17 @@ export interface ImagePickerAdapter {
 }
 
 /**
- * Haptics adapter.
- *
- * JSON-shaped contract: named haptic events only. Platform-specific intensity
- * constants stay in the consumer.
- */
-export interface HapticsAdapter {
-  impact?: (
-    style: "light" | "medium" | "heavy" | "soft" | "rigid",
-  ) => Promise<void> | void;
-  notification?: (
-    kind: "success" | "warning" | "error",
-  ) => Promise<void> | void;
-  selection?: () => Promise<void> | void;
-}
-
-/**
- * Notification adapter.
- *
- * JSON-shaped contract: event name plus optional structured payload. Apps
- * decide whether this becomes a toast, local notification, banner, or no-op.
- */
-export interface NotificationsAdapter {
-  notify: (event: string, payload?: JsonRecord) => Promise<void> | void;
-}
-
-/**
  * Nostr adapter.
  *
  * JSON-shaped contract: nprofile/message strings and compact profile data.
  * Relay pools, NDK, nostr-tools, and cache writes remain app concerns.
  */
 export interface NostrAdapter {
-  sendDirectMessage?: (nprofile: string, message: string) => Promise<void>;
+  sendDirectMessage?: (dm: { nprofile: string; message: string }) => Promise<void>;
   resolveProfile?: (
     pubkey: string,
     signal?: AbortSignal,
   ) => Promise<RecipientProfile | null>;
-}
-
-/**
- * BLE adapter.
- *
- * JSON-shaped contract: profile-scoped identity material and opaque peer
- * snapshots. Native BLE modules remain consumer-owned.
- */
-export interface BleAdapter {
-  getIdentityMaterial?: () => JsonRecord | null;
-  getPeerSnapshot?: (peerId: string) => Promise<JsonRecord | null>;
 }
 
 /**
@@ -208,40 +160,6 @@ export interface ChainAdapter {
 }
 
 /**
- * Plain storage adapter.
- *
- * JSON-shaped contract: values are JSON serializable. Consumers choose
- * AsyncStorage, SQLite, MMKV, in-memory tests, or browser storage.
- */
-export interface StorageAdapter {
-  getItem: (key: string) => Promise<JsonValue | null>;
-  setItem: (key: string, value: JsonValue) => Promise<void>;
-  removeItem: (key: string) => Promise<void>;
-}
-
-/**
- * Secure storage adapter.
- *
- * JSON-shaped contract: same as StorageAdapter plus the expectation that the
- * consumer implementation applies its platform's secure-storage policy.
- */
-export interface SecureStorageAdapter extends StorageAdapter {}
-
-/**
- * QR encoder adapter.
- *
- * JSON-shaped contract: input text returns a serializable image payload. Native
- * canvas/SVG libraries stay out of Colada.
- */
-export interface QrEncoderAdapter {
-  encode: (text: string) => Promise<{
-    kind: "svg" | "pngDataUri" | "utf8";
-    data: string;
-    size?: number;
-  }>;
-}
-
-/**
  * QR decoder adapter.
  *
  * JSON-shaped contract: callers provide a URI/data payload and receive text or
@@ -256,47 +174,15 @@ export interface QrDecoderAdapter {
   createUrDecoder?: () => URDecoderLike;
 }
 
-/**
- * Clock adapter.
- *
- * JSON-shaped contract: timestamps are Unix milliseconds. Timer handles stay
- * opaque to the host runtime and are intentionally not persisted.
- */
-export interface ClockAdapter {
-  now: () => number;
-  setTimeout?: (callback: () => void, delayMs: number) => unknown;
-  clearTimeout?: (handle: unknown) => void;
-}
-
-/**
- * Random adapter.
- *
- * JSON-shaped contract: random bytes are returned as numeric byte arrays so a
- * consumer can back them with WebCrypto, Expo Crypto, Nitro, or tests.
- */
-export interface RandomAdapter {
-  bytes: (length: number) => Promise<number[]>;
-  uuid?: () => string;
-}
-
 export type LoggerAdapter = CocoLogger;
 
 export interface ColadaAdapters {
   clipboardAdapter?: ClipboardAdapter;
   shareAdapter?: ShareAdapter;
-  cameraAdapter?: CameraAdapter;
   imagePickerAdapter?: ImagePickerAdapter;
-  hapticsAdapter?: HapticsAdapter;
-  notificationsAdapter?: NotificationsAdapter;
   nostrAdapter?: NostrAdapter;
-  bleAdapter?: BleAdapter;
   nfcAdapter?: NfcAdapter;
   chainAdapter?: ChainAdapter;
-  storageAdapter?: StorageAdapter;
-  secureStorageAdapter?: SecureStorageAdapter;
-  qrEncoderAdapter?: QrEncoderAdapter;
   qrDecoderAdapter?: QrDecoderAdapter;
-  clockAdapter?: ClockAdapter;
-  randomAdapter?: RandomAdapter;
   loggerAdapter?: LoggerAdapter;
 }

@@ -51,7 +51,7 @@ describe('quote-first melt preview (BTC-05)', () => {
 
     const quoteCall = tm.operationCalls.find((c) => c.name === 'quoteMelt');
     expect(quoteCall).toBeTruthy();
-    expect(quoteCall!.args).toEqual([MINT1, INPUTS.lightningAddress, 200, 'sat']);
+    expect(quoteCall!.args).toEqual([{ mintUrl: MINT1, meltTarget: INPUTS.lightningAddress, amount: 200, unit: 'sat' }]);
 
     // The preview handler received the quote — the screen can render
     // amount + fee + total from the moment it appears.
@@ -77,12 +77,50 @@ describe('quote-first melt preview (BTC-05)', () => {
     const meltCall = tm.operationCalls.find((c) => c.name === 'executeMelt');
     expect(meltCall).toBeTruthy();
     expect(meltCall!.args).toEqual([
-      MINT1,
-      INPUTS.lightningAddress,
-      200,
-      'sat',
-      { quoteId: 'quote-1' },
+      {
+        mintUrl: MINT1,
+        meltTarget: INPUTS.lightningAddress,
+        amount: 200,
+        unit: 'sat',
+        quoteId: 'quote-1',
+      },
     ]);
+  });
+
+  it('refreshes an expired preview and asks for approval again before paying', async () => {
+    let quotes = 0;
+    const tm = createTestMachine({
+      operations: { quoteMelt: async () => stubQuote({
+        quoteId: `quote-${++quotes}`, feeReserve: quotes === 1 ? 2 : 5,
+        expiresAt: quotes === 1 ? 1 : Math.floor(Date.now() / 1000) + 3600,
+      }) },
+    });
+    await tm.machine.execute(INPUTS.lightningAddress, { reset: true });
+    await tm.machine.enterAmount({ value: 200, unit: 'sat' }, MINT1);
+    await tm.machine.confirmMelt();
+    tm.assertStep('navigateToMeltPreview');
+    expect(tm.operationCalls.filter((c) => c.name === 'executeMelt')).toHaveLength(0);
+    expect(quotes).toBe(2);
+    const previews = tm.handlerCalls.filter((c) => c.step === 'navigateToMeltPreview');
+    expect(previews.at(-1)?.data).toMatchObject({ meltQuote: { quoteId: 'quote-2', feeReserve: 5 } });
+    await tm.machine.confirmMelt();
+    expect(tm.operationCalls.find((c) => c.name === 'executeMelt')?.args[0]).toMatchObject({ quoteId: 'quote-2' });
+  });
+
+  it('does not pay when refreshing an expired preview fails', async () => {
+    let quotes = 0;
+    const tm = createTestMachine({
+      operations: { quoteMelt: async () => {
+        if (++quotes > 1) throw new Error('mint unavailable');
+        return stubQuote({ expiresAt: 1 });
+      } },
+    });
+    await tm.machine.execute(INPUTS.lightningAddress, { reset: true });
+    await tm.machine.enterAmount({ value: 200, unit: 'sat' }, MINT1);
+    await tm.machine.confirmMelt();
+    expect(quotes).toBe(2);
+    expect(tm.operationCalls.filter((call) => call.name === 'executeMelt')).toHaveLength(0);
+    expect(tm.machine.inspect().isExecuting).toBe(false);
   });
 
   it('navigates without a quote when quote creation fails (Pay falls back to at-execution quoting)', async () => {
@@ -103,7 +141,7 @@ describe('quote-first melt preview (BTC-05)', () => {
 
     await tm.machine.confirmMelt();
     const meltCall = tm.operationCalls.find((c) => c.name === 'executeMelt');
-    expect(meltCall!.args).toEqual([MINT1, INPUTS.lightningAddress, 200, 'sat']);
+    expect(meltCall!.args).toEqual([{ mintUrl: MINT1, meltTarget: INPUTS.lightningAddress, amount: 200, unit: 'sat' }]);
   });
 
   it('does not pre-create a quote for onchain targets (fee picker stays at execution)', async () => {
@@ -139,7 +177,7 @@ describe('quote-first melt preview (BTC-05)', () => {
 
   it('re-quotes when the mint changes from the preview', async () => {
     const tm = createTestMachine({
-      operations: { quoteMelt: async (mintUrl) => stubQuote({ mintUrl }) },
+      operations: { quoteMelt: async ({ mintUrl }) => stubQuote({ mintUrl }) },
     });
     await tm.machine.execute(INPUTS.lightningAddress, { reset: true });
     await tm.machine.enterAmount({ value: 200, unit: 'sat' }, MINT1);
@@ -149,12 +187,11 @@ describe('quote-first melt preview (BTC-05)', () => {
 
     const quoteCalls = tm.operationCalls.filter((c) => c.name === 'quoteMelt');
     expect(quoteCalls.length).toBe(2);
-    expect(quoteCalls[1]!.args[0]).toBe(MINT2);
+    expect(quoteCalls[1]!.args[0]).toMatchObject({ mintUrl: MINT2 });
 
     // Pay executes against the NEW mint's quote.
     await tm.machine.confirmMelt();
     const meltCall = tm.operationCalls.find((c) => c.name === 'executeMelt');
-    expect(meltCall!.args[0]).toBe(MINT2);
-    expect(meltCall!.args[4]).toEqual({ quoteId: 'quote-1' });
+    expect(meltCall!.args[0]).toMatchObject({ mintUrl: MINT2, quoteId: 'quote-1' });
   });
 });

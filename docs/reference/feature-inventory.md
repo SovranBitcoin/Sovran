@@ -30,7 +30,7 @@ This reorganizes the claims in the app `README.md`; it does not add new ones.
 ## Mint management & discovery
 
 - [x] Multi-mint balances, mint rebalance planner (Split/Reset/Focus)
-- [x] Auditor integration (uptime, swap success, latency) and auditor-driven discovery
+- [x] Auditor integration (success rate of mint and melt operations, latency) and auditor-driven discovery
 - [x] Nostr mint reviews, mint state badges (`OK`/`DEGRADED`/`DOWN`), mint info screen
 - [x] Mint selector with dimming, inactive-mint reclaim
 

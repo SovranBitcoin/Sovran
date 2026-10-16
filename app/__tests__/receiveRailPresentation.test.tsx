@@ -119,8 +119,8 @@ jest.mock('@/shared/ui/primitives/Spinner', () => ({
     <view {...props}>{children}</view>
   ),
 }));
-jest.mock('@/shared/ui/composed/GradientCard', () => ({
-  GradientCard: ({ children }: React.PropsWithChildren) => <>{children}</>,
+jest.mock('@/shared/ui/composed/Surface', () => ({
+  Surface: ({ children }: React.PropsWithChildren) => <>{children}</>,
 }));
 jest.mock('@/shared/ui/composed/MintIcon', () => ({ MintIcon: () => null }));
 jest.mock('@/shared/ui/composed/CopyRequestCard', () => ({ CopyRequestCard: () => null }));

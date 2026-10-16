@@ -9,6 +9,7 @@
  * transport selection (HTTP POST, Nostr NIP-17, or inband) internally.
  */
 
+import { useState } from 'react';
 import { StyleSheet } from 'react-native';
 
 import type { SendHistoryEntry } from '@cashu/coco-core';
@@ -16,7 +17,6 @@ import { isPaymentRequestPreview } from 'wallet';
 import { useScreenActions } from 'wallet/react';
 import { MintSelector } from '@/features/wallet';
 import { log, useLifecycleLogger } from '@/shared/lib/logger';
-import { truncateMiddle } from '@/shared/lib/strings';
 import {
   HistoryEntryHeader,
   HistoryEntryRefresh,
@@ -25,6 +25,7 @@ import {
   transactionLeadDetailItems,
   amountDetailItem,
   mintDetailItem,
+  entryDetailItems,
 } from '@/features/transactions';
 import { TransactionProbe } from '@/features/transactions/components/detail/TransactionProbe';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
@@ -49,6 +50,8 @@ export function PaymentRequestScreen({
   onRequestMintList,
 }: PaymentRequestScreenProps) {
   useLifecycleLogger('PaymentRequestScreen');
+  // Details is opened from the footer, not from a row in the page.
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const { entry, error, actions, source, mintUrl } = useScreenActions(
     'paymentRequest',
     paymentRequestEntry
@@ -66,7 +69,14 @@ export function PaymentRequestScreen({
   }
 
   const tokenCreated = entry.metadata?.tokenCreated === 'true';
-  const nostrSent = entry.metadata?.nostrSent === 'true';
+  // "Sent" means the transport took it, whichever transport that was: an HTTP
+  // request that succeeded is delivered exactly as a relay-accepted DM is.
+  // `phase` alone will not do: the entry merge sets it to "delivered" the
+  // moment an operation id arrives, before anything has been sent. The HTTP
+  // transport is only ever named by the hand-over's own result.
+  const nostrSent =
+    entry.metadata?.nostrSent === 'true' ||
+    (entry.metadata?.transportType === 'http' && entry.metadata?.phase === 'delivered');
   const isPreview = isPaymentRequestPreview({ ...entry } as Record<string, unknown>);
   log.debug('send.payment_request.render', {
     isPreview,
@@ -84,6 +94,17 @@ export function PaymentRequestScreen({
         <ButtonHandler
           buttons={[
             {
+              // Every id and value behind this payment, each one copyable. It
+              // gives way to the screen's own actions: behind the dots when two
+              // of them are showing, in the free slot when they are not.
+              testID: 'payment-request-details',
+              text: 'Details',
+              icon: 'mdi:receipt-text-outline',
+              variant: 'secondary',
+              onPress: () => setDetailsOpen(true),
+              prefersOverflow: true,
+            },
+            {
               testID: 'payment-request-close',
               text: 'Close',
               icon: 'ri:close-circle-line',
@@ -93,21 +114,21 @@ export function PaymentRequestScreen({
               disabled: anyLoading,
             },
             {
-              testID: 'payment-request-confirm',
-              text: actions.confirm.loading ? 'Sending...' : 'Confirm',
-              icon: actions.confirm.loading ? 'ri:loader-line' : 'ri:send-plane-2-fill',
-              variant: 'primary',
-              onPress: () => actions.confirm.execute(),
-              condition: actions.confirm.available,
-              disabled: anyLoading,
-            },
-            {
               testID: 'payment-request-cancel',
               text: actions.cancel.loading ? 'Cancelling...' : 'Cancel',
               icon: actions.cancel.loading ? 'ri:loader-line' : 'ri:close-circle-line',
               variant: 'secondary',
               onPress: onCancel,
               condition: actions.cancel.available,
+              disabled: anyLoading,
+            },
+            {
+              testID: 'payment-request-confirm',
+              text: actions.confirm.loading ? 'Sending...' : 'Confirm',
+              icon: actions.confirm.loading ? 'ri:loader-line' : 'ri:send-plane-2-fill',
+              variant: 'primary',
+              onPress: () => actions.confirm.execute(),
+              condition: actions.confirm.available,
               disabled: anyLoading,
             },
           ]}
@@ -153,6 +174,9 @@ export function PaymentRequestScreen({
         />
 
         <DetailsSection
+          trigger="none"
+          open={detailsOpen}
+          onOpenChange={setDetailsOpen}
           items={[
             ...transactionLeadDetailItems({
               source,
@@ -168,10 +192,8 @@ export function PaymentRequestScreen({
                   value: `${entry.paymentRequestInfo.mints.length} mint(s)`,
                 }
               : null,
-            entry.operationId
-              ? { title: 'Operation ID', value: truncateMiddle(entry.operationId, 7) }
-              : null,
             mintDetailItem(mintUrl),
+            ...entryDetailItems(entry),
           ]}
         />
       </VStack>

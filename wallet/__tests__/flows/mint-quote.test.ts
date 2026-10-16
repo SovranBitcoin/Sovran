@@ -176,8 +176,7 @@ describe('mint quote — executeMintQuote operation', () => {
     // Find it in the recording array.
     const opCall = tm.operationCalls.find((c) => c.name === 'executeMintQuote');
     expect(opCall).toBeDefined();
-    expect(opCall!.args[0]).toBe(MINT1); // mintUrl
-    expect(opCall!.args[1]).toBe(1000); // amount
+    expect(opCall!.args[0]).toMatchObject({ mintUrl: MINT1, amount: 1000 });
   });
 
   it('does not call executeMintQuote while the device is offline', async () => {

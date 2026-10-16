@@ -21,7 +21,7 @@ const HIDDEN_HEADER_OPTIONS = { headerShown: false };
 
 export default function ProfileFlowLayout() {
   return (
-    <AndroidSheetFlowStack>
+    <AndroidSheetFlowStack flow="(profile-flow)">
       <Stack.Screen name="profile" options={PROFILE_OPTIONS} />
       <Stack.Screen name="userMessages" options={USER_MESSAGES_OPTIONS} />
       <Stack.Screen name="share" options={SHARE_OPTIONS} />

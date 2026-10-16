@@ -11,7 +11,7 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { withAlpha } from '@/shared/lib/color';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { truncateMiddle } from '@/shared/lib/strings';
-import { GradientCard } from '@/shared/ui/composed/GradientCard';
+import { Surface } from '@/shared/ui/composed/Surface';
 import { formatDisplayValue } from '@/shared/lib/format/displayValue';
 
 interface ItemTitle {
@@ -61,9 +61,9 @@ export function DetailsList({ items, style, camera = false, special, gradient }:
   if (gradient) {
     return (
       <Log name="DetailsList">
-        <GradientCard style={{ marginHorizontal: 16, ...style }} contentStyle={{ padding: 8 }}>
+        <Surface style={{ marginHorizontal: 16, ...style }} contentStyle={{ padding: 8 }}>
           {rows}
-        </GradientCard>
+        </Surface>
       </Log>
     );
   }
@@ -125,7 +125,7 @@ function renderValueContent(
       return (
         <VStack align="center" className="flex-1" justify="center">
           <Text size={18} color={withAlpha(colors.foreground, 0.9)} style={{ textAlign: 'center' }}>
-            {truncateMiddle(layout.username, 8)}
+            {truncateMiddle(layout.username)}
           </Text>
           <Pressable className="flex-row items-center">
             <StyledText

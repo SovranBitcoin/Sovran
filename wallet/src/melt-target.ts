@@ -42,3 +42,9 @@ export function meltMethodForTarget(meltTarget: string): MeltQuoteMethod | null 
         : null;
   return lastMethod;
 }
+
+/** Forget the last payment destination (account teardown). */
+export function resetMeltTarget(): void {
+  lastTarget = null;
+  lastMethod = null;
+}

@@ -1,3 +1,4 @@
+import { AppState } from 'react-native';
 import { act, renderHook } from '@testing-library/react-native';
 import { useBitChat } from '@/features/bitchat/hooks/useBitChat';
 import { bitchatLog } from '@/shared/lib/logger';
@@ -7,6 +8,7 @@ let mockPeerListener: (event: BLEPeerEvent) => void;
 const mockRemove = jest.fn();
 const mockIdentity = { nostrPubkey: 'a'.repeat(64) };
 jest.mock('bitchat-module', () => ({
+  acquirePublicBLEMesh: jest.fn(() => jest.fn()),
   startBLE: jest.fn().mockResolvedValue(undefined),
   getBLEState: () => 'poweredOn',
   addBLEStateListener: () => ({ remove: mockRemove }),
@@ -34,7 +36,10 @@ jest.mock('@/shared/lib/logger', () => ({
 jest.mock('@/shared/lib/id', () => ({ mintLocalId: jest.fn() }));
 jest.mock('@/shared/lib/protocolIds', () => ({ asNostrPubkeyHex: jest.fn() }));
 
-beforeEach(() => jest.clearAllMocks());
+beforeEach(() => {
+  jest.clearAllMocks();
+  jest.spyOn(AppState, 'addEventListener').mockReturnValue({ remove: jest.fn() });
+});
 
 test('BLE chat handles native iOS and Android peer list events without requiring a peerID', async () => {
   const view = renderHook(() => useBitChat(undefined, 'ble'));

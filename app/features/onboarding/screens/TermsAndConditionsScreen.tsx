@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { BackHandler, View } from 'react-native';
-import { Button, ControlField, Label } from 'heroui-native';
+import { Button as HerouiButton, ControlField, Label } from 'heroui-native';
+import { Button } from '@/shared/ui/primitives/Button';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { Text } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
@@ -12,14 +13,24 @@ interface TermsAndConditionsScreenProps {
   onClose: () => void;
   settingsError?: boolean;
   onRetry?: () => void;
+  /** Whether earlier documents were accepted. Read from settings unless given. */
+  updated?: boolean;
+  /**
+   * Replaces opening the recovery page, which shows the real recovery phrase.
+   * Set by the design system, whose previews must not reach it.
+   */
+  onViewRecovery?: () => void;
 }
 
 export function TermsAndConditionsScreen({
   onClose,
   settingsError = false,
   onRetry,
+  updated,
+  onViewRecovery,
 }: TermsAndConditionsScreenProps) {
-  const previousAcceptance = useSettingsStore((s) => s.legalAcceptance ?? s.termsAccepted);
+  const acceptedBefore = useSettingsStore((s) => !!(s.legalAcceptance ?? s.termsAccepted));
+  const previousAcceptance = updated ?? acceptedBefore;
   const [step, setStep] = useState<'terms' | 'privacy'>('terms');
   const [isChecked, setIsChecked] = useState(false);
   const [privacyChecked, setPrivacyChecked] = useState(false);
@@ -45,13 +56,13 @@ export function TermsAndConditionsScreen({
   if (showRecovery) return <SettingsProfileRecoveryScreen onBack={() => setShowRecovery(false)} />;
 
   const recovery = (
-    <Button
+    <HerouiButton
       variant="ghost"
       testID="legal-view-recovery"
       accessibilityLabel="View existing recovery information"
-      onPress={() => setShowRecovery(true)}>
-      <Button.Label>View existing recovery information</Button.Label>
-    </Button>
+      onPress={onViewRecovery ?? (() => setShowRecovery(true))}>
+      <HerouiButton.Label>View existing recovery information</HerouiButton.Label>
+    </HerouiButton>
   );
   if (settingsError) {
     return (
@@ -65,11 +76,11 @@ export function TermsAndConditionsScreen({
             replace unreadable settings with defaults.
           </Text>
           <Button
+            text="Retry loading settings"
             testID="legal-settings-retry"
             accessibilityLabel="Retry loading settings"
-            onPress={onRetry}>
-            <Button.Label>Retry loading settings</Button.Label>
-          </Button>
+            onPress={() => onRetry?.()}
+          />
           {recovery}
         </VStack>
       </Screen>
@@ -86,11 +97,11 @@ export function TermsAndConditionsScreen({
           {step === 'privacy' && (
             <Button
               variant="secondary"
+              text="Back to Terms"
               testID="privacy-back-to-terms"
               accessibilityLabel="Back to Terms"
-              onPress={backToTerms}>
-              <Button.Label>Back to Terms</Button.Label>
-            </Button>
+              onPress={backToTerms}
+            />
           )}
           {recovery}
         </VStack>
@@ -114,14 +125,14 @@ export function TermsAndConditionsScreen({
             <ControlField.Indicator />
           </ControlField>
           <Button
-            isDisabled={!isChecked}
+            text="Continue to Privacy"
+            disabled={!isChecked}
             testID="terms-continue"
             accessibilityLabel="Continue to Privacy"
             onPress={() => {
               if (isChecked) setStep('privacy');
-            }}>
-            <Button.Label>Continue to Privacy</Button.Label>
-          </Button>
+            }}
+          />
         </VStack>
       ) : (
         <VStack className="gap-4">
@@ -142,14 +153,14 @@ export function TermsAndConditionsScreen({
             <ControlField.Indicator />
           </ControlField>
           <Button
-            isDisabled={!isChecked || !privacyChecked}
+            text="Confirm and continue"
+            disabled={!isChecked || !privacyChecked}
             testID="privacy-confirm"
             accessibilityLabel="Confirm and continue"
             onPress={() => {
               if (isChecked && privacyChecked) onClose();
-            }}>
-            <Button.Label>Confirm and continue</Button.Label>
-          </Button>
+            }}
+          />
         </VStack>
       )}
     </LegalDocumentScreen>

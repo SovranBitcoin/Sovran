@@ -198,14 +198,19 @@ describe('demuxPrimalSocialGraph — contact_list → follows + bundled profiles
     const graph = demuxPrimalSocialGraph(
       [
         {
-          id: 'k3'.padEnd(64, '0'),
+          id: 'c3'.padEnd(64, '0'),
           pubkey: PUB,
           kind: 3,
           content: '',
           tags: [['p', FOLLOW_A], ['p', FOLLOW_B]],
           created_at: 1_700_000_500,
         },
-        { pubkey: FOLLOW_A, kind: 0, content: JSON.stringify({ name: 'bob', picture: 'http://x/b.png' }) },
+        {
+          id: 'c0'.padEnd(64, '0'),
+          pubkey: FOLLOW_A,
+          kind: 0,
+          content: JSON.stringify({ name: 'bob', picture: 'http://x/b.png' }),
+        },
       ],
       PUB
     );

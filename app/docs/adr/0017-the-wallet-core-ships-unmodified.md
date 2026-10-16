@@ -6,6 +6,10 @@ Status: Accepted; native verification outstanding.
 Amends [ADR 0016](0016-the-lock-lives-in-the-amount-header.md): every locked
 send is still asked for, but the only length on offer is forever.
 
+Amended by [ADR 0019](0019-an-exact-send-needs-no-mint.md): the core now carries
+one patch, which lets an exact-match send be prepared from stored mint data
+without contacting the mint. The reclaim patch described below stays removed.
+
 ## Context
 
 The lock sheet offered "Reclaim after 1 hour / 1 day / 1 week / 30 days". Each

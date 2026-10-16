@@ -1,0 +1,28 @@
+name: PR description
+
+# A pull request's title and description go stale when commits are pushed after it was
+# opened. The description ends with `<!-- describes <head sha> -->`; this fails until that
+# line names the commit at the head of the branch, so every push is followed by a rewrite.
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened, ready_for_review]
+
+jobs:
+  current:
+    if: ${{ !github.event.pull_request.draft }}
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Description names the head commit
+        env:
+          BODY: ${{ github.event.pull_request.body }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          described=$(printf '%s' "$BODY" | grep -oE '<!-- describes [0-9a-f]{7,40} -->' | tail -1 | grep -oE '[0-9a-f]{7,40}' || true)
+          if [ -n "$described" ] && [ "${HEAD_SHA#"$described"}" != "$HEAD_SHA" ]; then
+            echo "Description covers $described."
+            exit 0
+          fi
+          echo "::error::The description covers '${described:-nothing}' but the branch is at ${HEAD_SHA:0:9}. Rewrite the title and description for everything on the branch and end it with <!-- describes ${HEAD_SHA:0:9} -->."
+          exit 1

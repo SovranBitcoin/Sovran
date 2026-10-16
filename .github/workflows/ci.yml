@@ -19,6 +19,11 @@ jobs:
       - name: Checkout app
         uses: actions/checkout@v6
 
+      # Root tests include the Node test collector in the harness workspace.
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: harness/.node-version
+
       # Lint, Type Check, Knip, and React Compiler coverage each run in their own
       # workflow so the README can carry a status badge per check. This workflow
       # is named for its blocking gate: the test suite.
@@ -36,8 +41,9 @@ jobs:
         continue-on-error: true
         run: bun run pretty:check
 
-      # Runs at the repo ROOT, not in app/: `test` fans out over every workspace
-      # package (`bun run --filter '*'`). Pinning this to app/ is what left
+      # Runs at the repo ROOT, not in app/: `test` runs the harness first, then
+      # every remaining workspace. Their subprocess-heavy suites must not compete
+      # for the same test deadlines. Pinning this to app/ is what left
       # wallet's 1183 vitest tests and nostr's 259 — the payment engine and the
       # Nostr data layer — running nowhere on a push, so a change to either
       # could break every one of its own tests and still merge green.

@@ -114,6 +114,8 @@ object BitChatBLEBridge : BluetoothMeshDelegate {
     /// Our standing NUT-18 payment request (creq…) — accepted mints + P2PK lock
     /// key, built in JS and passed to start(). Sent as `[FAVORITED]:<npub>:<creq>`.
     private var selfCreq: String? = null
+    private var walletDiscovery = true
+    @Volatile private var eventProfileScope: String? = null
     /// peerIDs we intend to keep favorited. Persistent (NOT a one-shot queue):
     /// our favorite is (re-)sent every time a Noise session with one of these
     /// peers (re-)establishes, so a peer that restarts/reinstalls and loses our
@@ -163,6 +165,7 @@ object BitChatBLEBridge : BluetoothMeshDelegate {
         signingPrivateKeyHex: String,
         p2pkPubkeyHex: String,
         creq: String?,
+        walletDiscovery: Boolean,
     ) {
         val context = appContext ?: throw BitChatNotStartedException()
         if (!BluetoothStateMonitor.hasPermissions(context)) {
@@ -176,16 +179,14 @@ object BitChatBLEBridge : BluetoothMeshDelegate {
         val suffix = BitchatProfileScope.storageSuffix(profileScope)
 
         synchronized(lock) {
-            if (isRunning && activeScopeSuffix == suffix && activeIdentityID == identity.identityID) {
+            if (isRunning && activeScopeSuffix == suffix && activeIdentityID == identity.identityID && this.walletDiscovery == walletDiscovery) {
                 if (activeNickname != nickname) {
                     NicknameProvider.currentNickname = nickname
                     activeNickname = nickname
                     mesh?.sendBroadcastAnnounce()
                 }
-                // Update the advertised creq when provided (trusted mints can
-                // change without a profile switch). Only SET it — a startBLE call
-                // without a creq (e.g. the delivery path) must not clear it.
-                creq?.takeIf { it.isNotEmpty() }?.let { selfCreq = it }
+                // Clear withdrawn legacy favorite capability as well as applying updates.
+                selfCreq = creq?.takeIf { it.isNotEmpty() }
                 return
             }
             if (isRunning) {
@@ -196,6 +197,8 @@ object BitChatBLEBridge : BluetoothMeshDelegate {
             BitchatIdentityInstaller.install(scopedContext, identity)
             NicknameProvider.currentNickname = nickname
 
+            eventProfileScope = profileScope
+            this.walletDiscovery = walletDiscovery
             activeScopeSuffix = suffix
             activeIdentityID = identity.identityID
             activeNickname = nickname
@@ -211,9 +214,9 @@ object BitChatBLEBridge : BluetoothMeshDelegate {
                 Bech32.encode("npub", identity.p2pkPubkey.copyOfRange(1, identity.p2pkPubkey.size))
             }.getOrNull()
             selfPeerID = identity.peerID
-            creq?.takeIf { it.isNotEmpty() }?.let { selfCreq = it }
+            selfCreq = creq?.takeIf { it.isNotEmpty() }
 
-            val service = BluetoothMeshService(scopedContext)
+            val service = BluetoothMeshService(scopedContext, if (walletDiscovery) java.util.UUID.fromString("7C6A0001-5A8B-4C9D-AE10-534F5652414E") else com.bitchat.android.util.AppConstants.Mesh.Gatt.SERVICE_UUID)
             if (service.myPeerID != identity.peerID) {
                 // Defensive: would mean the persisted noise key differs from the
                 // injected one — the installer must run before construction.
@@ -257,10 +260,13 @@ object BitChatBLEBridge : BluetoothMeshDelegate {
     }
 
     private fun stopLocked() {
+        eventProfileScope = null
         discoveryWatchdogJob?.cancel()
         discoveryWatchdogJob = null
         hasDiscoveredPeerSinceStart = false
         appContext?.let { BitchatMeshForegroundService.stop(it) }
+        mesh?.delegate = null
+        mesh?.encryptionService?.onSessionEstablished = null
         mesh?.stopServices()
         mesh = null
         isRunning = false
@@ -333,7 +339,7 @@ object BitChatBLEBridge : BluetoothMeshDelegate {
         // The vendor's stopServices() terminates the instance — always build a
         // fresh BluetoothMeshService, never reuse.
         mesh?.stopServices()
-        val service = BluetoothMeshService(scopedContext)
+        val service = BluetoothMeshService(scopedContext, if (walletDiscovery) java.util.UUID.fromString("7C6A0001-5A8B-4C9D-AE10-534F5652414E") else com.bitchat.android.util.AppConstants.Mesh.Gatt.SERVICE_UUID)
         service.encryptionService.onSessionEstablished = { peerID ->
             flushPendingSends(peerID)
             resendFavoriteIfWanted(peerID)
@@ -430,7 +436,7 @@ object BitChatBLEBridge : BluetoothMeshDelegate {
         val recipientNickname = peerNickname(peerID) ?: peerID
         service.sendPrivateMessage(content, peerID, recipientNickname, messageID)
         emitDeliveryStatus(messageID, "sent")
-        recordDmPeer(peerID, peerNickname(peerID), System.currentTimeMillis().toDouble())
+        if (!content.startsWith("sovran:nearby:1:") && !content.startsWith("sovran:payment:1:")) recordDmPeer(peerID, peerNickname(peerID), System.currentTimeMillis().toDouble())
     }
 
     // MARK: - Favorite notification (native identity exchange)
@@ -533,6 +539,7 @@ object BitChatBLEBridge : BluetoothMeshDelegate {
                 "lastSeen" to info.lastSeen.toDouble(),
                 "nostrPubkeyHex" to nostrHex,
                 "creq" to creq,
+                "authenticatedNoiseFingerprint" to service.encryptionService.getAuthenticatedPeerFingerprint(peerID),
                 // The peer's announced Curve25519 noise static key — bitchat's
                 // own identity, present for EVERY peer (stock clients
                 // included). A stable pseudonym seed for identicons/word-pair
@@ -658,6 +665,7 @@ object BitChatBLEBridge : BluetoothMeshDelegate {
     // MARK: - BluetoothMeshDelegate (payload shapes mirror the iOS bridge)
 
     override fun didReceiveMessage(message: BitchatMessage) {
+        val profileScope = eventProfileScope ?: return
         // BLE callbacks wake the CPU only briefly; a short timed wake lock
         // carries it through JS classification + a possible mint call when
         // the screen is off (auto-released, never held persistently).
@@ -668,10 +676,11 @@ object BitChatBLEBridge : BluetoothMeshDelegate {
             val nickname = message.sender.takeIf { it.isNotBlank() }
                 ?: peerNickname(senderPeerID)
                 ?: senderPeerID.take(12)
-            recordDmPeer(senderPeerID, nickname, timestampMs)
+            if (!message.content.startsWith("sovran:nearby:1:") && !message.content.startsWith("sovran:payment:1:")) recordDmPeer(senderPeerID, nickname, timestampMs)
             emitter?.invoke(
                 "onBLEPrivateMessage",
                 mapOf(
+                    "profileScope" to profileScope,
                     "id" to message.id,
                     "peerID" to senderPeerID,
                     "sender" to nickname,

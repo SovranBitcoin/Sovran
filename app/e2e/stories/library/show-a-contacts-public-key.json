@@ -1,0 +1,85 @@
+{
+  "id": "show-a-contacts-public-key",
+  "purpose": "A person opens a contact, asks for their public profile code, and sees it with a button to copy it.",
+  "startsFrom": "onboarded",
+  "steps": [
+    {
+      "name": "the wallet opens",
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-send"
+          }
+        },
+        {
+          "logged": "splash.gone"
+        }
+      ],
+      "withinMs": 8000
+    },
+    {
+      "name": "go to contacts",
+      "tap": {
+        "label": "Contacts"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "screen-contacts"
+          }
+        },
+        {
+          "visible": {
+            "id": "underline-tab-Groups"
+          }
+        },
+        {
+          "visible": {
+            "idPrefix": "contact-row:nostr:"
+          }
+        }
+      ],
+      "withinMs": 40000
+    },
+    {
+      "name": "open the first contact",
+      "tap": {
+        "idPrefix": "contact-row:nostr:",
+        "matchIndex": 0
+      },
+      "expect": [
+        {
+          "page": "UserProfileScreen"
+        },
+        {
+          "visible": {
+            "id": "profile-follow-button"
+          }
+        },
+        {
+          "visible": {
+            "id": "profile-send-money"
+          }
+        }
+      ],
+      "withinMs": 10000
+    },
+    {
+      "name": "show their public code",
+      "tap": {
+        "id": "profile-share-qr"
+      },
+      "expect": [
+        {
+          "page": "ShareScreen"
+        },
+        {
+          "visible": {
+            "id": "share-copy-npub"
+          }
+        }
+      ],
+      "withinMs": 10000
+    }
+  ]
+}

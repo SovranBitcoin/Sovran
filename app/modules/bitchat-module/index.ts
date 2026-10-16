@@ -1,6 +1,9 @@
 export {
   // BLE Mesh
   startBLE,
+  stopBLE,
+  acquirePublicBLEMesh,
+  isPublicBLEMesh,
   sendBLEMessage,
   startBLEPrivateChat,
   resetBLEPrivateChat,

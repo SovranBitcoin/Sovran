@@ -89,6 +89,8 @@ void refreshAll().then(() => {
     if (scenario) void selectScenario(`run-${live.runId}`, scenario, 'auto');
     return;
   }
-  const first = state.runs.find((run) => run.proof === 'product-run' && run.scenarioIds.length > 0);
+  const first = state.runs.find(
+    (run) => run.proof !== 'orchestration-smoke' && run.scenarioIds.length > 0
+  );
   if (first) void selectScenario(`run-${first.runId}`, first.scenarioIds[0], 'auto');
 });

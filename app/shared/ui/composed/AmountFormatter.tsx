@@ -12,7 +12,7 @@ import { LiquidGlassText } from 'liquid-glass-text';
 import type { GlassVariant } from 'liquid-glass-text';
 
 import { formatAmount } from '@/shared/lib/currency';
-import { type AmountValue } from '@/shared/lib/cashu/amount';
+import { type AmountValue } from 'wallet/amount';
 import { Log, paymentLog } from '@/shared/lib/logger';
 import { cn } from '@/shared/lib/classNames';
 import { useCapabilities } from '@/shared/ui/capability';
@@ -21,7 +21,7 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { View } from '@/shared/ui/primitives/View/View';
 
-type FontWeight = 'light' | 'regular' | 'medium' | 'heavy';
+type FontWeight = 'light' | 'regular' | 'medium' | 'bold' | 'heavy';
 
 // MonaSans ships ₿ (U+20BF) as a proper glyph, so we can render the Bitcoin
 // sign inline with the digits instead of compositing a separate SVG icon.
@@ -37,6 +37,7 @@ export const AMOUNT_FONT_FAMILY: Record<FontWeight, string> = {
   light: 'MonaSans-Light',
   regular: 'MonaSans-Regular',
   medium: 'MonaSans-Medium',
+  bold: 'MonaSans-Bold',
   heavy: 'MonaSans-Black',
 };
 
