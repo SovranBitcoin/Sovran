@@ -49,7 +49,7 @@ test('new hook tests and legacy test directories cannot omit versioned guidance'
   writeFileSync(join(root, 'AGENTS.md'), 'Use component test guidance when the new test body is unknown');
   mkdirSync(join(root, 'app'));
   writeFileSync(join(root, 'app/package.json'), JSON.stringify({ devDependencies: { '@testing-library/react-native': '13.3.3' } }));
-  for (const scope of ['app/__tests__/newHook.test.ts', 'app/__tests__'])
+  for (const scope of ['app/__tests__/newHook.test.ts', 'app/__tests__', 'app/features/send/__tests__', 'app/shared/hooks/__tests__'])
     expect(contextPaths(root, { ...spec, scope: [scope] })).toContain('.agents/skills/react-native-testing/references/api-reference-v13.md');
   expect(contextPaths(root, { ...spec, scope: ['site/src'] })).toContain('docs/review/conventions-typescript.md');
   writeFileSync(join(root, 'app/package.json'), JSON.stringify({ devDependencies: { '@testing-library/react-native': '^13.3.3 || ^14.0.0' } }));

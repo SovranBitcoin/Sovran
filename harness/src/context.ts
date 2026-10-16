@@ -30,7 +30,7 @@ export function contextPaths(root: string, contract: Contract) {
   if (touches(/(^|\/)(__tests__|tests|e2e)($|\/)|\.(test|spec)\.[cm]?[jt]sx?$/))
     paths.add('docs/review/conventions-async-tests.md');
   const componentTest = planned.some(p => p.startsWith('app/') && !p.startsWith('app/e2e/') &&
-    (/^app\/__tests__(\/[^.]+)?$/.test(p) || /\.(test|spec)\.tsx$/.test(p) ||
+    (/(^|\/)__tests__(\/[^.]+)?$/.test(p) || /\.(test|spec)\.tsx$/.test(p) ||
       (/\.(test|spec)\.ts$/.test(p) && (!existsSync(join(root, p)) || ui ||
         readFileSync(within(root, p), 'utf8').includes('@testing-library/react-native')))));
   if (componentTest) {
