@@ -96,9 +96,11 @@ export class Publisher {
   reconcile(input: unknown): Publication {
     const p = publishPlan.parse(input); this.guard(p);
     if (this.remoteHead(p, p.branch) !== p.head) return { status: 'unknown', reason: 'Remote publication head is not confirmed' };
-    const found = this.find(p); return found ? { status: 'ci', pr: found } : { status: 'unknown', reason: 'No matching PR; uncertain effect remains unresolved' };
+    const found = this.find(p);
+    return found && found.title === p.title && found.body === this.body(p)
+      ? { status: 'ci', pr: found } : { status: 'unknown', reason: 'PR identity or final metadata is not confirmed' };
   }
-  check(input: unknown, number: number): { status: 'ready' | 'waiting'; reason: string; pr: PullRequest } {
+  check(input: unknown, number: number): { status: 'ready' | 'waiting' | 'failed'; reason: string; pr: PullRequest } {
     const p = publishPlan.parse(input); this.guard(p);
     const view = () => { const out = this.gh(p, ['pr', 'view', String(number), '--json', fields]); if (out.code !== 0) throw new Error('PR state unavailable'); const found = pr.parse(JSON.parse(out.text)); this.matches(p, found); return found; };
     const before = view();
@@ -110,6 +112,8 @@ export class Publisher {
       checks.every(c => c.bucket === 'pass') && p.requiredChecks.every(name => checks.some(c => c.name === name));
     const ready = green && !after.isDraft && after.mergeable === 'MERGEABLE' && after.mergeStateStatus === 'CLEAN' &&
       !['CHANGES_REQUESTED', 'REVIEW_REQUIRED'].includes(after.reviewDecision ?? '') && after.body === this.body(p) && after.title === p.title;
-    return { status: ready ? 'ready' : 'waiting', reason: ready ? 'Exact head satisfies required checks and current merge policy' : 'Required checks or PR merge policy are unsatisfied', pr: after };
+    const failed = checks.some(c => c.bucket === 'fail' || c.bucket === 'cancel') || after.reviewDecision === 'CHANGES_REQUESTED';
+    return { status: ready ? 'ready' : failed ? 'failed' : 'waiting', reason: ready ? 'Exact head satisfies required checks and current merge policy' :
+      `Required checks or PR merge policy are unsatisfied: ${checks.map(c => `${c.name}=${c.bucket}`).join(', ')}; review=${after.reviewDecision}`, pr: after };
   }
 }

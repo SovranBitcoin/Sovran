@@ -46,7 +46,9 @@ do not ask the owner questions. A missing prerequisite ends incomplete.
    runs. Do not treat a waiting turn or timeout as completion.
 4. Check the marker and parse the assessment. `submit` only the actual worker result;
    do not fill missing observations yourself. A failed worker with no live children is
-   recorded with `worker-stopped`; it never supplies passing evidence.
+   recorded with `worker-stopped`; it never supplies passing evidence. For an unclaimed
+   ticket, `withdraw-ticket` is allowed only when dispatch definitively never occurred or
+   all identified children are confirmed terminal. Uncertain dispatches retain ownership.
 5. Run `verify` in verifying, and `verify` with `audit:true` before the audit worker.
    Use the returned state to continue. Repair invalidates old receipts. Each new ticket
    is a new delegated task, not a message restarting an old child's thread.

@@ -13,6 +13,7 @@ export const request = z.discriminatedUnion('action', [
   z.object({ action: z.literal('publish'), id }),
   z.object({ action: z.literal('check-ci'), id }),
   z.object({ action: z.literal('worker-stopped'), id, ticket: text, worker: text, reason: text }),
+  z.object({ action: z.literal('withdraw-ticket'), id, ticket: text, reason: text }),
   z.object({ action: z.literal('seal'), id, policy: text }),
   z.object({ action: z.literal('claim'), id, ticket: text, worker: text, provider: text, model: text }),
   z.object({ action: z.literal('submit'), id, ticket: text, worker: text, assessment }),
@@ -32,6 +33,7 @@ export async function dispatch(controller: Controller, input: unknown) {
     case 'publish': return controller.publish(r.id);
     case 'check-ci': return controller.checkCI(r.id);
     case 'worker-stopped': return controller.workerStopped(r.id, r.ticket, r.worker, r.reason);
+    case 'withdraw-ticket': return controller.withdrawTicket(r.id, r.ticket, r.reason);
     case 'seal': return controller.seal(r.id, r.policy);
     case 'claim': return controller.claim(r.id, r.ticket, r.worker, r.provider, r.model);
     case 'submit': return controller.submit(r.id, r.ticket, r.worker, r.assessment);

@@ -2,7 +2,7 @@ import { join } from 'node:path';
 import { readFileSync } from 'node:fs';
 import { z } from 'zod';
 import { digest, fileEvidence } from './workspace';
-import type { Role, Task } from './workflow';
+import { assessment, type Role, type Task } from './workflow';
 
 const duties: Record<Role, string> = {
   research: 'Find the existing owners and reusable code with jg, falling back to exact source search if retrieval is incomplete. Read primary docs and pinned related Cashu implementations. Explain uncertainty, acceptance tests and missing context before intake is sealed. Do not edit source.',
@@ -24,7 +24,7 @@ export function brief(t: Task, stateDir: string) {
     if (!snapshot || snapshot.sha256 !== item.sha256 || digest(snapshot.content) !== item.sha256)
       throw new Error('Sealed context snapshot is missing or changed');
   }
-  const artifacts = t.receipts.flatMap(r => r.artifacts).map(item => {
+  const artifacts = (t.ticket.role === 'implementation' ? t.history : t.receipts).flatMap(r => r.artifacts).map(item => {
     if (fileEvidence(join(stateDir, t.id), item.path).sha256 !== item.sha256) throw new Error('Evidence changed');
     return { ...item, absolutePath: join(stateDir, t.id, item.path) };
   });
@@ -32,7 +32,9 @@ export function brief(t: Task, stateDir: string) {
     task: t.id, ticket: t.ticket.id, policy: t.policy, source: t.source,
     root: t.root, base: t.base, role: t.ticket.role, target: t.ticket.target,
     instructions: `${duties[t.ticket.role]} No user questions after sealing. No nested delegation. If blocked, return inconclusive with the missing prerequisite. Host access is trusted; role text does not restrict tools. Return assessment JSON matching harness/src/workflow.ts. Include a specific inspection for every supplied artifact, with its hash. Do not invent evidence.`,
-    contract: t.contract, context, artifacts,
+    contract: t.contract, context, artifacts, repairReason: t.reason,
+    assessmentSchema: z.toJSONSchema(assessment),
+    referenceFormat: 'observations.evidence and findings.evidence must be a repository-relative file path or artifact:<saved artifact filename>. Put explanations and line/frame details in observation/detail, never in the path. Copy hashes from the packet; do not guess them.',
     referenceSnapshot: join(stateDir, t.id, '0-references.json'),
     relatedProjects: ['cashubtc/nuts', 'cashubtc/coco', 'cashubtc/cashu-ts', 'cashubtc/nutshell', 'cashubtc/cdk', 'cashubtc/cashu.me', 'cashubtc/macadamia', 'cashubtc/minibits_wallet', 'cashubtc/wallet'],
     repairFindings: t.ticket.role === 'implementation' ? t.assessments.flatMap(a => a.result.findings) : [],

@@ -61,11 +61,21 @@ const ticket = z.object({
   id: text, role, target: model,
   claim: z.object({ worker: text, provider: text, model: text }).nullable(),
 });
+const legacyPublication = z.object({ kind: z.literal('pull-request'), remote: text, base: text, branch: text })
+  .catchall(z.json()).transform(original => ({ kind: 'legacy-pull-request' as const, original }));
+// Preserve earlier intake data for inspection/cancellation without inventing the
+// repository, revisions or CI authority that it never recorded.
+const storedContract = z.object({ ...contract.shape, publish: z.union([
+  contract.shape.publish,
+  z.object({ kind: z.literal('legacy-pull-request'), original: z.record(z.string(), z.json()) }),
+  legacyPublication,
+]) });
 export const task = z.object({
-  version: z.literal(1), id: text, root: text, base: text, contract,
+  version: z.literal(1), id: text, root: text, base: text, contract: storedContract,
   phase, generation: z.number().int().nonnegative(),
   source: hash.nullable(), policy: hash, ticket: ticket.nullable(),
   context: z.array(artifact), receipts: z.array(receipt),
+  history: z.array(receipt).default([]),
   referenceEvidence: artifact.nullable().default(null),
   assessments: z.array(z.object({ role, source: hash, worker: text, result: assessment, artifact })),
   pending: z.discriminatedUnion('kind', [z.object({ kind: z.literal('none') }),

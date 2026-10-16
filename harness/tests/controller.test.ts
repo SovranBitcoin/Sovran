@@ -192,3 +192,41 @@ test('resolver overrides cannot change outside dependency authorization', () => 
   writeFileSync(join(root, 'package.json'), JSON.stringify({ overrides: { transitive: '2.0.0' } }));
   expect(() => finish(c, t)).toThrow('Dependency policy needs intake authorization');
 });
+
+test('repair gives the next worker the failure reason and real logs without reusing a pass', async () => {
+  const { controller: c, root, state, spec } = fixture();
+  spec.checks[0] = { id: 'fails', argv: ['bun', '-e', 'console.error("diagnostic for repair"); process.exit(1)'], cwd: '.', timeoutMs: 1000 };
+  let t = finish(c, c.create(root, spec)); t = c.seal(t.id, t.policy); t = finish(c, t); t = await c.verify(t.id);
+  c.next(t.id);
+  const packet = c.brief(t.id).packet;
+  expect(packet.repairReason).toContain('fails');
+  expect(await Bun.file(join(state, t.id, packet.artifacts.find(a => a.path.endsWith('.stderr'))?.path ?? 'missing')).text()).toContain('diagnostic for repair');
+  expect(c.read(t.id).receipts).toEqual([]);
+});
+
+test('definitively undispatched work can be withdrawn without inventing a child', () => {
+  const { controller: c, root, spec } = fixture();
+  const t = c.next(c.create(root, spec).id);
+  if (!t.ticket) throw new Error('Missing ticket');
+  c.stop(t.id, 'unavailable', 'Provider rejected dispatch before creation');
+  c.withdrawTicket(t.id, t.ticket.id, 'No delegation was attempted');
+  expect(c.create(root, spec).phase).toBe('researching');
+});
+
+test('older PR authority remains inspectable and cancellable without gaining new authority', () => {
+  const { controller: c, root, spec } = fixture();
+  const t = c.create(root, spec); c.stop(t.id, 'fixture', 'Release fixture root');
+  const original = { kind: 'pull-request', remote: 'origin', base: 'main', branch: 'task/old' };
+  const id = '00000000-0000-4000-8000-000000000001';
+  c.journal.create(id, { ...t, id, contract: { ...spec, publish: original } });
+  expect(c.read(id).contract.publish).toEqual({ kind: 'legacy-pull-request', original });
+  expect(c.stop(id, 'unsupported', 'New publication authority requires fresh intake').phase).toBe('incomplete');
+  expect(c.read(id).contract.publish).toEqual({ kind: 'legacy-pull-request', original });
+});
+
+test('publication cannot include changes preceding the sealed task', () => {
+  const { controller: c, root, spec } = fixture();
+  spec.publish = { kind: 'pull-request', remote: 'origin', branch: 'task/new', base: 'main', repository: 'fixture/wallet',
+    remoteUrl: 'https://github.com/fixture/wallet.git', baseHead: 'a'.repeat(40), previousRemoteHead: null, requiredChecks: ['tests'] };
+  expect(() => c.create(root, spec)).toThrow('entire published diff');
+});

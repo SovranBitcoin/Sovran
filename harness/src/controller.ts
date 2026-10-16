@@ -29,6 +29,8 @@ export class Controller {
       throw new Error('Task state must live outside the source workspace');
     const spec = contract.parse(input);
     if (git(root, ['status', '--porcelain'])) throw new Error('Start from a clean checkout or a dedicated worktree');
+    if (spec.publish.kind === 'pull-request' && spec.publish.baseHead !== git(root, ['rev-parse', 'HEAD']))
+      throw new Error('Start the task at its sealed PR base so the entire published diff is reviewed');
     if (Date.parse(spec.limits.deadline) <= Date.now()) throw new Error('Task deadline already elapsed');
     const context = contextPaths(root, spec).map(path => fileEvidence(root, path));
     const references = spec.references.map(ref => prepareReference('/tmp/sovran-harness/references', ref));
@@ -37,7 +39,7 @@ export class Controller {
       version: 1, id, root, base: git(root, ['rev-parse', 'HEAD']), contract: spec,
       phase: 'researching', generation: 0, source: fingerprint(root),
       policy: digest(JSON.stringify({ spec, context, references: references.map(r => r.sha256) })), context, referenceEvidence: null, ticket: null,
-      receipts: [], assessments: [], pending: { kind: 'none' }, publication: null, reason: '', pr: null,
+      receipts: [], history: [], assessments: [], pending: { kind: 'none' }, publication: null, reason: '', pr: null,
     };
     const policy = inspectChange(root, value.base, spec);
     if (policy.problems.length) throw new Error(policy.problems.join('\n'));
@@ -152,7 +154,8 @@ export class Controller {
     this.live(t);
     if (t.ticket || t.pending.kind !== 'none') throw new Error('Outstanding work must be reconciled before repair');
     if (t.generation >= t.contract.limits.repairRounds) return { ...move(t, 'STOP'), reason: `Repair budget exhausted: ${reason}` };
-    return { ...move(t, 'REPAIR'), generation: t.generation + 1, source: fingerprint(t.root), receipts: [], reason };
+    return { ...move(t, 'REPAIR'), generation: t.generation + 1, source: fingerprint(t.root),
+      history: [...t.history, ...t.receipts], receipts: [], reason };
   }
 
   stop(id: string, key: string, reason: string, cancel = false) {
@@ -165,6 +168,16 @@ export class Controller {
     // This releases ownership, never accepts unfinished work as evidence.
     return this.change(id, `worker-stopped:${ticket}`, { worker, reason }, t => {
       if (t.ticket?.id !== ticket || t.ticket.claim?.worker !== worker) throw new Error('Worker does not own this ticket');
+      const next: Task = { ...t, ticket: null, reason };
+      return ['incomplete', 'cancelled'].includes(t.phase) ? next : move(next, 'STOP');
+    });
+  }
+
+  withdrawTicket(id: string, ticket: string, reason: string) {
+    // Trusted coordinator attests no dispatch occurred, or every identified child
+    // is terminal. Never use this for an ambiguous/lost dispatch response.
+    return this.change(id, `withdraw:${ticket}`, { reason }, t => {
+      if (t.ticket?.id !== ticket || t.ticket.claim) throw new Error('Only an unclaimed, undispatched ticket can be withdrawn');
       const next: Task = { ...t, ticket: null, reason };
       return ['incomplete', 'cancelled'].includes(t.phase) ? next : move(next, 'STOP');
     });
@@ -189,7 +202,7 @@ export class Controller {
     this.current(t);
     if (t.phase === 'publishing') {
       if (!t.publication) throw new Error('Missing publication intent');
-      const result = this.publisher.reconcile(t.publication);
+      const result = this.publisher.publish(t.publication, false);
       if (result.status === 'unknown') return { ...t, reason: result.reason };
       return this.change(id, `published:${t.generation}`, { pr: result.pr.number }, v => ({
         ...move(v, 'ACCEPT'), pending: { kind: 'none' }, pr: { url: result.pr.url, head: result.pr.headRefOid, number: result.pr.number },
@@ -200,6 +213,7 @@ export class Controller {
     const policy = inspectChange(t.root, t.base, t.contract);
     if (policy.problems.length) throw new Error(policy.problems.join('\n'));
     const plan = publishPlan.parse({ ...t.contract.publish, taskId: t.id, root: t.root,
+      previousRemoteHead: t.pr?.head ?? t.contract.publish.previousRemoteHead,
       source: t.source, head: git(t.root, ['rev-parse', 'HEAD']), title: t.contract.problem.slice(0, 160),
       body: `${t.contract.problem}\n\n${t.contract.requirements.map(r => `- ${r.outcome}`).join('\n')}\n\nValidation: ${t.receipts.map(r => `${r.id}: ${r.outcome}`).join('; ')}. Independent review, adversarial review and final audit completed for this source.`,
     });
@@ -221,6 +235,7 @@ export class Controller {
     const t = this.read(id); this.current(t);
     if (t.phase !== 'ci' || !t.publication || !t.pr) throw new Error('No published task waiting for CI');
     const result = this.publisher.check(t.publication, t.pr.number);
+    if (result.status === 'failed') return this.repair(id, result.reason);
     if (result.status !== 'ready') return { ...t, reason: result.reason };
     return this.change(id, `ready:${t.generation}`, { head: t.pr.head }, v => { this.current(v); return move(v, 'ACCEPT'); });
   }

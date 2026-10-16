@@ -14,7 +14,7 @@ function versions(contents: string) {
     Object.entries(values ?? {}).map(([name, version]) => [`${section}:${name}`, { name, version }] as const)));
 }
 
-export function inspectChange(root: string, base: string, spec: Contract) {
+export function inspectChange(root: string, base: string, spec: Pick<Contract, 'scope' | 'risks' | 'allowedDependencies'>) {
   const changed = [...new Set([
     ...git(root, ['diff', '--name-only', '-z', '--no-renames', base, '--']).split('\0'),
     ...git(root, ['ls-files', '--others', '--exclude-standard', '-z']).split('\0'),
@@ -60,6 +60,6 @@ export function inspectChange(root: string, base: string, spec: Contract) {
   // Conservative routing. A missed storage dependency is worse than an extra upgrade run.
   if (changed.some(p => /^(wallet\/|app\/)|(^|\/)(package\.json|bun\.lock)$/.test(p))) risks.add('persistence');
   if (changed.some(p => /^wallet\//.test(p) || /^app\/shared\/lib\/(cashu|nostr)\//.test(p))) risks.add('payments');
-  if (changed.some(p => /^app\/(app|features|shared\/components)\//.test(p))) risks.add('ui');
+  if (changed.some(p => /^app\/(app|features|shared\/(components|ui|hooks))\//.test(p))) risks.add('ui');
   return { changed, problems, risks: [...risks] };
 }

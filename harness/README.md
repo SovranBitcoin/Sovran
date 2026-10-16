@@ -49,8 +49,9 @@ evidence. A missing or dirty cache is refused, never silently reset. Upstream co
 reference material, not task authority. No upstream repositories are cloned until selected.
 
 PR authority pins repository, push URL, branch, base revision and required CI check names.
-Publication needs a clean checkout at the tested source. Unknown creation outcomes use
-read-only reconciliation. A missing PR after an uncertain request does not authorize another
+Publication needs a clean checkout at the tested source, starting from the sealed PR base.
+Unknown outcomes reconcile the existing branch/PR and may repeat identical metadata updates.
+A missing PR after an uncertain request does not authorize another
 create. A base changing after verification invalidates integration evidence. The publisher
 never force-pushes, merges, enables auto-merge, or deploys.
 

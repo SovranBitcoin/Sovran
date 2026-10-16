@@ -4,6 +4,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Publisher, type PublishPlan } from '../src/publisher';
 import { captureSourceFingerprint } from '../../app/e2e/core/git';
+import { Controller } from '../src/controller';
+import type { Contract, Task } from '../src/workflow';
 const directories: string[] = [];
 afterEach(() => directories.splice(0).forEach(dir => rmSync(dir, { recursive: true, force: true })));
 function git(root: string, args: string[]) {
@@ -79,4 +81,44 @@ test('unknown mergeability and a mismatched task owner cannot be accepted', () =
   f.change(s => { s.pr.mergeable = 'UNKNOWN'; }); expect(f.publisher.check(f.plan, 17).status).toBe('waiting');
   f.change(s => { s.pr.body = 'another task'; }); expect(() => f.publisher.reconcile(f.plan)).toThrow('ownership');
   expect(f.read().creates).toBe(1);
+});
+
+test('controller repairs failed CI and updates only its own existing PR', async () => {
+  const f = fixture(); git(f.root, ['reset', '--hard', f.plan.baseHead]);
+  const c = new Controller(join(f.dir, 'journal'), f.publisher);
+  const spec: Contract = { problem: 'Preserve the wallet state', requirements: [{ id: 'preserve', outcome: 'app text records the change' }],
+    scope: ['app.txt'], risks: [], contextFiles: ['app.txt'], references: [], allowedDependencies: [],
+    checks: [{ id: 'check', argv: ['bun', '-e', 'console.log("checked")'], cwd: '.', timeoutMs: 1000 }],
+    auditChecks: [{ id: 'audit', argv: ['git', 'diff', '--exit-code'], cwd: '.', timeoutMs: 1000 }],
+    models: { research: { provider: 'codex', model: 'luna' }, implementation: { provider: 'codex', model: 'sol' },
+      review: { provider: 'claudeAgent', model: 'opus' }, adversary: { provider: 'claudeAgent', model: 'fable' }, audit: { provider: 'claudeAgent', model: 'opus' } },
+    limits: { deadline: new Date(Date.now() + 60_000).toISOString(), repairRounds: 2 }, publish: { kind: 'pull-request',
+      repository: f.plan.repository, remote: f.plan.remote, remoteUrl: f.plan.remoteUrl, branch: f.plan.branch, base: f.plan.base,
+      baseHead: f.plan.baseHead, previousRemoteHead: null, requiredChecks: ['upgrade'] } };
+  const finish = (t: Task) => {
+    const issued = c.next(t.id); const ticket = issued.ticket; if (!ticket) throw new Error('Missing ticket');
+    c.claim(t.id, ticket.id, ticket.id, ticket.target.provider, ticket.target.model);
+    return c.submit(t.id, ticket.id, ticket.id, { verdict: 'pass', summary: 'Inspected fixture',
+      observations: [{ requirement: 'preserve', evidence: 'app.txt', observation: 'Read actual fixture' }], findings: [],
+      reuse: { searched: ['app.txt'], used: ['app.txt'], added: [], removed: [] },
+      inspections: issued.receipts.flatMap(r => r.artifacts).map(a => ({ ...a, observation: 'Read fixture output' })) });
+  };
+  const qualify = async (t: Task) => {
+    t = finish(t); t = await c.verify(t.id); t = finish(t); t = finish(t);
+    await c.verify(t.id, true); return finish(t);
+  };
+  try {
+    let t = finish(c.create(f.root, spec)); t = c.seal(t.id, t.policy);
+    for (const value of ['first change', 'fixed change']) {
+      writeFileSync(join(f.root, 'app.txt'), value); git(f.root, ['commit', '-qam', value]);
+      f.change(s => { s.plan.head = git(f.root, ['rev-parse', 'HEAD']); if (s.pr) s.pr.headRefOid = s.plan.head; });
+      t = await qualify(t); t = c.publish(t.id);
+      expect(t.phase).toBe('ci');
+      f.change(s => { s.checks[0].bucket = value === 'first change' ? 'fail' : 'pass'; });
+      t = c.checkCI(t.id);
+      expect(t.phase).toBe(value === 'first change' ? 'implementing' : 'ready');
+    }
+    expect(f.read().creates).toBe(1);
+    expect(f.read().pr.body.endsWith(`<!-- describes ${git(f.root, ['rev-parse', 'HEAD'])} -->`)).toBe(true);
+  } finally { c.close(); }
 });
