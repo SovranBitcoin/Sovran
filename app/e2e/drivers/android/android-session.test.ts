@@ -16,7 +16,9 @@ import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { SimulatorInfrastructureError } from '../simulator-session';
+import { Adb } from './adb';
 import {
+  androidFailureText,
   assertOwnedAndroidAvdSafe,
   ANDROID_BOOT_MIN_FREE_BYTES,
   waitForAndroidDiskSpace,
@@ -33,7 +35,167 @@ import {
   removeOwnedAndroidAvd,
   runAndroidInstallAsInfrastructure,
   throwIfAndroidInfrastructureUnavailable,
+  withAndroidEmulatorSession,
 } from './android-session';
+
+it.each([
+  'success',
+  'root reply lost',
+  'note write',
+  'unroot',
+  'cancel after root',
+  'receipt write',
+  'readiness failure',
+  'wrong device',
+  'cancel and unroot',
+  'receipt and unroot',
+])('bundled session restores privileges and preserves launch-once: %s', async (fault) => {
+  const parent = mkdtempSync(join(tmpdir(), 'bundled-session-'));
+  const calls: string[] = [];
+  const note = { run: 'session-test', url: 'ws://127.0.0.1:40123' };
+  const receipt = join(parent, 'provisioning.json');
+  let uid = '2000';
+  let disposed = false;
+  const handlers = new Map<string, () => void>();
+  class Device extends Adb {
+    readonly runSignal?: AbortSignal;
+    constructor(options: ConstructorParameters<typeof Adb>[0]) {
+      super(options);
+      this.runSignal = options.signal;
+    }
+    override async raw(args: string[]): Promise<string> {
+      this.runSignal?.throwIfAborted();
+      const command = args.join(' ');
+      calls.push(command);
+      if (command === 'root') {
+        uid = '0';
+        if (fault === 'root reply lost') throw new Error('injected root reply loss');
+        if (fault.startsWith('cancel')) handlers.get('SIGTERM')?.();
+        if (fault.startsWith('receipt')) {
+          rmSync(receipt);
+          mkdirSync(receipt);
+        }
+      }
+      if (command === 'unroot') {
+        if (fault.includes('unroot')) throw new Error('injected unroot failure');
+        uid = '2000';
+      }
+      if (fault === 'note write' && command.startsWith('shell mkdir'))
+        throw new Error('injected note write failure');
+      if (command === 'shell id -u') return uid;
+      if (command === 'shell getenforce') return 'Enforcing';
+      if (command.startsWith('shell stat -c')) return '10150:10150';
+      if (command.startsWith('shell ls -Zd'))
+        return 'u:object_r:app_data_file:s0:c150,c256,c512,c768';
+      if (command.startsWith('shell cat ')) return JSON.stringify(note);
+      if (command === 'shell settings get global airplane_mode_on') return '0';
+      if (command.startsWith('shell monkey')) expect(uid).toBe('2000');
+      return '';
+    }
+  }
+  try {
+    let failure: unknown;
+    try {
+      await withAndroidEmulatorSession(
+        {
+          runId: note.run,
+          runDir: parent,
+          application: { kind: 'bundled', apk: '/fixture/app.apk' },
+          onLifecycle: () => {},
+        },
+        async (session) => {
+          expect(session.runtime).toEqual({ kind: 'bundled' });
+          await session.install('erase', () => session.writeRunnerNote(note, receipt));
+          if (fault === 'readiness failure') throw new Error('injected missing app hello');
+        },
+        {
+          signals: {
+            on: (name, callback) => {
+              handlers.set(name, callback);
+            },
+            off: (name) => {
+              handlers.delete(name);
+            },
+          },
+          startMetro: async () => {
+            throw new Error('Bundled session attempted to start Metro');
+          },
+          createAdb: (options) => new Device({ ...options, bin: '/unused-fake-adb' }),
+          boot: async (options) => {
+            expect(options.kind).toBe('bundled');
+            return {
+              serial: 'emulator-5554',
+              consolePort: 5554,
+              avd: 'owned-fixture',
+              avdRoot: parent,
+              logPath: join(parent, 'emulator.log'),
+              assertRunningAndOwned: async () => {
+                if (fault === 'wrong device') throw new Error('serial belongs to another AVD');
+                return 'owned-fixture';
+              },
+              dispose: async () => {
+                disposed = true;
+              },
+            };
+          },
+        }
+      );
+    } catch (error) {
+      failure = error;
+    }
+    if (fault === 'success' || fault === 'readiness failure') {
+      if (fault === 'success') expect(failure).toBeUndefined();
+      else expect(String(failure)).toContain('missing app hello');
+      expect(calls.filter((call) => call.startsWith('shell monkey'))).toEqual([
+        'shell monkey -p com.sovranbitcoin.dev -c android.intent.category.LAUNCHER 1',
+      ]);
+      expect(calls.indexOf('unroot')).toBeLessThan(
+        calls.findIndex((call) => call.startsWith('shell monkey'))
+      );
+    } else {
+      expect(failure).toBeDefined();
+      expect(calls.some((call) => call.startsWith('shell monkey'))).toBe(false);
+    }
+    expect(
+      calls.some(
+        (call) =>
+          call.includes('pm grant') ||
+          call.includes('run-as') ||
+          call.includes('expo-development-client')
+      )
+    ).toBe(false);
+    expect(uid).toBe(fault.includes('unroot') ? '0' : '2000');
+    if (fault.includes('unroot'))
+      expect(androidFailureText(failure)).toContain('injected unroot failure');
+    if (fault.startsWith('cancel')) expect(androidFailureText(failure)).toContain('SIGTERM');
+    if (fault.startsWith('receipt')) expect(androidFailureText(failure)).toContain('EISDIR');
+    expect(disposed).toBe(true);
+    expect(handlers.size).toBe(0);
+    if (fault === 'wrong device') {
+      expect(calls).toEqual([]);
+      expect(existsSync(receipt)).toBe(false);
+      return;
+    }
+    if (fault.startsWith('receipt')) {
+      expect(failure).toBeDefined();
+      return;
+    }
+    const evidence = JSON.parse(readFileSync(receipt, 'utf8'));
+    if (fault === 'success' || fault === 'readiness failure') expect(evidence.failures).toEqual([]);
+    else
+      expect(evidence.failures.join(' ')).toContain(
+        fault.startsWith('cancel')
+          ? 'SIGTERM'
+          : `injected ${fault === 'root reply lost' ? 'root reply loss' : fault + ' failure'}`
+      );
+    if (!fault.includes('unroot'))
+      expect(evidence.observations).toContainEqual({ step: 'unroot-uid', output: '2000' });
+    if (fault === 'success')
+      expect(evidence.observations).toContainEqual({ step: 'note-readback', output: 'matched' });
+  } finally {
+    rmSync(parent, { recursive: true, force: true });
+  }
+});
 
 describe('Android capture profile', () => {
   async function captureAdb(overrides: Record<string, string | undefined> = {}) {
@@ -243,6 +405,27 @@ describe('owned Android emulator AVD', () => {
       expect(env.ANDROID_SDK_ROOT).toBe('/sdk');
       expect(env.KEEP_ME).toBe('yes');
       expect(env).not.toHaveProperty('OMIT_ME');
+    } finally {
+      rmSync(parent, { recursive: true, force: true });
+    }
+  });
+
+  it('creates a private AOSP device for bundled apps without changing development defaults', () => {
+    const parent = mkdtempSync(join(tmpdir(), 'sovran-e2e-bundled-avd-'));
+    try {
+      const owned = createOwnedAndroidAvd({
+        parent,
+        uniqueId: 'bundled-owned-01',
+        kind: 'bundled',
+      });
+      const config = readFileSync(owned.configPath, 'utf8');
+      expect(config).toContain('image.sysdir.1=system-images/android-36/default/arm64-v8a/');
+      expect(config).toContain('PlayStore.enabled=false');
+      expect(config).toContain('tag.id=default');
+      expect(readFileSync(owned.descriptorPath, 'utf8')).toContain('target=android-36\n');
+      expect(() => assertOwnedAndroidAvdSafe(owned)).not.toThrow();
+      removeOwnedAndroidAvd(owned);
+      expect(existsSync(owned.root)).toBe(false);
     } finally {
       rmSync(parent, { recursive: true, force: true });
     }

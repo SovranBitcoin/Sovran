@@ -12,6 +12,10 @@ test('an installed APK mismatch prevents writing a runner note or opening its ch
   const note = { run: 'current-run', url: 'ws://127.0.0.1:40123' };
   let connections = 0;
   const writes: string[] = [];
+  const writeRunnerNote = async (delivered: typeof note) => {
+    connections++;
+    writes.push(JSON.stringify(delivered));
+  };
   const adb = {
     shell: async (args: string[]) => {
       if (args[0] === 'pm') return 'package:/data/app/owned/base.apk';
@@ -22,12 +26,11 @@ test('an installed APK mismatch prevents writing a runner note or opening its ch
       writeFileSync(args[2], 'a stale APK');
       return '';
     },
-    reverse: async () => {
-      connections++;
-    },
   };
   try {
-    await expect(bindAndroidStoryApp({ adb, apk, outDir, note })).rejects.toThrow('differs');
+    await expect(bindAndroidStoryApp({ adb, apk, outDir, note, writeRunnerNote })).rejects.toThrow(
+      'differs'
+    );
     expect(connections).toBe(0);
     expect(writes).toEqual([]);
     const receipt = JSON.parse(readFileSync(join(outDir, 'payload.json'), 'utf8'));
@@ -36,12 +39,10 @@ test('an installed APK mismatch prevents writing a runner note or opening its ch
       writeFileSync(args[2], readFileSync(apk));
       return '';
     };
-    const matching = await bindAndroidStoryApp({ adb, apk, outDir, note });
+    const matching = await bindAndroidStoryApp({ adb, apk, outDir, note, writeRunnerNote });
     expect(matching.installed).toBe(matching.built);
     expect(connections).toBe(1);
-    expect(writes.at(-1)).toBe(
-      'run-as com.sovranbitcoin.dev cat /data/user/0/com.sovranbitcoin.dev/files/e2e/runner.json'
-    );
+    expect(writes).toEqual([JSON.stringify(note)]);
   } finally {
     rmSync(outDir, { recursive: true, force: true });
   }

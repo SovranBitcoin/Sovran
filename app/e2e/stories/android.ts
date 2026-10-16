@@ -1,5 +1,5 @@
 /** Fresh Android stories use the shared player and result format, on an owned
- * emulator. This development APK + Metro lane makes no performance claim. */
+ * emulator. Development and bundled lanes make no device-performance claim. */
 import { createHash, randomUUID } from 'node:crypto';
 import {
   closeSync,
@@ -13,7 +13,10 @@ import {
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { appSourceStamp } from '../../../scripts/lib/app-source.mjs';
-import { withAndroidEmulatorSession } from '../drivers/android/android-session';
+import {
+  androidFailureText as errorText,
+  withAndroidEmulatorSession,
+} from '../drivers/android/android-session';
 import {
   ANDROID_PACKAGE_ID as PACKAGE,
   escapeInputText,
@@ -23,7 +26,13 @@ import {
 } from '../drivers/android/adb';
 import { startOwnedMetro } from '../drivers/simulator-session';
 import { startAppLink, type AppHello } from '../link/appLink';
-import { ensureNativeBuild, nativeArtifactHash, nativeFingerprint } from '../press/native-build';
+import {
+  ensureNativeBuild,
+  bundledJavaScriptIsCurrent,
+  nativeArtifactHash,
+  nativeFingerprint,
+  type BuildKind,
+} from '../press/native-build';
 import {
   createStoryRun,
   registerAttempt,
@@ -36,13 +45,6 @@ import { playStory } from './play';
 import { storySchema, type Story } from './story';
 
 const ROOT = fileURLToPath(new URL('../../../', import.meta.url));
-const errorText = (error: unknown): string =>
-  error instanceof AggregateError
-    ? `${error.message}: ${error.errors.map(errorText).join('; ')}`
-    : error instanceof Error
-      ? error.message
-      : String(error);
-
 function fileHash(path: string): string {
   const hash = createHash('sha256');
   const file = openSync(path, 'r');
@@ -73,7 +75,8 @@ export function requireFreshAndroidStory(story: Story): void {
 /** Read back the installed payload and atomically hand the app its session note.
  * The source stamp hashes metadata too; installed APK comparison hashes bytes. */
 export async function bindAndroidStoryApp(options: {
-  adb: Pick<Adb, 'shell' | 'raw' | 'reverse'>;
+  adb: Pick<Adb, 'shell' | 'raw'>;
+  writeRunnerNote: (note: { url: string; run: string }, receiptPath: string) => Promise<void>;
   apk: string;
   outDir: string;
   note: { url: string; run: string };
@@ -89,27 +92,23 @@ export async function bindAndroidStoryApp(options: {
   if (payload.built !== payload.installed)
     throw new Error('Installed APK differs from the selected build');
   rmSync(copy); // The receipt retains the hashes; do not retain a second large APK.
-  await adb.reverse(Number(new URL(note.url).port));
-  const dir = `/data/user/0/${PACKAGE}/files/e2e`;
-  const text = JSON.stringify(note);
-  const encoded = Buffer.from(text).toString('base64');
-  // Keep the pipe inside run-as: some adb/run-as combinations drop forwarded stdin.
-  await adb.shell([
-    `run-as ${PACKAGE} sh -c 'mkdir -p ${dir}; echo ${encoded} | base64 -d > ${dir}/runner.tmp && mv ${dir}/runner.tmp ${dir}/runner.json'`,
-  ]);
-  if ((await adb.shell(['run-as', PACKAGE, 'cat', `${dir}/runner.json`])).trim() !== text)
-    throw new Error('Android runner note readback mismatch');
+  await options.writeRunnerNote(note, join(outDir, 'runner-provisioning.json'));
   return payload;
 }
 
-export async function runAndroidStory(storyPath: string): Promise<{ ok: boolean; runDir: string }> {
+export async function runAndroidStory(
+  storyPath: string,
+  kind: BuildKind = 'dev'
+): Promise<{ ok: boolean; runDir: string }> {
   const storyText = readFileSync(storyPath, 'utf8');
   const story = storySchema.parse(JSON.parse(storyText));
   requireFreshAndroidStory(story);
   const run = randomUUID();
-  const runDir = createStoryRun(join(ROOT, 'app/e2e/artifacts'), 'android-development-story', [
-    story.id,
-  ]);
+  const runDir = createStoryRun(
+    join(ROOT, 'app/e2e/artifacts'),
+    `android-${kind === 'bundled' ? 'bundled' : 'development'}-story`,
+    [story.id]
+  );
   const outDir = registerAttempt(runDir, `android-${run}`, story.id);
   const save = (name: string, value: unknown) =>
     writeFileSync(join(outDir, name), JSON.stringify(value, null, 2));
@@ -126,22 +125,29 @@ export async function runAndroidStory(storyPath: string): Promise<{ ok: boolean;
   let avdRoot: string | undefined;
   try {
     writeFileSync(join(outDir, 'story.json'), storyText);
-    const build = await ensureNativeBuild('android', 'never');
-    if (build.bundleId !== PACKAGE || build.kind === 'bundled')
-      throw new Error('Expected the Android development build');
+    const build = await ensureNativeBuild('android', 'never', kind);
+    if (build.bundleId !== PACKAGE || (build.kind ?? 'dev') !== kind)
+      throw new Error('Android build does not match the selected story mode');
     const source = appSourceStamp(ROOT);
     if (!source) throw new Error('Cannot identify the app source');
     const session = {
-      kind: 'android-development-functional',
+      kind: `android-${kind === 'bundled' ? 'bundled' : 'development'}-functional`,
       expected,
       story: { id: story.id, sha256: createHash('sha256').update(storyText).digest('hex') },
       build,
       source,
       limitations: [
-        'owned Metro, not bundled JavaScript',
-        'extended dev-mode toast and triple-tap timing',
-        'state mirror enabled',
-        'location pregranted by the Android session',
+        ...(kind === 'dev'
+          ? [
+              'owned Metro, not bundled JavaScript',
+              'extended dev-mode toast and triple-tap timing',
+              'state mirror enabled',
+              'location pregranted by the Android session',
+            ]
+          : [
+              'owned AOSP emulator; root used only to provision runner connection',
+              'normal animation scales; display kept awake and system status normalized',
+            ]),
         'no video or pixel-motion measurement',
         'no device performance certification',
       ],
@@ -150,21 +156,28 @@ export async function runAndroidStory(storyPath: string): Promise<{ ok: boolean;
     const appLink = startAppLink(expected);
     link = appLink;
     await withAndroidEmulatorSession(
-      { runId: run, runDir },
+      {
+        runId: run,
+        runDir,
+        application: kind === 'bundled' ? { kind, apk: build.artifact } : { kind },
+      },
       async (device, signal) => {
         avdRoot = device.avdRoot;
         const ownership = {
           serial: device.serial,
           avd: device.avd,
           avdRoot,
-          metroPid: device.metroPid,
-          metroPort: device.metroPort,
+          runtime: device.runtime,
+          systemImage: device.systemImage,
         };
         save('session.json', { ...session, ownership });
         try {
           await device.install('erase', async () => {
+            if (kind === 'bundled' && !bundledJavaScriptIsCurrent(build))
+              throw new Error('Bundled JavaScript no longer matches the source');
             await bindAndroidStoryApp({
               adb: device.adb,
+              writeRunnerNote: device.writeRunnerNote,
               apk: build.artifact,
               outDir,
               note: { url: appLink.url, run },
@@ -238,9 +251,10 @@ export async function runAndroidStory(storyPath: string): Promise<{ ok: boolean;
     const sourceAfter = appSourceStamp(ROOT);
     save('source-after.json', sourceAfter);
     if (
+      (kind === 'bundled' && !bundledJavaScriptIsCurrent(build)) ||
       !sourceAfter ||
       sourceAfter.fingerprint !== source.fingerprint ||
-      (await nativeFingerprint('android')) !== build.fingerprint ||
+      (await nativeFingerprint('android', kind)) !== build.fingerprint ||
       nativeArtifactHash(build.artifact) !== build.artifactSha256
     )
       throw new Error('App source or native build changed during the story');

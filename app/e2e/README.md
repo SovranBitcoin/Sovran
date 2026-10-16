@@ -36,6 +36,14 @@ changes in logging mode. The [Expo plugin](../plugins/withAndroidE2ERunner.js) o
 boundary. A successful build alone is not a functional or performance result; the remaining
 native certification work is tracked in [F156](../../../docs/follow-ups/F156.md).
 
+Android's bundled story lane uses an owned disposable AOSP emulator. Its Release app
+cannot use Android's development-only `run-as`, so the session temporarily roots ADB to
+write the connection note with the app's owner and SELinux labels. It verifies normal
+shell privileges again before launching. Cancellation and failed writes still attempt
+restoration, and failure prevents launch. This is emulator functional evidence, not a
+production-device security or performance result. The [story CLI](stories/cli.ts) selects
+the lane; development sessions retain their separate Metro setup.
+
 ## Other generated material
 
 `artifacts/native-builds/` owns reusable app binaries. `artifacts/cache/` owns reusable private

@@ -1,13 +1,13 @@
 /**
  * The sole owner of real Android emulator resources for JSON-native E2E runs.
- * Mirrors simulator-session.ts: every session owns a unique Metro process and
- * a cold-booted emulator on an allocated console port, reached over
- * `adb reverse` so the SAME localhost dev-client URL works unchanged. Callers
+ * Every session owns a cold-booted emulator on an allocated console port.
+ * Development sessions also own Metro; bundled stories provision a connection
+ * note on a disposable AOSP image and restore shell privileges before launch. Callers
  * get only a bound install operation plus a NetworkChannel; no arbitrary
  * device crosses this boundary. Airplane-mode restore is the highest-priority
  * cleanup — a leaked offline device would poison everything after it.
  */
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import sharp from 'sharp';
 import {
   assertCaptureResolution,
@@ -47,6 +47,23 @@ import {
   emulatorBin,
   resolveAndroidSdkRoot,
 } from './adb';
+
+/** Preserve primary and restoration failures through infrastructure wrappers. */
+export function androidFailureText(error: unknown): string {
+  const seen = new Set<Error>();
+  const describe = (value: unknown): string => {
+    if (!(value instanceof Error)) return String(value);
+    if (seen.has(value)) return '[previously reported error]';
+    seen.add(value);
+    const details = [
+      value.message,
+      ...(value instanceof AggregateError ? value.errors.map(describe) : []),
+      ...(value.cause === undefined ? [] : [describe(value.cause)]),
+    ];
+    return details.join('; ');
+  };
+  return describe(error);
+}
 
 type ResetMode = 'erase' | 'reinstall' | 'none';
 
@@ -90,6 +107,7 @@ const DEFAULT_GRANTS = [
 interface EmulatorBootOptions {
   runId: string;
   runDir: string;
+  kind?: 'dev' | 'bundled';
   signal?: AbortSignal;
   onLifecycle?: (message: string) => void;
 }
@@ -100,12 +118,28 @@ interface BootedEmulator {
   readonly avd: string;
   readonly avdRoot: string;
   readonly logPath: string;
+  assertRunningAndOwned(adb: Pick<Adb, 'raw'>): Promise<string>;
   dispose(): Promise<void>;
 }
 
 const OWNED_AVD_ROOT_PREFIX = 'sovran-e2e-android-avd-';
 const OWNED_AVD_NAME_PREFIX = 'Sovran_E2E_';
-const E2E_SYSTEM_IMAGE = LIBRARY_CAPTURE_PROFILE.android.systemImage;
+const ANDROID_IMAGES = {
+  dev: {
+    path: LIBRARY_CAPTURE_PROFILE.android.systemImage,
+    target: 'android-36.1',
+    tag: 'google_apis_playstore',
+    display: 'Google Play',
+    playStore: true,
+  },
+  bundled: {
+    path: 'system-images/android-36/default/arm64-v8a',
+    target: 'android-36',
+    tag: 'default',
+    display: 'Default Android System Image',
+    playStore: false,
+  },
+};
 /** A factory-fresh image performs Android's first-boot provisioning and can
  * exceed the old 180s persistent-image budget, especially beside an iOS run. */
 export const EMULATOR_BOOT_TIMEOUT_MS = 360_000;
@@ -158,10 +192,11 @@ export function isOwnedAndroidAvdMetadata(metadata: {
   );
 }
 
-function ownedAvdConfig(avdName: string): string {
+function ownedAvdConfig(avdName: string, kind: 'dev' | 'bundled'): string {
+  const image = ANDROID_IMAGES[kind];
   return [
     `AvdId=${avdName}`,
-    'PlayStore.enabled=true',
+    `PlayStore.enabled=${image.playStore}`,
     'abi.type=arm64-v8a',
     `avd.ini.displayname=${avdName}`,
     'avd.ini.encoding=UTF-8',
@@ -198,16 +233,16 @@ function ownedAvdConfig(avdName: string): string {
     'hw.sensors.pressure=yes',
     'hw.sensors.proximity=yes',
     'hw.trackBall=no',
-    `image.sysdir.1=${E2E_SYSTEM_IMAGE}/`,
+    `image.sysdir.1=${image.path}/`,
     'runtime.network.latency=none',
     'runtime.network.speed=full',
     'showDeviceFrame=no',
     'skin.dynamic=yes',
     'skin.name=1080x2400',
     'skin.path=1080x2400',
-    'tag.display=Google Play',
-    'tag.id=google_apis_playstore',
-    'target=android-36.1',
+    `tag.display=${image.display}`,
+    `tag.id=${image.tag}`,
+    `target=${image.target}`,
     'vm.heapSize=768',
     '',
   ].join('\n');
@@ -220,10 +255,12 @@ export function createOwnedAndroidAvd(
   options: {
     parent?: string;
     uniqueId?: string;
+    kind?: 'dev' | 'bundled';
   } = {}
 ): OwnedAndroidAvd {
   const parent = realpathSync(options.parent ?? tmpdir());
   const uniqueId = options.uniqueId ?? randomUUID();
+  const kind = options.kind ?? 'dev';
   const root = realpathSync(mkdtempSync(join(parent, ownedAndroidAvdRootPrefix(uniqueId))));
   const avdName = ownedAndroidAvdName(uniqueId);
   const contentDir = join(root, `${avdName}.avd`);
@@ -242,12 +279,12 @@ export function createOwnedAndroidAvd(
         'avd.ini.encoding=UTF-8',
         `path=${contentDir}`,
         `path.rel=${avdName}.avd`,
-        'target=android-36.1',
+        `target=${ANDROID_IMAGES[kind].target}`,
         '',
       ].join('\n'),
       { mode: 0o600 }
     );
-    writeFileSync(configPath, ownedAvdConfig(avdName), { mode: 0o600 });
+    writeFileSync(configPath, ownedAvdConfig(avdName, kind), { mode: 0o600 });
     assertOwnedAndroidAvdSafe(owned);
     return owned;
   } catch (error) {
@@ -445,14 +482,13 @@ async function bootEmulator(options: EmulatorBootOptions): Promise<BootedEmulato
   const serial = `emulator-${consolePort}`;
   const logPath = join(options.runDir, 'emulator.log');
   preparePrivateLog(logPath);
-  const systemImage = join(sdkRoot, E2E_SYSTEM_IMAGE, 'system.img');
+  const image = ANDROID_IMAGES[options.kind ?? 'dev'];
+  const systemImage = join(sdkRoot, image.path, 'system.img');
   if (!existsSync(systemImage)) {
-    throw new Error(
-      `Android E2E system image not found at ${systemImage} — install ${E2E_SYSTEM_IMAGE}`
-    );
+    throw new Error(`Android E2E system image not found at ${systemImage} — install ${image.path}`);
   }
   await waitForAndroidDiskSpace(options.signal, onLifecycle);
-  const owned = createOwnedAndroidAvd({ uniqueId: options.runId });
+  const owned = createOwnedAndroidAvd({ uniqueId: options.runId, kind: options.kind });
   onLifecycle(
     `booting emulator ${owned.avdName} on ${serial} (factory-fresh private AVD, no snapshot, headless)`
   );
@@ -490,19 +526,45 @@ async function bootEmulator(options: EmulatorBootOptions): Promise<BootedEmulato
   }
 
   let disposePromise: Promise<void> | undefined;
+  const assertRunningAndOwned = async (transport: Pick<Adb, 'raw'>): Promise<string> => {
+    if (child.exitCode !== null) throw new Error('Owned Android emulator is no longer running');
+    const response = await transport.raw(['emu', 'avd', 'name']);
+    if (response.trim().split(/\r?\n/)[0] !== owned.avdName)
+      throw new Error('Android serial does not identify the owned AVD');
+    return response;
+  };
   const dispose = (): Promise<void> => {
     disposePromise ??= (async () => {
       // A broken adb transport must not prevent reaping our qemu child.
-      await run([adb, '-s', serial, 'emu', 'kill'], { allowFail: true, timeoutMs: 5_000 }).catch(
-        () => undefined
-      );
+      // Never kill a replacement device that has acquired the same serial.
+      const transport = new Adb({ serial, bin: adb });
+      try {
+        await assertRunningAndOwned(transport);
+        await transport.raw(['emu', 'kill'], { timeoutMs: 5_000 });
+      } catch {
+        /* The owned child is still reaped below. */
+      }
       const exited = await Promise.race([
         child.exited.then(() => true),
         sleep(15_000).then(() => false),
       ]);
       if (!exited) {
         child.kill('SIGKILL');
-        await child.exited;
+        let deadline: ReturnType<typeof setTimeout> | undefined;
+        try {
+          await Promise.race([
+            child.exited,
+            new Promise<never>((_, reject) => {
+              deadline = setTimeout(
+                () => reject(new Error('Owned emulator did not exit; retaining its AVD')),
+                10_000
+              );
+            }),
+          ]);
+        } finally {
+          clearTimeout(deadline);
+          child.unref();
+        }
       }
       // The emulator process must release every qcow2 handle before its exact
       // owned directory is removed. The user's shared AVD is never touched.
@@ -536,6 +598,7 @@ async function bootEmulator(options: EmulatorBootOptions): Promise<BootedEmulato
       avd: owned.avdName,
       avdRoot: owned.root,
       logPath,
+      assertRunningAndOwned,
       dispose,
     };
   } catch (error) {
@@ -726,7 +789,7 @@ export async function prepareAndroidCapture(
     model: await adb.getprop('ro.product.model'),
     runtime: await adb.getprop('ro.build.version.release'),
     runtimeBuild: await adb.getprop('ro.build.fingerprint'),
-    systemImage: E2E_SYSTEM_IMAGE,
+    systemImage: ANDROID_IMAGES.dev.path,
     resolution,
     density: { dpi },
     motion: profile.android.motion,
@@ -759,6 +822,137 @@ async function suppressDevMenuChrome(adb: Pick<AndroidAppLifecycleAdb, 'shell'>)
   await adb.shell([
     `echo '${encoded}' | base64 -d | run-as ${ANDROID_PACKAGE_ID} sh -c 'mkdir -p shared_prefs; cat > shared_prefs/expo.modules.devmenu.sharedpreferences.xml'`,
   ]);
+}
+
+/** Session-owned provisioning: a Release app cannot use run-as. Root is only
+ * available on our disposable AOSP device and must be relinquished before launch. */
+async function writeAndroidRunnerNote(options: {
+  kind: 'dev' | 'bundled';
+  adb: Pick<Adb, 'raw' | 'shell' | 'reverse'>;
+  cleanupAdb: Pick<Adb, 'raw' | 'shell'>;
+  assertOwned: (adb: Pick<Adb, 'raw'>) => Promise<string>;
+  note: { url: string; run: string };
+  receiptPath: string;
+}): Promise<void> {
+  const { adb, cleanupAdb, assertOwned, note } = options;
+  const endpoint = new URL(note.url);
+  if (endpoint.protocol !== 'ws:' || endpoint.hostname !== '127.0.0.1' || !endpoint.port)
+    throw new Error('Android runner requires a loopback WebSocket');
+  const data = `/data/user/0/${ANDROID_PACKAGE_ID}`;
+  const files = `${data}/files`,
+    dir = `${files}/e2e`,
+    path = `${dir}/runner.json`;
+  const text = JSON.stringify(note),
+    encoded = Buffer.from(text).toString('base64');
+  const observations: { step: string; output: string }[] = [];
+  const failures: unknown[] = [];
+  const save = () => {
+    try {
+      writeFileSync(
+        options.receiptPath,
+        JSON.stringify(
+          {
+            kind: options.kind,
+            run: note.run,
+            noteSha256: createHash('sha256').update(text).digest('hex'),
+            observations,
+            failures: failures.map(String),
+          },
+          null,
+          2
+        ),
+        { mode: 0o600 }
+      );
+    } catch (error) {
+      failures.push(error);
+    }
+  };
+  const observe = async (step: string, action: () => Promise<string>) => {
+    const output = await action();
+    observations.push({ step, output });
+    save();
+    return output;
+  };
+  let restoreRequired = false;
+  try {
+    await observe('owned-before', () => assertOwned(adb));
+    if (failures.length) throw new Error('Cannot retain Android provisioning evidence');
+    if (options.kind === 'bundled') {
+      // Set before sending: a lost response is not proof that root did not happen.
+      restoreRequired = true;
+      await observe('root', () => adb.raw(['root']));
+      await adb.raw(['wait-for-device']);
+      await observe('owned-root', () => assertOwned(adb));
+      if ((await observe('root-uid', () => adb.shell(['id', '-u']))).trim() !== '0')
+        throw new Error('Owned AOSP device did not enter root');
+      if ((await observe('root-selinux', () => adb.shell(['getenforce']))).trim() !== 'Enforcing')
+        throw new Error('Android SELinux is not enforcing');
+      const owner = (
+        await observe('app-owner', () => adb.shell(['stat', '-c', '%u:%g', data]))
+      ).trim();
+      if (!/^\d+:\d+$/.test(owner) || Number(owner.split(':')[0]) < 10000)
+        throw new Error('Unexpected Android app owner');
+      const label = (await observe('app-label', () => adb.shell(['ls', '-Zd', data])))
+        .trim()
+        .split(/\s+/)[0];
+      if (!/^u:object_r:app_data_file:s0(?::c\d+(?:,c\d+)*)?$/.test(label))
+        throw new Error('Unexpected Android app SELinux label');
+      await adb.shell([
+        `mkdir -p ${dir} && echo ${encoded} | base64 -d > ${dir}/runner.tmp && chown ${owner} ${files} ${dir} ${dir}/runner.tmp && chmod 700 ${dir} && chmod 600 ${dir}/runner.tmp && mv ${dir}/runner.tmp ${path}`,
+      ]);
+      await observe('restore-app-labels', () => adb.shell(['restorecon', '-DFRv', files]));
+      for (const item of [files, dir, path]) {
+        if (
+          (
+            await observe(`owner:${item}`, () => adb.shell(['stat', '-c', '%u:%g', item]))
+          ).trim() !== owner
+        )
+          throw new Error('Android runner note owner mismatch');
+        if (
+          (await observe(`label:${item}`, () => adb.shell(['ls', '-Zd', item])))
+            .trim()
+            .split(/\s+/)[0] !== label
+        )
+          throw new Error('Android runner note label mismatch');
+      }
+      if ((await adb.shell(['cat', path])).trim() !== text)
+        throw new Error('Android runner note readback mismatch');
+    } else {
+      await adb.shell([
+        `run-as ${ANDROID_PACKAGE_ID} sh -c 'mkdir -p ${dir} && echo ${encoded} | base64 -d > ${dir}/runner.tmp && mv ${dir}/runner.tmp ${path}'`,
+      ]);
+      if ((await adb.shell(['run-as', ANDROID_PACKAGE_ID, 'cat', path])).trim() !== text)
+        throw new Error('Android runner note readback mismatch');
+    }
+    observations.push({ step: 'note-readback', output: 'matched' });
+  } catch (error) {
+    failures.push(error);
+  } finally {
+    if (restoreRequired) {
+      // This transport deliberately has no run AbortSignal. Cancellation must
+      // not prevent restoration, including after an ambiguous root response.
+      try {
+        await cleanupAdb.raw(['wait-for-device']);
+        await observe('owned-before-unroot', () => assertOwned(cleanupAdb));
+        await observe('unroot', () => cleanupAdb.raw(['unroot']));
+        await cleanupAdb.raw(['wait-for-device']);
+        await observe('owned-unroot', () => assertOwned(cleanupAdb));
+        if ((await observe('unroot-uid', () => cleanupAdb.shell(['id', '-u']))).trim() !== '2000')
+          throw new Error('Android runner did not return to shell UID');
+        if (
+          (await observe('unroot-selinux', () => cleanupAdb.shell(['getenforce']))).trim() !==
+          'Enforcing'
+        )
+          throw new Error('Android SELinux changed during provisioning');
+      } catch (error) {
+        failures.push(error);
+      }
+    }
+    save();
+  }
+  if (failures.length) throw new AggregateError(failures, 'Android runner provisioning failed');
+  // adbd restarts remove existing reverse rules.
+  await adb.reverse(Number(endpoint.port));
 }
 
 /** The dev-launcher home screen's unmistakable copy. The bundle-loading
@@ -858,9 +1052,10 @@ interface AndroidEmulatorSession {
   readonly serial: string;
   readonly avd: string;
   readonly avdRoot: string;
-  readonly metroUrl: string;
-  readonly metroPort: number;
-  readonly metroPid: number;
+  readonly runtime:
+    { kind: 'dev'; metro: { url: string; port: number; pid: number } } | { kind: 'bundled' };
+  readonly systemImage: string;
+  writeRunnerNote(note: { url: string; run: string }, receiptPath: string): Promise<void>;
   readonly adb: Adb;
   readonly network: NetworkChannel;
   reportInfrastructureFailure(error: Error): void;
@@ -882,6 +1077,7 @@ interface AndroidSessionDependencies {
   startMetro?: typeof startOwnedMetro;
   boot?: typeof bootEmulator;
   signals?: SignalSource;
+  createAdb?: (options: Omit<ConstructorParameters<typeof Adb>[0], 'bin'>) => Adb;
 }
 
 export async function withAndroidEmulatorSession<T>(
@@ -889,6 +1085,7 @@ export async function withAndroidEmulatorSession<T>(
     runId: string;
     runDir: string;
     onLifecycle?: (message: string) => void;
+    application?: { kind: 'dev' } | { kind: 'bundled'; apk: string };
     /** Presentation lane: 1080x1920 at 320 dpi on the disposable device. */
     storeScreenshots?: boolean;
     captureProfile?: CaptureProfile;
@@ -901,10 +1098,22 @@ export async function withAndroidEmulatorSession<T>(
   callback: (session: AndroidEmulatorSession, signal: AbortSignal) => Promise<T>,
   dependencies: AndroidSessionDependencies = {}
 ): Promise<T> {
+  const application = options.application ?? { kind: 'dev' };
+  if (
+    application.kind === 'bundled' &&
+    (options.storeScreenshots ||
+      options.captureProfile ||
+      options.onSeedExport ||
+      options.fundedAssets)
+  )
+    throw new Error('Bundled Android sessions do not support presentation or funded overrides');
   const findApk = dependencies.findApk ?? findInstallableApk;
   const startMetro = dependencies.startMetro ?? startOwnedMetro;
   const boot = dependencies.boot ?? bootEmulator;
   const signals = dependencies.signals ?? processSignals;
+  const createAdb =
+    dependencies.createAdb ??
+    ((options) => new Adb({ ...options, bin: adbBin(resolveAndroidSdkRoot()) }));
   const onLifecycle = options.onLifecycle ?? log;
   const abort = new AbortController();
   const cleanups: { priority: number; run: () => Promise<void> }[] = [];
@@ -923,36 +1132,39 @@ export async function withAndroidEmulatorSession<T>(
   let result: T | undefined;
   let failure: unknown;
   try {
-    const apkPath = findApk();
+    const apkPath = application.kind === 'bundled' ? application.apk : findApk();
     if (abort.signal.aborted) throw abort.signal.reason;
-    const metro = await startMetro(options.runDir, abort.signal, {
-      onLifecycle,
-      ...(options.onSeedExport ? { onSeedExport: options.onSeedExport } : {}),
-      ...(options.fundedAssets ? { fundedAssets: options.fundedAssets } : {}),
-      extraEnv: {
-        // UIAutomator evidence between taps is slower than iOS. Keep the
-        // dev-mode triple-tap reachable without changing production timing.
-        EXPO_PUBLIC_E2E_TRIPLE_TAP_WINDOW_MS: '180000',
-        // The dev-mode unlock is proven by its toast, and that toast is the only
-        // on-screen evidence of it (see loader.test.ts). At production speed it
-        // dismisses well inside one uiautomator dump, so the gate was missing a
-        // toast that really had appeared — and it cannot be retried, because the
-        // triple tap toggles dev mode back off. iOS already slows the dismiss to
-        // 8s for the same reason; Android's dumps are slower still.
-        EXPO_PUBLIC_E2E_TOAST_DISMISS_MS: '15000',
-      },
-    });
-    cleanups.push({ priority: 20, run: () => metro.stop() });
+    const metro =
+      application.kind === 'dev'
+        ? await startMetro(options.runDir, abort.signal, {
+            onLifecycle,
+            ...(options.onSeedExport ? { onSeedExport: options.onSeedExport } : {}),
+            ...(options.fundedAssets ? { fundedAssets: options.fundedAssets } : {}),
+            extraEnv: {
+              // UIAutomator evidence between taps is slower than iOS. Keep the
+              // dev-mode triple-tap reachable without changing production timing.
+              EXPO_PUBLIC_E2E_TRIPLE_TAP_WINDOW_MS: '180000',
+              // The dev-mode unlock is proven by its toast, and that toast is the only
+              // on-screen evidence of it (see loader.test.ts). At production speed it
+              // dismisses well inside one uiautomator dump, so the gate was missing a
+              // toast that really had appeared — and it cannot be retried, because the
+              // triple tap toggles dev mode back off. iOS already slows the dismiss to
+              // 8s for the same reason; Android's dumps are slower still.
+              EXPO_PUBLIC_E2E_TOAST_DISMISS_MS: '15000',
+            },
+          })
+        : undefined;
+    if (metro) cleanups.push({ priority: 20, run: () => metro.stop() });
     const emulator = await boot({
       runId: options.runId,
       runDir: options.runDir,
       signal: abort.signal,
       onLifecycle,
+      kind: application.kind,
     });
     cleanups.push({ priority: 10, run: () => emulator.dispose() });
-    const adb = new Adb({
+    const adb = createAdb({
       serial: emulator.serial,
-      bin: adbBin(resolveAndroidSdkRoot()),
       signal: abort.signal,
     });
     // Cleanups run AFTER the session-complete abort fires, and the shared
@@ -960,14 +1172,22 @@ export async function withAndroidEmulatorSession<T>(
     // uses a signal-less adb, not the driver's signal-bound one. Airplane
     // restore outranks everything: run it FIRST even on failure so nothing
     // later (or a reused AVD) inherits a dead network.
-    const cleanupAdb = new Adb({ serial: emulator.serial, bin: adbBin(resolveAndroidSdkRoot()) });
+    const cleanupAdb = createAdb({ serial: emulator.serial });
     cleanups.push({
       priority: 50,
       run: async () => {
+        await emulator.assertRunningAndOwned(cleanupAdb);
         await cleanupAdb.setAirplaneMode(false).catch(() => undefined);
       },
     });
-    cleanups.push({ priority: 30, run: () => cleanupAdb.reverseRemoveAll() });
+    cleanups.push({
+      priority: 30,
+      run: async () => {
+        await emulator.assertRunningAndOwned(cleanupAdb);
+        await cleanupAdb.reverseRemoveAll();
+      },
+    });
+    await emulator.assertRunningAndOwned(adb);
     const capture = await prepareAndroidCapture(adb, options);
     await prepareEmulator(adb, !!options.captureProfile);
     if (options.storeScreenshots || options.captureProfile) {
@@ -994,11 +1214,11 @@ export async function withAndroidEmulatorSession<T>(
         }).flatMap(([key, value]) => ['-e', key, value]),
       ]);
     }
-    await adb.reverse(metro.port);
+    if (metro) await adb.reverse(metro.port);
     // Funded sessions: reverse the seed-export server too, so the emulator
     // app's POST to http://127.0.0.1:<seedPort>/seed reaches the host server
     // (which validates a 127.0.0.1 origin — adb reverse preserves that).
-    if (metro.seedExportPort) {
+    if (metro?.seedExportPort) {
       await adb.reverse(metro.seedExportPort);
       onLifecycle(`adb reverse seed-export port ${metro.seedExportPort}`);
     }
@@ -1007,9 +1227,19 @@ export async function withAndroidEmulatorSession<T>(
       serial: emulator.serial,
       avd: emulator.avd,
       avdRoot: emulator.avdRoot,
-      metroUrl: metro.url,
-      metroPort: metro.port,
-      metroPid: metro.pid,
+      runtime: metro
+        ? { kind: 'dev', metro: { url: metro.url, port: metro.port, pid: metro.pid } }
+        : { kind: 'bundled' },
+      systemImage: ANDROID_IMAGES[application.kind].path,
+      writeRunnerNote: (note, receiptPath) =>
+        writeAndroidRunnerNote({
+          kind: application.kind,
+          adb,
+          cleanupAdb,
+          assertOwned: emulator.assertRunningAndOwned,
+          note,
+          receiptPath,
+        }),
       adb,
       network: new AndroidNetworkChannel(adb),
       reportInfrastructureFailure(error) {
@@ -1017,15 +1247,28 @@ export async function withAndroidEmulatorSession<T>(
       },
       install: (reset, beforeLaunch) =>
         runAndroidInstallAsInfrastructure(
-          () =>
-            installOwnedAndroidApp({
-              adb,
-              reset,
-              apkPath,
-              metroUrl: metro.url,
-              onLifecycle,
-              beforeLaunch,
-            }),
+          async () => {
+            await emulator.assertRunningAndOwned(adb);
+            if (metro) {
+              await installOwnedAndroidApp({
+                adb,
+                reset,
+                apkPath,
+                metroUrl: metro.url,
+                onLifecycle,
+                beforeLaunch,
+              });
+            } else {
+              if (reset !== 'erase')
+                throw new Error('Bundled Android stories require a fresh install');
+              await adb.forceStop();
+              await adb.uninstall();
+              await adb.install(apkPath);
+              await beforeLaunch?.();
+              await emulator.assertRunningAndOwned(adb);
+              await adb.launchApp();
+            }
+          },
           (error) => abort.abort(error)
         ),
     };
@@ -1046,7 +1289,11 @@ export async function withAndroidEmulatorSession<T>(
     for (const [signal, handler] of handlers) signals.off(signal, handler);
   }
 
-  if (interrupted) failure = interrupted;
+  if (interrupted && failure !== interrupted)
+    failure =
+      failure === undefined
+        ? interrupted
+        : new AggregateError([failure, interrupted], 'android run interrupted with failure');
   if (failure !== undefined && cleanupErrors.length)
     throw new AggregateError([failure, ...cleanupErrors], 'android run and cleanup failed');
   if (failure !== undefined) throw failure;

@@ -59,15 +59,25 @@ const appPath = flag('app');
 const onlyState = flag('state');
 const platform = flag('platform') ?? 'ios';
 if (platform === 'android') {
-  if (!storyPath || flags.length !== 2 || flags[0] !== '--platform' || flags[1] !== 'android') {
+  const androidFlags = flags.filter((value) => value !== '--bundled');
+  if (
+    !storyPath ||
+    flags.filter((value) => value === '--bundled').length > 1 ||
+    androidFlags.length !== 2 ||
+    androidFlags[0] !== '--platform' ||
+    androidFlags[1] !== 'android'
+  ) {
     console.error(
-      'Usage: bun e2e/stories/cli.ts <story.json> --platform android (fresh stories only)'
+      'Usage: bun e2e/stories/cli.ts <story.json> --platform android [--bundled] (fresh stories only)'
     );
     process.exit(2);
   }
   const { runAndroidStory } = await import('./android');
   try {
-    const result = await runAndroidStory(storyPath);
+    const result = await runAndroidStory(
+      storyPath,
+      flags.includes('--bundled') ? 'bundled' : 'dev'
+    );
     console.log(`${result.ok ? 'PASS' : 'FAIL'}  Android story: ${result.runDir}`);
     process.exit(result.ok ? 0 : 1);
   } catch (error) {
