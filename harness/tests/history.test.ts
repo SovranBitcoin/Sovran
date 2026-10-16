@@ -1,4 +1,5 @@
 import { expect, test } from 'bun:test';
+import { z } from 'zod';
 import { mkdirSync, readFileSync, writeFileSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { fixture } from './controller.test';
@@ -158,4 +159,13 @@ test('a research brief says a history owner is a file path, which the schema typ
   // Live 2026-10-16: a research worker named the author as owner and the controller refused it.
   const owner = JSON.parse(JSON.stringify(c.brief(t.id).packet.assessmentSchema)).properties.history.items.properties.owner;
   expect(owner.description).toContain('path of the file');
+});
+
+test('implementation and audit schemas state the acceptance rules JSON Schema types cannot', () => {
+  const schema = (role: 'implementation' | 'audit') => JSON.parse(JSON.stringify(z.toJSONSchema(assessmentFor(role)))).properties;
+  const audit = schema('audit'), implementation = schema('implementation');
+  expect(audit.observations.items.properties.requirement.description).toContain('contract.requirements[].id');
+  expect(audit.resolutionReviews.items.properties.proposal.description).toContain('digest');
+  expect(audit.historyReview.description).toContain('per path changed');
+  expect(implementation.resolutionProposals.description).toContain('Exactly one per');
 });

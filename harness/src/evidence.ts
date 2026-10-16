@@ -11,7 +11,7 @@ export const resolutionProposal = z.object({
   evidence: citations, regressionEvidence: citations,
 });
 export const resolutionReview = z.object({
-  obligation: text, proposal: z.string().regex(/^[a-f0-9]{64}$/),
+  obligation: text, proposal: z.string().regex(/^[a-f0-9]{64}$/).describe('The digest from reconciliation.proposals; a pass needs accept for every obligation'),
   decision: z.enum(['accept', 'reject', 'inconclusive']), explanation: text, evidence: citations,
 });
 

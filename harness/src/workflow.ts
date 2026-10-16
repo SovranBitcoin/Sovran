@@ -51,13 +51,15 @@ const receipt = z.object({
 export const assessment = z.object({
   verdict: z.enum(['pass', 'fail', 'inconclusive']),
   summary: text,
-  observations: z.array(z.object({ requirement: text, evidence: text, observation: text })).min(1),
-  findings: z.array(z.object({ id: text, severity: z.enum(['blocking', 'follow-up']), evidence: text, detail: text })),
+  observations: z.array(z.object({
+    requirement: text.describe('An exact contract.requirements[].id; every id needs at least one observation'),
+    evidence: text, observation: text })).min(1),
+  findings: z.array(z.object({ id: text.describe('Unique within this assessment'), severity: z.enum(['blocking', 'follow-up']), evidence: text, detail: text })),
   reuse: z.object({ searched: z.array(text).min(1), used: z.array(text), added: z.array(text), removed: z.array(text) }),
   history: z.array(historyEntry).optional(),
-  historyReview: z.array(historyReview).optional(),
-  oracleReviews: z.array(oracleReview).optional(),
-  resolutionProposals: z.array(resolutionProposal).optional(),
+  historyReview: z.array(historyReview).optional().describe('On a pass, exactly one entry per path changed from base, new files included'),
+  oracleReviews: z.array(oracleReview).optional().describe('Only verificationPolicy node requirements, each once; any verdict other than valid forbids a pass'),
+  resolutionProposals: z.array(resolutionProposal).optional().describe('Exactly one per reconciliation.obligations[].id; an obligation without one blocks the final audit'),
   resolutionReviews: z.array(resolutionReview).optional(),
   inspections: z.array(z.object({ path: text, sha256: hash, observation: text })).default([]),
 });
