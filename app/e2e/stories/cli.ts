@@ -57,6 +57,28 @@ const flag = (name: string) => {
 const udid = flag('udid');
 const appPath = flag('app');
 const onlyState = flag('state');
+const platform = flag('platform') ?? 'ios';
+if (platform === 'android') {
+  if (!storyPath || flags.length !== 2 || flags[0] !== '--platform' || flags[1] !== 'android') {
+    console.error(
+      'Usage: bun e2e/stories/cli.ts <story.json> --platform android (fresh stories only)'
+    );
+    process.exit(2);
+  }
+  const { runAndroidStory } = await import('./android');
+  try {
+    const result = await runAndroidStory(storyPath);
+    console.log(`${result.ok ? 'PASS' : 'FAIL'}  Android story: ${result.runDir}`);
+    process.exit(result.ok ? 0 : 1);
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exit(1);
+  }
+}
+if (platform !== 'ios') {
+  console.error(`Unsupported story platform: ${platform}`);
+  process.exit(2);
+}
 if ((!storyPath && !onlyState) || !udid || !appPath) {
   console.error(
     'Usage: bun e2e/stories/cli.ts <story.json> --udid <simulator> --app <Sovran.app> [--look]\n' +

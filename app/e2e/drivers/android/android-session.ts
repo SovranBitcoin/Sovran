@@ -772,6 +772,8 @@ export async function installOwnedAndroidApp(options: {
   apkPath: string;
   metroUrl: string;
   onLifecycle: (message: string) => void;
+  /** Bind runner evidence to the installed app before its first launch. */
+  beforeLaunch?: () => Promise<void>;
   wait?: (ms: number) => Promise<void>;
 }): Promise<void> {
   const { adb, reset, apkPath, metroUrl, onLifecycle, wait = sleep } = options;
@@ -792,6 +794,7 @@ export async function installOwnedAndroidApp(options: {
     }
     await suppressDevMenuChrome(adb);
   }
+  await options.beforeLaunch?.();
   // Deep-link-first launch: the VIEW intent both starts the app and hands it
   // the bundle URL. A cold dev client can drop the deep link while it is
   // still initializing, which strands it on the dev-launcher home — detect
@@ -861,7 +864,7 @@ interface AndroidEmulatorSession {
   readonly adb: Adb;
   readonly network: NetworkChannel;
   reportInfrastructureFailure(error: Error): void;
-  install(reset: ResetMode): Promise<void>;
+  install(reset: ResetMode, beforeLaunch?: () => Promise<void>): Promise<void>;
 }
 
 interface SignalSource {
@@ -1012,9 +1015,17 @@ export async function withAndroidEmulatorSession<T>(
       reportInfrastructureFailure(error) {
         abort.abort(asAndroidInfrastructureError(error));
       },
-      install: (reset) =>
+      install: (reset, beforeLaunch) =>
         runAndroidInstallAsInfrastructure(
-          () => installOwnedAndroidApp({ adb, reset, apkPath, metroUrl: metro.url, onLifecycle }),
+          () =>
+            installOwnedAndroidApp({
+              adb,
+              reset,
+              apkPath,
+              metroUrl: metro.url,
+              onLifecycle,
+              beforeLaunch,
+            }),
           (error) => abort.abort(error)
         ),
     };

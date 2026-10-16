@@ -353,6 +353,34 @@ function fakeLifecycleAdb(calls: string[]) {
 }
 
 describe('owned Android app lifecycle', () => {
+  it('prepares the installed app once before any launch, including launch recovery', async () => {
+    const calls: string[] = [];
+    const adb = fakeLifecycleAdb(calls);
+    let prepared = 0;
+    let launches = 0;
+    adb.openUrl = async () => {
+      expect(prepared).toBe(1);
+      launches++;
+    };
+    adb.uiautomatorDumpXml = async () =>
+      launches === 1 ? '' : '<node package="com.sovranbitcoin.dev" />';
+    await installOwnedAndroidApp({
+      adb,
+      reset: 'erase',
+      apkPath: '/build/app-debug.apk',
+      metroUrl: 'http://localhost:8081',
+      onLifecycle: () => undefined,
+      wait: async () => undefined,
+      beforeLaunch: async () => {
+        expect(calls).toContain('install:/build/app-debug.apk');
+        expect(calls).toContain('suppress-dev-menu');
+        prepared++;
+      },
+    });
+    expect(launches).toBe(2);
+    expect(prepared).toBe(1);
+  });
+
   for (const reset of ['erase', 'reinstall'] as const) {
     it(`${reset} installs the dev client into an initially empty data image`, async () => {
       const calls: string[] = [];
@@ -385,6 +413,24 @@ describe('owned Android app lifecycle', () => {
     expect(calls).not.toContain('uninstall');
     expect(calls.some((call) => call.startsWith('install:'))).toBe(false);
     expect(calls[0]).toBe('forceStop');
+  });
+
+  it('does not launch when installed-app preparation fails', async () => {
+    const calls: string[] = [];
+    await expect(
+      installOwnedAndroidApp({
+        adb: fakeLifecycleAdb(calls),
+        reset: 'erase',
+        apkPath: '/build/app-debug.apk',
+        metroUrl: 'http://localhost:8081',
+        onLifecycle: () => undefined,
+        wait: async () => undefined,
+        beforeLaunch: async () => {
+          throw new Error('installed payload mismatch');
+        },
+      })
+    ).rejects.toThrow('installed payload mismatch');
+    expect(calls).not.toContain('openUrl');
   });
 
   it('promotes install loss to a terminal infrastructure failure', async () => {

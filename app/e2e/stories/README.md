@@ -12,6 +12,15 @@ bun run e2e:story e2e/stories/library/<story>.json --udid <simulator> --app e2e/
 Open the shared history with `bun run e2e:viewer`. [Results ownership](../README.md) explains
 where generated evidence belongs and how to group older output.
 
+For a fresh Android story, use `bun run e2e:story e2e/stories/library/<story>.json --platform android`.
+It uses the current stamped development APK and owns a disposable emulator and Metro server;
+build the APK first with `bun run screenshots:native-build android`. Saved states, handed/given
+inputs, deep links and permission overrides are not supported in this lane yet. It keeps the
+same story report, screenshots and received logs, plus the installed APK comparison and session
+receipt. Cleanup and source drift can fail an otherwise passing story. This is functional
+development-build evidence: toast/triple-tap timing is extended, location is pregranted, and video, pixel-motion and
+device performance measurements are absent. It does not satisfy the controller's native gate.
+
 Each play has its own session identity, checked against the app's hello before accepting
 logs or sending requests. A profile restart may reconnect to that same session. The attempt
 keeps the hello and all received log entries, including those outside step windows; this
