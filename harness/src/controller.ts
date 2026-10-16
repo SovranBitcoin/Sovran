@@ -95,6 +95,7 @@ export class Controller {
     return this.change(id, `submit:${ticketId}`, { worker, result }, t => {
       this.live(t);
       if (t.ticket?.id !== ticketId || t.ticket.claim?.worker !== worker) throw new Error('Unclaimed or stale ticket');
+      if (t.pending.kind !== 'none') throw new Error('Wait for the outstanding command before submitting');
       const role = t.ticket.role;
       if (role !== 'implementation' && result.verdict !== 'inconclusive') this.current(t);
       if (role === 'audit' && !t.contract.auditChecks.every(c => t.receipts.some(r => r.id === c.id && r.source === t.source && r.outcome === 'pass')))
@@ -191,6 +192,7 @@ export class Controller {
       if (!(error instanceof Error && 'code' in error && error.code === 'ESRCH')) throw error;
     }
     return this.change(id, `reconcile:${before.generation}:${before.pending.id}`, {}, t => {
+      if (t.generation !== before.generation || JSON.stringify(t.pending) !== JSON.stringify(before.pending)) throw new Error('Stale process reconciliation');
       if (t.ticket) throw new Error('A worker still owns this task');
       const next: Task = { ...t, pending: { kind: 'none' }, reason: 'Interrupted check process group is gone; available logs retained, outcome unproven' };
       return ['incomplete', 'cancelled'].includes(t.phase) ? next : move(next, 'STOP');
@@ -204,9 +206,7 @@ export class Controller {
       if (!t.publication) throw new Error('Missing publication intent');
       const result = this.publisher.publish(t.publication, false);
       if (result.status === 'unknown') return { ...t, reason: result.reason };
-      return this.change(id, `published:${t.generation}`, { pr: result.pr.number }, v => ({
-        ...move(v, 'ACCEPT'), pending: { kind: 'none' }, pr: { url: result.pr.url, head: result.pr.headRefOid, number: result.pr.number },
-      }));
+      return this.published(t, { url: result.pr.url, head: result.pr.headRefOid, number: result.pr.number });
     }
     if (t.phase !== 'publishable') throw new Error('All local gates must pass before publication');
     if (t.contract.publish.kind !== 'pull-request') throw new Error('Publication was not authorized at intake');
@@ -226,18 +226,35 @@ export class Controller {
     t = task.parse(claim.value);
     const result = this.publisher.publish(plan, true);
     if (result.status === 'unknown') return { ...t, reason: result.reason };
-    return this.change(id, `published:${t.generation}`, { pr: result.pr.number }, v => ({
-      ...move(v, 'ACCEPT'), pending: { kind: 'none' }, pr: { url: result.pr.url, head: result.pr.headRefOid, number: result.pr.number },
-    }));
+    return this.published(t, { url: result.pr.url, head: result.pr.headRefOid, number: result.pr.number });
+  }
+
+  private published(before: Task, pr: NonNullable<Task['pr']>) {
+    return this.change(before.id, `published:${before.generation}`, { pr }, t => {
+      if (t.generation !== before.generation || t.pending.kind !== 'publish' || t.pending.head !== pr.head ||
+        t.publication?.head !== before.publication?.head) throw new Error('Stale publication result');
+      const next: Task = { ...t, pending: { kind: 'none' }, pr };
+      if (['incomplete', 'cancelled'].includes(t.phase)) return next;
+      if (t.phase !== 'publishing') throw new Error('Publication phase changed');
+      return move(next, 'ACCEPT');
+    });
   }
 
   checkCI(id: string) {
     const t = this.read(id); this.current(t);
     if (t.phase !== 'ci' || !t.publication || !t.pr) throw new Error('No published task waiting for CI');
     const result = this.publisher.check(t.publication, t.pr.number);
-    if (result.status === 'failed') return this.repair(id, result.reason);
-    if (result.status !== 'ready') return { ...t, reason: result.reason };
-    return this.change(id, `ready:${t.generation}`, { head: t.pr.head }, v => { this.current(v); return move(v, 'ACCEPT'); });
+    return this.change(id, `ci:${t.generation}:${digest(JSON.stringify(result))}`, result, v => {
+      this.current(v);
+      if (v.generation !== t.generation || v.phase !== 'ci' || v.source !== t.source ||
+        v.publication?.head !== t.publication?.head || v.pr?.head !== t.pr?.head || v.pr?.number !== t.pr?.number)
+        throw new Error('Stale CI result; keep the current task generation');
+      if (result.status === 'waiting') return { ...v, reason: result.reason };
+      const artifact = this.save(v, `ci-${digest(JSON.stringify(result))}.json`, result);
+      const next: Task = { ...v, receipts: [...v.receipts, { id: 'harness:ci', source: z.string().parse(v.source),
+        artifacts: [artifact], outcome: result.status === 'ready' ? 'pass' : 'fail', summary: result.reason }] };
+      return result.status === 'failed' ? this.repairTask(next, result.reason) : move(next, 'ACCEPT');
+    });
   }
 
   save(t: Task, name: string, value: unknown) {
@@ -321,6 +338,7 @@ export class Controller {
       return this.stop(id, `native-evidence:${t.generation}`, 'Functional native/performance results are not yet bound to an installed binary on both platforms. See docs/follow-ups/F156.md');
     return this.change(id, `verified:${t.generation}`, {}, v => {
       this.current(v);
+      if (v.generation !== t.generation || v.phase !== 'verifying') throw new Error('Stale verification result');
       if (!commands.every(c => v.receipts.some(r => r.id === c.id && r.outcome === 'pass' && r.source === v.source))) throw new Error('Missing verification');
       return move(v, 'ACCEPT');
     });

@@ -83,7 +83,7 @@ test('unknown mergeability and a mismatched task owner cannot be accepted', () =
   expect(f.read().creates).toBe(1);
 });
 
-test('controller repairs failed CI and updates only its own existing PR', async () => {
+test.each(['failed CI', 'concurrent repair'] as const)('controller handles %s and updates only its own existing PR', async (trigger) => {
   const f = fixture(); git(f.root, ['reset', '--hard', f.plan.baseHead]);
   const c = new Controller(join(f.dir, 'journal'), f.publisher);
   const spec: Contract = { problem: 'Preserve the wallet state', requirements: [{ id: 'preserve', outcome: 'app text records the change' }],
@@ -114,8 +114,24 @@ test('controller repairs failed CI and updates only its own existing PR', async 
       f.change(s => { s.plan.head = git(f.root, ['rev-parse', 'HEAD']); if (s.pr) s.pr.headRefOid = s.plan.head; });
       t = await qualify(t); t = c.publish(t.id);
       expect(t.phase).toBe('ci');
-      f.change(s => { s.checks[0].bucket = value === 'first change' ? 'fail' : 'pass'; });
-      t = c.checkCI(t.id);
+      f.change(s => { s.checks[0].bucket = value === 'first change' && trigger === 'failed CI' ? 'fail' : 'pass'; });
+      if (value === 'first change' && trigger === 'concurrent repair') {
+        const other = new Controller(join(f.dir, 'journal'), f.publisher);
+        const check = f.publisher.check.bind(f.publisher);
+        f.publisher.check = (plan, number) => {
+          const result = check(plan, number);
+          other.repair(t.id, 'Repair began while GitHub checks were being read');
+          return result;
+        };
+        try {
+          expect(() => c.checkCI(t.id)).toThrow('Stale CI result');
+          t = c.read(t.id);
+          expect(t.generation).toBe(1);
+        } finally { f.publisher.check = check; other.close(); }
+      } else {
+        t = c.checkCI(t.id);
+        if (value === 'first change') expect(t.history.some(r => r.id === 'harness:ci' && r.outcome === 'fail')).toBe(true);
+      }
       expect(t.phase).toBe(value === 'first change' ? 'implementing' : 'ready');
     }
     expect(f.read().creates).toBe(1);
