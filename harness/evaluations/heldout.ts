@@ -6,10 +6,12 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join } from 'node:path';
 
-const REPO = resolve(import.meta.dir, '../..');
-const show = (commit: string, path: string) => execFileSync('git', ['-C', REPO, 'show', `${commit}:${path}`], { encoding: 'utf8' });
+// Case sources are copied out of history so a shallow CI clone can build every case.
+// 3f2e37df1 exists only on PR #289's branch. Refresh with `git show <commit>:<path>`.
+export const source = (commit: string, path: string) =>
+  readFileSync(join(import.meta.dir, 'sources', commit.slice(0, 9), `${path.split('/').at(-1)}.txt`), 'utf8');
 const git = (cwd: string, ...args: string[]) => execFileSync('git', ['-c', 'user.name=Eval', '-c', 'user.email=eval@example.invalid', ...args], { cwd, encoding: 'utf8' });
 const write = (root: string, files: Record<string, string>) => {
   for (const [path, text] of Object.entries(files)) {
@@ -74,7 +76,7 @@ function reviewWorkspace(dir: string, base: Record<string, string>, candidate: R
   write(dir, candidate); git(dir, 'add', '-A'); git(dir, 'commit', '-qm', message);
 }
 const AT_PILOT = '3f2e37df16ef950fde75af8a2f2ee9031e088bea';
-const pilotFiles = () => ({ 'scripts/followups.mjs': show(AT_PILOT, 'scripts/followups.mjs'), 'scripts/followups.test.mjs': show(AT_PILOT, 'scripts/followups.test.mjs') });
+const pilotFiles = () => ({ 'scripts/followups.mjs': source(AT_PILOT, 'scripts/followups.mjs'), 'scripts/followups.test.mjs': source(AT_PILOT, 'scripts/followups.test.mjs') });
 const replaceOnce = (text: string, from: string, to: string) => {
   if (text.split(from).length !== 2) throw new Error(`Case source changed: ${from.slice(0, 40)}`);
   return text.replace(from, to);
@@ -84,7 +86,7 @@ export const cases: Case[] = [
   {
     id: 'untitled-entry', kind: 'implementation', source: 'a8940a9e8 (bug), edca4842b (recorded fix)',
     task: 'In this repository, `node scripts/followups.mjs check` crashes with a stack trace when a follow-up entry has no title, before any problem is printed. Make check report such an entry by name like its other entry problems, and keep every other behaviour of the script unchanged.',
-    prepare: dir => { git(dir, 'init', '-q'); write(dir, { 'scripts/followups.mjs': show('a8940a9e8', 'scripts/followups.mjs'), 'docs/follow-ups/README.md': README, 'docs/follow-ups/F12.md': entry('F12', 'Something is left') }); git(dir, 'add', '-A'); git(dir, 'commit', '-qm', 'Follow-up checker'); },
+    prepare: dir => { git(dir, 'init', '-q'); write(dir, { 'scripts/followups.mjs': source('a8940a9e8', 'scripts/followups.mjs'), 'docs/follow-ups/README.md': README, 'docs/follow-ups/F12.md': entry('F12', 'Something is left') }); git(dir, 'add', '-A'); git(dir, 'commit', '-qm', 'Follow-up checker'); },
     grade: ({ dir }) => gradeUntitled(readFileSync(join(dir, 'scripts/followups.mjs'), 'utf8')),
   },
   {
@@ -121,7 +123,7 @@ export const cases: Case[] = [
     id: 'clean-fix', kind: 'review', source: 'PR #289 (bfd1b42..3f2e37df1)',
     task: 'Review the last commit (git show HEAD) against its stated goal. Decide pass or fail.',
     prepare: dir => {
-      const base = { 'scripts/followups.mjs': show('bfd1b42', 'scripts/followups.mjs'), 'scripts/followups.test.mjs': show('bfd1b42', 'scripts/followups.test.mjs') };
+      const base = { 'scripts/followups.mjs': source('bfd1b42', 'scripts/followups.mjs'), 'scripts/followups.test.mjs': source('bfd1b42', 'scripts/followups.test.mjs') };
       reviewWorkspace(dir, base, pilotFiles(), 'Read git\'s file list NUL-separated\n\nGit quotes a name holding a tab, a newline or a non-ASCII byte, so newline splitting hid those files from the check. Use -z and split on NUL; add tracked and untracked cases for each.');
     },
     grade: ({ assessment }) => {

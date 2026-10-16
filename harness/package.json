@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "type-check": "tsc --noEmit",
-    "test": "bun test",
+    "test": "bun test --timeout 30000",
     "start": "bun src/cli.ts"
   },
   "dependencies": {

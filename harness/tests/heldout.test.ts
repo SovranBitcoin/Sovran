@@ -2,11 +2,9 @@ import { expect, test } from 'bun:test';
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
-import { caseById, cases, type Assessment } from '../evaluations/heldout';
+import { join } from 'node:path';
+import { caseById, cases, source, type Assessment } from '../evaluations/heldout';
 
-const REPO = resolve(import.meta.dir, '../..');
-const show = (commit: string, path: string) => execFileSync('git', ['-C', REPO, 'show', `${commit}:${path}`], { encoding: 'utf8' });
 const gradeScript = (script: string) => {
   const dir = mkdtempSync(join(tmpdir(), 'heldout-grade-'));
   try {
@@ -17,7 +15,7 @@ const gradeScript = (script: string) => {
 };
 
 test('the untitled-entry grader rejects the original bug and a swallowed crash, and accepts valid fixes', async () => {
-  const original = show('a8940a9e8', 'scripts/followups.mjs');
+  const original = source('a8940a9e8', 'scripts/followups.mjs');
   expect(gradeScript(original).pass).toBe(false);
   // The recorded fix uses later conventions; port only its title guard to this version.
   const recorded = original.replace('${e.title.replaceAll("|", "\\\\|")}', '${(e.title ?? "").replaceAll("|", "\\\\|")}');
