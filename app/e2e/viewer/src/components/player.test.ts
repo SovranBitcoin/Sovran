@@ -27,7 +27,7 @@ test('story steps expose measured delays and escaped warnings beside their resul
   expect(row).toContain('125 ms');
   expect(row).toContain('screen moved 30 ms more');
   expect(row).toContain('app unresponsive for 500 ms');
-  expect(row).toContain('first touch not taken; touch repeated');
+  expect(row).toContain('touch repeated; first effect unknown');
   expect(row).toContain('warn: &lt;script&gt;unsafe&lt;/script&gt;');
   expect(row).not.toContain('<script>');
 });

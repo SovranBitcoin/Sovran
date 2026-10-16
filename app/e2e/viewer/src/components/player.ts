@@ -185,7 +185,7 @@ export function renderStepRow(frame: ReelFrame, index: number): string {
         measured.appUnresponsiveMs !== undefined
           ? `app unresponsive for ${measured.appUnresponsiveMs} ms`
           : '',
-        measured.touchMadeAgain ? 'first touch not taken; touch repeated' : '',
+        measured.touchMadeAgain ? 'touch repeated; first effect unknown' : '',
         ...measured.warnings.map((warning) => `${warning.level}: ${warning.event}`),
       ]
         .filter(Boolean)

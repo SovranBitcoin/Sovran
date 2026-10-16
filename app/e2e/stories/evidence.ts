@@ -61,8 +61,6 @@ const SAMPLE_EVERY_MS = 8;
 interface ScreenWatch {
   /** The picture on the simulator's screen has just changed. */
   changed(): void;
-  /** Whether the picture has changed at all since a moment on the watch's clock. */
-  changedSince(moment: number): boolean;
   /** Resolves once the picture on screen has not changed for `stillForMs` (100 ms unless said). */
   pixelsStill(stillForMs?: number, giveUpAfterMs?: number): Promise<ScreenMotion>;
 }
@@ -84,7 +82,6 @@ export function createScreenWatch(io: {
     changed() {
       changedAt = io.now();
     },
-    changedSince: (moment) => changedAt > moment,
     async pixelsStill(stillForMs = STILL_FOR_MS, giveUpAfterMs = MOVING_CAP_MS) {
       const started = io.now();
       for (;;) {

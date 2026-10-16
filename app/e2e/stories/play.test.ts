@@ -321,14 +321,14 @@ describe('playStory', () => {
     expect(result.steps[0].failure).toMatch(/hand/);
   });
 
-  test('a touch that reached nothing is made again, once', async () => {
+  test('missing touch feedback fails the expectation without issuing the action again', async () => {
     const app = fakeApp(screenOf(box({ id: 'receive-method-paste' })));
     let touches = 0;
     const device = {
       ...noSwipe,
       tap: async () => {
         touches += 1;
-        // The first lands on a sheet that is not taking touches yet.
+        // A second action could appear to fix the test while duplicating an unseen effect.
         if (touches === 2) app.state.screen = screenOf(box({ id: 'receive-token-redeem' }));
       },
     };
@@ -341,6 +341,7 @@ describe('playStory', () => {
       story([
         {
           name: 'paste',
+          withinMs: 100,
           tap: { id: 'receive-method-paste' },
           expect: [{ visible: { id: 'receive-token-redeem' } }],
         },
@@ -350,9 +351,23 @@ describe('playStory', () => {
       pixels
     );
 
+    expect(result.ok).toBe(false);
+    expect(touches).toBe(1);
+    expect(result.steps[0].failure).toContain('receive-token-redeem');
+  });
+
+  test('an action with an unchanged screen and missing log still happens only once', async () => {
+    const app = fakeApp(screenOf(box({ id: 'publish' })));
+    let publications = 0;
+    const pixels = { pixelsStill: async () => ({ movedForMs: 0, stillMoving: false }), changedSince: () => false };
+    const result = await playStory(
+      story([{ name: 'publish', tap: { id: 'publish' }, expect: [{ visible: { id: 'publish' } }] }]),
+      app.link,
+      { ...noSwipe, tap: async () => { publications += 1; } },
+      pixels
+    );
     expect(result.ok).toBe(true);
-    expect(touches).toBe(2);
-    expect(result.steps[0].touchMadeAgain).toBe(true);
+    expect(publications).toBe(1);
   });
 
   test('a touch that changed the screen is not made again', async () => {

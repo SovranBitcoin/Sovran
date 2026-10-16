@@ -167,14 +167,13 @@ const play = async (
       const busy = step.appUnresponsiveMs
         ? `, app unresponsive for ${step.appUnresponsiveMs} ms`
         : '';
-      const again = step.touchMadeAgain ? ', first touch not taken' : '';
       const moved = step.screenKeptMoving
         ? ', screen never stopped moving'
         : step.screenMovedMs
           ? `, screen moved for ${step.screenMovedMs} ms after`
           : '';
       console.log(
-        `  ${step.ok ? 'ok  ' : 'FAIL'} ${index + 1}. ${step.name}  ${step.wallMs} ms${moved}${busy}${again}${shown.length ? `  (${shown.join(', ')})` : ''}`
+        `  ${step.ok ? 'ok  ' : 'FAIL'} ${index + 1}. ${step.name}  ${step.wallMs} ms${moved}${busy}${shown.length ? `  (${shown.join(', ')})` : ''}`
       );
       if (step.failure) console.log(`       ${step.failure}`);
     }

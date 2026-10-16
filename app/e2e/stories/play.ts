@@ -13,8 +13,6 @@ type Element = AppScreen['elements'][number];
 
 /** A control that is about to be tapped and is not there is looked for again for this long. */
 const APPEARS_WITHIN_MS = 2500;
-/** A touch that was taken shows, in the app's log or on the screen, within this long. */
-const TOUCH_SHOWS_WITHIN_MS = 700;
 /**
  * Looking for what iOS drew is given this long however short the step: one look
  * takes a second or more with several simulators running, and the first can
@@ -44,8 +42,6 @@ interface PixelWatch {
     stillForMs?: number,
     giveUpAfterMs?: number
   ): Promise<{ movedForMs: number; stillMoving: boolean }>;
-  /** Whether the picture has changed at all since a moment of `performance.now()`. */
-  changedSince?(moment: number): boolean;
 }
 
 /** Makes what a step says the person is handed (`handed`), by the name a later step uses it under. */
@@ -83,8 +79,6 @@ interface StepResult {
   screenMovedMs?: number;
   /** True when the screen never stopped changing: something on it animates for ever. */
   screenKeptMoving?: true;
-  /** True when the first touch reached nothing (no touch seen, no pixel changed) and was made again. */
-  touchMadeAgain?: true;
   /** The longest the app took to answer the runner, when long enough that a person would feel it. */
   appUnresponsiveMs?: number;
   /** The entries the app logged during the step. */
@@ -192,7 +186,6 @@ async function playStep(
   const from = link.entries.indexOf(mark) + 1;
   const deadline = startedWall + step.withinMs;
   let motion: { movedForMs: number; stillMoving: boolean } | undefined;
-  let touchNotTaken = false;
   // The app answers from its JavaScript thread, so a slow answer is that thread
   // busy with something else. It is given until the step's deadline, and the
   // longest it kept the runner waiting is reported.
@@ -213,7 +206,6 @@ async function playStep(
       ...(motion ? { screenMovedMs: motion.movedForMs } : {}),
       ...(motion?.stillMoving ? { screenKeptMoving: true as const } : {}),
       ...(slowestAnswerMs >= SLOW_ANSWER_MS ? { appUnresponsiveMs: slowestAnswerMs } : {}),
-      ...(touchNotTaken ? { touchMadeAgain: true as const } : {}),
       startedAtAppMs: mark._t,
       endedAtAppMs: entries.at(-1)?._t ?? mark._t,
       wallMs: Math.round(performance.now() - startedWall),
@@ -290,29 +282,9 @@ async function playStep(
         : outside
           ? [outside.x + outside.width * across, outside.y + outside.height * down]
           : [0, 0];
-      const touchedAt = performance.now();
       await device.tap(...at);
-      // A touch can be lost outright: a sheet that has only just opened takes
-      // none for a moment, however still it looks. If the app saw no touch and
-      // not one pixel changed, nothing was done, and the touch is made again.
-      // This is not trying an action twice: the first did not happen.
-      if (pixels?.changedSince) {
-        // A step that expects the app to log the touch has said the control is the
-        // app's own, so the log alone decides: a page that never holds still (a
-        // sheet with something animating on it) makes the pixels useless here.
-        const appLogsIt = step.expect.some(
-          (expectation) => 'logged' in expectation && expectation.logged === 'ui.touch'
-        );
-        const taken = () =>
-          link.entries.slice(from).some((entry) => entry.event === 'ui.touch') ||
-          (!appLogsIt && pixels.changedSince?.(touchedAt) === true);
-        while (!taken() && performance.now() - touchedAt < TOUCH_SHOWS_WITHIN_MS)
-          await new Promise((resolve) => setTimeout(resolve, 20));
-        if (!taken()) {
-          touchNotTaken = true;
-          await device.tap(...at);
-        }
-      }
+      // Missing feedback cannot establish that an effect did not happen.
+      // Observe the expected state below; never repeat the action to obtain it.
     }
     if (step.swipe) {
       const { screen, found: target } = await lookFor(step.swipe.on);
