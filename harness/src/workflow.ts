@@ -31,6 +31,8 @@ export const contract = z.object({
   ] satisfies [string, string[]][]) {
     if (new Set(ids).size !== ids.length) ctx.addIssue({ code: 'custom', message: `Duplicate ${name}` });
   }
+  if ([...value.checks, ...value.auditChecks].some(c => c.id.startsWith('harness:')))
+    ctx.addIssue({ code: 'custom', message: 'harness: check ids are reserved for controller gates' });
   if (value.models.implementation.provider === value.models.review.provider)
     ctx.addIssue({ code: 'custom', message: 'Implementation and independent review must use different providers' });
 });

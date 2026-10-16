@@ -4,6 +4,8 @@ import { join, relative, resolve } from 'node:path';
 import { z } from 'zod';
 import { Journal } from './journal';
 import { runCommand } from './command';
+import { inspectChange } from './policy';
+import { inspectUpgradeEvidence, upgradeInventorySchema } from './upgrade';
 import { assessment, contract, move, roleFor, task, type Task } from './workflow';
 import { digest, fileEvidence, fingerprint, git, within } from './workspace';
 
@@ -17,10 +19,11 @@ export class Controller {
   read(id: string) { return task.parse(this.journal.read(id).value); }
 
   create(root: string, input: unknown) {
-    root = realpathSync(root);
+    root = realpathSync(git(realpathSync(root), ['rev-parse', '--show-toplevel']));
     if (!relative(root, resolve(this.stateDir)).startsWith('..'))
       throw new Error('Task state must live outside the source workspace');
     const spec = contract.parse(input);
+    if (git(root, ['status', '--porcelain'])) throw new Error('Start from a clean checkout or a dedicated worktree');
     if (Date.parse(spec.limits.deadline) <= Date.now()) throw new Error('Task deadline already elapsed');
     const context = spec.contextFiles.map(path => fileEvidence(root, path));
     const id = randomUUID();
@@ -30,6 +33,9 @@ export class Controller {
       policy: digest(JSON.stringify({ spec, context })), context, ticket: null,
       receipts: [], assessments: [], pending: { kind: 'none' }, reason: '', pr: null,
     };
+    const policy = inspectChange(root, value.base, spec);
+    if (policy.problems.length) throw new Error(policy.problems.join('\n'));
+    this.save(value, 'intake-context.json', context.map(item => ({ ...item, content: readFileSync(within(root, item.path), 'utf8') })));
     this.journal.create(id, value);
     return this.read(id);
   }
@@ -84,6 +90,10 @@ export class Controller {
       if (role === 'audit' && !t.contract.auditChecks.every(c => t.receipts.some(r => r.id === c.id && r.source === t.source && r.outcome === 'pass')))
         throw new Error('Run every audit retrieval/check before submitting judgment');
       const source = fingerprint(t.root);
+      if (role === 'implementation' && result.verdict === 'pass') {
+        const policy = inspectChange(t.root, t.base, t.contract);
+        if (policy.problems.length) throw new Error(policy.problems.join('\n'));
+      }
       const missing = t.contract.requirements.filter(r => !result.observations.some(o => o.requirement === r.id));
       if (missing.length) throw new Error(`Missing requirement observations: ${missing.map(r => r.id).join(', ')}`);
       if (result.verdict === 'pass' && result.findings.some(f => f.severity === 'blocking'))
@@ -151,7 +161,13 @@ export class Controller {
     this.current(t);
     if (t.phase !== (audit ? 'auditing' : 'verifying')) throw new Error('Wrong verification phase');
     if (t.pending.kind !== 'none') throw new Error('Previous command outcome unknown; reconcile before retrying');
-    const commands = audit ? t.contract.auditChecks : t.contract.checks;
+    const directory = join(this.stateDir, t.id);
+    const upgradePath = join(directory, `${t.generation}-upgrade.json`);
+    const needsUpgrade = inspectChange(t.root, t.base, t.contract).risks.includes('persistence');
+    const commands = audit ? t.contract.auditChecks : [...t.contract.checks, ...(needsUpgrade ? [
+      { id: 'harness:upgrade-inventory', argv: ['bun', join(import.meta.dir, 'discover-upgrade.ts'), t.root], cwd: '.', timeoutMs: 60_000 },
+      { id: 'harness:upgrade', argv: ['bun', 'run', 'test:upgrade', '--json', `--outputFile=${upgradePath}`], cwd: 'app', timeoutMs: 600_000 },
+    ] : [])];
     for (const check of commands) {
       if (t.receipts.some(r => r.id === check.id && r.source === t.source && r.outcome === 'pass')) continue;
       // Deterministic launch errors must not reserve an effect that never started.
@@ -172,23 +188,38 @@ export class Controller {
         Math.max(1, Math.min(check.timeoutMs, Date.parse(t.contract.limits.deadline) - Date.now())));
       const logArtifact = { path: log, sha256: digest(readFileSync(join(dir, log))) };
       const stderrArtifact = { path: `${log}.stderr`, sha256: digest(readFileSync(join(dir, `${log}.stderr`))) };
-      t = this.change(id, `result:${t.generation}:${check.id}`, { exit, logArtifact, stderrArtifact }, v => {
+      const artifacts = [logArtifact, stderrArtifact];
+      let outcome: 'pass' | 'fail' | 'inconclusive' = exit === 0 ? 'pass' : 'fail';
+      let summary = `${reason}: ${check.argv.join(' ')}`;
+      if (check.id === 'harness:upgrade' && exit === 0) {
+        try {
+          const inventoryPath = join(dir, `${t.generation}-${digest('harness:upgrade-inventory')}.log`);
+          const inventory = upgradeInventorySchema.parse(JSON.parse(readFileSync(inventoryPath, 'utf8')));
+          if (inventory.sourceFingerprint !== t.source) throw new Error('Upgrade inventory is stale');
+          const inspected = inspectUpgradeEvidence(JSON.parse(readFileSync(upgradePath, 'utf8')), inventory);
+          artifacts.push(fileEvidence(dir, `${t.generation}-upgrade.json`), this.save(t, 'upgrade-inspection.json', inspected));
+          outcome = inspected.status;
+          summary = inspected.status === 'pass' ? 'Recorded historical fixture checks passed; this is bounded unit evidence' : inspected.reasons.join('\n');
+        } catch (error) { outcome = 'inconclusive'; summary = `Upgrade evidence unavailable: ${String(error)}`; }
+      }
+      t = this.change(id, `result:${t.generation}:${check.id}`, { exit, artifacts, outcome, summary }, v => {
         if (v.pending.kind !== 'command' || v.pending.id !== check.id) throw new Error('Command ownership lost');
         const source = z.string().parse(v.source);
         const changed = fingerprint(v.root) !== source;
-        const next: Task = { ...v, pending: { kind: 'none' }, receipts: [...v.receipts, { id: check.id, source, artifacts: [logArtifact, stderrArtifact], outcome: changed ? 'inconclusive' : exit === 0 ? 'pass' : 'fail', summary: `${reason}: ${check.argv.join(' ')}` }] };
+        const next: Task = { ...v, pending: { kind: 'none' }, receipts: [...v.receipts, { id: check.id, source, artifacts, outcome: changed ? 'inconclusive' : outcome, summary }] };
         if (['incomplete', 'cancelled'].includes(v.phase)) return next;
         if (Date.parse(v.contract.limits.deadline) <= Date.now()) return { ...move(next, 'STOP'), reason: 'Task deadline exhausted during verification' };
         if (changed) return { ...move(next, 'STOP'), reason: 'Candidate changed during verification; logs retained, result is inconclusive' };
+        if (outcome === 'inconclusive') return { ...move(next, 'STOP'), reason: summary };
         return next;
       });
       if (['incomplete', 'cancelled'].includes(t.phase)) return t;
-      if (exit !== 0) return this.repair(id, `Check failed: ${check.id}`);
+      if (outcome === 'fail') return this.repair(id, `Check failed: ${check.id}`);
     }
     if (audit) return t; // Retrieval is evidence; an independent audit ticket supplies judgment.
     return this.change(id, `verified:${t.generation}`, {}, v => {
       this.current(v);
-      if (!v.contract.checks.every(c => v.receipts.some(r => r.id === c.id && r.outcome === 'pass' && r.source === v.source))) throw new Error('Missing verification');
+      if (!commands.every(c => v.receipts.some(r => r.id === c.id && r.outcome === 'pass' && r.source === v.source))) throw new Error('Missing verification');
       return move(v, 'ACCEPT');
     });
   }

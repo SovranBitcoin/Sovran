@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from 'bun:test';
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Controller } from '../src/controller';
@@ -132,4 +132,28 @@ test('simultaneous verification admits one command owner across controller conne
     expect(await Bun.file(effect).text()).toBe('executed\n');
     expect(c.read(t.id).receipts).toHaveLength(1);
   } finally { other.close(); }
+});
+
+test('implementation cannot silently expand its sealed scope', () => {
+  const { controller: c, root, spec } = fixture();
+  let t = finish(c, c.create(root, spec)); t = c.seal(t.id, t.policy);
+  writeFileSync(join(root, 'unrequested.txt'), 'extra work');
+  expect(() => finish(c, t)).toThrow('Outside sealed scope');
+});
+
+test('a subdirectory cannot bypass workspace ownership', () => {
+  const { controller: c, root, spec } = fixture();
+  mkdirSync(join(root, 'child'));
+  c.create(root, spec);
+  expect(() => c.create(join(root, 'child'), spec)).toThrow('UNIQUE constraint');
+});
+
+test('a dependency version change requires its exact intake allowance', () => {
+  const { controller: c, root, spec } = fixture();
+  writeFileSync(join(root, 'package.json'), JSON.stringify({ dependencies: { existing: '1.0.0' } }));
+  git(root, ['add', '.']); git(root, ['commit', '-qm', 'existing dependency']);
+  spec.scope.push('package.json');
+  let t = finish(c, c.create(root, spec)); t = c.seal(t.id, t.policy);
+  writeFileSync(join(root, 'package.json'), JSON.stringify({ dependencies: { existing: '2.0.0' } }));
+  expect(() => finish(c, t)).toThrow('existing@2.0.0');
 });
