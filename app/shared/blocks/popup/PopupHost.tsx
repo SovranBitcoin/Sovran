@@ -50,7 +50,6 @@ import { ActionMenuSheetContent } from '@/shared/lib/popup/popups/actionMenuShee
 import { markE2EActionMenuPresented } from '@/shared/lib/popup/E2EActionMenuProbe';
 import { OPEN_WATCHDOG_MS } from '@/shared/lib/popup/openWatchdog';
 import { E2EStaticToastRenderMarker } from '@/shared/lib/popup/E2EToastProbe';
-import { PaymentOptionsContent } from '@/shared/lib/popup/popups/paymentOptionsSheet';
 import { SendFallbackContent } from '@/shared/lib/popup/popups/sendFallbackSheet';
 import { NfcTapContent } from '@/shared/lib/popup/popups/nfcTapSheet';
 import { ProofSelectorContent } from '@/shared/lib/popup/popups/proofSelectorSheet';
@@ -264,15 +263,6 @@ type CustomSheetRenderer = React.ComponentType<CustomSheetContentProps>;
 // for everything else, prefer `actionMenuPopup`.
 const CUSTOM_SHEET_CONTENT: Record<keyof ActionSheetPayloads, CustomSheetRenderer> = {
   'action-menu': ActionMenuSheetContent as CustomSheetRenderer,
-  // `payment-options` and `payment-fallback` share one renderer; the
-  // `isFallback` prop decides title + per-row red-wash. Wrapping keeps the
-  // registry's `Record<keyof ActionSheetPayloads, ...>` shape intact.
-  'payment-options': ((props: CustomSheetContentProps<ActionSheetPayloads['payment-options']>) => (
-    <PaymentOptionsContent {...props} isFallback={false} />
-  )) as CustomSheetRenderer,
-  'payment-fallback': ((
-    props: CustomSheetContentProps<ActionSheetPayloads['payment-fallback']>
-  ) => <PaymentOptionsContent {...props} isFallback={true} />) as CustomSheetRenderer,
   'send-fallback': SendFallbackContent as CustomSheetRenderer,
   'proof-selector': ProofSelectorContent as CustomSheetRenderer,
   'send-memo': SendMemoContent as CustomSheetRenderer,
@@ -967,7 +957,7 @@ function SheetPopup() {
             // Custom sheets render the same chrome as `ActionMenuHost`
             // (`<Menu presentation="bottom-sheet">`), which uses `bg-overlay` for
             // its content background. Match it here so surfaces routed through
-            // PopupHost (e.g. emoji picker, payment-options — both need
+            // PopupHost (the send memo, the signer sheets — all need
             // FullWindowOverlay above route modals) are visually
             // indistinguishable from menu-lane surfaces.
             backgroundClassName={isCustom ? 'bg-overlay' : 'bg-surface rounded-[32px]'}

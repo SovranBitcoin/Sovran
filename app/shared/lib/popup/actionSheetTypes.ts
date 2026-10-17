@@ -1,4 +1,4 @@
-import type { AnnotatedOption, PaymentMachine, StepDataMap } from 'wallet';
+import type { PaymentMachine, StepDataMap } from 'wallet';
 
 import type { ParsedNostrConnectUri } from '@/features/nostrSigner';
 import type { ActionMenuItem } from './popups/actionMenu';
@@ -24,19 +24,6 @@ export type ProfileSwitcherAction =
   | { type: 'switch'; accountIndex: number }
   | { type: 'create' }
   | { type: 'import'; nsec: string; pubkeyHex: string; accountIndex: number };
-
-type PaymentOptionsPayload = {
-  options: readonly AnnotatedOption[];
-  unit: string;
-  machine: PaymentMachine;
-  onDismiss?: () => void;
-};
-
-type PaymentFallbackPayload = PaymentOptionsPayload & {
-  failedOptionValues: readonly string[];
-  lastFailedMessage?: string;
-  lastFailedAuthored?: boolean;
-};
 
 type SendFallbackPayload = StepDataMap['chooseSendFallback'] & {
   machine: PaymentMachine;
@@ -94,25 +81,9 @@ type BaseActionSheetPayloads = {
    * `ActionMenuButton presentation="bottom-sheet"` callers — e.g. the
    * amount-screen "Next" split button (as Lightning / as Ecash) — live inside
    * `(send-flow)` route modals, where the menu-lane host renders underneath
-   * and is invisible. Same above-modal stacking reason as `payment-options`.
+   * and is invisible.
    */
   'action-menu': ActionMenuSheetPayload;
-  /**
-   * "Choose how to pay" — pick one of N detected payment methods (Lightning,
-   * Cashu, etc.) for a scanned destination. Lives in this lane because the
-   * QR-scan camera screen inside `(send-flow)` is itself an iOS route modal;
-   * the menu-lane (heroui `<Menu>` with `disableFullWindowOverlay`) renders
-   * in the root window and stacks *under* the camera, hiding the picker.
-   * The standalone `<BottomSheet>` path here uses FullWindowOverlay and
-   * mounts above route modals.
-   */
-  'payment-options': PaymentOptionsPayload;
-  /**
-   * Fallback variant — same surface as `payment-options`, but seeded with
-   * the failed attempt so the broken row renders red. Routed here for the
-   * same above-modal stacking reason.
-   */
-  'payment-fallback': PaymentFallbackPayload;
   /**
    * "Send another way" — a send picked from the amount screen failed (an
    * optional lock, or the recipient's own Lightning address) and an
@@ -123,8 +94,7 @@ type BaseActionSheetPayloads = {
    * "Choose amount" — round-up / round-down / change-mint suggestions when
    * the entered amount doesn't compose exactly from available proofs. Fires
    * from the send-flow amount screen, which is itself an iOS route modal;
-   * the menu lane would render below it. Same above-modal stacking reason
-   * as `payment-options`.
+   * the menu lane would render below it.
    */
   'proof-selector': ProofSelectorPayload;
   /**
@@ -137,7 +107,7 @@ type BaseActionSheetPayloads = {
    * NIP-46 signer approval prompt. Lives in this lane because a signing
    * request can arrive while ANY surface is up — send-flow route modals,
    * camera, drawer — and the prompt must stack above all of them
-   * (FullWindowOverlay), exactly like `payment-options`.
+   * (FullWindowOverlay).
    */
   'signer-approval': SignerApprovalPayload;
   /**

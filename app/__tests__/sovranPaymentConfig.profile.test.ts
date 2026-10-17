@@ -105,13 +105,15 @@ jest.mock('@/shared/lib/popup', () => ({
   nfcEcashSharedPopup: jest.fn(),
   nfcSendFailedPopup: jest.fn(),
   paymentCancelledPopup: jest.fn(),
-  paymentFallbackPopup: jest.fn(),
-  paymentOptionsPopup: jest.fn(),
   paymentStatusPopup: jest.fn(),
   proofSelectorPopup: jest.fn(),
   sendMemoPopup: jest.fn(),
   staticPopup: jest.fn(),
   paramPopup: jest.fn(),
+}));
+jest.mock('@/features/send/lib/paymentOptionPicker', () => ({
+  choosePaymentOption: jest.fn(),
+  chooseFallbackPaymentOption: jest.fn(),
 }));
 jest.mock('@/shared/hooks/useTransactionLocation', () => ({
   captureAndStoreLocation: jest.fn(),
