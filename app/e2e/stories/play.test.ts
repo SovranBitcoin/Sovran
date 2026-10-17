@@ -375,6 +375,82 @@ describe('playStory', () => {
     ]);
   });
 
+  test('swipes again until the element sits in the open middle of the screen', async () => {
+    // Each swipe brings the row 200 points up a 800 point screen.
+    const rowAt = (y: number) =>
+      screenOf(box({ id: 'list', x: 0, y: 0, width: 400, height: 800 }), box({ id: 'row', y }));
+    const app = fakeApp(rowAt(1000));
+    let swiped = 0;
+    const device = {
+      ...noSwipe,
+      tap: async () => {},
+      swipe: async () => void (app.state.screen = rowAt(1000 - 200 * ++swiped)),
+    };
+
+    const report = await playStory(
+      story([
+        {
+          name: 'scroll to the row',
+          swipe: { on: { id: 'list' }, direction: 'up', distance: 0.25, until: { id: 'row' } },
+          expect: [{ visible: { id: 'row' } }],
+        },
+      ]),
+      app.link,
+      device
+    );
+
+    // At 800 the row is off screen and at 600 its bottom is under the last
+    // fifth, where a tab bar sits; at 400 it is in the open.
+    expect(swiped).toBe(3);
+    expect(report.ok).toBe(true);
+  });
+
+  test('a swipe that never brings the element into the open fails', async () => {
+    const app = fakeApp(screenOf(box({ id: 'list', x: 0, y: 0, width: 400, height: 800 })));
+    let swiped = 0;
+    const device = { ...noSwipe, tap: async () => {}, swipe: async () => void swiped++ };
+
+    const report = await playStory(
+      story([
+        {
+          name: 'scroll to the row',
+          swipe: { on: { id: 'list' }, direction: 'up', until: { id: 'row' } },
+          expect: [{ visible: { id: 'list' } }],
+        },
+      ]),
+      app.link,
+      device
+    );
+
+    expect(report.ok).toBe(false);
+    expect(swiped).toBe(8);
+  });
+
+  test('the finger goes down on the part of a long page that is on screen', async () => {
+    const app = fakeApp(screenOf(box({ id: 'page', x: 0, y: -1000, width: 400, height: 1600 })));
+    const swipes: [number, number][][] = [];
+    const device = {
+      ...noSwipe,
+      tap: async () => {},
+      swipe: async (from: [number, number], to: [number, number]) => void swipes.push([from, to]),
+    };
+
+    await playStory(
+      story([
+        {
+          name: 'scroll the page',
+          swipe: { on: { id: 'page' }, direction: 'up', distance: 0.25 },
+          expect: [{ visible: { id: 'page' } }],
+        },
+      ]),
+      app.link,
+      device
+    );
+
+    // The page runs from -1000 to 600; its centre is above the glass.
+    expect(swipes[0][0]).toEqual([0.5, 0.375]);
+  });
+
   test('a step that asks for a tap and a swipe is refused', () => {
     expect(() =>
       story([
@@ -672,7 +748,9 @@ test('a step with taps presses its element that many times, back to back, as one
     id: 'reveal',
     purpose: 'Press the version three times.',
     startsFrom: 'fresh',
-    steps: [{ name: 'press three times', tap: { id: 'version' }, taps: 3, expect: [{ logged: 'dev' }] }],
+    steps: [
+      { name: 'press three times', tap: { id: 'version' }, taps: 3, expect: [{ logged: 'dev' }] },
+    ],
   });
   let presses = 0;
   const result = await playStory(story, app.link, {
