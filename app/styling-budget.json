@@ -708,7 +708,7 @@
     "inline-style": 1
   },
   "shared/blocks/popup/ActionMenuHost.tsx": {
-    "inline-style": 9,
+    "inline-style": 7,
     "stack-layout-props": 1,
     "content-container-style": 1
   },
@@ -750,18 +750,6 @@
   },
   "shared/lib/popup/ToastSlab.tsx": {
     "inline-style": 1
-  },
-  "shared/lib/popup/popups/actionSheets.tsx": {
-    "stack-layout-props": 1
-  },
-  "shared/lib/popup/popups/emojiPicker.tsx": {
-    "stylesheet-create": 1,
-    "inline-style": 5
-  },
-  "shared/lib/popup/popups/modelPicker.tsx": {
-    "stylesheet-create": 1,
-    "inline-style": 2,
-    "content-container-style": 1
   },
   "shared/lib/popup/popups/nfcTapSheet.tsx": {
     "stylesheet-create": 1,

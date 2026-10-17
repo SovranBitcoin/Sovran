@@ -1,6 +1,7 @@
 import { useCallback, useEffect } from 'react';
 import { useRoutstrFunds } from '../hooks/useRoutstrFunds';
 import { useModelCatalog } from '../hooks/useModelCatalog';
+import { useModelPicker } from '../hooks/useModelPicker';
 import { Keyboard } from 'react-native';
 import Icon from 'assets/icons';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
@@ -8,7 +9,6 @@ import { isE2eeModelId, lineupProviderIds } from '@/shared/lib/routstr/lineup';
 import { refreshRoutstrLineup } from '@/shared/lib/routstr/refreshLineup';
 import { sweepUnsettledPayments } from '@/shared/lib/routstr/sdk/client';
 import { useVisualActivityEffect } from '@/shared/hooks/useVisualActivityEffect';
-import { modelPickerPopup } from '@/shared/lib/popup';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Button } from '@/shared/ui/primitives/Button';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -60,6 +60,7 @@ import { withAlpha } from '@/shared/lib/color';
  */
 export function ModelChip() {
   const background = useThemeColor('background');
+  const openModelPicker = useModelPicker();
 
   const selectedTier = useRoutstrStore((s) => s.selectedTier);
   const selectedProvider = useRoutstrStore((s) => s.selectedProvider);
@@ -208,15 +209,10 @@ export function ModelChip() {
   ]);
 
   const onPress = useCallback(() => {
-    // Picker has no in-sheet inputs, so gorhom can't lift over an
-    // externally owned keyboard (the composer). Dismiss it so the sheet
-    // isn't occluded. The picker itself is a custom heroui BottomSheet
-    // (`PopupHost`'s lane) — tabs *filter* the row list to the active
-    // provider instead of scrolling between sections, which is the
-    // requested behaviour.
+    // The composer's keyboard would cover the picker sheet; put it away first.
     Keyboard.dismiss();
-    modelPickerPopup();
-  }, []);
+    openModelPicker();
+  }, [openModelPicker]);
 
   // Routed through the shared `Button` primitive (variant="primary") so the
   // chip and the DM Send Money button share one visual contract — same fill,

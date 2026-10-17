@@ -2,128 +2,114 @@ import { getPublicKey } from 'nostr-tools/pure';
 import * as nip19 from 'nostr-tools/nip19';
 
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
-import { Avatar } from '@/shared/ui/primitives/Avatar';
-import { HStack } from '@/shared/ui/primitives/View/HStack';
-import Icon from 'assets/icons';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { pubkeyToAccountNumber } from '@/shared/lib/nostr/keyDerivation';
-import { useProfileStore } from '@/shared/stores/global/profileStore';
+import { openPicker } from '@/shared/lib/picker/openPicker';
+import type { PickerOption, PickerRequest, PickerSection } from '@/shared/lib/picker/types';
+import { useProfileStore, type ProfileEntry } from '@/shared/stores/global/profileStore';
 
 import type { ProfileSwitcherAction } from '../actionSheetTypes';
-import { actionMenuPopup, type ActionMenuItem, type ActionMenuSection } from './actionMenu';
+import { actionMenuPopup } from './actionMenu';
 
 // ---------------------------------------------------------------------------
-// Profile switcher — dispatched through `actionMenuPopup` so each profile +
-// the Generate / Import affordances render as `Menu.Item`s on the canonical
-// heroui-native `Menu presentation="bottom-sheet"` surface (same look as
-// "as Lightning" / "as Ecash" / "as Onchain" / "as Text" / "as Emoji").
-// Profiles are split into Imported / Derived tabs (`sections`); tapping a
-// tab scrolls the body. `footerButtons` keeps Generate / Import sticky at
-// the bottom; tapping Import chains a second `actionMenuPopup` with `inputs`
-// for the nsec form.
+// Profile switcher — the picker sheet (`openPicker`), the same sheet as
+// Select mint. Profiles are split into Imported / Derived tabs; Generate and
+// Import sit in the footer. Import opens the nsec form, still an
+// `actionMenuPopup`, once the sheet has gone: a menu opened sooner paints
+// beneath the closing iPhone sheet.
 // ---------------------------------------------------------------------------
 
-type ProfileSwitcherPopupPayload = {
+type ProfileSwitcherPayload = {
   onRequestAction: (action: ProfileSwitcherAction) => void;
 };
 
-export function profileSwitcherPopup(payload: ProfileSwitcherPopupPayload): void {
-  const state = useProfileStore.getState();
-  const profiles = state.profiles;
-  const activeIndex = state.activeAccountIndex;
-
-  const buildProfileButton = (profile: (typeof profiles)[number]): ActionMenuItem => {
-    const isActive = profile.accountIndex === activeIndex;
-    const displayName = resolveIdentityName({
-      pubkey: profile.pubkey,
-      overrideName: profile.cachedDisplayName,
-    });
-    return {
-      // `accountIndex` is the profile's derivation account — its stable
-      // identity, not a position in this list.
-      testID: `profile-row-${profile.accountIndex}`,
-      text: displayName,
-      // The active profile is the current choice: checked for screen readers
-      // (the check-circle suffix is its visual), and inert to re-selection.
-      selected: isActive,
-      disabled: isActive,
-      iconNode: (
-        <Avatar
-          state={profile.cachedPicture ? 'image' : 'fallback'}
-          seed={profile.pubkey}
-          picture={profile.cachedPicture}
-          name={displayName}
-          size={36}
-        />
-      ),
-      suffix: (
-        <HStack align="center" gap={6}>
-          {profile.cachedBalanceSats != null ? (
-            <AmountFormatter
-              amount={profile.cachedBalanceSats}
-              unit="sat"
-              size={13}
-              weight="medium"
-            />
-          ) : null}
-          {isActive ? <Icon name="mdi:check-circle" size={18} /> : null}
-        </HStack>
-      ),
-      onPress: () => {
-        payload.onRequestAction({ type: 'switch', accountIndex: profile.accountIndex });
-      },
-    };
-  };
-
-  const importedButtons = profiles.filter((p) => p.source === 'imported').map(buildProfileButton);
-  const derivedButtons = profiles.filter((p) => p.source !== 'imported').map(buildProfileButton);
-
-  // Only render tabs that have profiles — when a user has only derived
-  // accounts (or only imported), a single-tab bar would be useless chrome.
-  const sections = [
-    importedButtons.length > 0 && {
-      id: 'imported',
-      anchor: {
-        icon: <Icon name="mdi:key-variant" size={14} />,
-        label: 'Imported',
-        testID: 'profile-tab-imported',
-      },
-      buttons: importedButtons,
-    },
-    derivedButtons.length > 0 && {
-      id: 'derived',
-      anchor: {
-        icon: <Icon name="mdi:tree" size={14} />,
-        label: 'Derived',
-        testID: 'profile-tab-derived',
-      },
-      buttons: derivedButtons,
-    },
-  ].filter(Boolean) as ActionMenuSection[];
-
-  actionMenuPopup({
-    title: 'Select profile',
-    sections,
-    footerButtons: [
-      {
-        testID: 'profile-create',
-        text: 'Generate new account',
-        icon: 'la:user-plus',
-        onPress: () => {
-          payload.onRequestAction({ type: 'create' });
-        },
-      },
-      {
-        testID: 'profile-import',
-        text: 'Import Nostr',
-        icon: 'mdi:key-variant',
-        onPress: (close) => close(() => openProfileImportMenu(payload)),
-      },
-    ],
+function profileOption(profile: ProfileEntry, activeIndex: number): PickerOption {
+  const isActive = profile.accountIndex === activeIndex;
+  const displayName = resolveIdentityName({
+    pubkey: profile.pubkey,
+    overrideName: profile.cachedDisplayName,
   });
+  return {
+    // `accountIndex` is the profile's derivation account — its stable
+    // identity, not a position in this list.
+    id: String(profile.accountIndex),
+    testID: `profile-row-${profile.accountIndex}`,
+    title: displayName,
+    leading: {
+      avatar: { picture: profile.cachedPicture, seed: profile.pubkey, name: displayName },
+    },
+    trailing:
+      profile.cachedBalanceSats != null ? (
+        <AmountFormatter amount={profile.cachedBalanceSats} unit="sat" size={13} weight="medium" />
+      ) : undefined,
+    // The active profile is the current choice: checked. Picking it again
+    // only closes the sheet (see `openProfileSwitcher`).
+    selected: isActive,
+  };
 }
 
-function openProfileImportMenu(payload: ProfileSwitcherPopupPayload): void {
+function profileSwitcherRequest(
+  profiles: readonly ProfileEntry[],
+  activeIndex: number
+): PickerRequest {
+  const sections: PickerSection[] = [
+    {
+      id: 'imported',
+      title: 'Imported',
+      icon: 'mdi:key-variant',
+      testID: 'profile-tab-imported',
+      options: profiles
+        .filter((p) => p.source === 'imported')
+        .map((p) => profileOption(p, activeIndex)),
+    },
+    {
+      id: 'derived',
+      title: 'Derived',
+      icon: 'mdi:tree',
+      testID: 'profile-tab-derived',
+      options: profiles
+        .filter((p) => p.source !== 'imported')
+        .map((p) => profileOption(p, activeIndex)),
+    },
+  ];
+  return {
+    title: 'Select profile',
+    testID: 'profile-switcher',
+    sections,
+    actions: [
+      { id: 'import', title: 'Import Nostr', icon: 'mdi:key-variant', testID: 'profile-import' },
+      {
+        id: 'create',
+        title: 'Generate new account',
+        icon: 'la:user-plus',
+        variant: 'primary',
+        testID: 'profile-create',
+      },
+    ],
+  };
+}
+
+export async function openProfileSwitcher(payload: ProfileSwitcherPayload): Promise<void> {
+  const { profiles, activeAccountIndex } = useProfileStore.getState();
+  const picker = openPicker(profileSwitcherRequest(profiles, activeAccountIndex));
+  const result = await picker.result;
+  if (result.kind === 'dismissed') return;
+  // Act once the sheet has gone. A switch remounts the account's screens,
+  // the sheet included, and the import form would paint beneath it.
+  await picker.closed;
+  if (result.kind === 'option') {
+    const profile = profiles.find((p) => String(p.accountIndex) === result.id);
+    if (profile && profile.accountIndex !== activeAccountIndex) {
+      payload.onRequestAction({ type: 'switch', accountIndex: profile.accountIndex });
+    }
+  } else if (result.id === 'create') {
+    payload.onRequestAction({ type: 'create' });
+  } else if (result.id === 'import') {
+    openProfileImportMenu(payload);
+  }
+}
+
+function openProfileImportMenu(payload: ProfileSwitcherPayload): void {
   actionMenuPopup({
     title: 'Import Nostr',
     inputs: [

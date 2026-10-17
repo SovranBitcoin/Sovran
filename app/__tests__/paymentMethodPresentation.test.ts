@@ -5,7 +5,7 @@
  * own raw enum name. A total record makes that unrepresentable; these lock the
  * behavior the record encodes.
  */
-import { METHOD_PRESENTATION } from '@/shared/lib/popup/popups/paymentMethodPresentation';
+import { METHOD_PRESENTATION } from '@/features/send/lib/paymentMethodPresentation';
 
 describe('payment method presentation', () => {
   const kinds = Object.keys(METHOD_PRESENTATION) as (keyof typeof METHOD_PRESENTATION)[];

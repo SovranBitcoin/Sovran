@@ -30,6 +30,7 @@ export const PAGE_JOURNEY_GAPS: Partial<Record<Page, JourneyGap>> = {
   'ai-provider-info': UNAUTHORED,
   details: UNAUTHORED,
   'note-picker': UNAUTHORED,
+  'emoji-picker': UNAUTHORED,
   'restore-gate': UNAUTHORED,
   'recovery-complete': UNAUTHORED,
   map: UNAUTHORED,

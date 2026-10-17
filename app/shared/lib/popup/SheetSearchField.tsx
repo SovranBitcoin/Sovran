@@ -1,5 +1,4 @@
-import type { StyleProp, ViewStyle } from 'react-native';
-import { BottomSheetTextInput } from '@gorhom/bottom-sheet';
+import { TextInput, type StyleProp, type ViewStyle } from 'react-native';
 
 import { withAlpha } from '@/shared/lib/color';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -8,11 +7,9 @@ import { View } from '@/shared/ui/primitives/View/View';
 import Icon from 'assets/icons';
 
 /**
- * Search input for a bottom-sheet popup, with a clear button that appears once
- * the field has content.
- *
- * Uses `BottomSheetTextInput` rather than a plain `TextInput` so gorhom's
- * keyboard avoidance lifts the sheet on focus. The wrapper is the clear
+ * Search input for a sheet, with a clear button that appears once the field
+ * has content. The emoji sheet is a route, so a plain `TextInput` is right:
+ * the system sheet handles the keyboard itself. The wrapper is the clear
  * button's containing block, so its absolute `right` is measured from the
  * input's edge — callers that need outer padding must add their own wrapper
  * around this one rather than pushing it in via `style`.
@@ -41,7 +38,7 @@ export function SheetSearchField({
   ] as const);
   return (
     <View style={[{ justifyContent: 'center' }, style]}>
-      <BottomSheetTextInput
+      <TextInput
         testID={testID}
         value={value}
         onChangeText={onChangeText}

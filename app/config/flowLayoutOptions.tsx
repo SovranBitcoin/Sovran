@@ -7,6 +7,7 @@ import { GRADIENT_HEADER_OPTIONS } from '@/navigation/headerOptions';
  */
 
 import { androidFlowPresentation } from './androidFlowPresentation';
+import { PICKER_SHEET_OPTIONS } from './modalScreens';
 import { memo, useMemo, type ReactNode } from 'react';
 import { Platform } from 'react-native';
 import type { NativeStackHeaderProps, NativeStackNavigationOptions } from 'expo-router';
@@ -122,31 +123,18 @@ const renderSheetPageLayer = ({ children }: { children: ReactNode }) => (
  * (user-flow)) must NOT set this — their native headers work.
  */
 /**
- * The mint selector, when a flow pushes it over another screen.
- *
- * On iPhone it is a system sheet: it rises over the amount screen at a little
- * over half height, shows a grabber, grows to full height when pulled or
- * scrolled, and is dismissed by pulling down. Choosing a mint is a short
- * detour from the screen underneath, and a sheet keeps that screen in view.
- * As the first screen of a flow there is nothing to rise over, and the stack
- * shows it as an ordinary page.
- *
- * Android keeps the pushed page (ADR 0025).
+ * The mint selector, when a flow pushes it over another screen: the picker
+ * sheet (`PICKER_SHEET_OPTIONS`) on iPhone, a pushed page on Android. As the
+ * first screen of a flow there is nothing to rise over, and the stack shows it
+ * as an ordinary page.
  */
 /** Route names that use the options below, for the header's close button. */
 const IOS_SHEET_SCREENS: ReadonlySet<string> = new Set(['mintSelect']);
 
-export const MINT_SELECT_SCREEN_OPTIONS: NativeStackNavigationOptions =
-  Platform.OS === 'ios'
-    ? {
-        title: 'Select mint',
-        presentation: 'formSheet',
-        sheetAllowedDetents: [0.62, 1],
-        sheetGrabberVisible: true,
-        sheetCornerRadius: 28,
-        sheetExpandsWhenScrolledToEdge: true,
-      }
-    : { title: 'Select mint' };
+export const MINT_SELECT_SCREEN_OPTIONS: NativeStackNavigationOptions = {
+  ...PICKER_SHEET_OPTIONS,
+  title: 'Select mint',
+};
 
 export const createFlowLayoutScreenOptions = (
   colors: FlowColors,

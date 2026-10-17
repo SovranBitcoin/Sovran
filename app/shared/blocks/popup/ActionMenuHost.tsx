@@ -5,8 +5,8 @@
  * open an action menu without needing a local Trigger in scope.
  */
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { LayoutChangeEvent, useWindowDimensions } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { LayoutChangeEvent } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Menu } from 'heroui-native';
 import {
@@ -22,7 +22,6 @@ import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { log } from '@/shared/lib/logger';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
-import { SectionAnchorList, type AnchorSection } from '@/shared/ui/composed/SectionAnchorList';
 import {
   dismissActionMenuPopup,
   getActionMenuSnapshot,
@@ -31,14 +30,12 @@ import {
   type ActionMenuItem,
   type ActionMenuInput,
   type ActionMenuPrimaryAction,
-  type ActionMenuSection,
 } from '@/shared/lib/popup/popups/actionMenu';
 import Icon from 'assets/icons';
 import { E2EAccessibilityProbe } from '@/shared/lib/e2e/E2EAccessibilityProbe';
 import { markE2EHerouiMenu } from '@/shared/lib/popup/E2EActionMenuProbe';
 import { OPEN_WATCHDOG_MS } from '@/shared/lib/popup/openWatchdog';
 import { MenuRowTint, SheetMenuRowContent } from '@/shared/lib/popup/popups/sheetMenuRow';
-import { SheetSearchField } from '@/shared/lib/popup/SheetSearchField';
 import { MenuScrim } from '@/shared/blocks/popup/MenuScrim';
 
 const hostLog = log.child({ module: 'actionMenuHost' });
@@ -216,9 +213,6 @@ function ActionMenuInstance({
   // the sheet bottom and is clipped behind the home indicator on
   // iPhones with no notch / no home button.
   const insets = useSafeAreaInsets();
-  const { height: windowHeight } = useWindowDimensions();
-  const [sheetHeight, setSheetHeight] = useState(0);
-  const [viewportHeight, setViewportHeight] = useState(0);
   // The heroui Menu sheet uses `bg-overlay` for its content background
   // (see heroui-native's bottom-sheet.styles `contentBackground`), so the
   // gradient must taper to that exact token — not `surface` or
@@ -246,21 +240,11 @@ function ActionMenuInstance({
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Search state for tabbed menus. `inputText` is the immediate-controlled
-  // value (so the input feels responsive); `searchQuery` is the debounced
-  // value driving `searchable.renderResults`. 150ms matches the pattern the
-  // emoji picker used pre-migration.
-  const [inputText, setInputText] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
-  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
   useEffect(() => {
     hostLog.info('actionMenuHost.payload', {
       open: payload !== null,
-      sections: payload?.sections?.length ?? 0,
       buttons: payload?.buttons?.length ?? 0,
       footerButtons: payload?.footerButtons?.length ?? 0,
-      hasSearchable: !!payload?.searchable,
       snapPoint: payload?.snapPoint,
     });
     if (payload) {
@@ -269,12 +253,6 @@ function ActionMenuInstance({
       setInputValues(buildInitialValues(payload.inputs));
       setError(null);
       setIsSubmitting(false);
-      setInputText('');
-      setSearchQuery('');
-      if (searchDebounceRef.current) {
-        clearTimeout(searchDebounceRef.current);
-        searchDebounceRef.current = null;
-      }
     }
   }, [payload]);
 
@@ -283,24 +261,6 @@ function ActionMenuInstance({
     markE2EHerouiMenu(isOpen ? (payload?.title ?? '') : null);
     return () => markE2EHerouiMenu(null);
   }, [isOpen, payload?.title]);
-
-  useEffect(() => {
-    return () => {
-      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
-    };
-  }, []);
-
-  const handleSearchChange = useCallback((text: string) => {
-    setInputText(text);
-    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
-    searchDebounceRef.current = setTimeout(() => setSearchQuery(text), 150);
-  }, []);
-
-  const handleSearchClear = useCallback(() => {
-    setInputText('');
-    setSearchQuery('');
-    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
-  }, []);
 
   const close = useCallback(
     (afterClose?: () => void) => {
@@ -394,17 +354,13 @@ function ActionMenuInstance({
   // gorhom's `footerComponent` (which lifts above the keyboard).
   // `useScrollBody` is the stricter "needs a scrollable viewport at a
   // fixed tall snapPoint" mode — a long list of items with sticky
-  // footer affordances (the profile switcher pattern). Short
+  // footer affordances (the AI conversations list). Short
   // input-form menus (e.g. the chained "Import Nostr" → nsec field +
   // submit) only have `primaryAction` and should size to content via
   // gorhom's dynamic sizing; otherwise they stretch to 85% and look
   // empty.
-  // `useSections` is the tabbed mode — body becomes a `SectionAnchorList`
-  // with a horizontal anchor bar above the scroll viewport. It always
-  // needs a fixed snap so the list has a viewport to scroll inside.
-  const useSections = !!payload?.sections?.length;
   const hasFooter = !!payload?.footerButtons?.length || !!payload?.primaryAction;
-  const useScrollBody = !!payload?.footerButtons?.length || useSections;
+  const useScrollBody = !!payload?.footerButtons?.length;
 
   // Measured footer height — used to pad the scroll viewport so the last
   // row clears the absolutely-positioned footer. Two Menu.Items + safe
@@ -415,11 +371,6 @@ function ActionMenuInstance({
       ? footerHeight + 16
       : insets.bottom + 2 * 56
     : 24;
-  useEffect(() => {
-    if (sheetHeight > 0 && viewportHeight > 0) {
-      hostLog.debug('actionMenuHost.viewport', { sheetHeight, viewportHeight, footerHeight });
-    }
-  }, [sheetHeight, viewportHeight, footerHeight]);
   const handleFooterLayout = useCallback((e: LayoutChangeEvent) => {
     const h = Math.round(e.nativeEvent.layout.height);
     setFooterHeight((prev) => (Math.abs(prev - h) > 1 ? h : prev));
@@ -429,12 +380,10 @@ function ActionMenuInstance({
   }, [hasFooter]);
 
   // Decide the sheet snap point. Explicit override wins; otherwise
-  // sticky-footer lists get 60% (profile switcher), sections-tabbed
-  // menus get 60%, inputs-only forms get 40%, and pure pick-one-of-N
-  // menus auto-fit to content.
+  // sticky-footer lists get 60%, inputs-only forms get 40%, and pure
+  // pick-one-of-N menus auto-fit to content.
   const snapPoint =
-    payload?.snapPoint ??
-    (useSections ? '60%' : payload?.footerButtons?.length ? '60%' : hasFooter ? '40%' : undefined);
+    payload?.snapPoint ?? (payload?.footerButtons?.length ? '60%' : hasFooter ? '40%' : undefined);
 
   const renderActionButton = (button: ActionMenuItem, key: React.Key): React.ReactNode => {
     const isDisabled = button.disabled === true || button.isFailed === true;
@@ -538,52 +487,6 @@ function ActionMenuInstance({
       </Menu.Item>
     </>
   ) : null;
-
-  // Map ActionMenuSection[] → AnchorSection<ActionMenuItem>[] for
-  // SectionAnchorList. Two shapes:
-  //   - Sections with `buttons` use the standard data + renderItem
-  //     path so each profile row virtualizes individually (FlashList
-  //     mounts only the rows in the draw window). Items render as
-  //     `Menu.Item`s; the section gets no header.
-  //   - Sections with `renderBody` (custom non-button content, e.g.
-  //     emoji grids when this lane is used for them) render through
-  //     `renderHeader` with empty `data` — same as before.
-  const sectionsForList = useMemo<AnchorSection<ActionMenuItem>[]>(() => {
-    const list = payload?.sections;
-    if (!list?.length) return [];
-    return list.map((section: ActionMenuSection) => {
-      if (section.renderBody) {
-        return {
-          id: section.id,
-          anchor: section.anchor,
-          data: [] as ActionMenuItem[],
-          renderHeader: () => section.renderBody!(),
-        };
-      }
-      return {
-        id: section.id,
-        anchor: section.anchor,
-        data: section.buttons ?? [],
-      };
-    });
-  }, [payload?.sections]);
-
-  const searchInputNode = payload?.searchable ? (
-    <SheetSearchField
-      testID="action-menu-search"
-      clearTestID="action-menu-search-clear"
-      placeholder={payload.searchable.placeholder}
-      value={inputText}
-      onChangeText={handleSearchChange}
-      onClear={handleSearchClear}
-      style={{ marginTop: 8 }}
-    />
-  ) : null;
-
-  const isSearching = useSections && !!payload?.searchable && searchQuery.length > 0;
-  const searchOverrideContent = isSearching
-    ? (payload?.searchable?.renderResults?.(searchQuery) ?? null)
-    : null;
 
   // Footer renderer for gorhom's `footerComponent` slot — it tracks the
   // sheet's animated bottom edge AND lifts above the keyboard when a
@@ -728,9 +631,8 @@ function ActionMenuInstance({
           // drops when layout isn't ready — the original stall.
           mountIndex={0}
           onClose={() => handleNativeClose(seq, attempt)}
-          onAnimate={(_from, to, _fromPosition, toPosition) => {
+          onAnimate={(_from, to) => {
             if (!isCurrent() || attempt !== attemptRef.current || to < 0) return;
-            setSheetHeight(windowHeight - toPosition);
             setLifecycle((previous) =>
               previous.phase === 'presenting' ? { ...previous, phase: 'open' } : previous
             );
@@ -785,16 +687,7 @@ function ActionMenuInstance({
           // overrides the scrollable type to `VIEW` on mount and pan
           // gestures dismiss the sheet instead of scrolling the list.
           // Only needed when there *is* a nested scroll container.
-          contentContainerProps={
-            useScrollBody
-              ? ({
-                  useDirectView: true,
-                  // Gorhom excludes the handle from content height, but its footer
-                  // is absolute. Reserve that lane in the section viewport itself.
-                  style: useSections ? { paddingBottom: footerHeight } : undefined,
-                } as never)
-              : undefined
-          }
+          contentContainerProps={useScrollBody ? ({ useDirectView: true } as never) : undefined}
           // gorhom's `BottomSheetFooter` slot — pinned absolute at the
           // sheet's animated bottom edge AND auto-tracks the keyboard
           // when a `BottomSheetTextInput` (via `MenuInputField`) gains
@@ -807,55 +700,7 @@ function ActionMenuInstance({
               accessibilityLabel="Action menu presented"
             />
           ) : null}
-          {useSections ? (
-            // Tabbed sections — `SectionAnchorList` owns the chrome
-            // (title + optional search input + horizontal anchor bar)
-            // and the scroll viewport. Rows fade behind the chrome via
-            // its built-in `ScrollEdgeFade` backdrop. `topFadeColor`
-            // tapers to `overlay` so the fade matches the Menu.Content
-            // background. `contentBottomInset` clears the gorhom
-            // `BottomSheetFooter` slot so the last row isn't hidden
-            // beneath sticky footer buttons.
-            <SectionAnchorList<ActionMenuItem>
-              testID="action-menu-viewport"
-              onLayout={(event) => setViewportHeight(event.nativeEvent.layout.height)}
-              sections={sectionsForList}
-              // Each section's `data` is its `ActionMenuItem[]` (see
-              // `sectionsForList`); we render one Menu.Item per button.
-              // FlashList virtualizes the row stream so even a long
-              // profile list (or future >100-item picker) only mounts
-              // the rows in the draw window.
-              renderItem={(button, sectionId) =>
-                renderActionButton(button, `${sectionId}-${button.testID}`)
-              }
-              keyExtractor={(button, sectionId) => `${sectionId}-${button.testID}`}
-              // The 12px horizontal inset that previously wrapped each
-              // section now lives on the list contentContainer so
-              // every row aligns with `Menu.Label`'s `ml-3` (24px from
-              // the menu's left edge).
-              listContentContainerStyle={{ paddingHorizontal: 12 }}
-              ScrollComponent={BottomSheetScrollView as never}
-              topFadeColor={String(overlay)}
-              // The measured footer is already outside the viewport. The
-              // spacer carries only the remaining gap (or the initial reserve).
-              contentBottomInset={Math.max(0, contentBottomInset - footerHeight)}
-              // Tab pills align with the title text: wrapper `paddingHorizontal: 12`
-              // + `Menu.Label`'s `ml-3` (12px) puts the title at 24px from the
-              // menu's left edge. The anchor bar's inner ScrollView uses
-              // `marginHorizontal: -18` + `contentPaddingHorizontal: 18` to allow
-              // overscroll past the visible bounds — those cancel out, so the
-              // first pill renders at this `paddingHorizontal` value (24px).
-              anchorBarStyle={{ paddingHorizontal: 24 }}
-              aboveAnchors={
-                <View style={{ paddingHorizontal: 12, paddingTop: 8 }}>
-                  {labelNode}
-                  {headerNode}
-                  {searchInputNode}
-                </View>
-              }
-              overrideContent={searchOverrideContent}
-            />
-          ) : useScrollBody ? (
+          {useScrollBody ? (
             <>
               {/* Sticky title — rendered *outside* the scroll viewport
                   so it doesn't get clipped by the scroll's top edge as
