@@ -207,11 +207,17 @@ the wider state-space argument, including interrupted operations, skipped releas
 combinations, account types and platform differences. The controller does not reimplement
 wallet migrations or Cashu behavior. Current known losses make this gate inconclusive.
 
-Functional UI and performance tasks currently stop incomplete: the existing story/scenario
-results do not bind their session to an installed binary on both platforms. Build-bound
-captures establish visual evidence, not functional success. The producer integration and
-required device validation are tracked in [F156](../docs/follow-ups/F156.md). This first
-version must not be presented as production-ready autonomous wallet development.
+A UI task passes only through a sealed `native` requirement whose stories play on both iOS
+and Android. The check runs `app/e2e/stories/bound.ts`, which builds each platform's bundled
+app afresh from the candidate and plays each story on its own disposable simulator or
+emulator. The controller then judges the raw evidence itself: every step passed, on a build
+of exactly this source, installed unchanged, with each frame, video and log retained as
+receipt evidence that an independent story-oracle review must cite. A candidate that edits
+the host-side runner cannot pass. Stories must start fresh: saved states, handed inputs,
+links and permission overrides are not supported in a bound run. Performance tasks still
+stop incomplete. The controller-driven pilot and performance evidence are tracked in
+[F156](../docs/follow-ups/F156.md). This version must not be presented as production-ready
+autonomous wallet development.
 
 ## Development
 

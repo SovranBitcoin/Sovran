@@ -1,8 +1,9 @@
 /**
  * Plays a story against the app (ADR 0033): mark the step in the app's log,
  * issue its one action, wait for the app to report its screen still, then wait
- * until everything the step expects is true. Nothing is repeated and nothing
- * waits on a duration; a step that is not satisfied by its deadline fails and
+ * until everything the step expects is true. Nothing is repeated, except a
+ * swipe with `until`, which scrolls on as a person does, a bounded number of
+ * times, until its element is in reach. Nothing waits on a duration; a step that is not satisfied by its deadline fails and
  * says what the screen and the log held.
  */
 import type { AppLink, AppLogEntry, AppScreen } from '../link/appLink';
@@ -31,6 +32,14 @@ const SLOW_ANSWER_MS = 250;
 const STILL_AFTER_SWIPE_MS = 400;
 /** A list springing back on a busy machine was seen still moving after 900 ms; it is given this long. */
 const SWIPE_SETTLES_WITHIN_MS = 3000;
+/** The most swipes a step with `until` makes before it gives up. */
+const SWIPES_UNTIL_MAX = 8;
+/**
+ * The band of the screen, as fractions of its height, that `until` treats as in
+ * the open when it swipes up or down: below a page's header and above a tab bar,
+ * on both platforms. Swiping across, anywhere on screen is in the open.
+ */
+const OPEN_BAND = [0.2, 0.8] as const;
 /** Which way the finger moves, as steps across and down the screen. */
 const SWIPES = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] } as const;
 
@@ -315,25 +324,75 @@ async function playStep(
         : outside
           ? [outside.x + outside.width * across, outside.y + outside.height * down]
           : [0, 0];
-      await device.tap(...at);
+      for (let tap = 0; tap < (step.taps ?? 1); tap++) await device.tap(...at);
       // Missing feedback cannot establish that an effect did not happen.
       // Observe the expected state below; never repeat the action to obtain it.
     }
     if (step.swipe) {
-      const { screen, found: target } = await lookFor(step.swipe.on);
-      if (!target)
-        return finish(`Nothing to swipe: ${describeSelector(step.swipe.on)} is not on screen`);
-      const [startAcross, startDown] = step.swipe.from ?? [0.5, 0.5];
-      const from: [number, number] = [
-        (target.x + target.width * startAcross) / screen.width,
-        (target.y + target.height * startDown) / screen.height,
-      ];
-      const [across, down] = SWIPES[step.swipe.direction];
-      const clamp = (fraction: number) => Math.min(0.98, Math.max(0.02, fraction));
-      await device.swipe(from, [
-        clamp(from[0] + across * step.swipe.distance),
-        clamp(from[1] + down * step.swipe.distance),
-      ]);
+      const { until, direction } = step.swipe;
+      const across = direction === 'left' || direction === 'right';
+      /**
+       * Where the sought element is, or why it is not yet in reach: wholly in the
+       * open band along the swipe (clear of a header and a tab bar), or filling
+       * that band, or wholly on screen at the end of what the page can scroll.
+       */
+      const placeOf = (screen: AppScreen) => {
+        const sought = until && find(until, screen);
+        if (!sought) return null;
+        const [start, length, extent] = across
+          ? [sought.x, sought.width, screen.width]
+          : [sought.y, sought.height, screen.height];
+        const [low, high] = across ? [0, extent] : OPEN_BAND.map((edge) => edge * extent);
+        return {
+          start,
+          inTheOpen:
+            (start >= low && start + length <= high) || (start <= low && start + length >= high),
+          onScreen: start >= 0 && start + length <= extent,
+        };
+      };
+      let before: number | undefined;
+      for (let swiped = 0; ; swiped++) {
+        const { screen, found: target } = await lookFor(step.swipe.on);
+        const place = placeOf(screen);
+        if (place?.inTheOpen) break;
+        // The page did not move with the last swipe: it is at its end.
+        if (place?.onScreen && place.start === before) break;
+        before = place?.start;
+        if (until && swiped === SWIPES_UNTIL_MAX)
+          return finish(
+            `${describeSelector(until)} did not come into the open after ${SWIPES_UNTIL_MAX} swipes`
+          );
+        if (until && performance.now() > deadline)
+          return finish(
+            `${describeSelector(until)} did not come into the open within ${step.withinMs} ms`
+          );
+        if (!target)
+          return finish(`Nothing to swipe: ${describeSelector(step.swipe.on)} is not on screen`);
+        // The finger goes down on the part of the element that is on screen: a
+        // scrolled page is mostly above or below the glass.
+        const left = Math.max(0, target.x);
+        const top = Math.max(0, target.y);
+        const width = Math.min(screen.width, target.x + target.width) - left;
+        const height = Math.min(screen.height, target.y + target.height) - top;
+        if (width <= 0 || height <= 0)
+          return finish(
+            `Nothing to swipe: ${describeSelector(step.swipe.on)} is off the edge of the screen`
+          );
+        const [startAcross, startDown] = step.swipe.from ?? [0.5, 0.5];
+        const clamp = (fraction: number) => Math.min(0.98, Math.max(0.02, fraction));
+        const from: [number, number] = [
+          clamp((left + width * startAcross) / screen.width),
+          clamp((top + height * startDown) / screen.height),
+        ];
+        const [dx, dy] = SWIPES[direction];
+        await device.swipe(from, [
+          clamp(from[0] + dx * step.swipe.distance),
+          clamp(from[1] + dy * step.swipe.distance),
+        ]);
+        if (!until) break;
+        // The next look is taken once the page has stopped where this swipe left it.
+        await pixels?.pixelsStill(STILL_AFTER_SWIPE_MS, SWIPE_SETTLES_WITHIN_MS);
+      }
     }
     if (step.handed) {
       if (!hand) return finish('Nothing here can hand the person anything.');

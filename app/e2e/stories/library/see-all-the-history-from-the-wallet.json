@@ -1,0 +1,336 @@
+{
+  "id": "see-all-the-history-from-the-wallet",
+  "purpose": "A person with payments in their wallet presses View all under the latest ones on the wallet and sees their whole history. Mock Mode supplies the payments, so nothing is spent.",
+  "startsFrom": "fresh",
+  "steps": [
+    {
+      "name": "the Terms are shown first",
+      "expect": [
+        {
+          "page": "LegalDocumentScreen"
+        },
+        {
+          "visible": {
+            "id": "terms-acceptance"
+          }
+        }
+      ],
+      "withinMs": 20000
+    },
+    {
+      "name": "agree to the Terms",
+      "tap": {
+        "id": "terms-acceptance"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "terms-continue"
+          }
+        }
+      ]
+    },
+    {
+      "name": "continue to Privacy",
+      "tap": {
+        "id": "terms-continue"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "privacy-acknowledgment"
+          }
+        },
+        {
+          "gone": {
+            "id": "terms-acceptance"
+          }
+        }
+      ]
+    },
+    {
+      "name": "acknowledge the Privacy Policy",
+      "tap": {
+        "id": "privacy-acknowledgment"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "privacy-confirm"
+          }
+        }
+      ]
+    },
+    {
+      "name": "confirm and leave the legal pages",
+      "tap": {
+        "id": "privacy-confirm"
+      },
+      "expect": [
+        {
+          "gone": {
+            "id": "privacy-confirm"
+          }
+        },
+        {
+          "gone": {
+            "id": "screen-legal-document"
+          }
+        }
+      ]
+    },
+    {
+      "name": "go on to the profile card",
+      "tap": {
+        "id": "onboarding-next"
+      },
+      "expect": [
+        {
+          "visible": {
+            "label": "Carry your profile with you"
+          }
+        }
+      ]
+    },
+    {
+      "name": "go on to the privacy card",
+      "tap": {
+        "id": "onboarding-next"
+      },
+      "expect": [
+        {
+          "visible": {
+            "label": "Understand your privacy"
+          }
+        }
+      ]
+    },
+    {
+      "name": "go on to the last card",
+      "tap": {
+        "id": "onboarding-next"
+      },
+      "expect": [
+        {
+          "visible": {
+            "label": "Start small"
+          }
+        },
+        {
+          "visible": {
+            "id": "onboarding-get-started"
+          }
+        }
+      ]
+    },
+    {
+      "name": "get started",
+      "tap": {
+        "id": "onboarding-get-started"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-receive"
+          }
+        },
+        {
+          "visible": {
+            "id": "wallet-send"
+          }
+        },
+        {
+          "gone": {
+            "id": "screen-onboarding"
+          }
+        },
+        {
+          "logged": "gate.app.onboarding_complete"
+        }
+      ],
+      "withinMs": 10000
+    },
+    {
+      "name": "open the drawer",
+      "tap": {
+        "id": "header-profile-avatar"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "drawer-menu-settings"
+          }
+        }
+      ]
+    },
+    {
+      "name": "open Settings",
+      "tap": {
+        "id": "drawer-menu-settings"
+      },
+      "expect": [
+        {
+          "page": "SettingsScreen"
+        },
+        {
+          "visible": {
+            "id": "settings-profile-row"
+          }
+        }
+      ]
+    },
+    {
+      "name": "scroll down",
+      "swipe": {
+        "on": {
+          "id": "screen-settings"
+        },
+        "direction": "up",
+        "distance": 0.4,
+        "until": {
+          "id": "settings-terms-row"
+        }
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "settings-terms-row"
+          }
+        }
+      ],
+      "withinMs": 15000
+    },
+    {
+      "name": "scroll to the very end",
+      "swipe": {
+        "on": {
+          "id": "screen-settings"
+        },
+        "direction": "up",
+        "distance": 0.4,
+        "until": {
+          "id": "settings-version-row"
+        }
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "settings-version-row"
+          }
+        }
+      ],
+      "withinMs": 15000
+    },
+    {
+      "name": "press the version three times",
+      "tap": {
+        "id": "settings-version-row"
+      },
+      "taps": 3,
+      "expect": [
+        {
+          "logged": "settings.dev_mode.toggle",
+          "with": {
+            "enabled": true
+          }
+        }
+      ]
+    },
+    {
+      "name": "scroll to the developer rows",
+      "swipe": {
+        "on": {
+          "id": "screen-settings"
+        },
+        "direction": "up",
+        "distance": 0.4,
+        "until": {
+          "id": "settings-mock-mode-toggle"
+        }
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "settings-mock-mode-toggle"
+          }
+        }
+      ],
+      "withinMs": 15000
+    },
+    {
+      "name": "turn on Mock Mode, and let the notice over the header go",
+      "tap": {
+        "id": "settings-mock-mode-toggle"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "settings-mock-mode-toggle"
+          }
+        },
+        {
+          "gone": {
+            "label": "Developer mode enabled"
+          }
+        }
+      ],
+      "withinMs": 10000
+    },
+    {
+      "name": "close Settings",
+      "tap": {
+        "id": "flow-header-close"
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "wallet-send"
+          }
+        },
+        {
+          "visible": {
+            "label": "Balance, 247,382 BTC"
+          }
+        }
+      ],
+      "withinMs": 10000
+    },
+    {
+      "name": "scroll the wallet down to the history",
+      "swipe": {
+        "on": {
+          "id": "screen-wallet"
+        },
+        "direction": "up",
+        "distance": 0.25,
+        "until": {
+          "id": "transactions-view-all"
+        }
+      },
+      "expect": [
+        {
+          "visible": {
+            "id": "transactions-view-all"
+          }
+        }
+      ],
+      "withinMs": 15000
+    },
+    {
+      "name": "view all of the history",
+      "tap": {
+        "id": "transactions-view-all"
+      },
+      "expect": [
+        {
+          "page": "TransactionsScreen"
+        },
+        {
+          "visible": {
+            "id": "transactions-filter-open"
+          }
+        }
+      ]
+    }
+  ]
+}

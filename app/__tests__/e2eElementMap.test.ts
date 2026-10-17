@@ -56,8 +56,8 @@ describe('collectElements', () => {
         view({ testID: 'top-control' }, { x: 4, y: -44, width: 40, height: 30 }),
         fiber(
           5,
-          { type: 'RNSScreenStackHeaderConfig', rect: { x: -12, y: -100, width: 402, height: 54 } },
-          [view({ testID: 'header-control' }, { x: 4, y: -100, width: 40, height: 30 })]
+          { type: 'RNSScreenStackHeaderConfig', rect: { x: -12, y: 0, width: 402, height: 54 } },
+          [view({ testID: 'header-control' }, { x: 4, y: 6, width: 40, height: 30 })]
         ),
       ]),
     ]);
@@ -65,7 +65,9 @@ describe('collectElements', () => {
     expect(collectElements(captured, { width: 402, height: 874 })).toEqual([
       { id: 'accept', x: 16, y: 700, width: 370, height: 40 },
       { id: 'top-control', x: 16, y: 10, width: 40, height: 30 },
-      { id: 'header-control', x: 16, y: 70, width: 40, height: 30 },
+      // Android lays a header out where it is drawn, below anything above it such as
+      // the offline banner; it is measured like the page, not placed under the inset.
+      { id: 'header-control', x: 16, y: 60, width: 40, height: 30 },
     ]);
     // iOS reports window coordinates already; preserve its surface origin.
     expect(collectElements(capturing(root))[0]).toEqual({

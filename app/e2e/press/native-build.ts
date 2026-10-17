@@ -511,10 +511,20 @@ async function buildAndroid(fingerprint: string, kind: BuildKind): Promise<Nativ
     ANDROID_HOME: sdk,
     ANDROID_SDK_ROOT: sdk,
   };
+  // A bundled build is evidence of the source: regenerate android/ (ignored by Git
+  // and by the native fingerprint) so nothing left in it reaches the APK.
+  if (kind === 'bundled' && git(['ls-files', '--', 'app/android']).length)
+    throw new Error('Refusing to clean tracked Android sources');
   await step(
     'expo prebuild (android)',
     'node',
-    [require.resolve('expo/bin/cli'), 'prebuild', '--platform', 'android'],
+    [
+      require.resolve('expo/bin/cli'),
+      'prebuild',
+      '--platform',
+      'android',
+      ...(kind === 'bundled' ? ['--clean'] : []),
+    ],
     APP_DIR,
     env,
     log
@@ -522,6 +532,9 @@ async function buildAndroid(fingerprint: string, kind: BuildKind): Promise<Nativ
   // Gradle's app-local JS inputs omit sibling workspace code and some assets.
   // Once this owner requires a rebuild, Metro must traverse its actual graph.
   const tasks = [
+    // A release build's R8 pass runs out of the 2 GB heap prebuild writes into
+    // gradle.properties. This outranks it for the e2e builds made here, not EAS's.
+    '-Dorg.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g',
     ...(kind === 'bundled'
       ? ['-PsovranBundledE2e=true', ':app:createBundleReleaseJsAndAssets', '--rerun']
       : []),

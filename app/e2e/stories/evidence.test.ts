@@ -8,6 +8,7 @@ import {
   captureSimulatorScreen,
   createScreenWatch,
   pictureName,
+  recordAndroid,
   recordSimulator,
 } from './evidence';
 
@@ -71,7 +72,7 @@ async function recorderProcess(
   }
 }
 const launchTestRecorder = (script: string) =>
-  spawn(process.execPath, ['-e', script], { stdio: ['ignore', 'ignore', 'pipe'] });
+  spawn(process.execPath, ['-e', script], { stdio: ['ignore', 'pipe', 'pipe'] });
 
 test('normal stop waits for successful finalization and is repeatable', () =>
   recorderProcess(
@@ -276,10 +277,15 @@ test('simulator capture validates fresh child output, not an old file or header'
     await expect(captureSimulatorScreen('owned-test', 1000, command)).rejects.toThrow();
     writeFileSync(input, '');
     await expect(captureSimulatorScreen('owned-test', 1000, command)).rejects.toThrow();
-    writeFileSync(script, `process.exit(7)`);
-    await expect(captureSimulatorScreen('owned-test', 1000, command)).rejects.toThrow();
+    writeFileSync(script, `process.stderr.write('Invalid device state'); process.exit(7)`);
+    // The failure says what simctl said, not only that the command failed.
+    await expect(captureSimulatorScreen('owned-test', 1000, command)).rejects.toThrow(
+      /exit 7: Invalid device state/
+    );
     writeFileSync(script, `setInterval(() => {}, 1000)`);
-    await expect(captureSimulatorScreen('owned-test', 30, command)).rejects.toThrow();
+    await expect(captureSimulatorScreen('owned-test', 30, command)).rejects.toThrow(
+      /took longer than 30 ms/
+    );
   } finally {
     rmSync(dir, { recursive: true });
   }
@@ -317,3 +323,72 @@ test('a capture rejection after a successful baseline is never a still screen', 
   });
   await expect(watch.pixelsStill()).rejects.toThrow('display unavailable');
 });
+
+test('an Android recording is ready when screenrecord reports its content area', () =>
+  recorderProcess(
+    `
+  process.on('SIGINT', () => process.exit(0));
+  console.log('Configuring recorder'); setTimeout(() => console.log('Content area is 1080x2400'), 20);
+  setInterval(() => {}, 1000);
+`,
+    async (child) => {
+      let interrupted = 0;
+      const recording = await recordAndroid(['adb', '-s', 'test-only'], {
+        launch: () => child,
+        interrupt: async () => {
+          interrupted++;
+          child.kill('SIGINT');
+        },
+      });
+      await recording.stop();
+      expect(interrupted).toBe(1);
+      expect(child.exitCode).toBe(0);
+    }
+  ));
+
+test('Android stop interrupts on the device, not the local adb client', () =>
+  recorderProcess(
+    `
+  process.on('SIGINT', () => process.exit(5));
+  console.log('Content area is 1080x2400'); setInterval(() => {}, 1000);
+`,
+    async (child) => {
+      const recording = await recordAndroid(['adb', '-s', 'test-only'], {
+        launch: () => child,
+        stopMs: 100,
+        interrupt: async () => {},
+      });
+      // A local SIGINT would exit 5; the device interrupt is what stop sends.
+      await expect(recording.stop()).rejects.toThrow('did not stop gracefully');
+      expect(child.signalCode).toBe('SIGKILL');
+    }
+  ));
+
+test('a failed device interrupt fails the recording and reaps the client', () =>
+  recorderProcess(
+    `
+  console.log('Content area is 1080x2400'); setInterval(() => {}, 1000);
+`,
+    async (child) => {
+      const recording = await recordAndroid(['adb', '-s', 'test-only'], {
+        launch: () => child,
+        interrupt: async () => {
+          throw new Error('device gone');
+        },
+      });
+      await expect(recording.stop()).rejects.toThrow('device gone');
+      expect(child.signalCode).toBe('SIGKILL');
+    }
+  ));
+
+test('screenrecord stopping itself at its time limit is a gap, not a recording', () =>
+  recorderProcess(
+    `
+  console.log('Content area is 1080x2400'); setTimeout(() => process.exit(0), 20);
+`,
+    async (child, exited) => {
+      const recording = await recordAndroid(['adb', '-s', 'test-only'], { launch: () => child });
+      await exited;
+      await expect(recording.stop()).rejects.toThrow('before stop');
+    }
+  ));

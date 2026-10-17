@@ -258,10 +258,12 @@ export function collectElements(
           // The layout places a header bar above its page, which for a page drawn
           // under its header is above the window. The bar is really just below
           // the status bar; what is in it keeps its place within the bar.
-          // On a sheet the bar is at the sheet's top instead.
+          // On a sheet the bar is at the sheet's top instead. That is iOS: Android lays
+          // the bar out where it is drawn, below a banner too, and the inset guess put
+          // its buttons some 30 points low (the drawer button was tapped beneath itself).
           const rect = !laidOut
             ? null
-            : barTop !== undefined
+            : barTop !== undefined && !capture.normalizeViewportOrigin
               ? { ...laidOut, y: (sheetTop || topInset) + BAR_SITS_LOWER + (laidOut.y - barTop) }
               : { ...laidOut, y: laidOut.y + sheetTop - origin.y };
           if (rect) rect.x -= origin.x;
@@ -291,8 +293,8 @@ export function collectElements(
   };
   for (const root of capture.roots) {
     if (!root.current) continue;
-    // Each React surface has its own viewport offset. Header y is synthesized
-    // above from window insets, so only its x uses this correction.
+    // Each React surface has its own viewport offset. On iOS a header's y is
+    // synthesized above from window insets, so only its x uses this correction.
     const origin = capture.normalizeViewportOrigin ? rootFrame(capture, root) : null;
     visit(root.current, origin ?? { x: 0, y: 0 });
   }

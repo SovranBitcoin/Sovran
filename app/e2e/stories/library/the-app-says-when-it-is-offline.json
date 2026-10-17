@@ -148,7 +148,9 @@
           }
         },
         {
-          "logged": "popup.toast.hidden"
+          "gone": {
+            "label": "Developer mode enabled"
+          }
         },
         {
           "logged": "store.settings.set_mock_offline",
