@@ -27,8 +27,6 @@ export type ProfileSwitcherAction =
 
 type EmojiPickerPayload = { token: string };
 
-type ModelPickerPayload = Record<string, never>;
-
 type PaymentOptionsPayload = {
   options: readonly AnnotatedOption[];
   unit: string;
@@ -110,15 +108,6 @@ type BaseActionSheetPayloads = {
    * working surface that stacks above iOS route modals.
    */
   'emoji-picker': EmojiPickerPayload;
-  /**
-   * AI tab model picker. Lives in this lane (not `actionMenuPopup` with
-   * sections) because the UX is *filter-by-tab*, not scroll-to-section:
-   * tapping the OpenAI tab should hide the Claude / Grok rows entirely,
-   * which `SectionAnchorList` (the actionMenu sections renderer) can't
-   * do. The body keeps its own active-provider state and re-derives the
-   * row list on each tab switch — see `ModelPickerContent`.
-   */
-  'model-picker': ModelPickerPayload;
   /**
    * "Choose how to pay" — pick one of N detected payment methods (Lightning,
    * Cashu, etc.) for a scanned destination. Lives in this lane because the

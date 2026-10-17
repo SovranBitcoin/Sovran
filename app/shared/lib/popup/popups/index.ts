@@ -13,7 +13,6 @@ export { proofSelectorPopup } from './proofSelectorSheet';
 export { sendFallbackPopup } from './sendFallbackSheet';
 export { sendMemoPopup } from './sendMemoSheet';
 export { emojiPickerPopup } from './emojiPicker';
-export { modelPickerPopup } from './modelPicker';
 export type { ProfileSwitcherAction } from '../actionSheetTypes';
 export { actionMenuPopup, replaceActionMenuPopup } from './actionMenu';
 export { deleteStatusPopup } from './deleteStatus';

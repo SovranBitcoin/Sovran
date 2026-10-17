@@ -213,29 +213,14 @@ describe('wallet surface e2e selectors', () => {
     expect(source).toContain('accessibilityState={{ checked: isVisible }}');
   });
 
-  it('pins the picker sheet ids the Following scenario waits on', () => {
+  it('pins the picker sheet ids the Following, model and history scenarios wait on', () => {
     const sheet = read('shared/ui/composed/PickerSheet.tsx');
     expect(sheet).toContain('testID="picker-sheet"');
     expect(sheet).toContain('testID="picker-sheet-close"');
+    expect(read('features/ai/lib/modelPickerRequest.tsx')).toContain("testID: 'ai-model-picker'");
   });
 
-  it('makes the AI model picker FWO sheet observable to e2e', () => {
-    expect(read('shared/lib/popup/E2EActionMenuProbe.tsx')).toContain(
-      "state.current.sheetId === 'model-picker'"
-    );
-    // Keyed on the live openSeq (not a static string) so the render marker
-    // re-fires when the snapPoints sheet settles — see the sidecar diagnosis.
-    expect(read('shared/lib/popup/popups/modelPicker.tsx')).toContain(
-      '<E2EActionMenuRenderMarker presentationKey={popupOpenSeq} />'
-    );
-    expect(read('shared/blocks/popup/PopupHost.tsx')).toContain(
-      "activeCustomPage?.sheetId === 'model-picker'"
-    );
-    // The probe COMPONENT (not just the gate) must be mounted on the AI screen.
-    expect(read('features/ai/screens/AiChatScreen.tsx')).toContain('<E2EActionMenuProbe />');
-  });
-
-  it('gives the AI history header button an AX identity and mounts its menu probe', () => {
+  it('gives the AI history header button an AX identity', () => {
     expect(read('app/(drawer)/(tabs)/ai/_layout.tsx')).toContain(
       "headerRightTestID: 'ai-history-button'"
     );
@@ -243,7 +228,6 @@ describe('wallet surface e2e selectors', () => {
     expect(read('navigation/nativeTabs.tsx')).toContain(
       'accessibilityLabel={headerRightAccessibilityLabel}'
     );
-    expect(read('features/ai/screens/AiChatScreen.tsx')).toContain('<E2EHerouiMenuProbe />');
   });
 
   it('pins the geohash channel probe on GeohashChatScreen', () => {

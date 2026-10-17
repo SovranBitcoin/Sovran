@@ -13,7 +13,6 @@ import TestRenderer, { act } from 'react-test-renderer';
 import { AiTurnErrorPill } from '@/features/ai/components/AiTurnErrorPill';
 import { ERROR_COPY } from '@/shared/lib/errors/catalog';
 import { guardedRouter } from '@/shared/hooks/useGuardedRouter';
-import { modelPickerPopup } from '@/shared/lib/popup';
 const mockNavigateToAddFunds = jest.fn();
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -30,7 +29,10 @@ jest.mock('@/shared/hooks/useThemeColor', () => ({
 jest.mock('@/shared/hooks/useGuardedRouter', () => ({
   guardedRouter: { navigate: jest.fn() },
 }));
-jest.mock('@/shared/lib/popup', () => ({ modelPickerPopup: jest.fn() }));
+const mockOpenModelPicker = jest.fn();
+jest.mock('@/features/ai/hooks/useModelPicker', () => ({
+  useModelPicker: () => mockOpenModelPicker,
+}));
 jest.mock('@/features/ai/lib/navigateToAddFunds', () => ({
   useNavigateToAddFunds: () => mockNavigateToAddFunds,
 }));
@@ -122,7 +124,7 @@ describe('AiTurnErrorPill', () => {
       />
     );
     press(r, 'change-model');
-    expect(modelPickerPopup).toHaveBeenCalledTimes(1);
+    expect(mockOpenModelPicker).toHaveBeenCalledTimes(1);
   });
 
   it('dispatches Change Provider to the AI provider list', () => {
