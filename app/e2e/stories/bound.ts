@@ -90,13 +90,12 @@ async function playIos(
   return { exit, deviceRemoved };
 }
 
-async function playAndroid(storyPath: string, out: string) {
+async function playAndroid(storyPath: string, storyId: string, out: string) {
   const { ok, runDir } = await runAndroidStory(storyPath, 'bundled');
   const workers = join(runDir, 'workers');
   const [worker] = existsSync(workers) ? readdirSync(workers) : [];
   if (!worker) throw new Error('The Android run left no attempt');
-  const id = storySchema.parse(JSON.parse(readFileSync(storyPath, 'utf8'))).id;
-  cpSync(attemptDirectory(runDir, worker, id), out, { recursive: true });
+  cpSync(attemptDirectory(runDir, worker, storyId), out, { recursive: true });
   return { exit: ok ? 0 : 1, deviceRemoved: null };
 }
 
@@ -121,7 +120,7 @@ export async function playBound(request: z.infer<typeof boundRequestSchema>) {
         const result =
           platform === 'ios'
             ? await playIos(storyPath, story.id, build.artifact, request.invocation, out)
-            : await playAndroid(storyPath, out);
+            : await playAndroid(storyPath, story.id, out);
         runs.push({ platform, story: relative, dir, ...result });
       } catch (error) {
         runs.push({

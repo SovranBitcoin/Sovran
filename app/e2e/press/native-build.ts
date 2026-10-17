@@ -533,7 +533,7 @@ async function buildAndroid(fingerprint: string, kind: BuildKind): Promise<Nativ
   // Once this owner requires a rebuild, Metro must traverse its actual graph.
   const tasks = [
     // A release build's R8 pass runs out of the 2 GB heap prebuild writes into
-    // gradle.properties; this outranks it for these builds only.
+    // gradle.properties. This outranks it for the e2e builds made here, not EAS's.
     '-Dorg.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g',
     ...(kind === 'bundled'
       ? ['-PsovranBundledE2e=true', ':app:createBundleReleaseJsAndAssets', '--rerun']
