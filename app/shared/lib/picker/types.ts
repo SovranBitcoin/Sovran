@@ -20,6 +20,9 @@ export interface PickerOption {
   /** A choice that loses something, drawn in the danger colour. */
   isCaution?: boolean;
   testID: string;
+  /** Spoken name when it should differ from `title` (default: `title`). */
+  accessibilityLabel?: string;
+  accessibilityHint?: string;
 }
 
 /** A group of options, drawn as a tab. A tab with no options is left out. */
@@ -46,6 +49,8 @@ export interface PickerRequest {
   title: string;
   /** Rows split into tabs. Takes the place of `options` when set. */
   sections?: readonly PickerSection[];
+  /** The tab to open on (default: the one holding the selected row, else the first). */
+  initialSectionId?: string;
   options?: readonly PickerOption[];
   actions?: readonly PickerAction[];
   /** e2e selector for the list (the sheet itself is always `picker-sheet`). */

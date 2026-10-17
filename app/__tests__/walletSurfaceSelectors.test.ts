@@ -213,8 +213,10 @@ describe('wallet surface e2e selectors', () => {
     expect(source).toContain('accessibilityState={{ checked: isVisible }}');
   });
 
-  it('mounts the heroui menu probe on the feed for the Following mode menu', () => {
-    expect(read('features/feed/screens/FeedScreen.tsx')).toContain('<E2EHerouiMenuProbe />');
+  it('pins the picker sheet ids the Following scenario waits on', () => {
+    const sheet = read('shared/ui/composed/PickerSheet.tsx');
+    expect(sheet).toContain('testID="picker-sheet"');
+    expect(sheet).toContain('testID="picker-sheet-close"');
   });
 
   it('makes the AI model picker FWO sheet observable to e2e', () => {

@@ -4,19 +4,19 @@
  * preview prefilled for confirmation, plus a "Custom amount…" row that goes
  * through the amount screen first.
  *
- * Menu-lane note: this only ever opens from feed/thread routes
- * (slideFromRight), where `actionMenuPopup` is visible. Both paths navigate
- * away BEFORE the native send-flow modal opens, so the invisible-menu trap
- * (menus inside iOS route modals) is avoided by design.
+ * It opens in the picker sheet, and acts only once the sheet has gone: both
+ * rows open the send flow, which must not start under a closing sheet.
  */
 
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { actionMenuPopup } from '@/shared/lib/popup/popups/actionMenu';
+import { openPicker } from '@/shared/lib/picker/openPicker';
 import { AnimatedEmoji, prefetchAnimatedEmojis } from '@/shared/ui/primitives/AnimatedEmoji';
 import { Text } from '@/shared/ui/primitives/Text';
 
 import { formatSats } from '../components/nostr/feedFormat';
 import { ZAP_PRESETS, type ZapPreset } from './zapPresets';
+
+const CUSTOM_ID = 'custom';
 
 function ZapAmountSuffix({ sats }: { sats: number }) {
   const muted = useThemeColor('muted');
@@ -25,41 +25,43 @@ function ZapAmountSuffix({ sats }: { sats: number }) {
   );
 }
 
-export function openZapMenu({
+export async function openZapMenu({
   onPreset,
   onCustom,
 }: {
-  /** Opens the melt preview prefilled with the preset; the menu closes first. */
+  /** Opens the melt preview prefilled with the preset. */
   onPreset: (preset: ZapPreset) => void;
   onCustom: () => void;
-}): void {
+}): Promise<void> {
   void prefetchAnimatedEmojis(ZAP_PRESETS.map((preset) => preset.emoji));
-  actionMenuPopup({
+  const picker = openPicker({
     title: 'Zap',
-    buttons: [
+    options: [
       ...ZAP_PRESETS.map((preset) => ({
+        id: String(preset.sats),
         // The animated emoji is the row icon; strip it from the displayed
         // message so it doesn't render twice. The zap COMMENT keeps the full
         // message (emoji included) — that's what the recipient sees.
-        text: preset.message.replace(preset.emoji, '').trim(),
-        iconNode: <AnimatedEmoji emoji={preset.emoji} size={28} />,
-        suffix: <ZapAmountSuffix sats={preset.sats} />,
+        title: preset.message.replace(preset.emoji, '').trim(),
+        leading: { node: <AnimatedEmoji emoji={preset.emoji} size={28} /> },
+        trailing: <ZapAmountSuffix sats={preset.sats} />,
         testID: `zap-preset-${preset.sats}`,
-        onPress: (close: () => void) => {
-          close();
-          onPreset(preset);
-        },
       })),
       {
-        text: 'Custom amount…',
-        icon: 'mingcute:lightning-fill',
-        separator: true,
+        id: CUSTOM_ID,
+        title: 'Custom amount…',
+        leading: { icon: { name: 'mingcute:lightning-fill' } },
         testID: 'zap-custom',
-        onPress: (close: () => void) => {
-          close();
-          onCustom();
-        },
       },
     ],
   });
+  const result = await picker.result;
+  if (result.kind !== 'option') return;
+  await picker.closed;
+  if (result.id === CUSTOM_ID) {
+    onCustom();
+    return;
+  }
+  const preset = ZAP_PRESETS.find((candidate) => String(candidate.sats) === result.id);
+  if (preset) onPreset(preset);
 }

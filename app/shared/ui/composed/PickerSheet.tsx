@@ -89,7 +89,8 @@ function PickerRow({
       disabled={option.disabled}
       onPress={() => onPick({ kind: 'option', id: option.id })}
       testID={option.testID}
-      accessibilityLabel={option.title}
+      accessibilityLabel={option.accessibilityLabel ?? option.title}
+      accessibilityHint={option.accessibilityHint}
     />
   );
 }
@@ -106,13 +107,16 @@ export function PickerSheetScreen() {
   );
 
   // Only tabs that have rows; a single one needs no tab bar. The first tab is
-  // the one holding the current choice, until the person picks another.
+  // the one asked for, else the one holding the current choice, until the
+  // person picks another.
   const sections = (request?.sections ?? EMPTY_SECTIONS).filter(
     (section) => section.options.length > 0
   );
   const tabbed = sections.length > 1;
   const initialTab =
-    sections.find((section) => section.options.some((option) => option.selected)) ?? sections[0];
+    sections.find((section) => section.id === request?.initialSectionId) ??
+    sections.find((section) => section.options.some((option) => option.selected)) ??
+    sections[0];
   const activeTab = sections.find((section) => section.id === chosenTab) ?? initialTab;
   const options = request?.sections
     ? tabbed
