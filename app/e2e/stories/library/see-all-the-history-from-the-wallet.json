@@ -257,7 +257,9 @@
           }
         },
         {
-          "logged": "popup.toast.hidden"
+          "gone": {
+            "label": "Developer mode enabled"
+          }
         }
       ],
       "withinMs": 10000
@@ -285,10 +287,13 @@
       "name": "scroll the wallet down to the history",
       "swipe": {
         "on": {
-          "id": "wallet-receive"
+          "id": "screen-wallet"
         },
         "direction": "up",
-        "distance": 0.55
+        "distance": 0.25,
+        "until": {
+          "id": "transactions-view-all"
+        }
       },
       "expect": [
         {
