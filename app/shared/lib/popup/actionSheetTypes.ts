@@ -25,10 +25,6 @@ export type ProfileSwitcherAction =
   | { type: 'create' }
   | { type: 'import'; nsec: string; pubkeyHex: string; accountIndex: number };
 
-type SendFallbackPayload = StepDataMap['chooseSendFallback'] & {
-  machine: PaymentMachine;
-};
-
 type ProofSelectorPayload = StepDataMap['chooseProofs'] & {
   machine: PaymentMachine;
 };
@@ -84,12 +80,6 @@ type BaseActionSheetPayloads = {
    * and is invisible.
    */
   'action-menu': ActionMenuSheetPayload;
-  /**
-   * "Send another way" — a send picked from the amount screen failed (an
-   * optional lock, or the recipient's own Lightning address) and an
-   * alternative can still pay them. Above-modal for the same reason.
-   */
-  'send-fallback': SendFallbackPayload;
   /**
    * "Choose amount" — round-up / round-down / change-mint suggestions when
    * the entered amount doesn't compose exactly from available proofs. Fires

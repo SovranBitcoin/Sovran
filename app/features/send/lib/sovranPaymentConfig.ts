@@ -69,13 +69,13 @@ import {
   paymentCancelledPopup,
   paymentStatusPopup,
   proofSelectorPopup,
-  sendFallbackPopup,
   sendMemoPopup,
   staticPopup,
   paramPopup,
 } from '@/shared/lib/popup';
 import { RECEIVE_PENDING_TOAST_COPY } from '@/shared/lib/popup/paymentStatusCopy';
 import { chooseFallbackPaymentOption, choosePaymentOption } from './paymentOptionPicker';
+import { chooseSendFallback } from './sendFallbackPicker';
 import { captureAndStoreLocation } from '@/shared/hooks/useTransactionLocation';
 import { executeRoutstrTopUp, formatRoutstrBalance } from '@/shared/lib/routstr/topUp';
 import { useRoutstrTopUpStore } from '@/shared/stores/runtime/routstrTopUpStore';
@@ -1476,7 +1476,7 @@ export function createSovranHandlers({
     },
 
     chooseSendFallback: (stepData) => {
-      sendFallbackPopup({ ...stepData, machine });
+      chooseSendFallback(stepData, machine);
     },
 
     chooseProofs: (stepData) => {

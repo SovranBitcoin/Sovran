@@ -62,6 +62,7 @@ jest.mock('@/features/send/lib/paymentOptionPicker', () => ({
   choosePaymentOption: jest.fn(),
   chooseFallbackPaymentOption: jest.fn(),
 }));
+jest.mock('@/features/send/lib/sendFallbackPicker', () => ({ chooseSendFallback: jest.fn() }));
 jest.mock('@/shared/hooks/useTransactionLocation', () => ({
   captureAndStoreLocation: jest.fn(),
 }));
