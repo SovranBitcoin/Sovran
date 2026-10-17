@@ -50,6 +50,7 @@ export const CANONICAL_PAGES = [
   'profile', // nostr user profile (UserProfileScreen)
   'dm-chat', // 1:1 DM conversation (UserMessagesScreen, dm-chat-probe)
   'details', // every fact about one payment, as a table (details-sheet, details-sheet-done)
+  'picker', // choosing one of several things, the sheet `openPicker` opens (picker-sheet)
   'note-picker', // held ecash by denomination, from the amount screen's notes key (note-picker, note-picker-use)
   'camera', // QR scan camera screen (CameraScreen, incl. its permission-required state)
   'search', // header search overlay with results (SearchOverlay)

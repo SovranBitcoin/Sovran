@@ -47,6 +47,7 @@ export const PAGE_ROUTES: Partial<Record<(typeof CANONICAL_PAGES)[number], reado
   'receive-amount': ['(receive-flow)/amount.tsx'],
   details: ['details.tsx'],
   'note-picker': ['notes.tsx'],
+  picker: ['picker.tsx'],
   camera: ['(receive-flow)/camera.tsx', '(send-flow)/camera.tsx', 'camera.tsx'],
   'lightning-receive': [
     '(receive-flow)/lightningReceive.tsx',

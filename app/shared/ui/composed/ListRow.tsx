@@ -57,7 +57,7 @@ export interface ListRowIconCircle {
 }
 
 /** Plain leading icon — no circle chrome, settings-row style. */
-interface ListRowIcon {
+export interface ListRowIcon {
   name: string;
   /** Defaults to the foreground theme color. */
   color?: string;
@@ -110,6 +110,9 @@ interface ListRowProps {
 
   onPress?: () => void;
   disabled?: boolean;
+  /** The row is the current choice in a list of choices. Announced only; the
+   *  caller draws the mark (a check in `trailing`). */
+  selected?: boolean;
   /** When true, render loading placeholders for string title/subtitle. */
   loading?: boolean;
   /** Title placeholder text (invisible) that sizes the loading bar. Defaults to a generic label. */
@@ -163,6 +166,7 @@ export function ListRow({
   trailingInteractive = false,
   onPress,
   disabled = false,
+  selected,
   loading = false,
   titlePlaceholder = 'Display name',
   subtitlePlaceholder = 'Secondary line',
@@ -353,7 +357,7 @@ export function ListRow({
           accessibilityRole="button"
           accessibilityLabel={a11yLabel}
           accessibilityHint={accessibilityHint}
-          accessibilityState={{ disabled }}>
+          accessibilityState={{ disabled, selected }}>
           <PressableFeedback.Scale>
             <View style={{ paddingRight: trailingWidth + ROW_GAP }}>{body}</View>
           </PressableFeedback.Scale>
@@ -381,7 +385,7 @@ export function ListRow({
       accessibilityRole="button"
       accessibilityLabel={a11yLabel}
       accessibilityHint={accessibilityHint}
-      accessibilityState={{ disabled }}
+      accessibilityState={{ disabled, selected }}
       style={[disabled && styles.disabled, style]}>
       <PressableFeedback.Scale>{body}</PressableFeedback.Scale>
       {/* See `trailingInteractive` doc: the ripple overlay is the row's touch
