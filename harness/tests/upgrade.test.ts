@@ -29,7 +29,7 @@ test('a green expected-failure preservation assertion cannot certify preservatio
   expect(result.status).toBe('inconclusive'); expect(result.losses[0]).toContain('starts, three times');
 });
 test('complete ordinary observations satisfy only the bounded unit gate', () => {
-  const { jest, inventory } = inputs(); expect(inspectUpgradeEvidence(jest, inventory)).toEqual({ status: 'pass', reasons: [], losses: [], skips: [] });
+  const { jest, inventory } = inputs(); expect(inspectUpgradeEvidence(jest, inventory)).toEqual({ status: 'pass', reasons: [], losses: [], skips: [], accepted: [] });
 });
 test('an epoch omitted from discovery cannot silently disappear', () => {
   const { jest, inventory } = inputs(); inventory.expectedEpochIds.push('E2');
@@ -54,7 +54,7 @@ test('only the exact writer skip in its expected file is allowed', () => {
   skip.title = skip.fullName = 'skipped account recovery'; expect(inspectUpgradeEvidence(jest, inventory).status).toBe('inconclusive');
 });
 test('malformed reports never become passes', () => {
-  expect(inspectUpgradeEvidence({}, {})).toEqual({ status: 'inconclusive', reasons: ['Malformed upgrade report or inventory'], losses: [], skips: [] });
+  expect(inspectUpgradeEvidence({}, {})).toEqual({ status: 'inconclusive', reasons: ['Malformed upgrade report or inventory'], losses: [], skips: [], accepted: [] });
 });
 test('a missing declared surviving fact cannot pass', () => {
   const { jest, inventory } = inputs(); inventory.epochs[0]!.facts.push('the paid provider key');

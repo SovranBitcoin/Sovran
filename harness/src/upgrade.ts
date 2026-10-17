@@ -34,12 +34,15 @@ const epochChecks = ['starts, three times over, without stopping on a failure or
 const cocoChecks = ['keeps every proof with its secret, amount, mint, keyset and state',
   'keeps the spendable balance of each mint', 'does not lower a keyset counter'];
 type Inspection = { status: 'pass' | 'fail' | 'inconclusive'; reasons: string[];
-  losses: string[]; skips: string[] };
+  losses: string[]; skips: string[]; accepted: string[] };
 
 /** A pass means the enumerated unit evidence is complete, never every install is safe.
+ * A gap whose followUp is exactly `accepted` is an owner-accepted loss: it is listed in
+ * `accepted` instead of `losses`, and when it names a surviving fact the loss must still
+ * reproduce as the passing expected failure releaseFixtures.test.ts emits for it.
  * Caller must bind this inventory and report to its own before/after fingerprint. */
 export function inspectUpgradeEvidence(jest: unknown, inventory: unknown): Inspection {
-  const result: Inspection = { status: 'inconclusive', reasons: [], losses: [], skips: [] };
+  const result: Inspection = { status: 'inconclusive', reasons: [], losses: [], skips: [], accepted: [] };
   const parsed = report.safeParse(jest), discovered = upgradeInventorySchema.safeParse(inventory);
   if (!parsed.success || !discovered.success) {
     result.reasons.push('Malformed upgrade report or inventory'); return result;
@@ -48,6 +51,7 @@ export function inspectUpgradeEvidence(jest: unknown, inventory: unknown): Inspe
   let failed = !data.success;
   if (failed) result.reasons.push('Jest reported unsuccessful execution');
   const files = new Map<string, z.infer<typeof assertion>[]>();
+  const expectedFailures: z.infer<typeof assertion>[] = [];
   for (const suite of data.testResults) {
     const name = suite.name.replaceAll('\\', '/').split('/').at(-1) ?? '';
     if (files.has(name)) result.reasons.push(`Duplicate suite: ${name}`);
@@ -61,7 +65,7 @@ export function inspectUpgradeEvidence(jest: unknown, inventory: unknown): Inspe
       else if (test.status !== 'passed') {
         result.skips.push(test.fullName);
         if (writerSkips.get(test.fullName) !== name) result.reasons.push(`Unexpected skip: ${test.fullName}`);
-      } else if (test.failing) result.losses.push(test.fullName);
+      } else if (test.failing) expectedFailures.push(test);
     }
   }
   for (const name of suites) if (!files.has(name)) result.reasons.push(`Missing suite: ${name}`);
@@ -72,12 +76,29 @@ export function inspectUpgradeEvidence(jest: unknown, inventory: unknown): Inspe
       epochIds.some(id => !expected.expectedEpochIds.includes(id))) result.reasons.push('Epoch inventory is incomplete or duplicated');
   const release = files.get('releaseFixtures.test.ts') ?? [];
   const ordinaryPass = (test: z.infer<typeof assertion>) => test.status === 'passed' && !test.failing && test.numPassingAsserts > 0;
+  const claimed = new Set<z.infer<typeof assertion>>(), gapLosses: string[] = [];
   for (const epoch of expected.epochs) {
-    for (const gap of epoch.knownGaps) result.losses.push(`${epoch.id}: ${gap.what} [${gap.followUp}: ${gap.why}]`);
-    for (const title of [...epochChecks, ...epoch.facts.map(what => `keeps ${what}`)]) if (!release.some(test =>
-      test.ancestorTitles.some(ancestor => ancestor.startsWith(`${epoch.id} (`)) &&
-      test.title === title && ordinaryPass(test))) result.reasons.push(`Missing ordinary evidence: ${epoch.id}: ${title}`);
+    const inEpoch = (test: z.infer<typeof assertion>) => test.ancestorTitles.some(ancestor => ancestor.startsWith(`${epoch.id} (`));
+    const acceptedFacts = new Set<string>();
+    for (const gap of epoch.knownGaps) {
+      const loss = `${epoch.id}: ${gap.what} [${gap.followUp}: ${gap.why}]`;
+      if (gap.followUp !== 'accepted') { gapLosses.push(loss); continue; }
+      // The exact title releaseFixtures.test.ts gives the it.failing check of an accepted gap.
+      const title = `keeps ${gap.what} [known gap accepted: ${gap.why}]`;
+      const proof = release.find(test => inEpoch(test) && test.title === title && test.status === 'passed' && test.failing);
+      if (proof) claimed.add(proof);
+      if (epoch.facts.includes(gap.what)) {
+        acceptedFacts.add(gap.what);
+        if (!proof) {
+          gapLosses.push(loss); result.reasons.push(`Missing expected-failure evidence: ${epoch.id}: ${title}`); continue;
+        }
+      }
+      result.accepted.push(proof ? `${loss} reproduced by ${proof.fullName}` : loss);
+    }
+    for (const title of [...epochChecks, ...epoch.facts.filter(what => !acceptedFacts.has(what)).map(what => `keeps ${what}`)]) if (!release.some(test =>
+      inEpoch(test) && test.title === title && ordinaryPass(test))) result.reasons.push(`Missing ordinary evidence: ${epoch.id}: ${title}`);
   }
+  result.losses.push(...expectedFailures.filter(test => !claimed.has(test)).map(test => test.fullName), ...gapLosses);
   const coco = files.get('cocoDatabaseUpgrade.test.ts') ?? [];
   for (const adapter of expected.cocoAdapters) for (const title of cocoChecks) if (!coco.some(test =>
     test.ancestorTitles.includes(`a wallet written by ${adapter.package} ${adapter.version}`) &&
@@ -85,6 +106,13 @@ export function inspectUpgradeEvidence(jest: unknown, inventory: unknown): Inspe
   if (result.losses.length) result.reasons.push('Known losses or expected failures remain');
   result.status = failed ? 'fail' : result.reasons.length ? 'inconclusive' : 'pass';
   return result;
+}
+
+/** The harness:upgrade receipt summary; a pass names how many owner-accepted losses it carries. */
+export function upgradeReceiptSummary(inspected: Inspection): string {
+  if (inspected.status !== 'pass') return inspected.reasons.join('\n');
+  const count = inspected.accepted.length;
+  return `Recorded historical fixture checks passed${count ? ` with ${count} owner-accepted loss${count === 1 ? '' : 'es'}` : ''}; this is bounded unit evidence`;
 }
 
 /** Discover metadata only from the existing fixture index and Coco manifest.
