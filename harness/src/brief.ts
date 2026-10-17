@@ -20,7 +20,7 @@ const duties: Record<Role, string> = {
  * opened Simulator.app or started windowed emulators took each other's
  * devices and the owner's screen, and filled the disk and swap.
  */
-const devices = 'To see the app, play a story from app/: `bun run e2e:story e2e/stories/library/<story>.json --look` plays on this checkout\'s own simulator, made on first use and reused, with no window (about 12 s a story); `--platform android` plays on a disposable windowless emulator. Never open Simulator.app, boot or use a simulator or emulator you did not get this way, run `expo run:*` or `bun run ios|android`, or start Metro on port 8081. Builds and multi-story runs wait for one lease shared by every checkout on this Mac; do not work around it. If native work refuses for lack of disk, return inconclusive naming that: never delete files to make room.';
+const devices = 'To see the app, play a story from app/: `bun run e2e:story e2e/stories/library/<story>.json --look` plays on this checkout\'s own simulator, made on first use and reused, with no window (about 12 s a new story; a repeated one gets a fresh copy, about a minute); `--platform android` plays on a disposable windowless emulator. Never open Simulator.app, boot or use a simulator or emulator you did not get this way, run `expo run:*` or `bun run ios|android`, or start Metro on port 8081. Builds and multi-story runs wait for one lease shared by every checkout on this Mac; do not work around it. If native work refuses for lack of disk, return inconclusive naming that: never delete files to make room.';
 
 export function brief(t: Task, stateDir: string) {
   if (!t.ticket) throw new Error('Issue a role ticket first');

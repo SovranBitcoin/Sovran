@@ -97,8 +97,7 @@ export function recommendedModels(catalog: unknown, outages: Outage[] = []) {
   const astra = { provider: 'codex', model: 'gpt-6-astra', options: { reasoningEffort: 'high' } };
   const opus = { provider: 'claudeAgent', model: 'claude-opus-5-5', options: { effort: 'high' } };
   const fable = { provider: 'claudeAgent', model: 'claude-fable-5-1', options: { effort: 'high' } };
-  const observedAt = Date.parse(modelCatalog.parse(catalog).observedAt);
-  const current = outages.filter(o => Date.parse(o.until) > observedAt);
+  const current = outages.filter(o => Date.parse(o.until) > Date.now());
   const policy = models.parse({ kind: 'routed', allowGptOnly: true, allowClaudeOnly: true, catalog,
     routes: {
       research: { purpose: 'Bounded evidence extraction, escalating to the coding model, then across providers, when unavailable', candidates: [
@@ -113,8 +112,11 @@ export function recommendedModels(catalog: unknown, outages: Outage[] = []) {
   });
   if (!('kind' in policy)) return policy;
   for (const [name, route] of Object.entries(policy.routes)) {
-    route.candidates = route.candidates.filter(m => !current.some(o => covers(o, m)));
-    if (!route.candidates.length) throw new Error(`No available model for ${name}: ${current.map(o => `${o.provider}/${o.model} ${o.reason} until ${o.until}`).join('; ')}`);
+    const available = route.candidates.filter(m => !current.some(o => covers(o, m)));
+    // Outages are assumptions about the future: a route they would empty keeps every
+    // candidate, and its purpose says so, rather than refusing every new task.
+    if (available.length) route.candidates = available;
+    else route.purpose = `${route.purpose} (all candidates recently unavailable; tried anyway)`;
   }
   return policy;
 }

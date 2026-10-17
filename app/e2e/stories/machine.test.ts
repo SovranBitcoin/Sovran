@@ -3,13 +3,14 @@ import { spawn } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { checkoutLane } from './workers';
 
 const folder = mkdtempSync(join(tmpdir(), 'sovran-lease-'));
 const lease = join(folder, 'lease.json');
 process.env.SOVRAN_NATIVE_LEASE = lease;
 process.env.SOVRAN_NATIVE_MIN_FREE_GB = '0';
+// Both read where the lease lives as they load, so they load after it is set.
 const { holdNativeLease } = await import('./machine');
+const { checkoutLane } = await import('./workers');
 
 test('two checkouts of one folder name get different simulators', () => {
   expect(checkoutLane('/a/sovran-app')).not.toBe(checkoutLane('/b/sovran-app'));

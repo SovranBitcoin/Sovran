@@ -20,6 +20,13 @@
 set -euo pipefail
 
 link() { echo "https://$1.ngrok.io/_expo/link?choice=expo-dev-client"; }
+# ngrok allows lower-case letters, digits and hyphens, up to 63 of them.
+subdomain_for() {
+  local name
+  name=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9-' '-' | sed -E 's/-+/-/g; s/^-|-$//g' | cut -c1-48)
+  name="sovran-${name#sovran-}"
+  echo "${name%-}"
+}
 sessions() { { screen -ls || true; } | awk '$1 ~ /\.sovran-/ {sub(/^[0-9]+\./, "", $1); print $1}'; }
 
 detach=0
@@ -32,7 +39,7 @@ case "${1:-}" in
   --detach) detach=1; shift ;;
   --stop)
     [[ -n "${2:-}" ]] || { echo "dev-tunnel: --stop needs a name" >&2; exit 1; }
-    session="sovran-${2#sovran-}"
+    session=$(subdomain_for "${2#*/}")
     pid=$({ screen -ls || true; } | awk -v s="$session" '$1 ~ "\\."s"$" {split($1, a, "."); print a[1]}')
     [[ -n "$pid" ]] || { echo "dev-tunnel: $session is not running" >&2; exit 1; }
     # Ctrl-c typed into screen does not get through `script`'s terminal, so
@@ -61,10 +68,7 @@ if [[ -z "${1:-}" ]]; then
     set -- "${branch#*/}"
   fi
 fi
-# ngrok allows lower-case letters, digits and hyphens, up to 63 of them.
-name=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9-' '-' | sed -E 's/-+/-/g; s/^-|-$//g' | cut -c1-48)
-subdomain="sovran-${name#sovran-}"
-subdomain=${subdomain%-}
+subdomain=$(subdomain_for "$1")
 
 if { screen -ls || true; } | grep -q "\.$subdomain[[:space:]]"; then
   echo "dev-tunnel: $subdomain is already running; open $(link "$subdomain")" >&2
@@ -108,7 +112,7 @@ fi
 screen -dmS "$subdomain" bun run dev --tunnel --port "$port"
 # Ready means the tunnel itself answers with the redirect into the dev client.
 for _ in $(seq 1 120); do
-  location=$(curl -s -o /dev/null -w '%{redirect_url}' -A 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)' "$(link "$subdomain")" || true)
+  location=$(curl -s --max-time 5 -o /dev/null -w '%{redirect_url}' -A 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)' "$(link "$subdomain")" || true)
   if [[ "$location" == exp+sovran://* ]]; then
     echo "dev-tunnel: ready in screen session $subdomain"
     echo "dev-tunnel: open $(link "$subdomain")"

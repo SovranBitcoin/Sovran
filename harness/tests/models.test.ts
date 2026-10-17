@@ -356,10 +356,13 @@ test('a provider out of quota is left out of the next task\'s routes until it is
   const now = await dispatch(c, { action: 'model-policy', catalog: catalog(new Date().toISOString()) });
   if (!('kind' in now)) throw new Error('Expected a routed policy');
   for (const route of Object.values(now.routes)) expect(route.candidates.map(m => m.provider)).not.toContain('codex');
-  const later = recommendedModels(catalog(new Date(Date.parse(recorded!.until) + 1).toISOString()), c.outages());
+  const expired = { ...recorded!, until: new Date(Date.now() - 1).toISOString() };
+  const later = recommendedModels(catalog(new Date().toISOString()), [expired]);
   if (!('kind' in later)) throw new Error('Expected a routed policy');
   expect(later.routes.implementation.candidates[0]?.provider).toBe('codex');
-  expect(() => recommendedModels(catalog(new Date().toISOString()), [
-    ...c.outages(), { ...recorded!, provider: 'claudeAgent' },
-  ])).toThrow('No available model');
+  // Every provider out: routes keep their candidates rather than refusing new tasks.
+  const none = recommendedModels(catalog(new Date().toISOString()), [recorded!, { ...recorded!, provider: 'claudeAgent' }]);
+  if (!('kind' in none)) throw new Error('Expected a routed policy');
+  expect(none.routes.review.candidates).toHaveLength(2);
+  expect(none.routes.review.purpose).toContain('tried anyway');
 });

@@ -13,15 +13,15 @@
  */
 import { execFileSync, spawnSync } from 'node:child_process';
 import {
-  closeSync,
   existsSync,
+  linkSync,
   mkdirSync,
-  openSync,
   readFileSync,
   readdirSync,
+  renameSync,
   rmSync,
   statfsSync,
-  writeSync,
+  writeFileSync,
 } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -67,52 +67,96 @@ const freeGb = (path = tmpdir()) => {
 };
 
 /**
- * Take the Mac's native lease for `what`, waiting while another checkout holds
- * it, and give it back when this process ends. Fails at once when the disk is
- * too full to finish, naming what can be reclaimed.
+ * Move aside a lease whose holder has gone. Another waiter may have done the
+ * same and taken a fresh lease in between; if what was moved is not what was
+ * read, it is put back.
  */
-export async function holdNativeLease(what: string): Promise<void> {
+function clearStale(): void {
+  let seen: string;
+  try {
+    seen = readFileSync(LEASE, 'utf8');
+    const { pid } = JSON.parse(seen) as Holder;
+    if (alive(pid)) return;
+  } catch (error) {
+    // Missing: nothing to clear. Unreadable: a lease is written whole, so this is not one.
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return;
+    seen = '';
+  }
+  const aside = `${LEASE}.${process.pid}.stale`;
+  try {
+    renameSync(LEASE, aside);
+  } catch {
+    return;
+  }
+  if (readFileSync(aside, 'utf8') !== seen) {
+    try {
+      linkSync(aside, LEASE);
+    } catch {
+      // Someone else holds it now; the one moved aside lost the race either way.
+    }
+  }
+  rmSync(aside, { force: true });
+}
+
+/**
+ * Take the Mac's native lease for `what`, waiting while another checkout holds
+ * it. Fails at once when the disk is too full to finish, naming what can be
+ * reclaimed. Returns its release, which also runs when this process ends.
+ */
+export async function holdNativeLease(
+  what: string,
+  { needsDisk = true } = {}
+): Promise<() => void> {
   const inherited = Number(process.env[HELD]);
-  if (inherited && holder()?.pid === inherited) return;
+  if (inherited && holder()?.pid === inherited) return () => {};
   const free = freeGb();
-  if (free < NATIVE_MIN_FREE_GB)
+  if (needsDisk && free < NATIVE_MIN_FREE_GB)
     throw new Error(
       `${what} needs ${NATIVE_MIN_FREE_GB} GB free and this Mac has ${free.toFixed(1)} GB. ` +
         'See what test runs left behind with `bun app/e2e/stories/machine.ts reclaim`.'
     );
   mkdirSync(dirname(LEASE), { recursive: true });
+  const mine: Holder = {
+    pid: process.pid,
+    what,
+    checkout: process.cwd(),
+    since: new Date().toISOString(),
+  };
+  // Written whole first and linked into place, so no one ever reads half a lease.
+  const draft = `${LEASE}.${process.pid}.draft`;
+  writeFileSync(draft, JSON.stringify(mine));
   let told = false;
-  for (;;) {
-    const current = holder();
-    if (!current) rmSync(LEASE, { force: true });
-    try {
-      const fd = openSync(LEASE, 'wx');
-      const mine: Holder = {
-        pid: process.pid,
-        what,
-        checkout: process.cwd(),
-        since: new Date().toISOString(),
-      };
-      writeSync(fd, JSON.stringify(mine));
-      closeSync(fd);
-      break;
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+  try {
+    for (;;) {
+      clearStale();
+      try {
+        linkSync(draft, LEASE);
+        break;
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+      }
+      const current = holder();
+      if (!told && current) {
+        console.log(
+          `waiting for the native lease: ${current.what} in ${current.checkout} (process ${current.pid}, since ${current.since})`
+        );
+        told = true;
+      }
+      await new Promise((resolve) => setTimeout(resolve, WAIT_MS));
     }
-    if (!told && current) {
-      console.log(
-        `waiting for the native lease: ${current.what} in ${current.checkout} (process ${current.pid}, since ${current.since})`
-      );
-      told = true;
-    }
-    await new Promise((resolve) => setTimeout(resolve, WAIT_MS));
+  } finally {
+    rmSync(draft, { force: true });
   }
   process.env[HELD] = String(process.pid);
   const release = () => {
-    if (holder()?.pid === process.pid) rmSync(LEASE, { force: true });
+    if (holder()?.pid !== process.pid) return;
+    rmSync(LEASE, { force: true });
+    delete process.env[HELD];
+    process.off('exit', release);
   };
   // A process killed outright leaves the file, and the next taker sees its holder has gone.
   process.on('exit', release);
+  return release;
 }
 
 interface Device {
@@ -152,10 +196,10 @@ function leftovers(): { label: string; gb: number; remove: () => void }[] {
   for (const device of devices()) {
     // Ephemeral run simulators are deleted as their run ends; one still here outlived it.
     const ephemeral = device.name.startsWith('Sovran E2E ');
-    const worker = /^sovran-e2e-.*worker-\d+$/.test(device.name);
-    // Before each checkout had its own, every checkout shared this one.
-    const shared = device.name === 'sovran-e2e-base';
-    if ((ephemeral || worker || shared || orphaned(device)) && device.state === 'Shutdown')
+    // Not the shared `sovran-e2e-base` and `sovran-e2e-worker-N` of older checkouts: their
+    // runs take no lease, so one could be cloning from them now.
+    const worker = /^sovran-e2e-.+-worker-\d+$/.test(device.name);
+    if ((ephemeral || worker || orphaned(device)) && device.state === 'Shutdown')
       found.push({
         label: `simulator ${device.name}`,
         gb: sizeGb(join(device.dataPath, '..')),
@@ -191,6 +235,8 @@ function leftovers(): { label: string; gb: number; remove: () => void }[] {
   for (const name of readdirSync(tmpdir())) {
     if (!name.startsWith('sovran-e2e-android-avd-')) continue;
     const path = join(tmpdir(), name);
+    // Older runners make these without the lease: one an emulator still uses is not left behind.
+    if (spawnSync('pgrep', ['-f', path]).status === 0) continue;
     found.push({
       label: `Android emulator left by a run (${name})`,
       gb: sizeGb(path),
@@ -214,10 +260,8 @@ if (import.meta.main) {
     for (const device of devices().filter((candidate) => candidate.state === 'Booted'))
       console.log(`booted: ${device.name} (${device.udid})`);
   } else if (command === 'reclaim') {
-    if (holder()) {
-      console.error('A native run holds the lease; reclaim once it has finished.');
-      process.exit(1);
-    }
+    // Held throughout, so no run starts making what is about to be deleted.
+    const release = await holdNativeLease('reclaim', { needsDisk: false });
     const found = leftovers();
     for (const item of found) console.log(`${item.gb.toFixed(1).padStart(6)} GB  ${item.label}`);
     const total = found.reduce((sum, item) => sum + item.gb, 0);
@@ -227,6 +271,7 @@ if (import.meta.main) {
       for (const item of found) item.remove();
       console.log(`deleted; ${freeGb().toFixed(1)} GB free`);
     }
+    release();
   } else {
     console.error('Usage: bun app/e2e/stories/machine.ts status | reclaim [--yes]');
     process.exit(2);

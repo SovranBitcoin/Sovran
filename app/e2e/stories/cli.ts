@@ -119,7 +119,18 @@ if (!existsSync(appPath)) {
   console.error(`No test build at ${appPath}: bun e2e/press/native-build.ts ios --bundled`);
   process.exit(2);
 }
-const udid = flag('udid') ?? ownSimulator(appPath);
+/**
+ * The story's own end, if this checkout's simulator holds it, means it was played
+ * there before; a wallet cannot be replayed against a public mint, so the story
+ * gets a fresh copy of the simulator instead.
+ */
+const playedOn = (candidate: string) => {
+  if (!storyPath) return false;
+  const text = readFileSync(storyPath, 'utf8');
+  const parsed = storySchema.parse(JSON.parse(text));
+  return storySimulator(candidate).hasState(parsed.id, madeFrom(parsed, text));
+};
+const udid = flag('udid') ?? (await ownSimulator(appPath, bundled ? undefined : playedOn));
 
 /** What the recorder is given to capture the final screen. This paces no step. */
 const LAST_FRAME_MS = 300;

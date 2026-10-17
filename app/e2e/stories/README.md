@@ -11,7 +11,9 @@ bun run e2e:story e2e/stories/library/<story>.json --look   # one story, about 1
 
 Each checkout has its own simulators, named after it (`sovran-e2e-<checkout>-…`), so worktrees
 running at once never touch each other's. A single story plays on the checkout's own simulator,
-made on first use and used again until the build changes; `--udid` picks another and `--app`
+made on first use and used again until the build changes, so later stories start from states
+earlier ones saved. A story it has already played gets a fresh copy (about a minute), since a
+wallet cannot be replayed against a public mint. `--udid` picks another simulator, `--app`
 another build. None opens a window. Builds and multi-story runs take one lease for the whole Mac
 and wait their turn, and refuse to start below 20 GB free:
 `bun app/e2e/stories/machine.ts status` shows who holds it, and `machine.ts reclaim` lists the

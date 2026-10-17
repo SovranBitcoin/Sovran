@@ -17,6 +17,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { holdNativeLease } from './machine';
 import { simctl } from './simctl';
 
 /** The checkout these simulators belong to: its folder name, and a hash of its path so two folders of one name differ. */
@@ -282,28 +283,49 @@ export function startWorkers(baseUdid: string, count: number): string[] {
 
 /**
  * This checkout's own simulator for playing one story at a time, booted and
- * ready: cloned from the prepared one, and used again by every later story
- * until the build changes. Nothing else here removes it.
+ * ready: cloned from the prepared one, and used again by later stories, which
+ * can start from the states earlier ones saved, until the build changes or
+ * `playedOn` says it has already played this one. Nothing else here removes it.
  */
-export function ownSimulator(appPath: string): string {
-  const base = prepareBase(appPath);
+export async function ownSimulator(
+  appPath: string,
+  playedOn?: (udid: string) => boolean
+): Promise<string> {
   const stamp = wanted(appPath);
-  const existing = devices().find((device) => device.name === OWN_NAME);
-  let udid = existing?.udid;
-  if (existing && readStamp(existing) !== stamp) {
-    remove(existing.udid);
-    udid = undefined;
-  }
-  if (!udid) {
-    udid = simctl('clone', base, OWN_NAME);
+  const ready = () => {
+    const own = devices().find((device) => device.name === OWN_NAME);
+    return own && readStamp(own) === stamp ? own : undefined;
+  };
+  const boot = (udid: string) => {
+    try {
+      simctl('boot', udid);
+    } catch {
+      // Already booted, perhaps by another story of this checkout a moment ago.
+    }
+    simctl('bootstatus', udid, '-b');
+    return udid;
+  };
+  const existing = ready();
+  if (existing && !playedOn?.(boot(existing.udid))) return existing.udid;
+  // Making a simulator is native work: queue for it, and look again once it is our turn.
+  const release = await holdNativeLease(`this checkout's simulator`);
+  try {
+    const own = ready();
+    if (own && own.udid !== existing?.udid && !playedOn?.(boot(own.udid))) return own.udid;
+    const base = prepareBase(appPath);
+    for (const stale of devices().filter((device) => device.name === OWN_NAME)) {
+      if (stale.state !== 'Shutdown') simctl('shutdown', stale.udid);
+      remove(stale.udid);
+    }
+    const udid = simctl('clone', base, OWN_NAME);
     switchOffUnusedServices(udid);
     const made = devices().find((device) => device.udid === udid);
     if (!made) throw new Error("This checkout's simulator disappeared while it was being made.");
     writeFileSync(join(made.dataPath, '..', STAMP_FILE), stamp);
+    return boot(udid);
+  } finally {
+    release();
   }
-  if (devices().find((device) => device.udid === udid)?.state !== 'Booted') simctl('boot', udid);
-  simctl('bootstatus', udid, '-b');
-  return udid;
 }
 
 function readStamp(device: Device): string | undefined {
