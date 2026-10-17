@@ -183,10 +183,13 @@
       "name": "scroll down",
       "swipe": {
         "on": {
-          "id": "settings-network-row"
+          "id": "screen-settings"
         },
         "direction": "up",
-        "distance": 0.6
+        "distance": 0.4,
+        "until": {
+          "id": "settings-terms-row"
+        }
       },
       "expect": [
         {
@@ -194,16 +197,20 @@
             "id": "settings-terms-row"
           }
         }
-      ]
+      ],
+      "withinMs": 15000
     },
     {
       "name": "scroll to the very end",
       "swipe": {
         "on": {
-          "id": "settings-terms-row"
+          "id": "screen-settings"
         },
         "direction": "up",
-        "distance": 0.3
+        "distance": 0.4,
+        "until": {
+          "id": "settings-version-row"
+        }
       },
       "expect": [
         {
@@ -211,7 +218,8 @@
             "id": "settings-version-row"
           }
         }
-      ]
+      ],
+      "withinMs": 15000
     },
     {
       "name": "press the version three times",
@@ -232,10 +240,13 @@
       "name": "scroll to the developer rows",
       "swipe": {
         "on": {
-          "id": "settings-terms-row"
+          "id": "screen-settings"
         },
         "direction": "up",
-        "distance": 0.8
+        "distance": 0.4,
+        "until": {
+          "id": "settings-mock-mode-toggle"
+        }
       },
       "expect": [
         {
@@ -243,7 +254,8 @@
             "id": "settings-mock-mode-toggle"
           }
         }
-      ]
+      ],
+      "withinMs": 15000
     },
     {
       "name": "turn on Mock Mode, and let the notice over the header go",
@@ -301,7 +313,8 @@
             "id": "transactions-view-all"
           }
         }
-      ]
+      ],
+      "withinMs": 15000
     },
     {
       "name": "view all of the history",
