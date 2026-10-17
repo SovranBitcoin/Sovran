@@ -136,7 +136,7 @@ reports) keep their evidence, and link here for anything still open.
 | [F153](F153.md) | medium | fix | An answer that arrives while a chat is open is not shown until the chat is opened again |
 | [F154](F154.md) | low | test | Pre-existing native harness and lint failures remain |
 | [F155](F155.md) | low | device | Consolidated results needs Android and semantic verification |
-| [F156](F156.md) | medium | fix | Bind functional native and performance evidence to full-send task gates |
+| [F156](F156.md) | medium | fix | Pilot the bound native story gate through full-send, and bind performance evidence |
 | [F157](F157.md) | medium | test | Validate the complete full-send workflow against live T3 providers and GitHub |
 | [F158](F158.md) | low | fix | Web export cannot resolve the platform-only GlassSearchBar |
 | [F159](F159.md) | high | test | Add explicit model effort and reconciled availability fallback to task attempts |
