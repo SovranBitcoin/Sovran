@@ -7,7 +7,7 @@ import { inspectNodeTests, isNativeCheck, isNodeCheck, regression, validateVerif
 import { inspectNativeStories, nativeRunnerChanges } from './native';
 import { runCommand } from './command';
 import { inspectChange } from './policy';
-import { inspectUpgradeEvidence, upgradeInventorySchema } from './upgrade';
+import { inspectUpgradeEvidence, upgradeInventorySchema, upgradeReceiptSummary } from './upgrade';
 import { brief } from './brief';
 import { assessmentArtifacts, inspected, unresolved, validateResolutions } from './evidence';
 import { Publisher, publishPlan } from './publisher';
@@ -613,7 +613,7 @@ export class Controller {
           const inspected = inspectUpgradeEvidence(JSON.parse(readFileSync(upgradePath, 'utf8')), inventory);
           artifacts.push(fileEvidence(dir, `${t.generation}-upgrade.json`), this.save(t, 'upgrade-inspection.json', inspected));
           outcome = inspected.status;
-          summary = inspected.status === 'pass' ? 'Recorded historical fixture checks passed; this is bounded unit evidence' : inspected.reasons.join('\n');
+          summary = upgradeReceiptSummary(inspected);
         } catch (error) { outcome = 'inconclusive'; summary = `Upgrade evidence unavailable: ${String(error)}`; }
       }
       t = this.change(id, `result:${t.generation}:${check.id}`, { exit, artifacts, outcome, summary }, v => {
