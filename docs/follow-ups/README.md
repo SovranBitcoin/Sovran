@@ -148,7 +148,7 @@ reports) keep their evidence, and link here for anything still open.
 | [F165](F165.md) | medium | device | Check the instant mint page, its stars and ring, and its Details modal on both platforms |
 | [F166](F166.md) | medium | fix | The docs build fails on 22 dead links |
 | [F167](F167.md) | medium | fix | The testing coverage ledger cites a deleted test and misses a scenario |
-| [F168](F168.md) | high | investigation | The upgrade gate is inconclusive on main for every app change, so no app task can pass |
+| [F168](F168.md) | high | decision | The upgrade gate is inconclusive on main for every app change, so no app task can pass |
 | [F169](F169.md) | medium | fix | A failed research pass ends a full-send task; amend and reseal its contract in place |
 | [F170](F170.md) | medium | decision | Bound native runs rebuild both platforms from scratch on every verify and repair |
 | [F171](F171.md) | low | upstream | Harness simulators appear as windows whenever Simulator.app is open |
