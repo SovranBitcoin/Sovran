@@ -4,7 +4,7 @@ on:
   push:
     branches: [main, master]
   pull_request:
-    branches: [main, master]
+    branches: [main, master, feat/offline-send-just-works]
 
 env:
   APP_DIR: app

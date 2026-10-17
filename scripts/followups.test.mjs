@@ -12,8 +12,11 @@ const README =
 const entry = (id, title = "Something is left") =>
   `---\nid: ${id}\ntitle: ${JSON.stringify(title)}\npriority: low\nneeds: fix\n---\n\nWhat is wrong.\n\n## Done when\n\nIt is right.\n`;
 
-/** A scratch repository holding one open entry, F12, plus the given files. */
-function ledger(files = {}) {
+/**
+ * A scratch repository holding one open entry, F12, plus the given files. Those named in
+ * `staged` are added to the index; the rest stay untracked.
+ */
+function ledger(files = {}, staged = []) {
   const root = mkdtempSync(join(tmpdir(), "followups-"));
   execFileSync("git", ["init", "-q"], { cwd: root });
   const all = {
@@ -25,6 +28,8 @@ function ledger(files = {}) {
     mkdirSync(dirname(join(root, path)), { recursive: true });
     writeFileSync(join(root, path), text);
   }
+  if (staged.length)
+    execFileSync("git", ["add", "--", ...staged], { cwd: root });
   const run = (...args) => {
     const result = spawnSync("node", [SCRIPT, ...args], {
       env: { ...process.env, FOLLOWUPS_ROOT: root },
@@ -122,4 +127,37 @@ test("an unknown command prints usage", () => {
   const { run, done } = ledger();
   assert.match(run("chekc").text, /usage: followups check/);
   done();
+});
+
+/** A tracked and an untracked file whose names contain `special`, each citing a deleted entry. */
+function specialNames(special) {
+  const tracked = `notes${special}tracked.md`;
+  const untracked = `src/a${special}untracked.ts`;
+  const { run, done } = ledger(
+    { [tracked]: "See F40.\n", [untracked]: "// FOLLOWUP(F41): finish this\n" },
+    [tracked],
+  );
+  const result = run("check");
+  done();
+  assert.equal(result.code, 1, result.text);
+  assert.ok(
+    result.text.includes(`${tracked}:1: F40 is not an open follow-up`),
+    result.text,
+  );
+  assert.ok(
+    result.text.includes(`${untracked}:1: F41 is not an open follow-up`),
+    result.text,
+  );
+}
+
+test("unresolved references in Unicode filenames fail", () => {
+  specialNames("\u00e9");
+});
+
+test("unresolved references in tab filenames fail", () => {
+  specialNames("\t");
+});
+
+test("unresolved references in newline filenames fail", () => {
+  specialNames("\n");
 });
