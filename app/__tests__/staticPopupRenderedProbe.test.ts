@@ -23,7 +23,6 @@ jest.mock('@/shared/lib/popup/popups/proofSelectorSheet', () => ({}));
 jest.mock('@/shared/lib/popup/popups/sendFallbackSheet', () => ({}));
 jest.mock('@/shared/lib/popup/popups/sendMemoSheet', () => ({}));
 jest.mock('@/shared/lib/popup/popups/emojiPicker', () => ({}));
-jest.mock('@/shared/lib/popup/popups/modelPicker', () => ({}));
 jest.mock('@/shared/lib/popup/popups/actionMenu', () => ({}));
 jest.mock('@/shared/lib/popup/popups/deleteStatus', () => ({}));
 jest.mock('@/shared/lib/popup/popups/payment', () => ({}));
