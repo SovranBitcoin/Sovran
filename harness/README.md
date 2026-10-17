@@ -219,6 +219,17 @@ stop incomplete. The controller-driven pilot and performance evidence are tracke
 [F156](../docs/follow-ups/F156.md). This version must not be presented as production-ready
 autonomous wallet development.
 
+## Sharing one Mac
+
+Several tasks run at once, each in its own worktree. Briefs tell workers to look at the app
+only through the story runners, which give each checkout its own windowless simulators; native
+builds and story runs queue on one lease for the whole Mac and refuse to start below 20 GB free
+(`bun app/e2e/stories/machine.ts status`). A worker also writes its assessment to the brief's
+`resultFile`, so a host restart cannot lose a finished result. A `fallback` records the provider
+or model as unavailable for an assumed period, and `model-policy` leaves it out of new routes
+until then. After publishing, `bun run dev:tunnel --detach` serves the branch to the owner's
+phone through a link that opens the Sovran dev client.
+
 ## Development
 
 The Node test collector requires `node:test.expectFailure` support (validated here with
