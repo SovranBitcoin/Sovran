@@ -7,16 +7,14 @@
  * was tapped.
  */
 
-import { useEffect, useState } from 'react';
-import { useNavigation } from 'expo-router';
+import { useState } from 'react';
+import { Platform } from 'react-native';
 import Icon from 'assets/icons';
 
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import {
-  answerPicker,
-  pickerRouteMounted,
-  pickerRouteUnmounted,
-} from '@/shared/lib/picker/openPicker';
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
+import { pickerSheet } from '@/shared/lib/picker/openPicker';
+import { useSheetRouteScreen } from '@/shared/lib/picker/useSheetRouteScreen';
 import type { PickerOption, PickerResult, PickerSection } from '@/shared/lib/picker/types';
 import { usePickerSheetStore } from '@/shared/stores/runtime/pickerSheetStore';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
@@ -24,11 +22,32 @@ import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { ListRow } from '@/shared/ui/composed/ListRow';
 import { PillTabs, PILL_TABS_HEIGHT } from '@/shared/ui/composed/PillTabs';
 import { Screen, useScreenOptions } from '@/shared/ui/composed/Screen';
+import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { ScreenScrollView } from '@/shared/ui/composed/ScreenScrollView';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 
 const EMPTY_SECTIONS: readonly PickerSection[] = [];
+
+/**
+ * The header control that leaves a sheet route: the close on iPhone, where it
+ * is a sheet, and the back arrow on Android, where it is a page. One selector
+ * on both, so a native test leaves every sheet the same way.
+ */
+function SheetCloseButton() {
+  const sheet = Platform.OS === 'ios';
+  return (
+    <ScreenHeaderAction
+      icon={sheet ? 'material-symbols:close-rounded' : 'material-symbols:arrow-back-rounded'}
+      accessibilityLabel={sheet ? 'Close screen' : 'Go back'}
+      testID="picker-sheet-close"
+      onPress={() => router.back()}
+    />
+  );
+}
+
+// Module scope, so the header's component identity is stable across renders.
+const renderSheetCloseButton = () => <SheetCloseButton />;
 
 function PickerRow({
   option,
@@ -60,7 +79,9 @@ function PickerRow({
           option.title
         )
       }
-      // A disabled choice stays in the list and says why.
+      // A disabled choice stays in the list, dimmed, and says why. The current
+      // choice is drawn at full strength with its check; picking it again is
+      // the opener's no-op, not a dimmed row.
       subtitle={option.disabled && option.reason ? option.reason : option.description}
       wrapSubtitle
       trailing={trailing}
@@ -75,23 +96,14 @@ function PickerRow({
 
 export function PickerSheetScreen() {
   const request = usePickerSheetStore((state) => state.request);
-  const navigation = useNavigation();
+  const pick = useSheetRouteScreen(pickerSheet);
   const [headerHeight, setHeaderHeight] = useState(0);
   const [chosenTab, setChosenTab] = useState<string | null>(null);
 
-  useScreenOptions(() => ({ headerTitle: request?.title ?? '' }), [request?.title]);
-
-  // Leaving by any road (a tap, a pull, the close or back button) ends the
-  // picker; `openPicker` answers whoever is still waiting.
-  useEffect(() => {
-    pickerRouteMounted();
-    return pickerRouteUnmounted;
-  }, []);
-
-  // Go back from this screen itself, so the tap can only ever close the sheet.
-  const pick = (result: PickerResult) => {
-    if (answerPicker(result)) navigation.goBack();
-  };
+  useScreenOptions(
+    () => ({ headerTitle: request?.title ?? '', headerLeft: renderSheetCloseButton }),
+    [request?.title]
+  );
 
   // Only tabs that have rows; a single one needs no tab bar. The first tab is
   // the one holding the current choice, until the person picks another.

@@ -56,7 +56,7 @@ export type PickerResult =
   { kind: 'option'; id: string } | { kind: 'action'; id: string } | { kind: 'dismissed' };
 
 /** One open picker, as its opener holds it. */
-export interface PickerSession {
+export interface PickerSession<Request = PickerRequest> {
   /**
    * The person's answer. A row or footer button resolves it at the tap; it
    * resolves `dismissed` when the sheet goes without one (pulled down, the
@@ -70,5 +70,5 @@ export interface PickerSession {
    */
   closed: Promise<void>;
   /** Replaces what the sheet shows. Does nothing once the answer is in or another picker has taken over. */
-  update: (request: PickerRequest) => void;
+  update: (request: Request) => void;
 }

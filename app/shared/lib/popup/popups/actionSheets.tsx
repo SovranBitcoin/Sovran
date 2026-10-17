@@ -42,10 +42,9 @@ function profileOption(profile: ProfileEntry, activeIndex: number): PickerOption
       profile.cachedBalanceSats != null ? (
         <AmountFormatter amount={profile.cachedBalanceSats} unit="sat" size={13} weight="medium" />
       ) : undefined,
-    // The active profile is the current choice: checked, and inert to
-    // re-selection.
+    // The active profile is the current choice: checked. Picking it again
+    // only closes the sheet (see `openProfileSwitcher`).
     selected: isActive,
-    disabled: isActive,
   };
 }
 
@@ -100,7 +99,9 @@ export async function openProfileSwitcher(payload: ProfileSwitcherPayload): Prom
   await picker.closed;
   if (result.kind === 'option') {
     const profile = profiles.find((p) => String(p.accountIndex) === result.id);
-    if (profile) payload.onRequestAction({ type: 'switch', accountIndex: profile.accountIndex });
+    if (profile && profile.accountIndex !== activeAccountIndex) {
+      payload.onRequestAction({ type: 'switch', accountIndex: profile.accountIndex });
+    }
   } else if (result.id === 'create') {
     payload.onRequestAction({ type: 'create' });
   } else if (result.id === 'import') {

@@ -6,12 +6,8 @@
  * gone.
  */
 
-import {
-  answerPicker,
-  openPicker,
-  pickerRouteMounted,
-  pickerRouteUnmounted,
-} from '@/shared/lib/picker/openPicker';
+import { pickOption, pickerSheet } from '@/shared/lib/picker/openPicker';
+import { createSheetRoute, OPEN_BOUND_MS, type SheetRoute } from '@/shared/lib/picker/sheetRoute';
 import type { PickerRequest } from '@/shared/lib/picker/types';
 import { usePickerSheetStore } from '@/shared/stores/runtime/pickerSheetStore';
 
@@ -34,17 +30,39 @@ async function settled(promise: Promise<unknown>): Promise<boolean> {
   return done;
 }
 
+/** A fresh lifecycle per test, handing its requests to `shown`. */
+let sheet: SheetRoute<PickerRequest>;
+let shown: PickerRequest | null = null;
+const openPicker = (next: PickerRequest) => sheet.open(next);
+
+/** The screen's side of the lifecycle, for the open sheet's current instance. */
+let instance: number | null = null;
+const answerPicker = (...args: Parameters<SheetRoute<PickerRequest>['answer']>) =>
+  sheet.answer(...args);
+const pickerRouteMounted = () => {
+  instance = sheet.mounted();
+};
+const pickerRouteUnmounted = () => sheet.unmounted(instance);
+
 beforeEach(() => {
-  // Ends whatever an earlier test left open.
-  pickerRouteUnmounted();
+  sheet = createSheetRoute<PickerRequest>('/picker', {
+    show: (next) => (shown = next),
+    clear: () => (shown = null),
+  });
+  shown = null;
+  instance = null;
   mockPush.mockClear();
 });
 
-describe('openPicker', () => {
-  it('pushes the route once and hands the rows over', () => {
+afterEach(() => {
+  jest.useRealTimers();
+});
+
+describe('a sheet route', () => {
+  it('pushes the route once and hands the request over', () => {
     openPicker(request('Select profile'));
     expect(mockPush).toHaveBeenCalledWith('/picker');
-    expect(usePickerSheetStore.getState().request?.title).toBe('Select profile');
+    expect(shown?.title).toBe('Select profile');
   });
 
   it('answers a tap at once, and closes only when the route unmounts', async () => {
@@ -57,7 +75,7 @@ describe('openPicker', () => {
 
     pickerRouteUnmounted();
     expect(await settled(session.closed)).toBe(true);
-    expect(usePickerSheetStore.getState().request).toBeNull();
+    expect(shown).toBeNull();
   });
 
   it('counts only the first tap', async () => {
@@ -83,7 +101,7 @@ describe('openPicker', () => {
 
     await expect(first.result).resolves.toEqual({ kind: 'dismissed' });
     expect(mockPush).toHaveBeenCalledTimes(1);
-    expect(usePickerSheetStore.getState().request?.title).toBe('Second');
+    expect(shown?.title).toBe('Second');
 
     // The first opener's sheet is still on screen, now showing the second.
     expect(await settled(first.closed)).toBe(false);
@@ -101,11 +119,11 @@ describe('openPicker', () => {
 
     const next = openPicker(request('Next'));
     expect(mockPush).toHaveBeenCalledTimes(1);
-    expect(usePickerSheetStore.getState().request?.title).toBe('First');
+    expect(shown?.title).toBe('First');
 
     pickerRouteUnmounted();
     expect(mockPush).toHaveBeenCalledTimes(2);
-    expect(usePickerSheetStore.getState().request?.title).toBe('Next');
+    expect(shown?.title).toBe('Next');
     expect(await settled(next.result)).toBe(false);
   });
 
@@ -115,18 +133,77 @@ describe('openPicker', () => {
     const second = openPicker(request('Second'));
 
     first.update(request('First again'));
-    expect(usePickerSheetStore.getState().request?.title).toBe('Second');
+    expect(shown?.title).toBe('Second');
 
     second.update(request('Second, refreshed'));
-    expect(usePickerSheetStore.getState().request?.title).toBe('Second, refreshed');
+    expect(shown?.title).toBe('Second, refreshed');
 
     answerPicker({ kind: 'option', id: 'a' });
     second.update(request('After the answer'));
-    expect(usePickerSheetStore.getState().request?.title).toBe('Second, refreshed');
+    expect(shown?.title).toBe('Second, refreshed');
   });
 
-  it('ignores a tap on a sheet nobody opened', () => {
-    pickerRouteMounted();
+  it('ignores a tap on a sheet nobody opened, and tells that screen to leave', () => {
+    expect(sheet.mounted()).toBeNull();
     expect(answerPicker({ kind: 'option', id: 'a' })).toBe(false);
+  });
+
+  it('gives up a push that never mounts, so the next open pushes again', async () => {
+    jest.useFakeTimers();
+    const lost = openPicker(request('Lost'));
+    jest.advanceTimersByTime(OPEN_BOUND_MS - 1);
+    expect(await settled(lost.result)).toBe(false);
+
+    jest.advanceTimersByTime(1);
+    await expect(lost.result).resolves.toEqual({ kind: 'dismissed' });
+    expect(await settled(lost.closed)).toBe(true);
+    expect(shown).toBeNull();
+
+    openPicker(request('Next'));
+    expect(mockPush).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps a sheet that mounted in time open past the bound', async () => {
+    jest.useFakeTimers();
+    const session = openPicker(request('One'));
+    pickerRouteMounted();
+    jest.advanceTimersByTime(OPEN_BOUND_MS * 2);
+    expect(await settled(session.result)).toBe(false);
+  });
+
+  it('ignores the unmount of a screen from a push that was given up', async () => {
+    jest.useFakeTimers();
+    openPicker(request('Lost'));
+    jest.advanceTimersByTime(OPEN_BOUND_MS);
+    // The lost push lands late: nobody is waiting, so it leaves.
+    const late = sheet.mounted();
+    expect(late).toBeNull();
+
+    const next = openPicker(request('Next'));
+    pickerRouteMounted();
+    sheet.unmounted(late);
+    expect(await settled(next.result)).toBe(false);
+  });
+});
+
+describe('pickOption', () => {
+  it('resolves with the row, or null without one', async () => {
+    let mounted: number | null;
+    const picked = pickOption(request('One'));
+    mounted = pickerSheet.mounted();
+    pickerSheet.answer({ kind: 'option', id: 'a' });
+    await expect(picked).resolves.toBe('a');
+    pickerSheet.unmounted(mounted);
+
+    const dismissed = pickOption(request('Two'));
+    mounted = pickerSheet.mounted();
+    pickerSheet.unmounted(mounted);
+    await expect(dismissed).resolves.toBeNull();
+  });
+
+  it('shows the rows in the picker sheet store', () => {
+    void pickOption(request('Shown'));
+    expect(usePickerSheetStore.getState().request?.title).toBe('Shown');
+    expect(mockPush).toHaveBeenCalledWith('/picker');
   });
 });

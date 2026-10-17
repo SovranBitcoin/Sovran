@@ -60,7 +60,7 @@ beforeEach(() => {
 });
 
 describe('openProfileSwitcher', () => {
-  it('asks for Imported and Derived tabs with the active profile checked and inert', () => {
+  it('asks for Imported and Derived tabs with the active profile checked', () => {
     void openProfileSwitcher({ onRequestAction: jest.fn() });
     const request = mockRequest!;
 
@@ -82,8 +82,9 @@ describe('openProfileSwitcher', () => {
         disabled,
       }))
     ).toEqual([
-      { testID: 'profile-row-0', title: 'name-a', selected: true, disabled: true },
-      { testID: 'profile-row-1', title: 'Second', selected: false, disabled: false },
+      // Selected is not disabled: the current choice is drawn at full strength.
+      { testID: 'profile-row-0', title: 'name-a', selected: true, disabled: undefined },
+      { testID: 'profile-row-1', title: 'Second', selected: false, disabled: undefined },
     ]);
     // A balance is drawn only when one is known.
     expect(derived.options[0].trailing).toBeTruthy();
@@ -104,6 +105,15 @@ describe('openProfileSwitcher', () => {
     close();
     await flush();
     expect(onRequestAction).toHaveBeenCalledWith({ type: 'switch', accountIndex: 77 });
+  });
+
+  it('only closes when the active profile is picked again', async () => {
+    const onRequestAction = jest.fn();
+    void openProfileSwitcher({ onRequestAction });
+    answer({ kind: 'option', id: '0' });
+    close();
+    await flush();
+    expect(onRequestAction).not.toHaveBeenCalled();
   });
 
   it('creates a profile from the footer', async () => {

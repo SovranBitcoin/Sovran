@@ -17,8 +17,7 @@
     {"action":"waitFor","selector":{"id":"profile-create"},"timeoutMs":30000},
     {"action":"assert","that":"visible","selector":{"id":"profile-create"}},
     {"action":"screenshot","name":"profile-switcher"},
-    {"action":"tapAt","x":0.5,"y":0.12},
-    {"action":"tap","selector":{"id":"flow-header-back"},"optional":{"reason":"iPhone dismisses the sheet with the tap above it; Android leaves the pushed page with Back"}},
+    {"action":"tap","selector":{"id":"picker-sheet-close"}},
     {"action":"assert","that":"notVisible","selector":{"id":"profile-create"},"timeoutMs":5000}
   ],
   "verify": [
