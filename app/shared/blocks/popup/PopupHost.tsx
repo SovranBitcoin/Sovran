@@ -51,7 +51,6 @@ import { markE2EActionMenuPresented } from '@/shared/lib/popup/E2EActionMenuProb
 import { OPEN_WATCHDOG_MS } from '@/shared/lib/popup/openWatchdog';
 import { E2EStaticToastRenderMarker } from '@/shared/lib/popup/E2EToastProbe';
 import { NfcTapContent } from '@/shared/lib/popup/popups/nfcTapSheet';
-import { ProofSelectorContent } from '@/shared/lib/popup/popups/proofSelectorSheet';
 import { SendMemoContent } from '@/shared/lib/popup/popups/sendMemoSheet';
 import { SignerApprovalSheetContent } from '@/features/nostrSigner/components/SignerApprovalSheetContent';
 import {
@@ -262,7 +261,6 @@ type CustomSheetRenderer = React.ComponentType<CustomSheetContentProps>;
 // for everything else, prefer `actionMenuPopup`.
 const CUSTOM_SHEET_CONTENT: Record<keyof ActionSheetPayloads, CustomSheetRenderer> = {
   'action-menu': ActionMenuSheetContent as CustomSheetRenderer,
-  'proof-selector': ProofSelectorContent as CustomSheetRenderer,
   'send-memo': SendMemoContent as CustomSheetRenderer,
   'signer-approval': SignerApprovalSheetContent as CustomSheetRenderer,
   'signer-connect': SignerConnectSheetContent as CustomSheetRenderer,

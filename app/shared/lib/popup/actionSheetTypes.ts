@@ -25,10 +25,6 @@ export type ProfileSwitcherAction =
   | { type: 'create' }
   | { type: 'import'; nsec: string; pubkeyHex: string; accountIndex: number };
 
-type ProofSelectorPayload = StepDataMap['chooseProofs'] & {
-  machine: PaymentMachine;
-};
-
 type SendMemoPayload = StepDataMap['enterSendMemo'] & {
   machine: PaymentMachine;
 };
@@ -80,13 +76,6 @@ type BaseActionSheetPayloads = {
    * and is invisible.
    */
   'action-menu': ActionMenuSheetPayload;
-  /**
-   * "Choose amount" — round-up / round-down / change-mint suggestions when
-   * the entered amount doesn't compose exactly from available proofs. Fires
-   * from the send-flow amount screen, which is itself an iOS route modal;
-   * the menu lane would render below it.
-   */
-  'proof-selector': ProofSelectorPayload;
   /**
    * Optional memo before creating an ecash token. This is reached from the
    * send-flow amount route, which is itself an iOS route modal, so it needs

@@ -79,9 +79,6 @@ jest.mock('@/shared/lib/popup/popups/nfcTapSheet', () => {
   const ReactActual = jest.requireActual<typeof import('react')>('react');
   return { NfcTapContent: () => ReactActual.createElement('NfcTapContent') };
 });
-jest.mock('@/shared/lib/popup/popups/proofSelectorSheet', () => ({
-  ProofSelectorContent: () => null,
-}));
 jest.mock('@/shared/lib/popup/popups/sendMemoSheet', () => ({ SendMemoContent: () => null }));
 jest.mock('@/features/nostrSigner/components/SignerApprovalSheetContent', () => ({
   SignerApprovalSheetContent: () => null,

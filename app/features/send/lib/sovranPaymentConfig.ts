@@ -68,13 +68,13 @@ import {
   nfcSendFailedPopup,
   paymentCancelledPopup,
   paymentStatusPopup,
-  proofSelectorPopup,
   sendMemoPopup,
   staticPopup,
   paramPopup,
 } from '@/shared/lib/popup';
 import { RECEIVE_PENDING_TOAST_COPY } from '@/shared/lib/popup/paymentStatusCopy';
 import { chooseFallbackPaymentOption, choosePaymentOption } from './paymentOptionPicker';
+import { chooseProofs } from './proofSelectorPicker';
 import { chooseSendFallback } from './sendFallbackPicker';
 import { captureAndStoreLocation } from '@/shared/hooks/useTransactionLocation';
 import { executeRoutstrTopUp, formatRoutstrBalance } from '@/shared/lib/routstr/topUp';
@@ -1480,7 +1480,7 @@ export function createSovranHandlers({
     },
 
     chooseProofs: (stepData) => {
-      proofSelectorPopup({ ...stepData, machine });
+      chooseProofs(stepData, machine);
     },
 
     enterSendMemo: (stepData) => {
