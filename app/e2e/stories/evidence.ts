@@ -79,8 +79,11 @@ export function recordAndroid(
     io.interrupt ??
     (() =>
       new Promise<void>((resolve, reject) =>
-        execFile(adb[0], shell(['pkill', '-INT', '-x', 'screenrecord']), { timeout: 10_000 }, (error) =>
-          error ? reject(error) : resolve()
+        execFile(
+          adb[0],
+          shell(['pkill', '-INT', '-x', 'screenrecord']),
+          { timeout: 10_000 },
+          (error) => (error ? reject(error) : resolve())
         )
       ));
   return recordScreen(child, { ...io, ready: 'Content area is', interrupt });
@@ -215,7 +218,18 @@ export async function captureSimulatorScreen(
       command[0],
       [...command.slice(1), 'io', udid, 'screenshot', '--type=jpeg', '--display=internal', '-'],
       { encoding: 'buffer', timeout: timeoutMs, killSignal: 'SIGKILL', maxBuffer: 24_000_000 },
-      (error, stdout) => (error ? reject(error) : resolve(stdout))
+      (error, stdout, stderr) => {
+        if (!error) return resolve(stdout);
+        // What simctl said is the only clue to why a capture failed.
+        const said = stderr.toString().trim();
+        reject(
+          new Error(
+            error.killed
+              ? `The screen capture took longer than ${timeoutMs} ms`
+              : `The screen capture failed (exit ${error.code ?? error.signal}${said ? `: ${said}` : ''})`
+          )
+        );
+      }
     );
   });
   return { jpeg: bytes, ...(await decodeScreen(bytes, 'jpeg', timeoutMs)) };

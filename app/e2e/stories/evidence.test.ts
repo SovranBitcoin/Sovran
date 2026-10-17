@@ -277,10 +277,15 @@ test('simulator capture validates fresh child output, not an old file or header'
     await expect(captureSimulatorScreen('owned-test', 1000, command)).rejects.toThrow();
     writeFileSync(input, '');
     await expect(captureSimulatorScreen('owned-test', 1000, command)).rejects.toThrow();
-    writeFileSync(script, `process.exit(7)`);
-    await expect(captureSimulatorScreen('owned-test', 1000, command)).rejects.toThrow();
+    writeFileSync(script, `process.stderr.write('Invalid device state'); process.exit(7)`);
+    // The failure says what simctl said, not only that the command failed.
+    await expect(captureSimulatorScreen('owned-test', 1000, command)).rejects.toThrow(
+      /exit 7: Invalid device state/
+    );
     writeFileSync(script, `setInterval(() => {}, 1000)`);
-    await expect(captureSimulatorScreen('owned-test', 30, command)).rejects.toThrow();
+    await expect(captureSimulatorScreen('owned-test', 30, command)).rejects.toThrow(
+      /took longer than 30 ms/
+    );
   } finally {
     rmSync(dir, { recursive: true });
   }
