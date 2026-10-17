@@ -532,6 +532,9 @@ async function buildAndroid(fingerprint: string, kind: BuildKind): Promise<Nativ
   // Gradle's app-local JS inputs omit sibling workspace code and some assets.
   // Once this owner requires a rebuild, Metro must traverse its actual graph.
   const tasks = [
+    // A release build's R8 pass runs out of the 2 GB heap prebuild writes into
+    // gradle.properties; this outranks it for these builds only.
+    '-Dorg.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g',
     ...(kind === 'bundled'
       ? ['-PsovranBundledE2e=true', ':app:createBundleReleaseJsAndAssets', '--rerun']
       : []),
