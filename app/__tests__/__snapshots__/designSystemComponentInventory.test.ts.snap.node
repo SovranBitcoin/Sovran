@@ -241,6 +241,7 @@ exports[`Design System component inventory tracks the complete reusable componen
     "shared/ui/composed/MiddleEllipsisValue.tsx",
     "shared/ui/composed/ModalLayoutWrapper.tsx",
     "shared/ui/composed/PatternBackground.tsx",
+    "shared/ui/composed/PickerSheet.tsx",
     "shared/ui/composed/ProfileTierRing.tsx",
     "shared/ui/composed/QRButton/QRButton.android.tsx",
     "shared/ui/composed/QRButton/QRButton.ios.tsx",
@@ -288,6 +289,6 @@ exports[`Design System component inventory tracks the complete reusable componen
     "shared/ui/primitives/View/Stack.tsx",
     "shared/ui/primitives/icon-symbol.tsx",
   ],
-  "total": 282,
+  "total": 283,
 }
 `;
