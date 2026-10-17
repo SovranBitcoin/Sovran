@@ -22,7 +22,7 @@ export const CANONICAL_PAGES = [
   // shell
   'wallet', // wallet home (WalletScreen)
   'drawer', // profile drawer (drawer-profile-name)
-  'profile-switcher', // independently tested action-menu sheet
+  'profile-switcher', // the picker sheet showing the drawer's profiles (profile-switcher)
   // receive flow
   'receive', // receive method hub sheet (receive-method-*)
   'receive-qr', // standing receive rails QR display (ReceiveScreen: Unified/Lightning/Onchain/Cashu)

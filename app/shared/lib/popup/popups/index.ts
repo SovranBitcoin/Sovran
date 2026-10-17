@@ -7,7 +7,7 @@ import type { PopupTextSegment } from '../format';
 
 export type { CopyTarget } from './copy';
 export { copyPopup } from './copy';
-export { profileSwitcherPopup } from './actionSheets';
+export { openProfileSwitcher } from './actionSheets';
 export { paymentOptionsPopup, paymentFallbackPopup } from './paymentOptionsSheet';
 export { proofSelectorPopup } from './proofSelectorSheet';
 export { sendFallbackPopup } from './sendFallbackSheet';
