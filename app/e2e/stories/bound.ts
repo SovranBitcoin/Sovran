@@ -50,9 +50,16 @@ export const boundIndexSchema = z.object({
 });
 type BoundRun = z.infer<typeof boundIndexSchema>['runs'][number];
 
-async function playIos(storyPath: string, app: string, invocation: string, out: string) {
+async function playIos(
+  storyPath: string,
+  storyId: string,
+  app: string,
+  invocation: string,
+  out: string
+) {
+  // Everything that can fail runs before the simulator exists, so none is left behind.
+  const runDir = createStoryRun(join(APP, 'e2e/artifacts'), 'bound-ios-story', [storyId]);
   const device = await createEphemeralSimulatorDevice({ runId: invocation.slice(0, 16) });
-  const runDir = createStoryRun(join(APP, 'e2e/artifacts'), 'bound-ios-story', [storyPath]);
   let exit = 1;
   let deviceRemoved = false;
   try {
@@ -113,7 +120,7 @@ export async function playBound(request: z.infer<typeof boundRequestSchema>) {
       try {
         const result =
           platform === 'ios'
-            ? await playIos(storyPath, build.artifact, request.invocation, out)
+            ? await playIos(storyPath, story.id, build.artifact, request.invocation, out)
             : await playAndroid(storyPath, out);
         runs.push({ platform, story: relative, dir, ...result });
       } catch (error) {
