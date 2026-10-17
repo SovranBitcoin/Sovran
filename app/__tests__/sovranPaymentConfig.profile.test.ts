@@ -100,7 +100,7 @@ jest.mock('@/shared/lib/nfc', () => ({
 }));
 jest.mock('@/shared/lib/popup', () => ({
   copyPopup: jest.fn(),
-  emojiPickerPopup: jest.fn(),
+  copyTokenAsEmoji: jest.fn(),
   nfcConnectionLostPopup: jest.fn(),
   nfcEcashSharedPopup: jest.fn(),
   nfcSendFailedPopup: jest.fn(),

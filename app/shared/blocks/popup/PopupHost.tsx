@@ -50,7 +50,6 @@ import { ActionMenuSheetContent } from '@/shared/lib/popup/popups/actionMenuShee
 import { markE2EActionMenuPresented } from '@/shared/lib/popup/E2EActionMenuProbe';
 import { OPEN_WATCHDOG_MS } from '@/shared/lib/popup/openWatchdog';
 import { E2EStaticToastRenderMarker } from '@/shared/lib/popup/E2EToastProbe';
-import { EmojiPickerContent } from '@/shared/lib/popup/popups/emojiPicker';
 import { PaymentOptionsContent } from '@/shared/lib/popup/popups/paymentOptionsSheet';
 import { SendFallbackContent } from '@/shared/lib/popup/popups/sendFallbackSheet';
 import { NfcTapContent } from '@/shared/lib/popup/popups/nfcTapSheet';
@@ -265,7 +264,6 @@ type CustomSheetRenderer = React.ComponentType<CustomSheetContentProps>;
 // for everything else, prefer `actionMenuPopup`.
 const CUSTOM_SHEET_CONTENT: Record<keyof ActionSheetPayloads, CustomSheetRenderer> = {
   'action-menu': ActionMenuSheetContent as CustomSheetRenderer,
-  'emoji-picker': EmojiPickerContent as CustomSheetRenderer,
   // `payment-options` and `payment-fallback` share one renderer; the
   // `isFallback` prop decides title + per-row red-wash. Wrapping keeps the
   // registry's `Record<keyof ActionSheetPayloads, ...>` shape intact.

@@ -25,8 +25,6 @@ export type ProfileSwitcherAction =
   | { type: 'create' }
   | { type: 'import'; nsec: string; pubkeyHex: string; accountIndex: number };
 
-type EmojiPickerPayload = { token: string };
-
 type PaymentOptionsPayload = {
   options: readonly AnnotatedOption[];
   unit: string;
@@ -99,15 +97,6 @@ type BaseActionSheetPayloads = {
    * and is invisible. Same above-modal stacking reason as `payment-options`.
    */
   'action-menu': ActionMenuSheetPayload;
-  /**
-   * Tabbed emoji picker invoked from inside the Send Ecash route modal.
-   * Lives here because heroui Menu in FWO mode doesn't render visibly —
-   * verified by tracing `actionMenu.dispatch` → `actionMenuHost.payload
-   * {open: true}` followed by no openChange and no visual mount. The
-   * heroui standalone `<BottomSheet>` path (this one) is the only known-
-   * working surface that stacks above iOS route modals.
-   */
-  'emoji-picker': EmojiPickerPayload;
   /**
    * "Choose how to pay" — pick one of N detected payment methods (Lightning,
    * Cashu, etc.) for a scanned destination. Lives in this lane because the

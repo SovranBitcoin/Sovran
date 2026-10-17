@@ -4,7 +4,6 @@ export const SHEET_LAYOUT_CONFIG: Record<CustomSheetId, SheetLayoutConfig> = {
   // Generic action-menu auto-fits: typically 1–4 short rows, same as the
   // menu-lane equivalent (`actionMenuPopup` with no footer).
   'action-menu': { mode: 'contentHeight' },
-  'emoji-picker': { mode: 'snapPoints', snapPoints: ['80%'] },
   // Payment options auto-fit: typical N is 1–3 rows, and the menu-lane
   // equivalent (`actionMenuPopup` with no footer) also uses dynamic sizing.
   'payment-options': { mode: 'contentHeight' },

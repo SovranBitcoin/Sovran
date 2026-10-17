@@ -61,11 +61,24 @@ jest.mock('@/shared/lib/popup/popups/actionMenuSheet', () => {
     ActionMenuSheetContent: () => ReactActual.createElement('ActionMenuSheetContent'),
   };
 });
-jest.mock('@/shared/lib/popup/popups/emojiPicker', () => {
-  const ReactActual = jest.requireActual<typeof import('react')>('react');
-  return { EmojiPickerContent: () => ReactActual.createElement('EmojiPickerContent') };
+// No sheet asks for fixed detents since the emoji picker became a route, but
+// the host still supports them; the NFC sheet stands in as one here.
+jest.mock('@/shared/lib/popup/sheets/sheetLayoutConfig', () => {
+  const actual = jest.requireActual<typeof import('@/shared/lib/popup/sheets/sheetLayoutConfig')>(
+    '@/shared/lib/popup/sheets/sheetLayoutConfig'
+  );
+  return {
+    ...actual,
+    SHEET_LAYOUT_CONFIG: {
+      ...actual.SHEET_LAYOUT_CONFIG,
+      'nfc-tap': { mode: 'snapPoints', snapPoints: ['80%'] },
+    },
+  };
 });
-jest.mock('@/shared/lib/popup/popups/nfcTapSheet', () => ({ NfcTapContent: () => null }));
+jest.mock('@/shared/lib/popup/popups/nfcTapSheet', () => {
+  const ReactActual = jest.requireActual<typeof import('react')>('react');
+  return { NfcTapContent: () => ReactActual.createElement('NfcTapContent') };
+});
 jest.mock('@/shared/lib/popup/popups/paymentOptionsSheet', () => ({
   PaymentOptionsContent: () => null,
 }));
@@ -211,12 +224,10 @@ describe('PopupHost presentation', () => {
     const menu = sheet(renderer!).props.instance;
     act(() => usePopupStore.getState().close());
     expect(sheet(renderer!).props.isOpen).toBe(false);
-    // The emoji picker dispatches 300ms after the menu's close, inside the
-    // 400ms exit window — the same gorhom instance must snap back up.
+    // A fixed-detent follow-on dispatched 300ms after the menu's close, inside
+    // the 400ms exit window — the same gorhom instance must snap back up.
     act(() => jest.advanceTimersByTime(300));
-    act(() =>
-      usePopupStore.getState().open({ sheetId: 'emoji-picker', payload: { token: 'cashuB' } })
-    );
+    act(() => usePopupStore.getState().open({ sheetId: 'nfc-tap', payload: {} }));
     expect(sheet(renderer!).props.instance).toBe(menu);
     expect(sheet(renderer!).props.isOpen).toBe(true);
     act(() => jest.advanceTimersByTime(400));
@@ -227,7 +238,7 @@ describe('PopupHost presentation', () => {
   it('still mounts a fresh instance for a contentHeight follow-on that lands mid-exit', () => {
     act(() => {
       renderer = TestRenderer.create(<PopupHost />);
-      usePopupStore.getState().open({ sheetId: 'emoji-picker', payload: { token: 'cashuB' } });
+      usePopupStore.getState().open({ sheetId: 'nfc-tap', payload: {} });
     });
     const picker = sheet(renderer!).props.instance;
     act(() => usePopupStore.getState().close());
@@ -287,22 +298,23 @@ describe('PopupHost presentation', () => {
 
   // gorhom's content mask has no height until the container's onLayout lands,
   // and each open() is a fresh instance — a snapPoints body mounted in that
-  // first commit lays out unbounded, and the emoji picker's FlashList then
-  // renders every row (≈2s JS jam on device, so gorhom never animated open
-  // and the watchdog closed the sheet). The body waits for a bounded height.
+  // first commit lays out unbounded, and a virtualized list inside then
+  // renders every row (the emoji picker's ≈2s JS jam on device, so gorhom never
+  // animated open and the watchdog closed the sheet). The body waits for a
+  // bounded height.
   it('holds a snapPoints body until its wrapper reports a bounded height', () => {
     act(() => {
       renderer = TestRenderer.create(<PopupHost />);
-      usePopupStore.getState().open({ sheetId: 'emoji-picker', payload: { token: 'cashuB' } });
+      usePopupStore.getState().open({ sheetId: 'nfc-tap', payload: {} });
     });
-    expect(bodies(renderer!, 'EmojiPickerContent')).toHaveLength(0);
+    expect(bodies(renderer!, 'NfcTapContent')).toHaveLength(0);
     layoutGate(renderer!, 0);
-    expect(bodies(renderer!, 'EmojiPickerContent')).toHaveLength(0);
+    expect(bodies(renderer!, 'NfcTapContent')).toHaveLength(0);
     layoutGate(renderer!, 640);
-    expect(bodies(renderer!, 'EmojiPickerContent')).toHaveLength(1);
+    expect(bodies(renderer!, 'NfcTapContent')).toHaveLength(1);
     // A later shrink (keyboard) never unmounts a body that is already up.
     layoutGate(renderer!, 320);
-    expect(bodies(renderer!, 'EmojiPickerContent')).toHaveLength(1);
+    expect(bodies(renderer!, 'NfcTapContent')).toHaveLength(1);
   });
 
   it('mounts a contentHeight body immediately so gorhom can measure it', () => {

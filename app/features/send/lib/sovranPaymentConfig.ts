@@ -62,7 +62,7 @@ import { usePopupStore } from '@/shared/stores/runtime/popupStore';
 import { buildModalProfileHref } from '@/shared/lib/nav/profileRoutes';
 import {
   copyPopup,
-  emojiPickerPopup,
+  copyTokenAsEmoji,
   nfcConnectionLostPopup,
   nfcEcashSharedPopup,
   nfcSendFailedPopup,
@@ -1608,7 +1608,7 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
         // narrow it directly without a cast.
         const variantId = typeof rawCtx.variantId === 'string' ? rawCtx.variantId : 'text';
         if (variantId === 'emoji') {
-          emojiPickerPopup({ token: getEncodedToken(entry.token) });
+          void copyTokenAsEmoji(getEncodedToken(entry.token));
           return;
         }
         // Default — text clipboard copy.

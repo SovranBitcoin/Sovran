@@ -47,7 +47,7 @@ function SheetCloseButton() {
 }
 
 // Module scope, so the header's component identity is stable across renders.
-const renderSheetCloseButton = () => <SheetCloseButton />;
+export const renderSheetCloseButton = () => <SheetCloseButton />;
 
 function PickerRow({
   option,

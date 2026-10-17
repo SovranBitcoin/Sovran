@@ -212,6 +212,9 @@ const standaloneScreens: ModalConfig[] = [
   // Choosing one of several things, opened by `openPicker`: the same sheet as
   // Select mint on iPhone, a pushed page with the back button on Android.
   modalWithGradient('picker', 'picker'),
+  // An emoji, picked from a grid with search: the same sheet, opened by
+  // `openEmojiPicker`.
+  modalWithGradient('emojiPicker', 'picker', 'Emoji'),
   // The ecash held at one mint, picked by hand from the amount screen.
   modalWithGradient('notes', 'modal', 'Pick notes'),
   modalWithGradient('lightningSend', 'modal', railHeaderTitle('lightningSend')),
