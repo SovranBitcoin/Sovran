@@ -13,6 +13,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync
 import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { lanes } from './lanes';
+import { holdNativeLease } from './machine';
 import { runRounds } from './pool';
 import { ensureCertificates } from './privateMint';
 import { createStoryRun, finishStoryRun, registerAttempt, finishAttempt } from '../results/runs';
@@ -137,6 +138,7 @@ let failed = 0;
 try {
   // Made once here: every worker's story would otherwise make them at the same moment.
   ensureCertificates();
+  await holdNativeLease(`${workerCount} story workers`);
   const base = prepareBase(appPath);
   const prepared = performance.now();
   const workerNumbers = new Map<string, number>();

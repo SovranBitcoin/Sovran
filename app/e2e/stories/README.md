@@ -6,8 +6,16 @@ An end-to-end test here is one thing a person does with the app, played on an iP
 ```sh
 bun app/e2e/press/native-build.ts ios --bundled   # the test build, once per change to the app
 cd app && bun run e2e:stories --workers 4         # every story; each invocation preserves a run
-bun run e2e:story e2e/stories/library/<story>.json --udid <simulator> --app e2e/artifacts/native-builds/ios-bundled/Sovran.app --look
+bun run e2e:story e2e/stories/library/<story>.json --look   # one story, about 12 s once its simulator exists
 ```
+
+Each checkout has its own simulators, named after it (`sovran-e2e-<checkout>-…`), so worktrees
+running at once never touch each other's. A single story plays on the checkout's own simulator,
+made on first use and used again until the build changes; `--udid` picks another and `--app`
+another build. None opens a window. Builds and multi-story runs take one lease for the whole Mac
+and wait their turn, and refuse to start below 20 GB free:
+`bun app/e2e/stories/machine.ts status` shows who holds it, and `machine.ts reclaim` lists the
+simulators, emulators and Xcode caches that runs left behind (`--yes` deletes them).
 
 Open the shared history with `bun run e2e:viewer`. [Results ownership](../README.md) explains
 where generated evidence belongs and how to group older output.
@@ -20,7 +28,7 @@ and permission overrides are unsupported. Both lanes retain screenshots, control
 installed-APK comparison and cleanup evidence. See [builds and evidence limits](../README.md#builds-are-part-of-the-evidence).
 Neither lane currently supplies a controller-bound native receipt.
 
-For a fresh iOS story, add `--bundled` to the `--udid … --app …` command above. Use a
+For a fresh iOS story, add `--bundled` to the single-story command above. Use a
 disposable, unfunded simulator: this command resets its app state and keychain. The selected
 app must have its adjacent build stamp, including for an edition build. The runner checks
 current clean source, the selected artifact and the installed payload before launch and
