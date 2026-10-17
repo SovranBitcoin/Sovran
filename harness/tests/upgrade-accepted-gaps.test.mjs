@@ -1,7 +1,39 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import module from 'node:module';
+import { dirname, isAbsolute, join, relative } from 'node:path';
 import { describe, test } from 'node:test';
-// A namespace import, so a build without the new export fails by assertion, not by linking.
-import * as upgrade from '../src/upgrade.ts';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+
+/** The repository's primary checkout, when its bun.lock is byte-identical to this checkout's own. */
+function lockedInstall() {
+  const [top, common] = execFileSync('git', ['-C', dirname(fileURLToPath(import.meta.url)), 'rev-parse',
+    '--path-format=absolute', '--show-toplevel', '--git-common-dir'], { encoding: 'utf8' }).trim().split('\n');
+  const primary = dirname(common);
+  if (primary === top) return null;
+  if (!readFileSync(join(primary, 'bun.lock')).equals(readFileSync(join(top, 'bun.lock'))))
+    throw new Error(`${primary}/bun.lock differs from ${top}/bun.lock; its packages are not this checkout's`);
+  return { top, primary };
+}
+// The regression baseline is a bare worktree of the base with only this file copied in, so it has
+// no node_modules. There (Node only; Bun has no hooks) a package this checkout cannot find resolves
+// from the primary checkout's install, as if this file sat there, and only while both lock the same
+// dependencies: the base's own environment, never a candidate's.
+let install;
+module.registerHooks?.({ resolve(specifier, context, nextResolve) {
+  try { return nextResolve(specifier, context); } catch (error) {
+    if (error?.code !== 'ERR_MODULE_NOT_FOUND' || /^([./#]|[a-z][a-z0-9+.-]*:)/i.test(specifier) ||
+      !context.parentURL?.startsWith('file:')) throw error;
+    install ??= lockedInstall();
+    const path = install && relative(install.top, fileURLToPath(context.parentURL));
+    if (!install || isAbsolute(path) || path.startsWith('..')) throw error;
+    process.stderr.write(`Resolving ${specifier} from ${install.primary}, whose bun.lock matches this checkout\n`);
+    return nextResolve(specifier, { ...context, parentURL: pathToFileURL(join(install.primary, path)).href });
+  }
+} });
+// A namespace object, so a build without the new export fails by assertion, not by linking.
+const upgrade = await import('../src/upgrade.ts');
 
 const epochTitles = ['starts, three times over, without stopping on a failure or recovery screen',
   'keeps the phrase and makes no new one',
