@@ -10,7 +10,7 @@ import { within } from './workspace';
 // guarded: the frames and video are what reviewers check them against. Page
 // registrations (app/e2e/schema) are data a new route must add; story JSON is the
 // sealed oracle reviewers judge.
-export const NATIVE_RUNNER = ['app/e2e/', 'app/scripts/', 'scripts/', 'press/', 'bunfig.toml', 'app/bunfig.toml',
+const NATIVE_RUNNER = ['app/e2e/', 'app/scripts/', 'scripts/', 'press/', 'bunfig.toml', 'app/bunfig.toml',
   'package.json', 'app/package.json', 'bun.lock', 'app/tsconfig.json', 'tsconfig.json'];
 export const nativeRunnerChanges = (changed: string[]) =>
   changed.filter(p => NATIVE_RUNNER.some(prefix => prefix.endsWith('/') ? p.startsWith(prefix) : p === prefix) &&

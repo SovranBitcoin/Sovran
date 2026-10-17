@@ -32,6 +32,7 @@
         "e2e/audit/fresh-matrix-cli.ts",
         "e2e/capture/refresh.ts",
         "e2e/capture/status.ts",
+        "e2e/stories/bound.ts",
         "shared/stores/runtime/mockDataStore.ts"
       ],
       "project": ["**/*.{ts,tsx,js,jsx}"],

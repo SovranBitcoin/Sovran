@@ -27,7 +27,7 @@ const nativeCheck = z.object({ ...base, cwd: z.literal('.').default('.'), kind: 
 });
 export const command = z.union([nodeCheck, nativeCheck, z.object({ ...base, argv: z.array(text).min(1) }).strict()]);
 type NodeCheck = z.infer<typeof nodeCheck>;
-export type NativeCheck = z.infer<typeof nativeCheck>;
+type NativeCheck = z.infer<typeof nativeCheck>;
 export const isNodeCheck = (c: z.infer<typeof command>): c is NodeCheck => 'kind' in c && c.kind === 'node-tests';
 export const isNativeCheck = (c: z.infer<typeof command>): c is NativeCheck => 'kind' in c && c.kind === 'native-stories';
 
