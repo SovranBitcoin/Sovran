@@ -33,6 +33,7 @@
     "assets:test": "node --test ../scripts/brand-assets.test.mjs ../scripts/artwork.test.mjs",
     "start": "expo start --clear 2>&1 | tee log.txt",
     "dev": "bash scripts/start-dev.sh",
+    "dev:tunnel": "bash scripts/dev-tunnel.sh",
     "dev:wda": "bash scripts/start-wda.sh",
     "start:emulator:ios": "expo run:ios",
     "start:emulator:android": "expo run:android",

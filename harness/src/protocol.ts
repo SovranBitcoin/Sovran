@@ -30,7 +30,7 @@ export const request = z.discriminatedUnion('action', [
 export async function dispatch(controller: Controller, input: unknown) {
   const r = request.parse(input);
   switch (r.action) {
-    case 'model-policy': return recommendedModels(r.catalog);
+    case 'model-policy': return recommendedModels(r.catalog, controller.outages());
     case 'create': return controller.create(r.root, r.contract);
     case 'status': return controller.read(r.id);
     case 'next': return controller.next(r.id);

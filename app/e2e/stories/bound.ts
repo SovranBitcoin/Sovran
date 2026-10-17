@@ -17,6 +17,7 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 import { createEphemeralSimulatorDevice } from '../drivers/simulator-session';
+import { holdNativeLease } from './machine';
 import { attemptDirectory, createStoryRun } from '../results/runs';
 import { ensureNativeBuild } from '../press/native-build';
 import { runAndroidStory } from './android';
@@ -100,6 +101,7 @@ async function playAndroid(storyPath: string, storyId: string, out: string) {
 }
 
 export async function playBound(request: z.infer<typeof boundRequestSchema>) {
+  await holdNativeLease(`bound stories ${request.invocation}`);
   const runs: BoundRun[] = [];
   const save = () =>
     writeFileSync(

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { z } from 'zod';
 import { Journal } from './journal';
@@ -14,7 +14,7 @@ import { Publisher, publishPlan } from './publisher';
 import { captureHistory, inspectHistoricalReference, validateHistory } from './history';
 import { contextPaths } from './context';
 import { prepareReference } from './references';
-import { availability, candidates, dispatchRejection, driver, runtimeTask, type Model, type RuntimeTask } from './models';
+import { availability, candidates, dispatchRejection, driver, OUTAGE_MS, outage, runtimeTask, type Model, type Outage, type RuntimeTask } from './models';
 import { assessment, contract, move, roleFor, task, type Task } from './workflow';
 import { baselineFingerprint, digest, fileEvidence, fingerprint, git, testInputEvidence, within } from './workspace';
 
@@ -27,6 +27,28 @@ export class Controller {
   close() { this.journal.close(); }
   read(id: string) { return task.parse(this.journal.read(id).value); }
   brief(id: string) { return brief(this.read(id), this.stateDir); }
+
+  /** Unavailable providers and models across every task, oldest first. */
+  outages(): Outage[] {
+    const file = join(this.stateDir, 'outages.json');
+    try {
+      return existsSync(file) ? z.array(outage).parse(JSON.parse(readFileSync(file, 'utf8'))) : [];
+    } catch {
+      // Only advice for routing: an unreadable record must not stop new tasks.
+      return [];
+    }
+  }
+
+  private recordOutage(target: Model, reason: z.infer<typeof availability>, detail: string) {
+    const now = Date.now();
+    const kept = this.outages().filter(o => Date.parse(o.until) > now);
+    const until = new Date(now + OUTAGE_MS[reason]).toISOString();
+    // Written aside and renamed into place, so a reader never sees half a file.
+    const file = join(this.stateDir, 'outages.json');
+    writeFileSync(`${file}.${process.pid}`, JSON.stringify([...kept,
+      { provider: target.provider, model: target.model, reason, until, detail: detail.slice(0, 500) }], null, 2), { mode: 0o600 });
+    renameSync(`${file}.${process.pid}`, file);
+  }
 
   create(root: string, input: unknown) {
     root = realpathSync(git(realpathSync(root), ['rev-parse', '--show-toplevel']));
@@ -247,13 +269,17 @@ export class Controller {
     const observed = runtimeTask.parse(runtime);
     const cause = availability.parse(reason);
     if (!detail.trim()) throw new Error('Availability evidence is required');
-    return this.change(id, `fallback:${ticketId}`, { cause, observed, detail }, t => {
+    let target: Model | undefined;
+    const result = this.change(id, `fallback:${ticketId}`, { cause, observed, detail }, t => {
       if (t.ticket?.id !== ticketId || !('kind' in t.contract.models)) throw new Error('No routed attempt owns this fallback');
       if (t.pending.kind !== 'none') throw new Error('Outstanding command must finish first');
       this.terminalWorker(t, observed);
       if (observed.status !== 'failed') throw new Error('Only a failed availability attempt can fall back');
+      target = t.ticket.target;
       return this.replaceAttempt(t, { kind: 'unavailable', reason: cause, runtime: observed, detail });
     });
+    if (target) this.recordOutage(target, cause, detail);
+    return result;
   }
 
   dispatchRejected(id: string, ticketId: string, reason: z.infer<typeof availability>, input: unknown) {

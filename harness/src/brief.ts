@@ -1,5 +1,5 @@
 import { join, resolve } from 'node:path';
-import { readFileSync } from 'node:fs';
+import { mkdirSync, readFileSync } from 'node:fs';
 import { z } from 'zod';
 import { digest, fileEvidence } from './workspace';
 import { assessmentFor, type Role, type Task } from './workflow';
@@ -15,11 +15,19 @@ const duties: Record<Role, string> = {
   diversityReview: 'Independently review the full requirements, source and raw test evidence using a model that has not authored this task. Challenge the design and test validity. Do not rely on other reviewers agreeing. Do not edit source or publish.',
 };
 
+/**
+ * Several tasks run on one Mac at once. Workers that booted shared simulators,
+ * opened Simulator.app or started windowed emulators took each other's
+ * devices and the owner's screen, and filled the disk and swap.
+ */
+const devices = 'To see the app, play a story from app/: `bun run e2e:story e2e/stories/library/<story>.json --look` plays on this checkout\'s own simulator, made on first use and reused, with no window (about 12 s a new story; a repeated one gets a fresh copy, about a minute); `--platform android` plays on a disposable windowless emulator. Never open Simulator.app, boot or use a simulator or emulator you did not get this way, run `expo run:*` or `bun run ios|android`, or start Metro on port 8081. Builds and multi-story runs wait for one lease shared by every checkout on this Mac; do not work around it. If native work refuses for lack of disk, return inconclusive naming that: never delete files to make room.';
+
 export function brief(t: Task, stateDir: string) {
   if (!t.ticket) throw new Error('Issue a role ticket first');
   const taskDir = resolve(stateDir, t.id);
   if (!t.referenceEvidence || fileEvidence(taskDir, t.referenceEvidence.path).sha256 !== t.referenceEvidence.sha256)
     throw new Error('Pinned reference snapshot is missing or changed');
+  mkdirSync(join(taskDir, 'results'), { recursive: true, mode: 0o700 });
   const contextFile = join(taskDir, '0-intake-context.json');
   const snapshots = z.array(z.object({ path: z.string(), sha256: z.string(), content: z.string() }))
     .parse(JSON.parse(readFileSync(contextFile, 'utf8')));
@@ -57,6 +65,9 @@ export function brief(t: Task, stateDir: string) {
     attempts: t.attempts.map(a => ({ ticket: a.ticket.id, role: a.ticket.role, target: a.ticket.target,
       worker: a.ticket.claim?.worker ?? null, generation: a.generation, sourceBefore: a.ticket.sourceAtIssue,
       sourceAfter: a.sourceAfter, availability: a.completion.kind === 'unavailable' || a.completion.kind === 'dispatch-rejected' ? a.completion.reason : null })),
+    devices,
+    resultFile: join(taskDir, 'results', `${t.ticket.id}.json`),
+    resultInstructions: 'Before you finish, write your final assessment JSON to resultFile as well as returning it, so a result is not lost if the task host restarts. It is a copy for recovery, not a substitute for returning it.',
     effortEvidence: 'Target options record requested effort. Runtime model identity comes from T3. Effective effort is unreported unless separately observed; never infer it from the request.',
     historyScope: t.historyEvidence ? 'The baseline-history artifact captures pre-edit source and bounded blame/changes. Research must record the reason and preservation plan for every planned path, distinguishing gaps from completed investigation. Search active and deleted follow-ups. In followups.explanation, give each relevant ID its relationship (required, prerequisite, outside scope, resolved, or suspected/verified recurrence), rationale and supporting evidence. Follow older commits and associated PR discussions; distinguish the final merged patch from earlier review comments. Audit must recheck actual changed paths and these relationships. Missing pages or unavailable PRs remain explicit gaps.' : 'Legacy contract: no executable pre-edit history coverage was sealed.',
     verificationScope: 'The sealed verificationPolicy maps requirements to named cases or explicitly bounded inspection. Independent review, final audit and additional GPT review must supply oracleReviews for Node requirements, citing test files and current candidate/baseline node-inspection artifacts: evidence must list each sealed cases[].file exactly, and artifact:<path> of the *-node-inspection.json artifact from that check receipt (plus the harness:baseline:<check> one when regression is sealed). Judge assertions, fixtures, mocks, selectors, skips and test/runner changes against the requirement and history. Inspect negative-control copiedInputs: copying the fix into the baseline cannot establish a regression. Explain why the failing assertion reaches the intended old behavior; setup/import/hook failures do not qualify. Node reports are consistency evidence, not authentication of hostile test code; inspect unusual runner/IPC manipulation. An inspection-only requirement does not gain execution proof. Native requirements play sealed stories on fresh owned devices from bundled builds of this source: their oracleReviews cite each sealed story file and artifact:<path> of the current *-native-inspection.json. Judge whether each step\'s expectations prove the requirement, and look at every step picture and the video (sample frames with ffmpeg; the step pictures alone are not the video) for what the expectations cannot see: wrong look, clipping, overlap, flashes, a platform that differs.',

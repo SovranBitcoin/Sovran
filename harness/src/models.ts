@@ -63,6 +63,24 @@ export const dispatchRejection = z.object({
 });
 export type RuntimeTask = z.infer<typeof runtimeTask>;
 
+/**
+ * A provider or model a worker found unavailable, and until when to skip it.
+ * Recorded by `fallback`, so the next task's policy starts with what works
+ * instead of spending a dispatch per ticket rediscovering an exhausted quota.
+ */
+export const outage = z.object({
+  provider: text, model: text, reason: availability, until: z.iso.datetime(), detail: text,
+});
+export type Outage = z.infer<typeof outage>;
+/** How long each kind of unavailability is assumed to last when the provider names no time. */
+export const OUTAGE_MS: Record<z.infer<typeof availability>, number> = {
+  'quota-exhausted': 24 * 3_600_000, 'rate-limited': 3_600_000,
+  'capacity-unavailable': 3_600_000, 'model-unavailable': 24 * 3_600_000,
+};
+/** A quota covers every model of its provider; the others are one model's. */
+const covers = (o: Outage, m: Model) =>
+  o.provider === m.provider && (o.reason === 'quota-exhausted' || o.model === m.model);
+
 export function candidates(policy: Models, selectedRole: Role): Model[] {
   if ('kind' in policy) return policy.routes[selectedRole].candidates;
   return selectedRole === 'diversityReview' ? [] : [policy[selectedRole]];
@@ -74,12 +92,13 @@ export function driver(policy: Models, target: Model) {
 
 /** Initial hypotheses from the linked research, to be measured on local tasks.
  * The live catalog must support every choice; there is no silent option downgrade. */
-export function recommendedModels(catalog: unknown) {
+export function recommendedModels(catalog: unknown, outages: Outage[] = []) {
   const sol = { provider: 'codex', model: 'gpt-6.1-sol', options: { reasoningEffort: 'high' } };
   const astra = { provider: 'codex', model: 'gpt-6-astra', options: { reasoningEffort: 'high' } };
   const opus = { provider: 'claudeAgent', model: 'claude-opus-5-5', options: { effort: 'high' } };
   const fable = { provider: 'claudeAgent', model: 'claude-fable-5-1', options: { effort: 'high' } };
-  return models.parse({ kind: 'routed', allowGptOnly: true, allowClaudeOnly: true, catalog,
+  const current = outages.filter(o => Date.parse(o.until) > Date.now());
+  const policy = models.parse({ kind: 'routed', allowGptOnly: true, allowClaudeOnly: true, catalog,
     routes: {
       research: { purpose: 'Bounded evidence extraction, escalating to the coding model, then across providers, when unavailable', candidates: [
         { provider: 'codex', model: 'gpt-6-luna', options: { reasoningEffort: 'high' } }, sol, opus,
@@ -91,4 +110,13 @@ export function recommendedModels(catalog: unknown) {
       diversityReview: { purpose: 'Extra single-provider review by a model outside the complete source-author model set', candidates: [astra, fable] },
     },
   });
+  if (!('kind' in policy)) return policy;
+  for (const [name, route] of Object.entries(policy.routes)) {
+    const available = route.candidates.filter(m => !current.some(o => covers(o, m)));
+    // Outages are assumptions about the future: a route they would empty keeps every
+    // candidate, and its purpose says so, rather than refusing every new task.
+    if (available.length) route.candidates = available;
+    else route.purpose = `${route.purpose} (all candidates recently unavailable; tried anyway)`;
+  }
+  return policy;
 }

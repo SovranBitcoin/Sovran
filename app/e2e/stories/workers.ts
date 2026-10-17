@@ -7,17 +7,43 @@
  * Mac's memory and then its disk. The prepared simulator has the ones no story
  * uses switched off, which leaves about 50 processes and under 1 GB, and it
  * boots in 3 s instead of 20. Clones inherit the installed app.
+ *
+ * Every checkout has its own: several worktrees run stories at once, and a
+ * run that removed "the" workers used to delete another checkout's in the
+ * middle of its stories. None of them opens a window: `simctl` boots without
+ * Simulator.app, which only shows them if someone has it open.
  */
+import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { holdNativeLease } from './machine';
 import { simctl } from './simctl';
 
-const BASE_NAME = 'sovran-e2e-base';
-const WORKER_PREFIX = 'sovran-e2e-worker-';
+/** The checkout these simulators belong to: its folder name, and a hash of its path so two folders of one name differ. */
+export function checkoutLane(root: string): string {
+  const name = basename(root)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 24);
+  return `${name || 'checkout'}-${createHash('sha256').update(root).digest('hex').slice(0, 6)}`;
+}
+
+const CHECKOUT = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
+const LANE = checkoutLane(CHECKOUT);
+const BASE_NAME = `sovran-e2e-${LANE}-base`;
+const WORKER_PREFIX = `sovran-e2e-${LANE}-worker-`;
+/** The one simulator a person or agent plays single stories on in this checkout, kept between runs. */
+const OWN_NAME = `sovran-e2e-${LANE}`;
 const DEVICE_TYPE = 'iPhone 17 Pro';
 const RUNTIME = 'com.apple.CoreSimulator.SimRuntime.iOS-26-1';
-/** Written into the prepared simulator's folder: which build it carries and what was switched off. */
-const STAMP_FILE = 'sovran-e2e-base.json';
+/**
+ * Written into the prepared simulator's folder: which build it carries, what
+ * was switched off, and the checkout it belongs to, so `machine.ts reclaim`
+ * knows it can go once that checkout has.
+ */
+export const STAMP_FILE = 'sovran-e2e-base.json';
 
 /**
  * Background services of the simulator that no story needs, by launchd label
@@ -174,7 +200,13 @@ function wanted(appPath: string): string {
   const artifact = existsSync(build)
     ? (JSON.parse(readFileSync(build, 'utf8')) as { artifactSha256?: string }).artifactSha256
     : undefined;
-  return JSON.stringify({ artifact, runtime: RUNTIME, device: DEVICE_TYPE, off: UNUSED_SERVICES });
+  return JSON.stringify({
+    artifact,
+    runtime: RUNTIME,
+    device: DEVICE_TYPE,
+    off: UNUSED_SERVICES,
+    checkout: CHECKOUT,
+  });
 }
 
 /** Where a simulator keeps its launch settings: outside its own folder, and left behind when it is deleted. */
@@ -210,8 +242,7 @@ export function prepareBase(appPath: string): string {
   const stamp = wanted(appPath);
   const existing = devices().find((device) => device.name === BASE_NAME);
   if (existing) {
-    const stampFile = join(existing.dataPath, '..', STAMP_FILE);
-    if (existsSync(stampFile) && readFileSync(stampFile, 'utf8') === stamp) {
+    if (readStamp(existing) === stamp) {
       if (existing.state !== 'Shutdown') simctl('shutdown', existing.udid);
       return existing.udid;
     }
@@ -229,7 +260,7 @@ export function prepareBase(appPath: string): string {
   return udid;
 }
 
-/** Remove every worker simulator, from this run or one that was interrupted. */
+/** Remove this checkout's worker simulators, from this run or one that was interrupted. */
 export function removeWorkers(): void {
   for (const device of devices()) {
     if (device.name.startsWith(WORKER_PREFIX)) remove(device.udid);
@@ -248,4 +279,56 @@ export function startWorkers(baseUdid: string, count: number): string[] {
   }
   for (const udid of udids) simctl('bootstatus', udid, '-b');
   return udids;
+}
+
+/**
+ * This checkout's own simulator for playing one story at a time, booted and
+ * ready: cloned from the prepared one, and used again by later stories, which
+ * can start from the states earlier ones saved, until the build changes or
+ * `playedOn` says it has already played this one. Nothing else here removes it.
+ */
+export async function ownSimulator(
+  appPath: string,
+  playedOn?: (udid: string) => boolean
+): Promise<string> {
+  const stamp = wanted(appPath);
+  const ready = () => {
+    const own = devices().find((device) => device.name === OWN_NAME);
+    return own && readStamp(own) === stamp ? own : undefined;
+  };
+  const boot = (udid: string) => {
+    try {
+      simctl('boot', udid);
+    } catch {
+      // Already booted, perhaps by another story of this checkout a moment ago.
+    }
+    simctl('bootstatus', udid, '-b');
+    return udid;
+  };
+  const existing = ready();
+  if (existing && !playedOn?.(boot(existing.udid))) return existing.udid;
+  // Making a simulator is native work: queue for it, and look again once it is our turn.
+  const release = await holdNativeLease(`this checkout's simulator`);
+  try {
+    const own = ready();
+    if (own && own.udid !== existing?.udid && !playedOn?.(boot(own.udid))) return own.udid;
+    const base = prepareBase(appPath);
+    for (const stale of devices().filter((device) => device.name === OWN_NAME)) {
+      if (stale.state !== 'Shutdown') simctl('shutdown', stale.udid);
+      remove(stale.udid);
+    }
+    const udid = simctl('clone', base, OWN_NAME);
+    switchOffUnusedServices(udid);
+    const made = devices().find((device) => device.udid === udid);
+    if (!made) throw new Error("This checkout's simulator disappeared while it was being made.");
+    writeFileSync(join(made.dataPath, '..', STAMP_FILE), stamp);
+    return boot(udid);
+  } finally {
+    release();
+  }
+}
+
+function readStamp(device: Device): string | undefined {
+  const file = join(device.dataPath, '..', STAMP_FILE);
+  return existsSync(file) ? readFileSync(file, 'utf8') : undefined;
 }

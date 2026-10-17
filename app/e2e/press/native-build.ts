@@ -42,6 +42,7 @@ import { ROOT, type Platform } from './plan';
 import type { NativeBuildSummary } from './promote';
 import { resolveAndroidSdkRoot } from '../drivers/android/adb';
 import { captureGitInfo, captureSourceFingerprint } from '../core/git';
+import { holdNativeLease } from '../stories/machine';
 
 const APP_DIR = join(ROOT, 'app');
 const NATIVE_BUILDS = join(APP_DIR, 'e2e/artifacts/native-builds');
@@ -716,6 +717,7 @@ export async function ensureNativeBuild(
   console.log(
     `${platform}: ${stamp ? 'native inputs changed' : 'no stamped native build'}; building locally (this takes a while)`
   );
+  await holdNativeLease(`${platform} ${kind} build`);
   const built = await withStableBuildSource(ROOT, () =>
     platform === 'ios' ? buildIos(fingerprint, kind) : buildAndroid(fingerprint, kind)
   );

@@ -339,3 +339,30 @@ test('a definitive rejection before child creation permits only the next sealed 
   await expect(dispatch(c, { action: 'dispatch-rejected', id: t.id, ticket: next.ticket?.id,
     reason: 'model-unavailable', rejection: { ...rejection, kind: 'unknown' } })).rejects.toThrow();
 });
+
+test('a provider out of quota is left out of the next task\'s routes until it is due back', async () => {
+  const { controller: c, root, spec } = fixture();
+  const t = c.create(root, { ...spec, historyPolicy: { version: 1, paths: ['source.txt'] }, verificationPolicy: fixtureVerification, models: routedModels() });
+  quota(c, c.next(t.id));
+  const [recorded] = c.outages();
+  expect(recorded).toMatchObject({ provider: 'codex', reason: 'quota-exhausted' });
+  const select = (id: string) => ({ id, type: 'select', options: ['high'].map(o => ({ id: o })) });
+  const catalog = (observedAt: string) => ({ observedAt, providers: [
+    { providerInstanceId: 'codex', driverKind: 'codex', canRunChildTask: true,
+      models: ['gpt-6-luna', 'gpt-6.1-sol', 'gpt-6-astra'].map(id => ({ id, options: [select('reasoningEffort')] })) },
+    { providerInstanceId: 'claudeAgent', driverKind: 'claudeAgent', canRunChildTask: true,
+      models: ['claude-opus-5-5', 'claude-fable-5-1'].map(id => ({ id, options: [select('effort')] })) },
+  ] });
+  const now = await dispatch(c, { action: 'model-policy', catalog: catalog(new Date().toISOString()) });
+  if (!('kind' in now)) throw new Error('Expected a routed policy');
+  for (const route of Object.values(now.routes)) expect(route.candidates.map(m => m.provider)).not.toContain('codex');
+  const expired = { ...recorded!, until: new Date(Date.now() - 1).toISOString() };
+  const later = recommendedModels(catalog(new Date().toISOString()), [expired]);
+  if (!('kind' in later)) throw new Error('Expected a routed policy');
+  expect(later.routes.implementation.candidates[0]?.provider).toBe('codex');
+  // Every provider out: routes keep their candidates rather than refusing new tasks.
+  const none = recommendedModels(catalog(new Date().toISOString()), [recorded!, { ...recorded!, provider: 'claudeAgent' }]);
+  if (!('kind' in none)) throw new Error('Expected a routed policy');
+  expect(none.routes.review.candidates).toHaveLength(2);
+  expect(none.routes.review.purpose).toContain('tried anyway');
+});

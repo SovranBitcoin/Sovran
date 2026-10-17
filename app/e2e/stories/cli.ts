@@ -1,8 +1,11 @@
 /* eslint-disable no-console -- CLI boundary */
 /**
  * Play one story on a simulator:
- *   bun e2e/stories/cli.ts <story.json> --udid <simulator> --app <Sovran.app> [--look]
- *   bun e2e/stories/cli.ts --state <name> --udid <simulator> --app <Sovran.app>
+ *   bun e2e/stories/cli.ts <story.json> [--udid <simulator>] [--app <Sovran.app>] [--look]
+ *   bun e2e/stories/cli.ts --state <name> [--udid <simulator>] [--app <Sovran.app>]
+ *
+ * Without `--udid` it plays on this checkout's own simulator, made on first use
+ * and used again after, with no window. Without `--app` it plays the bundled test build.
  *
  * `--look` lists what is on screen when the story ends, for writing the next step.
  * `--state` only builds and saves a state on the simulator, if it is not there already.
@@ -50,6 +53,7 @@ import {
 import { tokenFromMint } from './secondWallet';
 import { makePerson } from './person';
 import { storySimulator } from './simulator';
+import { ownSimulator } from './workers';
 import { madeFrom, reachState } from './states';
 import { storySchema, type Story } from './story';
 import { selectBundledIosStoryApp } from '../press/native-build';
@@ -61,8 +65,12 @@ const flag = (name: string) => {
   const at = flags.indexOf(`--${name}`);
   return at === -1 ? undefined : flags[at + 1];
 };
-const udid = flag('udid');
-const appPath = flag('app');
+const appPath =
+  flag('app') ??
+  join(
+    dirname(fileURLToPath(import.meta.url)),
+    '../artifacts/native-builds/ios-bundled/Sovran.app'
+  );
 const onlyState = flag('state');
 const bundled = flags.includes('--bundled');
 let boundApp: Awaited<ReturnType<typeof selectBundledIosStoryApp>> | undefined;
@@ -82,7 +90,9 @@ if (platform === 'android') {
     process.exit(2);
   }
   const { runAndroidStory } = await import('./android');
+  const { holdNativeLease } = await import('./machine');
   try {
+    await holdNativeLease(`Android story ${storyPath}`);
     const result = await runAndroidStory(
       storyPath,
       flags.includes('--bundled') ? 'bundled' : 'dev'
@@ -98,13 +108,29 @@ if (platform !== 'ios') {
   console.error(`Unsupported story platform: ${platform}`);
   process.exit(2);
 }
-if ((!storyPath && !onlyState) || !udid || !appPath) {
+if (!storyPath && !onlyState) {
   console.error(
-    'Usage: bun e2e/stories/cli.ts <story.json> --udid <simulator> --app <Sovran.app> [--look]\n' +
-      '       bun e2e/stories/cli.ts --state <name> --udid <simulator> --app <Sovran.app>'
+    'Usage: bun e2e/stories/cli.ts <story.json> [--udid <simulator>] [--app <Sovran.app>] [--look]\n' +
+      '       bun e2e/stories/cli.ts --state <name> [--udid <simulator>] [--app <Sovran.app>]'
   );
   process.exit(2);
 }
+if (!existsSync(appPath)) {
+  console.error(`No test build at ${appPath}: bun e2e/press/native-build.ts ios --bundled`);
+  process.exit(2);
+}
+/**
+ * The story's own end, if this checkout's simulator holds it, means it was played
+ * there before; a wallet cannot be replayed against a public mint, so the story
+ * gets a fresh copy of the simulator instead.
+ */
+const playedOn = (candidate: string) => {
+  if (!storyPath) return false;
+  const text = readFileSync(storyPath, 'utf8');
+  const parsed = storySchema.parse(JSON.parse(text));
+  return storySimulator(candidate).hasState(parsed.id, madeFrom(parsed, text));
+};
+const udid = flag('udid') ?? (await ownSimulator(appPath, bundled ? undefined : playedOn));
 
 /** What the recorder is given to capture the final screen. This paces no step. */
 const LAST_FRAME_MS = 300;

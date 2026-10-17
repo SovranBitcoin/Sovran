@@ -9,6 +9,19 @@ Use the controller in `harness/`; read `harness/README.md` first. This procedure
 T3 interface. The controller owns progress. Host shell access is trusted, not sandboxed.
 Use the existing T3 thread, including when the owner is using their phone.
 
+## Share the Mac
+
+Other tasks run on this Mac at the same time, each in its own worktree. Before intake, run
+`bun app/e2e/stories/machine.ts status`: it names the task holding the native lease, free disk
+and swap. Builds and story runs queue on that lease by themselves; a task with native work
+waits rather than competing. Below 20 GB free native work refuses to start, so settle space
+in the intake question round (`machine.ts reclaim` lists what runs left behind) instead of
+stopping mid-run. Never delete files without the owner's answer.
+
+Do not boot, open or reuse simulators and emulators yourself, and never open Simulator.app.
+Briefs tell workers how to look at the app; a story runner gives each checkout its own
+windowless devices. Each worker writes a copy of its result to the brief's `resultFile`.
+
 ## Settle the task
 
 Research the requested behavior, existing owners and relevant primary sources. Use the
@@ -59,6 +72,8 @@ do not ask the owner questions. A missing prerequisite ends incomplete.
 3. Verify the returned structured model/provider against the ticket, then `claim` with
    `worker=<T3 taskId>` and the structured tool result as `runtime`. Preserve that taskId.
    Requested effort is recorded; do not claim T3 reported effective effort when it did not.
+   If a worker stays non-terminal well past its expected time, compare its `resultFile`
+   and T3 activity before waiting longer; never leave a ticket idle for hours.
    Check `task_status` on completion: require
    completed/result_available, matching identity, no pending question and no live child
    runs. Do not treat a waiting turn or timeout as completion.
@@ -97,7 +112,10 @@ host investigation. Do not clear the database or replay a possibly completed ope
 
 At publishable, call `publish` only when the contract authorizes a PR. On a lost response,
 the same action reconciles the existing intent; it does not blindly create another PR.
-Immediately register any returned PR with `link_pull_request`. Use T3's PR watcher to
+Immediately register any returned PR with `link_pull_request`. Then start the branch's
+dev server from its checkout with `bun run dev:tunnel --detach` and put the link it prints
+in the PR comment and your reply: tapped on the owner's phone, it opens that build in the
+Sovran dev client. `bun run dev:tunnel --list` shows those running; `--stop <name>` ends one. Use T3's PR watcher to
 wake this thread for CI; on wake call `check-ci`. Stop at ready; never merge or deploy.
 Before handing back, reconcile the thread's PR links and remove its watcher.
 
