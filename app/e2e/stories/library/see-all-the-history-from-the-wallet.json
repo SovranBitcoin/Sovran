@@ -288,7 +288,7 @@
           "id": "wallet-receive"
         },
         "direction": "up",
-        "distance": 0.6
+        "distance": 0.55
       },
       "expect": [
         {
