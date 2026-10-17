@@ -7,7 +7,7 @@ import { inspectNodeTests, isNativeCheck, isNodeCheck, regression, validateVerif
 import { inspectNativeStories, nativeRunnerChanges } from './native';
 import { runCommand } from './command';
 import { inspectChange } from './policy';
-import { inspectUpgradeEvidence, upgradeInventorySchema } from './upgrade';
+import { inspectUpgradeEvidence, upgradeBaselineSchema, upgradeInventorySchema } from './upgrade';
 import { brief } from './brief';
 import { assessmentArtifacts, inspected, unresolved, validateResolutions } from './evidence';
 import { Publisher, publishPlan } from './publisher';
@@ -610,10 +610,14 @@ export class Controller {
           const inventoryPath = join(dir, `${t.generation}-${digest('harness:upgrade-inventory')}.log`);
           const inventory = upgradeInventorySchema.parse(JSON.parse(readFileSync(inventoryPath, 'utf8')));
           if (inventory.sourceFingerprint !== t.source) throw new Error('Upgrade inventory is stale');
-          const inspected = inspectUpgradeEvidence(JSON.parse(readFileSync(upgradePath, 'utf8')), inventory);
+          // The controller's own copy: a candidate cannot widen what is accepted.
+          const baseline = upgradeBaselineSchema.parse(JSON.parse(readFileSync(join(import.meta.dir, '../upgrade-baseline.json'), 'utf8')));
+          const inspected = inspectUpgradeEvidence(JSON.parse(readFileSync(upgradePath, 'utf8')), inventory, baseline);
           artifacts.push(fileEvidence(dir, `${t.generation}-upgrade.json`), this.save(t, 'upgrade-inspection.json', inspected));
           outcome = inspected.status;
-          summary = inspected.status === 'pass' ? 'Recorded historical fixture checks passed; this is bounded unit evidence' : inspected.reasons.join('\n');
+          summary = inspected.status === 'pass'
+            ? `Recorded historical fixture checks passed; this is bounded unit evidence. ${inspected.accepted.length} findings main already had (recorded from ${baseline.recordedFrom}) were accepted, not fixed`
+            : inspected.reasons.join('\n');
         } catch (error) { outcome = 'inconclusive'; summary = `Upgrade evidence unavailable: ${String(error)}`; }
       }
       t = this.change(id, `result:${t.generation}:${check.id}`, { exit, artifacts, outcome, summary }, v => {

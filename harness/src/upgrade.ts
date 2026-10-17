@@ -34,12 +34,18 @@ const epochChecks = ['starts, three times over, without stopping on a failure or
 const cocoChecks = ['keeps every proof with its secret, amount, mint, keyset and state',
   'keeps the spendable balance of each mint', 'does not lower a keyset counter'];
 type Inspection = { status: 'pass' | 'fail' | 'inconclusive'; reasons: string[];
-  losses: string[]; skips: string[] };
+  losses: string[]; skips: string[]; accepted: string[] };
+/** Findings main already had when the owner chose to accept them: reported, never blocking. */
+export const upgradeBaselineSchema = z.object({
+  recordedFrom: z.string().min(1), reasons: z.array(z.string().min(1)), losses: z.array(z.string().min(1)),
+});
+type Baseline = z.infer<typeof upgradeBaselineSchema>;
 
 /** A pass means the enumerated unit evidence is complete, never every install is safe.
  * Caller must bind this inventory and report to its own before/after fingerprint. */
-export function inspectUpgradeEvidence(jest: unknown, inventory: unknown): Inspection {
-  const result: Inspection = { status: 'inconclusive', reasons: [], losses: [], skips: [] };
+export function inspectUpgradeEvidence(jest: unknown, inventory: unknown,
+  baseline: Baseline = { recordedFrom: 'none', reasons: [], losses: [] }): Inspection {
+  const result: Inspection = { status: 'inconclusive', reasons: [], losses: [], skips: [], accepted: [] };
   const parsed = report.safeParse(jest), discovered = upgradeInventorySchema.safeParse(inventory);
   if (!parsed.success || !discovered.success) {
     result.reasons.push('Malformed upgrade report or inventory'); return result;
@@ -82,7 +88,11 @@ export function inspectUpgradeEvidence(jest: unknown, inventory: unknown): Inspe
   for (const adapter of expected.cocoAdapters) for (const title of cocoChecks) if (!coco.some(test =>
     test.ancestorTitles.includes(`a wallet written by ${adapter.package} ${adapter.version}`) &&
     test.title === title && ordinaryPass(test))) result.reasons.push(`Missing Coco evidence: ${adapter.package}@${adapter.version}: ${title}`);
-  if (result.losses.length) result.reasons.push('Known losses or expected failures remain');
+  // Only what main did not already have can stop a task. A failure always does.
+  const old = new Set([...baseline.reasons, ...baseline.losses]);
+  result.accepted = [...result.reasons, ...result.losses].filter(item => old.has(item));
+  result.reasons = result.reasons.filter(item => !old.has(item));
+  if (result.losses.some(item => !old.has(item))) result.reasons.push('New known losses or expected failures');
   result.status = failed ? 'fail' : result.reasons.length ? 'inconclusive' : 'pass';
   return result;
 }

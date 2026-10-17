@@ -29,7 +29,7 @@ test('a green expected-failure preservation assertion cannot certify preservatio
   expect(result.status).toBe('inconclusive'); expect(result.losses[0]).toContain('starts, three times');
 });
 test('complete ordinary observations satisfy only the bounded unit gate', () => {
-  const { jest, inventory } = inputs(); expect(inspectUpgradeEvidence(jest, inventory)).toEqual({ status: 'pass', reasons: [], losses: [], skips: [] });
+  const { jest, inventory } = inputs(); expect(inspectUpgradeEvidence(jest, inventory)).toEqual({ status: 'pass', reasons: [], losses: [], skips: [], accepted: [] });
 });
 test('an epoch omitted from discovery cannot silently disappear', () => {
   const { jest, inventory } = inputs(); inventory.expectedEpochIds.push('E2');
@@ -54,7 +54,7 @@ test('only the exact writer skip in its expected file is allowed', () => {
   skip.title = skip.fullName = 'skipped account recovery'; expect(inspectUpgradeEvidence(jest, inventory).status).toBe('inconclusive');
 });
 test('malformed reports never become passes', () => {
-  expect(inspectUpgradeEvidence({}, {})).toEqual({ status: 'inconclusive', reasons: ['Malformed upgrade report or inventory'], losses: [], skips: [] });
+  expect(inspectUpgradeEvidence({}, {})).toEqual({ status: 'inconclusive', reasons: ['Malformed upgrade report or inventory'], losses: [], skips: [], accepted: [] });
 });
 test('a missing declared surviving fact cannot pass', () => {
   const { jest, inventory } = inputs(); inventory.epochs[0]!.facts.push('the paid provider key');
@@ -63,4 +63,28 @@ test('a missing declared surviving fact cannot pass', () => {
 test('a manual throwing guard is not mistaken for an empty suite', () => {
   const { jest, inventory } = inputs(); jest.testResults[2]!.assertionResults[0]!.numPassingAsserts = 0;
   expect(inspectUpgradeEvidence(jest, inventory).status).toBe('pass');
+});
+
+test('what main already had is reported but stops nothing; anything new still does', () => {
+  const { jest, inventory } = inputs();
+  inventory.epochs[0]!.knownGaps.push({ what: 'retired store', followUp: 'F89', why: 'No reader exists' });
+  inventory.epochs[0]!.facts.push('the wallpaper theme');
+  const baseline = { recordedFrom: 'main', reasons: ['Missing ordinary evidence: E1: keeps the wallpaper theme'],
+    losses: ['E1: retired store [F89: No reader exists]'] };
+  const result = inspectUpgradeEvidence(jest, inventory, baseline);
+  expect(result.status).toBe('pass');
+  expect(result.accepted).toEqual([...baseline.reasons, ...baseline.losses]);
+  inventory.epochs[0]!.knownGaps.push({ what: 'the signer', followUp: 'F90', why: 'New' });
+  expect(inspectUpgradeEvidence(jest, inventory, baseline).reasons).toEqual(['New known losses or expected failures']);
+  inventory.epochs[0]!.knownGaps.pop(); inventory.epochs[0]!.facts.push('the paid provider key');
+  expect(inspectUpgradeEvidence(jest, inventory, baseline).reasons).toEqual(['Missing ordinary evidence: E1: keeps the paid provider key']);
+  inventory.epochs[0]!.facts.pop(); jest.testResults[0]!.assertionResults[0]!.status = 'failed';
+  expect(inspectUpgradeEvidence(jest, inventory, { ...baseline, reasons: [...baseline.reasons, `Failed: ${jest.testResults[0]!.assertionResults[0]!.fullName}`] }).status).toBe('fail');
+});
+
+test('the recorded baseline accepts exactly what main reports today', async () => {
+  const { upgradeBaselineSchema } = await import('../src/upgrade');
+  const baseline = upgradeBaselineSchema.parse(await Bun.file(new URL('../upgrade-baseline.json', import.meta.url)).json());
+  expect(baseline.reasons.every(reason => reason.startsWith('Missing ordinary evidence: '))).toBe(true);
+  expect(new Set(baseline.losses).size).toBe(baseline.losses.length);
 });

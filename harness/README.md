@@ -205,7 +205,11 @@ A passing unit gate is bounded fixture evidence, never certification of every re
 Zustand, Redux-era, SecureStore or Coco state. The existing persistence skill and ledger own
 the wider state-space argument, including interrupted operations, skipped releases, restore
 combinations, account types and platform differences. The controller does not reimplement
-wallet migrations or Cashu behavior. Current known losses make this gate inconclusive.
+wallet migrations or Cashu behavior. Known losses and missing facts that main already had
+are listed in `upgrade-baseline.json`, read from the controller's own checkout: they are
+reported as accepted, not fixed, and only a new one makes the gate inconclusive. A failed
+assertion always fails it. The source fingerprint needs the Bitchat vendor submodules checked
+out (`git submodule update --init`).
 
 A UI task passes only through a sealed `native` requirement whose stories play on both iOS
 and Android. The check runs `app/e2e/stories/bound.ts`, which builds each platform's bundled

@@ -19,7 +19,7 @@ export function git(root: string, args: string[]) {
 
 export function fingerprint(root: string) {
   const result = captureSourceFingerprint(root);
-  if (!result) throw new Error('Source fingerprint unavailable');
+  if (!result) throw new Error('Source fingerprint unavailable; if its submodules are empty, run `git submodule update --init` in the checkout');
   return result;
 }
 

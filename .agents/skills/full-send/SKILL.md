@@ -48,7 +48,8 @@ fallbacks. Put the returned policy in the contract's `models`; settle any owner-
 changes before sealing. Unsupported choices are errors, never silent effort downgrades.
 Keep private conversation material and raw logs out of PR text.
 
-Start from a clean checkout. Preserve unrelated work in its own worktree. Resolve any
+Start from a clean checkout with its submodules checked out (`git submodule update --init`;
+a plain `git worktree add` leaves them empty and the controller refuses the source). Preserve unrelated work in its own worktree. Resolve any
 dependency changes and their lockfile in a disposable preview before sealing; record the
 exact allowances the owner approved. Select relevant Cashu references by commit and
 relative file paths, including their license. Missing repositories are evidence gaps.
