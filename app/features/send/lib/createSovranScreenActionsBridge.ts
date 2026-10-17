@@ -312,6 +312,19 @@ interface CreateSovranScreenActionsBridgeConfig {
 let mintInfoRetry: (() => void) | null = null;
 
 /** Re-run the mint-info NUT-06 read for the mounted mint-info screen. Returns false when none is mounted. */
+/**
+ * The name a mint page shows once the mint's own info arrives. A mint that
+ * leaves its name blank keeps the name the list showed for it (the route's
+ * seed) rather than turning into its URL a moment after opening.
+ */
+export function mintInfoDisplayName(
+  infoName: string | undefined,
+  seedName: unknown,
+  mintUrl: string
+): string {
+  return infoName?.trim() || (typeof seedName === 'string' && seedName.trim()) || mintUrl;
+}
+
 export function retryMintInfoFetch(): boolean {
   if (!mintInfoRetry) return false;
   mintInfoRetry();
@@ -623,7 +636,7 @@ export function createSovranScreenActionsBridge({
               cb({
                 _mintInfoFetched: true,
                 _mintInfoError: null,
-                displayName: mintInfo.name ?? mintUrl,
+                displayName: mintInfoDisplayName(mintInfo.name, current.seedDisplayName, mintUrl),
                 iconUrl: mintInfo.icon_url,
                 description: mintInfo.description,
                 longDescription: mintInfo.description_long,

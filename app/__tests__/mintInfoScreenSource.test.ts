@@ -53,6 +53,57 @@ describe('mint info screen source', () => {
     expect(source).toContain("isLoading={detail.identity === 'loading'}");
   });
 
+  it('keeps the rating chart mounted when no score is known', () => {
+    // The chart used to render only for a known score or while loading, so the
+    // stars vanished for a mint nobody had rated. Only a failed read with no
+    // score swaps it for the warning; otherwise it draws its empty state.
+    expect(source).toContain("{hasScore || detail.reviews !== 'error' ? (");
+    expect(source).toContain("empty={detail.reviews !== 'loading'}");
+    expect(source).not.toContain('still shows nothing');
+    const chart = readFileSync(
+      resolve(ROOT, 'features/mint/components/RatingBarChart.tsx'),
+      'utf8'
+    );
+    expect(chart).toContain('empty = false');
+    expect(chart).toContain('const showSkeleton = !isValidScore && !showEmpty;');
+    expect(chart).toContain('No ratings yet');
+  });
+
+  it('draws the icon ring without a mount fade or a fake half score', () => {
+    const ringStart = source.indexOf('function ProgressRing(');
+    const ring = source.slice(ringStart, source.indexOf('function AnimatedAvatar(', ringStart));
+    expect(ringStart).toBeGreaterThan(-1);
+    expect(ring).not.toContain('fadeAnim');
+    expect(ring).not.toContain('withTiming');
+    expect(ring).toContain('progress === undefined ? trackColor : errorColor');
+    expect(source).not.toContain('progress = 0.5');
+    expect(source).not.toContain('?? 0.5');
+    expect(source).toContain('progress={audit?.successRate}');
+  });
+
+  it('replaces Close with Details in the footer', () => {
+    const footer = source.slice(
+      source.indexOf('<BottomButtons>'),
+      source.indexOf('</BottomButtons>')
+    );
+    // Close is gone from the footer; the accepter's Reject keeps its old id.
+    expect(footer).not.toContain("text: 'Close'");
+    expect(footer).toContain("text: 'Reject'");
+    expect(
+      footer.match(
+        /testID: 'mint-info-details-open',\s+text: 'Details',\s+accessibilityLabel: 'Mint details',\s+variant: 'secondary',\s+onPress: \(\) => setDetailsOpen\(true\),/g
+      )
+    ).toHaveLength(2);
+    // The modal opens through the shared DetailsSection, from the footer only.
+    expect(source).toContain('<DetailsSection\n          trigger="none"');
+    expect(source).toContain('open={detailsOpen}');
+    expect(source).toContain('onOpenChange={setDetailsOpen}');
+    expect(source).toContain('items={buildMintDetailsRows({');
+    // One thing on the page is called Details: the long description is not.
+    expect(source).not.toContain('title="Details"');
+    expect(source).toContain('testID="mint-info-details"');
+  });
+
   it('renders the shared status dot for every audit state', () => {
     expect(source).toContain('<AvatarStatusDot status={status} size={badgeSize} />');
     expect(source).not.toContain('STATUS_BADGE_CONFIG');

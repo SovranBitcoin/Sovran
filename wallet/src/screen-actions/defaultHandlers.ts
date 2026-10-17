@@ -731,26 +731,24 @@ export function createDefaultScreenActionHandlers(
         const mintUrl = (ctx as EntryLike).mintUrl as string | undefined;
         if (!mintUrl) return;
 
-        // The selector hands the full row in via `actions.getInfo.execute`
-        // so audit/score travel with the navigation; falls back to a
-        // cache-only build for callers that don't have a row.
+        // Opens at once, painted from the row the selector hands in. Only
+        // `seed*` keys, as buildMintInfoHref writes them: the page's bridge
+        // fetches NUT-06 info while `displayName` is unset, and audit comes
+        // from the metadata cache, so nothing here waits on the network.
         const item = (ctx as EntryLike).item as
           | import("../types").MintListItem
           | undefined;
-
-        const ops = getOperations();
-        let infoEntry: EntryLike = { mintUrl };
-        if (ops?.buildMintReviewInfo) {
-          try {
-            const info = await ops.buildMintReviewInfo(mintUrl, item);
-            infoEntry = { ...(info as unknown as EntryLike) };
-          } catch (e) {
-            logger.warn("screenAction.mintInfo.buildReviewInfo.failed", {
-              ...mintUrlFields(mintUrl),
-              error: errField(e),
-            });
-          }
-        }
+        const infoEntry: EntryLike = {
+          mintUrl,
+          seedDisplayName: item?.displayName || undefined,
+          seedIconUrl: item?.iconUrl || undefined,
+          seedKymScore:
+            typeof item?.kymScore === "number" ? item.kymScore : undefined,
+          seedReviewCount:
+            typeof item?.reviewCount === "number"
+              ? item.reviewCount
+              : undefined,
+        };
         navigation.mintInfo?.(JSON.stringify(infoEntry));
       },
 

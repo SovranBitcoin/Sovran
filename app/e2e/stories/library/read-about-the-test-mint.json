@@ -57,7 +57,7 @@
         },
         {
           "visible": {
-            "id": "mint-info-close"
+            "id": "mint-info-details-open"
           }
         }
       ],
@@ -66,12 +66,12 @@
     {
       "name": "close it",
       "tap": {
-        "id": "mint-info-close"
+        "id": "flow-header-close"
       },
       "expect": [
         {
           "gone": {
-            "id": "mint-info-close"
+            "id": "mint-info-details-open"
           }
         }
       ]

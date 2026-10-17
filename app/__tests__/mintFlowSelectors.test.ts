@@ -93,9 +93,11 @@ describe('mint flow e2e selectors', () => {
 
   it('pins the mint info trust decision buttons on every ButtonHandler variant', () => {
     const source = read('features/mint/screens/MintInfoScreen.tsx');
-    // trust: accepter ("Accept") + scan/untrusted ("Add mint"); close: those
-    // two plus the trusted read-only variant.
+    // trust: accepter ("Accept") + scan/untrusted ("Add mint"); close: the
+    // accepter's Reject only; details: scan/untrusted plus the trusted
+    // read-only variant, where Close used to be.
     expect(source.match(/testID: 'mint-info-trust'/g)).toHaveLength(2);
-    expect(source.match(/testID: 'mint-info-close'/g)).toHaveLength(3);
+    expect(source.match(/testID: 'mint-info-close'/g)).toHaveLength(1);
+    expect(source.match(/testID: 'mint-info-details-open'/g)).toHaveLength(2);
   });
 });

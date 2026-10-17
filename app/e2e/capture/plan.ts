@@ -62,12 +62,12 @@ const rules: Rule[] = [];
 // Pin expanded steps, including setup/cleanup fixtures. A new tap in a previously
 // reviewed scenario must not silently inherit permission to publish or spend.
 const REVIEWED_STEPS: Record<string, string> = {
-  'store.screenshots': '3b23abe66391bbb050d3e891946504c4d5c03eec46471989f6a7ffd559a4ffeb',
-  'marketing.screenshots': '656edc6f2a8eb63094f54c6df0caf177351b53ec46cc7b897c0c67935ab78987',
+  'store.screenshots': 'a52bc34fb965b292b3cd6a120fcfd6e562f29d09993f54abddb8d45ca6ce5880',
+  'marketing.screenshots': '450416c9fad96340bffb49213debaa305d255dd733499078dc191c71a84772b3',
   'marketing.screenshots.wallpapers':
     '0975631fb929f95d12fa4b28ca3e64acea5e0baeaa7d0d9e193834ba40a51897',
   'marketing.screenshots.media': '03f950e886a9f3666c8c9eb1c9929961e15d9c62bd1abe2d1349b2619dc814df',
-  'marketing.screenshots.mints': 'b38a9e491a0d1db28e214ca3ca72dd834266b0039c95837676fba0b7ab7f9217',
+  'marketing.screenshots.mints': '8f8454c37794890b03c0bf847e1f26adf470171b497672dabfd202e3bbfa95db',
   'backup.flow': '2523421b3c969266966ccadc6ff6ad44d105395e42736c2efde0a79e95fd176d',
   'cta.preview': '2c99d2f5d5347645bc82c8280e09d786baa7ea1ae1e9f802886fc90b852bc7f0',
   'profile.own.view': 'c8c64b57462630175aeb71c6927aab2cac816312d3333492fa819de3b318a4f5',

@@ -9,6 +9,7 @@ import Animated, {
 import { RatingStars } from './RatingStars';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useCountRollIn } from '@/shared/ui/composed/AnimatedCountValue';
+import { UNKNOWN_STAT } from '@/shared/ui/composed/StatsGrid';
 import { SkeletonContentCrossfade } from '@/shared/ui/composed/SkeletonContentCrossfade';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -19,9 +20,16 @@ import { View } from '@/shared/ui/primitives/View/View';
 export function RatingBarChart({
   score,
   visualSurface = 'mint-info',
+  empty = false,
 }: {
   score: number;
   visualSurface?: 'mint-info' | 'mint-reviews';
+  /**
+   * Nobody has rated the mint: draw the stars at the finished height with
+   * "No ratings yet" in place of a score. Off by default, so a negative
+   * score keeps meaning "still loading" for callers that do not opt in.
+   */
+  empty?: boolean;
 }) {
   const starColor = useThemeColor('yellow-300');
 
@@ -39,7 +47,8 @@ export function RatingBarChart({
   }));
 
   const isValidScore = score >= 0;
-  const showSkeleton = !isValidScore;
+  const showEmpty = empty && !isValidScore;
+  const showSkeleton = !isValidScore && !showEmpty;
 
   const targetRow = isValidScore ? Math.max(1, Math.min(5, Math.ceil(score))) : 0;
   const goldPercentage = isValidScore && targetRow > 0 ? Math.min(1, score / targetRow) : 0;
@@ -89,16 +98,29 @@ export function RatingBarChart({
   const renderContent = () => (
     <HStack className="w-full items-center gap-4 self-stretch px-4">
       <VStack className="shrink-0 items-center">
-        <Animated.View style={fadeStyle}>
-          <Animated.View style={scoreRoll}>
+        {showEmpty ? (
+          // Drawn as it is, not faded in: the fade waits for a score that has
+          // not come, and would leave this column invisible.
+          <>
             <Text heavy size={28} className="text-foreground">
-              {formattedScore}
+              {UNKNOWN_STAT}
+            </Text>
+            <Text size={12} className="text-foreground/50">
+              No ratings yet
+            </Text>
+          </>
+        ) : (
+          <Animated.View style={fadeStyle}>
+            <Animated.View style={scoreRoll}>
+              <Text heavy size={28} className="text-foreground">
+                {formattedScore}
+              </Text>
+            </Animated.View>
+            <Text size={12} className="text-foreground/50">
+              out of 5
             </Text>
           </Animated.View>
-          <Text size={12} className="text-foreground/50">
-            out of 5
-          </Text>
-        </Animated.View>
+        )}
       </VStack>
 
       <VStack className="min-w-0 flex-1 gap-1">

@@ -1,14 +1,12 @@
 import { useIdentityHeader } from '@/shared/ui/composed/IdentityHeader';
 import { Screen } from '@/shared/ui/composed/Screen';
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { StyleSheet } from 'react-native';
 import Animated, {
-  Easing,
   useAnimatedStyle,
   useSharedValue,
   withDelay,
   withSpring,
-  withTiming,
 } from 'react-native-reanimated';
 import { Stack } from 'expo-router';
 import { z } from 'zod';
@@ -56,9 +54,11 @@ import { openExternalUrl } from '@/shared/lib/url';
 import { useNostrProfile } from '@/shared/hooks/useNostrProfile';
 import { useCachedMintMetadata } from '@/shared/stores/global/mintMetadataStore';
 import { Button } from '@/shared/ui/primitives/Button';
+import { DetailsSection } from '@/shared/ui/composed/DetailsSection';
 import { useMintDetailRead, type MintDetailGroupStatus } from '../hooks/useMintDetailRead';
 import { useIsMintTrusted } from '../hooks/useIsMintTrusted';
 import type { MintAuditSummary } from '../lib/auditInfo';
+import { buildMintDetailsRows } from '../lib/mintDetailsRows';
 import {
   formatMintInfoNostrFallback,
   getMintInfoNostrDisplayName,
@@ -70,45 +70,46 @@ const ParamsSchema = z.object({
   mintInfoEntry: z.string().min(1).max(64_000).optional(),
 });
 
+/**
+ * The audit success rate as a ring around the mint's icon, drawn on the first
+ * frame: it used to fade in after the content mounted, so it blinked into a
+ * page that was already showing. With no audit it is a plain track, not a
+ * half-green, half-red ring that read as a 50% score.
+ */
 function ProgressRing({
   size = 84,
   strokeWidth = 3,
-  progress = 0.5,
+  progress,
   successColor,
   errorColor,
+  trackColor,
   children,
 }: {
   size?: number;
   strokeWidth?: number;
-  progress: number;
+  /** Share of operations that succeeded, 0..1; `undefined` when not audited. */
+  progress: number | undefined;
   successColor: string;
   errorColor: string;
+  trackColor: string;
   children?: React.ReactNode;
 }) {
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   const center = size / 2;
 
-  const strokeDashoffset = circumference * (1 - progress);
-  const fadeAnim = useSharedValue(0);
-  const fadeStyle = useAnimatedStyle(() => ({ opacity: fadeAnim.get() }));
-
-  useEffect(() => {
-    fadeAnim.set(withTiming(1, { duration: 320, easing: Easing.out(Easing.cubic) }));
-  }, [fadeAnim]);
-
   return (
     <View style={{ width: size, height: size }}>
-      <Animated.View style={fadeStyle}>
-        <Svg width={size} height={size} style={{ transform: [{ rotate: '-90deg' }] }}>
-          <Circle
-            cx={center}
-            cy={center}
-            r={radius}
-            stroke={errorColor}
-            strokeWidth={strokeWidth}
-            fill="transparent"
-          />
+      <Svg width={size} height={size} style={{ transform: [{ rotate: '-90deg' }] }}>
+        <Circle
+          cx={center}
+          cy={center}
+          r={radius}
+          stroke={progress === undefined ? trackColor : errorColor}
+          strokeWidth={strokeWidth}
+          fill="transparent"
+        />
+        {progress !== undefined && (
           <Circle
             cx={center}
             cy={center}
@@ -117,11 +118,11 @@ function ProgressRing({
             strokeWidth={strokeWidth}
             fill="transparent"
             strokeDasharray={circumference}
-            strokeDashoffset={strokeDashoffset}
+            strokeDashoffset={circumference * (1 - progress)}
             strokeLinecap="round"
           />
-        </Svg>
-      </Animated.View>
+        )}
+      </Svg>
       <View style={[StyleSheet.absoluteFill, styles.centered]}>{children}</View>
     </View>
   );
@@ -265,7 +266,11 @@ function StatsGrid({
 export function MintInfoScreen() {
   useLifecycleLogger('MintInfoScreen');
   const [foreground, background] = useThemeColor(['foreground', 'surface'] as const);
-  const [danger, success] = useThemeColor(['danger', 'green-300'] as const);
+  const [danger, success, ringTrack] = useThemeColor([
+    'danger',
+    'green-300',
+    'surface-tertiary',
+  ] as const);
   const params = useRouteParams(ParamsSchema, { where: 'mint-flow.info' });
   const { entry, actions } = useScreenActions('mintInfo', params?.mintInfoEntry);
 
@@ -315,11 +320,11 @@ export function MintInfoScreen() {
       ? entry.kymScore
       : (cachedMeta?.averageScore ??
         (typeof entry?.seedKymScore === 'number' ? entry.seedKymScore : undefined));
+  const hasScore = typeof kymScore === 'number' && kymScore >= 0;
   // Audit comes from the metadata store alone, through the selector the mint
   // rows use. The entry's audit fields are a snapshot of that store taken at
   // navigation, so reading them here let the page lag behind its own row.
   const audit = detail.meta.audit;
-  const ringProgress = audit?.successRate ?? 0.5;
   const identityError = detail.identityError;
   const contact = entry?.contact as
     { method: string; info: import('wallet').FormattedString }[] | undefined;
@@ -334,6 +339,8 @@ export function MintInfoScreen() {
     nostrContactPubkey ?? null
   );
   const nostrContactPicture = nostrContactProfile?.picture || nostrContactProfile?.image;
+  // The footer's Details button asks for the modal; DetailsSection opens it.
+  const [detailsOpen, setDetailsOpen] = useState(false);
 
   // ── Instrumentation ───────────────────────────────────────────────────────
   // Four groups land independently (identity from the route entry, audit and
@@ -488,12 +495,14 @@ export function MintInfoScreen() {
                   : mintUrl && (entry?.fromScan || !isTrusted)
                     ? [
                         {
-                          testID: 'mint-info-close',
-                          text: 'Close',
+                          // The header already closes the page. This slot opens
+                          // everything else known about the mint, every value
+                          // copyable, as the transaction pages do.
+                          testID: 'mint-info-details-open',
+                          text: 'Details',
+                          accessibilityLabel: 'Mint details',
                           variant: 'secondary',
-                          onPress: async () => {
-                            await actions.back.execute();
-                          },
+                          onPress: () => setDetailsOpen(true),
                         },
                         {
                           testID: 'mint-info-trust',
@@ -505,12 +514,11 @@ export function MintInfoScreen() {
                       ]
                     : [
                         {
-                          testID: 'mint-info-close',
-                          text: 'Close',
+                          testID: 'mint-info-details-open',
+                          text: 'Details',
+                          accessibilityLabel: 'Mint details',
                           variant: 'secondary',
-                          onPress: async () => {
-                            await actions.back.execute();
-                          },
+                          onPress: () => setDetailsOpen(true),
                         },
                       ]
               }
@@ -518,14 +526,30 @@ export function MintInfoScreen() {
           </BottomButtons>
         }>
         {morph.probe}
+        <DetailsSection
+          trigger="none"
+          label="Mint details"
+          open={detailsOpen}
+          onOpenChange={setDetailsOpen}
+          items={buildMintDetailsRows({
+            mintUrl,
+            entry,
+            cached: cachedMeta,
+            operator: {
+              pubkey: nostrContactPubkey,
+              name: getMintInfoNostrDisplayName(nostrContactProfile, ''),
+            },
+          })}
+        />
         <View className="pt-4">
           <VStack align="center" className="w-full pb-8 pt-6">
             <Animated.View className="items-center" style={morph.contentStyle}>
               <ProgressRing
                 size={84}
-                progress={ringProgress}
+                progress={audit?.successRate}
                 successColor={success}
-                errorColor={danger}>
+                errorColor={danger}
+                trackColor={ringTrack}>
                 <AnimatedAvatar
                   picture={iconUrl}
                   name={displayName}
@@ -568,19 +592,21 @@ export function MintInfoScreen() {
 
             <Spacer size={16} />
 
-            {(typeof kymScore === 'number' && kymScore >= 0) || detail.reviews === 'loading' ? (
+            {hasScore || detail.reviews !== 'error' ? (
               // Keyed by mintUrl so a screen reused for a different mint remounts
               // the chart (fresh roll-in) instead of rolling the prior mint's score.
-              // Mounted while the reviews read is out too: the chart draws its own
-              // skeleton at the finished height, so the score lands in place
-              // instead of pushing the grid down when it arrives.
+              // Mounted at one height in every state but a failed read with no
+              // score to show: a skeleton while the reviews read is out, the score
+              // once known, and the stars marked "No ratings yet" when nobody has
+              // rated the mint, so the stars never vanish and the grid never moves.
               <RatingBarChart
                 key={mintUrl}
-                score={typeof kymScore === 'number' && kymScore >= 0 ? kymScore : -1}
+                score={hasScore ? kymScore : -1}
+                empty={detail.reviews !== 'loading'}
               />
-            ) : detail.reviews === 'error' ? (
+            ) : (
               // A failed read says so and offers the read again, as the audit
-              // block below does. A mint with no reviews still shows nothing.
+              // block below does.
               <VStack
                 className="w-full items-center gap-3 pb-3"
                 testID="mint-info-reviews-status"
@@ -598,7 +624,7 @@ export function MintInfoScreen() {
                   onPress={detail.retry}
                 />
               </VStack>
-            ) : null}
+            )}
 
             <StatsGrid status={detail.audit} onRetry={detail.retry} audit={audit} />
           </VStack>
@@ -677,7 +703,7 @@ export function MintInfoScreen() {
               <Notice
                 status="info"
                 icon="ri:file-text-line"
-                title="Details"
+                title="More about this mint"
                 collapseLines={4}
                 description={entry.longDescription}
                 testID="mint-info-details"
