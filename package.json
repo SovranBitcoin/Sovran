@@ -29,6 +29,7 @@
     "docs:build": "vitepress build docs",
     "docs:preview": "vitepress preview docs",
     "dev": "cd app && bun run dev",
+    "dev:tunnel": "cd app && bun run dev:tunnel",
     "start": "cd app && bun run start",
     "ios": "cd app && bun run ios",
     "android": "cd app && bun run android",
