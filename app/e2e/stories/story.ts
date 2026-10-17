@@ -112,10 +112,13 @@ const stepSchema = z
          */
         from: z.tuple([z.number().min(0).max(1), z.number().min(0).max(1)]).optional(),
         /**
-         * Swipe again, as a person scrolls, until this element sits whole in the
-         * open middle of the screen, clear of the bars at the top and bottom: a
-         * scroll goes further on iOS than on Android, so a single distance cannot
-         * place a control on both. At most eight swipes; none if it is there already.
+         * Swipe again, as a person scrolls, until this element is in reach: whole
+         * in the open middle of the screen, clear of the bars at the top and
+         * bottom (anywhere on screen, swiping across), or wholly on screen once
+         * the page stops moving at its end. A scroll goes further on iOS than on
+         * Android, and further on a busy machine, so one distance cannot place a
+         * control on both. At most eight swipes within the step's `withinMs`;
+         * none if it is in reach already.
          */
         until: selectorSchema.optional(),
       })

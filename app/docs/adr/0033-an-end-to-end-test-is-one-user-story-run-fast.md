@@ -42,7 +42,9 @@ it leaves is saved there, the app's files together with the simulator's keychain
 in the app is changed or told a seed for this. No story depends on another having run in the same run. Onboarding
 is itself a few stories, not the first minute of every one.
 
-**Every action is issued once.** No step repeats a tap, swipe or text entry. A step names what it does and what
+**Every action is issued once.** No step repeats a tap, swipe or text entry, with one exception: a swipe may
+name the element it scrolls to, and swipes again, at most eight times, until that element is in reach, as a person
+scrolls until they see a control. A step names what it does and what
 must be true afterwards; if that does not come true before its deadline the story fails and says what the app was
 still doing.
 

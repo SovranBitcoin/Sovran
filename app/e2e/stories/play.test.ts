@@ -426,6 +426,103 @@ describe('playStory', () => {
     expect(swiped).toBe(8);
   });
 
+  /** Plays one `until` swipe step; `move` turns the swipe count into the next screen. */
+  const swipeUntil = async (
+    first: AppScreen,
+    move: (swiped: number) => AppScreen,
+    swipe: Record<string, unknown>,
+    withinMs?: number,
+    swipeMs = 0
+  ) => {
+    const app = fakeApp(first);
+    let swiped = 0;
+    const device = {
+      ...noSwipe,
+      tap: async () => {},
+      swipe: async () => {
+        await new Promise((resolve) => setTimeout(resolve, swipeMs));
+        app.state.screen = move(++swiped);
+      },
+    };
+    const report = await playStory(
+      story([
+        {
+          name: 'scroll to it',
+          swipe: { on: { id: 'list' }, ...swipe },
+          expect: [{ visible: { id: 'list' } }],
+          ...(withinMs ? { withinMs } : {}),
+        },
+      ]),
+      app.link,
+      device
+    );
+    return { report, swiped };
+  };
+  const list = box({ id: 'list', x: 0, y: 0, width: 400, height: 800 });
+
+  test('swiping across, a card is in reach once it is wholly on screen', async () => {
+    const cardAt = (x: number) => screenOf(list, box({ id: 'card', x, y: 700, width: 300 }));
+    const { report, swiped } = await swipeUntil(cardAt(900), (n) => cardAt(900 - 400 * n), {
+      direction: 'left',
+      until: { id: 'card' },
+    });
+    expect(report.ok).toBe(true);
+    expect(swiped).toBe(2);
+  });
+
+  test('an element taller than the open band is in reach once it fills it', async () => {
+    const tallAt = (y: number) => screenOf(list, box({ id: 'tall', y, height: 700 }));
+    const { report, swiped } = await swipeUntil(tallAt(500), (n) => tallAt(500 - 400 * n), {
+      direction: 'up',
+      until: { id: 'tall' },
+    });
+    expect(report.ok).toBe(true);
+    expect(swiped).toBe(1);
+  });
+
+  test('at the end of the page, an element wholly on screen is in reach', async () => {
+    // The page stops with the row in the last fifth, where nothing more can lift it.
+    const rowAt = (y: number) => screenOf(list, box({ id: 'row', y }));
+    const { report, swiped } = await swipeUntil(rowAt(900), () => rowAt(700), {
+      direction: 'up',
+      until: { id: 'row' },
+    });
+    expect(report.ok).toBe(true);
+    expect(swiped).toBe(2);
+  });
+
+  test('swiping until stops at the step deadline', async () => {
+    const { report, swiped } = await swipeUntil(
+      screenOf(list),
+      () => screenOf(list),
+      { direction: 'up', until: { id: 'row' } },
+      100,
+      40
+    );
+    expect(report.ok).toBe(false);
+    expect(report.steps[0].failure).toContain('within 100 ms');
+    expect(swiped).toBeLessThan(8);
+  });
+
+  test('a swipe on an element wholly off the glass fails instead of touching the edge', async () => {
+    const app = fakeApp(screenOf(box({ id: 'list', x: 0, y: 900, width: 400, height: 200 })));
+    let swiped = 0;
+    const device = { ...noSwipe, tap: async () => {}, swipe: async () => void swiped++ };
+    const report = await playStory(
+      story([
+        {
+          name: 'scroll',
+          swipe: { on: { id: 'list' }, direction: 'up' },
+          expect: [{ visible: { id: 'list' } }],
+        },
+      ]),
+      app.link,
+      device
+    );
+    expect(report.ok).toBe(false);
+    expect(swiped).toBe(0);
+  });
+
   test('the finger goes down on the part of a long page that is on screen', async () => {
     const app = fakeApp(screenOf(box({ id: 'page', x: 0, y: -1000, width: 400, height: 1600 })));
     const swipes: [number, number][][] = [];
