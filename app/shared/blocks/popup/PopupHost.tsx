@@ -50,13 +50,7 @@ import { ActionMenuSheetContent } from '@/shared/lib/popup/popups/actionMenuShee
 import { markE2EActionMenuPresented } from '@/shared/lib/popup/E2EActionMenuProbe';
 import { OPEN_WATCHDOG_MS } from '@/shared/lib/popup/openWatchdog';
 import { E2EStaticToastRenderMarker } from '@/shared/lib/popup/E2EToastProbe';
-import { EmojiPickerContent } from '@/shared/lib/popup/popups/emojiPicker';
-import { ModelPickerContent } from '@/shared/lib/popup/popups/modelPicker';
-import { useRoutstrFunds } from '@/features/ai/hooks/useRoutstrFunds';
-import { PaymentOptionsContent } from '@/shared/lib/popup/popups/paymentOptionsSheet';
-import { SendFallbackContent } from '@/shared/lib/popup/popups/sendFallbackSheet';
 import { NfcTapContent } from '@/shared/lib/popup/popups/nfcTapSheet';
-import { ProofSelectorContent } from '@/shared/lib/popup/popups/proofSelectorSheet';
 import { SendMemoContent } from '@/shared/lib/popup/popups/sendMemoSheet';
 import { SignerApprovalSheetContent } from '@/features/nostrSigner/components/SignerApprovalSheetContent';
 import {
@@ -248,7 +242,6 @@ function SubmessageRenderer({
 
 /** Props every custom-sheet renderer receives; `payload` is typed per sheet id. */
 type CustomSheetContentProps<P = unknown> = {
-  balanceSats: number;
   payload: P;
   close: () => void;
   pushCustomPage: <K extends keyof ActionSheetPayloads>(
@@ -268,19 +261,6 @@ type CustomSheetRenderer = React.ComponentType<CustomSheetContentProps>;
 // for everything else, prefer `actionMenuPopup`.
 const CUSTOM_SHEET_CONTENT: Record<keyof ActionSheetPayloads, CustomSheetRenderer> = {
   'action-menu': ActionMenuSheetContent as CustomSheetRenderer,
-  'emoji-picker': EmojiPickerContent as CustomSheetRenderer,
-  'model-picker': ModelPickerContent as CustomSheetRenderer,
-  // `payment-options` and `payment-fallback` share one renderer; the
-  // `isFallback` prop decides title + per-row red-wash. Wrapping keeps the
-  // registry's `Record<keyof ActionSheetPayloads, ...>` shape intact.
-  'payment-options': ((props: CustomSheetContentProps<ActionSheetPayloads['payment-options']>) => (
-    <PaymentOptionsContent {...props} isFallback={false} />
-  )) as CustomSheetRenderer,
-  'payment-fallback': ((
-    props: CustomSheetContentProps<ActionSheetPayloads['payment-fallback']>
-  ) => <PaymentOptionsContent {...props} isFallback={true} />) as CustomSheetRenderer,
-  'send-fallback': SendFallbackContent as CustomSheetRenderer,
-  'proof-selector': ProofSelectorContent as CustomSheetRenderer,
   'send-memo': SendMemoContent as CustomSheetRenderer,
   'signer-approval': SignerApprovalSheetContent as CustomSheetRenderer,
   'signer-connect': SignerConnectSheetContent as CustomSheetRenderer,
@@ -317,7 +297,6 @@ function SnapPointsContentGate({ children }: { children: React.ReactNode }) {
 }
 
 function SheetContent({
-  balanceSats,
   payload,
   activeCustomPage,
   close,
@@ -330,7 +309,6 @@ function SheetContent({
   canPopCustomPage,
   onCustomFooterConfigChange,
 }: {
-  balanceSats: number;
   payload: ReturnType<typeof usePopupStore.getState>['current'];
   activeCustomPage: CustomSheetPage | null;
   close: () => void;
@@ -379,7 +357,6 @@ function SheetContent({
       // for the "Show taps" recording setting.
       <TouchIndicatorLayer fill={false}>
         <ContentComponent
-          balanceSats={balanceSats}
           payload={activeCustomPage.payload}
           close={close}
           pushCustomPage={pushCustomPage}
@@ -494,7 +471,6 @@ function SheetActionButton({
 const popupHostLog = log.child({ module: 'popupHost' });
 
 function SheetPopup() {
-  const funds = useRoutstrFunds();
   const insets = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
   // Captured here (inside the account-scoped providers) and re-provided
@@ -842,9 +818,7 @@ function SheetPopup() {
         index >= 0 &&
         isOpen &&
         (activeCustomPage?.sheetId === 'action-menu' ||
-          activeCustomPage?.sheetId === 'proof-selector' ||
-          activeCustomPage?.sheetId === 'signer-connect' ||
-          activeCustomPage?.sheetId === 'model-picker')
+          activeCustomPage?.sheetId === 'signer-connect')
       ) {
         markE2EActionMenuPresented(openSeq);
       }
@@ -978,7 +952,7 @@ function SheetPopup() {
             // Custom sheets render the same chrome as `ActionMenuHost`
             // (`<Menu presentation="bottom-sheet">`), which uses `bg-overlay` for
             // its content background. Match it here so surfaces routed through
-            // PopupHost (e.g. emoji picker, payment-options — both need
+            // PopupHost (the send memo, the signer sheets — all need
             // FullWindowOverlay above route modals) are visually
             // indistinguishable from menu-lane surfaces.
             backgroundClassName={isCustom ? 'bg-overlay' : 'bg-surface rounded-[32px]'}
@@ -1020,7 +994,6 @@ function SheetPopup() {
             // signer sheets' expandable sections need this).
             contentContainerProps={patchedContentContainerProps as never}>
             <SheetContent
-              balanceSats={funds?.balanceSats ?? 0}
               payload={payload}
               activeCustomPage={activeCustomPage}
               close={scopedClose}

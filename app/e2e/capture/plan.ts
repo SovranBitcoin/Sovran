@@ -84,7 +84,7 @@ const REVIEWED_STEPS: Record<string, string> = {
   'capture.onboarding': '165d9d57552dbb9753bedf213e3e24a434c39b07d3c19f83f6eb95ad643382ae',
   'capture.local-navigation': '3b6bf9f69f0a16a27acf0ebb5f843d5865de10af1504cb5fd65486906b732966',
   'wallet.search.no-results': '3bcfd5f20343cb8a0afdfc22d53b348fae60abf6432642d1e36f75b187d6a925',
-  'profile.switcher': 'a38d39d701881a6f7a3a8e2eef181c9f99f31c4c295012000849c57781cb7aa3',
+  'profile.switcher': '18995fb685436ecf90c6189b5b662e5d951a4e2cef7d73d50771a3ae97659348',
   'capture.account-entry': 'aebcb34620a504625ed057e63ff664ab686878c431714fc03550b8050026b3e7',
   'capture.composer': '46a8e3f9628c210b4b55197c3e86aa805be81a4c94a20f34a386704219c5b2b0',
   'capture.followers': '7e07e9fdbe6dbc5e51ee6f371344e1927c8b5e80de455e9dcc83a74e6a686df3',

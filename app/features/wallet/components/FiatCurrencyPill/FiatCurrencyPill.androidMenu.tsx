@@ -4,9 +4,8 @@ import { unitFlagIcon, unitName } from '@/shared/lib/cashu/unitPresentation';
 import React, { useCallback } from 'react';
 
 import Icon from 'assets/icons';
-import { actionMenuPopup } from '@/shared/lib/popup/popups/actionMenu';
+import { pickOption } from '@/shared/lib/picker/openPicker';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
-import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useFiatCurrencyPill, type FiatCurrencyPillProps } from './useFiatCurrencyPill';
 import { FiatPillShell } from './FiatCurrencyPill.shell';
 
@@ -27,33 +26,30 @@ export function FiatCurrencyPillAndroidMenu(props: FiatCurrencyPillProps): React
     accessibilityLabel,
   } = useFiatCurrencyPill(props);
   const displayCurrency = useSettingsStore((state) => state.displayCurrency);
-  const [success] = useThemeColor(['success'] as const);
 
-  // The pick-one surface is the app-wide `actionMenuPopup()` bottom sheet
-  // (rendered once by <ActionMenuHost /> at the app root) — not an inline
-  // heroui Menu. Inline bottom-sheet menus mis-position / paint at rest on
-  // Android; the global host opens fully and stays hidden when closed.
-  const openCurrencyMenu = useCallback(() => {
-    actionMenuPopup({
+  // The pick-one surface is the picker sheet, the same one Select mint uses
+  // (a pushed page on Android) — not an inline heroui Menu, which
+  // mis-positions and paints at rest on Android.
+  const openCurrencyMenu = useCallback(async () => {
+    const picked = await pickOption({
       title: 'Display currency',
-      buttons: CURRENCY_OPTIONS.map((option) => ({
-        text: option.label,
-        iconNode: <Icon name={option.icon} size={20} />,
+      options: CURRENCY_OPTIONS.map((option) => ({
+        id: option.currency,
+        title: option.label,
+        leading: { node: <Icon name={option.icon} size={20} /> },
         testID: `fiat-currency-menu-${option.currency}`,
         // Match the native iOS UIMenu's stable row names while retaining the
         // friendlier long visual title and hint for Android screen readers.
         accessibilityLabel: option.currency.toUpperCase(),
         accessibilityHint: option.label,
-        suffix:
-          option.currency === displayCurrency ? (
-            <Icon name="mdi:check" size={20} color={success} />
-          ) : undefined,
-        onPress: () => handleSelectCurrency(option.currency),
+        selected: option.currency === displayCurrency,
       })),
     });
-  }, [displayCurrency, success, handleSelectCurrency]);
+    const option = CURRENCY_OPTIONS.find((candidate) => candidate.currency === picked);
+    if (option) handleSelectCurrency(option.currency);
+  }, [displayCurrency, handleSelectCurrency]);
 
-  const { primaryHandler, longPressHandler } = handlersFor(openCurrencyMenu);
+  const { primaryHandler, longPressHandler } = handlersFor(() => void openCurrencyMenu());
 
   return (
     <FiatPillShell

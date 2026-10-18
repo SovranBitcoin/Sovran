@@ -24,14 +24,10 @@
  * a picker that had simply become pessimistic about everything.
  */
 
-import React from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
-
-import { ModelPickerContent } from '@/shared/lib/popup/popups/modelPicker';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
 import type { AiLineup, LineupEntry } from '@/shared/lib/routstr/lineup';
 
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+import { openModelPicker } from './helpers/modelPicker';
 
 jest.mock('@/shared/lib/apiClient', () => ({ getAiLineup: jest.fn() }));
 jest.mock('@/shared/stores/global/profileStore', () => ({
@@ -96,40 +92,7 @@ jest.mock('@/shared/lib/logger', () => {
   };
 });
 
-jest.mock('heroui-native', () => {
-  const ReactActual = jest.requireActual<typeof import('react')>('react');
-  const host =
-    (name: string) =>
-    ({ children, ...props }: { children?: React.ReactNode }) =>
-      ReactActual.createElement(name, props, children);
-  const text = ({ children }: { children?: React.ReactNode }) =>
-    ReactActual.createElement('Text', null, children);
-  const Menu = Object.assign(host('Menu'), {
-    Item: host('MenuItem'),
-    ItemTitle: text,
-    ItemDescription: text,
-  });
-  return { Menu, BottomSheet: { Title: text } };
-});
 jest.mock('assets/icons', () => ({ __esModule: true, default: () => null }));
-jest.mock('@/shared/hooks/useThemeColor', () => {
-  const { INVARIANT_BLACK } = jest.requireActual<typeof import('@/shared/lib/brandColors')>(
-    '@/shared/lib/brandColors'
-  );
-  return {
-    useThemeColor: (tokens: string | string[]) =>
-      Array.isArray(tokens) ? tokens.map(() => INVARIANT_BLACK) : INVARIANT_BLACK,
-  };
-});
-jest.mock('@/shared/stores/runtime/popupStore', () => ({
-  usePopupStore: (selector: (s: unknown) => unknown) => selector({ openSeq: 1 }),
-}));
-jest.mock('@/shared/lib/popup/popups/bridge', () => ({ showActionSheet: jest.fn() }));
-jest.mock('@/shared/lib/popup/popups', () => ({ paramPopup: jest.fn() }));
-jest.mock('@/shared/lib/popup/E2EActionMenuProbe', () => ({
-  E2EActionMenuRenderMarker: () => null,
-  E2EActionMenuTargetMarker: () => null,
-}));
 
 /**
  * The row from the device log, to the sat.
@@ -166,37 +129,6 @@ const LINEUP: AiLineup = {
 /** Less than the sealed reservation, comfortably more than the discounted one. */
 const BALANCE_SATS = 50;
 
-function renderPicker(): { json: string; row: (testID: string) => Record<string, unknown> } {
-  let tree!: TestRenderer.ReactTestRenderer;
-  act(() => {
-    tree = TestRenderer.create(
-      <ModelPickerContent
-        payload={{}}
-        balanceSats={BALANCE_SATS}
-        close={() => {}}
-        pushCustomPage={() => {}}
-        popCustomPage={() => {}}
-        canPop={false}
-        setFooterConfig={() => {}}
-      />
-    );
-  });
-  const json = JSON.stringify(tree.toJSON());
-  const props = new Map<string, Record<string, unknown>>();
-  for (const node of tree.root.findAll((n) => String(n.type) === 'MenuItem')) {
-    props.set(String(node.props.testID), node.props as Record<string, unknown>);
-  }
-  act(() => tree.unmount());
-  return {
-    json,
-    row: (testID: string) => {
-      const found = props.get(testID);
-      if (!found) throw new Error(`no row ${testID}; rows: ${[...props.keys()].join(', ')}`);
-      return found;
-    },
-  };
-}
-
 describe('the model picker prices a sealed row the way the node does', () => {
   beforeEach(() => {
     useRoutstrStore.setState({
@@ -210,21 +142,21 @@ describe('the model picker prices a sealed row the way the node does', () => {
 
   it('refuses a sealed tier the balance cannot reserve, and says the real figure', () => {
     useRoutstrStore.setState({ selectedProvider: 'tinfoil' });
-    const { json, row } = renderPicker();
+    const row = openModelPicker(BALANCE_SATS).row('ai-model-tinfoil-auto');
 
-    expect(row('ai-model-tinfoil-auto').isDisabled).toBe(true);
+    expect(row.disabled).toBe(true);
     // 307 × the 1.1 headroom buffer, less the 50 sats already held.
-    expect(json).toContain('Top up 288 more sats to use this tier');
+    expect(row.reason).toBe('Top up 288 more sats to use this tier');
     // And a bare tier label — never "Auto · ~N left" beside a tier the very
     // next send would be refused for.
-    expect(json).toContain('["Auto"]');
+    expect(row.title).toBe('Auto');
   });
 
   it('still offers the identically-priced plaintext twin at the same balance', () => {
     useRoutstrStore.setState({ selectedProvider: 'openai' });
-    const { json, row } = renderPicker();
+    const picker = openModelPicker(BALANCE_SATS);
 
-    expect(row('ai-model-openai-auto').isDisabled).toBe(false);
-    expect(json).not.toContain('Top up');
+    expect(picker.row('ai-model-openai-auto').disabled).toBe(false);
+    expect(picker.copy()).not.toContain('Top up');
   });
 });

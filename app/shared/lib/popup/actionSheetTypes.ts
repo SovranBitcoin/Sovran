@@ -1,4 +1,4 @@
-import type { AnnotatedOption, PaymentMachine, StepDataMap } from 'wallet';
+import type { PaymentMachine, StepDataMap } from 'wallet';
 
 import type { ParsedNostrConnectUri } from '@/features/nostrSigner';
 import type { ActionMenuItem } from './popups/actionMenu';
@@ -24,31 +24,6 @@ export type ProfileSwitcherAction =
   | { type: 'switch'; accountIndex: number }
   | { type: 'create' }
   | { type: 'import'; nsec: string; pubkeyHex: string; accountIndex: number };
-
-type EmojiPickerPayload = { token: string };
-
-type ModelPickerPayload = Record<string, never>;
-
-type PaymentOptionsPayload = {
-  options: readonly AnnotatedOption[];
-  unit: string;
-  machine: PaymentMachine;
-  onDismiss?: () => void;
-};
-
-type PaymentFallbackPayload = PaymentOptionsPayload & {
-  failedOptionValues: readonly string[];
-  lastFailedMessage?: string;
-  lastFailedAuthored?: boolean;
-};
-
-type SendFallbackPayload = StepDataMap['chooseSendFallback'] & {
-  machine: PaymentMachine;
-};
-
-type ProofSelectorPayload = StepDataMap['chooseProofs'] & {
-  machine: PaymentMachine;
-};
 
 type SendMemoPayload = StepDataMap['enterSendMemo'] & {
   machine: PaymentMachine;
@@ -98,57 +73,9 @@ type BaseActionSheetPayloads = {
    * `ActionMenuButton presentation="bottom-sheet"` callers — e.g. the
    * amount-screen "Next" split button (as Lightning / as Ecash) — live inside
    * `(send-flow)` route modals, where the menu-lane host renders underneath
-   * and is invisible. Same above-modal stacking reason as `payment-options`.
+   * and is invisible.
    */
   'action-menu': ActionMenuSheetPayload;
-  /**
-   * Tabbed emoji picker invoked from inside the Send Ecash route modal.
-   * Lives here because heroui Menu in FWO mode doesn't render visibly —
-   * verified by tracing `actionMenu.dispatch` → `actionMenuHost.payload
-   * {open: true}` followed by no openChange and no visual mount. The
-   * heroui standalone `<BottomSheet>` path (this one) is the only known-
-   * working surface that stacks above iOS route modals.
-   */
-  'emoji-picker': EmojiPickerPayload;
-  /**
-   * AI tab model picker. Lives in this lane (not `actionMenuPopup` with
-   * sections) because the UX is *filter-by-tab*, not scroll-to-section:
-   * tapping the OpenAI tab should hide the Claude / Grok rows entirely,
-   * which `SectionAnchorList` (the actionMenu sections renderer) can't
-   * do. The body keeps its own active-provider state and re-derives the
-   * row list on each tab switch — see `ModelPickerContent`.
-   */
-  'model-picker': ModelPickerPayload;
-  /**
-   * "Choose how to pay" — pick one of N detected payment methods (Lightning,
-   * Cashu, etc.) for a scanned destination. Lives in this lane because the
-   * QR-scan camera screen inside `(send-flow)` is itself an iOS route modal;
-   * the menu-lane (heroui `<Menu>` with `disableFullWindowOverlay`) renders
-   * in the root window and stacks *under* the camera, hiding the picker.
-   * The standalone `<BottomSheet>` path here uses FullWindowOverlay and
-   * mounts above route modals.
-   */
-  'payment-options': PaymentOptionsPayload;
-  /**
-   * Fallback variant — same surface as `payment-options`, but seeded with
-   * the failed attempt so the broken row renders red. Routed here for the
-   * same above-modal stacking reason.
-   */
-  'payment-fallback': PaymentFallbackPayload;
-  /**
-   * "Send another way" — a send picked from the amount screen failed (an
-   * optional lock, or the recipient's own Lightning address) and an
-   * alternative can still pay them. Above-modal for the same reason.
-   */
-  'send-fallback': SendFallbackPayload;
-  /**
-   * "Choose amount" — round-up / round-down / change-mint suggestions when
-   * the entered amount doesn't compose exactly from available proofs. Fires
-   * from the send-flow amount screen, which is itself an iOS route modal;
-   * the menu lane would render below it. Same above-modal stacking reason
-   * as `payment-options`.
-   */
-  'proof-selector': ProofSelectorPayload;
   /**
    * Optional memo before creating an ecash token. This is reached from the
    * send-flow amount route, which is itself an iOS route modal, so it needs
@@ -159,7 +86,7 @@ type BaseActionSheetPayloads = {
    * NIP-46 signer approval prompt. Lives in this lane because a signing
    * request can arrive while ANY surface is up — send-flow route modals,
    * camera, drawer — and the prompt must stack above all of them
-   * (FullWindowOverlay), exactly like `payment-options`.
+   * (FullWindowOverlay).
    */
   'signer-approval': SignerApprovalPayload;
   /**

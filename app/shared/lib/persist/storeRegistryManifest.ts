@@ -593,6 +593,14 @@ export const storeRegistryManifest = [
     profileStorage: false,
   },
   {
+    file: 'shared/stores/runtime/pickerSheetStore.ts',
+    name: 'usePickerSheetStore',
+    scope: 'session',
+    persisted: false,
+    queryCache: false,
+    profileStorage: false,
+  },
+  {
     file: 'shared/stores/runtime/popupStore.ts',
     name: 'usePopupStore',
     scope: 'session',

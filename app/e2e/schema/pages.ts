@@ -22,7 +22,7 @@ export const CANONICAL_PAGES = [
   // shell
   'wallet', // wallet home (WalletScreen)
   'drawer', // profile drawer (drawer-profile-name)
-  'profile-switcher', // independently tested action-menu sheet
+  'profile-switcher', // the picker sheet showing the drawer's profiles (profile-switcher)
   // receive flow
   'receive', // receive method hub sheet (receive-method-*)
   'receive-qr', // standing receive rails QR display (ReceiveScreen: Unified/Lightning/Onchain/Cashu)
@@ -50,6 +50,8 @@ export const CANONICAL_PAGES = [
   'profile', // nostr user profile (UserProfileScreen)
   'dm-chat', // 1:1 DM conversation (UserMessagesScreen, dm-chat-probe)
   'details', // every fact about one payment, as a table (details-sheet, details-sheet-done)
+  'picker', // choosing one of several things, the sheet `openPicker` opens (picker-sheet)
+  'emoji-picker', // an emoji grid with search, to copy a token as an emoji (emoji-picker, emoji-picker-search)
   'note-picker', // held ecash by denomination, from the amount screen's notes key (note-picker, note-picker-use)
   'camera', // QR scan camera screen (CameraScreen, incl. its permission-required state)
   'search', // header search overlay with results (SearchOverlay)

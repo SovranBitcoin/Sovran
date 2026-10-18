@@ -93,9 +93,8 @@
     {
       "name": "close the models",
       "tap": {
-        "id": "popup-sheet-overlay"
+        "id": "picker-sheet-close"
       },
-      "tapAt": [0.5, 0.12],
       "expect": [
         {
           "gone": {
@@ -135,9 +134,8 @@
     {
       "name": "close them",
       "tap": {
-        "id": "action-menu-dismiss"
+        "id": "picker-sheet-close"
       },
-      "tapAt": [0.5, 0.12],
       "expect": [
         {
           "gone": {

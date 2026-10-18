@@ -52,9 +52,10 @@ import type { RoutstrModel } from '@/shared/lib/routstr/api';
 import { ModelChip } from '@/features/ai/components/ModelChip';
 import { E2EE_BADGE_LABEL, UNSERVED_SELECTION_LABEL } from '@/features/ai/lib/format';
 import { chatErrorActions } from '@/features/ai/lib/chatErrorActions';
-import { ModelPickerContent } from '@/shared/lib/popup/popups/modelPicker';
 import { E2EE_PROVIDER_ID } from '@/shared/lib/routstr/lineup';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
+
+import { openModelPicker } from './helpers/modelPicker';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -136,7 +137,7 @@ jest.mock('@/shared/lib/popup/E2EActionMenuProbe', () => ({
   E2EActionMenuRenderMarker: () => null,
   E2EActionMenuTargetMarker: () => null,
 }));
-jest.mock('@/shared/lib/popup', () => ({ modelPickerPopup: jest.fn() }));
+jest.mock('@/features/ai/hooks/useModelPicker', () => ({ useModelPicker: () => jest.fn() }));
 jest.mock('@/shared/lib/routstr/refreshLineup', () => ({ refreshRoutstrLineup: jest.fn() }));
 jest.mock('@/shared/lib/routstr/sdk/client', () => ({
   sweepUnsettledPayments: jest.fn(async () => {}),
@@ -188,30 +189,10 @@ type Renderer = TestRenderer.ReactTestRenderer;
 const has = (tree: Renderer, testID: string): boolean =>
   tree.root.findAll((node) => node.props.testID === testID).length > 0;
 
-const rendered = (tree: Renderer): string => JSON.stringify(tree.toJSON());
-
 function renderChip(): Renderer {
   let tree!: Renderer;
   act(() => {
     tree = TestRenderer.create(<ModelChip />);
-  });
-  return tree;
-}
-
-function openPicker(): Renderer {
-  let tree!: Renderer;
-  act(() => {
-    tree = TestRenderer.create(
-      <ModelPickerContent
-        payload={{}}
-        balanceSats={10_000}
-        close={() => {}}
-        pushCustomPage={() => {}}
-        popCustomPage={() => {}}
-        canPop={false}
-        setFooterConfig={() => {}}
-      />
-    );
   });
   return tree;
 }
@@ -276,36 +257,25 @@ describe('a sealed selection on a node that serves nothing sealed', () => {
   });
 
   it('opens the picker on a vendor that exists, and highlights that one', () => {
-    const tree = openPicker();
-    const pill = (id: string) =>
-      tree.root.find(
-        (node) => node.props.testID === `model-tab-${id}` && node.props.accessibilityRole === 'tab'
-      ).props;
-
+    const picker = openModelPicker();
     // The stranded vendor has no tab at all — it is not in this lineup.
-    expect(has(tree, `model-tab-${E2EE_PROVIDER_ID}`)).toBe(false);
-    // The rows on screen belong to a real vendor...
-    expect(rendered(tree)).toContain('GPT-5 mini');
-    // ...and the tab strip says so. It used to stay pointed at the stranded
-    // vendor, so every pill read unselected while another vendor's rows were
-    // the ones actually offered.
-    expect(pill('openai').accessibilityState).toEqual({ selected: true });
-    act(() => tree.unmount());
+    expect(picker.tab(E2EE_PROVIDER_ID)).toBeUndefined();
+    // The sheet opens on a real vendor's rows. It used to stay pointed at the
+    // stranded vendor, so every pill read unselected while another vendor's
+    // rows were the ones actually offered.
+    expect(picker.openTab?.id).toBe('openai');
+    expect(picker.copy()).toContain('GPT-5 mini');
   });
 
-  it('moves off the sealed vendor only when the user says so', () => {
-    const tree = openPicker();
-    const [target] = tree.root.findAll(
-      (node) =>
-        node.props.testID === 'ai-model-openai-auto' && typeof node.props.onPress === 'function'
+  it('marks nothing as chosen, so the sheet does not claim a model it cannot name', () => {
+    const picker = openModelPicker();
+    const chosen = (picker.request.sections ?? []).flatMap((section) =>
+      section.options.filter((option) => option.selected)
     );
-    expect(target).toBeDefined();
-    act(() => {
-      void target.props.onPress();
-    });
-    // A downgrade the user chose, in the surface whose whole job is choosing.
-    expect(useRoutstrStore.getState().selectedProvider).toBe('openai');
-    act(() => tree.unmount());
+    expect(chosen).toEqual([]);
+    // Every real row stays pickable: moving off the sealed vendor is the
+    // user's choice to make here.
+    expect(picker.row('ai-model-openai-auto').disabled).toBe(false);
   });
 
   it('offers both ways forward on the failed turn itself', () => {

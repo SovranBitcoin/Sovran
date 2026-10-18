@@ -254,12 +254,8 @@ export function E2EActionMenuProbe(): React.ReactElement | null {
     state.isOpen &&
     isCustomSheetPayload(state.current) &&
     // Any FullWindowOverlay sheet whose rows need coordinate selection: the
-    // classic action menu, the offline proof-selector ("Choose amount"), and
-    // the NIP-46 signer connect approval.
-    (state.current.sheetId === 'action-menu' ||
-      state.current.sheetId === 'proof-selector' ||
-      state.current.sheetId === 'signer-connect' ||
-      state.current.sheetId === 'model-picker')
+    // classic action menu and the NIP-46 signer connect approval.
+    (state.current.sheetId === 'action-menu' || state.current.sheetId === 'signer-connect')
       ? state.current.sheetId
       : null
   );
@@ -299,12 +295,8 @@ export function E2EActionMenuProbe(): React.ReactElement | null {
         pointerEvents="none"
         style={{ position: 'absolute', left: 1, top: 0, width: 1, height: 1 }}
       />
-      {/* Sheets whose rows publish a measured centre. `model-picker` is here
-          because its rows had no way to be pressed by the harness at all —
-          the picker's scenario could only open and dismiss it, which is how a
-          picker whose rows took no taps on device passed e2e. */}
-      {actionTargetBridgeEnabled() &&
-      (openSheetId === 'action-menu' || openSheetId === 'model-picker')
+      {/* Sheets whose rows publish a measured centre. */}
+      {actionTargetBridgeEnabled() && openSheetId === 'action-menu'
         ? presentedTargets.map((target) => (
             <View
               key={`${target.actionId}-${target.registration}`}
