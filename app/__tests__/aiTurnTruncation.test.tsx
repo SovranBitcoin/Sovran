@@ -50,7 +50,13 @@ jest.mock('@/shared/ui/primitives/View/VStack', () => ({ VStack: stub('VStack') 
 jest.mock('@/shared/ui/composed/AmountFormatter', () => ({ AmountFormatter: stub('Amount') }));
 jest.mock('assets/icons', () => ({ __esModule: true, default: stub('Icon') }));
 jest.mock('@/shared/lib/logger', () => {
-  const lane = { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() };
+  const lane: Record<string, unknown> = {
+    debug: jest.fn(),
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+  };
+  lane.child = () => lane;
   return {
     aiLog: lane,
     apiLog: lane,

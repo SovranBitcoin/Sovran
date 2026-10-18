@@ -254,11 +254,8 @@ export function E2EActionMenuProbe(): React.ReactElement | null {
     state.isOpen &&
     isCustomSheetPayload(state.current) &&
     // Any FullWindowOverlay sheet whose rows need coordinate selection: the
-    // classic action menu, the offline proof-selector ("Choose amount"), and
-    // the NIP-46 signer connect approval.
-    (state.current.sheetId === 'action-menu' ||
-      state.current.sheetId === 'proof-selector' ||
-      state.current.sheetId === 'signer-connect')
+    // classic action menu and the NIP-46 signer connect approval.
+    (state.current.sheetId === 'action-menu' || state.current.sheetId === 'signer-connect')
       ? state.current.sheetId
       : null
   );

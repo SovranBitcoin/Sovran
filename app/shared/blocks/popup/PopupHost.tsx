@@ -818,7 +818,6 @@ function SheetPopup() {
         index >= 0 &&
         isOpen &&
         (activeCustomPage?.sheetId === 'action-menu' ||
-          activeCustomPage?.sheetId === 'proof-selector' ||
           activeCustomPage?.sheetId === 'signer-connect')
       ) {
         markE2EActionMenuPresented(openSeq);
