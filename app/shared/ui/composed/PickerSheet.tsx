@@ -11,6 +11,7 @@ import { useState } from 'react';
 import { Platform } from 'react-native';
 import Icon from 'assets/icons';
 
+import { withGlassHeaderItems } from '@/navigation/headerItems';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { pickerSheet } from '@/shared/lib/picker/openPicker';
@@ -102,7 +103,11 @@ export function PickerSheetScreen() {
   const [chosenTab, setChosenTab] = useState<string | null>(null);
 
   useScreenOptions(
-    () => ({ headerTitle: request?.title ?? '', headerLeft: renderSheetCloseButton }),
+    () =>
+      withGlassHeaderItems({
+        headerTitle: request?.title ?? '',
+        headerLeft: renderSheetCloseButton,
+      }),
     [request?.title]
   );
 
