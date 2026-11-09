@@ -196,7 +196,10 @@ new work until reconciled; they are never deleted to make a migration pass.
 All application/wallet changes conservatively trigger the existing historical upgrade suite.
 This includes feature-owned storage, not only `app/shared`. The controller discovers the
 epoch inventory and Coco database manifest and checks ordinary assertions for the recorded
-facts. Expected failures, missing cases, unexpected skips and known loss metadata cannot pass.
+facts. Expected failures, missing cases, unexpected skips and known loss metadata cannot pass,
+except a known gap whose follow-up is exactly `accepted`: it passes only while a fact it names
+still fails as its expected-failure assertion, and every such loss is listed in
+`upgrade-inspection.json` and counted in the receipt summary.
 Existing historical check inputs and the upgrade command cannot change within the task they
 certify; settle changes to that baseline before sealing. This deliberately favors false blocks
 over silently dropping an old version from the test population.
@@ -205,7 +208,7 @@ A passing unit gate is bounded fixture evidence, never certification of every re
 Zustand, Redux-era, SecureStore or Coco state. The existing persistence skill and ledger own
 the wider state-space argument, including interrupted operations, skipped releases, restore
 combinations, account types and platform differences. The controller does not reimplement
-wallet migrations or Cashu behavior. Current known losses make this gate inconclusive.
+wallet migrations or Cashu behavior.
 
 A UI task passes only through a sealed `native` requirement whose stories play on both iOS
 and Android. The check runs `app/e2e/stories/bound.ts`, which builds each platform's bundled
