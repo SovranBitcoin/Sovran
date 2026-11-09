@@ -13,11 +13,10 @@ import { useCallback } from 'react';
 import { ListGroup, PressableFeedback } from 'heroui-native';
 import { Switch as HeroSwitch } from '@/shared/ui/primitives/Switch';
 
-import Icon from 'assets/icons';
 import type { Nip46Connection } from '@/features/nostrSigner/data/nip46ConnectionsStore';
 import type { GrantKey } from '@/features/nostrSigner/lib/nip46Types';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { actionMenuPopup } from '@/shared/lib/popup';
+import { pickOption } from '@/shared/lib/picker/openPicker';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 
@@ -82,54 +81,46 @@ export function PermissionSwitchRow({
   /** Stable id for the row, derived from its grant key or bundle id by the caller. */
   testID?: string;
 }) {
-  const [danger, muted] = useThemeColor(['danger', 'muted'] as const);
+  const danger = useThemeColor('danger');
   const blocked = state === 'block';
 
-  const openMenu = useCallback(() => {
-    const checkSuffix = <Icon name="mdi:check" size={18} color={muted} />;
-    actionMenuPopup({
+  const openMenu = useCallback(async () => {
+    const choices = ['allow', 'ask', 'block'] as const;
+    const picked = await pickOption({
       title: label,
-      buttons: [
+      options: [
         {
-          text: 'Allow',
-          icon: 'mdi:check-circle',
+          id: 'allow',
+          title: 'Allow',
+          leading: { icon: { name: 'mdi:check-circle' } },
           description: MENU_ALLOW_DESCRIPTION,
-          ...(state === 'allow' && { suffix: checkSuffix }),
+          selected: state === 'allow',
           disabled: !allowEligible,
           ...(!allowEligible && { reason: ALLOW_INELIGIBLE_REASON }),
           testID: 'signer-permission-allow',
-          onPress: (close) => {
-            close();
-            onChange('allow');
-          },
         },
         {
-          text: 'Ask',
-          icon: 'mdi:help-circle',
+          id: 'ask',
+          title: 'Ask',
+          leading: { icon: { name: 'mdi:help-circle' } },
           description: MENU_ASK_DESCRIPTION,
-          ...(state === 'ask' && { suffix: checkSuffix }),
-          variant: 'secondary',
+          selected: state === 'ask',
           testID: 'signer-permission-ask',
-          onPress: (close) => {
-            close();
-            onChange('ask');
-          },
         },
         {
-          text: 'Block',
-          icon: 'mdi:cancel',
+          id: 'block',
+          title: 'Block',
+          leading: { icon: { name: 'mdi:cancel' } },
           description: MENU_BLOCK_DESCRIPTION,
-          ...(state === 'block' && { suffix: checkSuffix }),
-          variant: 'dangerous',
+          selected: state === 'block',
+          isCaution: true,
           testID: 'signer-permission-block',
-          onPress: (close) => {
-            close();
-            onChange('block');
-          },
         },
       ],
     });
-  }, [label, state, allowEligible, onChange, muted]);
+    const next = choices.find((choice) => choice === picked);
+    if (next) onChange(next);
+  }, [label, state, allowEligible, onChange]);
 
   const onTap = useCallback(() => {
     if (state === 'block') {
@@ -137,7 +128,7 @@ export function PermissionSwitchRow({
       return;
     }
     if (!allowEligible) {
-      openMenu();
+      void openMenu();
       return;
     }
     onChange(state === 'allow' ? 'ask' : 'allow');
@@ -153,7 +144,7 @@ export function PermissionSwitchRow({
     <PressableFeedback
       animation={false}
       onPress={onTap}
-      onLongPress={openMenu}
+      onLongPress={() => void openMenu()}
       testID={testID}
       accessibilityRole="switch"
       accessibilityLabel={label}

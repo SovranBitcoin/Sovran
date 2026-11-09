@@ -3,7 +3,7 @@ import { useSettingsStore } from '@/shared/stores/global/settingsStore';
  * Drawer profile chrome: the top-of-drawer header. A single row with the
  * active-profile avatar on the left and the profile-switcher buttons on
  * the right, followed by display name / handle / follow counts. Owns its
- * own profile-domain wiring (profileStore reads, profileSwitcherPopup,
+ * own profile-domain wiring (profileStore reads, openProfileSwitcher,
  * profileSessionOrchestrator, imported-nsec persistence) so the drawer
  * route file only orchestrates routes.
  */
@@ -33,7 +33,7 @@ import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata'
 import { useNostrSocialStore } from '@/shared/stores/profile/nostrSocialStore';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { resolveIdentityName } from '@/shared/lib/identity';
-import { profileSwitcherPopup, type ProfileSwitcherAction, staticPopup } from '@/shared/lib/popup';
+import { openProfileSwitcher, type ProfileSwitcherAction, staticPopup } from '@/shared/lib/popup';
 import { truncateMiddle } from '@/shared/lib/strings';
 import {
   createAndSwitchProfile,
@@ -108,8 +108,10 @@ function useProfileSwitcher(closeDrawer: () => void) {
     }
   };
 
+  // The picker opens over the drawer, which stays open beneath it: leaving
+  // the picker without a choice returns to the drawer. A choice closes both.
   const openSheet = () => {
-    profileSwitcherPopup({
+    void openProfileSwitcher({
       onRequestAction: (action) => {
         void executeProfileAction(action);
       },

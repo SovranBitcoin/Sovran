@@ -201,7 +201,7 @@ export function useZap() {
   /** Open the zap chooser for a post. `baseSats` = the post's current satsZapped. */
   const openZapMenu = useCallback(
     (event: FeedEvent, baseSats: number) => {
-      openZapMenuPopup({
+      void openZapMenuPopup({
         onPreset: (preset) => void startPresetZap(event, preset, baseSats),
         onCustom: () => void startCustomZap(event, baseSats),
       });

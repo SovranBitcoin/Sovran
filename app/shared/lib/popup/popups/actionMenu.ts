@@ -29,46 +29,6 @@
  *     })),
  *   });
  *
- * Usage (custom header + trailing buttons, e.g. profile switcher):
- *
- *   actionMenuPopup({
- *     title: 'Select profile',
- *     header: <ProfileList ... />,
- *     buttons: [
- *       { text: 'Generate new account', icon: '...', separator: true, onPress: ... },
- *       { text: 'Import Nostr', icon: '...', onPress: () => openImportMenu() },
- *     ],
- *   });
- *
- * Usage (tabbed sections — pick-one-of-N grouped by category):
- *
- *   actionMenuPopup({
- *     title: 'Select profile',
- *     sections: [
- *       { id: 'imported', anchor: { icon: 'mdi:download', label: 'Imported' },
- *         buttons: importedProfileButtons },
- *       { id: 'derived', anchor: { icon: 'mdi:source-branch', label: 'Derived' },
- *         buttons: derivedProfileButtons },
- *     ],
- *     footerButtons: [{ text: 'Generate new account', icon: '...', onPress: ... }],
- *   });
- *
- * Usage (tabbed sections with custom bodies + search, e.g. emoji picker):
- *
- *   actionMenuPopup({
- *     title: 'Emoji',
- *     snapPoint: '80%',
- *     searchable: {
- *       placeholder: 'Search emoji...',
- *       renderResults: (q) => <EmojiGrid emojis={searchEmojis(q)} ... />,
- *     },
- *     sections: CATEGORIES.map((cat) => ({
- *       id: cat.id,
- *       anchor: { icon: <Text>{cat.icon}</Text>, label: cat.label },
- *       renderBody: () => <EmojiGrid emojis={cat.emojis} ... />,
- *     })),
- *   });
- *
  * Usage (input form, e.g. import nsec):
  *
  *   actionMenuPopup({
@@ -98,8 +58,7 @@ export interface ActionMenuItem {
   text: string;
   icon?: string;
   /** Custom leading glyph node (takes precedence over `icon`). Use when the
-   * row needs an avatar / emoji / non-iconify visual — e.g. profile rows in
-   * the profile switcher menu. */
+   * row needs an avatar / emoji / non-iconify visual. */
   iconNode?: React.ReactNode;
   /** Stable e2e selector derived from what the item does or the entity it
    * picks (e.g. `mint-picker-${mintUrl}`) — never its position or label. */
@@ -185,35 +144,6 @@ export interface ActionMenuPrimaryAction {
   ) => void | Promise<void>;
 }
 
-/**
- * A scroll-to-section group within a tabbed menu. Each section gets a pill in
- * the horizontal anchor bar above the scroll viewport; tapping the pill
- * scrolls the body to the section, and the active pill highlights as the
- * user scrolls. Reuses `SectionAnchorList` under the hood.
- *
- * Provide `buttons` for a vertical list of `Menu.Item`s (the profile-switcher
- * pattern), or `renderBody` for arbitrary content like an emoji grid. When
- * both are set, `renderBody` wins.
- */
-export interface ActionMenuSection {
-  id: string;
-  anchor: { icon?: React.ReactNode; label: string; testID?: string };
-  buttons?: ActionMenuItem[];
-  renderBody?: () => React.ReactNode;
-}
-
-/**
- * Search support for tabbed menus. The host owns the input state and renders
- * a `BottomSheetTextInput` above the anchor bar; while the query is non-empty
- * the sections + tab bar hide and `renderResults(query)` becomes the body.
- * Return `null` (or omit `renderResults`) to keep showing the section list
- * regardless of input — useful when the caller wants the input as filter only.
- */
-interface ActionMenuSearchable {
-  placeholder?: string;
-  renderResults?: (query: string) => React.ReactNode | null;
-}
-
 export interface ActionMenuPayload {
   /** Rendered as `Menu.Label` at the top of the sheet. */
   title?: string;
@@ -225,8 +155,7 @@ export interface ActionMenuPayload {
    * above them so the scrollable content visibly disappears beneath).
    * Rendered after `inputs` and `primaryAction`. Use for affordances that
    * should always be reachable regardless of scroll position — e.g.
-   * "Generate new account" / "Import Nostr" on the profile switcher
-   * where the scrollable header can be tall.
+   * "New conversation" under a long list of AI conversations.
    *
    * When set, the menu's body becomes a scroll container capped at ~85%
    * of the viewport. When unset, the menu auto-fits content as before.
@@ -237,19 +166,8 @@ export interface ActionMenuPayload {
   /** Submit button for `inputs`. Required when `inputs` is set. */
   primaryAction?: ActionMenuPrimaryAction;
   /**
-   * Tabbed scroll-to-section groups. When set, the menu body becomes a
-   * scrollable section list with a horizontal anchor bar above it (same
-   * `SectionAnchorList` primitive used elsewhere). Mutually exclusive with
-   * top-level `buttons` / `inputs` for the body region — those are still
-   * supported for legacy single-list menus.
-   */
-  sections?: ActionMenuSection[];
-  /** Adds a search input above the anchor bar. Has no effect without `sections`. */
-  searchable?: ActionMenuSearchable;
-  /**
    * Override the sheet's snap point. Defaults: `'60%'` when there's a sticky
-   * footer or sections, otherwise dynamic-sized to content. Useful for tabbed
-   * pickers that need taller real estate (`'80%'`).
+   * footer, otherwise dynamic-sized to content.
    */
   snapPoint?: string;
   /** Fired when the sheet closes without the user picking any item (overlay tap, swipe-down). */
@@ -272,11 +190,9 @@ function emit(): void {
 export function actionMenuPopup(payload: ActionMenuPayload): void {
   actionMenuLog.info('actionMenu.dispatch', {
     hadPayload: snapshot.payload !== null,
-    sections: payload.sections?.length ?? 0,
     buttons: payload.buttons?.length ?? 0,
     footerButtons: payload.footerButtons?.length ?? 0,
     inputs: payload.inputs?.length ?? 0,
-    hasSearchable: !!payload.searchable,
     snapPoint: payload.snapPoint,
     listeners: listeners.size,
   });

@@ -23,14 +23,13 @@
  * failed lineup refresh must not bank a whole day of silence.
  */
 
-import React from 'react';
 import { ok, err } from 'neverthrow';
-import TestRenderer, { act } from 'react-test-renderer';
 
 import type { RoutstrModel } from '@/shared/lib/routstr/api';
 
-import { ModelPickerContent } from '@/shared/lib/popup/popups/modelPicker';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
+
+import { openModelPicker } from './helpers/modelPicker';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -82,44 +81,9 @@ jest.mock('@/shared/lib/logger', () => {
 });
 jest.mock('@/shared/lib/http/requestSignal', () => ({ buildAbortSignal: () => undefined }));
 
-// Render-side stand-ins. The picker's chrome (heroui rows, icons, theme
-// tokens, the popup host) is not what is under test — the copy in the row it
+// The row icons are not what is under test — the copy in the row the picker
 // falls back to is.
-jest.mock('heroui-native', () => {
-  const ReactActual = jest.requireActual<typeof import('react')>('react');
-  const host =
-    (name: string) =>
-    ({ children, ...props }: { children?: React.ReactNode }) =>
-      ReactActual.createElement(name, props, children);
-  const text = ({ children }: { children?: React.ReactNode }) =>
-    ReactActual.createElement('Text', null, children);
-  const Menu = Object.assign(host('Menu'), {
-    Item: host('MenuItem'),
-    ItemTitle: text,
-    ItemDescription: text,
-  });
-  return { Menu, BottomSheet: { Title: text } };
-});
 jest.mock('assets/icons', () => ({ __esModule: true, default: () => null }));
-jest.mock('@/shared/hooks/useThemeColor', () => {
-  // Any real token will do; `withAlpha` rejects a non-hex stand-in.
-  const { INVARIANT_BLACK } = jest.requireActual<typeof import('@/shared/lib/brandColors')>(
-    '@/shared/lib/brandColors'
-  );
-  return {
-    useThemeColor: (tokens: string | string[]) =>
-      Array.isArray(tokens) ? tokens.map(() => INVARIANT_BLACK) : INVARIANT_BLACK,
-  };
-});
-jest.mock('@/shared/stores/runtime/popupStore', () => ({
-  usePopupStore: (selector: (s: unknown) => unknown) => selector({ openSeq: 1 }),
-}));
-jest.mock('@/shared/lib/popup/popups/bridge', () => ({ showActionSheet: jest.fn() }));
-jest.mock('@/shared/lib/popup/popups', () => ({ paramPopup: jest.fn() }));
-jest.mock('@/shared/lib/popup/E2EActionMenuProbe', () => ({
-  E2EActionMenuRenderMarker: () => null,
-  E2EActionMenuTargetMarker: () => null,
-}));
 
 const NODE = 'https://node.example';
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -169,26 +133,8 @@ const WORKING_CATALOG = [
 ];
 const DEGRADED_CATALOG = Array.from({ length: 10 }, (_, i) => unusable(`text-embedding-${i}`));
 
-/** Everything the open picker puts on screen, as one searchable string. */
-function pickerCopy(): string {
-  let tree!: TestRenderer.ReactTestRenderer;
-  act(() => {
-    tree = TestRenderer.create(
-      <ModelPickerContent
-        payload={{}}
-        balanceSats={10_000}
-        close={() => {}}
-        pushCustomPage={() => {}}
-        popCustomPage={() => {}}
-        canPop={false}
-        setFooterConfig={() => {}}
-      />
-    );
-  });
-  const rendered = JSON.stringify(tree.toJSON());
-  act(() => tree.unmount());
-  return rendered;
-}
+/** Everything the open picker's tab says, as one searchable string. */
+const pickerCopy = (): string => openModelPicker().copy();
 
 describe('the model picker always resolves its loading state', () => {
   beforeEach(() => {

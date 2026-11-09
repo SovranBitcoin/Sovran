@@ -57,6 +57,7 @@ import { useSecureStoreState } from '@/shared/stores/runtime/secureStoreState';
 import { useSendLockStore } from '@/shared/stores/runtime/sendLockStore';
 import { useDetailsSheetStore } from '@/shared/stores/runtime/detailsSheetStore';
 import { useNotePickerStore } from '@/shared/stores/runtime/notePickerStore';
+import { usePickerSheetStore } from '@/shared/stores/runtime/pickerSheetStore';
 import { usePopupStore } from '@/shared/stores/runtime/popupStore';
 import { useRollbackStore } from '@/shared/stores/runtime/rollbackStore';
 import { useRoutstrTopUpStore } from '@/shared/stores/runtime/routstrTopUpStore';
@@ -110,6 +111,7 @@ export const E2E_STORE_MANIFEST: Record<string, MirrorableStore> = {
   'runtime/sendLockStore': useSendLockStore,
   'runtime/detailsSheetStore': useDetailsSheetStore,
   'runtime/notePickerStore': useNotePickerStore,
+  'runtime/pickerSheetStore': usePickerSheetStore,
   'runtime/debugTierStore': useDebugTierStore,
   'runtime/deleteStatusStore': useDeleteStatusStore,
   'runtime/mockDataStore': useMockDataStore,

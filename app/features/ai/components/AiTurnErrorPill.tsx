@@ -18,7 +18,6 @@ import Icon from 'assets/icons';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { aiLog } from '@/shared/lib/logger';
-import { modelPickerPopup } from '@/shared/lib/popup';
 import { Button } from '@/shared/ui/primitives/Button';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -28,6 +27,7 @@ import {
   chatErrorActions,
   type ChatErrorActionId,
 } from '../lib/chatErrorActions';
+import { useModelPicker } from '../hooks/useModelPicker';
 import { useNavigateToAddFunds } from '../lib/navigateToAddFunds';
 import type { TurnError } from '../lib/turnErrors';
 
@@ -65,6 +65,7 @@ function ActionButton({ action, messageId, onPress }: ActionButtonProps) {
 
 export function AiTurnErrorPill({ messageId, error, onRetry }: AiTurnErrorPillProps) {
   const navigateToAddFunds = useNavigateToAddFunds();
+  const openModelPicker = useModelPicker();
   const [danger, dangerInk, muted] = useThemeColor([
     'danger',
     'danger-soft-foreground',
@@ -79,7 +80,7 @@ export function AiTurnErrorPill({ messageId, error, onRetry }: AiTurnErrorPillPr
           onRetry?.(messageId);
           return;
         case 'change-model':
-          modelPickerPopup();
+          openModelPicker();
           return;
         case 'change-provider':
           router.navigate('/(ai-flow)/providers');
@@ -89,7 +90,7 @@ export function AiTurnErrorPill({ messageId, error, onRetry }: AiTurnErrorPillPr
           return;
       }
     },
-    [messageId, error.id, onRetry, navigateToAddFunds]
+    [messageId, error.id, onRetry, navigateToAddFunds, openModelPicker]
   );
 
   // Retry is the one action with a precondition outside this component: the

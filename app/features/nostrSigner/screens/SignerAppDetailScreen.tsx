@@ -67,6 +67,7 @@ import { formatDate, formatRelative } from '@/shared/lib/date';
 import { nostrLog } from '@/shared/lib/logger';
 import { isNostrPubkeyHex } from '@/shared/lib/protocolIds';
 import { actionMenuPopup, popup } from '@/shared/lib/popup';
+import { pickOption } from '@/shared/lib/picker/openPicker';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { ListRow } from '@/shared/ui/composed/ListRow';
 import { Screen, useScreenOptions } from '@/shared/ui/composed/Screen';
@@ -468,37 +469,32 @@ export function SignerAppDetailScreen(): React.ReactElement {
     setMode(clientPubkey, strictModeOn ? 'standard' : 'strict');
   };
   const strictA11yState = { checked: strictModeOn };
-  const openStrictMenu = () => {
+  const openStrictMenu = async () => {
     if (clientPubkey === undefined) return;
-    const checkSuffix = <Icon name="mdi:check" size={18} color={muted} />;
-    actionMenuPopup({
+    const modes = ['standard', 'strict'] as const;
+    const picked = await pickOption({
       title: STRICT_MODE_TITLE,
-      buttons: [
+      options: [
         {
-          text: STANDARD_MODE_MENU_LABEL,
-          icon: 'mdi:check-circle',
+          id: 'standard',
+          title: STANDARD_MODE_MENU_LABEL,
+          leading: { icon: { name: 'mdi:check-circle' } },
           description: STANDARD_MODE_MENU_DESCRIPTION,
-          ...(!strictModeOn && { suffix: checkSuffix }),
+          selected: !strictModeOn,
           testID: 'signer-app-mode-standard',
-          onPress: (close) => {
-            close();
-            setMode(clientPubkey, 'standard');
-          },
         },
         {
-          text: STRICT_MODE_TITLE,
-          icon: 'mdi:help-circle',
+          id: 'strict',
+          title: STRICT_MODE_TITLE,
+          leading: { icon: { name: 'mdi:help-circle' } },
           description: STRICT_MODE_DESCRIPTION,
-          ...(strictModeOn && { suffix: checkSuffix }),
-          variant: 'secondary',
+          selected: strictModeOn,
           testID: 'signer-app-mode-strict',
-          onPress: (close) => {
-            close();
-            setMode(clientPubkey, 'strict');
-          },
         },
       ],
     });
+    const mode = modes.find((candidate) => candidate === picked);
+    if (mode) setMode(clientPubkey, mode);
   };
 
   const onSelectTriState = (grantKey: GrantKey, state: TriState) => {
@@ -679,7 +675,7 @@ export function SignerAppDetailScreen(): React.ReactElement {
             <PressableFeedback
               animation={false}
               onPress={onPressStrictRow}
-              onLongPress={openStrictMenu}
+              onLongPress={() => void openStrictMenu()}
               testID="signer-app-strict-mode"
               accessibilityRole="switch"
               accessibilityLabel={STRICT_MODE_TITLE}

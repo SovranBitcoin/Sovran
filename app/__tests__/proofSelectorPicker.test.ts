@@ -6,17 +6,12 @@ import {
   getProofSuggestionDisplay,
   shouldShowProofSelectorMintChange,
   submitProofSuggestion,
-} from '@/shared/lib/popup/popups/proofSelectorSheet';
+} from '@/features/send/lib/proofSelectorPicker';
 
 jest.mock('react-native', () => ({ View: 'View' }));
-jest.mock('heroui-native', () => ({
-  BottomSheet: { Title: 'BottomSheet.Title' },
-  Menu: Object.assign('Menu', { Item: 'Menu.Item', ItemTitle: 'Menu.ItemTitle' }),
-}));
-jest.mock('assets/icons', () => 'Icon', { virtual: true });
 jest.mock('@/shared/ui/composed/AmountFormatter', () => ({ AmountFormatter: 'AmountFormatter' }));
-jest.mock('@/shared/ui/primitives/View/HStack', () => ({ HStack: 'HStack' }));
-jest.mock('@/shared/lib/popup/popups/bridge', () => ({ showActionSheet: jest.fn() }));
+jest.mock('@/shared/ui/primitives/Text', () => ({ Text: 'Text' }));
+jest.mock('@/shared/lib/picker/openPicker', () => ({ openPicker: jest.fn() }));
 
 const fiatDisplay = {
   inputMode: 'fiat' as const,

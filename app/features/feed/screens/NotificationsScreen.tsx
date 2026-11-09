@@ -56,7 +56,7 @@ import { feedLog, Log, useLifecycleLogger } from '@/shared/lib/logger';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useNostrProfileMetadataMany } from '@/shared/hooks/useNostrProfileMetadata';
 import { useOwnContentStore } from '@/shared/stores/profile/ownContentStore';
-import { actionMenuPopup } from '@/shared/lib/popup';
+import { pickOption } from '@/shared/lib/picker/openPicker';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { Badge } from '@/shared/ui/primitives/Badge';
@@ -186,20 +186,21 @@ function NotificationsContent({ demo }: { demo: boolean }) {
   );
 
   // Direct/Thread reply-scope picker for the Mentions tab. Mirrors the Following
-  // feed tab: the Mentions pill shows a chevron and opens this popup when active.
-  const openReplyScopeMenu = useCallback(() => {
-    actionMenuPopup({
+  // feed tab: the Mentions pill shows a chevron and opens the picker sheet when
+  // active.
+  const openReplyScopeMenu = useCallback(async () => {
+    const scopes = ['DIRECT', 'THREAD'] as const;
+    const picked = await pickOption({
       title: 'Mentions',
-      buttons: (['DIRECT', 'THREAD'] as const).map((scope) => ({
-        text: notificationReplyScopeLabel(scope),
-        variant: replyScope === scope ? 'primary' : undefined,
+      options: scopes.map((scope) => ({
+        id: scope,
+        title: notificationReplyScopeLabel(scope),
+        selected: replyScope === scope,
         testID: `notifications-reply-scope-${scope.toLowerCase()}`,
-        onPress: (close) => {
-          close();
-          setReplyScope(scope);
-        },
       })),
     });
+    const scope = scopes.find((candidate) => candidate === picked);
+    if (scope) setReplyScope(scope);
   }, [replyScope, setReplyScope]);
 
   // Tapping Mentions when it's already active opens the scope popup (like
@@ -207,7 +208,7 @@ function NotificationsContent({ demo }: { demo: boolean }) {
   const handleNotificationTabPress = useCallback(
     (tab: NotificationTab) => {
       if (tab === 'MENTIONS' && activeTab === 'MENTIONS') {
-        openReplyScopeMenu();
+        void openReplyScopeMenu();
         return;
       }
       selectTab(tab);

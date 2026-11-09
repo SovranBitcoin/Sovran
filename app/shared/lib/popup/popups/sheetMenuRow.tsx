@@ -24,7 +24,7 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
  * The rest of heroui's typography (`text-base font-medium text-foreground`)
  * is preserved.
  */
-export function SheetItemTitle({
+function SheetItemTitle({
   children,
   singleLine = true,
 }: {

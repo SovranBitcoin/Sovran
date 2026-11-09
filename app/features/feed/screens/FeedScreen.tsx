@@ -13,10 +13,9 @@ import {
 } from '@/features/feed/components/HomeFeed';
 import { SearchOverlay } from '@/shared/ui/composed/search/SearchOverlay';
 import { ComposeFab } from '@/features/composer/ui/ComposeFab';
-import { E2EHerouiMenuProbe } from '@/shared/lib/popup/E2EActionMenuProbe';
 import { FeedTabButton } from '@/features/feed/components/FeedTabButton';
 import { Log, feedLog, useLifecycleLogger } from '@/shared/lib/logger';
-import { actionMenuPopup } from '@/shared/lib/popup';
+import { pickOption } from '@/shared/lib/picker/openPicker';
 
 const SEARCH_FILTERS_HEIGHT = 56;
 const FEED_TAB_FOR_YOU = 'for-you';
@@ -28,6 +27,26 @@ type FollowingMode = 'Popular' | 'Recent';
 const FEED_TABS: { id: FeedTabId; label: string; opensMenu?: boolean }[] = [
   { id: FEED_TAB_FOR_YOU, label: 'For You' },
   { id: FEED_TAB_FOLLOWING, label: 'Following', opensMenu: true },
+];
+
+const FOLLOWING_MODES: readonly {
+  id: FollowingMode;
+  description: string;
+  icon: string;
+  testID: string;
+}[] = [
+  {
+    id: 'Popular',
+    description: 'Top followed posts and replies by recent like activity.',
+    icon: 'iconamoon:heart-fill',
+    testID: 'feed-following-popular',
+  },
+  {
+    id: 'Recent',
+    description: 'Latest posts and replies from people you follow.',
+    icon: 'mdi:clock-outline',
+    testID: 'feed-following-recent',
+  },
 ];
 
 type FeedFiltersProps = {
@@ -43,34 +62,20 @@ function FeedFilters({
   onSelectForYou,
   onSelectFollowingMode,
 }: FeedFiltersProps) {
-  const openFollowingMenu = useCallback(() => {
-    actionMenuPopup({
+  const openFollowingMenu = useCallback(async () => {
+    const picked = await pickOption({
       title: 'Following',
-      buttons: [
-        {
-          text: 'Popular',
-          description: 'Top followed posts and replies by recent like activity.',
-          icon: 'iconamoon:heart-fill',
-          variant: followingMode === 'Popular' ? 'primary' : undefined,
-          testID: 'feed-following-popular',
-          onPress: (close) => {
-            close();
-            onSelectFollowingMode('Popular');
-          },
-        },
-        {
-          text: 'Recent',
-          description: 'Latest posts and replies from people you follow.',
-          icon: 'mdi:clock-outline',
-          variant: followingMode === 'Recent' ? 'primary' : undefined,
-          testID: 'feed-following-recent',
-          onPress: (close) => {
-            close();
-            onSelectFollowingMode('Recent');
-          },
-        },
-      ],
+      options: FOLLOWING_MODES.map((mode) => ({
+        id: mode.id,
+        title: mode.id,
+        description: mode.description,
+        leading: { icon: { name: mode.icon } },
+        selected: followingMode === mode.id,
+        testID: mode.testID,
+      })),
     });
+    const mode = FOLLOWING_MODES.find((candidate) => candidate.id === picked);
+    if (mode) onSelectFollowingMode(mode.id);
   }, [followingMode, onSelectFollowingMode]);
 
   const handleTabPress = useCallback(
@@ -79,7 +84,7 @@ function FeedFilters({
         onSelectForYou();
         return;
       }
-      openFollowingMenu();
+      void openFollowingMenu();
     },
     [onSelectForYou, openFollowingMenu]
   );
@@ -169,10 +174,6 @@ export function FeedScreen() {
       </ScreenContainer>
       <ComposeFab />
       <SearchOverlay recentContext="feed" />
-      {/* The Following tab opens a heroui actionMenuPopup (Popular/Recent),
-          whose rows are AX-invisible under FullWindowOverlay — mirror its open
-          state so e2e can wait before a coordinate tap (same as WalletScreen). */}
-      <E2EHerouiMenuProbe />
     </Screen>
   );
 }

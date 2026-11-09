@@ -45,6 +45,25 @@ const ANDROID_SHEET_OPTIONS = {
 } satisfies Partial<NativeStackNavigationOptions>;
 
 /**
+ * A short "pick one of N" list, as a sheet over the screen that asked for it
+ * (ADR 0026). On iPhone a system form sheet: it rises to a little over half
+ * height with a grabber, grows to full height when pulled or scrolled, and is
+ * dismissed by pulling down, so the screen underneath stays in view. Android
+ * keeps a pushed page (ADR 0025), so there is nothing to add there. Select
+ * mint and the `picker` route both use it.
+ */
+export const PICKER_SHEET_OPTIONS: Partial<NativeStackNavigationOptions> =
+  Platform.OS === 'ios'
+    ? {
+        presentation: 'formSheet',
+        sheetAllowedDetents: [0.62, 1],
+        sheetGrabberVisible: true,
+        sheetCornerRadius: 28,
+        sheetExpandsWhenScrolledToEdge: true,
+      }
+    : {};
+
+/**
  * Modal flow hosting a nested stack. iOS: fullscreen pageSheet-style modal.
  * Android: a pushed screen, or a native bottom sheet for the few flows
  * `androidFlowPresentation` names. The flow's `_layout` renders
@@ -91,17 +110,19 @@ const slideFromBottom = (name: string): ModalConfig => ({
 
 /**
  * Standalone single-screen route. iOS: pageSheet/formSheet with material blur
- * header. Android: a pushed screen with the native header, or a native bottom
- * sheet for the routes `androidFlowPresentation` names.
+ * header, or the picker sheet's geometry for `picker`. Android: a pushed
+ * screen with the native header, or a native bottom sheet for the routes
+ * `androidFlowPresentation` names.
  */
 const modalWithGradient = (
   name: string,
-  presentation: 'modal' | 'formSheet',
+  presentation: 'modal' | 'formSheet' | 'picker',
   title?: string
 ): ModalConfig => {
   const config = { name, ...(title && { title }) };
   if (Platform.OS !== 'android') {
-    return { ...config, options: { presentation, ...GRADIENT_HEADER_OPTIONS } };
+    const sheet = presentation === 'picker' ? PICKER_SHEET_OPTIONS : { presentation };
+    return { ...config, options: { ...sheet, ...GRADIENT_HEADER_OPTIONS } };
   }
   if (androidFlowPresentation(name) === 'sheet') {
     return { ...config, options: ANDROID_SHEET_OPTIONS };
@@ -188,6 +209,12 @@ const standaloneScreens: ModalConfig[] = [
   // standalone screen: the page sheet with a close button on iPhone, a pushed
   // page with the back button on Android.
   modalWithGradient('details', 'modal', 'Details'),
+  // Choosing one of several things, opened by `openPicker`: the same sheet as
+  // Select mint on iPhone, a pushed page with the back button on Android.
+  modalWithGradient('picker', 'picker'),
+  // An emoji, picked from a grid with search: the same sheet, opened by
+  // `openEmojiPicker`.
+  modalWithGradient('emojiPicker', 'picker', 'Emoji'),
   // The ecash held at one mint, picked by hand from the amount screen.
   modalWithGradient('notes', 'modal', 'Pick notes'),
   modalWithGradient('lightningSend', 'modal', railHeaderTitle('lightningSend')),

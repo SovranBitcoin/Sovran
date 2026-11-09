@@ -3,7 +3,8 @@ import TestRenderer from 'react-test-renderer';
 import Icon, { CurrencyIcon } from 'assets/icons';
 import { UnitSwitcherPillFallback } from '@/features/wallet/components/UnitSwitcherPill/UnitSwitcherPill.fallback';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
-import { actionMenuSheet } from '@/shared/lib/popup/popups/actionMenuSheet';
+import { pickOption } from '@/shared/lib/picker/openPicker';
+import type { PickerRequest } from '@/shared/lib/picker/types';
 import { act, renderHook } from '@testing-library/react-native';
 import { useUnitSwitcherPill } from '@/features/wallet/components/UnitSwitcherPill/useUnitSwitcherPill';
 const mockSelectUnit = jest.fn();
@@ -12,7 +13,7 @@ jest.mock('@/shared/ui/primitives/View/View', () => ({ View: () => null }));
 jest.mock('@/shared/ui/composed/ScreenHeaderAction', () => ({ ScreenHeaderAction: () => null }));
 jest.mock('@/shared/ui/composed/CapsuleButton', () => ({ CapsuleButton: () => null }));
 jest.mock('@/shared/hooks/useThemeColor', () => ({ useThemeColor: () => 'green' }));
-jest.mock('@/shared/lib/popup/popups/actionMenuSheet', () => ({ actionMenuSheet: jest.fn() }));
+jest.mock('@/shared/lib/picker/openPicker', () => ({ pickOption: jest.fn(async () => null) }));
 jest.mock('@/features/wallet/hooks/useWalletPresentationUnit', () => ({
   useWalletPresentationUnit: () => ({
     unit: 'sat',
@@ -51,7 +52,9 @@ describe('receive account picker', () => {
   });
 });
 
-it('uses the modal-safe sheet from the canonical receive header action', () => {
+const lastRequest = (): PickerRequest => jest.mocked(pickOption).mock.calls.at(-1)![0];
+
+it('opens the picker sheet from the canonical receive header action', async () => {
   mockAvailableUnits = ['sat', 'usd'];
   const onSelectUnit = jest.fn();
   let renderer!: TestRenderer.ReactTestRenderer;
@@ -65,21 +68,19 @@ it('uses the modal-safe sheet from the canonical receive header action', () => {
   expect(header.props.children.props).toEqual({ name: 'circle-flags:us', size: 24 });
   expect(header.props.disabled).not.toBe(true);
   expect(header.props.accessibilityLabel).toBe('Switch wallet account, USD');
-  act(() => {
+  jest.mocked(pickOption).mockResolvedValueOnce('sat');
+  await act(async () => {
     header.props.onPress();
   });
-  const payload = jest.mocked(actionMenuSheet).mock.calls.at(-1)![0];
-  expect(payload.title).toBe('Wallet accounts');
-  expect(payload.buttons.map((button) => button.testID)).toEqual([
+  const request = lastRequest();
+  expect(request.title).toBe('Wallet accounts');
+  expect(request.options!.map((option) => option.testID)).toEqual([
     'wallet-unit-menu-sat',
     'wallet-unit-menu-usd',
   ]);
   expect(
-    payload.buttons.filter((button) => button.suffix !== undefined).map((button) => button.testID)
+    request.options!.filter((option) => option.selected).map((option) => option.testID)
   ).toEqual(['wallet-unit-menu-usd']);
-  act(() => {
-    void payload.buttons[0].onPress?.(jest.fn());
-  });
   expect(onSelectUnit).toHaveBeenCalledWith('sat');
   act(() => renderer.unmount());
 });
@@ -88,7 +89,7 @@ it.each([
   { available: ['sat'] },
   { available: ['sat', 'usd'] },
   { available: ['sat', 'eur', 'gbp'] },
-])('only offers available wallet units: $available', ({ available }) => {
+])('only offers available wallet units: $available', async ({ available }) => {
   mockAvailableUnits = available;
   const onSelectUnit = jest.fn();
   let renderer!: TestRenderer.ReactTestRenderer;
@@ -101,16 +102,15 @@ it.each([
   expect(header.props.children.type).toBe(CurrencyIcon);
   expect(header.props.children.props).toEqual({ currency: 'sat', width: 24 });
   expect(header.props.disabled).not.toBe(true);
-  act(() => {
-    header.props.onPress();
-  });
-  const payload = jest.mocked(actionMenuSheet).mock.calls.at(-1)![0];
-  expect(payload.buttons.map((button) => button.testID)).toEqual(
+  for (const unit of available) {
+    jest.mocked(pickOption).mockResolvedValueOnce(unit);
+    await act(async () => {
+      header.props.onPress();
+    });
+  }
+  expect(lastRequest().options!.map((option) => option.testID)).toEqual(
     available.map((unit) => `wallet-unit-menu-${unit}`)
   );
-  act(() => {
-    for (const button of payload.buttons) void button.onPress?.(jest.fn());
-  });
   expect(onSelectUnit.mock.calls).toEqual(available.map((unit) => [unit]));
   act(() => renderer.unmount());
 });

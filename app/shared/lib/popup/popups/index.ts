@@ -7,13 +7,9 @@ import type { PopupTextSegment } from '../format';
 
 export type { CopyTarget } from './copy';
 export { copyPopup } from './copy';
-export { profileSwitcherPopup } from './actionSheets';
-export { paymentOptionsPopup, paymentFallbackPopup } from './paymentOptionsSheet';
-export { proofSelectorPopup } from './proofSelectorSheet';
-export { sendFallbackPopup } from './sendFallbackSheet';
+export { openProfileSwitcher } from './actionSheets';
 export { sendMemoPopup } from './sendMemoSheet';
-export { emojiPickerPopup } from './emojiPicker';
-export { modelPickerPopup } from './modelPicker';
+export { copyTokenAsEmoji } from './emojiPicker';
 export type { ProfileSwitcherAction } from '../actionSheetTypes';
 export { actionMenuPopup, replaceActionMenuPopup } from './actionMenu';
 export { deleteStatusPopup } from './deleteStatus';

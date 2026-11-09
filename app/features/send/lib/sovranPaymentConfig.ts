@@ -62,21 +62,20 @@ import { usePopupStore } from '@/shared/stores/runtime/popupStore';
 import { buildModalProfileHref } from '@/shared/lib/nav/profileRoutes';
 import {
   copyPopup,
-  emojiPickerPopup,
+  copyTokenAsEmoji,
   nfcConnectionLostPopup,
   nfcEcashSharedPopup,
   nfcSendFailedPopup,
   paymentCancelledPopup,
-  paymentFallbackPopup,
-  paymentOptionsPopup,
   paymentStatusPopup,
-  proofSelectorPopup,
-  sendFallbackPopup,
   sendMemoPopup,
   staticPopup,
   paramPopup,
 } from '@/shared/lib/popup';
 import { RECEIVE_PENDING_TOAST_COPY } from '@/shared/lib/popup/paymentStatusCopy';
+import { chooseFallbackPaymentOption, choosePaymentOption } from './paymentOptionPicker';
+import { chooseProofs } from './proofSelectorPicker';
+import { chooseSendFallback } from './sendFallbackPicker';
 import { captureAndStoreLocation } from '@/shared/hooks/useTransactionLocation';
 import { executeRoutstrTopUp, formatRoutstrBalance } from '@/shared/lib/routstr/topUp';
 import { useRoutstrTopUpStore } from '@/shared/stores/runtime/routstrTopUpStore';
@@ -1469,19 +1468,19 @@ export function createSovranHandlers({
     },
 
     chooseOption: (stepData) => {
-      paymentOptionsPopup({ ...stepData, machine, onDismiss: onOptionDismiss });
+      choosePaymentOption(stepData, machine, onOptionDismiss);
     },
 
     chooseFallbackOption: (stepData) => {
-      paymentFallbackPopup({ ...stepData, machine, onDismiss: onOptionDismiss });
+      chooseFallbackPaymentOption(stepData, machine, onOptionDismiss);
     },
 
     chooseSendFallback: (stepData) => {
-      sendFallbackPopup({ ...stepData, machine });
+      chooseSendFallback(stepData, machine);
     },
 
     chooseProofs: (stepData) => {
-      proofSelectorPopup({ ...stepData, machine });
+      chooseProofs(stepData, machine);
     },
 
     enterSendMemo: (stepData) => {
@@ -1608,7 +1607,7 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
         // narrow it directly without a cast.
         const variantId = typeof rawCtx.variantId === 'string' ? rawCtx.variantId : 'text';
         if (variantId === 'emoji') {
-          emojiPickerPopup({ token: getEncodedToken(entry.token) });
+          void copyTokenAsEmoji(getEncodedToken(entry.token));
           return;
         }
         // Default — text clipboard copy.

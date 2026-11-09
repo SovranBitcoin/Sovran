@@ -21,10 +21,6 @@ import { usePopupStore } from '@/shared/stores/runtime/popupStore';
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const mockWarn = jest.fn();
-let mockBalanceSats = 10;
-jest.mock('@/features/ai/hooks/useRoutstrFunds', () => ({
-  useRoutstrFunds: () => ({ balanceSats: mockBalanceSats }),
-}));
 
 jest.mock('@/shared/lib/logger', () => {
   const ReactActual = jest.requireActual<typeof import('react')>('react');
@@ -65,24 +61,24 @@ jest.mock('@/shared/lib/popup/popups/actionMenuSheet', () => {
     ActionMenuSheetContent: () => ReactActual.createElement('ActionMenuSheetContent'),
   };
 });
-jest.mock('@/shared/lib/popup/popups/emojiPicker', () => {
-  const ReactActual = jest.requireActual<typeof import('react')>('react');
-  return { EmojiPickerContent: () => ReactActual.createElement('EmojiPickerContent') };
-});
-jest.mock('@/shared/lib/popup/popups/modelPicker', () => {
-  const ReactActual = jest.requireActual<typeof import('react')>('react');
+// No sheet asks for fixed detents since the emoji picker became a route, but
+// the host still supports them; the NFC sheet stands in as one here.
+jest.mock('@/shared/lib/popup/sheets/sheetLayoutConfig', () => {
+  const actual = jest.requireActual<typeof import('@/shared/lib/popup/sheets/sheetLayoutConfig')>(
+    '@/shared/lib/popup/sheets/sheetLayoutConfig'
+  );
   return {
-    ModelPickerContent: ({ balanceSats }: { balanceSats: number }) =>
-      ReactActual.createElement('View', { testID: 'model-picker-content', balanceSats }),
+    ...actual,
+    SHEET_LAYOUT_CONFIG: {
+      ...actual.SHEET_LAYOUT_CONFIG,
+      'nfc-tap': { mode: 'snapPoints', snapPoints: ['80%'] },
+    },
   };
 });
-jest.mock('@/shared/lib/popup/popups/nfcTapSheet', () => ({ NfcTapContent: () => null }));
-jest.mock('@/shared/lib/popup/popups/paymentOptionsSheet', () => ({
-  PaymentOptionsContent: () => null,
-}));
-jest.mock('@/shared/lib/popup/popups/proofSelectorSheet', () => ({
-  ProofSelectorContent: () => null,
-}));
+jest.mock('@/shared/lib/popup/popups/nfcTapSheet', () => {
+  const ReactActual = jest.requireActual<typeof import('react')>('react');
+  return { NfcTapContent: () => ReactActual.createElement('NfcTapContent') };
+});
 jest.mock('@/shared/lib/popup/popups/sendMemoSheet', () => ({ SendMemoContent: () => null }));
 jest.mock('@/features/nostrSigner/components/SignerApprovalSheetContent', () => ({
   SignerApprovalSheetContent: () => null,
@@ -178,7 +174,6 @@ describe('PopupHost presentation', () => {
   let renderer: TestRenderer.ReactTestRenderer | undefined;
 
   beforeEach(() => {
-    mockBalanceSats = 10;
     jest.useFakeTimers();
     mockWarn.mockClear();
     usePopupStore.setState({ current: null, isOpen: false, destroyed: false });
@@ -223,12 +218,10 @@ describe('PopupHost presentation', () => {
     const menu = sheet(renderer!).props.instance;
     act(() => usePopupStore.getState().close());
     expect(sheet(renderer!).props.isOpen).toBe(false);
-    // The emoji picker dispatches 300ms after the menu's close, inside the
-    // 400ms exit window — the same gorhom instance must snap back up.
+    // A fixed-detent follow-on dispatched 300ms after the menu's close, inside
+    // the 400ms exit window — the same gorhom instance must snap back up.
     act(() => jest.advanceTimersByTime(300));
-    act(() =>
-      usePopupStore.getState().open({ sheetId: 'emoji-picker', payload: { token: 'cashuB' } })
-    );
+    act(() => usePopupStore.getState().open({ sheetId: 'nfc-tap', payload: {} }));
     expect(sheet(renderer!).props.instance).toBe(menu);
     expect(sheet(renderer!).props.isOpen).toBe(true);
     act(() => jest.advanceTimersByTime(400));
@@ -239,7 +232,7 @@ describe('PopupHost presentation', () => {
   it('still mounts a fresh instance for a contentHeight follow-on that lands mid-exit', () => {
     act(() => {
       renderer = TestRenderer.create(<PopupHost />);
-      usePopupStore.getState().open({ sheetId: 'emoji-picker', payload: { token: 'cashuB' } });
+      usePopupStore.getState().open({ sheetId: 'nfc-tap', payload: {} });
     });
     const picker = sheet(renderer!).props.instance;
     act(() => usePopupStore.getState().close());
@@ -299,22 +292,23 @@ describe('PopupHost presentation', () => {
 
   // gorhom's content mask has no height until the container's onLayout lands,
   // and each open() is a fresh instance — a snapPoints body mounted in that
-  // first commit lays out unbounded, and the emoji picker's FlashList then
-  // renders every row (≈2s JS jam on device, so gorhom never animated open
-  // and the watchdog closed the sheet). The body waits for a bounded height.
+  // first commit lays out unbounded, and a virtualized list inside then
+  // renders every row (the emoji picker's ≈2s JS jam on device, so gorhom never
+  // animated open and the watchdog closed the sheet). The body waits for a
+  // bounded height.
   it('holds a snapPoints body until its wrapper reports a bounded height', () => {
     act(() => {
       renderer = TestRenderer.create(<PopupHost />);
-      usePopupStore.getState().open({ sheetId: 'emoji-picker', payload: { token: 'cashuB' } });
+      usePopupStore.getState().open({ sheetId: 'nfc-tap', payload: {} });
     });
-    expect(bodies(renderer!, 'EmojiPickerContent')).toHaveLength(0);
+    expect(bodies(renderer!, 'NfcTapContent')).toHaveLength(0);
     layoutGate(renderer!, 0);
-    expect(bodies(renderer!, 'EmojiPickerContent')).toHaveLength(0);
+    expect(bodies(renderer!, 'NfcTapContent')).toHaveLength(0);
     layoutGate(renderer!, 640);
-    expect(bodies(renderer!, 'EmojiPickerContent')).toHaveLength(1);
+    expect(bodies(renderer!, 'NfcTapContent')).toHaveLength(1);
     // A later shrink (keyboard) never unmounts a body that is already up.
     layoutGate(renderer!, 320);
-    expect(bodies(renderer!, 'EmojiPickerContent')).toHaveLength(1);
+    expect(bodies(renderer!, 'NfcTapContent')).toHaveLength(1);
   });
 
   it('mounts a contentHeight body immediately so gorhom can measure it', () => {
@@ -329,46 +323,6 @@ describe('PopupHost presentation', () => {
     expect(
       renderer!.root.findAll((node) => node.props.testID === 'popup-snap-content-gate')
     ).toHaveLength(0);
-  });
-
-  // The model picker is a `contentHeight` sheet, like every other sheet in
-  // this host whose rows have a demonstrated tap record. It used to ask for a
-  // fixed `snapPoints` detent, which swapped gorhom's self-sizing
-  // `BottomSheetView` for a plain `View` whose height came from an animated
-  // parent — and on device neither its rows nor its tab pills took a tap
-  // (six opens, no `modelPicker.select`, no `modelPicker.tab.switch`). Pinning
-  // the lane here: no layout gate in the path, body up on the first commit.
-  it('mounts the model picker body immediately, with no snapPoints gate', () => {
-    act(() => {
-      renderer = TestRenderer.create(<PopupHost />);
-      usePopupStore.getState().open({ sheetId: 'model-picker', payload: {} });
-    });
-    expect(renderer!.root.findAllByProps({ testID: 'model-picker-content' })).not.toHaveLength(0);
-    expect(
-      renderer!.root.findAll((node) => node.props.testID === 'popup-snap-content-gate')
-    ).toHaveLength(0);
-    expect(content(renderer!).props.enableDynamicSizing).toBe(true);
-    // `useDirectView` is the snapPoints-only flag that replaces
-    // `BottomSheetView`; the picker has no nested gorhom scrollable and must
-    // not carry it.
-    expect(content(renderer!).props.contentContainerProps).toBeUndefined();
-  });
-
-  // The model picker renders inside a FullWindowOverlay portal, which sits
-  // outside the wallet providers mounted on the route tree — reading the
-  // balance from a hook *inside* the body threw "BalanceProvider is missing".
-  // The host reads it on the provider side of that boundary and passes it in.
-  it('passes live wallet funds across the model-picker portal', () => {
-    act(() => {
-      renderer = TestRenderer.create(<PopupHost />);
-      usePopupStore.getState().open({ sheetId: 'model-picker', payload: {} });
-    });
-    const picker = () => renderer!.root.findByProps({ testID: 'model-picker-content' });
-    expect(picker().props.balanceSats).toBe(10);
-
-    mockBalanceSats = 25;
-    act(() => renderer!.update(<PopupHost />));
-    expect(picker().props.balanceSats).toBe(25);
   });
 
   it('treats a native close reported before layout as a real dismissal', () => {

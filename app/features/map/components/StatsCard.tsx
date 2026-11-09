@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import { LiquidGlassMenu } from 'liquid-glass-menu';
 import { ActionSheetIOS, Platform, StyleSheet, Text } from 'react-native';
-import { actionMenuPopup } from '@/shared/lib/popup/popups/actionMenu';
+import { pickOption } from '@/shared/lib/picker/openPicker';
 import { withAlpha } from '@/shared/lib/color';
 import Icon from 'assets/icons';
 import { useColorScheme } from '@/shared/hooks/useColorScheme';
@@ -44,11 +44,10 @@ export const StatsCard = memo(function StatsCard({
   onCategoryChange,
   cardWidth,
 }: StatsCardProps) {
-  const [foreground, surfaceSecondary, muted, success] = useThemeColor([
+  const [foreground, surfaceSecondary, muted] = useThemeColor([
     'foreground',
     'surface-secondary',
     'muted',
-    'success',
   ] as const);
   const { liquidGlass } = useCapabilities();
   const colorScheme = useColorScheme();
@@ -115,24 +114,22 @@ export const StatsCard = memo(function StatsCard({
       );
     }
 
-    // Android: the app-wide `actionMenuPopup()` bottom sheet (rendered once by
-    // <ActionMenuHost /> at the app root) — ActionSheetIOS doesn't exist here,
-    // which used to leave this card a dead control. The global host opens fully
-    // and stays hidden at rest, unlike an inline heroui sheet on Android.
-    return renderCard(() =>
-      actionMenuPopup({
+    // Android: the picker sheet, a pushed page there — ActionSheetIOS doesn't
+    // exist on Android, which used to leave this card a dead control.
+    return renderCard(() => {
+      void pickOption({
         title: 'Merchant category',
-        buttons: CATEGORY_FILTERS.map((cat) => ({
-          text: categoryLabel(cat),
+        options: CATEGORY_FILTERS.map((cat) => ({
+          id: cat,
+          title: categoryLabel(cat),
           testID: `map-category-${cat}`,
-          accessibilityLabel:
-            cat === category ? `${categoryLabel(cat)}, selected` : categoryLabel(cat),
-          suffix:
-            cat === category ? <Icon name="mdi:check" size={20} color={success} /> : undefined,
-          onPress: () => onCategoryChange(cat),
+          selected: cat === category,
         })),
-      })
-    );
+      }).then((picked) => {
+        const next = CATEGORY_FILTERS.find((cat) => cat === picked);
+        if (next) onCategoryChange(next);
+      });
+    });
   }
 
   // Same native UIKit glass-button morph the wallet's FiatCurrencyPill uses, so

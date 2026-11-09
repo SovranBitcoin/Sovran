@@ -30,8 +30,9 @@ import type { RoutstrModel } from '@/shared/lib/routstr/api';
 
 import { ModelChip } from '@/features/ai/components/ModelChip';
 import { E2EE_BADGE_ICON, E2EE_BADGE_LABEL } from '@/features/ai/lib/format';
-import { ModelPickerContent } from '@/shared/lib/popup/popups/modelPicker';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
+
+import { openModelPicker } from './helpers/modelPicker';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -117,7 +118,7 @@ jest.mock('@/shared/lib/popup/E2EActionMenuProbe', () => ({
 }));
 
 // ModelChip-only stand-ins.
-jest.mock('@/shared/lib/popup', () => ({ modelPickerPopup: jest.fn() }));
+jest.mock('@/features/ai/hooks/useModelPicker', () => ({ useModelPicker: () => jest.fn() }));
 jest.mock('@/shared/lib/routstr/refreshLineup', () => ({ refreshRoutstrLineup: jest.fn() }));
 jest.mock('@/shared/lib/routstr/sdk/client', () => ({
   sweepUnsettledPayments: jest.fn(async () => {}),
@@ -189,42 +190,8 @@ const CATALOG: RoutstrModel[] = [
 
 type Renderer = TestRenderer.ReactTestRenderer;
 
-function openPicker(): Renderer {
-  let tree!: Renderer;
-  act(() => {
-    tree = TestRenderer.create(
-      <ModelPickerContent
-        payload={{}}
-        balanceSats={10_000}
-        close={() => {}}
-        pushCustomPage={() => {}}
-        popCustomPage={() => {}}
-        canPop={false}
-        setFooterConfig={() => {}}
-      />
-    );
-  });
-  return tree;
-}
-
-/** Press the tap surface behind a testID. The shared `Pressable` primitive
- *  and the RN `Pressable` it wraps both carry the id, and the handler comes
- *  back single-flight-wrapped (so it resolves a promise) — hence the first
- *  match and the discarded return. */
-function press(tree: Renderer, testID: string): void {
-  const [target] = tree.root.findAll(
-    (node) => node.props.testID === testID && typeof node.props.onPress === 'function'
-  );
-  expect(target).toBeDefined();
-  act(() => {
-    void target.props.onPress();
-  });
-}
-
 const has = (tree: Renderer, testID: string): boolean =>
   tree.root.findAll((node) => node.props.testID === testID).length > 0;
-
-const rendered = (tree: Renderer): string => JSON.stringify(tree.toJSON());
 
 describe('the encryption badge names the sealed model, not its provider', () => {
   beforeEach(() => {
@@ -250,68 +217,48 @@ describe('the encryption badge names the sealed model, not its provider', () => 
     expect(lineup?.['z-ai']?.max?.modelId).toBe('glm-5-3');
     expect(lineup?.['z-ai']?.max?.displayName).toBe(lineup?.tinfoil?.max?.displayName);
 
-    const tree = openPicker();
-    press(tree, 'model-tab-tinfoil');
-    expect(has(tree, 'ai-model-tinfoil-max-e2ee')).toBe(true);
-    act(() => tree.unmount());
+    const picker = openModelPicker();
+    const badge = picker.trailing('ai-model-tinfoil-max');
+    expect(badge?.root.findAllByProps({ testID: 'ai-model-tinfoil-max-e2ee' })).not.toHaveLength(0);
   });
 
   it('withholds the badge from the identically-named plaintext twin', () => {
-    const tree = openPicker();
-    press(tree, 'model-tab-z-ai');
+    const picker = openModelPicker();
     // Same display name, same price, same row copy as the sealed one — the
     // whole reason a per-provider lock would be a lie.
-    expect(rendered(tree)).toContain(TWIN_NAME);
-    expect(has(tree, 'ai-model-z-ai-max-e2ee')).toBe(false);
-    expect(rendered(tree)).not.toContain(E2EE_BADGE_LABEL);
-    act(() => tree.unmount());
+    expect(picker.copy('z-ai')).toContain(TWIN_NAME);
+    expect(picker.trailing('ai-model-z-ai-max')).toBeNull();
+    expect(picker.copy('z-ai')).not.toContain(E2EE_BADGE_LABEL);
   });
 
   it('says "end-to-end encrypted" rather than showing an unnamed padlock', () => {
-    const tree = openPicker();
-    press(tree, 'model-tab-tinfoil');
-    const [badge] = tree.root.findAll(
-      (node) => node.props.testID === 'ai-model-tinfoil-max-e2ee' && node.props.accessible === true
+    const badge = openModelPicker().trailing('ai-model-tinfoil-max');
+    const [node] = badge!.root.findAll(
+      (n) => n.props.testID === 'ai-model-tinfoil-max-e2ee' && n.props.accessible === true
     );
-    expect(badge?.props.accessibilityLabel).toBe(E2EE_BADGE_LABEL);
-    act(() => tree.unmount());
+    expect(node?.props.accessibilityLabel).toBe(E2EE_BADGE_LABEL);
   });
 
-  it('switches the offered rows when a vendor tab is pressed', () => {
-    const tree = openPicker();
+  it('opens on the selected vendor, with each vendor its own tab', () => {
+    const picker = openModelPicker();
     // Opens on the selected vendor, so nothing sealed is on screen yet.
-    expect(rendered(tree)).toContain('GPT-5 mini');
-    expect(has(tree, 'ai-model-tinfoil-max-e2ee')).toBe(false);
-
-    press(tree, 'model-tab-tinfoil');
-    // Tabs FILTER: the previous vendor's rows are unmounted, not scrolled past.
-    expect(rendered(tree)).not.toContain('GPT-5 mini');
-    expect(has(tree, 'ai-model-tinfoil-max')).toBe(true);
-    act(() => tree.unmount());
+    expect(picker.openTab?.id).toBe('openai');
+    expect(picker.copy()).toContain('GPT-5 mini');
+    expect(picker.copy()).not.toContain(E2EE_BADGE_LABEL);
+    // Tabs FILTER: the sealed vendor's rows are its own tab's, not the open one's.
+    expect(picker.copy('tinfoil')).not.toContain('GPT-5 mini');
+    expect(picker.tab('tinfoil')?.options.map((option) => option.testID)).toContain(
+      'ai-model-tinfoil-max'
+    );
   });
 
-  /**
-   * Which tab is active is drawn as a background colour and nothing else, so
-   * a screen reader and the native harness both had to guess — and a tab that
-   * stops responding is invisible to every automated check there is. A device
-   * capture of this sheet shows the pills with an empty role and no selected
-   * state.
-   */
-  it('publishes which vendor tab is active', () => {
-    const tree = openPicker();
-    const pill = (id: string) =>
-      tree.root.find(
-        (node) => node.props.testID === `model-tab-${id}` && node.props.accessibilityRole === 'tab'
-      ).props;
-
-    expect(pill('openai').accessibilityState).toEqual({ selected: true });
-    expect(pill('tinfoil').accessibilityLabel).toBe('Private (E2EE)');
-    expect(pill('tinfoil').accessibilityState).toEqual({ selected: false });
-
-    press(tree, 'model-tab-tinfoil');
-    expect(pill('tinfoil').accessibilityState).toEqual({ selected: true });
-    expect(pill('openai').accessibilityState).toEqual({ selected: false });
-    act(() => tree.unmount());
+  it('names each vendor tab, for a screen reader and the native harness', () => {
+    const picker = openModelPicker();
+    expect(picker.tab('tinfoil')).toMatchObject({
+      title: 'Private (E2EE)',
+      testID: 'model-tab-tinfoil',
+    });
+    expect(picker.tab('openai')?.testID).toBe('model-tab-openai');
   });
 });
 

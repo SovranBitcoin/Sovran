@@ -5,7 +5,7 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { actionMenuSheet } from '@/shared/lib/popup/popups/actionMenuSheet';
+import { pickOption } from '@/shared/lib/picker/openPicker';
 import { MORE_BUTTON_WIDTH, partitionTabs } from '@/shared/ui/composed/underlineTabsLayout';
 import Icon from 'assets/icons';
 
@@ -36,8 +36,8 @@ const defaultTestIDFor = (tab: string) => `underline-tab-${tab}`;
  *
  * When the labels can't all fit at a readable width, the bar keeps the
  * longest fitting prefix and collapses the rest behind a trailing (…) button
- * that opens the canonical action-menu sheet (FWO lane, so it stacks above
- * route modals like the receive hub). The (…) button carries the active
+ * that opens the picker sheet, which also presents over route modals like the
+ * receive hub. The (…) button carries the active
  * underline whenever the selected tab lives in the overflow.
  */
 export function UnderlineTabs({
@@ -47,11 +47,10 @@ export function UnderlineTabs({
   handleTabPress,
   accentColor,
 }: UnderlineTabsProps) {
-  const [foreground, muted, themeAccent, success] = useThemeColor([
+  const [foreground, muted, themeAccent] = useThemeColor([
     'foreground',
     'muted',
     'accent',
-    'success',
   ] as const);
   const underline = accentColor ?? themeAccent;
 
@@ -77,23 +76,23 @@ export function UnderlineTabs({
   );
   const selectedInOverflow = overflow.includes(selectedTab);
 
-  const openOverflowMenu = useCallback(() => {
+  const openOverflowMenu = useCallback(async () => {
     log.info('ui.underline_tabs.overflow_menu', {
       overflowCount: overflow.length,
       selectedInOverflow,
     });
-    actionMenuSheet({
+    const picked = await pickOption({
       title: 'More',
-      buttons: overflow.map((tab) => ({
-        text: tab,
+      options: overflow.map((tab) => ({
+        id: tab,
+        title: tab,
         testID: `${testIDFor(tab)}-menu`,
         selected: tab === selectedTab,
-        suffix:
-          tab === selectedTab ? <Icon name="mdi:check" size={20} color={success} /> : undefined,
-        onPress: () => handleTabPress(tab, tabs.indexOf(tab)),
       })),
     });
-  }, [overflow, selectedTab, selectedInOverflow, handleTabPress, tabs, success, testIDFor]);
+    const tab = overflow.find((candidate) => candidate === picked);
+    if (tab !== undefined) handleTabPress(tab, tabs.indexOf(tab));
+  }, [overflow, selectedTab, selectedInOverflow, handleTabPress, tabs, testIDFor]);
 
   return (
     <Log name="UnderlineTabs">
@@ -145,7 +144,7 @@ export function UnderlineTabs({
             // one of the tabs collapsed behind it; name which one.
             accessibilityState={{ selected: selectedInOverflow }}
             accessibilityValue={selectedInOverflow ? { text: selectedTab } : undefined}
-            onPress={openOverflowMenu}
+            onPress={() => void openOverflowMenu()}
             style={[
               styles.moreButton,
               selectedInOverflow && { borderBottomColor: underline, borderBottomWidth: 2 },

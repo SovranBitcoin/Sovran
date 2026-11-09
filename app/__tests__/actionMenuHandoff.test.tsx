@@ -276,30 +276,6 @@ describe('action-menu successor handoff', () => {
     expect(list().props.extraData.contentBottomInset).toBe(144);
   });
 
-  it('reserves a measured section footer once and keeps its remaining gap in the list spacer', () => {
-    act(() => {
-      renderer = TestRenderer.create(<ActionMenuHost />);
-      actionMenuPopup({
-        sections: [{ id: 'profiles', anchor: { label: 'Profiles' }, buttons: [] }],
-        footerButtons: [{ text: 'Create', testID: 'create' }],
-      });
-    });
-    const sectionList = () =>
-      renderer!.root.find((node) => String(node.type) === 'SectionAnchorList');
-    expect(sectionList().props.contentBottomInset).toBe(112);
-    act(() => {
-      renderer!.root
-        .find((node) => String(node.type) === 'BottomButtons')
-        .props.onLayout({
-          nativeEvent: { layout: { height: 128 } },
-        });
-    });
-    const content = renderer!.root.find((node) => String(node.type) === 'Menu.Content');
-    expect(content.props.contentContainerClassName).toBe('flex-1 px-0 pt-0 pb-0');
-    expect(content.props.contentContainerProps.style.paddingBottom).toBe(128);
-    expect(sectionList().props.contentBottomInset).toBe(16);
-  });
-
   it('mounts the menu already open and lets gorhom animate on mount', () => {
     act(() => {
       renderer = TestRenderer.create(<ActionMenuHost />);

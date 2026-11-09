@@ -54,7 +54,7 @@ import {
   useWhyDidRender,
 } from '@/shared/lib/logger';
 import { useVisualStateLogger } from '@/shared/lib/contentShiftLog';
-import { actionMenuPopup } from '@/shared/lib/popup';
+import { pickOption } from '@/shared/lib/picker/openPicker';
 import {
   DEFAULT_REPLY_SKELETON_COUNT,
   MAX_REPLY_SKELETON_COUNT,
@@ -206,21 +206,20 @@ function ReplySortPicker({
   const selectedOption =
     REPLY_SORT_OPTIONS.find((option) => option.id === selected) ?? REPLY_SORT_OPTIONS[0];
 
-  const openSortMenu = useCallback(() => {
-    actionMenuPopup({
+  const openSortMenu = useCallback(async () => {
+    const picked = await pickOption({
       title: 'Replies',
-      buttons: REPLY_SORT_OPTIONS.map((option) => ({
-        text: option.label,
+      options: REPLY_SORT_OPTIONS.map((option) => ({
+        id: option.id,
+        title: option.label,
         description: option.description,
-        icon: option.icon,
-        variant: selected === option.id ? 'primary' : undefined,
+        leading: { icon: { name: option.icon } },
+        selected: selected === option.id,
         testID: `thread-reply-sort-${option.id}`,
-        onPress: (close) => {
-          close();
-          if (selected !== option.id) onSelect(option.id);
-        },
       })),
     });
+    const option = REPLY_SORT_OPTIONS.find((candidate) => candidate.id === picked);
+    if (option && option.id !== selected) onSelect(option.id);
   }, [onSelect, selected]);
 
   return (
@@ -232,7 +231,7 @@ function ReplySortPicker({
           accessibilityLabel={`Reply sort: ${selectedOption.label}`}
           activeOpacity={1}
           haptics
-          onPress={openSortMenu}
+          onPress={() => void openSortMenu()}
           style={({ pressed }) => [
             styles.replySortButton,
             { backgroundColor: pressed ? pressedBg : activeBg },

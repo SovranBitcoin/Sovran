@@ -12,11 +12,11 @@ import { FiatCurrencyPillAndroidMenu } from '@/features/wallet/components/FiatCu
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const mockSetDisplayCurrency = jest.fn();
-const mockActionMenuPopup = jest.fn();
+const mockPickOption = jest.fn(async (_request: unknown): Promise<string | null> => null);
 const mockTransactionLocation = { latitude: 51.5, longitude: -0.12 };
 
-jest.mock('@/shared/lib/popup/popups/actionMenu', () => ({
-  actionMenuPopup: (...args: unknown[]) => mockActionMenuPopup(...args),
+jest.mock('@/shared/lib/picker/openPicker', () => ({
+  pickOption: (request: unknown) => mockPickOption(request),
 }));
 
 jest.mock('@/shared/ui/capability', () => ({
@@ -162,7 +162,7 @@ describe('Android UI regressions', () => {
 
   beforeEach(() => {
     mockSetDisplayCurrency.mockReset();
-    mockActionMenuPopup.mockReset();
+    mockPickOption.mockClear();
     Object.defineProperty(Platform, 'OS', { configurable: true, value: 'android' });
     consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation((...args: unknown[]) => {
       if (String(args[0]).includes('react-test-renderer is deprecated')) return;
@@ -174,7 +174,7 @@ describe('Android UI regressions', () => {
     consoleErrorSpy.mockRestore();
   });
 
-  it('renders no inline sheet at rest and dispatches the global currency menu on tap', () => {
+  it('renders no inline sheet at rest and opens the picker sheet on tap', async () => {
     let renderer: TestRenderer.ReactTestRenderer;
 
     act(() => {
@@ -184,38 +184,41 @@ describe('Android UI regressions', () => {
     });
 
     // Regression: the pill renders NO inline bottom-sheet (which paints at rest
-    // on Android). The pick-one surface is the app-wide actionMenuPopup() host.
+    // on Android). The pick-one surface is the picker sheet.
     expect(findAllByType(renderer!, 'Menu.Portal')).toHaveLength(0);
     expect(findAllByType(renderer!, 'Menu.Content')).toHaveLength(0);
-    expect(mockActionMenuPopup).not.toHaveBeenCalled();
+    expect(mockPickOption).not.toHaveBeenCalled();
 
-    // The pill is the trigger — pressing it dispatches the global action menu.
-    act(() => {
+    // The pill is the trigger — pressing it opens the picker; the person picks EUR.
+    mockPickOption.mockResolvedValueOnce('eur');
+    await act(async () => {
       findAllByType(renderer!, 'Pressable')[0].props.onPress();
     });
 
-    expect(mockActionMenuPopup).toHaveBeenCalledTimes(1);
-    const payload = mockActionMenuPopup.mock.calls[0][0] as {
+    expect(mockPickOption).toHaveBeenCalledTimes(1);
+    const request = mockPickOption.mock.calls[0][0] as {
       title: string;
-      buttons: {
-        testID?: string;
+      options: {
+        testID: string;
         accessibilityLabel?: string;
         accessibilityHint?: string;
-        suffix?: unknown;
-        onPress: () => void;
+        selected?: boolean;
       }[];
     };
-    expect(payload.title).toBe('Display currency');
-    expect(payload.buttons).toHaveLength(3);
-    // displayCurrency mock is 'usd' → the USD row carries the selected-check suffix.
-    const usd = payload.buttons.find((b) => b.testID === 'fiat-currency-menu-usd');
-    expect(usd?.suffix).toBeTruthy();
-    expect(usd).toMatchObject({ accessibilityLabel: 'USD', accessibilityHint: 'US Dollar' });
-
-    const eur = payload.buttons.find((b) => b.testID === 'fiat-currency-menu-eur');
-    expect(eur).toMatchObject({ accessibilityLabel: 'EUR', accessibilityHint: 'Euro' });
-    act(() => {
-      eur?.onPress();
+    expect(request.title).toBe('Display currency');
+    expect(request.options).toHaveLength(3);
+    // displayCurrency mock is 'usd' → the USD row is the selected one.
+    const usd = request.options.find((o) => o.testID === 'fiat-currency-menu-usd');
+    expect(usd).toMatchObject({
+      selected: true,
+      accessibilityLabel: 'USD',
+      accessibilityHint: 'US Dollar',
+    });
+    const eur = request.options.find((o) => o.testID === 'fiat-currency-menu-eur');
+    expect(eur).toMatchObject({
+      selected: false,
+      accessibilityLabel: 'EUR',
+      accessibilityHint: 'Euro',
     });
     expect(mockSetDisplayCurrency).toHaveBeenCalledWith('eur');
   });

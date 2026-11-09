@@ -1,19 +1,18 @@
 /**
  * Fallback tiers (iOS blur/flat + Android): the shared `CapsuleButton` face —
  * the same component behind the ecash status pills, which tiers itself
- * (blur/flat). The shared action-menu sheet also presents above native route
- * modals. Header callers use the canonical circular header action instead.
+ * (blur/flat). The accounts open in the picker sheet, which also presents
+ * over native route modals. Header callers use the canonical circular header action instead.
  */
 
 import React, { useCallback } from 'react';
 import { StyleSheet } from 'react-native';
 
 import Icon from 'assets/icons';
-import { actionMenuSheet } from '@/shared/lib/popup/popups/actionMenuSheet';
+import { pickOption } from '@/shared/lib/picker/openPicker';
 import { CapsuleButton } from '@/shared/ui/composed/CapsuleButton';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { View } from '@/shared/ui/primitives/View/View';
-import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useStylePaint } from '@/shared/styles/appStyle';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -31,29 +30,28 @@ export function UnitSwitcherPillFallback(
   const { unit, shownUnit, shownOption, availableOptions, canSwitch, handleSelectUnit, textSize } =
     useUnitSwitcherPill(props);
   const selectedUnit = props.header ? shownUnit : unit;
-  const success = useThemeColor('success');
   const paint = useStylePaint();
 
-  const openUnitMenu = useCallback(() => {
-    actionMenuSheet({
+  const openUnitMenu = useCallback(async () => {
+    const picked = await pickOption({
       title: 'Wallet accounts',
-      buttons: availableOptions.map((option) => ({
-        text: option.label,
-        iconNode: unitIconNode(option, 22),
+      options: availableOptions.map((option) => ({
+        id: option.unit,
+        title: option.label,
+        leading: { node: unitIconNode(option, 22) },
         testID: `wallet-unit-menu-${option.unit}`,
-        suffix:
-          option.unit === selectedUnit ? (
-            <Icon name="mdi:check" size={20} color={success} />
-          ) : undefined,
-        onPress: () => handleSelectUnit(option.unit),
+        selected: option.unit === selectedUnit,
       })),
     });
-  }, [selectedUnit, availableOptions, handleSelectUnit, success]);
+    const option = availableOptions.find((candidate) => candidate.unit === picked);
+    if (option) handleSelectUnit(option.unit);
+  }, [selectedUnit, availableOptions, handleSelectUnit]);
+  const openUnitSheet = () => void openUnitMenu();
 
   if (props.header) {
     return (
       <ScreenHeaderAction
-        onPress={openUnitMenu}
+        onPress={openUnitSheet}
         testID="wallet-unit-switcher"
         accessibilityLabel={`Switch wallet account, ${pillLabel(shownUnit)}`}>
         {unitIconNode(shownOption, 24)}
@@ -76,7 +74,7 @@ export function UnitSwitcherPillFallback(
         accessibilityState={{ disabled: !canSwitch }}
         disabled={!canSwitch}
         hitSlop={BARE_HIT_SLOP}
-        onPress={openUnitMenu}
+        onPress={openUnitSheet}
         style={styles.bare}>
         <Text medium size={14} family={paint.style.type.family} color={paint.text.secondary}>
           {label}
@@ -96,7 +94,7 @@ export function UnitSwitcherPillFallback(
         // Matches the liquid tier's spoken name — the visible "SATS"/"USD"
         // abbreviation does not stand alone.
         accessibilityLabel="Switch wallet account"
-        onPress={openUnitMenu}
+        onPress={openUnitSheet}
         height={PILL_HEIGHT}
         fitContent
         textSize={textSize}
