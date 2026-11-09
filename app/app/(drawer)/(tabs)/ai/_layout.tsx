@@ -23,7 +23,7 @@ export default function AiLayout() {
           iconColor,
           headerLeft: () => <HeaderProfileButton onPress={openDrawer} />,
           headerRightIcon: 'clock.arrow.circlepath',
-          onHeaderRightPress: openAiSessionsMenu,
+          onHeaderRightPress: () => void openAiSessionsMenu(),
           headerRightAccessibilityLabel: 'Conversation history',
           headerRightTestID: 'ai-history-button',
           options: {
