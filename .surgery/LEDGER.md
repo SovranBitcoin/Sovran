@@ -2,12 +2,12 @@
 
 State, not history. Passes run in order; one call runs one pass.
 
-| Pass                      | Status                                                                                                                   |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| 0 Pin behaviour           | **Done** (2026-11-11). Every boundary the surveys listed has a pin; the gates are closed. Branch `surgery/pass-0-gates`. |
-| 1 Persisted state         | **Cut, awaiting merge** (2026-11-10). Branch `surgery/pass-1-cuts`. Proposal 3 awaits its plan. See "Pass 1".            |
-| 2 Implicit state machines | Not started.                                                                                                             |
-| 3 Deepen modules          | Not started.                                                                                                             |
+| Pass                      | Status                                                                                                                                                               |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0 Pin behaviour           | **Done** (2026-11-11). Every boundary the surveys listed has a pin; the gates are closed. Branch `surgery/pass-0-gates`.                                             |
+| 1 Persisted state         | **Done** (2026-11-11), proven on every release fixture; no real upgrade was run. Cuts on `surgery/pass-1-cuts` and `surgery/pass-1-queue`, not merged. See "Pass 1". |
+| 2 Implicit state machines | Not started.                                                                                                                                                         |
+| 3 Deepen modules          | Not started.                                                                                                                                                         |
 
 Pass 0 is on branch `surgery/pass-0`; pass 1's evidence is on `surgery/pass-1` and its cuts on `surgery/pass-1-cuts`, each stacked on the one before (worktree `../sovran-surgery`,
 based on `main` at `e5d70b590`). Neither is pushed. Until they merge, this file and the survey folders also sit
@@ -231,10 +231,15 @@ PASS. They sit in a pull request, not on `main`.
 Remaining: F193 (after a restart, a 0.1.3 payment to a re-drawn request waits until it is shown again), F195 (native
 bridges), F192 (wallpaper and location limits).
 
-Redeem queue (proposal 3), approved and built on `surgery/pass-1-queue`: every saved token, mint address and unit is
-read whatever its length; over-long or wrong-typed notes on an entry read as absent; an over-limit Bluetooth token is
-refused before saving, with the message path's check; after a load, a queue found under `:unreadable` is merged back
-in by token hash and that copy removed only after the merged queue is saved and read back. No real upgrade was run.
+Redeem queue (proposal 3), approved on 2026-11-11 and built on `surgery/pass-1-queue` (`a73ea88f1` to `06e2585c8`):
+every saved token, mint address and unit is read whatever its length; over-long or wrong-typed notes on an entry read
+as absent; an over-limit Bluetooth token is refused before saving, with the message path's check; after a load, a
+queue found under `:unreadable` is merged back in by token hash, saved, read back, and only then is the copy removed.
+The queue records which copy it merged (`recoveredCopy`, a new optional field), so a copy whose removal failed is not
+merged twice. Reviewed by Codex GPT-6.1 Sol: two defects in the merge-back, fixed in `06e2585c8` (not re-reviewed).
+Still loads empty, with its bytes kept aside as before: a queue with an entry that has no token or mint address, or a
+broken amount, attempt count or time. The review also found F208, older than this work: a second rejected blob is
+overwritten when an earlier set-aside copy still exists. No real upgrade was run.
 
 ### Open findings from this pass
 
