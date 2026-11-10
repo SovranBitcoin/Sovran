@@ -1361,10 +1361,12 @@ export function createDefaultOperations(
 
       let hadP2PK = false;
       let tokenAmount = 0;
+      let tokenUnit = "sat";
       try {
         const metadata = getTokenMetadata(tokenString);
         hadP2PK = proofsHaveP2PK(metadata.incompleteProofs);
         tokenAmount = amountToNumber(metadata.amount);
+        tokenUnit = metadata.unit ?? "sat";
         logger.info("operations.executeReceive.tokenDecoded", {
           ...mintUrlFields(mintUrl),
           amount: tokenAmount,
@@ -1405,7 +1407,7 @@ export function createDefaultOperations(
         type: "receive" as const,
         createdAt: Date.now(),
         mintUrl,
-        unit: "sat",
+        unit: tokenUnit,
         amount: tokenAmount,
       };
       return { historyEntry: JSON.stringify(entry), hadP2PKProofs: hadP2PK };
@@ -2062,8 +2064,8 @@ export function createDefaultOperations(
           // narrow is safe; the cast is a pragmatic alternative to re-running
           // the type guard inside parseHistoryEntryOnce's loose return.
           ((parseHistoryEntryOnce(historyEntry) as ParsedSendEntry | null) ??
-          buildSyntheticPaymentRequestEntry(operationId, mintUrl, amount))
-        : buildSyntheticPaymentRequestEntry(operationId, mintUrl, amount);
+          buildSyntheticPaymentRequestEntry(operationId, mintUrl, amount, unit))
+        : buildSyntheticPaymentRequestEntry(operationId, mintUrl, amount, unit);
       // Enrich with transport metadata so the screen can show progress
       const enriched: ParsedSendEntry = {
         ...baseEntry,
@@ -2126,6 +2128,7 @@ function buildSyntheticPaymentRequestEntry(
   operationId: string,
   mintUrl: string,
   amount: number,
+  unit: string,
 ): Omit<SyntheticSendEntry, "token" | "metadata"> {
   const now = Date.now();
   return {
@@ -2133,7 +2136,7 @@ function buildSyntheticPaymentRequestEntry(
     type: "send",
     createdAt: now,
     mintUrl,
-    unit: "sat",
+    unit,
     amount,
     operationId,
     state: "pending",

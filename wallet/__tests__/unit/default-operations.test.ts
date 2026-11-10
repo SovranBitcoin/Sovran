@@ -1755,3 +1755,64 @@ describe("legacy nearby receive history ownership", () => {
     expect(manager.history.getPaginatedHistory).not.toHaveBeenCalled();
   });
 });
+
+describe("synthetic history entries keep the operation's unit", () => {
+  it("builds a usd payment-request entry when the history row is missing", async () => {
+    const manager = createMockManager({
+      history: { getHistoryEntryById: vi.fn().mockResolvedValue(null) },
+    });
+    mockGetPRInfo.mockReturnValue({
+      mints: [MINT1],
+      amount: 100,
+      unit: "usd",
+      transports: [{ type: "nostr", target: "nprofile1abc" }],
+    });
+    const ops = createDefaultOperations({
+      getManager: () => manager as unknown as Manager,
+      sendNostrDM: vi.fn().mockResolvedValue(undefined),
+    });
+
+    const result = await ops.executePaymentRequest!({
+      mintUrl: MINT1,
+      paymentRequest: "creqUSD",
+      amount: 100,
+      unit: "usd",
+    });
+
+    expect(JSON.parse(result.historyEntry)).toMatchObject({
+      id: "op-1",
+      amount: 100,
+      unit: "usd",
+    });
+  });
+
+  it("builds a usd receive entry when the history row is missing", async () => {
+    const token = getEncodedToken({
+      mint: MINT1,
+      unit: "usd",
+      proofs: [
+        {
+          id: "00".repeat(8),
+          amount: Amount.from(25),
+          C: "02" + "ab".repeat(32),
+          secret: "synthetic",
+        },
+      ],
+    });
+    const manager = createMockManager({
+      wallet: { receive: vi.fn().mockResolvedValue(undefined) },
+      history: { getPaginatedHistory: vi.fn().mockResolvedValue([]) },
+    });
+    const ops = createDefaultOperations({
+      getManager: () => manager as unknown as Manager,
+    });
+
+    const result = await ops.executeReceive!({ tokenString: token, mintUrl: MINT1, amount: 25 });
+
+    expect(JSON.parse(result.historyEntry)).toMatchObject({
+      type: "receive",
+      amount: 25,
+      unit: "usd",
+    });
+  });
+});
