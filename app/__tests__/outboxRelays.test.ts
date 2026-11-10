@@ -5,18 +5,14 @@
  */
 /* eslint-disable import/first */
 
-jest.mock(
-  '@nostr-dev-kit/ndk-mobile',
-  () => ({
-    __esModule: true,
-    normalizeRelayUrl: (url: string) => {
-      const trimmed = url.trim().toLowerCase();
-      if (!/^wss?:\/\//.test(trimmed)) throw new Error('invalid');
-      return trimmed.replace(/\/+$/, '');
-    },
-  }),
-  { virtual: true }
-);
+jest.mock('@nostr-dev-kit/ndk-mobile', () => ({
+  __esModule: true,
+  normalizeRelayUrl: (url: string) => {
+    const trimmed = url.trim().toLowerCase();
+    if (!/^wss?:\/\//.test(trimmed)) throw new Error('invalid');
+    return trimmed.replace(/\/+$/, '');
+  },
+}));
 
 import {
   parseRelayList,

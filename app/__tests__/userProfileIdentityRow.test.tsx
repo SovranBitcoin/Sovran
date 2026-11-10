@@ -24,7 +24,7 @@ jest.mock('@/shared/lib/contentShiftLog', () => ({
 // Keep the screen's unrelated navigation, wallet, and feed services out of this
 // render test. The identity row uses the real Text, stack, View, and icon.
 jest.mock('expo-router', () => ({}));
-jest.mock('@nostr-dev-kit/ndk-mobile', () => ({}), { virtual: true });
+jest.mock('@nostr-dev-kit/ndk-mobile', () => ({}));
 jest.mock('wallet/react', () => ({}), { virtual: true });
 jest.mock('heroui-native', () => ({}));
 jest.mock('@/shared/ui/primitives/Pressable', () => ({}));

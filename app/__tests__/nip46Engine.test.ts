@@ -12,22 +12,18 @@
 
 /* eslint-disable import/first */
 
-jest.mock(
-  '@nostr-dev-kit/ndk-mobile',
-  () => ({
-    __esModule: true,
-    default: class MockNDK {},
-    NDKPrivateKeySigner: class MockPrivateKeySigner {},
-    NDKUser: class MockUser {
-      pubkey: string;
-      constructor(params: { pubkey: string }) {
-        this.pubkey = params.pubkey;
-      }
-    },
-    // virtual: ndk-mobile ships ESM-only exports jest-expo cannot resolve.
-  }),
-  { virtual: true }
-);
+jest.mock('@nostr-dev-kit/ndk-mobile', () => ({
+  __esModule: true,
+  default: class MockNDK {},
+  NDKPrivateKeySigner: class MockPrivateKeySigner {},
+  NDKUser: class MockUser {
+    pubkey: string;
+    constructor(params: { pubkey: string }) {
+      this.pubkey = params.pubkey;
+    }
+  },
+  // virtual: ndk-mobile ships ESM-only exports jest-expo cannot resolve.
+}));
 
 jest.mock('@sovranbitcoin/schemas', () => ({
   loggableIssues: () => [],

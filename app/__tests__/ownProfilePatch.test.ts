@@ -33,19 +33,15 @@ const mockIngest = jest.fn();
 const mockDelete = jest.fn();
 jest.mock('@/shared/lib/nostr/publish/publishEvent', () => ({ publishEvent: jest.fn() }));
 jest.mock('@/shared/lib/nostr/outbox/relayListStore', () => ({ getOwnWriteRelays: () => [] }));
-jest.mock(
-  '@nostr-dev-kit/ndk-mobile',
-  () => ({
-    __esModule: true,
-    default: jest.fn(),
-    normalizeRelayUrl: (url: string) => url,
-    NDKEvent: class {
-      id = 'e'.repeat(64);
-      sign = jest.fn(async () => {});
-    },
-  }),
-  { virtual: true }
-);
+jest.mock('@nostr-dev-kit/ndk-mobile', () => ({
+  __esModule: true,
+  default: jest.fn(),
+  normalizeRelayUrl: (url: string) => url,
+  NDKEvent: class {
+    id = 'e'.repeat(64);
+    sign = jest.fn(async () => {});
+  },
+}));
 
 it('preserves unknown keys and untouched metadata', () => {
   const base = {
