@@ -331,9 +331,7 @@ describe('a live scan', () => {
   });
 
   it('accepts only pairing codes in signer-pair mode and hides the gallery', async () => {
-    jest
-      .mocked(openPairingFromUri)
-      .mockReturnValue(err({ type: 'invalid-uri' }) as never);
+    jest.mocked(openPairingFromUri).mockReturnValue(err({ type: 'invalid-uri' }) as never);
     await mount({ signerPairOnly: true });
 
     await scan(TOKEN);
@@ -365,9 +363,7 @@ describe('paste and gallery', () => {
 
   it('sends a pasted nostrconnect link to pairing with the invalid-link wording on failure', async () => {
     mockClipboardText = 'nostrconnect://broken';
-    jest
-      .mocked(openPairingFromUri)
-      .mockReturnValue(err({ type: 'invalid-uri' }) as never);
+    jest.mocked(openPairingFromUri).mockReturnValue(err({ type: 'invalid-uri' }) as never);
     await mount();
 
     await act(async () => layout().handleClipboardPress());
