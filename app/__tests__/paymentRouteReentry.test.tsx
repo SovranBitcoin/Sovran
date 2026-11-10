@@ -277,7 +277,11 @@ const RECEIVE_BASE = {
 describe('reopening a receive', () => {
   it('offers Redeem for a token not yet redeemed, and redeems nothing on open', async () => {
     await open(<ReceiveTokenRoute where="test.receiveToken" />, {
-      receiveHistoryEntry: JSON.stringify({ ...RECEIVE_BASE, id: PLACEHOLDER_ID, state: 'prepared' }),
+      receiveHistoryEntry: JSON.stringify({
+        ...RECEIVE_BASE,
+        id: PLACEHOLDER_ID,
+        state: 'prepared',
+      }),
     });
 
     expect(testIds()).toEqual(expect.arrayContaining(['receive-token-redeem']));
@@ -286,7 +290,11 @@ describe('reopening a receive', () => {
 
   it('decides redeemed from the id, not the state', async () => {
     await open(<ReceiveTokenRoute where="test.receiveToken" />, {
-      receiveHistoryEntry: JSON.stringify({ ...RECEIVE_BASE, id: PLACEHOLDER_ID, state: 'finalized' }),
+      receiveHistoryEntry: JSON.stringify({
+        ...RECEIVE_BASE,
+        id: PLACEHOLDER_ID,
+        state: 'finalized',
+      }),
     });
 
     // QUIRK: a `receive-…` id is read as "not redeemed yet" whatever its state says, so a
