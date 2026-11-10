@@ -107,7 +107,11 @@ export interface MeshRedeemOrchestratorConfig {
 }
 
 export interface MeshRedeemOrchestrator {
-  /** Drain due entries. Single-flight: overlapping calls return immediately. */
+  /**
+   * Drain due entries. Single-flight: a call made while a drain runs does not
+   * start a second one; it asks for one more run after the current one, and
+   * resolves when that run settles. Calls during the same run share it.
+   */
   drain(): Promise<void>;
 }
 
@@ -115,10 +119,28 @@ export function createMeshRedeemOrchestrator(
   config: MeshRedeemOrchestratorConfig,
 ): MeshRedeemOrchestrator {
   const now = config.now ?? Date.now;
-  let inFlight = false;
+  let running: Promise<void> | null = null;
+  let rerun: Promise<void> | null = null;
 
-  async function drain(): Promise<void> {
-    if (inFlight) return;
+  // A drop that arrives, or an entry requeued by hand, while a run is in
+  // progress is not in that run's `due` snapshot, so it gets a run of its own.
+  function drain(): Promise<void> {
+    if (!running) {
+      running = drainOnce().finally(() => {
+        running = null;
+      });
+      return running;
+    }
+    rerun ??= running
+      .catch(() => undefined)
+      .then(() => {
+        rerun = null;
+        return drain();
+      });
+    return rerun;
+  }
+
+  async function drainOnce(): Promise<void> {
     const manager = config.getManager();
     if (!manager) return;
     if (config.isRestoreSettled && !config.isRestoreSettled()) {
@@ -126,94 +148,89 @@ export function createMeshRedeemOrchestrator(
       return;
     }
 
-    inFlight = true;
-    try {
-      config.queue.prune();
-      const cutoff = now();
-      // `redeeming` entries are recovered too: the single-flight latch means
-      // they can only exist from a drain interrupted by a crash or an
-      // expired background budget. Retrying is safe — a receive that
-      // actually completed re-classifies as `spent`.
-      const due = Object.entries(config.queue.entries()).filter(
-        ([, entry]) =>
-          (entry.status === "pending" || entry.status === "redeeming") &&
-          entry.nextAttemptAt <= cutoff,
-      );
-      if (due.length === 0) return;
+    config.queue.prune();
+    const cutoff = now();
+    // `redeeming` entries are recovered too: single-flight means they can
+    // only exist from a drain interrupted by a crash or an expired
+    // background budget. Retrying is safe — a receive that actually
+    // completed re-classifies as `spent`.
+    const due = Object.entries(config.queue.entries()).filter(
+      ([, entry]) =>
+        (entry.status === "pending" || entry.status === "redeeming") &&
+        entry.nextAttemptAt <= cutoff,
+    );
+    if (due.length === 0) return;
 
-      logger.info("transport.redeem.drainStart", { dueCount: due.length });
+    logger.info("transport.redeem.drainStart", { dueCount: due.length });
 
-      for (const [tokenHash, entry] of due) {
-        // A profile switch swaps the manager (and the profile-scoped queue
-        // behind the port) mid-drain. Redeeming a queued token into the NEW
-        // profile's wallet would bleed funds across profiles — abort the
-        // drain the moment the manager identity changes.
-        if (config.getManager() !== manager) {
-          logger.warn("transport.redeem.managerChanged");
-          return;
-        }
-        let trusted: boolean;
-        try {
-          trusted = await manager.mint.isTrustedMint(entry.mintUrl);
-        } catch (err) {
-          if (config.getManager() !== manager) return;
-          config.queue.scheduleRetry(
-            tokenHash,
-            err instanceof Error ? err.message : String(err),
-          );
-          continue;
-        }
-        if (config.getManager() !== manager) return;
-        if (!trusted) {
-          // Never auto-trust a mint pushed at us over the mesh. The entry
-          // stays visible (untrusted-mint) for manual review.
-          config.queue.markStatus(tokenHash, "untrusted-mint");
-          logger.warn("transport.redeem.untrustedMint", {
-            tokenHash: tokenHash.slice(0, 12),
-            ...mintUrlFields(entry.mintUrl),
-          });
-          continue;
-        }
-
-        config.queue.markStatus(tokenHash, "redeeming");
-        config.onRedeeming?.(tokenHash, entry);
-        try {
-          const { historyEntryId } = await config.executeAutoRedeem({
-            tokenString: entry.token,
-            mintUrl: entry.mintUrl,
-            manager,
-          });
-          if (config.getManager() !== manager) return;
-          config.queue.markStatus(tokenHash, "redeemed");
-          logger.info("transport.redeem.success", {
-            tokenHash: tokenHash.slice(0, 12),
-            amount: entry.amount,
-            ...mintUrlFields(entry.mintUrl),
-          });
-          config.onRedeemed?.(tokenHash, entry, historyEntryId);
-        } catch (err) {
-          if (config.getManager() !== manager) return;
-          const kind = classifyMeshRedeemError(err);
-          const message = err instanceof Error ? err.message : String(err);
-          logger.warn("transport.redeem.attemptFailed", {
-            tokenHash: tokenHash.slice(0, 12),
-            kind,
-            error: message,
-          });
-          if (kind === "spent") {
-            // Duplicate delivery race (an equivalent token already redeemed)
-            // or the sender reclaimed. Nothing actionable.
-            config.queue.markStatus(tokenHash, "spent", message);
-          } else if (kind === "network" || kind === "retryable") {
-            config.queue.scheduleRetry(tokenHash, message);
-          } else {
-            config.queue.markStatus(tokenHash, "failed", message);
-          }
-          config.onFailed?.(tokenHash, entry, kind, message);
-        }
+    for (const [tokenHash, entry] of due) {
+      // A profile switch swaps the manager (and the profile-scoped queue
+      // behind the port) mid-drain. Redeeming a queued token into the NEW
+      // profile's wallet would bleed funds across profiles — abort the
+      // drain the moment the manager identity changes.
+      if (config.getManager() !== manager) {
+        logger.warn("transport.redeem.managerChanged");
+        return;
       }
-    } finally {
-      inFlight = false;
+      let trusted: boolean;
+      try {
+        trusted = await manager.mint.isTrustedMint(entry.mintUrl);
+      } catch (err) {
+        if (config.getManager() !== manager) return;
+        config.queue.scheduleRetry(
+          tokenHash,
+          err instanceof Error ? err.message : String(err),
+        );
+        continue;
+      }
+      if (config.getManager() !== manager) return;
+      if (!trusted) {
+        // Never auto-trust a mint pushed at us over the mesh. The entry
+        // stays visible (untrusted-mint) for manual review.
+        config.queue.markStatus(tokenHash, "untrusted-mint");
+        logger.warn("transport.redeem.untrustedMint", {
+          tokenHash: tokenHash.slice(0, 12),
+          ...mintUrlFields(entry.mintUrl),
+        });
+        continue;
+      }
+
+      config.queue.markStatus(tokenHash, "redeeming");
+      config.onRedeeming?.(tokenHash, entry);
+      try {
+        const { historyEntryId } = await config.executeAutoRedeem({
+          tokenString: entry.token,
+          mintUrl: entry.mintUrl,
+          manager,
+        });
+        if (config.getManager() !== manager) return;
+        config.queue.markStatus(tokenHash, "redeemed");
+        logger.info("transport.redeem.success", {
+          tokenHash: tokenHash.slice(0, 12),
+          amount: entry.amount,
+          ...mintUrlFields(entry.mintUrl),
+        });
+        config.onRedeemed?.(tokenHash, entry, historyEntryId);
+      } catch (err) {
+        if (config.getManager() !== manager) return;
+        const kind = classifyMeshRedeemError(err);
+        const message = err instanceof Error ? err.message : String(err);
+        logger.warn("transport.redeem.attemptFailed", {
+          tokenHash: tokenHash.slice(0, 12),
+          kind,
+          error: message,
+        });
+        if (kind === "spent") {
+          // Duplicate delivery race (an equivalent token already redeemed)
+          // or the sender reclaimed. Nothing actionable.
+          config.queue.markStatus(tokenHash, "spent", message);
+        } else if (kind === "network" || kind === "retryable") {
+          config.queue.scheduleRetry(tokenHash, message);
+        } else {
+          config.queue.markStatus(tokenHash, "failed", message);
+        }
+        config.onFailed?.(tokenHash, entry, kind, message);
+      }
     }
   }
 

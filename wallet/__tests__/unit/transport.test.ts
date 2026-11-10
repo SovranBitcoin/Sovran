@@ -344,6 +344,60 @@ describe("createMeshRedeemOrchestrator", () => {
     expect(queue.statuses).toContainEqual(["fatal", "failed"]);
   });
 
+  it("a drop queued while a drain runs is redeemed by one more run after it", async () => {
+    const entries: Record<string, MeshRedeemEntry> = { a: entry({ token: "a" }) };
+    const queue = createQueue(entries);
+    const prune = vi.fn();
+    queue.port.prune = prune;
+    let releaseA!: () => void;
+    const redeemed: string[] = [];
+    const orchestrator = createMeshRedeemOrchestrator({
+      getManager: fakeManager(),
+      queue: queue.port,
+      executeAutoRedeem: async ({ tokenString: token }) => {
+        if (token === "a") await new Promise<void>((resolve) => (releaseA = resolve));
+        redeemed.push(token);
+        // The fixture's queue does not move statuses; settle the entry so
+        // a later run does not pick it again.
+        entries[token] = entry({ token, status: "redeemed" });
+        return { historyEntryId: null };
+      },
+    });
+
+    const first = orchestrator.drain();
+    await vi.waitFor(() => expect(releaseA).toBeTypeOf("function"));
+    // B arrives (or a "try again" requeues it) while A is being redeemed;
+    // two triggers during the run still mean one more run.
+    entries.b = entry({ token: "b" });
+    const second = orchestrator.drain();
+    const third = orchestrator.drain();
+    releaseA();
+    await Promise.all([first, second, third]);
+
+    expect(redeemed).toEqual(["a", "b"]);
+    // Each run prunes once: A's run and exactly one more.
+    expect(prune).toHaveBeenCalledTimes(2);
+    expect(queue.statuses).toEqual([
+      ["a", "redeeming"],
+      ["a", "redeemed"],
+      ["b", "redeeming"],
+      ["b", "redeemed"],
+    ]);
+  });
+
+  it("a drain with nothing arriving during it runs once", async () => {
+    const queue = createQueue({ h1: entry() });
+    const prune = vi.fn();
+    queue.port.prune = prune;
+    const orchestrator = createMeshRedeemOrchestrator({
+      getManager: fakeManager(),
+      queue: queue.port,
+      executeAutoRedeem: async () => ({ historyEntryId: null }),
+    });
+    await orchestrator.drain();
+    expect(prune).toHaveBeenCalledTimes(1);
+  });
+
   it("gates on manager availability, restore status, and backoff windows", async () => {
     const queue = createQueue({
       h1: entry({ nextAttemptAt: Number.MAX_SAFE_INTEGER }),
