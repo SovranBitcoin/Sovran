@@ -45,6 +45,7 @@ import type { Launch } from './releaseFixtures/launch';
 import { fixture as E19 } from './releaseFixtures/E19-0.1.2';
 import { ACCOUNTS, IMPORTED, PHRASE_HASH, accountKey } from './releaseFixtures/format';
 import type { ReleaseFixture } from './releaseFixtures/format';
+import { meshTokenDedupeKey } from 'wallet';
 
 // Each case starts the whole app over a disk; allow what the fixture runner allows.
 jest.setTimeout(120_000);
@@ -756,5 +757,121 @@ describe('wallet-lifecycle: a restore error longer than 500', () => {
     expect(run.rejections).toEqual([]);
     expect(loaded).toMatchObject({ ...LIFECYCLE, lastRestoreError: longText(500) });
     expect(run.disk.asyncStorage[sideKey(KEY)]).toBeUndefined();
+  });
+});
+
+// ── 10. nut-drop-redeem-queue: a nearby token over the read limits ───────────
+
+/**
+ * Writer: the Bluetooth listener (`app/features/nearPay/hooks/
+ * useNutDropAutoRedeem.ts:88-95@d9ad12c4b`) hands `enqueue` the token, the
+ * mint address and unit the token names, with no limit; `enqueue`
+ * (`P/nutDropRedeemQueueStore.ts:120-139`) adds status `pending`, no attempts
+ * and the time; `partialize` :216-218, version 1 (no `version` option,
+ * :211-219). 0.1.3 read limits :91-94 (token, mint address, unit), which
+ * rejected the whole queue, every waiting token with it. Repaired: the reader
+ * takes them at any length, byte for byte; a new token over the limits is
+ * refused before it is queued (`nutDropRedeemQueueOversize.test.tsx`); and a
+ * queue a build before the repair set aside is merged back in
+ * (`nutDropRedeemQueueRecovery.test.ts`).
+ */
+describe('nut-drop-redeem-queue: a queued nearby token over the 0.1.3 read limits', () => {
+  const STORE = 'nut-drop-redeem-queue';
+  const KEY = accountKey(STORE, A0);
+  const fixtureQueue = e19Row(KEY).state.byTokenHash as State;
+  /** An entry as 0.1.3's `enqueue` built it from what the listener passed. */
+  const enqueued = (token: string, mintUrl: string, unit = 'sat') => ({
+    token,
+    mintUrl,
+    amount: 64,
+    unit,
+    senderPeerID: '0f1e2d3c4b5a6978',
+    status: 'pending',
+    attempts: 0,
+    nextAttemptAt: 0,
+    receivedAt: 1_789_100_000_000,
+  });
+  const overLimits = Object.fromEntries(
+    [
+      enqueued('cashuBnearbyoverthemintlimit', `https://mint.example/${longText(2049)}`),
+      enqueued('cashuBnearbyovertheunitlimit', 'https://21mint.me', longText(17)),
+      enqueued(`cashuBnearby${longText(60_001)}`, 'https://21mint.me'),
+    ].map((entry) => [meshTokenDedupeKey(entry.token), entry])
+  );
+  type Entry = { token: string; mintUrl: string; unit: string };
+
+  /** Every token in `queue` is in the saved queue at `key`, byte for byte. */
+  const expectEveryToken = (run: Launch, key: string, queue: State) => {
+    const saved = (JSON.parse(run.disk.asyncStorage[key]) as Row).state.byTokenHash as Record<
+      string,
+      Entry
+    >;
+    expect(Object.keys(saved).sort()).toEqual(Object.keys(queue).sort());
+    for (const [hash, entry] of Object.entries(queue as Record<string, Entry>)) {
+      expect(saved[hash].token).toBe(entry.token);
+      expect(saved[hash].mintUrl).toBe(entry.mintUrl);
+      expect(saved[hash].unit).toBe(entry.unit);
+    }
+    expect(saved).toMatchObject(queue);
+  };
+
+  it('keeps every queued token over three launches when 0.1.3 saved some over the limits', async () => {
+    const queue = { ...fixtureQueue, ...overLimits };
+    const first = await startWith(KEY, released(1, { byTokenHash: queue }), STORE, { account: 0 });
+    const second = await launch(first.variant);
+    const third = await launch(first.variant);
+
+    // The entry E19 already held, parked status and peer id included, and the long ones.
+    expect(first.loaded.byTokenHash).toEqual(queue);
+    for (const run of [first.run, second, third]) {
+      expectEveryToken(run, KEY, queue);
+      expect(run.rejections).toEqual([]);
+      expect(run.defaultedRows).not.toContain(`${STORE} (account 0)`);
+      expect(run.disk.asyncStorage[sideKey(STORE, A0)]).toBeUndefined();
+    }
+  });
+
+  /**
+   * What a build before the repair left for the account it opened: the queue
+   * it could not read, copied aside whole, and an empty queue saved over it.
+   * Account 1 is the one E19 opens at start. (An account loaded only through
+   * the in-process switch, a developer setting, gets its copy merged, but the
+   * copy stays until it is loaded at a start: the switch holds saves while
+   * stores reload, so the merged queue cannot be read back then.)
+   */
+  it('brings back every token from the copy a build before the repair set aside', async () => {
+    const MINE = accountKey(STORE, A1);
+    const SIDE = sideKey(STORE, A1);
+    const first = await startWith(MINE, released(1, { byTokenHash: {} }), STORE, {
+      account: 1,
+      rows: { [SIDE]: released(1, { byTokenHash: overLimits }) },
+    });
+    const second = await launch(first.variant);
+    const third = await launch(first.variant);
+
+    expect(first.loaded.byTokenHash).toEqual(overLimits);
+    for (const run of [first.run, second, third]) {
+      expectEveryToken(run, MINE, overLimits);
+      expect(run.rejections).toEqual([]);
+      expect(run.disk.asyncStorage[SIDE]).toBeUndefined();
+      // Account 0's queue is its own, as E19 saved it.
+      expectEveryToken(run, KEY, fixtureQueue);
+    }
+  });
+
+  it('keeps the queue whole with every value exactly at the limit', async () => {
+    const atLimit = enqueued(
+      `cashuB${longText(60_000 - 'cashuB'.length)}`,
+      `https://${longText(2048 - 'https://'.length)}`,
+      longText(16)
+    );
+    const queue = { ...fixtureQueue, [meshTokenDedupeKey(atLimit.token)]: atLimit };
+    const { run, loaded } = await startWith(KEY, released(1, { byTokenHash: queue }), STORE, {
+      account: 0,
+    });
+
+    expect(run.rejections).toEqual([]);
+    expect(loaded.byTokenHash).toEqual(queue);
+    expect(run.disk.asyncStorage[sideKey(STORE, A0)]).toBeUndefined();
   });
 });
