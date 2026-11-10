@@ -1,0 +1,260 @@
+/**
+ * @jest-environment node
+ *
+ * Characterization of `useOwnEventsSync`, the one live subscription for the
+ * person's own Nostr events. Batches of events are fed through a fake relay
+ * subscription into the real partition and the real profile, social, own
+ * content and own-profile stores. Only the NDK subscription, the keys
+ * provider, the mute-list fetch, the Nostr cache layer and storage are replaced.
+ */
+
+import { act, renderHook } from '@testing-library/react-native';
+
+import { useOwnEventsSync } from '@/shared/lib/nostr/ownsync/useOwnEventsSync';
+import { useProfileStore } from '@/shared/stores/global/profileStore';
+import { useNostrSocialStore } from '@/shared/stores/profile/nostrSocialStore';
+import { useOwnContentStore } from '@/shared/stores/profile/ownContentStore';
+import { useOwnProfileMetadataStore } from '@/shared/stores/profile/ownProfileMetadataStore';
+
+type RawEvent = {
+  id: string;
+  kind: number;
+  pubkey: string;
+  content: string;
+  tags: string[][];
+  created_at: number;
+};
+
+let mockEvents: RawEvent[] = [];
+let mockPubkey: string | undefined;
+const mockSubscribeFilters: unknown[] = [];
+
+jest.mock('@nostr-dev-kit/ndk-mobile', () => ({
+  ...jest.requireActual('@nostr-dev-kit/ndk-mobile'),
+  useSubscribe: ({ filters }: { filters: unknown }) => {
+    mockSubscribeFilters.push(filters);
+    return { events: mockEvents };
+  },
+}));
+jest.mock('@/shared/providers/NostrKeysProvider', () => ({
+  useNostrKeysContext: () => ({ keys: mockPubkey ? { pubkey: mockPubkey } : null }),
+}));
+jest.mock('@/shared/lib/nostr/ownsync/useMuteListSync', () => ({
+  useMuteListSync: () => undefined,
+}));
+jest.mock('@/shared/lib/nostr/buildNostrDataLayer', () => ({ buildNostrDataLayer: () => null }));
+jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({
+  createProfileScopedStorage: () => ({
+    getItem: async () => null,
+    setItem: async () => undefined,
+    removeItem: async () => undefined,
+  }),
+}));
+
+const A = 'a1'.repeat(32);
+const B = 'b2'.repeat(32);
+const T = 1_760_000_000;
+
+const id = (n: number | string) => String(n).padStart(64, '0');
+
+function profileEvent(eventId: string, createdAt: number, name: string, pubkey = A): RawEvent {
+  return {
+    id: eventId,
+    kind: 0,
+    pubkey,
+    content: JSON.stringify({ name }),
+    tags: [],
+    created_at: createdAt,
+  };
+}
+
+function likeEvent(eventId: string, target: string, pubkey = A): RawEvent {
+  return { id: eventId, kind: 7, pubkey, content: '+', tags: [['e', target]], created_at: T };
+}
+
+function activate(pubkey: string, accountIndex: number) {
+  mockPubkey = pubkey;
+  useProfileStore.setState({
+    profiles: [
+      { accountIndex: 0, pubkey: A, addedAt: 1 },
+      { accountIndex: 1, pubkey: B, addedAt: 2 },
+    ],
+    activeAccountIndex: accountIndex,
+  });
+}
+
+function deliver(rerender: () => void, events: RawEvent[]) {
+  mockEvents = events;
+  act(() => rerender());
+}
+
+function latestProfileId(): string | undefined {
+  return useOwnProfileMetadataStore.getState().latest?.eventId;
+}
+
+function cachedName(accountIndex: number): string | undefined {
+  return useProfileStore.getState().profiles.find((p) => p.accountIndex === accountIndex)
+    ?.cachedDisplayName;
+}
+
+function liked(target: string): string | undefined {
+  return useNostrSocialStore.getState().engagementByEventId[target]?.liked?.ownEventId;
+}
+
+function mount() {
+  const view = renderHook(() => useOwnEventsSync());
+  return { ...view, rerender: () => view.rerender({}) };
+}
+
+beforeEach(() => {
+  for (const level of ['debug', 'info', 'warn', 'error', 'log'] as const) {
+    jest.spyOn(console, level).mockImplementation(() => undefined);
+  }
+  mockEvents = [];
+  mockSubscribeFilters.length = 0;
+  activate(A, 0);
+  useOwnProfileMetadataStore.setState({ latest: null });
+  useNostrSocialStore.setState({ engagementByEventId: {} });
+  useOwnContentStore.setState({ byId: {} });
+});
+
+afterEach(() => {
+  jest.restoreAllMocks();
+});
+
+describe('useOwnEventsSync', () => {
+  it('subscribes to every own kind for the last year, live', () => {
+    jest.spyOn(Date, 'now').mockReturnValue(T * 1000);
+    const { unmount } = mount();
+
+    // QUIRK: the one-year `since` is applied to the replaceable kinds 0 and 3 as well, which
+    // relays may honour by returning nothing for an older profile or follow list. A change
+    // to per-kind filters should change this assertion on purpose.
+    expect(mockSubscribeFilters.at(-1)).toEqual([
+      {
+        authors: [A],
+        kinds: [0, 1, 3, 5, 6, 7],
+        since: T - 365 * 24 * 60 * 60,
+        limit: 5000,
+      },
+    ]);
+    unmount();
+  });
+
+  it('asks for nothing without keys', () => {
+    mockPubkey = undefined;
+    const { unmount } = mount();
+
+    expect(mockSubscribeFilters.at(-1)).toBeNull();
+    unmount();
+  });
+
+  it('applies the active account profile and its cached name', () => {
+    const { rerender, unmount } = mount();
+
+    deliver(rerender, [profileEvent(id(1), T, 'Alice')]);
+
+    expect(latestProfileId()).toBe(id(1));
+    expect(cachedName(0)).toBe('Alice');
+    unmount();
+  });
+
+  it('keeps the newest profile when an older one arrives in a later batch', () => {
+    const { rerender, unmount } = mount();
+
+    deliver(rerender, [profileEvent(id(1), T, 'New')]);
+    deliver(rerender, [profileEvent(id(1), T, 'New'), profileEvent(id(2), T - 10, 'Old')]);
+
+    expect(latestProfileId()).toBe(id(1));
+    expect(cachedName(0)).toBe('New');
+    unmount();
+  });
+
+  it('picks the lower id between equal-time profiles in one batch', () => {
+    const { rerender, unmount } = mount();
+
+    deliver(rerender, [profileEvent(id('b'), T, 'B-id'), profileEvent(id('a'), T, 'A-id')]);
+
+    expect(latestProfileId()).toBe(id('a'));
+    unmount();
+  });
+
+  it('ignores an equal-time, lower-id profile that arrives in a later batch', () => {
+    const { rerender, unmount } = mount();
+
+    deliver(rerender, [profileEvent(id('b'), T, 'B-id')]);
+    deliver(rerender, [profileEvent(id('b'), T, 'B-id'), profileEvent(id('a'), T, 'A-id')]);
+
+    // QUIRK: the hook admits only a strictly newer timestamp, so the event that would win in
+    // a single batch is dropped when it comes later; the result depends on batching
+    // (nostr D2). A fix that compares timestamp then id should change this assertion on
+    // purpose.
+    expect(latestProfileId()).toBe(id('b'));
+    expect(cachedName(0)).toBe('B-id');
+    unmount();
+  });
+
+  it('dispatches an event id only once, even when relays deliver it again', () => {
+    const { rerender, unmount } = mount();
+    const like = likeEvent(id(10), 'target-1');
+
+    deliver(rerender, [like]);
+    expect(liked('target-1')).toBe(id(10));
+
+    useNostrSocialStore.setState({ engagementByEventId: {} });
+    deliver(rerender, [like]);
+
+    expect(liked('target-1')).toBeUndefined();
+    unmount();
+  });
+
+  it('records own notes and applies own deletions', () => {
+    const { rerender, unmount } = mount();
+    const note: RawEvent = {
+      id: id(20),
+      kind: 1,
+      pubkey: A,
+      content: 'hello',
+      tags: [],
+      created_at: T,
+    };
+
+    deliver(rerender, [note, likeEvent(id(21), 'target-2')]);
+    expect(useOwnContentStore.getState().byId[id(20)]).toBeDefined();
+    expect(liked('target-2')).toBe(id(21));
+
+    deliver(rerender, [
+      note,
+      { id: id(22), kind: 5, pubkey: A, content: '', tags: [['e', id(21)]], created_at: T + 1 },
+    ]);
+    expect(liked('target-2')).toBeUndefined();
+    unmount();
+  });
+
+  it('does not apply another account profile while this one is active', () => {
+    const { rerender, unmount } = mount();
+
+    deliver(rerender, [profileEvent(id(30), T, 'Bob', B)]);
+
+    expect(latestProfileId()).toBeUndefined();
+    expect(cachedName(1)).toBeUndefined();
+    unmount();
+  });
+
+  it('starts over for a new account, and dispatches its events afresh', () => {
+    const { rerender, unmount } = mount();
+    const like = likeEvent(id(40), 'target-3');
+    deliver(rerender, [like]);
+
+    useNostrSocialStore.setState({ engagementByEventId: {} });
+    activate(B, 1);
+    deliver(rerender, [like]);
+
+    // QUIRK: the hook does not check an event's author; after the account changes, a batch
+    // still holding the previous account's like is ingested for the new one. It relies on
+    // the subscription's `authors` filter (and the app reload on switch). A fix that drops
+    // foreign authors should change this assertion on purpose.
+    expect(liked('target-3')).toBe(id(40));
+    unmount();
+  });
+});
