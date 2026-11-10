@@ -88,15 +88,11 @@ jest.mock('@/shared/hooks/useForegroundFocusEffect', () => ({
       .useFocusEffect(effect),
 }));
 
-jest.mock(
-  '@nostr-dev-kit/ndk-mobile',
-  () => ({
-    __esModule: true,
-    NDKEvent: class NDKEvent {},
-    useNDK: () => ({ ndk: {} }),
-  }),
-  { virtual: true }
-);
+jest.mock('@nostr-dev-kit/ndk-mobile', () => ({
+  __esModule: true,
+  NDKEvent: class NDKEvent {},
+  useNDK: () => ({ ndk: {} }),
+}));
 
 jest.mock('@/shared/providers/NostrKeysProvider', () => ({
   useNostrKeysContext: () => ({

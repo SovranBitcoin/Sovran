@@ -4,20 +4,16 @@
  */
 /* eslint-disable import/first */
 
-jest.mock(
-  '@nostr-dev-kit/ndk-mobile',
-  () => ({
-    __esModule: true,
-    NDKRelay: class NDKRelay {
-      url: string;
-      constructor(url: string) {
-        this.url = url;
-      }
-    },
-    normalizeRelayUrl: (url: string) => url.trim().toLowerCase().replace(/\/+$/, ''),
-  }),
-  { virtual: true }
-);
+jest.mock('@nostr-dev-kit/ndk-mobile', () => ({
+  __esModule: true,
+  NDKRelay: class NDKRelay {
+    url: string;
+    constructor(url: string) {
+      this.url = url;
+    }
+  },
+  normalizeRelayUrl: (url: string) => url.trim().toLowerCase().replace(/\/+$/, ''),
+}));
 
 jest.mock('@/shared/lib/logger', () => ({
   nostrLog: { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() },

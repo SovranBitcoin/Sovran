@@ -23,38 +23,34 @@ const mockListeners = new Set<(state: typeof mockProfile) => void>();
 const mockPublish = jest.fn(async (..._args: unknown[]) => ({ isErr: () => false }));
 let mockEventId = 100;
 
-jest.mock(
-  '@nostr-dev-kit/ndk-mobile',
-  () => ({
-    __esModule: true,
-    default: class {},
-    NDKSubscriptionCacheUsage: { ONLY_RELAY: 'ONLY_RELAY' },
-    NDKRelaySet: {
-      fromRelayUrls: (urls: string[]) => ({
-        relays: new Set(mockRelays.filter((relay) => urls.includes(relay.url))),
-      }),
-    },
-    NDKEvent: class {
-      kind = 10000;
-      pubkey = 'a'.repeat(64);
-      created_at = 10;
-      tags: string[][] = [];
-      content = '';
-      id = 'c'.repeat(64);
-      getEventHash() {
-        return this.id;
-      }
-      verifySignature() {
-        return true;
-      }
-      async sign(signer: { user: () => Promise<{ pubkey: string }> }) {
-        this.pubkey = (await signer.user()).pubkey;
-        this.id = (++mockEventId).toString(16).padStart(64, '0');
-      }
-    },
-  }),
-  { virtual: true }
-);
+jest.mock('@nostr-dev-kit/ndk-mobile', () => ({
+  __esModule: true,
+  default: class {},
+  NDKSubscriptionCacheUsage: { ONLY_RELAY: 'ONLY_RELAY' },
+  NDKRelaySet: {
+    fromRelayUrls: (urls: string[]) => ({
+      relays: new Set(mockRelays.filter((relay) => urls.includes(relay.url))),
+    }),
+  },
+  NDKEvent: class {
+    kind = 10000;
+    pubkey = 'a'.repeat(64);
+    created_at = 10;
+    tags: string[][] = [];
+    content = '';
+    id = 'c'.repeat(64);
+    getEventHash() {
+      return this.id;
+    }
+    verifySignature() {
+      return true;
+    }
+    async sign(signer: { user: () => Promise<{ pubkey: string }> }) {
+      this.pubkey = (await signer.user()).pubkey;
+      this.id = (++mockEventId).toString(16).padStart(64, '0');
+    }
+  },
+}));
 jest.mock('@/shared/stores/global/profileStore', () => ({
   useProfileStore: {
     getState: () => mockProfile,

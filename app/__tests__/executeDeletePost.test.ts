@@ -47,21 +47,17 @@ jest.mock('@/shared/providers/NostrKeysProvider', () => ({
   useNostrKeysContext: () => ({ keys: null }),
 }));
 jest.mock('nostr-tools/kinds', () => ({ __esModule: true, EventDeletion: 5 }));
-jest.mock(
-  '@nostr-dev-kit/ndk-mobile',
-  () => ({
-    __esModule: true,
-    default: class {},
-    NDKEvent: class {
-      kind = 0;
-      content = '';
-      created_at = 0;
-      tags: string[][] = [];
-    },
-    useNDK: () => ({ ndk: {} }),
-  }),
-  { virtual: true }
-);
+jest.mock('@nostr-dev-kit/ndk-mobile', () => ({
+  __esModule: true,
+  default: class {},
+  NDKEvent: class {
+    kind = 0;
+    content = '';
+    created_at = 0;
+    tags: string[][] = [];
+  },
+  useNDK: () => ({ ndk: {} }),
+}));
 jest.mock('@/shared/lib/logger', () => ({
   __esModule: true,
   nostrLog: { info: jest.fn(), warn: jest.fn(), debug: jest.fn() },
