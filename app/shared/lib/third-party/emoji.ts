@@ -31,10 +31,17 @@ function fromVariationSelector(codePoint: number): number | null {
   }
 }
 
+// VS16, the emoji presentation selector many picker emojis carry. Left in the
+// carrier, a decoder reads it as byte 0x0F; inside a ZWJ or keycap sequence it
+// also ends the run before the payload starts.
+const EMOJI_PRESENTATION_SELECTOR = String.fromCodePoint(VARIATION_SELECTOR_END);
+
 export function encode(emoji: string, text: string): string {
   // convert the string to utf-8 bytes
   const bytes = new TextEncoder().encode(text);
-  let encoded = emoji;
+  // The carrier keeps no selector of its own, so the payload's selectors are
+  // the first run any decoder of this scheme meets.
+  let encoded = emoji.split(EMOJI_PRESENTATION_SELECTOR).join('');
 
   for (const byte of bytes) {
     encoded += toVariationSelector(byte);
@@ -43,12 +50,17 @@ export function encode(emoji: string, text: string): string {
   return encoded;
 }
 
-export function decode(text: string): string {
+function decodeBytes(text: string, skipCarrierSelectors: boolean): Uint8Array {
   let decoded = [];
   const chars = Array.from(text);
 
   for (const char of chars) {
-    const byte = fromVariationSelector(char.codePointAt(0)!);
+    const codePoint = char.codePointAt(0)!;
+    // Before the payload starts, a VS16 belongs to the carrier emoji.
+    if (skipCarrierSelectors && decoded.length === 0 && codePoint === VARIATION_SELECTOR_END) {
+      continue;
+    }
+    const byte = fromVariationSelector(codePoint);
 
     if (byte === null && decoded.length > 0) {
       break;
@@ -59,8 +71,23 @@ export function decode(text: string): string {
     decoded.push(byte);
   }
 
-  let decodedArray = new Uint8Array(decoded);
-  return new TextDecoder().decode(decodedArray);
+  return new Uint8Array(decoded);
+}
+
+/**
+ * Read the text hidden after the carrier emoji.
+ *
+ * With `isToken`, a result that is not a token is read once more without the
+ * carrier emoji's own VS16 selectors, which the 0.1.3 encoder left in front of
+ * the payload (a leading 0x0F, or a run cut short inside a ZWJ or keycap
+ * sequence). That reading is used only when `isToken` accepts it whole;
+ * otherwise the first reading stands.
+ */
+export function decode(text: string, isToken?: (decoded: string) => boolean): string {
+  const decoded = new TextDecoder().decode(decodeBytes(text, false));
+  if (!isToken || isToken(decoded)) return decoded;
+  const repaired = new TextDecoder().decode(decodeBytes(text, true));
+  return repaired !== decoded && isToken(repaired) ? repaired : decoded;
 }
 
 export function isEncoded(text: string): boolean {

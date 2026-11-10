@@ -222,4 +222,5 @@ old cache file.
 reader's limit, in 0.1.0 to 0.1.3 and today: `T/releasedWriterBounds.test.ts`, F191, F192; the redeem queue is F174.
 
 **What 0.1.3 and this build do not read of each other's messages** is in `.surgery/pass-1/surveys/wire-formats.md`:
-F193 (a 0.1.3 payment to a Nostr payment request), F194 (emoji tokens), F199 (Nut Drop).
+F193 (a 0.1.3 payment to a re-encoded Nostr payment request after a restart), F199 (Nut Drop).
+Tokens 0.1.3 copied as an emoji now paste.

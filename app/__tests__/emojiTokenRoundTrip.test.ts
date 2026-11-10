@@ -1,6 +1,6 @@
 /** @jest-environment node */
 import { Amount, getEncodedToken } from '@cashu/cashu-ts';
-import { defaultDetectors, parsePaymentInput } from 'wallet';
+import { defaultDetectors, isValidEcashToken, parsePaymentInput } from 'wallet';
 
 import { CATEGORIES } from '@/shared/lib/popup/popups/emojiData';
 import { decode, encode, isEncoded } from '@/shared/lib/third-party/emoji';
@@ -12,8 +12,8 @@ import { decode, encode, isEncoded } from '@/shared/lib/third-party/emoji';
  * emojiPicker.tsx: the picker's answer is an option whose id is the emoji).
  * Pasting reads the clipboard as the scan source does
  * (features/send/lib/sovranPaymentConfig.ts, `createSovranScanSources`:
- * `isEncoded(rawText) ? decode(rawText) : rawText`) and hands the text to the
- * wallet's input parser.
+ * `isEncoded(rawText) ? decode(rawText, isValidEcashToken) : rawText`) and
+ * hands the text to the wallet's input parser.
  */
 
 const TOKEN = getEncodedToken({
@@ -35,10 +35,30 @@ const PICKER = [...new Set(CATEGORIES.flatMap((category) => category.emojis.map(
 const plain = PICKER.filter((emoji) => !emoji.includes(VS16));
 const withVs16 = PICKER.filter((emoji) => emoji.includes(VS16));
 
+/**
+ * The 0.1.3 encoder, copied (app/shared/lib/third-party/emoji.ts at d9ad12c4b):
+ * the carrier exactly as picked, then one variation selector per UTF-8 byte.
+ * Tokens already sent were copied with this.
+ */
+function encodeAs013(emoji: string, text: string): string {
+  let encoded = emoji;
+  for (const byte of new TextEncoder().encode(text)) {
+    encoded += String.fromCodePoint(byte < 16 ? 0xfe00 + byte : 0xe0100 + byte - 16);
+  }
+  return encoded;
+}
+
 /** What a paste of the copied text gives the wallet. */
 function paste(copied: string) {
-  const text = isEncoded(copied) ? decode(copied) : copied;
+  const text = isEncoded(copied) ? decode(copied, isValidEcashToken) : copied;
   return { text, parsed: parsePaymentInput(text, defaultDetectors) };
+}
+
+function failuresOf(emojis: string[], copy: (emoji: string) => string) {
+  return emojis.filter((emoji) => {
+    const { text, parsed } = paste(copy(emoji));
+    return text !== TOKEN || parsed.type !== 'payment';
+  });
 }
 
 describe('a token copied as an emoji', () => {
@@ -55,30 +75,44 @@ describe('a token copied as an emoji', () => {
     });
   });
 
-  it('round-trips with every emoji that has no U+FE0F, and pastes as a payment', () => {
-    const failures = plain.filter((emoji) => {
-      const { text, parsed } = paste(encode(emoji, TOKEN));
-      return text !== TOKEN || parsed.type !== 'payment';
-    });
+  it('round-trips with every emoji the picker offers, and pastes as a payment', () => {
+    const failures = failuresOf(PICKER, (emoji) => encode(emoji, TOKEN));
+    expect({ tried: PICKER.length, failures }).toEqual({ tried: 1341, failures: [] });
+  });
+
+  it('copies without the carrier’s own U+FE0F, so a decoder that stops at the carrier reads it', () => {
+    for (const emoji of withVs16) {
+      const copied = encode(emoji, TOKEN);
+      expect(copied.startsWith(emoji.replaceAll(VS16, ''))).toBe(true);
+      expect(copied.includes(VS16)).toBe(false);
+      // The decoder as cashu.me and 0.1.3 have it, with no repair.
+      expect(decode(copied)).toBe(TOKEN);
+    }
+  });
+
+  it('pastes a token 0.1.3 copied with any emoji that has U+FE0F', () => {
+    const failures = failuresOf(withVs16, (emoji) => encodeAs013(emoji, TOKEN));
+    expect({ tried: withVs16.length, failures }).toEqual({ tried: 212, failures: [] });
+  });
+
+  it('still pastes a token 0.1.3 copied with any other emoji', () => {
+    const failures = failuresOf(plain, (emoji) => encodeAs013(emoji, TOKEN));
     expect({ tried: plain.length, failures }).toEqual({ tried: 1129, failures: [] });
   });
 
-  it('does not round-trip with any emoji that has U+FE0F', () => {
-    const outcomes = withVs16.map((emoji) => {
-      const { text, parsed } = paste(encode(emoji, TOKEN));
-      return {
-        emoji,
-        roundTrips: text === TOKEN,
-        startsWithU000F: text.startsWith('\u000F'),
-        type: parsed.type,
-      };
-    });
-    // QUIRK: `decode` reads the carrier's own U+FE0F as byte 0x0F, so the pasted
-    // text starts with U+000F, the parser sees no token, and a bearer token sent
-    // this way cannot be pasted back. Same at 0.1.3.
-    expect(outcomes.filter((each) => each.roundTrips)).toEqual([]);
-    expect(outcomes.filter((each) => !each.startsWithU000F)).toEqual([]);
-    expect(outcomes.filter((each) => each.type !== 'unknown')).toEqual([]);
-    expect(outcomes).toHaveLength(212);
+  it('leaves hidden text that is not a token as the decoder reads it today', () => {
+    for (const emoji of ['🛡️', '❤️‍🔥', '1️⃣', '🥜']) {
+      const old = encodeAs013(emoji, 'hello');
+      expect(paste(old).text).toBe(decode(old));
+    }
+    // A payload that really starts with byte 0x0F.
+    for (const copied of [encode('🥜', '\u000Fnot a token'), encode('🛡️', '\u000Fnot a token')]) {
+      expect(paste(copied).text).toBe('\u000Fnot a token');
+    }
+  });
+
+  it('leaves plain text with an ordinary emoji untouched', () => {
+    expect(paste('thanks 🥜').text).toBe('thanks 🥜');
+    expect(paste(`${TOKEN} 🥜`).text).toBe(`${TOKEN} 🥜`);
   });
 });

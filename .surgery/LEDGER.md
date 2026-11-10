@@ -215,7 +215,7 @@ of these helps a downgrade: older builds keep their limits.
 | 7   | `nostr-relay-list-store`: lists over 64 are read; the limit applies to every way of adding; a long list stays editable                                                                                  | F192      | Read side tried                                                          | Sound, with all growth paths capped                                         |
 | 8   | `search-history-store`: long searches are read; new ones capped                                                                                                                                         | F192      | Tried                                                                    | Sound                                                                       |
 | 9   | `mint-metadata-store`: an over-long name, icon or description is read as absent for that mint                                                                                                           | F192      | Tried                                                                    | Sound but narrow: other fields can still reject                             |
-| 10  | Emoji tokens: strip the emoji's own U+FE0F before encoding; on decode try as today, then without the leading byte only if the rest is a whole valid token                                               | F194      | Decode side tried in simple form                                         | Sound in that shape; cashu.me reads the new output, other wallets unchecked |
+| 10  | Emoji tokens: strip the emoji's own U+FE0F before encoding; on decode try as today, then without the leading byte only if the rest is a whole valid token                                               | fixed     | Built; carriers with a ZWJ or keycap handled too                         | Sound in that shape; cashu.me reads the new output, other wallets unchecked |
 | 11  | Keep the whole `sovran:` namespace out of BitChat chat, in JavaScript and both native bridges, while still delivering it to the payment handlers                                                        | F195      | Not tried                                                                | Sound, but a person can type `sovran:hello`: a product call                 |
 | 12  | `wallet-lifecycle`: an over-long restore error is read as null                                                                                                                                          | F192      | Tried                                                                    | Not reviewed separately                                                     |
 
@@ -225,8 +225,8 @@ found safe to delete.
 
 ### Open findings from this pass
 
-F191 to F199 in `docs/follow-ups/`. Money first: F193 (0.1.3 payments to a Nostr request sit in the sender's pending
-send), F174 (redeem queue), F191 (account list), F194 (emoji tokens), F197 (relay hints Sovran does not read; partly
+F191 to F193 and F195 to F199 in `docs/follow-ups/`. Money first: F193 (0.1.3 payments to a Nostr request sit in the sender's pending
+send), F174 (redeem queue), F191 (account list), F197 (relay hints Sovran does not read; partly
 inferred).
 
 ### Not verified in pass 1
