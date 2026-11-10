@@ -1305,6 +1305,18 @@ export function createPaymentMachine(
             getSatsPerUnitMinor,
           );
 
+      if ("kind" in result) {
+        // No transition: keep the step and its data, dispatch nothing.
+        logger.info("machine.event.unhandled", {
+          type: event.type,
+          currentStep: step,
+        });
+        if (!isStaleGeneration(sendGeneration, "transition.unchanged")) {
+          sendLocked = false;
+          notify();
+        }
+        return;
+      }
       flowCtx = result.context;
       setStep(result.step, result.data);
       if (step !== prevStep) {
@@ -1467,6 +1479,8 @@ export function createPaymentMachine(
                 enableEcashSendMemo,
                 getSatsPerUnitMinor,
               );
+              // This event always moves to a step; "unchanged" is not reached.
+              if ("kind" in r) break;
               flowCtx = r.context;
               flowCtx.source = "nfc";
               setStep(r.step, r.data);
@@ -1551,6 +1565,8 @@ export function createPaymentMachine(
                 enableEcashSendMemo,
                 getSatsPerUnitMinor,
               );
+              // This event always moves to a step; "unchanged" is not reached.
+              if ("kind" in r) break;
               flowCtx = r.context;
               flowCtx.source = "nfc";
               setStep(r.step, r.data);
@@ -1581,6 +1597,8 @@ export function createPaymentMachine(
                 enableEcashSendMemo,
                 getSatsPerUnitMinor,
               );
+              // This event always moves to a step; "unchanged" is not reached.
+              if ("kind" in r) break;
               flowCtx = r.context;
               flowCtx.source = "nfc";
               setStep(r.step, r.data);
@@ -1647,6 +1665,8 @@ export function createPaymentMachine(
                   enableEcashSendMemo,
                   getSatsPerUnitMinor,
                 );
+                // This event always moves to a step; "unchanged" is not reached.
+                if ("kind" in r) break;
                 flowCtx = r.context;
                 flowCtx.source = "nfc";
                 setStep(r.step, r.data);

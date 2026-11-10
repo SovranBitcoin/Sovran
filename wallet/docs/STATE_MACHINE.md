@@ -272,6 +272,10 @@ send(event)
         -> resolveNext(intent, ctx, walletCtx) | resolveFromContext(ctx, walletCtx)
         -> stamp offline onto every result.context
         -> {step, context, data}
+        -> or {kind:'unchanged'} when the step does not handle the event
+           (a stray PROOFS_CHOSEN / SEND_MEMO_SUBMITTED, MINT_TRUSTED with no
+           review token, a CONFIRM_* off its step): step, data and context
+           stay, nothing is dispatched, sendLocked released
   -> setStep(step, data); flowCtx = merged context
   -> if step is confirmSend/createMintQuote AND operations present:
         intercept -> run async effect -> setStep(result | error)

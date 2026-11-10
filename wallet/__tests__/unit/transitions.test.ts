@@ -47,7 +47,11 @@
 
 import { describe, it, expect } from 'vitest';
 import { PaymentRequest } from '@cashu/cashu-ts';
-import { transition, type TransitionResult } from '../../src/machine/transitions';
+import {
+  transition,
+  type TransitionResult,
+  type Unchanged,
+} from '../../src/machine/transitions';
 import { defaultDetectors } from '../../src/detectors';
 import { parsePaymentInput } from '../../src/parse';
 import { deriveMintMethodCapabilityMapFromTrustedMints } from '../../src/mint-capabilities';
@@ -72,6 +76,22 @@ function tx(
     getSatsPerUnitMinor?: (unit: string) => number | null;
   }
 ): TransitionResult {
+  const result = txOutcome(step, ctx, event, wallet, opts);
+  if ('kind' in result) throw new Error(`no transition for ${event.type} on ${step}`);
+  return result;
+}
+
+/** Like `tx`, for events that may leave the step unchanged. */
+function txOutcome(
+  step: FlowStep,
+  ctx: FlowContext,
+  event: FlowEvent,
+  wallet: WalletContext = WALLETS.default,
+  opts?: {
+    unit?: string;
+    getSatsPerUnitMinor?: (unit: string) => number | null;
+  }
+): TransitionResult | Unchanged {
   return transition(
     step,
     ctx,
@@ -536,22 +556,23 @@ describe('transition — event gating', () => {
     // A stray/double-fired proofs callback mid-flow must not supersede the
     // current step (previously it dereferenced ctx.mintUrl! and forced a
     // bogus confirmSend/error state).
-    const result = tx(
+    const result = txOutcome(
       'enterAmount',
       { ...idle },
       { type: 'PROOFS_CHOSEN', amount: 100 }
     );
-    expect(result.step).toBe('enterAmount');
+    expect(result).toEqual({ kind: 'unchanged' });
   });
 
   it('ignores SEND_MEMO_SUBMITTED outside the enterSendMemo step', () => {
-    const result = tx(
+    const ctx: FlowContext = { ...idle, amount: 100, mintUrl: MINT1 };
+    const result = txOutcome(
       'enterAmount',
-      { ...idle, amount: 100, mintUrl: MINT1 },
+      ctx,
       { type: 'SEND_MEMO_SUBMITTED', memo: 'hello' }
     );
-    expect(result.step).toBe('enterAmount');
-    expect(result.context.memo).toBeUndefined();
+    expect(result).toEqual({ kind: 'unchanged' });
+    expect(ctx.memo).toBeUndefined();
   });
 
   it('keeps the full constraint set on the AMOUNT_ENTERED unit-mismatch recovery', () => {
@@ -926,8 +947,8 @@ describe('transition — MINT_TRUSTED', () => {
   it('stays on current step when no reviewToken', () => {
     // Edge case: MINT_TRUSTED without a reviewToken. The machine has
     // nothing to continue with, so it stays on reviewMint.
-    const result = tx('reviewMint', idle, { type: 'MINT_TRUSTED' });
-    expect(result.step).toBe('reviewMint');
+    const result = txOutcome('reviewMint', idle, { type: 'MINT_TRUSTED' });
+    expect(result).toEqual({ kind: 'unchanged' });
   });
 });
 
@@ -1688,10 +1709,9 @@ describe('transition — OPTION_CHOSEN', () => {
 describe('transition — unhandled events', () => {
   it('returns current state for CONFIRM_MELT in transition (handled by createMachine)', () => {
     const ctx: FlowContext = { ...idle, mintUrl: MINT1 };
-    const result = tx('navigateToMeltPreview', ctx, { type: 'CONFIRM_MELT' });
-    // Same step, same context — event was not handled at this level
-    expect(result.step).toBe('navigateToMeltPreview');
-    expect(result.context).toBe(ctx);
+    const result = txOutcome('navigateToMeltPreview', ctx, { type: 'CONFIRM_MELT' });
+    // Not handled at this level: step, data and context stay as they are
+    expect(result).toEqual({ kind: 'unchanged' });
   });
 });
 

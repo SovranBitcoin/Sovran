@@ -73,3 +73,47 @@ describe('CONFIRM_MELT on a mint-less selectMint step (BTC-09)', () => {
     ).toBeUndefined();
   });
 });
+
+describe('Pay on a still-mounted preview after the machine moved to error', () => {
+  const RECIPIENT = 'cd'.repeat(32);
+
+  // QUIRK: BTC-09 says a confirm tap must never be dropped silently, but here
+  // it is. A Lightning-address melt failed, the person dismissed the
+  // npub.cash fallback (step `error`, MELT_FAILED), then tapped Pay on the
+  // preview that is still on screen. The machine is not on the preview, so
+  // the tap runs nothing and shows nothing; the error keeps its code and
+  // message. Whether that tap should retry the payment, reopen the preview or
+  // show the error again is a product choice, not settled here.
+  it('runs nothing and keeps the error as it was', async () => {
+    let attempts = 0;
+    const tm = createTestMachine({
+      operations: {
+        executeMelt: async () => {
+          attempts += 1;
+          throw new Error('LNURL invoice fetch failed');
+        },
+        npcAddressForPubkey: () => 'npub1recipient@npubx.cash',
+      },
+    });
+    await tm.machine.execute(INPUTS.lightningAddress, { reset: true });
+    await tm.machine.enterAmount({ value: 200, unit: 'sat' }, MINT1, {
+      recipientPubkey: RECIPIENT,
+    });
+    await tm.machine.confirmMelt();
+    tm.assertStep('chooseSendFallback');
+    await tm.machine.chooseSendFallback(null);
+    tm.assertStep('error');
+    const handlerCalls = tm.handlerCalls.length;
+
+    await tm.machine.confirmMelt();
+
+    expect(attempts).toBe(1);
+    tm.assertStep('error');
+    expect(tm.handlerCalls).toHaveLength(handlerCalls);
+    expect(tm.machine.inspect()).toMatchObject({
+      status: 'blocked',
+      code: 'MELT_FAILED',
+      message: 'LNURL invoice fetch failed',
+    });
+  });
+});

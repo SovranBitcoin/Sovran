@@ -27,6 +27,17 @@ export interface TransitionResult {
   data: StepResult["data"];
 }
 
+/**
+ * No transition: the event means nothing on the current step. The machine
+ * leaves step, data and context as they are and dispatches nothing, as it
+ * does for an effect's `{ kind: 'stale' }`.
+ */
+export interface Unchanged {
+  kind: "unchanged";
+}
+
+const UNCHANGED: Unchanged = { kind: "unchanged" };
+
 function apply(result: StepResult, ctx: FlowContext): TransitionResult {
   const merged = result.contextPatch ? { ...ctx, ...result.contextPatch } : ctx;
   return { step: result.step, context: merged, data: result.data };
@@ -711,7 +722,7 @@ export function transition(
   /** See `CreateMachineConfig.getSatsPerUnitMinor` — re-denominates scanned
    *  fixed sat amounts into the active unit at seeding time. */
   getSatsPerUnitMinor?: (unit: string) => number | null,
-): TransitionResult {
+): TransitionResult | Unchanged {
   function stamp(result: TransitionResult): TransitionResult {
     if (offline != null) result.context.offline = offline;
     return result;
@@ -789,7 +800,7 @@ export function transition(
           data: { token },
         });
       }
-      return stamp({ step: currentStep, context: currentCtx, data: {} as any });
+      return UNCHANGED;
     }
   }
 
@@ -822,7 +833,7 @@ export function transition(
           currentStep,
           amount: event.amount,
         });
-        return stamp({ step: currentStep, context: currentCtx, data: {} as any });
+        return UNCHANGED;
       }
       return stamp(
         handleProofsChosen(event, currentCtx, walletCtx, enableEcashSendMemo),
@@ -831,12 +842,12 @@ export function transition(
       // Same gating: only the memo prompt's own step may consume it (BTC-12).
       if (currentStep !== "enterSendMemo") {
         logger.warn("transitions.sendMemoSubmitted.wrongStep", { currentStep });
-        return stamp({ step: currentStep, context: currentCtx, data: {} as any });
+        return UNCHANGED;
       }
       return stamp(handleSendMemoSubmitted(event, currentCtx));
   }
 
   // Unhandled events (e.g. CONFIRM_MELT, CONFIRM_PAYMENT_REQUEST that
-  // bypassed their guard in createMachine.ts) — return current state.
-  return stamp({ step: currentStep, context: currentCtx, data: {} as any });
+  // bypassed their guard in createMachine.ts).
+  return UNCHANGED;
 }
