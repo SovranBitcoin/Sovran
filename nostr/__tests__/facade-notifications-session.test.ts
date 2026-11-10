@@ -207,6 +207,51 @@ describe('notifications session', () => {
     session.close();
   });
 
+  it('a failed older page leaves the source to be asked again from the same cursor', async () => {
+    const nagg = source('nagg', [
+      answered(bundle([flatItem('n1', 'alice', 'reply', 30)], { createdAt: 30, id: 'n1' })),
+      failed({ type: 'network', message: 'timed out', cause: undefined }),
+      answered(bundle([flatItem('n2', 'bob', 'reply', 10)], null)),
+    ]);
+    const timers = manualTimers();
+    const session = createNotificationsSession({
+      request: REQUEST,
+      sources: [nagg],
+      scheduleAfter: timers.scheduleAfter,
+    });
+    await session.firstPage();
+
+    await session.loadMore(); // fails
+    expect(session.hasMore()).toBe(true);
+
+    const more = await session.loadMore(); // tried again, answers with the end
+    expect(nagg.requests).toHaveLength(3);
+    expect(nagg.requests[2]?.cursor).toEqual({ createdAt: 30, id: 'n1' });
+    expect(more.notifications.map((n) => n.event.id)).toEqual(['n1', 'n2']);
+    // A real end of history (null cursor) is what ends paging.
+    expect(session.hasMore()).toBe(false);
+    session.close();
+  });
+
+  it('a source that cannot page at all stops being asked', async () => {
+    const nagg = source('nagg', [
+      answered(bundle([flatItem('n1', 'alice', 'reply', 30)], { createdAt: 30, id: 'n1' })),
+      unsupported(),
+    ]);
+    const timers = manualTimers();
+    const session = createNotificationsSession({
+      request: REQUEST,
+      sources: [nagg],
+      scheduleAfter: timers.scheduleAfter,
+    });
+    await session.firstPage();
+    await session.loadMore();
+    expect(session.hasMore()).toBe(false);
+    await session.loadMore();
+    expect(nagg.requests).toHaveLength(2);
+    session.close();
+  });
+
   it('serves an artificial pool-only page when all sources are exhausted', async () => {
     const nagg = source('nagg', [
       answered(bundle([flatItem('n1', 'alice', 'reply', 30)], null)), // null cursor → exhausted

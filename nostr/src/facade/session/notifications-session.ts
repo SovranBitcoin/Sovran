@@ -301,6 +301,10 @@ export function createNotificationsSession(
         const state = per.get(source.tier)!;
         const outcome = await source.fetch(sourceRequest(state.cursor));
         if (closed) return;
+        // A failed page (timeout, network, a 5xx) says nothing about the end
+        // of history: keep the cursor so the next loadMore asks again, as the
+        // feed pager does. Only a source that cannot page at all stops.
+        if (outcome.kind === 'failed') return;
         if (outcome.kind !== 'answered') {
           state.exhausted = true;
           return;
