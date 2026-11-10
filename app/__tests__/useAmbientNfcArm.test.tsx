@@ -58,6 +58,9 @@ jest.mock('@/shared/stores/runtime/clearPaymentContext', () => ({
   clearPaymentContext: jest.fn(),
 }));
 
+/** A store payload of the loose shape these cases need. */
+const loose = (value: object): never => value as never;
+
 const appStateListeners: ((state: string) => void)[] = [];
 let originalOS: typeof Platform.OS;
 
@@ -109,7 +112,7 @@ beforeEach(() => {
   jest.mocked(isNfcEnabled).mockResolvedValue(true);
   usePopupStore.setState({ current: null, isOpen: false });
   useNfcTapStore.setState({ armed: false, phase: 'armed' });
-  useSwapStatusStore.setState({ active: null } as never);
+  useSwapStatusStore.setState(loose({ active: null }));
 });
 
 afterEach(() => {
@@ -181,7 +184,7 @@ describe('arming', () => {
   });
 
   it('pauses without clearing anything while another popup is up, and resumes after it closes', async () => {
-    usePopupStore.setState({ current: { message: 'Pick a mint' } as never, isOpen: true });
+    usePopupStore.setState({ current: loose({ message: 'Pick a mint' }), isOpen: true });
     const { scan } = heldScan();
     renderHook(() => useAmbientNfcArm({ scan }));
     await flush(3_000);
@@ -195,7 +198,7 @@ describe('arming', () => {
   });
 
   it('keeps scanning while its own tap sheet is up', async () => {
-    usePopupStore.setState({ current: { sheetId: 'nfc-tap', payload: {} } as never, isOpen: true });
+    usePopupStore.setState({ current: loose({ sheetId: 'nfc-tap', payload: {} }), isOpen: true });
     const { scan } = heldScan();
     renderHook(() => useAmbientNfcArm({ scan }));
     await flush();
@@ -204,7 +207,7 @@ describe('arming', () => {
   });
 
   it('keeps scanning while a swap is running', async () => {
-    useSwapStatusStore.setState({ active: { state: 'running' } } as never);
+    useSwapStatusStore.setState(loose({ active: { state: 'running' } }));
     const { scan } = heldScan();
     renderHook(() => useAmbientNfcArm({ scan }));
     await flush();
@@ -248,7 +251,7 @@ describe('a tag arriving', () => {
   it('does not cover another popup', async () => {
     renderHook(() => useAmbientNfcArm({ scan: heldScan().scan }));
     await flush();
-    usePopupStore.setState({ current: { message: 'Other' } as never, isOpen: true });
+    usePopupStore.setState({ current: loose({ message: 'Other' }), isOpen: true });
 
     tagArrives();
 
@@ -259,7 +262,7 @@ describe('a tag arriving', () => {
   it('stops reopening the sheet once it was dismissed, until the wallet is focused again', async () => {
     renderHook(() => useAmbientNfcArm({ scan: heldScan().scan }));
     await flush();
-    act(() => usePopupStore.setState({ current: { sheetId: 'nfc-tap', payload: {} } as never }));
+    act(() => usePopupStore.setState({ current: loose({ sheetId: 'nfc-tap', payload: {} }) }));
     act(() => usePopupStore.setState({ current: null }));
 
     tagArrives();
@@ -278,7 +281,7 @@ describe('disarming', () => {
     const { scan } = heldScan();
     renderHook(() => useAmbientNfcArm({ scan }));
     await flush();
-    usePopupStore.setState({ current: { sheetId: 'nfc-tap', payload: {} } as never, isOpen: true });
+    usePopupStore.setState({ current: loose({ sheetId: 'nfc-tap', payload: {} }), isOpen: true });
     useNfcTapStore.setState({ phase: 'reading' });
 
     act(() => mockFocus.blur!());
@@ -292,7 +295,7 @@ describe('disarming', () => {
   it('leaves another popup alone on blur', async () => {
     renderHook(() => useAmbientNfcArm({ scan: heldScan().scan }));
     await flush();
-    usePopupStore.setState({ current: { message: 'Other' } as never, isOpen: true });
+    usePopupStore.setState({ current: loose({ message: 'Other' }), isOpen: true });
 
     act(() => mockFocus.blur!());
 
