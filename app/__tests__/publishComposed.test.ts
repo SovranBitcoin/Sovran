@@ -5,25 +5,21 @@
  */
 /* eslint-disable import/first */
 
-jest.mock(
-  '@nostr-dev-kit/ndk-mobile',
-  () => ({
-    __esModule: true,
-    default: class NDK {},
-    NDKEvent: class NDKEvent {
-      kind = 0;
-      content = '';
-      created_at = 0;
-      tags: string[][] = [];
-      id = 'signed-evt-id';
-      pubkey = 'me-pubkey';
-      sign = jest.fn(async () => {});
-    },
-    normalizeRelayUrl: (url: string) => url,
-    useNDK: () => ({ ndk: null }),
-  }),
-  { virtual: true }
-);
+jest.mock('@nostr-dev-kit/ndk-mobile', () => ({
+  __esModule: true,
+  default: class NDK {},
+  NDKEvent: class NDKEvent {
+    kind = 0;
+    content = '';
+    created_at = 0;
+    tags: string[][] = [];
+    id = 'signed-evt-id';
+    pubkey = 'me-pubkey';
+    sign = jest.fn(async () => {});
+  },
+  normalizeRelayUrl: (url: string) => url,
+  useNDK: () => ({ ndk: null }),
+}));
 
 jest.mock('@/shared/lib/logger', () => ({
   nostrLog: { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() },

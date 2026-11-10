@@ -26,8 +26,9 @@ jest.mock(
         };
       }
     },
-  }),
-  { virtual: true }
+  })
+  // Not `virtual`: the module is mapped to a stub file, and a virtual mock of
+  // it is dropped when another suite in the same worker loaded the stub first.
 );
 jest.mock('@/shared/stores/global/settingsStore', () => ({
   useSettingsStore: { getState: () => ({ mockMode }) },
