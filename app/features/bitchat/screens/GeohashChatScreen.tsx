@@ -10,7 +10,7 @@ import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
  * DM modes mount the shared `<DmChatHeader>`.
  */
 
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Stack } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 
@@ -63,6 +63,14 @@ interface GeohashChatScreenProps {
   dmNickname?: string;
   onBack?: () => void;
 }
+
+/**
+ * Failed Bluetooth DMs already retried in this app session, by message id. A
+ * retry sends the text again as a new message with its own status and its own
+ * retry, so the failed one is retried once. Module scope, so leaving and
+ * reopening the chat does not offer it again.
+ */
+const retriedBleDmIds = new Set<string>();
 
 export function GeohashChatScreen({
   geohash,
@@ -130,6 +138,7 @@ export function GeohashChatScreen({
   const ownPubkey = useNostrKeysContext().keys?.pubkey;
 
   const handleBack = onBack ?? (() => router.back());
+  const [retriedIds, setRetriedIds] = useState<ReadonlySet<string>>(() => new Set(retriedBleDmIds));
 
   const bubbleMessages = useMemo<ChatBubbleMessage[]>(
     () =>
@@ -314,8 +323,13 @@ export function GeohashChatScreen({
                 // token in `bubbleMessages`).
                 const original = messages.find((src) => src.id === m.id);
                 const handleRetry =
-                  m.deliveryStatus === 'failed' && original
+                  m.deliveryStatus === 'failed' && original && !retriedIds.has(m.id)
                     ? () => {
+                        // A second tap can land before the bubble re-renders
+                        // without its retry.
+                        if (retriedBleDmIds.has(m.id)) return;
+                        retriedBleDmIds.add(m.id);
+                        setRetriedIds(new Set(retriedBleDmIds));
                         bitchatLog.info('bitchat.screen.ble_dm_retry', {
                           messageID: m.id,
                         });
