@@ -135,7 +135,10 @@ describe('prepareBolt11MintQuote', () => {
 
     await expect(prepareBolt11MintQuote(coco.asManager, MINT, 21)).rejects.toBe(refused);
 
-    expect(coco.manager.ops.mint.prepare).toHaveBeenCalledWith({ quote: coco.mintQuote, amount: 21 });
+    expect(coco.manager.ops.mint.prepare).toHaveBeenCalledWith({
+      quote: coco.mintQuote,
+      amount: 21,
+    });
     expect(reportCocoApiFailure).toHaveBeenCalledWith(
       'quotes.mint.create/ops.mint.prepare',
       refused,
