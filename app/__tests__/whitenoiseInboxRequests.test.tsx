@@ -260,6 +260,17 @@ describe('each incoming gift wrap', () => {
     expect(await AsyncStorage.getItem(CURSOR_KEY)).toBe('{"v":1,"d":1700}');
   });
 
+  it('does not move a saved cursor it could not read', async () => {
+    await AsyncStorage.setItem(CURSOR_KEY, '{"v":1,"d":2000}');
+    jest.mocked(AsyncStorage.getItem).mockRejectedValueOnce(new Error('storage closed'));
+    const { deliver } = await started();
+
+    await deliver(giftWrap('old', 1_000));
+
+    // The backfill replays older wraps; the unread cursor may be newer than any of them.
+    expect(await AsyncStorage.getItem(CURSOR_KEY)).toBe('{"v":1,"d":2000}');
+  });
+
   it('never moves the cursor backwards', async () => {
     await AsyncStorage.setItem(CURSOR_KEY, '{"v":1,"d":2000}');
     const { deliver } = await started();

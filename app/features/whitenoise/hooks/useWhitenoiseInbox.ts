@@ -56,6 +56,9 @@ export function useWhitenoiseInbox() {
     // ingest events can update the persisted cursor without racing each
     // other on the AsyncStorage write.
     let cursorHighSec = 0;
+    // Set when the saved cursor could not be read: it may be newer than
+    // anything the backfill delivers, so it is left alone this session.
+    let cursorUnknown = false;
 
     const start = async () => {
       // Prefer the user's published kind-10051 inbox relays if any; fall
@@ -72,6 +75,7 @@ export function useWhitenoiseInbox() {
         wnLog.warn('whitenoise.inbox.cursor_read_failed', {
           error: err instanceof Error ? err.message : String(err),
         });
+        cursorUnknown = true;
         return null;
       });
       if (cancelled) return;
@@ -131,7 +135,7 @@ export function useWhitenoiseInbox() {
       // Skipping the write on stale events bounds AsyncStorage churn to the
       // narrow tail of newer gift wraps once we've caught up.
       const createdAtSec = typeof ev.created_at === 'number' ? ev.created_at : 0;
-      if (createdAtSec > cursorHighSec) {
+      if (createdAtSec > cursorHighSec && !cursorUnknown) {
         cursorHighSec = createdAtSec;
         cursorStore.setItem(CURSOR_KEY, cursorHighSec).catch((err) => {
           wnLog.debug('whitenoise.inbox.cursor_persist_failed', {
