@@ -3,10 +3,11 @@
  */
 
 /**
- * Values the 0.1.3 writers could save that today's reader turns down.
+ * Values the 0.1.3 writers could save without a limit that 0.1.3's reader
+ * turned down.
  *
  * Each case below is a value a 0.1.3 store action saved without a limit,
- * while the store's read schema holds a limit (`.max`) on that field and has
+ * while the 0.1.3 read schema held a limit (`.max`) on that field and had
  * no per-field or per-entry tolerance around it. The row is the E19 disk's own
  * row for that store (frozen fixture, 0.1.2 and 0.1.3; not edited here) with
  * that one value added, written as 0.1.3's `partialize` and the zustand
@@ -16,11 +17,14 @@
  * store through its real options and scoped storage, the accounts' keys, one
  * write from every store, and an account switch.
  *
- * These are CHARACTERIZATION tests. A case "over the limit" pins what the
- * person is left with today, and its `QUIRK:` lines name what is lost: in
- * every case the valid data beside the one long value goes too, because the
- * schema rejects the whole blob. The control case beside it holds the same
- * row with the value exactly at the limit, and loads whole.
+ * A store that has been repaired reads whatever a release could have written:
+ * its case "over the limit" expects every other value to load as saved, and
+ * nothing to be copied aside; the limit now holds only for new writes, which
+ * the store's own tests pin. A store not repaired is a CHARACTERIZATION: its
+ * case pins what the person is left with today, and its `QUIRK:` lines name
+ * what is lost, the valid data beside the one long value included, because
+ * the schema rejects the whole blob. In both, the control case beside it holds
+ * the same row with the value exactly at the limit, and loads whole.
  *
  * In every one of these stores the 0.1.3 READER already had the same limit as
  * today's (cited per case): the mismatch is between a released writer and
@@ -38,7 +42,7 @@
 import { install, launch } from './releaseFixtures/launch';
 import type { Launch } from './releaseFixtures/launch';
 import { fixture as E19 } from './releaseFixtures/E19-0.1.2';
-import { ACCOUNTS, IMPORTED, accountKey } from './releaseFixtures/format';
+import { ACCOUNTS, IMPORTED, PHRASE_HASH, accountKey } from './releaseFixtures/format';
 import type { ReleaseFixture } from './releaseFixtures/format';
 
 // Each case starts the whole app over a disk; allow what the fixture runner allows.
@@ -63,6 +67,8 @@ const sideKey = (store: string, pubkey?: string) =>
   pubkey ? accountKey(`${store}:unreadable`, pubkey) : `${store}:unreadable`;
 
 interface Started {
+  /** The disk that was installed, to start the app over again with `launch`. */
+  variant: ReleaseFixture;
   run: Launch;
   /** The store's state right after that account's copy loaded and wrote once. */
   loaded: State;
@@ -80,7 +86,6 @@ async function startWith(
   store: string,
   options: {
     account?: number;
-    accounts?: ReleaseFixture['survives']['accounts'];
     files?: Record<string, string>;
   } = {}
 ): Promise<Started> {
@@ -90,7 +95,6 @@ async function startWith(
     files: { ...E19.files, ...options.files },
     survives: {
       ...E19.survives,
-      accounts: options.accounts ?? E19.survives.accounts,
       facts: [{ what: 'loaded', store, accountIndex: options.account, path: [], equals: null }],
     },
     knownGaps: [],
@@ -99,6 +103,7 @@ async function startWith(
   const run = await launch(variant);
   const raw = run.disk.asyncStorage[key];
   return {
+    variant,
     run,
     loaded: run.facts.loaded as State,
     saved: raw === undefined ? undefined : (JSON.parse(raw) as Row),
@@ -121,50 +126,68 @@ afterAll(() => jest.restoreAllMocks());
  * `updateProfileMetadata` (`G/profileStore.ts:233-242`), which copies them
  * into the row uncapped; `partialize` :259-262 saves the whole list; version
  * 2 (`PROFILE_STORE_PERSIST_VERSION` :127). The 0.1.3 reader had the same
- * caps (:100-101); today's are `G/profileStore.ts:127-128@HEAD`.
+ * caps (:100-101) and rejected the whole list. Repaired: a label over the cap
+ * is read as absent, and `updateProfileMetadata` clips a name and does not
+ * save a picture URL over the cap (`profileStoreActions.test.ts`).
  */
 describe('profile-store: a kind-0 label longer than the cached-label limit', () => {
   const KEY = 'profile-store';
   const row = e19Row(KEY);
+  // The list as this build writes it: 0.1.4's wallet fields on every account
+  // (as in E20), so the repair is seen to keep them too.
+  const profiles: State[] = (row.state.profiles as State[]).map((profile) => ({
+    ...profile,
+    walletDatabaseCreated: true,
+    ...(profile.pubkey === IMPORTED.pubkey ? { walletPhraseFingerprint: PHRASE_HASH } : {}),
+  }));
   const withLabel = (label: { cachedDisplayName?: string; cachedPicture?: string }) => {
-    const [first, ...rest] = row.state.profiles as State[];
+    const [first, ...rest] = profiles;
     return released(2, { ...row.state, profiles: [{ ...first, ...label }, ...rest] });
   };
-  // Only account 0 is opened: with the list gone the app knows no other
-  // account, and the runner's switch to account 1 would stop on "not in the
-  // account list". What the app does with the list is what is pinned.
-  const ACCOUNT_0_ONLY = [{ accountIndex: 0, pubkey: A0 }];
 
   it.each([
-    ['cachedDisplayName', 513],
-    ['cachedPicture', 2049],
-  ])('loses every account when %s is %i characters', async (field, length) => {
-    const bytes = withLabel({ [field]: longText(length) });
-    const { run, loaded, saved } = await startWith(KEY, bytes, KEY, { accounts: ACCOUNT_0_ONLY });
+    ['cachedDisplayName', 513, 'cachedPicture'],
+    ['cachedPicture', 2049, 'cachedDisplayName'],
+  ])(
+    'keeps every account over three launches when %s is %i characters, and drops only that label',
+    async (field, length, otherLabel) => {
+      const bytes = withLabel({ [field]: longText(length) });
+      const first = await startWith(KEY, bytes, KEY);
+      const second = await launch(first.variant);
+      const third = await launch(first.variant);
 
-    // QUIRK: account 1, the account in use, and the imported account are gone
-    // from the list; the app opens account 0 instead, and re-adds only it.
-    expect((loaded.profiles as State[]).map((p) => p.pubkey)).toEqual([A0]);
-    expect(loaded.activeAccountIndex).toBe(0);
-    expect(run.activeAccountIndex).toBe(0);
-    expect(run.openedPubkeys).toEqual({ 0: A0 });
-    // QUIRK: account 0's own saved balance and label are gone with them.
-    expect((loaded.profiles as State[])[0]).not.toHaveProperty('cachedBalanceSats');
-    expect((loaded.profiles as State[])[0]).not.toHaveProperty('cachedDisplayName');
-    // The rejected list is copied aside byte for byte, and the main row now
-    // holds only the re-added account 0.
-    expect(run.rejections).toContain('store.profile.merge_rejected');
-    expect(run.disk.asyncStorage[sideKey(KEY)]).toBe(bytes);
-    expect((saved!.state.profiles as State[]).map((p) => p.pubkey)).toEqual([A0]);
-    // Account 1's own rows are still on disk under its key; nothing opens them.
-    expect(run.disk.asyncStorage[accountKey('mint-store', A1)]).toBe(
-      JSON.stringify(E19.asyncStorage[accountKey('mint-store', A1)])
-    );
-    // The keys themselves are untouched.
-    expect(run.disk.secureStore[`imported_nsec_${IMPORTED.pubkey}`]).toBe(
-      E19.secureStore[`imported_nsec_${IMPORTED.pubkey}`]
-    );
-  });
+      for (const run of [first.run, second, third]) {
+        const loaded = run.facts.loaded as State;
+        // Every account, in order, with the one in use still in use.
+        expect(loaded.activeAccountIndex).toBe(1);
+        expect(run.activeAccountIndex).toBe(1);
+        expect(run.openedPubkeys).toEqual(
+          Object.fromEntries(E19.survives.accounts.map((a) => [a.accountIndex, a.pubkey]))
+        );
+        const [zero, ...rest] = loaded.profiles as State[];
+        // Account 0 keeps all it had but the one label too long to read.
+        const { [field]: _tooLong, ...kept } = profiles[0];
+        expect(zero).toEqual(kept);
+        expect(zero[field]).toBeUndefined();
+        expect(zero[otherLabel]).toBe(profiles[0][otherLabel]);
+        // The other accounts, imported identity and wallet fields included, are as saved.
+        expect(rest).toEqual(profiles.slice(1));
+        expect(run.rejections).toEqual([]);
+        expect(run.defaultedRows.filter((r) => r.startsWith(`${KEY} `))).toEqual([]);
+        expect(run.disk.asyncStorage[sideKey(KEY)]).toBeUndefined();
+      }
+      // The next save writes the list without the long label.
+      const saved = JSON.parse(third.disk.asyncStorage[KEY]) as Row;
+      expect((saved.state.profiles as State[]).map((p) => p.pubkey)).toEqual(
+        profiles.map((p) => p.pubkey)
+      );
+      expect((saved.state.profiles as State[])[0]).not.toHaveProperty(field);
+      // The keys themselves are untouched.
+      expect(third.disk.secureStore[`imported_nsec_${IMPORTED.pubkey}`]).toBe(
+        E19.secureStore[`imported_nsec_${IMPORTED.pubkey}`]
+      );
+    }
+  );
 
   it.each([
     ['cachedDisplayName', 512],

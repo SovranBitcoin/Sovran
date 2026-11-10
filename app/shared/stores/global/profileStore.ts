@@ -109,6 +109,11 @@ interface ProfileActions {
 
 type ProfileStore = ProfileState & ProfileActions;
 
+/** Longest cached name kept: a longer one is clipped when saved. */
+const MAX_CACHED_DISPLAY_NAME = 512;
+/** Longest cached picture URL kept: a longer one is not saved, since a clipped URL is a different URL. */
+const MAX_CACHED_PICTURE_URL = 2048;
+
 const PersistedProfileEntry = z.looseObject({
   accountIndex: z.number().int(),
   pubkey: z.string().max(128),
@@ -124,8 +129,11 @@ const PersistedProfileEntry = z.looseObject({
   // global profile store, including coco migration completion flags.
   source: z.enum(['derived', 'imported']).catch('imported').optional(),
   externalChain: z.number().int().nonnegative().optional(),
-  cachedDisplayName: z.string().max(512).optional(),
-  cachedPicture: z.string().max(2048).optional(),
+  // A label too long to read is read as absent: 0.1.3 saved kind-0 labels
+  // with no limit, and rejecting one would discard every account in the list.
+  // New labels are held to the limit by `updateProfileMetadata`.
+  cachedDisplayName: z.string().max(MAX_CACHED_DISPLAY_NAME).optional().catch(undefined),
+  cachedPicture: z.string().max(MAX_CACHED_PICTURE_URL).optional().catch(undefined),
   // Absent means not recorded, which never asks for a restore. An unreadable
   // value is read the same way; rejecting it would discard the whole store.
   walletDatabaseCreated: z.boolean().optional().catch(undefined),
@@ -315,7 +323,14 @@ export const useProfileStore = create<ProfileStore>({ name: 'profile-store', sco
         set((state) => ({
           profiles: state.profiles.map((p) =>
             p.accountIndex === accountIndex
-              ? { ...p, cachedDisplayName: displayName, cachedPicture: picture }
+              ? {
+                  ...p,
+                  cachedDisplayName: displayName?.slice(0, MAX_CACHED_DISPLAY_NAME),
+                  cachedPicture:
+                    picture !== undefined && picture.length <= MAX_CACHED_PICTURE_URL
+                      ? picture
+                      : undefined,
+                }
               : p
           ),
         }));

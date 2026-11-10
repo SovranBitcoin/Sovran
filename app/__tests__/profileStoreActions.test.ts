@@ -138,6 +138,23 @@ describe('updateProfileMetadata', () => {
     expect(profiles()[0].cachedDisplayName).toBeUndefined();
     expect(profiles()[0].cachedPicture).toBeUndefined();
   });
+
+  it('clips a name longer than 512 characters and keeps one at the limit whole', () => {
+    useProfileStore.setState({ profiles: [entry(0), entry(1)] });
+    useProfileStore.getState().updateProfileMetadata(0, 'n'.repeat(513));
+    useProfileStore.getState().updateProfileMetadata(1, 'm'.repeat(512));
+    expect(profiles()[0].cachedDisplayName).toBe('n'.repeat(512));
+    expect(profiles()[1].cachedDisplayName).toBe('m'.repeat(512));
+  });
+
+  it('does not save a picture URL longer than 2048 characters, and keeps one at the limit', () => {
+    const url = (length: number) => `https://pic.example/${'p'.repeat(length - 20)}`;
+    useProfileStore.setState({ profiles: [entry(0), entry(1)] });
+    useProfileStore.getState().updateProfileMetadata(0, 'Alice', url(2049));
+    useProfileStore.getState().updateProfileMetadata(1, 'Bob', url(2048));
+    expect(profiles()[0]).toMatchObject({ cachedDisplayName: 'Alice', cachedPicture: undefined });
+    expect(profiles()[1].cachedPicture).toBe(url(2048));
+  });
 });
 
 describe('setWalletDatabaseCreated', () => {
