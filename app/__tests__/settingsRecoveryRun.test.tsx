@@ -27,7 +27,6 @@ jest.mock('react-native-safe-area-context', () => ({
 const MINT_A = 'https://a.example';
 const MINT_B = 'https://b.example';
 const KEYSET_1 = '00988fbe749ca4d1';
-const KEYSET_2 = '00107937db0cc865';
 
 const mockSliderMounts = { count: 0 };
 let mockMints: { mintUrl: string; mintInfo: { name: string } }[] = [];
@@ -96,7 +95,13 @@ jest.mock('@/shared/lib/color', () => ({
 jest.mock('@/shared/ui/composed/SlideToConfirm', () => {
   const ReactActual = jest.requireActual<typeof import('react')>('react');
   return {
-    SlideToConfirm: ({ onConfirm, testID }: { onConfirm: () => Promise<void>; testID?: string }) => {
+    SlideToConfirm: ({
+      onConfirm,
+      testID,
+    }: {
+      onConfirm: () => Promise<void>;
+      testID?: string;
+    }) => {
       // The real slider stays spent after one swipe until it is mounted again.
       ReactActual.useEffect(() => {
         mockSliderMounts.count += 1;
@@ -186,7 +191,9 @@ function texts(renderer: Renderer): unknown[] {
 }
 
 function byTestId(renderer: Renderer, testID: string) {
-  return renderer.root.findAll((node) => node.props.testID === testID && typeof node.type === 'string');
+  return renderer.root.findAll(
+    (node) => node.props.testID === testID && typeof node.type === 'string'
+  );
 }
 
 /** Each known mint advertises the given keysets; restore succeeds unless a case says otherwise. */
