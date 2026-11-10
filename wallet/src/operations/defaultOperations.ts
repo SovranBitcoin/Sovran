@@ -51,6 +51,7 @@ import { parsePaymentInput } from "../parse";
 import {
   AuthoredError,
   MeltUserCancelledError,
+  PaymentRequestUndeliveredError,
   UnitRateUnavailableError,
 } from "../errors";
 import { normalizeNostrPubkey, resolveRecipientPubkey } from "../recipient";
@@ -1984,7 +1985,7 @@ export function createDefaultOperations(
               errorMessage,
             );
           }
-          throw deliveryErr;
+          throw new PaymentRequestUndeliveredError(operationId, deliveryErr);
         }
       } else {
         logger.info("operations.executePaymentRequest.transport", {
@@ -2044,7 +2045,7 @@ export function createDefaultOperations(
               errorMessage,
             );
           }
-          throw deliveryErr;
+          throw new PaymentRequestUndeliveredError(operationId, deliveryErr);
         }
       }
 

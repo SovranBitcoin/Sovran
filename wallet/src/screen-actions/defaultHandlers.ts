@@ -559,13 +559,44 @@ export function createDefaultScreenActionHandlers(
             null,
         });
 
-        const result = await machine.confirmPaymentRequest();
+        const outcome = await machine.confirmPaymentRequest();
 
         const setEntry = ctx.setEntry as ((e: EntryLike) => void) | undefined;
 
+        // Nothing was sent (it failed before any ecash existed, or this tap
+        // did not run the send): the entry stays a preview so Pay can retry.
+        if (outcome.kind === "failed" || outcome.kind === "ignored") {
+          logger.info("screenAction.paymentRequest.confirm.notSent", {
+            kind: outcome.kind,
+          });
+          return;
+        }
+
+        // The ecash exists but neither reached the recipient nor came back.
+        // Say so, and offer no retry: a second Pay could pay twice.
+        if (outcome.kind === "undelivered") {
+          logger.warn("screenAction.paymentRequest.confirm.undelivered", {
+            operationId: outcome.operationId,
+          });
+          if (setEntry) {
+            setEntry({
+              ...preEntry,
+              state: "pending",
+              operationId: outcome.operationId,
+              metadata: {
+                ...((preEntry?.metadata ?? {}) as Record<string, unknown>),
+                operationId: outcome.operationId,
+                phase: "undelivered",
+                tokenCreated: "true",
+              },
+            } as EntryLike);
+          }
+          return;
+        }
+
         // If the delivery failed and ecash was rolled back, set the entry
         // to rolledBack state instead of enriching with delivered metadata.
-        if (result.rolledBack) {
+        if (outcome.kind === "rolledBack") {
           logger.info("screenAction.paymentRequest.confirm.rolledBack");
           if (setEntry) {
             const metadata = (preEntry?.metadata ?? {}) as Record<

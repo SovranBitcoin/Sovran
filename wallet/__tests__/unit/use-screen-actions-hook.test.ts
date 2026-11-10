@@ -82,7 +82,7 @@ function walletFixture(options: { offline?: boolean } = {}) {
     getContext: vi.fn(() => ({ rawInput: "scanned-raw", source: "scan" })),
     reviewMint: vi.fn(async () => {}),
     confirmMelt: vi.fn(async () => {}),
-    confirmPaymentRequest: vi.fn(async () => ({ rolledBack: false })),
+    confirmPaymentRequest: vi.fn(async () => ({ kind: "delivered" })),
   };
   const navigation = { goBack: vi.fn() };
   const notifications = {
@@ -573,7 +573,7 @@ describe("what pressing each action calls", () => {
   it("payment request Confirm that rolled back marks the entry rolled back", async () => {
     const wallet = walletFixture();
     wallet.machine.confirmPaymentRequest.mockResolvedValue({
-      rolledBack: true,
+      kind: "rolledBack",
     });
     const mounted = await mount(wallet, "paymentRequest", {
       id: "pr-1",

@@ -45,6 +45,11 @@ import {
   LEGACY_BASE64_KEYSET_V3_TOKEN,
   NUT00_V3_TOKEN,
 } from "../_harness/tokenVectors";
+import { createTestMachine, INPUTS } from "../_harness";
+import {
+  AuthoredError,
+  PaymentRequestUndeliveredError,
+} from "../../src/errors";
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -93,7 +98,7 @@ function createMockConfig(overrides?: {
 
   const machine: Partial<PaymentMachine> = {
     confirmMelt: vi.fn(async () => {}),
-    confirmPaymentRequest: vi.fn(async () => ({ rolledBack: false })),
+    confirmPaymentRequest: vi.fn(async () => ({ kind: "delivered" as const })),
     scan: vi.fn(async (): Promise<ProcessResult> => ({ urInProgress: false })),
     startReceiveLightning: vi.fn(async () => {}),
     showReceiveQr: vi.fn(async () => {}),
@@ -909,6 +914,96 @@ describe("paymentRequest default handlers", () => {
       await mgr.execute("cancel");
       expect(navigation.goBack).toHaveBeenCalled();
     });
+  });
+});
+
+// The confirm handler driven by the real machine: what the screen entry says
+// after each way a payment-request send can end.
+describe("paymentRequest confirm outcome on the screen entry", () => {
+  const previewEntry = {
+    id: "pr-preview-1",
+    type: "send",
+    amount: 100,
+    unit: "sat",
+    metadata: { paymentRequest: "creq-1", phase: "preview" },
+  };
+
+  async function confirmWith(
+    executePaymentRequest: MachineOperations["executePaymentRequest"],
+  ) {
+    const tm = createTestMachine({ operations: { executePaymentRequest } });
+    await tm.machine.execute(INPUTS.paymentRequestBasic, { reset: true });
+    tm.assertStep("navigateToPaymentRequest");
+    const handlers = createDefaultScreenActionHandlers({
+      getMachine: () => tm.machine,
+      getOperations: () => ({}),
+      notify: () => {},
+      navigation: {
+        scanQr: vi.fn(),
+        nutDrop: vi.fn(),
+        mintInfo: vi.fn(),
+        addMint: vi.fn(),
+        goBack: vi.fn(),
+      },
+    });
+    const { mgr } = createManager("paymentRequest", handlers, previewEntry);
+    await mgr.execute("confirm");
+    return { tm, mgr };
+  }
+
+  it("keeps the preview, with confirm available, when the send fails before any token exists", async () => {
+    const execute = vi.fn(async () => {
+      throw new AuthoredError("This payment request does not accept that mint");
+    });
+    const { mgr } = await confirmWith(execute);
+
+    expect(mgr.getEntry()).toEqual(previewEntry);
+    expect(mgr.inspect().confirm.available).toBe(true);
+
+    // The person can retry: a second Pay runs the operation again.
+    await mgr.execute("confirm");
+    expect(execute).toHaveBeenCalledTimes(2);
+  });
+
+  it("says token created but not sent, and offers no retry, when delivery and rollback both failed", async () => {
+    const { mgr } = await confirmWith(async () => {
+      throw new PaymentRequestUndeliveredError("op-9", new Error("relay down"));
+    });
+
+    const entry = mgr.getEntry() as Record<string, any>;
+    expect(entry.operationId).toBe("op-9");
+    expect(entry.metadata).toMatchObject({
+      operationId: "op-9",
+      phase: "undelivered",
+      tokenCreated: "true",
+    });
+    expect(entry.metadata.nostrSent).toBeUndefined();
+    expect(mgr.inspect().confirm.available).toBe(false);
+    expect(mgr.inspect().cancel.available).toBe(false);
+  });
+
+  it("marks the entry delivered after a successful send", async () => {
+    const { mgr } = await confirmWith(async () => ({
+      historyEntry: JSON.stringify({ id: "op-1", type: "send", state: "pending" }),
+    }));
+
+    expect(mgr.getEntry()?.metadata).toMatchObject({
+      phase: "delivered",
+      tokenCreated: "true",
+      nostrSent: "true",
+    });
+    expect(mgr.inspect().confirm.available).toBe(false);
+  });
+
+  it("tells a tap locked out by a send in flight that it was ignored", async () => {
+    const tm = createTestMachine();
+    await tm.machine.execute(INPUTS.paymentRequestBasic, { reset: true });
+
+    const outcomes = await Promise.all([
+      tm.machine.confirmPaymentRequest(),
+      tm.machine.confirmPaymentRequest(),
+    ]);
+    expect(outcomes.map((o) => o.kind)).toEqual(["delivered", "ignored"]);
   });
 });
 

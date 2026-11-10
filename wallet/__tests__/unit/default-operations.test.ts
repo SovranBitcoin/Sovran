@@ -23,6 +23,7 @@ import {
 } from "@cashu/cashu-ts";
 import type { Manager } from "@cashu/coco-core";
 import { createDefaultOperations } from "../../src/operations/defaultOperations";
+import { PaymentRequestUndeliveredError } from "../../src/errors";
 
 import { defaultDetectors } from "../../src/detectors";
 
@@ -390,6 +391,28 @@ describe("executePaymentRequest — Nostr transport", () => {
 
     expect(result.historyEntry).toBeDefined();
     expect(typeof result.historyEntry).toBe("string");
+  });
+
+  it("names the operation when delivery fails and the ecash cannot be taken back", async () => {
+    const mockManager = createMockManager();
+    mockManager.ops.send.get = vi.fn().mockResolvedValue({ id: "op-1", state: "pending" });
+    mockManager.ops.send.reclaim = vi.fn().mockRejectedValue(new Error("mint down"));
+    mockGetPRInfo.mockReturnValue({
+      mints: [MINT1],
+      amount: 100,
+      unit: "sat",
+      transports: [{ type: "nostr", target: "nprofile1abc" }],
+    });
+    const ops = createDefaultOperations({
+      getManager: () => mockManager as unknown as Manager,
+      sendNostrDM: vi.fn().mockRejectedValue(new Error("relay down")),
+    });
+
+    const failure = await ops
+      .executePaymentRequest!({ mintUrl: MINT1, paymentRequest: "creqABC", amount: 100, unit: "sat" })
+      .catch((e: unknown) => e);
+    expect(failure).toBeInstanceOf(PaymentRequestUndeliveredError);
+    expect(failure).toMatchObject({ operationId: "op-1", message: "relay down" });
   });
 
   it("throws when sendNostrDM is not provided for Nostr transport", async () => {

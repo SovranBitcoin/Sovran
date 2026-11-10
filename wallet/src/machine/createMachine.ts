@@ -9,6 +9,7 @@ import {
   failureText,
   isMeltUserCancelledError,
   isMintOfflineError,
+  PaymentRequestUndeliveredError,
 } from "../errors";
 import { isLockedSend } from "../p2pk";
 import { t } from "../formatting/locales";
@@ -46,6 +47,7 @@ import type {
   MintQuoteMethod,
   MintSelectorScope,
   PaymentMachine,
+  PaymentRequestConfirmOutcome,
   ProcessResult,
   RecipientProfile,
   ScanOptions,
@@ -282,7 +284,9 @@ export function createPaymentMachine(
   // handler snapshots and drains holders right after acquiring `sendLocked`,
   // so concurrent callers blocked by the lock keep their own default and
   // never observe another call's outcome.
-  let pendingPaymentRequestConfirms: { rolledBack: boolean }[] = [];
+  let pendingPaymentRequestConfirms: {
+    outcome: PaymentRequestConfirmOutcome;
+  }[] = [];
   const listeners = new Set<() => void>();
 
   function setStep<S extends FlowStep>(
@@ -1031,8 +1035,8 @@ export function createPaymentMachine(
       // result to a subsequent locked-out caller.
       const holders = pendingPaymentRequestConfirms;
       pendingPaymentRequestConfirms = [];
-      const settle = (rolledBack: boolean) => {
-        for (const h of holders) h.rolledBack = rolledBack;
+      const settle = (outcome: PaymentRequestConfirmOutcome) => {
+        for (const h of holders) h.outcome = outcome;
       };
       logger.info("machine.confirmPaymentRequest.start", {
         ...mintUrlFields(data.mintUrl),
@@ -1072,7 +1076,7 @@ export function createPaymentMachine(
             ...mintUrlFields(data.mintUrl),
             errorMessage: effect.value.errorMessage,
           });
-          settle(true);
+          settle({ kind: "rolledBack" });
           routeOperationFailure(
             effect.value.cause,
             "paymentRequest",
@@ -1085,7 +1089,7 @@ export function createPaymentMachine(
           logger.info("machine.paymentRequest.success", {
             ...mintUrlFields(data.mintUrl),
           });
-          settle(false);
+          settle({ kind: "delivered" });
 
           for (const link of effect.value.links) {
             if (link.type === "linkTransaction") {
@@ -1110,7 +1114,12 @@ export function createPaymentMachine(
         logger.warn("machine.paymentRequest.failed", {
           error: errField(effect.error.cause),
         });
-        settle(false);
+        const cause = effect.error.cause;
+        settle(
+          cause instanceof PaymentRequestUndeliveredError
+            ? { kind: "undelivered", operationId: cause.operationId }
+            : { kind: "failed" },
+        );
         routeOperationFailure(
           effect.error.cause,
           "paymentRequest",
@@ -2269,16 +2278,18 @@ export function createPaymentMachine(
   const mintTrusted = () => send({ type: "MINT_TRUSTED" });
 
   const confirmMelt = () => send({ type: "CONFIRM_MELT" });
-  const confirmPaymentRequest = async (): Promise<{ rolledBack: boolean }> => {
+  const confirmPaymentRequest = async (): Promise<PaymentRequestConfirmOutcome> => {
     // Per-call holder isolates this caller's result from any concurrent
     // confirmPaymentRequest the lock blocks. The handler writes only to
     // holders it snapshotted before its await, so a locked-out caller's
-    // holder retains its default `{ rolledBack: false }`.
-    const holder: { rolledBack: boolean } = { rolledBack: false };
+    // holder retains its default `ignored`.
+    const holder: { outcome: PaymentRequestConfirmOutcome } = {
+      outcome: { kind: "ignored" },
+    };
     pendingPaymentRequestConfirms.push(holder);
     try {
       await send({ type: "CONFIRM_PAYMENT_REQUEST" });
-      return holder;
+      return holder.outcome;
     } finally {
       const idx = pendingPaymentRequestConfirms.indexOf(holder);
       if (idx >= 0) pendingPaymentRequestConfirms.splice(idx, 1);

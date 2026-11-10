@@ -1354,6 +1354,23 @@ export interface CreateMachineConfig {
 // Machine interface
 // ---------------------------------------------------------------------------
 
+/**
+ * How one `confirmPaymentRequest()` call ended.
+ * - `delivered`: the transport took the ecash.
+ * - `rolledBack`: delivery failed and the ecash was taken back.
+ * - `failed`: it failed before any ecash existed; Pay can be tried again.
+ * - `undelivered`: ecash was created, delivery failed and taking it back
+ *   failed too. It may already be out, so Pay must not be offered again.
+ * - `ignored`: this call did not run the send (another one was in flight,
+ *   the step was not the preview, or the flow was reset meanwhile).
+ */
+export type PaymentRequestConfirmOutcome =
+  | { kind: "delivered" }
+  | { kind: "rolledBack" }
+  | { kind: "failed" }
+  | { kind: "undelivered"; operationId: string }
+  | { kind: "ignored" };
+
 export interface PaymentMachine {
   /** Send any event to advance the machine. */
   send: (event: FlowEvent) => Promise<void>;
@@ -1465,8 +1482,9 @@ export interface PaymentMachine {
    * Requires `operations.executePaymentRequest` to be provided. On success,
    * dispatches the result handler. On failure in a BIP321 multi-option flow,
    * transitions to `chooseFallbackOption` with the failed option disabled.
+   * Resolves with what this call did; see `PaymentRequestConfirmOutcome`.
    */
-  confirmPaymentRequest: () => Promise<{ rolledBack: boolean }>;
+  confirmPaymentRequest: () => Promise<PaymentRequestConfirmOutcome>;
   /** Clear all flow state. */
   reset: () => void;
   /**

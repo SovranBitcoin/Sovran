@@ -170,7 +170,7 @@ guarded by `sendLocked`.
 | `reviewMint(mintUrl, token)` | `REVIEW_MINT` | |
 | `mintTrusted()` | `MINT_TRUSTED` | then runs `operations.trustMint` |
 | `confirmMelt()` | `CONFIRM_MELT` | runs `operations.executeMelt` in place |
-| `confirmPaymentRequest()` | `CONFIRM_PAYMENT_REQUEST` | returns `{rolledBack}` |
+| `confirmPaymentRequest()` | `CONFIRM_PAYMENT_REQUEST` | returns `PaymentRequestConfirmOutcome`: `delivered`, `rolledBack`, `failed`, `undelivered {operationId}` or `ignored` |
 | `reset()` | `resetInternal` + notify | |
 | `inspect()` | cached `ExecutionState` | the snapshot accessor is `inspect`, not `getSnapshot` |
 | `getContext()` | current `FlowContext` | |
@@ -594,9 +594,11 @@ intentionally skipped.
 EXECUTE(paymentRequest) / OPTION_CHOSEN(paymentRequest)
    -> enterAmount? -> selectMint? (supportedMintUrls-constrained) -> navigateToPaymentRequest
    -> CONFIRM_PAYMENT_REQUEST -- in place --> executePaymentRequest
-        completed  -> step STAYS navigateToPaymentRequest, +historyEntry
-        rolledBack -> settle(true); routeOperationFailure(..,{rolledBack:true})
-        thrown     -> settle(false); routeOperationFailure(..)
+        completed  -> step STAYS navigateToPaymentRequest, +historyEntry; outcome delivered
+        rolledBack -> outcome rolledBack; routeOperationFailure(..,{rolledBack:true})
+        thrown     -> outcome undelivered (PaymentRequestUndeliveredError) or failed;
+                      routeOperationFailure(..)
+        stale / locked out -> outcome ignored
    NFC: source==='nfc' on navigateToPaymentRequest -> runNfcWriteBackEffect -> sendComplete
 ```
 
@@ -621,7 +623,10 @@ MUST:
   `operations.executePaymentRequest`. `createMachine.ts:661`.
 - On delivery failure the operation must attempt rollback (cancel if `prepared`,
   reclaim if executing/pending) and only return `rolledBack` when that
-  cancel-or-reclaim succeeds; otherwise rethrow. The decision is taken at the
+  cancel-or-reclaim succeeds; otherwise throw `PaymentRequestUndeliveredError`
+  with the operation id, so the screen says "created, not sent" and offers no
+  retry. Any other throw means no ecash was created: the screen entry stays a
+  preview and Pay can be tried again. The decision is taken at the
   transport call sites (`defaultOperations.ts:959-973` Nostr, `992-1006` HTTP)
   via the `attemptRollback` helper (`defaultOperations.ts:188-216`).
 - `executePaymentRequest` re-decodes the request and throws
@@ -994,7 +999,8 @@ during verification and the invariant rests on source review.
 ### Payment request
 
 - [ ] No `chooseProofs` from the normal gate (`resolveNext.ts:158-161`).
-- [ ] Rollback returns `rolledBack` only on successful reclaim, else rethrows
+- [ ] Rollback returns `rolledBack` only on successful reclaim, else throws
+      `PaymentRequestUndeliveredError`
       (`defaultOperations.ts:188-216`).
 - [ ] `rolledBack` routes through `routeOperationFailure {rolledBack:true}`
       (`createMachine.ts:698-712`).
