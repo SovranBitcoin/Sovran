@@ -154,9 +154,10 @@ export async function rotateReusableMintQuote(
   const key = reusableQuoteKey(input);
   // Let any in-flight ensure settle first so its callers keep a consistent
   // quote, then rotate — the rotation task owns the slot afterwards.
-  const flights = flightsFor(manager);
-  const pending = flights.get(key);
+  const pending = flightsFor(manager).get(key);
   if (pending) await pending.catch(() => undefined);
+  // Looked up after the wait: a dispose in between replaces the map.
+  const flights = flightsFor(manager);
 
   const unit = input.unit.trim().toLowerCase();
   const task = (async () => {

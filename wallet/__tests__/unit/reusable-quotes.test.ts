@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { Manager } from "@cashu/coco-core";
 
 import {
+  disposeReusableQuoteFlights,
   ensureReusableMintQuote,
   rotateReusableMintQuote,
   reusableQuoteKey,
@@ -196,6 +197,31 @@ describe("ensureReusableMintQuote across wallets", () => {
 
     expect(create).toHaveBeenCalledTimes(1);
     expect(second).toBe(first);
+  });
+});
+
+describe("reusable quote flights after a dispose", () => {
+  const input = { mintUrl: MINT, method: "onchain" as const, unit: "sat" };
+
+  it("lets an ensure join a rotation that resumed after the flights were disposed", async () => {
+    const finish: ((value: unknown) => void)[] = [];
+    const create = vi.fn().mockImplementation(() => new Promise((resolve) => finish.push(resolve)));
+    const manager = mockManager({ create });
+    const store = memoryStore();
+
+    const first = ensureReusableMintQuote(manager, input, store);
+    const rotation = rotateReusableMintQuote(manager, input, store, "manual");
+    disposeReusableQuoteFlights();
+    finish[0](quote({ quoteId: "first" }));
+    await first;
+    await vi.waitFor(() => expect(create).toHaveBeenCalledTimes(2));
+
+    const joined = ensureReusableMintQuote(manager, input, store);
+    finish[1](quote({ quoteId: "rotated" }));
+
+    expect(await rotation).toMatchObject({ quoteId: "rotated" });
+    expect(await joined).toMatchObject({ quoteId: "rotated" });
+    expect(create).toHaveBeenCalledTimes(2);
   });
 });
 
