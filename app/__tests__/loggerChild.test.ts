@@ -228,6 +228,18 @@ describe('logger redaction safety (audit 56.json F-001 / F-008 / F-012)', () => 
     expect(captured[0].error?.stack[0]).toBe('Error: failed for <REDACTED:nsec>');
   });
 
+  it('redacts nsec substrings inside an Error nested in a logged object or array', () => {
+    const { log, captured } = captureLog();
+    const nsec = 'nsec1' + 'a'.repeat(58);
+    const err = new Error(`failed for ${nsec}`);
+    err.stack = `Error: failed for ${nsec}\n at importNsec`;
+    log.warn('keys.import_failed', { ctx: { err }, attempts: [err] });
+    expect(JSON.stringify(captured)).not.toContain(nsec);
+    const nested = (captured[0].params!.ctx as { err: { message: string; stack: string[] } }).err;
+    expect(nested.message).toBe('failed for <REDACTED:nsec>');
+    expect(nested.stack[0]).toBe('Error: failed for <REDACTED:nsec>');
+  });
+
   it('summarizeString does not preview cashu_token bytes (F-001)', () => {
     const { log, captured } = captureLog();
     const token = 'cashuA' + 'B'.repeat(80);
