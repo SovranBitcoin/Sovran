@@ -307,6 +307,26 @@ describe('a swap with a failed leg', () => {
     expect(banners.map((b) => b.props.message)).toEqual(['Destination unreachable']);
   });
 
+  it('keeps counting a failed leg whose mint arrived, though its melt is not loaded', async () => {
+    seedGroup({
+      state: 'cancelled',
+      legs: [
+        leg('l1', { amount: 1000, meltQuoteId: 'melt1', mintQuoteId: 'mint1' }),
+        leg('l2', { amount: 500, mintQuoteId: 'mint2', localStatus: 'failed' }),
+      ],
+    });
+    mockHistory = [
+      historyEntry('melt', 'melt1', -1000),
+      historyEntry('mint', 'mint1', 990),
+      historyEntry('mint', 'mint2', 490),
+    ];
+
+    await render();
+
+    // Money arrived for the failed leg, so it was sent: 1500 out, 1480 in.
+    expect(details()).toMatchObject({ 'Total Fees': '20 sat' });
+  });
+
   it('a cancelled group with no history shows no fee', async () => {
     seedGroup({
       state: 'cancelled',

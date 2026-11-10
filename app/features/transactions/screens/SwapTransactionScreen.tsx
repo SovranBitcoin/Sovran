@@ -297,7 +297,7 @@ export function SwapTransactionScreen({ groupId }: Props) {
 
     let received = 0;
     let sent = 0;
-    // What left the wallet, for the fee: a failed leg with no melt never sent anything.
+    // What left the wallet, for the fee.
     let spent = 0;
     let steps = 0;
     let hasMintHistory = false;
@@ -323,7 +323,9 @@ export function SwapTransactionScreen({ groupId }: Props) {
           spent += melted;
         } else if (leg.amount > 0) {
           sent += leg.amount; // fallback for synthetic melts
-          if (leg.localStatus !== 'failed') spent += leg.amount;
+          // A failed leg with no sign of either side never sent anything. One
+          // whose mint arrived did, even if its melt is not loaded.
+          if (leg.localStatus !== 'failed' || mintEntry) spent += leg.amount;
         }
       }
     }
