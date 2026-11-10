@@ -297,6 +297,8 @@ export function SwapTransactionScreen({ groupId }: Props) {
 
     let received = 0;
     let sent = 0;
+    // What left the wallet, for the fee: a failed leg with no melt never sent anything.
+    let spent = 0;
     let steps = 0;
     let hasMintHistory = false;
 
@@ -315,8 +317,14 @@ export function SwapTransactionScreen({ groupId }: Props) {
           received += Math.abs(amountToNumber(mintEntry.amount));
           hasMintHistory = true;
         }
-        if (meltEntry) sent += Math.abs(amountToNumber(meltEntry.amount));
-        else if (leg.amount > 0) sent += leg.amount; // fallback for synthetic melts
+        if (meltEntry) {
+          const melted = Math.abs(amountToNumber(meltEntry.amount));
+          sent += melted;
+          spent += melted;
+        } else if (leg.amount > 0) {
+          sent += leg.amount; // fallback for synthetic melts
+          if (leg.localStatus !== 'failed') spent += leg.amount;
+        }
       }
     }
 
@@ -327,7 +335,7 @@ export function SwapTransactionScreen({ groupId }: Props) {
     return {
       totalReceived: received,
       totalSent: sent,
-      totalFees: ready ? Math.max(0, sent - received) : 0,
+      totalFees: ready ? Math.max(0, spent - received) : 0,
       stepCount: steps,
       historyReady: ready,
     };

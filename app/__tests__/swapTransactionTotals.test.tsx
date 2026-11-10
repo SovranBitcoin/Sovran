@@ -282,7 +282,7 @@ describe('before the wallet history has loaded', () => {
 });
 
 describe('a swap with a failed leg', () => {
-  it('counts the failed leg’s amount as sent, so the fee includes money never spent', async () => {
+  it('leaves a failed leg that never melted out of the fee', async () => {
     seedGroup({
       state: 'cancelled',
       legs: [
@@ -298,9 +298,8 @@ describe('a swap with a failed leg', () => {
 
     await render();
 
-    // QUIRK (D5): the failed leg never melted, yet its 500 is added to sent, so
-    // the fee reads 510 rather than 10.
-    expect(details()).toMatchObject({ Status: 'Cancelled', Steps: '2', 'Total Fees': '510 sat' });
+    // The failed leg never melted: only the 10 the first leg cost is a fee.
+    expect(details()).toMatchObject({ Status: 'Cancelled', Steps: '2', 'Total Fees': '10 sat' });
     expect(header()).toMatchObject({ amount: 990 });
 
     await expand();
@@ -308,7 +307,7 @@ describe('a swap with a failed leg', () => {
     expect(banners.map((b) => b.props.message)).toEqual(['Destination unreachable']);
   });
 
-  it('a cancelled group with no history shows its whole amount as fees', async () => {
+  it('a cancelled group with no history shows no fee', async () => {
     seedGroup({
       state: 'cancelled',
       legs: [leg('l1', { amount: 700, localStatus: 'failed' })],
@@ -316,8 +315,9 @@ describe('a swap with a failed leg', () => {
 
     await render();
 
-    // QUIRK: no mint ever happened, and the 700 that was never sent shows as fees.
-    expect(details()).toMatchObject({ Status: 'Cancelled', 'Total Fees': '700 sat' });
+    // Nothing was sent, so nothing was lost to fees; the header keeps the amount asked for.
+    expect(details()).toMatchObject({ Status: 'Cancelled' });
+    expect(details()).not.toHaveProperty('Total Fees');
     expect(header()).toMatchObject({ amount: 700 });
   });
 });
