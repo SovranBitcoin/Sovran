@@ -235,3 +235,21 @@ To repeat it: download the release APK, `apksigner sign` it and a local `assembl
 `cocoDatabaseUpgrade.test.ts` opens a wallet database written by each Coco storage version that shipped, with the
 candidate's Coco and through the app's own open path: 0.6.0, 1.0.0-rc11, 1.1.2-rc.30, 1.1.2-rc.32, 1.1.2-rc.34, 1.1.2-rc.47, 1.0.0-rc.0, 1.0.0-rc.5, 1.0.0, 1.0.1, 2.0.0. Which releases carried each is in
 [persistence-map.md](persistence-map.md) and in `app/__tests__/cocoDatabases/manifest.json`.
+
+## Read limits a release's own writer could exceed, 2026-11-10
+
+Candidate: branch `surgery/pass-1-cuts` (on `main` at `e5d70b590`). **Verdict for these rows: INCONCLUSIVE**, because
+no real upgrade was run; every test row passes.
+
+Eight stores loaded as defaults when one saved value was over the reader's limit, in 0.1.0 to 0.1.3 and on `main`:
+`profile-store`, `swap-transactions-store`, `nostr-social-store`, `own-content-store`, `nostr-relay-list-store`,
+`search-history-store`, `mint-metadata-store`, `wallet-lifecycle`. The reader now accepts what a release could have
+written, unaltered or with that one optional field read as absent, and the limit is applied to new writes. No key,
+version or field was renamed, removed or tightened.
+
+| Durable thing | Released shape | Fixture / test | Fault cases | Real upgrade | Verdict |
+| --- | --- | --- | --- | --- | --- |
+| The eight stores above, with an over-limit value beside ordinary data | Writers cited per case in `releasedWriterBounds.test.ts`, at `d9ad12c4b` | `releasedWriterBounds.test.ts`: the app started three times over the 0.1.3 fixture with that one row; neighbours kept, nothing written to `:unreadable`; at-limit controls | `persistUnreadableGuard.test.ts`, the stores' resilience and capacity tests | NOT RUN: no simulator was started on this Mac | INCONCLUSIVE |
+| Every release fixture E01 to E20 | as before | `bun run test:upgrade`: 981 passed, 2 skipped | as before | as recorded above for earlier candidates | PASS in tests |
+
+Still open in the same family: `nut-drop-redeem-queue` (F174), wallpaper and location limits (F192).

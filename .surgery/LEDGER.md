@@ -2,14 +2,14 @@
 
 State, not history. Passes run in order; one call runs one pass.
 
-| Pass                      | Status                                                                                     |
-| ------------------------- | ------------------------------------------------------------------------------------------ |
-| 0 Pin behaviour           | **Done for pass 1; gated for passes 2 and 3** (2026-11-10). See "Gates".                   |
-| 1 Persisted state         | **Awaiting approval** (2026-11-10). Evidence added; no product code changed. See "Pass 1". |
-| 2 Implicit state machines | Not started.                                                                               |
-| 3 Deepen modules          | Not started.                                                                               |
+| Pass                      | Status                                                                                                        |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| 0 Pin behaviour           | **Done for pass 1; gated for passes 2 and 3** (2026-11-10). See "Gates".                                      |
+| 1 Persisted state         | **Cut, awaiting merge** (2026-11-10). Branch `surgery/pass-1-cuts`. Proposal 3 awaits its plan. See "Pass 1". |
+| 2 Implicit state machines | Not started.                                                                                                  |
+| 3 Deepen modules          | Not started.                                                                                                  |
 
-Pass 0 is on branch `surgery/pass-0`; pass 1 is on `surgery/pass-1`, stacked on it (worktree `../sovran-surgery`,
+Pass 0 is on branch `surgery/pass-0`; pass 1's evidence is on `surgery/pass-1` and its cuts on `surgery/pass-1-cuts`, each stacked on the one before (worktree `../sovran-surgery`,
 based on `main` at `e5d70b590`). Neither is pushed. Until they merge, this file and the survey folders also sit
 untracked in the main checkout so the next call finds them.
 
@@ -197,31 +197,42 @@ Facts that later passes rely on:
 `releaseFixtureRestoreInFlight` and `releaseFixtureE20Records` are not in the `test:upgrade` script (that needs a
 `package.json` edit); they run with the full suite.
 
-### Proposed changes, awaiting the owner's approval item by item
+### Decisions (owner, 2026-11-10) and what was cut
 
-None is made. Each changes how saved data or a wire message is read, so each needs the `persistence-release-safety`
-verdict when it is built. "Tried" means in a throwaway copy with every upgrade, capacity and resilience test passing.
-The reviewer is Codex GPT-6 Astra, given the code and the tests; its changes are folded into the shapes below. None
-of these helps a downgrade: older builds keep their limits.
+Approved: every store repair (1, 4 to 9, 12), the 0.1.3 payment (2), emoji tokens (10), hiding `sovran:` from chat
+(11, knowing a typed `sovran:` message will not show), a plan for the redeem queue shown before it is built (3), and
+pushing with pull requests. Rule applied to every store: the reader accepts what a release could have written,
+unaltered; limits apply to new writes. No key, version or field was renamed, removed or tightened.
 
-| #   | Change                                                                                                                                                                                                  | Follow-up | Proof today                                                              | Reviewer                                                                    |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- | ------------------------------------------------------------------------ | --------------------------------------------------------------------------- |
-| 1   | `profile-store`: an over-long cached name or picture is read as absent instead of rejecting the account list. New writes: clip the name, drop an over-long picture                                      | F191      | Tried                                                                    | Sound, with the write cap added                                             |
-| 2   | Receiver accepts a 0.1.3 payer's payload: when the `id` is an encoded request that exactly matches a request this wallet holds, use that request's id. Stop re-offering a payload Coco refuses for good | F193      | Built (exact match, integer-safe); F193 keeps the after-restart gap      | Sound only with the exact match and integer-safe parsing                    |
-| 3   | `nut-drop-redeem-queue`: read every token a release could have saved, unclipped; park a record that cannot be processed instead of dropping it; recover queues already under `:unreadable`              | F174      | **Unproven.** Needs a design                                             | A drop-on-failure record is unsound here: tokens are money                  |
-| 4   | `swap-transactions-store`: an over-long leg error is read as absent; new errors clipped. Groups are never dropped                                                                                       | F192      | Tried                                                                    | Sound, without dropping groups                                              |
-| 5   | `nostr-social-store`: no read limit on the contacts document or its tags; never truncated                                                                                                               | F192      | Tried                                                                    | Sound                                                                       |
-| 6   | `own-content-store`: no read limit on a note's content                                                                                                                                                  | F192      | Tried                                                                    | Sound; dropping the note instead is rejected                                |
-| 7   | `nostr-relay-list-store`: lists over 64 are read; the limit applies to every way of adding; a long list stays editable                                                                                  | F192      | Read side tried                                                          | Sound, with all growth paths capped                                         |
-| 8   | `search-history-store`: long searches are read; new ones capped                                                                                                                                         | F192      | Tried                                                                    | Sound                                                                       |
-| 9   | `mint-metadata-store`: an over-long name, icon or description is read as absent for that mint                                                                                                           | F192      | Tried                                                                    | Sound but narrow: other fields can still reject                             |
-| 10  | Emoji tokens: strip the emoji's own U+FE0F before encoding; on decode try as today, then without the leading byte only if the rest is a whole valid token                                               | fixed     | Built; carriers with a ZWJ or keycap handled too                         | Sound in that shape; cashu.me reads the new output, other wallets unchecked |
-| 11  | Keep the whole `sovran:` namespace out of BitChat chat, in JavaScript and both native bridges, while still delivering it to the payment handlers                                                        | F195      | JavaScript side built; both native bridges left (no device)              | Sound, but a person can type `sovran:hello`: a product call                 |
-| 12  | `wallet-lifecycle`: an over-long restore error is read as null                                                                                                                                          | F192      | Tried                                                                    | Not reviewed separately                                                     |
+| #   | Commit on `surgery/pass-1-cuts` | Before                                                                   | After                                                                                                                                              |
+| --- | ------------------------------- | ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `8729892fe`                     | An over-long cached name or picture emptied the account list             | Read as absent; new names clipped, an over-long picture not saved                                                                                  |
+| 4   | `48cb8c4cb`                     | An over-long swap leg error emptied every swap                           | Read as absent; new errors clipped                                                                                                                 |
+| 5   | `27933bf63`                     | A large contacts document emptied follows, likes and the rest            | Read whole, unaltered                                                                                                                              |
+| 6   | `3f1f1d110`                     | A long own note emptied every own note                                   | Read whole                                                                                                                                         |
+| 7   | `fbc5fb03f`                     | A 65th relay emptied the relay list                                      | Read whole; a new relay beyond 64 is refused with a message                                                                                        |
+| 8   | `f4e8fd259`                     | A very long search emptied search history                                | Read whole; a new search over 2,048 is not recorded                                                                                                |
+| 9   | `9d0a3041c`                     | An over-long mint name, icon or description emptied every mint's details | Read as absent for that mint; new ones clipped, an over-long icon not saved                                                                        |
+| 12  | `92e1c9bd9`                     | An over-long restore error emptied the lifecycle record                  | Read as none; new errors clipped                                                                                                                   |
+| 2   | `3c51c5642`, `11e05366d`        | A 0.1.3 payment to a Nostr request was refused on every poll             | Claimed when its id is, byte for byte, a request this wallet handed out; otherwise set aside and offered again when the wallet holds more requests |
+| 10  | `1c1e525ee`, `99f3cf1e9`        | A token copied with 212 emojis could not be pasted back                  | Every picker emoji works; old copies are repaired only around a well-formed token                                                                  |
+| 11  | `ae12658a2`                     | A `sovran:` message other than version 1 showed as chat                  | No `sovran:` message is stored or shown as chat; handlers still receive it                                                                         |
 
-Not proposed: the wallpaper catalog limits (not shown to be reachable) and `transaction-location-store`'s 256-character
-key (the reviewer's addition; no caller shown to produce one). Both are in F192. Nothing at a storage boundary was
-found safe to delete.
+Reviewed commit by commit by Codex GPT-6.1 Sol: nine clean, two defects (a set-aside payment the inbox window could
+pass; an emoji repair check that accepted a malformed token), both fixed in `11e05366d` and `99f3cf1e9`, which were
+not re-reviewed. One nit left: a mint that changes to an over-long icon keeps showing its old icon.
+
+`persistence-release-safety` for the eight store commits: every upgrade, capacity and resilience test passes and
+every release fixture loads; **no real upgrade was run**, so by that skill's rule the verdict is INCONCLUSIVE, not
+PASS. They sit in a pull request, not on `main`.
+
+Remaining: F193 (after a restart, a 0.1.3 payment to a re-drawn request waits until it is shown again), F195 (native
+bridges), F174 (redeem queue: plan below, not built), F192 (wallpaper and location limits).
+
+Redeem queue plan (proposal 3), awaiting approval: read every saved token, mint address and unit whatever its length;
+read over-long notes on an entry as absent; refuse an over-limit Bluetooth token before saving, as the message path
+does; on start, merge a queue found under `:unreadable` back in by token hash and remove that copy only after the
+merged queue is saved.
 
 ### Open findings from this pass
 
@@ -232,8 +243,9 @@ inferred).
 ### Not verified in pass 1
 
 - Nothing was run on a device. No proposal was checked on a phone, against a real mint or with a real 0.1.3 sender.
-- No proposal is built in the worktree; the throwaway-copy trials were simple forms, not the reviewed shapes.
-- The `persistence-release-safety` verdict was not run: no change to saved data was made.
+- The two review fixes (`11e05366d`, `99f3cf1e9`) were not reviewed by another model.
+- Thirteen keycap emojis may draw as plain text when used as the carrier; not looked at on a phone.
+- No real upgrade (old build, then this one, on a device) was run for the store changes.
 - Native BitChat storage and the Nostr cache database contents have no upgrade test (F198).
 - The surveys' "inferred" items: relay behaviour behind F197, other wallets' emoji decoders, whether any release
   published an `npubx.cash` address.
