@@ -41,7 +41,7 @@ const BASE: Props = {
   enabled: true,
 };
 
-function tx(txid: string, outputs: [string, number][], blockTimeSec: number | null = null) {
+function tx(txid: string, outputs: [string, number][], blockTimeSec?: number) {
   return {
     txid,
     confirmed: blockTimeSec != null,
