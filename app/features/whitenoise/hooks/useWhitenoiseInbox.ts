@@ -57,7 +57,7 @@ export function useWhitenoiseInbox() {
     // other on the AsyncStorage write.
     let cursorHighSec = 0;
 
-    void (async () => {
+    const start = async () => {
       // Prefer the user's published kind-10051 inbox relays if any; fall
       // back to the default app relay set.
       const inboxRelays = await resolveInboxRelays(client.network, selfPubkey, relays);
@@ -66,7 +66,14 @@ export function useWhitenoiseInbox() {
       // No cursor on first cold start: full backfill once so users with
       // pre-cursor history don't silently drop unread invites. Subsequent
       // starts bound the relay-to-device fetch to events we haven't seen.
-      const persistedCursorSec = await cursorStore.getItem(CURSOR_KEY);
+      // A cursor that cannot be read is treated as none: everything is fetched
+      // once and invites already seen are skipped, rather than no inbox at all.
+      const persistedCursorSec = await cursorStore.getItem(CURSOR_KEY).catch((err: unknown) => {
+        wnLog.warn('whitenoise.inbox.cursor_read_failed', {
+          error: err instanceof Error ? err.message : String(err),
+        });
+        return null;
+      });
       if (cancelled) return;
       cursorHighSec = persistedCursorSec ?? 0;
       const since =
@@ -102,7 +109,12 @@ export function useWhitenoiseInbox() {
       });
 
       unsubscribe = () => handle.unsubscribe();
-    })();
+    };
+    start().catch((err: unknown) => {
+      wnLog.warn('whitenoise.inbox.start_failed', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    });
 
     async function handleGiftWrap(ev: GiftWrapEvent): Promise<void> {
       if (!ev.id || ev.kind !== GIFT_WRAP_KIND) return;

@@ -16,7 +16,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { act, renderHook } from '@testing-library/react-native';
 import type { ReactNode } from 'react';
-import { promiseHooks } from 'v8';
 
 import { wnLog } from '@/shared/lib/logger';
 import { WhitenoiseContext } from '@/features/whitenoise/WhitenoiseContext';
@@ -186,43 +185,31 @@ describe('the inbox subscription', () => {
     expect(client!.network.subscription).not.toHaveBeenCalled();
   });
 
-  it('a failed cursor read leaves no subscription, no retry and no log: the rejection escapes the hook (F184)', async () => {
-    // The start runs as `void (async () => ...)()`, so the rejection reaches
-    // the runtime unhandled, and Jest fails any test it lands in. Every promise
-    // settled while the hook starts is given a handler afterwards so the test
-    // can observe the state the failure leaves.
-    const settled: Promise<unknown>[] = [];
-    const stopHook = promiseHooks.onSettled((promise) => settled.push(promise));
+  it('a failed cursor read is reported and the inbox starts with a full backfill', async () => {
     jest.mocked(AsyncStorage.getItem).mockClear();
     jest.mocked(AsyncStorage.getItem).mockRejectedValueOnce(new Error('storage closed'));
-    let rejections: unknown[];
-    try {
-      const { rerender } = renderHook(() => useWhitenoiseInbox(), { wrapper });
-      await flush();
-      rerender({});
-      await flush();
-    } finally {
-      stopHook();
-      rejections = (
-        await Promise.all(
-          settled.map((promise) =>
-            promise.then(
-              () => null,
-              (err: unknown) => err
-            )
-          )
-        )
-      ).filter((err) => err !== null);
-      await new Promise((resolve) => setImmediate(resolve));
-    }
+    renderHook(() => useWhitenoiseInbox(), { wrapper });
+    await flush();
 
-    // QUIRK: the inbox is dead for the session: no subscription, no retry on
-    // rerender, and nothing in the hook reports the failure.
-    expect(rejections).toContainEqual(new Error('storage closed'));
-    expect(client!.network.subscription).not.toHaveBeenCalled();
-    expect(AsyncStorage.getItem).toHaveBeenCalledTimes(1);
-    expect(jest.mocked(wnLog.warn)).not.toHaveBeenCalled();
-    expect(jest.mocked(wnLog.debug)).not.toHaveBeenCalled();
+    expect(jest.mocked(wnLog.warn)).toHaveBeenCalledWith('whitenoise.inbox.cursor_read_failed', {
+      error: 'storage closed',
+    });
+    // No cursor means no `since`: everything is fetched once, as on a first start.
+    expect(client!.network.subscription).toHaveBeenCalledTimes(1);
+    const [, filters] = jest.mocked(client!.network.subscription).mock.calls[0];
+    expect(filters[0]).not.toHaveProperty('since');
+  });
+
+  it('a start that fails before subscribing is reported, not left unhandled', async () => {
+    jest.mocked(client!.network.subscription).mockImplementationOnce(() => {
+      throw new Error('pool closed');
+    });
+    renderHook(() => useWhitenoiseInbox(), { wrapper });
+    await flush();
+
+    expect(jest.mocked(wnLog.warn)).toHaveBeenCalledWith('whitenoise.inbox.start_failed', {
+      error: 'pool closed',
+    });
   });
 
   it('unsubscribes on unmount', async () => {

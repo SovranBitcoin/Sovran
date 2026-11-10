@@ -164,7 +164,7 @@ reports) keep their evidence, and link here for anything still open.
 | [F181](F181.md) | medium | decision | A receive or mint lookup can adopt another operation's row when its own has not been saved yet |
 | [F182](F182.md) | low | fix | An own-profile event with an equal timestamp and a lower id is ignored when it arrives in a later batch |
 | [F183](F183.md) | medium | decision | BitChat drops a failed public or geohash send without telling the person |
-| [F184](F184.md) | medium | fix | A storage failure while the Whitenoise inbox starts is unhandled and never retried |
+| [F184](F184.md) | medium | fix | A Whitenoise inbox start that fails before subscribing is not retried |
 | [F185](F185.md) | medium | fix | Feed: refresh can latch, and failed replies and poll votes are silent |
 | [F186](F186.md) | medium | fix | Mint screens show sat balances under another unit, and stale validation results |
 | [F187](F187.md) | low | investigation | The swap toast can latch as mounted when no toast host is registered |
