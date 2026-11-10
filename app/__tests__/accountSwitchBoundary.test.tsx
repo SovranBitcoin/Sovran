@@ -68,8 +68,13 @@ jest.mock('@/shared/providers/BitchatBLEProvider', () => ({
 jest.mock('@/features/payments/hooks/useDmEcashAutoRedeem', () => ({
   DmEcashAutoRedeemProvider: mockRecorder('DmEcashAutoRedeem'),
 }));
-jest.mock('@/shared/blocks/AppGate', () => ({ __esModule: true, default: mockRecorder('AppGate') }));
-jest.mock('@/shared/hooks/useRegisterKeyDerivation', () => ({ useRegisterKeyDerivation: jest.fn() }));
+jest.mock('@/shared/blocks/AppGate', () => ({
+  __esModule: true,
+  default: mockRecorder('AppGate'),
+}));
+jest.mock('@/shared/hooks/useRegisterKeyDerivation', () => ({
+  useRegisterKeyDerivation: jest.fn(),
+}));
 jest.mock('@/shared/lib/persist/storageUsage', () => ({ reportAsyncStorageUsage: jest.fn() }));
 jest.mock('@/shared/lib/profile/profileTransition', () => ({
   clearTransitionGuardOnStartup: jest.fn(),
@@ -79,10 +84,7 @@ jest.mock('@/shared/lib/profile/profileTransition', () => ({
 import React, { useEffect } from 'react';
 import { act, render, screen } from '@testing-library/react-native';
 
-import {
-  AccountScopedProviders,
-  AccountSwitchBoundary,
-} from '@/shared/providers/AccountProviders';
+import { AccountScopedProviders, AccountSwitchBoundary } from '@/shared/providers/AccountProviders';
 import { profileSwitchBoundary } from '@/shared/lib/account/accountRegistry';
 
 function Account({ name }: { name: string }) {
