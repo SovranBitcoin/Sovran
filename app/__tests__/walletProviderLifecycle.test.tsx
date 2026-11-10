@@ -8,7 +8,6 @@
  * detectors run; only the clipboard scan source (an injected port) is a stub.
  */
 
-import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 
 import {
