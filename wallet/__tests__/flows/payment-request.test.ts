@@ -289,3 +289,43 @@ describe('payment request — confirmPaymentRequest notification sequence', () =
     ]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// A confirm tap after the payment request was delivered
+// ---------------------------------------------------------------------------
+
+/**
+ * A delivered payment request keeps the step on navigateToPaymentRequest with
+ * the historyEntry attached. A second confirm must not send again; a confirm
+ * after a failed attempt is a retry and must still run.
+ */
+describe('payment request — confirm after delivery', () => {
+  it('does not send again when confirm is tapped after a delivered send', async () => {
+    const tm = createTestMachine();
+    await tm.machine.execute(INPUTS.paymentRequestBasic, { reset: true });
+    expect((await tm.machine.confirmPaymentRequest()).kind).toBe('delivered');
+
+    expect((await tm.machine.confirmPaymentRequest()).kind).toBe('ignored');
+
+    expect(tm.operationCalls.filter((c) => c.name === 'executePaymentRequest')).toHaveLength(1);
+    tm.assertStep('navigateToPaymentRequest');
+  });
+
+  it('sends again when confirm is tapped after a failed attempt', async () => {
+    let attempts = 0;
+    const tm = createTestMachine({
+      operations: {
+        executePaymentRequest: async () => {
+          attempts += 1;
+          if (attempts === 1) throw new Error('Transport down');
+          return { historyEntry: JSON.stringify({ id: 'pr-1', type: 'send', state: 'pending' }) };
+        },
+      },
+    });
+    await tm.machine.execute(INPUTS.paymentRequestBasic, { reset: true });
+    expect((await tm.machine.confirmPaymentRequest()).kind).toBe('failed');
+
+    expect((await tm.machine.confirmPaymentRequest()).kind).toBe('delivered');
+    expect(attempts).toBe(2);
+  });
+});

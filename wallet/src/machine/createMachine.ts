@@ -893,6 +893,14 @@ export function createPaymentMachine(
     ) {
       const originalStep = step;
       const data = stepData as StepDataMap["navigateToMeltPreview"];
+      if (data.historyEntry) {
+        // Already paid. Running executeMelt again would pay twice (for a
+        // Lightning address it fetches a fresh invoice). A failed attempt
+        // leaves no historyEntry, so Pay after a failure still retries.
+        logger.warn("machine.confirm.alreadySettled", { type: event.type });
+        sendLocked = false;
+        return;
+      }
       if (
         data.meltQuote?.expiresAt != null &&
         data.meltQuote.expiresAt <= Date.now() / 1000 &&
@@ -1028,6 +1036,13 @@ export function createPaymentMachine(
     ) {
       const originalStep = step;
       const data = stepData as StepDataMap["navigateToPaymentRequest"];
+      if (data.historyEntry) {
+        // Already delivered: sending again would pay twice. The caller's
+        // outcome stays `ignored`.
+        logger.warn("machine.confirm.alreadySettled", { type: event.type });
+        sendLocked = false;
+        return;
+      }
       // Snapshot holders registered before this handler ran. Concurrent
       // callers that arrive during the await below hit the sendLocked guard
       // and resolve through their own holder (which never reaches this

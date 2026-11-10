@@ -465,6 +465,10 @@ MUST NOT:
 - `CONFIRM_MELT` must not execute unless `step === 'navigateToMeltPreview'` and
   `operations.executeMelt` is provided; otherwise it falls through `transition()`
   unchanged. `createMachine.ts:589`.
+- `CONFIRM_MELT` must not execute again once the step data carries the settled
+  `historyEntry`: a second Pay is ignored (for a Lightning address it would
+  fetch a fresh invoice and pay twice). A failed attempt sets no
+  `historyEntry`, so Pay after a failure still retries.
 - Do not invent a `rolling_back` machine state. `MELT_FAILED` is a defined
   `ErrorCode` but the confirm-melt path never sets `error` with it for
   single-option flows.
@@ -620,7 +624,9 @@ MUST:
 - `checkProofComposition` returns null for `paymentRequest`; the proof picker
   must not be shown from the normal gate. `resolveNext.ts:158-161`.
 - `CONFIRM_PAYMENT_REQUEST` is gated on `step === 'navigateToPaymentRequest'` AND
-  `operations.executePaymentRequest`. `createMachine.ts:661`.
+  `operations.executePaymentRequest`. `createMachine.ts:661`. Once the step
+  data carries the delivered `historyEntry`, a further confirm is ignored
+  (outcome `ignored`) instead of sending again.
 - On delivery failure the operation must attempt rollback (cancel if `prepared`,
   reclaim if executing/pending) and only return `rolledBack` when that
   cancel-or-reclaim succeeds; otherwise throw `PaymentRequestUndeliveredError`
