@@ -2,7 +2,10 @@ import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { persist } from 'zustand/middleware';
 import { z } from 'zod';
 
-import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
+import {
+  createProfileScopedStorage,
+  getActiveProfilePubkey,
+} from '@/shared/lib/cashu/profileScopedStorage';
 import { storeLog } from '@/shared/lib/logger';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
 
@@ -154,8 +157,9 @@ const clipError = (error: string) => error.slice(0, NUT_DROP_QUEUE_LIMITS.lastEr
  * There is deliberately no per-entry tolerance that drops an entry. An entry
  * with no usable token or mint address, or with a broken amount, attempt count
  * or time (only this store's own code writes those), still fails the whole
- * blob, which is then kept whole at `<name>:unreadable`. Dropping it instead
- * would lose, without trace, whatever it still held.
+ * blob, which is then kept whole at `<name>:unreadable` until a release that
+ * can read it folds it back in (`recoverUnreadable` below). Dropping it
+ * instead would lose, without trace, whatever it still held.
  */
 const PersistedNutDropRedeemQueueStore = z.object({
   byTokenHash: z
@@ -324,6 +328,25 @@ export const useNutDropRedeemQueueStore = create<NutDropRedeemQueueStore>({
       partialize: (state) => ({
         byTokenHash: state.byTokenHash,
       }),
+      // A queue an earlier build set aside (one entry over its read limits)
+      // holds tokens waiting to be redeemed. Folded back in by token hash; an
+      // entry already queued wins, so its status is never rolled back.
+      recoverUnreadable: {
+        owner: getActiveProfilePubkey,
+        merge: (recovered) => {
+          useNutDropRedeemQueueStore.setState((state) => ({
+            byTokenHash: { ...recovered.byTokenHash, ...state.byTokenHash },
+          }));
+          return useNutDropRedeemQueueStore.getState();
+        },
+        // A redeemed or spent entry holds no money, and `prune` may already
+        // have removed it; every other one must be saved before the copy goes.
+        holds: (saved, recovered) =>
+          Object.entries(recovered.byTokenHash).every(
+            ([hash, entry]) =>
+              isTerminal(entry.status) || saved.byTokenHash[hash]?.token === entry.token
+          ),
+      },
     })
   )
 );

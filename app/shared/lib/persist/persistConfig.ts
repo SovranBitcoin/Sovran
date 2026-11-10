@@ -1,12 +1,17 @@
 import { profilePersistWrite } from './profileWriteBarrier';
 import { type ZodType } from 'zod';
-import { createJSONStorage, type PersistOptions, type StateStorage } from 'zustand/middleware';
+import {
+  createJSONStorage,
+  type PersistOptions,
+  type StateStorage,
+  type StorageValue,
+} from 'zustand/middleware';
 
 import { redactError, storeLog } from '@/shared/lib/logger';
 import type { LiveStore } from '@/shared/lib/account/accountRegistry';
 import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
 import { declaredStores } from '@/shared/lib/account/accountRegistry';
-import { guardUnreadable } from '@/shared/lib/persist/preserveUnreadable';
+import { guardUnreadable, unreadableKey } from '@/shared/lib/persist/preserveUnreadable';
 import { markHydrationFailed, markHydrationStarted } from '@/shared/lib/persist/hydrationOutcome';
 
 const DEFAULT_VERSION = 1;
@@ -62,6 +67,27 @@ interface PersistConfigOptions<TFull, TPartial> {
    * falling back to its default. See `createMergeWithSchema`.
    */
   independentFields?: boolean;
+  /**
+   * Read back the copy this store set aside at `<name>:unreadable` once this
+   * release's schema can parse it. Only for a store whose copies hold what a
+   * person cannot get back any other way. See `recoverUnreadable`.
+   */
+  recoverUnreadable?: UnreadableRecovery<TFull, TPartial>;
+}
+
+interface UnreadableRecovery<TFull, TPartial> {
+  /**
+   * Lay what the copy holds into the live store, keeping whatever the store
+   * already has, and return the store as it now is.
+   */
+  merge: (recovered: TPartial) => TFull;
+  /** True when `saved` holds everything in `recovered` that must survive, so the copy can go. */
+  holds: (saved: TPartial, recovered: TPartial) => boolean;
+  /**
+   * Whose data is loaded: for a per-account store, the active account.
+   * Recovery stops if it changes while a read or save is under way.
+   */
+  owner: () => string | undefined;
 }
 
 /**
@@ -93,6 +119,81 @@ function reportFailedSaves(logKey: string, storage: StateStorage): StateStorage 
       }
     },
   };
+}
+
+/**
+ * A saved blob as this release reads it: migrated from the version it was
+ * written at, then parsed by the schema. Null when it does not parse.
+ */
+function readBlob<TPartial>(
+  raw: string,
+  version: number,
+  migrate: (state: unknown, version: number) => TPartial,
+  schema: ZodType<unknown>
+): TPartial | null {
+  try {
+    const blob = JSON.parse(raw) as Partial<StorageValue<unknown>> | null;
+    if (!blob || typeof blob !== 'object') return null;
+    // As zustand does on load: migrate whenever the versions differ.
+    const state =
+      blob.version === version ? blob.state : migrate(blob.state, blob.version as number);
+    const parsed = schema.safeParse(state);
+    return parsed.success ? (parsed.data as TPartial) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Fold the copy a store set aside at `<name>:unreadable` back into it, once
+ * its schema can read the copy. Runs after a load that succeeded, for the
+ * owner that load was for.
+ *
+ * The copy is removed only after the merged state has been saved and read
+ * back under the main key, so a failed or dropped save, or a kill at any
+ * point, leaves the copy, the merged state, or both; never neither. The merge
+ * keeps what the store already has, so running it again adds nothing. A copy
+ * that still does not parse is left where it is.
+ */
+async function recoverUnreadable<TFull, TPartial>(run: {
+  name: string;
+  logKey: string;
+  version: number;
+  migrate: (state: unknown, version: number) => TPartial;
+  schema: ZodType<unknown>;
+  partialize: (state: TFull) => TPartial;
+  recovery: UnreadableRecovery<TFull, TPartial>;
+  /** Raw reads and the removal, under the store's own scope. */
+  storage: StateStorage;
+  /** The store's own save path. */
+  save: (value: StorageValue<TPartial>) => Promise<unknown> | unknown;
+  /** False once the store has started another load. */
+  stillLoaded: () => boolean;
+}): Promise<void> {
+  // A throw anywhere here rejects this promise; none reaches the hydration
+  // callback, which zustand would call again with the error.
+  const owner = run.recovery.owner();
+  const current = () => run.stillLoaded() && run.recovery.owner() === owner;
+  const side = unreadableKey(run.name);
+  const raw = await run.storage.getItem(side);
+  if (raw === null || !current()) return;
+  const recovered = readBlob(raw, run.version, run.migrate, run.schema);
+  if (!recovered) {
+    storeLog.warn(`store.${run.logKey}.unreadable_kept`, { bytes: raw.length });
+    return;
+  }
+  const value = { state: run.partialize(run.recovery.merge(recovered)), version: run.version };
+  await run.save(value);
+  if (!current()) return;
+  const savedRaw = await run.storage.getItem(run.name);
+  if (!current()) return;
+  const saved = savedRaw === null ? null : readBlob(savedRaw, run.version, run.migrate, run.schema);
+  if (!saved || !run.recovery.holds(saved, recovered)) {
+    storeLog.warn(`store.${run.logKey}.unreadable_recovery_not_saved`);
+    return;
+  }
+  await run.storage.removeItem(side);
+  storeLog.info(`store.${run.logKey}.unreadable_recovered`, { bytes: raw.length });
 }
 
 /** Derive a snake_case log slug from the kebab-case `<name>-store` storage key. */
@@ -171,29 +272,60 @@ export function persistConfig<TFull, TPartial>(
   const reported = reportFailedSaves(logKey, storage);
   const guard =
     opts.preserveUnreadable === false ? null : guardUnreadable(opts.name, logKey, reported);
+  /** Counts loads, so recovery can tell the store has reloaded under it. */
+  let loads = 0;
+  let loadTurnedDown = false;
+  const turnDown = () => {
+    loadTurnedDown = true;
+    guard?.reject();
+  };
   // A turned-down blob is copied aside before the next save, whether or not
   // some of its fields were kept.
   const mergeWithSchema = createMergeWithSchema(logKey, opts.schema, {
     independentFields: opts.independentFields,
-    onRejected: () => guard?.reject(),
+    onRejected: turnDown,
   });
+  const jsonStorage = createJSONStorage<TPartial>(() => guard?.storage ?? reported);
   return {
     name: opts.name,
-    storage: createJSONStorage(() => guard?.storage ?? reported),
+    storage: jsonStorage,
     version,
     partialize: opts.partialize,
     migrate,
     merge: mergeWithSchema,
     onRehydrateStorage: () => {
+      loads += 1;
+      loadTurnedDown = false;
       markHydrationStarted(opts.name);
       return (state, error) => {
         if (error) {
           // An unparseable blob or a throwing `migrate` ends up here, not in `merge`.
-          guard?.reject();
+          turnDown();
           storeLog.warn(`store.${logKey}.rehydrate_failed`, { error: redactError(error) });
           markHydrationFailed(opts.name);
         }
         opts.afterHydrate?.(state, error);
+        const recovery = opts.recoverUnreadable;
+        // Not after a load that was itself turned down: its own blob is the
+        // one waiting to be copied aside, and the copy already there is kept.
+        if (!recovery || !guard || !jsonStorage || loadTurnedDown) return;
+        const load = loads;
+        recoverUnreadable({
+          name: opts.name,
+          logKey,
+          version,
+          migrate,
+          schema: opts.schema,
+          partialize: opts.partialize,
+          recovery,
+          storage: reported,
+          save: (value) => jsonStorage.setItem(opts.name, value),
+          stillLoaded: () => load === loads,
+        }).catch((recoveryError: unknown) => {
+          storeLog.warn(`store.${logKey}.unreadable_recovery_failed`, {
+            error: redactError(recoveryError),
+          });
+        });
       };
     },
   };
