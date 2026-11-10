@@ -397,6 +397,43 @@ describe('a NUT-18 payment over Nostr into this build', () => {
     }
   });
 
+  it('claims a set-aside 0.1.3 payment the inbox no longer returns once its encoding is shown', async () => {
+    const t = await setup();
+    try {
+      const request = await t.createRequest();
+      const decoded = decodePaymentRequest(request.encodedRequest);
+      const lock = `02${'b'.repeat(64)}`;
+      const shownBefore = new PaymentRequest(
+        decoded.transport,
+        decoded.id,
+        decoded.amount,
+        decoded.unit,
+        decoded.mints,
+        decoded.description,
+        decoded.singleUse,
+        { kind: 'P2PK', data: lock, tags: [] },
+        decoded.mintsPreferred
+      ).toEncodedRequest();
+      t.setInbox([wrap('h', releasedPayload(shownBefore, 'aged-input'))]);
+      await t.pollAgain();
+      expect(t.ingested).toHaveLength(0);
+
+      // Newer wraps moved the read window past it: later polls leave it out.
+      t.setInbox([]);
+      await t.pollAgain();
+      expect(
+        reencodeSingleUsePaymentRequest(request.encodedRequest, { lockP2pkPubkey: lock })
+          .encodedRequest
+      ).toBe(shownBefore);
+      await t.pollAgain();
+      expect(t.ingested).toHaveLength(1);
+      expect(t.ingested[0].payload.id).toBe(request.requestId);
+      expect(t.ingested[0].outcome).toBe('finalized');
+    } finally {
+      await t.dispose();
+    }
+  });
+
   it('does not claim an id that is another request with the same inner id, and stops offering it', async () => {
     const t = await setup();
     try {

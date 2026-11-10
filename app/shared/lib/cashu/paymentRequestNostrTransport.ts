@@ -147,6 +147,11 @@ export function preparePayload(
   return { claimable: true, content: JSONInt.stringify({ ...raw, ...patch }) ?? content };
 }
 
+/** How many unclaimable wraps are kept for another look. */
+const MAX_SET_ASIDE_WRAPS = 200;
+
+type SetAsideEnvelope = { id: string; kind: number; content: string; pubkey: string };
+
 export function createPaymentRequestNostrTransportPlugin(
   config: NostrTransportPluginConfig
 ): Plugin {
@@ -192,15 +197,17 @@ export function createPaymentRequestNostrTransportPlugin(
         seenWraps: Set<string>;
         inFlightWraps: Set<string>;
         /** Wraps naming a payment request this wallet does not hold, with the
-         *  `knownRequestsVersion` they were checked against. */
-        unclaimableWraps: Map<string, number>;
+         *  `knownRequestsVersion` they were checked against. The envelope is
+         *  kept so it can be offered again once the wallet holds more requests:
+         *  by then the inbox read window may have moved past it. */
+        unclaimableWraps: Map<string, { version: number; envelope: SetAsideEnvelope }>;
       };
       const newSession = (viewerPubkey: string): InboxSession => ({
         viewerPubkey,
         newestCreatedAtSec: undefined,
         seenWraps: new Set<string>(),
         inFlightWraps: new Set<string>(),
-        unclaimableWraps: new Map<string, number>(),
+        unclaimableWraps: new Map<string, { version: number; envelope: SetAsideEnvelope }>(),
       });
       let inboxSession = newSession('');
       const sessionFor = (viewerPubkey: string) => {
@@ -210,7 +217,7 @@ export function createPaymentRequestNostrTransportPlugin(
       const isSettled = (session: InboxSession, wrapId: string) =>
         session.seenWraps.has(wrapId) ||
         session.inFlightWraps.has(wrapId) ||
-        session.unclaimableWraps.get(wrapId) === knownRequestsVersion();
+        session.unclaimableWraps.get(wrapId)?.version === knownRequestsVersion();
       const appState = config.appState ?? AppState;
       let timer: ReturnType<typeof setInterval> | null = null;
       let polling = false;
@@ -262,7 +269,23 @@ export function createPaymentRequestNostrTransportPlugin(
           if (!prepared.claimable) {
             // Names a payment request this wallet does not hold: Coco could
             // only refuse it. Set aside until the wallet holds more requests.
-            unclaimableWraps.set(envelope.id, knownRequestsVersion());
+            // Re-inserted so the oldest entry is the least recently checked.
+            unclaimableWraps.delete(envelope.id);
+            unclaimableWraps.set(envelope.id, {
+              version: knownRequestsVersion(),
+              envelope: {
+                id: envelope.id,
+                kind: envelope.kind,
+                content: envelope.content,
+                pubkey: envelope.pubkey,
+              },
+            });
+            // Anyone can send these; keep the newest and let the oldest go
+            // back to depending on the inbox read.
+            if (unclaimableWraps.size > MAX_SET_ASIDE_WRAPS) {
+              const oldest = unclaimableWraps.keys().next().value;
+              if (oldest !== undefined) unclaimableWraps.delete(oldest);
+            }
             cashuLog.debug('cashu.creq.transport.payload_unclaimable', {
               source,
               contentLength: rumor.content.length,
@@ -374,6 +397,13 @@ export function createPaymentRequestNostrTransportPlugin(
               session.newestCreatedAtSec ?? envelope.createdAtSec,
               envelope.createdAtSec
             );
+            if (isSettled(session, envelope.id)) continue;
+            if (await handleEnvelope(envelope, 'poll', viewerPubkey)) ingested += 1;
+          }
+          // Wraps set aside earlier that this read did not return: offer each
+          // again if the wallet holds requests it did not hold when checked.
+          for (const { envelope } of [...session.unclaimableWraps.values()]) {
+            if (disposed || activeOps.size === 0 || inboxSession !== session) break;
             if (isSettled(session, envelope.id)) continue;
             if (await handleEnvelope(envelope, 'poll', viewerPubkey)) ingested += 1;
           }
