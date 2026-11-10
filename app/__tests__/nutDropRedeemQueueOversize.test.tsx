@@ -261,7 +261,12 @@ describe('Nut Drop redeem queue reading what a release saved', () => {
     await settle();
     expect(mockDisk.has(SIDE_KEY)).toBe(false);
     // The order of an object's keys is not data.
-    expect(JSON.parse(mockDisk.get(QUEUE_KEY)!)).toEqual(JSON.parse(bytes));
+    // `recoveredCopy` is the one field this build adds; no copy was merged here.
+    const released = JSON.parse(bytes) as { state: object; version: number };
+    expect(JSON.parse(mockDisk.get(QUEUE_KEY)!)).toEqual({
+      ...released,
+      state: { ...released.state, recoveredCopy: null },
+    });
   });
 
   it('reads over-limit metadata as absent and keeps the token', async () => {

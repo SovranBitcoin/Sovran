@@ -136,6 +136,13 @@ export const fixture: ReleaseFixture = {
       groups: { ...SWAP_A0.state.groups, [SWAP_GROUP]: SWAP_GROUP_A0 },
     }),
     // shared/stores/global/settingsStore.ts: PersistedSettings
+    // shared/stores/profile/nutDropRedeemQueueStore.ts (`recoveredCopy`): which
+    // set-aside copy of the queue was merged back in; none on this install.
+    ...Object.fromEntries(
+      Object.keys(disk)
+        .filter((key) => key.startsWith('nut-drop-redeem-queue:profile:'))
+        .map((key) => [key, withState(key, { recoveredCopy: null })])
+    ),
     'settings-store': withState('settings-store', {
       lastKnownAppVersion: LAST_KNOWN_VERSION,
       vertexCreditsEnabled: false,
