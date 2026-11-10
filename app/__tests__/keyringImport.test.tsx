@@ -184,17 +184,15 @@ describe('keyring import', () => {
     );
   });
 
-  it('writes nothing for an invalid key, sets an error, and closes the sheet anyway', async () => {
+  it('writes nothing for an invalid key and keeps the sheet open beside the error', async () => {
     await mount();
 
     const helpers = await openImportAndSubmit('not a key');
 
     expect(mockKeyring.addKeyPair).not.toHaveBeenCalled();
     expect(helpers.setError).toHaveBeenCalledWith('Enter nsec or 64-character hex key.');
-    // QUIRK: the `finally` closes the sheet right after the error is set, so the person never
-    // sees why nothing was imported (settings-onboarding-routes D4). A fix that keeps the sheet
-    // open on invalid input should change this assertion on purpose.
-    expect(helpers.close).toHaveBeenCalledTimes(1);
+    // The sheet stays open beside the error so the key can be corrected.
+    expect(helpers.close).not.toHaveBeenCalled();
     expect(mockedStaticPopup).not.toHaveBeenCalled();
   });
 
