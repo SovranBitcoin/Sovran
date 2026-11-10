@@ -707,7 +707,7 @@ export function usePaymentStatusListener(): void {
 
     const offSendFinalized = manager.on('send:finalized', ({ mintUrl, operationId, operation }) => {
       const amount = amountToNumber(operation.amount);
-      const unit = 'sat';
+      const unit = operation.unit;
       paymentLog.info('hook.payment_status.send_finalized', {
         operationId,
         ...mintUrlLogFields(mintUrl),
@@ -871,7 +871,7 @@ export function usePaymentStatusListener(): void {
         } else {
           // Background melt (no active toast) — show new confirmed toast
           const amount = amountToNumber(operation.amount);
-          const unit = 'sat';
+          const unit = operation.unit;
           paymentLog.info('hook.payment_status.melt_new_success_toast', {
             operationId,
             quoteId: operation.quoteId,

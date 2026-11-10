@@ -411,7 +411,7 @@ describe('usePaymentStatusListener', () => {
     unmount();
   });
 
-  it('raises a new confirmed send toast in sats for a background send of another unit', () => {
+  it('raises a new confirmed send toast in the unit of a background send', () => {
     const { unmount } = mount();
 
     act(() =>
@@ -422,19 +422,17 @@ describe('usePaymentStatusListener', () => {
       })
     );
 
-    // QUIRK: the unit is always 'sat', so 500 usd cents read as "500 sats". A fix that uses
-    // operation.unit should change this assertion on purpose.
     expect(mockedPopup).toHaveBeenCalledWith({
       variant: 'send',
       id: 'send-usd',
       mintUrl: MINT,
       amount: 500,
-      unit: 'sat',
+      unit: 'usd',
     });
     expect(active()).toMatchObject({
       variant: 'send',
       id: 'send-usd',
-      unit: 'sat',
+      unit: 'usd',
       state: 'confirmed',
     });
     unmount();
@@ -510,14 +508,12 @@ describe('usePaymentStatusListener', () => {
         operation: { quoteId: 'mq-usd', amount: 500, unit: 'usd', method: 'bolt11' },
       })
     );
-    // QUIRK: the background melt toast always uses unit 'sat', even for a usd melt. A fix that
-    // uses operation.unit should change this assertion on purpose.
     expect(mockedPopup).toHaveBeenCalledWith({
       variant: 'melt',
       id: 'mq-usd',
       mintUrl: MINT,
       amount: 500,
-      unit: 'sat',
+      unit: 'usd',
       operationId: 'melt-op-usd',
     });
     unmount();
