@@ -255,6 +255,10 @@ version or field was renamed, removed or tightened.
 `nut-drop-redeem-queue` was repaired the same way, in its own section of `releasedWriterBounds.test.ts`: every
 token, mint address and unit is read at any length, a new Bluetooth token over the limits is refused before it is
 queued, and a queue an earlier build copied to `:unreadable` is merged back by token hash and the copy removed only
-once the merged queue is saved (`nutDropRedeemQueueRecovery.test.ts`). Real upgrade NOT RUN; INCONCLUSIVE.
+once the merged queue is saved and read back (`nutDropRedeemQueueRecovery.test.ts`, with a failed save, a dropped
+save, a failed removal and repeat launches). The queue gains one optional field, `recoveredCopy`, absent on every
+released blob, so a copy whose removal failed is not merged twice. Candidate: branch `surgery/pass-1-queue`. Real
+upgrade NOT RUN (7 GB free on this Mac, too little to build both apps); INCONCLUSIVE.
 
-Still open in the same family: wallpaper and location limits (F192).
+Still open in the same family: a second rejected blob is overwritten when an older set-aside copy exists (F208);
+wallpaper and location limits (F192).
