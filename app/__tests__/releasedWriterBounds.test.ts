@@ -87,11 +87,13 @@ async function startWith(
   options: {
     account?: number;
     files?: Record<string, string>;
+    /** Further AsyncStorage rows, beside the replaced one. */
+    rows?: Record<string, string>;
   } = {}
 ): Promise<Started> {
   const variant: ReleaseFixture = {
     ...E19,
-    asyncStorage: { ...E19.asyncStorage, [key]: bytes },
+    asyncStorage: { ...E19.asyncStorage, ...options.rows, [key]: bytes },
     files: { ...E19.files, ...options.files },
     survives: {
       ...E19.survives,
@@ -573,45 +575,67 @@ describe('search-history-store: a recorded search longer than 2048', () => {
  * Writer: `identityFromInfo` (`G/mintMetadataStore.ts:150-159`) copies a
  * mint's NUT-06 `name`, `icon_url` and `description` as they are;
  * `setIdentity` :205-207 merges them through `mergeCached` :183-196.
- * `partialize` :323-326, version 1. 0.1.3 read limits :105-108; HEAD
- * :126-129. `byMintUrl` is a plain `z.record` (:130, HEAD :162).
+ * `partialize` :323-326, version 1. 0.1.3 read limits :105-108, which
+ * rejected every mint's metadata. `byMintUrl` is a plain `z.record` (:130,
+ * HEAD :162). Repaired: an over-long name, icon or description is read as
+ * absent for that mint only; `identityFromInfo` clips a new name and
+ * description and does not save an over-long icon URL (`mintMetadataStore.test.ts`).
  */
-describe('mint-metadata-store: a mint name longer than 256', () => {
+describe('mint-metadata-store: a mint name, icon or description over the limit', () => {
   const KEY = 'mint-metadata-store';
   const row = e19Row(KEY);
   const byMintUrl = row.state.byMintUrl as Record<string, State>;
   const [MINT, MINT_B] = Object.keys(byMintUrl);
-  const withName = (displayName: string) =>
+  const withIdentity = (field: string, value: string) =>
     released(1, {
       ...row.state,
-      byMintUrl: { ...byMintUrl, [MINT_B]: { ...byMintUrl[MINT_B], displayName } },
+      byMintUrl: { ...byMintUrl, [MINT_B]: { ...byMintUrl[MINT_B], [field]: value } },
     });
+  // A pre-0.1.1 cache still on disk: the one-time import would fold it in if it
+  // ran again, so it shows whether the import marker survived.
+  const LEGACY_MINT = 'https://legacy.example';
+  const LEGACY = {
+    'mint-info-cache': JSON.stringify({
+      state: { cache: { [LEGACY_MINT]: { info: { name: 'Legacy' }, fetchedAt: 1 } } },
+    }),
+  };
 
-  it('loses every mint’s metadata when one name is 257 characters', async () => {
-    const bytes = withName(longText(257));
-    const { run, loaded, saved } = await startWith(KEY, bytes, KEY);
+  it.each([
+    ['displayName', 257],
+    ['iconUrl', 2049],
+    ['description', 4097],
+  ])('keeps every mint’s metadata when one %s is %i characters', async (field, length) => {
+    const bytes = withIdentity(field, longText(length));
+    const { run, loaded, saved } = await startWith(KEY, bytes, KEY, { rows: LEGACY });
 
-    // QUIRK: the other mint's name, reviews, audit and social scores go too.
-    expect(loaded.byMintUrl).toEqual({});
-    // The import-marker reset re-runs the one-time import of the pre-0.1.1
-    // caches (`migrateLegacyMintCaches`); E19 holds none, so it brings nothing
-    // back and sets the marker again. Because of that the runner's
-    // defaulted-row check does not flag this store.
+    const mints = loaded.byMintUrl as Record<string, State>;
+    // The other mint whole; this mint without only the field too long to read.
+    expect(mints[MINT]).toEqual(byMintUrl[MINT]);
+    const { [field]: _tooLong, ...kept } = byMintUrl[MINT_B];
+    expect(mints[MINT_B]).toEqual(kept);
+    expect(mints[MINT_B][field]).toBeUndefined();
+    expect(Object.keys(mints).sort()).toEqual([MINT, MINT_B].sort());
+    // The import marker held, so the one-time import did not run again.
     expect(loaded.legacyMigrated).toBe(true);
-    expect(run.defaultedRows.some((r) => r.startsWith('mint-metadata-store '))).toBe(false);
-    expect(saved!.state).toEqual({ byMintUrl: {}, legacyMigrated: true });
-    expect(run.rejections).toContain('store.mint_metadata.merge_rejected');
-    expect(run.disk.asyncStorage[sideKey(KEY)]).toBe(bytes);
+    expect(run.disk.asyncStorage['mint-info-cache']).toBe(LEGACY['mint-info-cache']);
+    expect(saved!.state).toEqual({ byMintUrl: mints, legacyMigrated: true });
+    expect(run.rejections).toEqual([]);
+    expect(run.disk.asyncStorage[sideKey(KEY)]).toBeUndefined();
   });
 
-  it('keeps every mint’s metadata when the name is exactly 256', async () => {
-    const bytes = withName(longText(256));
-    const { run, loaded } = await startWith(KEY, bytes, KEY);
+  it.each([
+    ['displayName', 256],
+    ['iconUrl', 2048],
+    ['description', 4096],
+  ])('keeps every mint’s metadata when the %s is exactly %i', async (field, length) => {
+    const bytes = withIdentity(field, longText(length));
+    const { run, loaded } = await startWith(KEY, bytes, KEY, { rows: LEGACY });
 
     expect(run.rejections).toEqual([]);
-    expect((loaded.byMintUrl as Record<string, State>)[MINT]).toMatchObject(byMintUrl[MINT]);
-    expect((loaded.byMintUrl as Record<string, State>)[MINT_B].displayName).toBe(longText(256));
+    expect((loaded.byMintUrl as Record<string, State>)[MINT]).toEqual(byMintUrl[MINT]);
+    expect((loaded.byMintUrl as Record<string, State>)[MINT_B][field]).toBe(longText(length));
     expect(loaded.legacyMigrated).toBe(true);
+    expect(run.disk.asyncStorage['mint-info-cache']).toBe(LEGACY['mint-info-cache']);
     expect(run.disk.asyncStorage[sideKey(KEY)]).toBeUndefined();
   });
 });

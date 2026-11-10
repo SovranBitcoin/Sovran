@@ -61,6 +61,57 @@ describe('mintMetadataStore aggregate-only invariant', () => {
   });
 });
 
+describe('a mint identity saved within the limits the store reads', () => {
+  type Info = Parameters<ReturnType<typeof useMintMetadataStore.getState>['setIdentity']>[1];
+  const info = (fields: Record<string, string>) => ({ nuts: {}, ...fields }) as unknown as Info;
+
+  it('clips a name over 256 and a description over 4096, and keeps them at the limit', () => {
+    useMintMetadataStore
+      .getState()
+      .setIdentity(MINT, info({ name: 'n'.repeat(257), description: 'd'.repeat(4097) }));
+    expect(useMintMetadataStore.getState().getCached(MINT)).toMatchObject({
+      displayName: 'n'.repeat(256),
+      description: 'd'.repeat(4096),
+    });
+
+    useMintMetadataStore
+      .getState()
+      .setIdentity(MINT, info({ name: 'm'.repeat(256), description: 'e'.repeat(4096) }));
+    expect(useMintMetadataStore.getState().getCached(MINT)).toMatchObject({
+      displayName: 'm'.repeat(256),
+      description: 'e'.repeat(4096),
+    });
+  });
+
+  it('does not save an icon URL over 2048, and keeps one at the limit', () => {
+    const url = (length: number) => `https://icon.example/${'i'.repeat(length - 21)}`;
+    useMintMetadataStore.getState().setIdentity(MINT, info({ icon_url: url(2048) }));
+    expect(useMintMetadataStore.getState().getCached(MINT)!.iconUrl).toBe(url(2048));
+
+    useMintMetadataStore
+      .getState()
+      .setIdentity('https://other.example', info({ icon_url: url(2049) }));
+    expect(useMintMetadataStore.getState().getCached('https://other.example')).not.toHaveProperty(
+      'iconUrl'
+    );
+  });
+
+  it('applies the same limits to a legacy cache it imports', async () => {
+    mockAsyncStore.set(
+      'mint-info-cache',
+      envelope({
+        byMintUrl: {
+          [KEY]: { info: { name: 'n'.repeat(300), icon_url: 'i'.repeat(3000) }, fetchedAt: 1 },
+        },
+      })
+    );
+    await migrateLegacyMintCaches();
+    const entry = useMintMetadataStore.getState().getCached(MINT)!;
+    expect(entry.displayName).toBe('n'.repeat(256));
+    expect(entry).not.toHaveProperty('iconUrl');
+  });
+});
+
 describe('migrateLegacyMintCaches', () => {
   it('merges the four legacy blobs into one entry and drops review rows', async () => {
     mockAsyncStore.set(
