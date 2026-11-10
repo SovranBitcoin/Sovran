@@ -1,8 +1,16 @@
 /** @jest-environment node */
 import type { AppStateStatus } from 'react-native';
-import { Amount, createBlindSignature, deriveKeysetId, pointFromHex } from '@cashu/cashu-ts';
+import {
+  Amount,
+  PaymentRequest,
+  createBlindSignature,
+  decodePaymentRequest,
+  deriveKeysetId,
+  pointFromHex,
+} from '@cashu/cashu-ts';
 import { initializeCoco, MemoryRepositories, type Manager } from '@cashu/coco-core';
 import type { Plugin } from '@cashu/coco-core/plugin';
+import { ensureStandingPaymentRequest, reencodeSingleUsePaymentRequest } from 'wallet';
 import { createPaymentRequestNostrTransportPlugin } from '@/shared/lib/cashu/paymentRequestNostrTransport';
 
 /**
@@ -29,9 +37,11 @@ const KEYPAIRS = Object.fromEntries([1, 2, 4, 8, 16].map((amount) => [String(amo
 const KEYSET = deriveKeysetId(KEYPAIRS, { unit: 'sat', input_fee_ppk: 0 });
 
 const mockRumors = new Map<string, string>();
+const mockUnwrapped: string[] = [];
 jest.mock('@/shared/lib/nostr/giftWrapCache', () => ({
   giftWrapCache: {
     unwrap: (_viewer: string, envelope: { id: string }) => {
+      mockUnwrapped.push(envelope.id);
       const content = mockRumors.get(envelope.id);
       return content === undefined ? null : { content, senderPubkey: 'c'.repeat(64) };
     },
@@ -63,6 +73,7 @@ async function until(what: string, condition: () => boolean): Promise<void> {
 }
 
 interface Ingested {
+  raw: string;
   payload: { id: string; proofs: { amount: unknown }[] };
   transportMessageId: string | undefined;
   outcome: string;
@@ -133,7 +144,16 @@ async function setup() {
       service = ctx.services.paymentRequestReceiveService;
     },
   };
-  const layer = { getDmEnvelopes, subscribeDmEnvelopes: () => () => undefined };
+  let live: ((envelope: Envelope) => void) | undefined;
+  const layer = {
+    getDmEnvelopes,
+    subscribeDmEnvelopes: (_filter: unknown, listener: (envelope: Envelope) => void) => {
+      live = listener;
+      return () => {
+        live = undefined;
+      };
+    },
+  };
   const manager: Manager = await initializeCoco({
     repo,
     seedGetter: async () => new Uint8Array(64).fill(7),
@@ -162,6 +182,7 @@ async function setup() {
   const original = receive.ingestPayload.bind(receive);
   jest.spyOn(receive, 'ingestPayload').mockImplementation(async (content, source) => {
     const record: Ingested = {
+      raw: String(content),
       payload: JSON.parse(String(content)) as Ingested['payload'],
       transportMessageId: source?.transportMessageId,
       outcome: 'pending',
@@ -202,6 +223,29 @@ async function setup() {
       await turns(50);
       return request;
     },
+    /** The receive hub's standing request, made the way the hub makes it. */
+    createStandingRequest: async () => {
+      const recorded = new Map<string, string>();
+      const standing = await ensureStandingPaymentRequest(
+        manager,
+        { unit: 'sat', mints: [MINT] },
+        { get: (key) => recorded.get(key), set: (key, id) => void recorded.set(key, id) }
+      );
+      await until('the first poll', () => getDmEnvelopes.mock.calls.length > 0);
+      await turns(50);
+      return standing;
+    },
+    /** A wrap arriving on the live subscription. */
+    deliverLive: (envelope: Envelope) => {
+      if (!live) throw new Error('the live subscription is not open');
+      live(envelope);
+    },
+    settle: async () => {
+      await until('the claims to settle', () =>
+        ingested.every((each) => each.outcome !== 'pending')
+      );
+      await turns(50);
+    },
     /** Back from the background: the transport polls at once. */
     pollAgain: async () => {
       const before = getDmEnvelopes.mock.calls.length;
@@ -222,6 +266,7 @@ describe('a NUT-18 payment over Nostr into this build', () => {
   const quieted: jest.SpyInstance[] = [];
   beforeEach(() => {
     mockRumors.clear();
+    mockUnwrapped.length = 0;
     // The logger prints every entry.
     for (const method of ['log', 'info', 'debug', 'warn', 'error'] as const) {
       quieted.push(jest.spyOn(console, method).mockImplementation(() => {}));
@@ -229,42 +274,167 @@ describe('a NUT-18 payment over Nostr into this build', () => {
   });
   afterEach(() => quieted.splice(0).forEach((spy) => spy.mockRestore()));
 
-  it('hands a 0.1.3 payer’s payload to Coco unchanged, is refused, and offers it again on the next poll', async () => {
+  /** wallet/src/operations/defaultOperations.ts:1821-1831@d9ad12c4b:
+   * `{ id: paymentRequest, mint: mintUrl, unit, proofs: token.proofs }`, where
+   * `paymentRequest` is the whole encoded request the payer scanned and each
+   * proof's amount is a cashu-ts `Amount`, which serialises as a string. */
+  function releasedPayload(
+    encodedRequest: string,
+    secret: string,
+    amount: unknown = Amount.from(8)
+  ) {
+    return JSON.stringify({
+      id: encodedRequest,
+      mint: MINT,
+      unit: 'sat',
+      proofs: [{ id: KEYSET, amount, secret, C: PUBLIC_KEY }],
+    });
+  }
+
+  it('claims a 0.1.3 payer’s payload once, with its string amounts, and does not offer it again', async () => {
     const t = await setup();
     try {
       const request = await t.createRequest();
       expect(request.encodedRequest.startsWith('creqA')).toBe(true);
-      // wallet/src/operations/defaultOperations.ts:1821-1831@d9ad12c4b:
-      // `{ id: paymentRequest, mint: mintUrl, unit, proofs: token.proofs }`, where
-      // `paymentRequest` is the whole encoded request and each proof's amount is a
-      // cashu-ts `Amount`, which serialises as a string.
-      const released = JSON.stringify({
-        id: request.encodedRequest,
-        mint: MINT,
-        unit: 'sat',
-        proofs: [{ id: KEYSET, amount: Amount.from(8), secret: 'released-input', C: PUBLIC_KEY }],
-      });
+      const released = releasedPayload(request.encodedRequest, 'released-input');
       expect(released).toContain('"amount":"8"');
       t.setInbox([wrap('a', released)]);
       await t.pollAgain();
       expect(t.ingested).toHaveLength(1);
 
-      expect(t.ingested[0].payload.id).toBe(request.encodedRequest);
+      // The encoded request this wallet handed out is replaced by its own id.
+      expect(t.ingested[0].payload.id).toBe(request.requestId);
       expect(t.ingested[0].payload.proofs[0].amount).toBe('8');
       expect(t.ingested[0].transportMessageId).toBe('a'.repeat(64));
-      // QUIRK: Coco looks the request up by the payload's `id`, which a 0.1.3
-      // payer sets to the whole encoded request, so a payment the request asked
-      // for is refused and the payer's proofs stay in its pending send.
-      expect(t.ingested[0].outcome).toBe(
-        `No active payment request found for id ${request.encodedRequest}`
-      );
+      expect(t.ingested[0].outcome).toBe('finalized');
+      expect(t.swaps).toHaveBeenCalledTimes(1);
 
       await t.pollAgain();
-      expect(t.ingested).toHaveLength(2);
-      // QUIRK: the refusal is treated as retryable, so the same wrap is unwrapped
-      // and refused again on every poll while it is in the read window.
-      expect(t.ingested[1].transportMessageId).toBe('a'.repeat(64));
-      expect(t.ingested[1].outcome).toBe(t.ingested[0].outcome);
+      await t.pollAgain();
+      expect(t.ingested).toHaveLength(1);
+      expect(t.swaps).toHaveBeenCalledTimes(1);
+    } finally {
+      await t.dispose();
+    }
+  });
+
+  it('claims a 0.1.3 payment to the standing request as the receive hub shows it, numeric amounts intact', async () => {
+    const t = await setup();
+    try {
+      const standing = await t.createStandingRequest();
+      // The hub shows an amountless re-encoding, not Coco's stored request.
+      const stored = (await t.manager.paymentRequests.incoming.get(standing.operationId))!;
+      expect(standing.encodedRequest).not.toBe(stored.encodedRequest);
+      t.setInbox([wrap('e', releasedPayload(standing.encodedRequest, 'standing-input', 8))]);
+      await t.pollAgain();
+      expect(t.ingested).toHaveLength(1);
+      expect(t.ingested[0].payload.id).toBe(standing.requestId);
+      expect(t.ingested[0].raw).toContain('"amount":8');
+      expect(t.ingested[0].outcome).toBe('finalized');
+      expect(t.swaps).toHaveBeenCalledTimes(1);
+    } finally {
+      await t.dispose();
+    }
+  });
+
+  it('claims a 0.1.3 payment once when the live subscription and a poll both carry it', async () => {
+    const t = await setup();
+    try {
+      const request = await t.createRequest();
+      const envelope = wrap('f', releasedPayload(request.encodedRequest, 'overlap-input'));
+      t.setInbox([envelope]);
+      t.deliverLive(envelope);
+      await t.pollAgain();
+      t.deliverLive(envelope);
+      await t.settle();
+      await t.pollAgain();
+      expect(t.swaps).toHaveBeenCalledTimes(1);
+      expect(t.ingested.length).toBeGreaterThanOrEqual(1);
+      for (const each of t.ingested) {
+        expect(each.payload.id).toBe(request.requestId);
+        expect(each.outcome).toBe('finalized');
+      }
+    } finally {
+      await t.dispose();
+    }
+  });
+
+  it('claims a 0.1.3 payment that arrived before the wallet showed that encoding again', async () => {
+    const t = await setup();
+    try {
+      const request = await t.createRequest();
+      // What the "as Ecash" screen showed in an earlier session, with a lock on.
+      const decoded = decodePaymentRequest(request.encodedRequest);
+      const lock = `02${'a'.repeat(64)}`;
+      const shownBefore = new PaymentRequest(
+        decoded.transport,
+        decoded.id,
+        decoded.amount,
+        decoded.unit,
+        decoded.mints,
+        decoded.description,
+        decoded.singleUse,
+        { kind: 'P2PK', data: lock, tags: [] },
+        decoded.mintsPreferred
+      ).toEncodedRequest();
+      t.setInbox([wrap('g', releasedPayload(shownBefore, 'early-input'))]);
+      await t.pollAgain();
+      await t.pollAgain();
+      // Not yet known as this wallet's: not claimed, and not unwrapped again.
+      expect(t.ingested).toHaveLength(0);
+      expect(mockUnwrapped.filter((id) => id === 'g'.repeat(64))).toHaveLength(1);
+
+      expect(
+        reencodeSingleUsePaymentRequest(request.encodedRequest, { lockP2pkPubkey: lock })
+          .encodedRequest
+      ).toBe(shownBefore);
+      await t.pollAgain();
+      expect(t.ingested).toHaveLength(1);
+      expect(t.ingested[0].payload.id).toBe(request.requestId);
+      expect(t.ingested[0].outcome).toBe('finalized');
+    } finally {
+      await t.dispose();
+    }
+  });
+
+  it('does not claim an id that is another request with the same inner id, and stops offering it', async () => {
+    const t = await setup();
+    try {
+      const request = await t.createRequest();
+      const decoded = decodePaymentRequest(request.encodedRequest);
+      const otherTerms = new PaymentRequest(
+        decoded.transport,
+        decoded.id,
+        Amount.from(1),
+        decoded.unit,
+        decoded.mints,
+        decoded.description,
+        decoded.singleUse
+      ).toEncodedRequest();
+      expect(decodePaymentRequest(otherTerms).id).toBe(request.requestId);
+      expect(otherTerms).not.toBe(request.encodedRequest);
+      t.setInbox([wrap('h', releasedPayload(otherTerms, 'foreign-input'))]);
+      await t.pollAgain();
+      await t.pollAgain();
+      expect(t.ingested).toHaveLength(0);
+      expect(mockUnwrapped.filter((id) => id === 'h'.repeat(64))).toHaveLength(1);
+      expect(t.swaps).not.toHaveBeenCalled();
+    } finally {
+      await t.dispose();
+    }
+  });
+
+  it('leaves a malformed creq id to Coco, which refuses it as before', async () => {
+    const t = await setup();
+    try {
+      await t.createRequest();
+      t.setInbox([wrap('i', releasedPayload('creqAnot-a-request', 'malformed-input'))]);
+      await t.pollAgain();
+      expect(t.ingested).toHaveLength(1);
+      expect(t.ingested[0].payload.id).toBe('creqAnot-a-request');
+      expect(t.ingested[0].outcome).toBe(
+        'No active payment request found for id creqAnot-a-request'
+      );
       expect(t.swaps).not.toHaveBeenCalled();
     } finally {
       await t.dispose();

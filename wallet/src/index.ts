@@ -345,6 +345,8 @@ export type {
 // Reusable mint-quote singleton (standing bolt12 offer / onchain address)
 export {
   ensureStandingPaymentRequest,
+  paymentRequestEncodingsHandedOut,
+  paymentRequestEncodingsVersion,
   reencodeSingleUsePaymentRequest,
   rotateStandingPaymentRequest,
   standingPaymentRequestKey,
