@@ -145,9 +145,15 @@ async function runCocoPhase2({ bgStage, chainManager, isLive }: CocoPhase2Args):
 
     // Each recovery stands alone: one that fails is reported and the rest still
     // run, so a stuck send cannot hold back a melt, a receive or a refund.
-    const recover = async (phase: string, run: () => Promise<unknown>): Promise<void> => {
+    const recover = async (
+      name: string,
+      phase: string,
+      run: () => Promise<unknown>
+    ): Promise<void> => {
+      log.info(`coco.recovery.${name}.start`);
       try {
         await initPhase(phase, run);
+        log.info(`coco.recovery.${name}.done`);
       } catch (recoveryErr) {
         initLog('Coco-bg', `recovery failed (non-fatal): ${recoveryErr}`);
         log.warn('coco.recovery.failed', {
@@ -160,46 +166,38 @@ async function runCocoPhase2({ bgStage, chainManager, isLive }: CocoPhase2Args):
 
     if (!isLive()) return;
     bgStage.log('Recovering pending operations...');
-    log.info('coco.recovery.send.start');
-    await recover('Coco-bg.sendRecovery', () => chainManager.ops.send.recovery.run());
+    await recover('send', 'Coco-bg.sendRecovery', () => chainManager.ops.send.recovery.run());
     if (!isLive()) return;
-    log.info('coco.recovery.send.done');
-    log.info('coco.recovery.melt.start');
-    await recover('Coco-bg.meltRecovery', () => chainManager.ops.melt.recovery.run());
+    await recover('melt', 'Coco-bg.meltRecovery', () => chainManager.ops.melt.recovery.run());
     if (!isLive()) return;
-    log.info('coco.recovery.melt.done');
-    log.info('coco.recovery.receive.start');
-    await recover('Coco-bg.receiveRecovery', () => chainManager.ops.receive.recovery.run());
+    await recover('receive', 'Coco-bg.receiveRecovery', () =>
+      chainManager.ops.receive.recovery.run()
+    );
     if (!isLive()) return;
-    log.info('coco.recovery.receive.done');
     // Safe no-op sweep while the NUT-18 incoming saga is unused.
-    log.info('coco.recovery.payment_request_receive.start');
-    await recover('Coco-bg.paymentRequestReceiveRecovery', () =>
+    await recover('payment_request_receive', 'Coco-bg.paymentRequestReceiveRecovery', () =>
       chainManager.recoverPendingPaymentRequestReceiveAttempts()
     );
-    log.info('coco.recovery.payment_request_receive.done');
     if (!isLive()) return;
     // Change for a request that ended between paying and being paid back —
     // the window a force quit or a crash opens. It has a deadline (a node
     // sweeps unclaimed refunds eventually). The sweep is idempotent, so a
     // failed pass simply retries next launch.
-    log.info('coco.recovery.routstr_payments.start');
-    await recover('Coco-bg.routstrPaymentRecovery', () => recoverPendingPayments());
+    await recover('routstr_payments', 'Coco-bg.routstrPaymentRecovery', () =>
+      recoverPendingPayments()
+    );
     if (!isLive()) return;
     // The same window, for payments `@routstr/sdk` now owns: it records each
     // request token before it leaves and clears it when the change is home,
     // so anything still recorded is money the node has to be asked about.
     // The sweep above drains rows written before the SDK took over; this one
     // drains everything since.
-    await recover('Coco-bg.routstrSdkSweep', () => sweepUnsettledPayments());
+    await recover('routstr_sdk_sweep', 'Coco-bg.routstrSdkSweep', () => sweepUnsettledPayments());
     if (!isLive()) return;
-    log.info('coco.recovery.routstr_payments.done');
     // Sats parked on a Routstr node the app has since been repointed away
     // from: money that is ours but not yet in the wallet, swept once the
     // wallet is ready.
-    log.info('coco.recovery.routstr_reclaim.start');
-    await recover('Coco-bg.routstrReclaim', () => reclaimRoutstrBalances());
-    log.info('coco.recovery.routstr_reclaim.done');
+    await recover('routstr_reclaim', 'Coco-bg.routstrReclaim', () => reclaimRoutstrBalances());
 
     if (!isLive()) return;
     // Ecash that releases before 0.0.45 stored themselves. Not awaited: it
