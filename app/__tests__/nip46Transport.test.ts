@@ -138,7 +138,7 @@ jest.mock('@nostr-dev-kit/ndk-mobile', () => {
     }),
     __mock: { instances, signInPolicy },
   };
-  // virtual: ndk-mobile ships ESM-only exports that jest-expo/node cannot
+  // Mocked: ndk-mobile ships ESM-only exports that jest-expo/node cannot
   // resolve; the factory above fully replaces the module surface used here.
 });
 

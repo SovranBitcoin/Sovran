@@ -19,7 +19,7 @@ jest.mock('@nostr-dev-kit/ndk-mobile', () => ({
       this.pubkey = params.pubkey;
     }
   },
-  // virtual: ndk-mobile ships ESM-only exports jest-expo cannot resolve.
+  // Mocked: ndk-mobile ships ESM-only exports jest-expo cannot resolve.
 }));
 
 jest.mock('@/shared/lib/logger', () => ({
