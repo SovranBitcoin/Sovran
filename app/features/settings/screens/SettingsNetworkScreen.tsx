@@ -35,7 +35,11 @@ import { publishEvent } from '@/shared/lib/nostr/publish';
 import { backendConfig } from '@/shared/config/backend';
 import { DEFAULT_RELAYS, safeNormalizeRelay } from '@/shared/lib/nostr/outbox/defaults';
 import { RELAY_LIST_KIND, serializeRelayList } from '@/shared/lib/nostr/outbox/nip65';
-import { getOwnWriteRelays, useRelayListStore } from '@/shared/lib/nostr/outbox/relayListStore';
+import {
+  MAX_RELAYS,
+  getOwnWriteRelays,
+  useRelayListStore,
+} from '@/shared/lib/nostr/outbox/relayListStore';
 import { Section } from '@/shared/ui/composed/Section';
 import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
 import { EmptyState } from '@/shared/ui/composed/EmptyState';
@@ -172,8 +176,11 @@ export function SettingsNetworkScreen() {
       setAddError('Enter a valid relay URL (wss://…).');
       return;
     }
+    if (!addRelay(normalized, { read: true, write: true })) {
+      setAddError(`You can keep up to ${MAX_RELAYS} relays. Remove one to add another.`);
+      return;
+    }
     setAddError(null);
-    addRelay(normalized, { read: true, write: true });
     setDraftUrl('');
   };
 

@@ -2477,7 +2477,6 @@ exports[`persisted schema drift nostr-relay-list-store schema matches the golden
             ],
             "type": "object",
           },
-          "maxItems": 64,
           "type": "array",
         },
         "hasPublished": {
@@ -2526,7 +2525,6 @@ exports[`persisted schema drift nostr-relay-list-store schema matches the golden
             ],
             "type": "object",
           },
-          "maxItems": 64,
           "type": "array",
         },
         "hasPublished": {

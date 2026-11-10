@@ -32,7 +32,8 @@ interface RelayListState {
 interface RelayListActions {
   /** Ingest a relay list parsed from a relay event (last-writer-wins). */
   setFromRelay: (entries: RelayListEntry[], createdAtSec: number) => void;
-  addRelay: (url: string, marker: { read: boolean; write: boolean }) => void;
+  /** Add or update a relay. False, and nothing changed, when it is a new one and the list is full. */
+  addRelay: (url: string, marker: { read: boolean; write: boolean }) => boolean;
   removeRelay: (url: string) => void;
   setMarker: (url: string, marker: { read: boolean; write: boolean }) => void;
   restoreDefaults: () => void;
@@ -47,8 +48,16 @@ const entrySchema = z.object({
   write: z.boolean(),
 });
 
+/**
+ * A new relay is refused once the list holds this many. Held by `addRelay`
+ * and `setMarker` only: 0.1.3 appended with no cap, so a saved list may be
+ * longer, and the reader takes it whole (a limit there would discard the
+ * whole configuration). A list from a relay is taken whole too.
+ */
+export const MAX_RELAYS = 64;
+
 const PersistedRelayListStore = z.object({
-  entries: z.array(entrySchema).max(64).default([]),
+  entries: z.array(entrySchema).default([]),
   updatedAt: z.number().default(0),
   hasPublished: z.boolean().default(false),
   // `.catch('default')`: unknown provenance degrades to "unpinned" — the
@@ -60,6 +69,13 @@ const PersistedRelayListStore = z.object({
 
 function defaultEntries(): RelayListEntry[] {
   return DEFAULT_RELAYS.map((url) => ({ url, read: true, write: true }));
+}
+
+/** Whether writing `url` would add a new relay to a list already holding `MAX_RELAYS`. */
+function wouldOverfill(entries: readonly RelayListEntry[], url: string): boolean {
+  if (entries.length < MAX_RELAYS) return false;
+  const normalized = safeNormalizeRelay(url);
+  return normalized !== null && !entries.some((e) => e.url === normalized);
 }
 
 function upsert(
@@ -95,7 +111,12 @@ export const useRelayListStore = create<RelayListStore>({
       },
 
       addRelay: (url, marker) => {
+        if (wouldOverfill(get().entries, url)) {
+          storeLog.warn('nostr.relays.add_at_capacity', { max: MAX_RELAYS });
+          return false;
+        }
         set({ entries: upsert(get().entries, url, marker), source: 'local' });
+        return true;
       },
 
       removeRelay: (url) => {
@@ -104,6 +125,7 @@ export const useRelayListStore = create<RelayListStore>({
       },
 
       setMarker: (url, marker) => {
+        if (wouldOverfill(get().entries, url)) return;
         set({ entries: upsert(get().entries, url, marker), source: 'local' });
       },
 

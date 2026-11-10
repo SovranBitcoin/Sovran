@@ -460,44 +460,48 @@ describe('own-content-store: an own note longer than the 0.1.3 content limit', (
  * Writer: `addRelay` (`L/nostr/outbox/relayListStore.ts:94-96`, through
  * `upsert` :65-77) appends a distinct normalized URL with no count cap, and
  * `setFromRelay` :87-92 assigns a relay's list whole. `partialize` :121-126,
- * version 1. 0.1.3 read limit :51; HEAD the same line.
+ * version 1. 0.1.3 read limit :51, which rejected the whole configuration.
+ * Repaired: a list of any length is read, and stays editable; adding a 65th
+ * distinct relay from Settings is refused (`relayListStoreAddLimit.test.ts`).
  */
 describe('nostr-relay-list-store: a relay list longer than 64', () => {
   const KEY = accountKey('nostr-relay-list-store', A0);
   const row = e19Row(KEY);
-  const withRelays = (count: number) =>
-    released(1, {
-      ...row.state,
-      entries: [
-        ...(row.state.entries as State[]),
-        ...Array.from({ length: count - (row.state.entries as State[]).length }, (_, i) => ({
-          url: `wss://relay${i}.example.com`,
-          read: true,
-          write: i % 2 === 0,
-        })),
-      ],
-      source: 'local',
-    });
+  const withRelays = (count: number) => {
+    const entries = [
+      ...(row.state.entries as State[]),
+      ...Array.from({ length: count - (row.state.entries as State[]).length }, (_, i) => ({
+        url: `wss://relay${i}.example.com`,
+        read: true,
+        write: i % 2 === 0,
+      })),
+    ];
+    return { entries, bytes: released(1, { ...row.state, entries, source: 'local' }) };
+  };
 
-  it('loses the whole relay configuration at 65 relays', async () => {
-    const bytes = withRelays(65);
+  it('keeps the whole relay configuration at 65 relays', async () => {
+    const { entries, bytes } = withRelays(65);
     const { run, loaded } = await startWith(KEY, bytes, 'nostr-relay-list-store', {
       account: 0,
     });
 
-    // QUIRK: the person's relays, the published marker and the list's time
-    // are gone; the account falls back to the bootstrap relays.
-    expect(loaded.entries).toEqual([]);
-    expect(loaded.hasPublished).toBe(false);
-    expect(loaded.updatedAt).toBe(0);
-    expect(loaded.source).toBe('default');
-    expect(run.rejections).toContain('store.nostr_relay_list.merge_rejected');
-    expect(run.defaultedRows).toContain('nostr-relay-list-store (account 0)');
-    expect(run.disk.asyncStorage[sideKey('nostr-relay-list-store', A0)]).toBe(bytes);
+    expect(loaded).toEqual(
+      expect.objectContaining({
+        entries,
+        hasPublished: true,
+        updatedAt: row.state.updatedAt,
+        source: 'local',
+      })
+    );
+    expect(run.rejections).toEqual([]);
+    expect(run.defaultedRows).not.toContain('nostr-relay-list-store (account 0)');
+    expect(run.disk.asyncStorage[sideKey('nostr-relay-list-store', A0)]).toBeUndefined();
+
+    // Editing that list without losing the rest: `relayListStoreAddLimit.test.ts`.
   });
 
   it('keeps the relay configuration at exactly 64 relays', async () => {
-    const bytes = withRelays(64);
+    const { bytes } = withRelays(64);
     const { run, loaded } = await startWith(KEY, bytes, 'nostr-relay-list-store', {
       account: 0,
     });
