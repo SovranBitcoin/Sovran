@@ -113,15 +113,15 @@ The pinning confirmed F175 and F178 by running them, and exposed the defects in 
 
 ## Behaviour changed in pass 0 (branch `surgery/pass-0`)
 
-| Commit                   | Before                                                                                                         | After                                                                                              |
-| ------------------------ | -------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `29b6e02a0`              | A receive or mint-quote lookup returned another operation's history row when that row sat earlier in the page. | It returns its own row wherever it sits; the new-row fallback comes second.                        |
-| `f88ab8518`, `176b4f4be` | Two wallet managers asking for the same standing quote at once shared the first one's quote and address.       | Each manager gets its own; a rotation that waited across a dispose stays visible to later callers. |
-| `0d56568e4`              | A secret in an `Error` nested inside logged params was written to the log unredacted.                          | Nested errors get the same redaction as top-level ones.                                            |
-| `536c7408e`, `0a1048295` | One startup recovery failing skipped every later recovery for that launch.                                     | Each recovery runs and fails on its own; "done" is logged only on success. Order unchanged.        |
-| `36f0f53e9`              | A background send or melt confirmation always said "sat".                                                      | It uses the operation's unit.                                                                      |
-| `b3e2cb871`              | A cancelled swap counted a failed leg that never sent anything as fees (510 instead of 10).                    | Only what left the wallet counts toward the fee; the header amount is unchanged.                   |
-| `afd6bbdf5`              | A Whitenoise inbox whose cursor could not be read never started, with nothing logged.                          | The failure is logged and the inbox starts with a full backfill; other start failures are logged.  |
+| Commit                   | Before                                                                                                         | After                                                                                                                             |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `29b6e02a0`              | A receive or mint-quote lookup returned another operation's history row when that row sat earlier in the page. | It returns its own row wherever it sits; the new-row fallback comes second.                                                       |
+| `f88ab8518`, `176b4f4be` | Two wallet managers asking for the same standing quote at once shared the first one's quote and address.       | Each manager gets its own; a rotation that waited across a dispose stays visible to later callers.                                |
+| `0d56568e4`              | A secret in an `Error` nested inside logged params was written to the log unredacted.                          | Nested errors get the same redaction as top-level ones.                                                                           |
+| `536c7408e`, `0a1048295` | One startup recovery failing skipped every later recovery for that launch.                                     | Each recovery runs and fails on its own; "done" is logged only on success. Order unchanged.                                       |
+| `36f0f53e9`              | A background send or melt confirmation always said "sat".                                                      | It uses the operation's unit.                                                                                                     |
+| `b3e2cb871`, `65a1d7022` | A cancelled swap counted a failed leg that never sent anything as fees (510 instead of 10).                    | A failed leg with neither side in the history is left out of the fee; the header amount is unchanged.                             |
+| `afd6bbdf5`, `fcdda8456` | A Whitenoise inbox whose cursor could not be read never started, with nothing logged.                          | The failure is logged and the inbox starts with a full backfill, leaving the saved cursor alone; other start failures are logged. |
 
 Reverted: `2b9834542` (keep the key import sheet open on an invalid key) had no effect in the real sheet; see F176.
 
