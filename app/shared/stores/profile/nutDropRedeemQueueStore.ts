@@ -65,6 +65,8 @@ type RedeemSource = (typeof REDEEM_SOURCES)[number];
 
 interface NutDropRedeemQueueState {
   byTokenHash: Record<string, NutDropRedeemEntry>;
+  /** Which set-aside copy of this queue was last merged back in, if any. */
+  recoveredCopy: string | null;
 }
 
 interface NutDropRedeemQueueActions {
@@ -192,6 +194,9 @@ const PersistedNutDropRedeemQueueStore = z.object({
       })
     )
     .default({}),
+  // Additive: absent on every released blob. Says which set-aside copy has
+  // been merged, so it is never merged twice.
+  recoveredCopy: z.string().max(128).nullable().default(null).catch(null),
 });
 
 function isTerminal(status: NutDropRedeemStatus): boolean {
@@ -205,6 +210,7 @@ export const useNutDropRedeemQueueStore = create<NutDropRedeemQueueStore>({
   persist(
     (set, get) => ({
       byTokenHash: {},
+      recoveredCopy: null,
 
       enqueue: (tokenHash, entry) => {
         if (get().byTokenHash[tokenHash]) return false;
@@ -327,21 +333,32 @@ export const useNutDropRedeemQueueStore = create<NutDropRedeemQueueStore>({
       logKey: 'nut_drop_queue',
       partialize: (state) => ({
         byTokenHash: state.byTokenHash,
+        recoveredCopy: state.recoveredCopy,
       }),
       // A queue an earlier build set aside (one entry over its read limits)
       // holds tokens waiting to be redeemed. Folded back in by token hash; an
       // entry already queued wins, so its status is never rolled back.
       recoverUnreadable: {
         owner: getActiveProfilePubkey,
-        merge: (recovered): NutDropRedeemQueueStore => {
+        merge: (recovered, copyId): NutDropRedeemQueueStore => {
+          const state = useNutDropRedeemQueueStore.getState();
+          return {
+            ...state,
+            byTokenHash: { ...recovered.byTokenHash, ...state.byTokenHash },
+            recoveredCopy: copyId,
+          };
+        },
+        apply: (recovered, copyId) => {
           useNutDropRedeemQueueStore.setState((state: NutDropRedeemQueueState) => ({
             byTokenHash: { ...recovered.byTokenHash, ...state.byTokenHash },
+            recoveredCopy: copyId,
           }));
-          return useNutDropRedeemQueueStore.getState();
         },
+        merged: (saved, copyId) => saved.recoveredCopy === copyId,
         // A redeemed or spent entry holds no money, and `prune` may already
         // have removed it; every other one must be saved before the copy goes.
-        holds: (saved, recovered) =>
+        holds: (saved, recovered, copyId) =>
+          saved.recoveredCopy === copyId &&
           Object.entries(recovered.byTokenHash).every(
             ([hash, entry]) =>
               isTerminal(entry.status) || saved.byTokenHash[hash]?.token === entry.token

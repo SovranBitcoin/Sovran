@@ -3354,6 +3354,18 @@ exports[`persisted schema drift nut-drop-redeem-queue schema matches the golden 
           },
           "type": "object",
         },
+        "recoveredCopy": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "type": "string",
+            },
+            {
+              "type": "null",
+            },
+          ],
+          "default": null,
+        },
       },
       "type": "object",
     },
@@ -3451,9 +3463,22 @@ exports[`persisted schema drift nut-drop-redeem-queue schema matches the golden 
           },
           "type": "object",
         },
+        "recoveredCopy": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "type": "string",
+            },
+            {
+              "type": "null",
+            },
+          ],
+          "default": null,
+        },
       },
       "required": [
         "byTokenHash",
+        "recoveredCopy",
       ],
       "type": "object",
     },

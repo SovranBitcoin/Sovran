@@ -1,5 +1,7 @@
 import { profilePersistWrite } from './profileWriteBarrier';
 import { type ZodType } from 'zod';
+import { sha256 } from '@noble/hashes/sha2.js';
+import { bytesToHex } from '@noble/hashes/utils.js';
 import {
   createJSONStorage,
   type PersistOptions,
@@ -77,12 +79,16 @@ interface PersistConfigOptions<TFull, TPartial> {
 
 interface UnreadableRecovery<TFull, TPartial> {
   /**
-   * Lay what the copy holds into the live store, keeping whatever the store
-   * already has, and return the store as it now is.
+   * What the store would hold with the copy laid into it, keeping whatever
+   * the store already has, and recording `copyId` as merged. Changes nothing.
    */
-  merge: (recovered: TPartial) => TFull;
+  merge: (recovered: TPartial, copyId: string) => TFull;
+  /** Lay the copy into the live store the same way, once the merge is saved. */
+  apply: (recovered: TPartial, copyId: string) => void;
+  /** True when `saved` records that the copy `copyId` was already merged into it. */
+  merged: (saved: TPartial, copyId: string) => boolean;
   /** True when `saved` holds everything in `recovered` that must survive, so the copy can go. */
-  holds: (saved: TPartial, recovered: TPartial) => boolean;
+  holds: (saved: TPartial, recovered: TPartial, copyId: string) => boolean;
   /**
    * Whose data is loaded: for a per-account store, the active account.
    * Recovery stops if it changes while a read or save is under way.
@@ -182,13 +188,31 @@ async function recoverUnreadable<TFull, TPartial>(run: {
     storeLog.warn(`store.${run.logKey}.unreadable_kept`, { bytes: raw.length });
     return;
   }
-  const value = { state: run.partialize(run.recovery.merge(recovered)), version: run.version };
+  // Which copy this is, so a merge that was saved but whose copy could not be
+  // removed is not laid in a second time: entries finished and dropped since
+  // would come back.
+  const copyId = bytesToHex(sha256(new TextEncoder().encode(raw)));
+  const before = await run.storage.getItem(run.name);
+  if (!current()) return;
+  const onDisk = before === null ? null : readBlob(before, run.version, run.migrate, run.schema);
+  if (onDisk && run.recovery.merged(onDisk, copyId)) {
+    await run.storage.removeItem(side);
+    storeLog.info(`store.${run.logKey}.unreadable_recovered`, { bytes: raw.length, repeat: true });
+    return;
+  }
+  // Saved before the live store changes: a save that fails leaves the store
+  // as it was, and the failure is this promise's, not an unawaited one.
+  const value = {
+    state: run.partialize(run.recovery.merge(recovered, copyId)),
+    version: run.version,
+  };
   await run.save(value);
   if (!current()) return;
+  run.recovery.apply(recovered, copyId);
   const savedRaw = await run.storage.getItem(run.name);
   if (!current()) return;
   const saved = savedRaw === null ? null : readBlob(savedRaw, run.version, run.migrate, run.schema);
-  if (!saved || !run.recovery.holds(saved, recovered)) {
+  if (!saved || !run.recovery.holds(saved, recovered, copyId)) {
     storeLog.warn(`store.${run.logKey}.unreadable_recovery_not_saved`);
     return;
   }

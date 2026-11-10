@@ -174,19 +174,21 @@ describe('Nut Drop redeem queue recovering a copy set aside as unreadable', () =
   });
 
   it.each([
-    // The store's own unawaited save (from the merge) is dropped, then the
-    // awaited one fails: zustand does not catch the first, so failing it too
-    // would only be an unhandled rejection here.
-    ['fails', (call: number) => (call === 1 ? ('drop' as const) : failSave())],
+    // Every save fails, the first included: nothing may be left unhandled.
+    ['fails', () => failSave()],
     ['is dropped without an error', () => 'drop' as const],
   ])('keeps the copy when the save of the merged queue %s', async (_what, fault) => {
     disk.set(sideKey(), blob(COPY));
     let calls = 0;
-    faults.beforeSet = (key) => (key === queueKey() ? fault((calls += 1)) : undefined);
+    faults.beforeSet = (key) => {
+      if (key !== queueKey()) return undefined;
+      calls += 1;
+      return fault();
+    };
 
     await launch();
 
-    expect(calls).toBeGreaterThanOrEqual(2);
+    expect(calls).toBeGreaterThanOrEqual(1);
     expect(disk.has(queueKey())).toBe(false);
     expect(disk.get(sideKey())).toBe(blob(COPY));
 
@@ -217,6 +219,31 @@ describe('Nut Drop redeem queue recovering a copy set aside as unreadable', () =
     expect(store.getState().byTokenHash).toEqual(merged);
     expect(Object.keys(store.getState().byTokenHash)).toHaveLength(4);
     expect(savedQueue()).toEqual(merged);
+    expect(disk.has(sideKey())).toBe(false);
+  });
+
+  it('does not bring back a token redeemed and pruned while its copy could not be removed', async () => {
+    disk.set(sideKey(), blob(COPY));
+    faults.beforeRemove = (key) => {
+      if (key === sideKey()) throw new Error('killed');
+    };
+    const first = await launch();
+    expect(savedQueue()).toEqual(byHash(COPY));
+    expect(disk.get(sideKey())).toBe(blob(COPY));
+
+    // ONE is redeemed and, being old, pruned: its record leaves the queue.
+    const hashOne = meshTokenDedupeKey(ONE.token);
+    first.setState((state) => {
+      const { [hashOne]: _gone, ...rest } = state.byTokenHash;
+      return { byTokenHash: rest };
+    });
+    await settle();
+    expect(savedQueue()).toEqual(byHash([TWO, THREE]));
+
+    faults.beforeRemove = () => undefined;
+    const store = await launch();
+    expect(store.getState().byTokenHash).toEqual(byHash([TWO, THREE]));
+    expect(savedQueue()).toEqual(byHash([TWO, THREE]));
     expect(disk.has(sideKey())).toBe(false);
   });
 
