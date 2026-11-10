@@ -153,6 +153,12 @@ const SwapLegLocalStatusSchema = z
   .catch('failed');
 const SwapGroupStateSchema = z.enum(['running', 'finished', 'cancelled']).catch('cancelled');
 
+/** Longest leg error message kept. */
+const MAX_ERROR_MESSAGE = 2048;
+
+/** A leg's error message as saved: clipped to what the reader accepts. */
+const clipErrorMessage = (message: string | undefined) => message?.slice(0, MAX_ERROR_MESSAGE);
+
 const PersistedLeg = z.looseObject({
   id: z.string().max(128),
   fromMintUrl: z.string().max(2048),
@@ -166,7 +172,10 @@ const PersistedLeg = z.looseObject({
   chainPath: z.array(z.string().max(2048)).max(16).optional(),
   chainHopIndex: z.number().int().nonnegative().optional(),
   localStatus: SwapLegLocalStatusSchema.optional(),
-  errorMessage: z.string().max(2048).optional(),
+  // A message too long to read is read as absent: 0.1.3 saved it with no
+  // limit, and rejecting it would discard every swap group and the quote
+  // index. New messages are clipped by `clipErrorMessage`.
+  errorMessage: z.string().max(MAX_ERROR_MESSAGE).optional().catch(undefined),
 });
 
 const PersistedSwapGroup = z.looseObject({
@@ -255,7 +264,13 @@ export const useSwapTransactionsStore = create<SwapTransactionsStore>({
           const group = state.groups[groupId];
           if (!group) return state;
 
-          const nextLeg: SwapLeg = { ...leg, id: legId };
+          const nextLeg: SwapLeg = {
+            ...leg,
+            id: legId,
+            ...(leg.errorMessage !== undefined
+              ? { errorMessage: clipErrorMessage(leg.errorMessage) }
+              : {}),
+          };
           return {
             ...state,
             groups: {
@@ -321,7 +336,9 @@ export const useSwapTransactionsStore = create<SwapTransactionsStore>({
           patchLeg(state, groupId, legId, (leg) => ({
             ...leg,
             localStatus,
-            errorMessage: errorMessage ?? (localStatus === 'failed' ? leg.errorMessage : undefined),
+            errorMessage:
+              clipErrorMessage(errorMessage) ??
+              (localStatus === 'failed' ? leg.errorMessage : undefined),
           }))
         );
       },

@@ -115,6 +115,29 @@ describe('swap leg patching', () => {
     expect(legOf().localStatus).toBe('done');
   });
 
+  it('clips a new error message to 2048 characters, from a status or a new leg', () => {
+    const { groupId, legA, legB } = freshGroup();
+    const legOf = (legId: string) =>
+      useSwapTransactionsStore
+        .getState()
+        .getGroup(groupId)!
+        .legs.find((l) => l.id === legId)!;
+
+    useSwapTransactionsStore
+      .getState()
+      .setLegStatus(groupId, legA, { localStatus: 'failed', errorMessage: 'e'.repeat(2049) });
+    useSwapTransactionsStore
+      .getState()
+      .setLegStatus(groupId, legB, { localStatus: 'failed', errorMessage: 'f'.repeat(2048) });
+    const added = useSwapTransactionsStore
+      .getState()
+      .addLeg(groupId, { ...leg(7), localStatus: 'failed', errorMessage: 'g'.repeat(5000) });
+
+    expect(legOf(legA).errorMessage).toBe('e'.repeat(2048));
+    expect(legOf(legB).errorMessage).toBe('f'.repeat(2048));
+    expect(legOf(added).errorMessage).toBe('g'.repeat(2048));
+  });
+
   it('leaves other groups untouched', () => {
     const first = freshGroup();
     const second = freshGroup();

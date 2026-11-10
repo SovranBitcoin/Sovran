@@ -212,66 +212,82 @@ describe('profile-store: a kind-0 label longer than the cached-label limit', () 
  * `errorMessage` it is given as it is; the rebalance orchestrator passes the
  * caught error's message through (`app/features/mint/hooks/
  * useMintRebalanceOrchestrator.ts:289-294`). `partialize` :304-307, version 1
- * (no `version` option, `L/persist/persistConfig.ts`). 0.1.3 read limit :142;
- * HEAD :169. `groups` is a plain `z.record` at both (:167, HEAD :193).
+ * (no `version` option, `L/persist/persistConfig.ts`). 0.1.3 read limit :142,
+ * which rejected every group. `groups` is a plain `z.record` at both (:167,
+ * HEAD :193). Repaired: an over-long message is read as absent, and
+ * `setLegStatus` and `addLeg` clip a new one (`swapTransactionsStoreLegPatch.test.ts`).
  */
-describe('swap-transactions-store: a failed leg with a long error message', () => {
+describe('swap-transactions-store: an unfinished leg with a long error message', () => {
   const KEY = accountKey('swap-transactions-store', A0);
   const row = e19Row(KEY);
-  const FAILED_ID = 'swap-1790000000000-7';
-  const withFailedSwap = (errorMessage: string) =>
+  const RUNNING_ID = 'swap-1790000000000-7';
+  const LEG_ID = 'leg-1790000000000-8';
+  const leg = {
+    id: LEG_ID,
+    fromMintUrl: 'https://mint.minibits.cash/Bitcoin',
+    toMintUrl: 'https://mint.coinos.io',
+    amount: 1000,
+    mintQuoteId: 'mint-quote-running-1',
+    mintOperationId: 'mint-op-running-1',
+    meltQuoteId: 'melt-quote-running-1',
+    meltOperationId: 'melt-op-running-1',
+    localStatus: 'paymentPending',
+  };
+  const group = {
+    id: RUNNING_ID,
+    unit: 'sat',
+    createdAt: 1_790_000_000_000,
+    title: 'Rebalance',
+    state: 'running',
+  };
+  const quoteIdToGroup = {
+    ...(row.state.quoteIdToGroup as State),
+    'mint-quote-running-1': { groupId: RUNNING_ID, legId: LEG_ID, kind: 'mint' },
+    'melt-quote-running-1': { groupId: RUNNING_ID, legId: LEG_ID, kind: 'melt' },
+  };
+  const withRunningSwap = (errorMessage: string) =>
     released(1, {
       groups: {
         ...(row.state.groups as State),
-        [FAILED_ID]: {
-          id: FAILED_ID,
-          unit: 'sat',
-          createdAt: 1_790_000_000_000,
-          title: 'Rebalance',
-          state: 'finished',
-          legs: [
-            {
-              id: 'leg-1790000000000-8',
-              fromMintUrl: 'https://mint.minibits.cash/Bitcoin',
-              toMintUrl: 'https://mint.coinos.io',
-              amount: 1000,
-              meltQuoteId: 'melt-quote-failed-1',
-              localStatus: 'failed',
-              errorMessage,
-            },
-          ],
-        },
+        [RUNNING_ID]: { ...group, legs: [{ ...leg, errorMessage }] },
       },
-      quoteIdToGroup: row.state.quoteIdToGroup,
+      quoteIdToGroup,
     });
 
-  it('loses every swap group when one error message is 2049 characters', async () => {
-    const bytes = withFailedSwap(longText(2049));
+  it('keeps every group, the unfinished leg and the quote index when one error message is 2049 characters', async () => {
+    const bytes = withRunningSwap(longText(2049));
     const { run, loaded, saved } = await startWith(KEY, bytes, 'swap-transactions-store', {
       account: 0,
     });
 
-    // QUIRK: the finished "Rebalance" group E19 already held, and its quote
-    // index, are gone with the failed one.
-    expect(loaded.groups).toEqual({});
-    expect(loaded.quoteIdToGroup).toEqual({});
-    expect(run.rejections).toContain('store.swap_tx.merge_rejected');
-    expect(run.defaultedRows).toContain('swap-transactions-store (account 0)');
-    expect(run.disk.asyncStorage[sideKey('swap-transactions-store', A0)]).toBe(bytes);
-    expect(saved!.state).toEqual({ groups: {}, quoteIdToGroup: {} });
+    // The group E19 already held, untouched; the unfinished one with its leg's
+    // ids, quote ids and state, and only the unreadable message gone.
+    expect(loaded.groups).toEqual({
+      ...(row.state.groups as State),
+      [RUNNING_ID]: { ...group, legs: [leg] },
+    });
+    expect(loaded.quoteIdToGroup).toEqual(quoteIdToGroup);
+    expect(run.rejections).toEqual([]);
+    expect(run.defaultedRows).not.toContain('swap-transactions-store (account 0)');
+    expect(run.disk.asyncStorage[sideKey('swap-transactions-store', A0)]).toBeUndefined();
+    expect(saved!.state).toEqual({ groups: loaded.groups, quoteIdToGroup });
   });
 
   it('keeps both groups when the error message is exactly 2048 characters', async () => {
-    const bytes = withFailedSwap(longText(2048));
+    const bytes = withRunningSwap(longText(2048));
     const { run, loaded } = await startWith(KEY, bytes, 'swap-transactions-store', {
       account: 0,
     });
 
     expect(run.rejections).toEqual([]);
     expect(Object.keys(loaded.groups as State).sort()).toEqual(
-      [...Object.keys(row.state.groups as State), FAILED_ID].sort()
+      [...Object.keys(row.state.groups as State), RUNNING_ID].sort()
     );
-    expect(loaded.quoteIdToGroup).toEqual(row.state.quoteIdToGroup);
+    expect((loaded.groups as Record<string, { legs: State[] }>)[RUNNING_ID].legs[0]).toEqual({
+      ...leg,
+      errorMessage: longText(2048),
+    });
+    expect(loaded.quoteIdToGroup).toEqual(quoteIdToGroup);
     expect(run.disk.asyncStorage[sideKey('swap-transactions-store', A0)]).toBeUndefined();
   });
 });
