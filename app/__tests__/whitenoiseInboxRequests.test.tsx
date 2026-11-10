@@ -196,7 +196,7 @@ describe('the inbox subscription', () => {
     });
     // No cursor means no `since`: everything is fetched once, as on a first start.
     expect(client!.network.subscription).toHaveBeenCalledTimes(1);
-    const [, filters] = jest.mocked(client!.network.subscription).mock.calls[0];
+    const filters = jest.mocked(client!.network.subscription).mock.calls[0][1] as object[];
     expect(filters[0]).not.toHaveProperty('since');
   });
 
