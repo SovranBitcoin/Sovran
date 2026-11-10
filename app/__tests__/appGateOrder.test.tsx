@@ -80,13 +80,7 @@ const CURRENT = {
 };
 
 type Page =
-  | 'wallet'
-  | 'key recovery'
-  | 'settings error'
-  | 'terms'
-  | 'onboarding'
-  | 'recovery'
-  | 'nothing';
+  'wallet' | 'key recovery' | 'settings error' | 'terms' | 'onboarding' | 'recovery' | 'nothing';
 
 function shown(): Page {
   const tree = JSON.stringify(screen.toJSON());
@@ -174,7 +168,11 @@ describe('AppGate order', () => {
   });
 
   it('shows the unlocked key recovery for a keys error before settings have loaded', async () => {
-    given({ keys: { isReady: false, error: new Error('keys') }, hydration: 'loading', legal: null });
+    given({
+      keys: { isReady: false, error: new Error('keys') },
+      hydration: 'loading',
+      legal: null,
+    });
 
     await renderGate();
 
