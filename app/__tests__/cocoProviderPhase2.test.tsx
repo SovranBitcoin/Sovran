@@ -214,7 +214,7 @@ describe('CocoProvider phase 2', () => {
     view.unmount();
   });
 
-  it('skips every later recovery when send recovery throws, but still starts the legacy claim', async () => {
+  it('still runs every later recovery when send recovery throws', async () => {
     const failure = new Error('Recovery is already in progress');
     mockManager.ops.send.recovery.run.mockImplementationOnce(async () => {
       mockCalls.push('sendRecovery');
@@ -223,22 +223,13 @@ describe('CocoProvider phase 2', () => {
 
     const view = await mountProvider();
 
-    // QUIRK: one try covers all recoveries, so a send recovery failure skips melt, receive,
-    // NUT-18 and all three Routstr recoveries for this launch (D3). A fix that isolates each
-    // recovery should change this assertion on purpose.
-    expect(mockCalls).toEqual([
-      'safeWatchers',
-      'defaultMints',
-      'npcSync',
-      'sendRecovery',
-      'legacyClaim',
-    ]);
+    expect(mockCalls).toEqual(FULL_ORDER);
     expect(mockReport).toHaveBeenCalledWith('ops.*.recovery.run', failure);
     expect(mockBgComplete).toHaveBeenCalledTimes(1);
     view.unmount();
   });
 
-  it('skips the receive and Routstr recoveries when melt recovery throws', async () => {
+  it('still runs the receive and Routstr recoveries when melt recovery throws', async () => {
     mockManager.ops.melt.recovery.run.mockImplementationOnce(async () => {
       mockCalls.push('meltRecovery');
       throw new Error('melt recovery failed');
@@ -246,15 +237,7 @@ describe('CocoProvider phase 2', () => {
 
     const view = await mountProvider();
 
-    // QUIRK: same shared try as above (D3).
-    expect(mockCalls).toEqual([
-      'safeWatchers',
-      'defaultMints',
-      'npcSync',
-      'sendRecovery',
-      'meltRecovery',
-      'legacyClaim',
-    ]);
+    expect(mockCalls).toEqual(FULL_ORDER);
     expect(mockReport).toHaveBeenCalledTimes(1);
     view.unmount();
   });
