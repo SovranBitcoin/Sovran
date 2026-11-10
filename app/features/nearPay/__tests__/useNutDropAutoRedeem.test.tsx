@@ -35,6 +35,8 @@ jest.mock('@/shared/providers/OfflineProvider', () => ({
   useOfflineStatus: () => ({ isOffline: false }),
 }));
 jest.mock('@/shared/stores/profile/nutDropRedeemQueueStore', () => ({
+  // The fixture token fits; the limits have their own tests.
+  fitsNutDropQueue: () => true,
   useNutDropRedeemQueueStore: { getState: () => ({ enqueue: () => true }) },
 }));
 jest.mock('@/shared/ui/composed/chat/extractCashuToken', () => ({
