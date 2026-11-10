@@ -2569,20 +2569,16 @@ exports[`persisted schema drift nostr-social-store schema matches the golden sna
       "properties": {
         "contactsContent": {
           "default": "",
-          "maxLength": 65536,
           "type": "string",
         },
         "contactsTags": {
           "default": [],
           "items": {
             "items": {
-              "maxLength": 2048,
               "type": "string",
             },
-            "maxItems": 16,
             "type": "array",
           },
-          "maxItems": 50000,
           "type": "array",
         },
         "contactsUpdatedAt": {
@@ -2876,20 +2872,16 @@ exports[`persisted schema drift nostr-social-store schema matches the golden sna
       "properties": {
         "contactsContent": {
           "default": "",
-          "maxLength": 65536,
           "type": "string",
         },
         "contactsTags": {
           "default": [],
           "items": {
             "items": {
-              "maxLength": 2048,
               "type": "string",
             },
-            "maxItems": 16,
             "type": "array",
           },
-          "maxItems": 50000,
           "type": "array",
         },
         "contactsUpdatedAt": {

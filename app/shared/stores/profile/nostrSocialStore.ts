@@ -384,11 +384,12 @@ const PersistedZappedRecord = z.looseObject({
 });
 
 const PersistedNostrSocialStore = z.object({
-  contactsTags: z
-    .array(z.array(z.string().max(2048)).max(16))
-    .max(50_000)
-    .default([]),
-  contactsContent: z.string().max(65_536).default(''),
+  // The newest own kind-3, read with no limit, as it was saved: 0.1.3 stored
+  // it as the relay sent it, and any limit here would discard the whole
+  // journal. It is what the next follow or unfollow is built from, so it is
+  // never clipped, reordered or filtered.
+  contactsTags: z.array(z.array(z.string())).default([]),
+  contactsContent: z.string().default(''),
   contactsUpdatedAt: z.number().int().nonnegative().default(0),
   // Tolerant: the follow set is a set — the `true` carries no information, so
   // a corrupt value has nothing to fall back to. Bare, one bad entry would

@@ -296,45 +296,67 @@ describe('swap-transactions-store: an unfinished leg with a long error message',
 
 /**
  * Writer: own-event sync passes the newest kind-3's tags and content
- * (`L/nostr/ownsync/useOwnEventsSync.ts:121-125`) to `setContactsFromRelay`
- * (`P/nostrSocialStore.ts:416-438`), which stores both unchanged;
- * `partialize` :701-714, version 2 (:699). 0.1.3 read limits :383-386; HEAD
- * :386-391. Only `followingPubkeys` is tolerant.
+ * (`L/nostr/ownsync/useOwnEventsSync.ts:121-125`, tags as the relay sent them,
+ * :54) to `setContactsFromRelay` (`P/nostrSocialStore.ts:416-438`), which
+ * stores both unchanged; `partialize` :701-714, version 2 (:699). 0.1.3 read
+ * limits :383-386 (content length, tag value length, values per tag, tag
+ * count), none of which the writer held, and any one over them rejected the
+ * whole journal. Repaired: the contacts document is read with no limit, as it
+ * was saved; it is what the next follow or unfollow is built from, so it must
+ * come back byte for byte. No write limit: the document is the person's own
+ * signed event, and a clipped copy would publish a different follow list.
  */
-describe('nostr-social-store: a contacts document longer than the limits', () => {
+describe('nostr-social-store: a contacts document longer than the 0.1.3 limits', () => {
   const KEY = accountKey('nostr-social-store', A0);
   const row = e19Row(KEY);
+  const tags = row.state.contactsTags as string[][];
   const withContacts = (contacts: { contactsContent?: string; contactsTags?: string[][] }) =>
     released(2, { ...row.state, ...contacts });
   const longPetnameTag = (length: number) => [
-    ...(row.state.contactsTags as string[][]),
+    ...tags,
     ['p', 'c'.repeat(64), 'wss://relay.example', longText(length)],
+  ];
+  const wideTag = (values: number) => [
+    ...tags,
+    ['p', 'd'.repeat(64), ...Array.from({ length: values - 2 }, (_, i) => `v${i}`)],
+  ];
+  const manyTags = (count: number) => [
+    ...tags,
+    ...Array.from({ length: count - tags.length }, (_, i) => [
+      'p',
+      i.toString(16).padStart(64, '0'),
+    ]),
   ];
 
   it.each([
     ['content of 65537 characters', { contactsContent: longText(65_537) }],
     ['a tag value of 2049 characters', { contactsTags: longPetnameTag(2049) }],
-  ])('loses the whole social journal for %s', async (_what, contacts) => {
+    ['a tag of 17 values', { contactsTags: wideTag(17) }],
+    ['50001 tags', { contactsTags: manyTags(50_001) }],
+  ])('keeps the whole social journal and the contacts as saved for %s', async (_what, contacts) => {
     const bytes = withContacts(contacts);
-    const { run, loaded } = await startWith(KEY, bytes, 'nostr-social-store', { account: 0 });
+    const { run, loaded, saved } = await startWith(KEY, bytes, 'nostr-social-store', {
+      account: 0,
+    });
 
-    // QUIRK: the follow list, the likes, the deleted-note ids and the zap
-    // totals all go with the one long contacts field.
-    expect(loaded.contactsTags).toEqual([]);
-    expect(loaded.followingPubkeys).toEqual({});
-    expect(loaded.engagementByEventId).toEqual({});
-    expect(loaded.deletedNoteIds).toEqual({});
-    expect(loaded.deletedRepostOriginalIds).toEqual({});
-    expect(loaded.zappedByEventId).toEqual({});
-    expect(loaded.contactsUpdatedAt).toBe(0);
-    expect(run.rejections).toContain('store.nostr_social.merge_rejected');
-    expect(run.defaultedRows).toContain('nostr-social-store (account 0)');
-    expect(run.disk.asyncStorage[sideKey('nostr-social-store', A0)]).toBe(bytes);
+    // The follow list, likes, deleted-note ids and zap totals, as saved.
+    expect(loaded).toMatchObject({ ...row.state, ...contacts });
+    // The contacts document, byte for byte, in memory and in the next save.
+    const document: State = { ...row.state, ...contacts };
+    expect(JSON.stringify(loaded.contactsTags)).toBe(JSON.stringify(document.contactsTags));
+    expect(loaded.contactsContent).toBe(document.contactsContent);
+    expect(JSON.stringify(saved!.state.contactsTags)).toBe(JSON.stringify(document.contactsTags));
+    expect(saved!.state.contactsContent).toBe(document.contactsContent);
+    expect(run.rejections).toEqual([]);
+    expect(run.defaultedRows).not.toContain('nostr-social-store (account 0)');
+    expect(run.disk.asyncStorage[sideKey('nostr-social-store', A0)]).toBeUndefined();
   });
 
   it.each([
     ['content of 65536 characters', { contactsContent: longText(65_536) }],
     ['a tag value of 2048 characters', { contactsTags: longPetnameTag(2048) }],
+    ['a tag of 16 values', { contactsTags: wideTag(16) }],
+    ['50000 tags', { contactsTags: manyTags(50_000) }],
   ])('keeps the social journal for %s', async (_what, contacts) => {
     const bytes = withContacts(contacts);
     const { run, loaded } = await startWith(KEY, bytes, 'nostr-social-store', { account: 0 });
