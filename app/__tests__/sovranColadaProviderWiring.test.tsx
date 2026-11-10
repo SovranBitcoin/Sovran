@@ -107,7 +107,8 @@ import { Share } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { URDecoder } from '@gandlaf21/bc-ur';
 import { act, render } from '@testing-library/react-native';
-import type { DeepLinkConfig, MachineOperations, NavigationCallbacks } from 'wallet';
+import type { MachineOperations, NavigationCallbacks } from 'wallet';
+import type { DeepLinkConfig } from 'wallet/react';
 
 import { SovranColadaProvider } from '@/features/send/providers/Colada';
 import {
@@ -116,10 +117,7 @@ import {
   createSovranScanSources,
 } from '@/features/send/lib/sovranPaymentConfig';
 import { createSovranScreenActionsBridge } from '@/features/send/lib/createSovranScreenActionsBridge';
-import {
-  prepareBolt11MintQuote,
-  prepareOnchainMintQuote,
-} from '@/shared/lib/cashu/cocoOperations';
+import { prepareBolt11MintQuote, prepareOnchainMintQuote } from '@/shared/lib/cashu/cocoOperations';
 import { runDataMigrations } from '@/shared/lib/migrations/dataMigrations';
 import { clearPaymentContext } from '@/shared/stores/runtime/clearPaymentContext';
 import { staticPopup } from '@/shared/lib/popup';
@@ -129,6 +127,9 @@ import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 
 const MINT = 'https://mint.example';
+
+/** Hands a callback the loose shape the wallet types more narrowly. */
+const loose = (value: object): never => value as never;
 
 function fakeManager() {
   return {
@@ -161,7 +162,10 @@ function props() {
     nfcAdapter: unknown;
     chainAdapter: unknown;
     scanSources: unknown;
-    qrDecoderAdapter: { decode: (input: unknown) => Promise<unknown>; createUrDecoder: () => unknown };
+    qrDecoderAdapter: {
+      decode: (input: unknown) => Promise<unknown>;
+      createUrDecoder: () => unknown;
+    };
     deepLinks: DeepLinkConfig;
     getUnit: () => string;
     navigation: NavigationCallbacks;
@@ -290,18 +294,18 @@ describe('unit and operations', () => {
     useMintStore.setState({ activeUnit: 'tsat' as never });
     await mount();
 
-    props().operations.switchUnit('usd');
+    void props().operations.switchUnit('usd');
     expect(useMintStore.getState().activeUnit).toBe('tusd');
 
     useMintStore.setState({ activeUnit: 'sat' });
-    props().operations.switchUnit('USD');
+    void props().operations.switchUnit('USD');
     expect(useMintStore.getState().activeUnit).toBe('usd');
   });
 
   it('ignores a switch to a unit that is no account', async () => {
     await mount();
 
-    props().operations.switchUnit('doge');
+    void props().operations.switchUnit('doge');
 
     expect(useMintStore.getState().activeUnit).toBe('sat');
   });
@@ -400,7 +404,7 @@ describe('navigation callbacks', () => {
   ] as const)('opens the %s camera after permission is granted', async (context, pathname) => {
     await mount();
 
-    props().navigation.scanQr!({ unit: 'sat', context } as never);
+    props().navigation.scanQr!(loose({ unit: 'sat', context }));
     await act(async () => {
       await Promise.resolve();
     });
@@ -412,7 +416,7 @@ describe('navigation callbacks', () => {
     mockPermission = false;
     await mount();
 
-    props().navigation.scanQr!({ unit: 'sat', context: 'receive' } as never);
+    props().navigation.scanQr!(loose({ unit: 'sat', context: 'receive' }));
     await act(async () => {
       await Promise.resolve();
     });
@@ -424,7 +428,7 @@ describe('navigation callbacks', () => {
     await mount();
     const nav = props().navigation;
 
-    nav.nutDrop!({ unit: 'sat' } as never);
+    nav.nutDrop!(loose({ unit: 'sat' }));
     nav.mintInfo!('{"mintUrl":"x"}' as never);
     nav.addMint!();
     nav.goBack!();
