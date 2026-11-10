@@ -8,7 +8,6 @@
  * and the screens are replaced.
  */
 
-import React from 'react';
 import { Text } from 'react-native';
 import { act, render, screen } from '@testing-library/react-native';
 
