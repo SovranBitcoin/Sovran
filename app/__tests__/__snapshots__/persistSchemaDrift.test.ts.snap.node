@@ -3489,7 +3489,6 @@ exports[`persisted schema drift own-content-store schema matches the golden snap
                 "additionalProperties": {},
                 "properties": {
                   "content": {
-                    "maxLength": 65536,
                     "type": "string",
                   },
                   "created_at": {
@@ -3513,13 +3512,10 @@ exports[`persisted schema drift own-content-store schema matches the golden snap
                   "tags": {
                     "items": {
                       "items": {
-                        "maxLength": 8192,
                         "type": "string",
                       },
-                      "maxItems": 200,
                       "type": "array",
                     },
-                    "maxItems": 5000,
                     "type": "array",
                   },
                 },
@@ -3581,7 +3577,6 @@ exports[`persisted schema drift own-content-store schema matches the golden snap
                 "additionalProperties": {},
                 "properties": {
                   "content": {
-                    "maxLength": 65536,
                     "type": "string",
                   },
                   "created_at": {
@@ -3605,13 +3600,10 @@ exports[`persisted schema drift own-content-store schema matches the golden snap
                   "tags": {
                     "items": {
                       "items": {
-                        "maxLength": 8192,
                         "type": "string",
                       },
-                      "maxItems": 200,
                       "type": "array",
                     },
-                    "maxItems": 5000,
                     "type": "array",
                   },
                 },

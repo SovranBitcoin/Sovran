@@ -102,8 +102,10 @@ const PersistedFeedEvent = z.looseObject({
   id: z.string().max(128),
   kind: z.number().int(),
   pubkey: z.string().max(128),
-  content: z.string().max(65_536),
-  tags: z.array(z.array(z.string().max(8192)).max(200)).max(5000),
+  // Read with no limit, as saved: 0.1.3 copied own notes in as they came, and
+  // any limit here would discard every own note, unpublished ones included.
+  content: z.string(),
+  tags: z.array(z.array(z.string())),
   created_at: z.number().int().nonnegative(),
 });
 

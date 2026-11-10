@@ -373,52 +373,82 @@ describe('nostr-social-store: a contacts document longer than the 0.1.3 limits',
  * Writer: own-event sync feeds each own kind-1 to `ingestSeen`
  * (`L/nostr/ownsync/useOwnEventsSync.ts:116-118`), which copies the event
  * (`feedEventFrom`, `P/ownContentStore.ts:70-77`; `ingestSeen` :157-168);
- * `prune` caps counts and age, not text. `partialize` :185-192, version 1.
- * 0.1.3 read limit :105; HEAD the same field. `byId` is a plain `z.record`
- * (:121).
+ * `recordOwn` saves the person's own unpublished note the same way; `prune`
+ * caps counts and age, not text. `partialize` :185-192, version 1. 0.1.3 read
+ * limits :105-106 (content length, tag value length, values per tag, tag
+ * count), none held by a writer, and any one over them rejected every note.
+ * `byId` is a plain `z.record` (:121). Repaired: a note's content and tags are
+ * read with no limit. No write limit: the note is the person's own text.
  */
-describe('own-content-store: an own note longer than the content limit', () => {
+describe('own-content-store: an own note longer than the 0.1.3 content limit', () => {
   const KEY = accountKey('own-content-store', A0);
   const row = e19Row(KEY);
-  const LONG_ID = 'e'.repeat(64);
-  const withLongNote = (content: string) =>
+  const CONFIRMED_ID = 'e'.repeat(64);
+  const LOCAL_ID = 'f'.repeat(64);
+  const note = (id: string, content: string, tags: string[][] = []) => ({
+    id,
+    kind: 1,
+    pubkey: A0,
+    content,
+    tags,
+    created_at: 1_790_000_000,
+  });
+  const withLongNotes = (content: string, tags: string[][] = []) =>
     released(1, {
       byId: {
         ...(row.state.byId as State),
-        [LONG_ID]: {
-          event: {
-            id: LONG_ID,
-            kind: 1,
-            pubkey: A0,
-            content,
-            tags: [],
-            created_at: 1_790_000_000,
-          },
+        [CONFIRMED_ID]: {
+          event: note(CONFIRMED_ID, content, tags),
           authorPubkey: A0,
           status: 'confirmed',
           updatedAt: 1_790_000_000_000,
         },
+        // Not yet seen on a relay: the only copy of what the person wrote.
+        [LOCAL_ID]: {
+          event: note(LOCAL_ID, content, tags),
+          authorPubkey: A0,
+          status: 'local',
+          updatedAt: Date.now(),
+        },
       },
     });
+  const longTags = (values: number, count: number) =>
+    Array.from({ length: count }, (_, i) => [
+      't',
+      ...Array.from({ length: values - 1 }, (_, j) => `${i}-${j}`),
+    ]);
 
-  it('loses every own note when one is 65537 characters', async () => {
-    const bytes = withLongNote(longText(65_537));
+  it.each([
+    ['content of 65537 characters', longText(65_537), []],
+    ['a tag value of 8193 characters', 'gm', [['t', longText(8193)]]],
+    ['a tag of 201 values', 'gm', longTags(201, 1)],
+    ['5001 tags', 'gm', longTags(2, 5001)],
+  ])('keeps every own note, the long ones whole, for %s', async (_what, content, tags) => {
+    const bytes = withLongNotes(content, tags as string[][]);
     const { run, loaded } = await startWith(KEY, bytes, 'own-content-store', { account: 0 });
 
-    // QUIRK: E19's short "gm from the fixture" note goes with the long one.
-    expect(loaded.byId).toEqual({});
-    expect(run.rejections).toContain('store.own_content.merge_rejected');
-    expect(run.defaultedRows).toContain('own-content-store (account 0)');
-    expect(run.disk.asyncStorage[sideKey('own-content-store', A0)]).toBe(bytes);
+    const byId = loaded.byId as Record<string, { event: State; status: string }>;
+    // E19's short "gm from the fixture" note, as saved.
+    expect(byId).toMatchObject(row.state.byId as State);
+    for (const [id, status] of [
+      [CONFIRMED_ID, 'confirmed'],
+      [LOCAL_ID, 'local'],
+    ]) {
+      expect(byId[id].status).toBe(status);
+      expect(byId[id].event).toEqual(note(id, content, tags as string[][]));
+    }
+    expect(run.rejections).toEqual([]);
+    expect(run.defaultedRows).not.toContain('own-content-store (account 0)');
+    expect(run.disk.asyncStorage[sideKey('own-content-store', A0)]).toBeUndefined();
   });
 
-  it('keeps both notes when the long one is exactly 65536 characters', async () => {
-    const bytes = withLongNote(longText(65_536));
+  it('keeps every note when the long ones are exactly 65536 characters', async () => {
+    const bytes = withLongNotes(longText(65_536));
     const { run, loaded } = await startWith(KEY, bytes, 'own-content-store', { account: 0 });
 
     expect(run.rejections).toEqual([]);
     expect(Object.keys(loaded.byId as State).sort()).toEqual(
-      [...Object.keys(row.state.byId as State), LONG_ID].sort()
+      [...Object.keys(row.state.byId as State), CONFIRMED_ID, LOCAL_ID].sort()
     );
     expect(run.disk.asyncStorage[sideKey('own-content-store', A0)]).toBeUndefined();
   });
