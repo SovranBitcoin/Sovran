@@ -54,7 +54,13 @@ type Props = Parameters<typeof useMempoolAcceleration>[0];
 
 function mount(props: Partial<Props> = {}) {
   return renderHook((p: Props) => useMempoolAcceleration(p), {
-    initialProps: { txid: TXID, quoteId: 'q-1', alreadyAccelerated: false, enabled: true, ...props },
+    initialProps: {
+      txid: TXID,
+      quoteId: 'q-1',
+      alreadyAccelerated: false,
+      enabled: true,
+      ...props,
+    },
   });
 }
 
