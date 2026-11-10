@@ -109,9 +109,9 @@ const STATUS_VALUES = [
 ] as const;
 
 /**
- * The stored limits a queued entry must fit. One entry over a limit fails the
- * whole blob's parse on the next launch and takes every other queued token
- * with it, so a writer checks these before it enqueues.
+ * The limits a new entry must fit before it is queued. They hold for writes
+ * only: the reader takes a token, mint address and unit of any length, since
+ * 0.1.3's Bluetooth listener queued them unchecked and they are money.
  */
 export const NUT_DROP_QUEUE_LIMITS = {
   tokenHash: 64,
@@ -125,15 +125,28 @@ export const NUT_DROP_QUEUE_LIMITS = {
  *  page, and one entry past its limit fails the stored queue on next launch. */
 const clipError = (error: string) => error.slice(0, NUT_DROP_QUEUE_LIMITS.lastError);
 
+/**
+ * The reader. Every entry that holds a token loads, byte for byte: `token`,
+ * `mintUrl` and `unit` have no length limit here (0.1.3's Bluetooth listener
+ * saved them unchecked), and an error, peer id or payment id over its limit or
+ * of the wrong type reads as absent for that entry alone; none is needed to
+ * redeem.
+ *
+ * There is deliberately no per-entry tolerance that drops an entry. An entry
+ * with no usable token or mint address, or with a broken amount, attempt count
+ * or time (only this store's own code writes those), still fails the whole
+ * blob, which is then kept whole at `<name>:unreadable`. Dropping it instead
+ * would lose, without trace, whatever it still held.
+ */
 const PersistedNutDropRedeemQueueStore = z.object({
   byTokenHash: z
     .record(
       z.string().max(NUT_DROP_QUEUE_LIMITS.tokenHash),
       z.looseObject({
-        token: z.string().min(1).max(NUT_DROP_QUEUE_LIMITS.token),
-        mintUrl: z.string().min(1).max(NUT_DROP_QUEUE_LIMITS.mintUrl),
+        token: z.string().min(1),
+        mintUrl: z.string().min(1),
         amount: z.number().int().nonnegative(),
-        unit: z.string().max(NUT_DROP_QUEUE_LIMITS.unit),
+        unit: z.string(),
         // Forward-compatible persisted status: an older build that opens a
         // queue written by a newer build must keep the locked ecash and retry
         // it, not reject the whole profile-scoped blob. Mint redemption is
@@ -142,9 +155,9 @@ const PersistedNutDropRedeemQueueStore = z.object({
         attempts: z.number().int().nonnegative(),
         nextAttemptAt: z.number().int().nonnegative(),
         receivedAt: z.number().int().nonnegative(),
-        lastError: z.string().max(NUT_DROP_QUEUE_LIMITS.lastError).optional(),
-        senderPeerID: z.string().max(128).optional(),
-        paymentId: z.string().max(128).optional(),
+        lastError: z.string().max(NUT_DROP_QUEUE_LIMITS.lastError).optional().catch(undefined),
+        senderPeerID: z.string().max(128).optional().catch(undefined),
+        paymentId: z.string().max(128).optional().catch(undefined),
         // Additive and tolerant: an unknown source from a newer build reads as
         // absent (the mesh default, the stricter path), never a rejected blob.
         source: z.enum(REDEEM_SOURCES).optional().catch(undefined),

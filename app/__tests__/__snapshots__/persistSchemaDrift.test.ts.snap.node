@@ -3284,7 +3284,6 @@ exports[`persisted schema drift nut-drop-redeem-queue schema matches the golden 
                 "type": "string",
               },
               "mintUrl": {
-                "maxLength": 2048,
                 "minLength": 1,
                 "type": "string",
               },
@@ -3330,12 +3329,10 @@ exports[`persisted schema drift nut-drop-redeem-queue schema matches the golden 
                 "type": "string",
               },
               "token": {
-                "maxLength": 60000,
                 "minLength": 1,
                 "type": "string",
               },
               "unit": {
-                "maxLength": 16,
                 "type": "string",
               },
             },
@@ -3383,7 +3380,6 @@ exports[`persisted schema drift nut-drop-redeem-queue schema matches the golden 
                 "type": "string",
               },
               "mintUrl": {
-                "maxLength": 2048,
                 "minLength": 1,
                 "type": "string",
               },
@@ -3429,12 +3425,10 @@ exports[`persisted schema drift nut-drop-redeem-queue schema matches the golden 
                 "type": "string",
               },
               "token": {
-                "maxLength": 60000,
                 "minLength": 1,
                 "type": "string",
               },
               "unit": {
-                "maxLength": 16,
                 "type": "string",
               },
             },

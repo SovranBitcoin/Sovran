@@ -1,8 +1,9 @@
 /**
  * @jest-environment node
  *
- * Characterization of the Nut Drop redeem queue when a Bluetooth token does not
- * fit the stored limits. The BLE listener (`useNutDropAutoRedeem`) and the real
+ * The Nut Drop redeem queue and entries that do not fit the stored limits:
+ * what the Bluetooth listener queues, and what a launch reads back from a
+ * queue a release saved. The BLE listener (`useNutDropAutoRedeem`) and the real
  * queue store run over an in-memory disk; "next launch" loads a fresh copy of
  * the store module from the same disk. Only the native Bluetooth module, the
  * key and offline providers, the drainer and the storage adapter are replaced.
@@ -177,44 +178,140 @@ describe('Nut Drop redeem queue and an entry over the stored limits', () => {
     });
     unmount();
   });
+});
 
-  it('loads the whole queue empty on the next launch once one entry is over a limit', async () => {
-    const { unmount } = renderHook(() => useNutDropAutoRedeem());
+// ── What a release saved ─────────────────────────────────────────────────────
+
+/**
+ * An entry as 0.1.3's `enqueue` saved it
+ * (`app/shared/stores/profile/nutDropRedeemQueueStore.ts:120-139@d9ad12c4b`):
+ * what the Bluetooth listener handed it
+ * (`app/features/nearPay/hooks/useNutDropAutoRedeem.ts:88-95@d9ad12c4b`, no
+ * limit checked) plus the queue's own fields. 0.1.3's `markStatus` and
+ * `scheduleRetry` (:142-197) stored an error message unclipped.
+ */
+function releasedEntry(token: string, fields: Record<string, unknown> = {}) {
+  return {
+    token,
+    mintUrl: NORMAL_MINT,
+    amount: 8,
+    unit: 'sat',
+    senderPeerID: '0123456789abcdef',
+    status: 'pending',
+    attempts: 0,
+    nextAttemptAt: 0,
+    receivedAt: 1_790_000_000_000,
+    ...fields,
+  };
+}
+
+/** The bytes zustand's persist wrote for the queue: `{ state, version }`, version 1. */
+function saveReleasedQueue(entries: Record<string, unknown>[]): string {
+  const byTokenHash = Object.fromEntries(
+    entries.map((entry) => [meshTokenDedupeKey(entry.token as string), entry])
+  );
+  const bytes = JSON.stringify({ state: { byTokenHash }, version: 1 });
+  mockDisk.set(QUEUE_KEY, bytes);
+  return bytes;
+}
+
+describe('Nut Drop redeem queue reading what a release saved', () => {
+  const longMint = `https://mint.example/${'b'.repeat(3000)}`;
+  const longUnit = 'u'.repeat(NUT_DROP_QUEUE_LIMITS.unit + 4);
+
+  it('loads every entry, tokens byte for byte, when some are over the stored limits', async () => {
     const good = bearerToken(NORMAL_MINT, 16, '4');
-    const oversize = bearerToken(`https://mint.example/${'b'.repeat(3000)}`, 2, '5');
+    const overMint = bearerToken(longMint, 2, '5');
+    const overUnit = bearerToken(NORMAL_MINT, 3, '6', longUnit);
+    // A token of many proofs, longer than the read limit on the token itself.
+    const overToken = `${bearerToken(NORMAL_MINT, 1, '7')}${'A'.repeat(NUT_DROP_QUEUE_LIMITS.token)}`;
+    const saved = [
+      releasedEntry(good, { amount: 16 }),
+      releasedEntry(overMint, { mintUrl: longMint, amount: 2 }),
+      releasedEntry(overUnit, { unit: longUnit, amount: 3 }),
+      releasedEntry(overToken, { amount: 1, status: 'untrusted-mint', attempts: 1 }),
+    ];
+    const bytes = saveReleasedQueue(saved);
 
-    receiveOverBle(good);
-    receiveOverBle(oversize);
+    const store = await nextLaunch();
+    const queue = store.getState().byTokenHash;
+
+    expect(Object.keys(queue).sort()).toEqual(
+      saved.map((entry) => meshTokenDedupeKey(entry.token)).sort()
+    );
+    for (const entry of saved) {
+      const loaded = queue[meshTokenDedupeKey(entry.token)];
+      expect(loaded).toEqual(entry);
+      expect(loaded.token).toBe(entry.token);
+      expect(loaded.mintUrl).toBe(entry.mintUrl);
+      expect(loaded.unit).toBe(entry.unit);
+    }
+
+    // That launch saves once, as any queue change would; nothing is set aside.
+    store.getState().prune();
     await settle();
-    expect(Object.keys(useNutDropRedeemQueueStore.getState().byTokenHash)).toHaveLength(2);
-    expect(mockDisk.get(QUEUE_KEY)).toContain(good);
-
-    // QUIRK: one oversize entry fails the parse of the whole stored blob, so the good token
-    // is gone from the queue too (D2). A fix (refuse at enqueue, or a per-entry tolerant
-    // schema) should change this assertion on purpose.
-    await expect(nextLaunchQueue()).resolves.toEqual({});
-    unmount();
+    expect(mockDisk.has(SIDE_KEY)).toBe(false);
+    // The order of an object's keys is not data.
+    expect(JSON.parse(mockDisk.get(QUEUE_KEY)!)).toEqual(JSON.parse(bytes));
   });
 
-  it('keeps the unreadable bytes only in a side copy once that launch saves', async () => {
-    const { unmount } = renderHook(() => useNutDropAutoRedeem());
-    const good = bearerToken(NORMAL_MINT, 16, '6');
-    const oversize = bearerToken(`https://mint.example/${'c'.repeat(3000)}`, 2, '7');
-    receiveOverBle(good);
-    receiveOverBle(oversize);
+  it('reads over-limit metadata as absent and keeps the token', async () => {
+    const token = bearerToken(NORMAL_MINT, 21, '8');
+    const neighbour = bearerToken(NORMAL_MINT, 5, '9');
+    const entry = releasedEntry(token, {
+      amount: 21,
+      status: 'failed',
+      attempts: 5,
+      lastError: 'e'.repeat(NUT_DROP_QUEUE_LIMITS.lastError + 1),
+      senderPeerID: 'p'.repeat(129),
+      paymentId: 'i'.repeat(129),
+    });
+    saveReleasedQueue([entry, releasedEntry(neighbour, { amount: 5 })]);
+
+    const store = await nextLaunch();
+    const loaded = store.getState().byTokenHash[meshTokenDedupeKey(token)];
+
+    const { lastError: _e, senderPeerID: _s, paymentId: _p, ...kept } = entry;
+    expect(loaded).toEqual(kept);
+    expect(loaded.token).toBe(token);
+    expect(store.getState().byTokenHash[meshTokenDedupeKey(neighbour)]?.token).toBe(neighbour);
+    store.getState().prune();
     await settle();
-    unmount();
-    const storedBefore = mockDisk.get(QUEUE_KEY);
+    expect(mockDisk.has(SIDE_KEY)).toBe(false);
+  });
 
-    expect(storedBefore).toContain(good);
-    expect(storedBefore).toContain(oversize);
+  it('reads wrong-typed metadata as absent and keeps the token', async () => {
+    const token = bearerToken(NORMAL_MINT, 13, 'a');
+    const entry = releasedEntry(token, {
+      amount: 13,
+      lastError: 42,
+      senderPeerID: { id: 'x' },
+      paymentId: ['y'],
+    });
+    saveReleasedQueue([entry]);
 
-    // That launch saves once, as any queue change would.
-    (await nextLaunch()).getState().prune();
+    const store = await nextLaunch();
+    const { lastError: _e, senderPeerID: _s, paymentId: _p, ...kept } = entry;
+    expect(store.getState().byTokenHash[meshTokenDedupeKey(token)]).toEqual(kept);
+    store.getState().prune();
+    await settle();
+    expect(mockDisk.has(SIDE_KEY)).toBe(false);
+  });
+
+  it('still sets the whole queue aside when an entry has no token to redeem', async () => {
+    const good = bearerToken(NORMAL_MINT, 16, 'b');
+    const bytes = saveReleasedQueue([releasedEntry(good)]);
+    const parsed = JSON.parse(bytes) as { state: { byTokenHash: Record<string, unknown> } };
+    parsed.state.byTokenHash['c'.repeat(64)] = { ...releasedEntry(''), token: '' };
+    const broken = JSON.stringify(parsed);
+    mockDisk.set(QUEUE_KEY, broken);
+
+    const store = await nextLaunch();
+    expect(store.getState().byTokenHash).toEqual({});
+    store.getState().prune();
     await settle();
 
-    // QUIRK: the side copy holds every queued token, but nothing reads it back (D2).
-    expect(mockDisk.get(SIDE_KEY)).toBe(storedBefore);
-    expect(mockDisk.get(QUEUE_KEY)).not.toContain(good);
+    // Kept whole where a later release can read it; see the reader's comment.
+    expect(mockDisk.get(SIDE_KEY)).toBe(broken);
   });
 });
