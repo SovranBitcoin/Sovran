@@ -2,12 +2,12 @@
 
 State, not history. Passes run in order; one call runs one pass.
 
-| Pass                      | Status                                                                                                        |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| 0 Pin behaviour           | **Done for pass 1; gated for passes 2 and 3** (2026-11-10). See "Gates".                                      |
-| 1 Persisted state         | **Cut, awaiting merge** (2026-11-10). Branch `surgery/pass-1-cuts`. Proposal 3 awaits its plan. See "Pass 1". |
-| 2 Implicit state machines | Not started.                                                                                                  |
-| 3 Deepen modules          | Not started.                                                                                                  |
+| Pass                      | Status                                                                                                                   |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| 0 Pin behaviour           | **Done** (2026-11-11). Every boundary the surveys listed has a pin; the gates are closed. Branch `surgery/pass-0-gates`. |
+| 1 Persisted state         | **Cut, awaiting merge** (2026-11-10). Branch `surgery/pass-1-cuts`. Proposal 3 awaits its plan. See "Pass 1".            |
+| 2 Implicit state machines | Not started.                                                                                                             |
+| 3 Deepen modules          | Not started.                                                                                                             |
 
 Pass 0 is on branch `surgery/pass-0`; pass 1's evidence is on `surgery/pass-1` and its cuts on `surgery/pass-1-cuts`, each stacked on the one before (worktree `../sovran-surgery`,
 based on `main` at `e5d70b590`). Neither is pushed. Until they merge, this file and the survey folders also sit
@@ -88,29 +88,28 @@ Limits of these pins: `whitenoiseStorage` uses a JSON stand-in for the marmot-ts
 wait could not be isolated (AppGate's reinstall check waits first); `forgetWalletDatabases`, a fourth hand-written
 `profile-store` writer, is exercised but not asserted.
 
-## Gates
+## Gates (closed 2026-11-11)
 
-Pass 1 touches stores, migrations and wire formats. Those boundaries are pinned by the existing upgrade tests
-(`cd app && bun run test:upgrade`) plus the store tests above.
+Every survey-listed boundary that had no pin now has one, on branch `surgery/pass-0-gates` (stacked on
+`surgery/pass-1-cuts`): 40 test files, 481 tests, each `describe` seen to fail under a broken variant in a throwaway
+copy. Passes 2 and 3 may cut where a pin exists; a cut that reaches past a pin's stated limit pins first.
 
-Passes 2 and 3 may only cut where the boundary is pinned. These survey-listed boundaries still have **no** pin; pin
-first (same rules: passes today, seen to fail) before any cut touches them:
+| Area                  | Test files (in `app/__tests__/` unless a path is given)                                                                                                                                                                                   |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Startup and accounts  | `appGateOrder`, `initializationGiveUp`, `accountSwitchBoundary`, `settingsRecoveryRun`, `paymentDeepLinkRouting`                                                                                                                          |
+| Payments              | `sovranColadaProviderWiring`, `cocoQuoteFirstWrappers`, `cameraScanBoundary`, `paymentRouteReentry`, `nearbyDiscoveryLifecycle`, `useMempoolAcceleration`, `useOnchainMeltOutpointDiscovery`, `guardedRouterCooldown`, `useAmbientNfcArm` |
+| Wallet package        | `wallet/__tests__/integration/operation-outcome-contract`, `wallet/__tests__/unit/use-screen-actions-hook`, `wallet/__tests__/unit/use-transaction-annotation-hook`                                                                       |
+| Nostr                 | `nearbyPaymentDmRetry`, `useOwnRelayListSync`, `ownSyncLifecycle`, `giftWrapCache`, `nostrDataLayerMirror`                                                                                                                                |
+| Feed                  | `app/features/feed/__tests__/homeFeedLoad`, `publishPoll`, `threadReplyPost`, `composerPost`, `app/features/feed/__tests__/useThreadPaging`, `postMenuActions`, `ownProfileSync`, `composerStore`                                         |
+| Messaging and AI      | `whitenoiseDmSend`, `whitenoiseInboxRequests`, `bitchatSend`, `bitchatBridgeLifecycle`, `aiConversationBranchStream`, `mapCameraMerchantDetail`                                                                                           |
+| Transactions and mint | `swapTransactionTotals`, `transactionsSwapTimeline`, `debouncedMintValidation`, `mintManagementCache`                                                                                                                                     |
 
-- **Startup and accounts:** AppGate rendered order; `InitializationProvider` stages when a profile flow gives up;
-  `AccountSwitchBoundary` and provider order; `SettingsRecoveryScreen` run; payment deep links through the route tree.
-- **Payments:** `SovranColadaProvider` assembled wiring; quote-first wrappers in `cocoOperations.ts`; camera scan
-  orchestration; route re-entry for pending send, melt and receive; nearby discovery lifecycle;
-  `useMempoolAcceleration`; `useOnchainMeltOutpointDiscovery`; `guardedRouter` cooldown; `useAmbientNfcArm`.
-- **Wallet package:** operation outcome contract against a real Manager; `useScreenActions`;
-  `useColadaTransactionAnnotation`.
-- **Nostr:** prepared payment-request DM retry; `useOwnRelayListSync`; `useOwnSocialGraphSeed`; `useMuteListSync`;
-  gift-wrap cache wrapper; data-layer durable mirror.
-- **Messaging and AI:** Whitenoise DM create/send, inbox and requests; BitChat send and bridge lifecycle; AI
-  conversation branch and streaming; map camera and merchant detail.
-- **Feed:** HomeFeed loader; poll publish path; reply bar and composer post flows; `useThread` paging;
-  `usePostActions`; `useModerationActions`; `ownProfileSync`; `composerStore`.
-- **Transactions and mint:** swap detail totals; swap-group injection and sections in `Transactions.tsx`;
-  `useDebouncedMintValidation`; `useMintManagement` cache.
+Stated limits of these pins: Expo Router's own resolution of a passed-through `sovran://<token>`; multi-frame `ur:`
+scans and scans dropped while busy; the ecash send screen beyond its route shell; advertised-request reuse in nearby
+discovery; `RootLayout` is not rendered for the account switch; the spam-audit promotion in `useThread`; onchain and
+bolt12 melts in the outcome contract; `useSetTransactionAnnotation` (needs the provider's context exported).
+
+The pinning confirmed F175 and F178 by running them, and exposed the defects in F200 to F207.
 
 ## Behaviour changed in pass 0 (branch `surgery/pass-0`)
 
@@ -121,6 +120,8 @@ first (same rules: passes today, seen to fail) before any cut touches them:
 | `0d56568e4`              | A secret in an `Error` nested inside logged params was written to the log unredacted.                          | Nested errors get the same redaction as top-level ones.                                            |
 | `536c7408e`, `0a1048295` | One startup recovery failing skipped every later recovery for that launch.                                     | Each recovery runs and fails on its own; "done" is logged only on success. Order unchanged.        |
 | `36f0f53e9`              | A background send or melt confirmation always said "sat".                                                      | It uses the operation's unit.                                                                      |
+| `b3e2cb871`              | A cancelled swap counted a failed leg that never sent anything as fees (510 instead of 10).                    | Only what left the wallet counts toward the fee; the header amount is unchanged.                   |
+| `afd6bbdf5`              | A Whitenoise inbox whose cursor could not be read never started, with nothing logged.                          | The failure is logged and the inbox starts with a full backfill; other start failures are logged.  |
 
 Reverted: `2b9834542` (keep the key import sheet open on an invalid key) had no effect in the real sheet; see F176.
 
