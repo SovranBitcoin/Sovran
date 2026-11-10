@@ -521,8 +521,11 @@ describe('nostr-relay-list-store: a relay list longer than 64', () => {
  * caller records the settled query of a search with at least one result
  * (`app/shared/ui/composed/search/UnifiedSearch.tsx:54-61`), under the
  * surface `'contacts' | 'feed' | 'wallet'` (`useRecentSearches.ts:16`), so a
- * context longer than 64 is not reachable from 0.1.3's UI. `partialize` :102,
- * version 1. 0.1.3 read limit :40; HEAD the same field.
+ * context longer than 64 is not reachable from 0.1.3's UI and its limit
+ * stays. `partialize` :102, version 1. 0.1.3 read limit on the query :40,
+ * which rejected every surface's searches. Repaired: a query of any length is
+ * read; `addSearch` does not record a new one over 2048
+ * (`searchHistoryStore.test.ts`).
  */
 describe('search-history-store: a recorded search longer than 2048', () => {
   const KEY = accountKey('search-history-store', A0);
@@ -538,17 +541,17 @@ describe('search-history-store: a recorded search longer than 2048', () => {
       },
     });
 
-  it('loses every surface’s searches when one is 2049 characters', async () => {
+  it('keeps every surface’s searches, the long one whole, when one is 2049 characters', async () => {
     const bytes = withFeedSearch(longText(2049));
     const { run, loaded } = await startWith(KEY, bytes, 'search-history-store', {
       account: 0,
     });
 
-    // QUIRK: the contacts searches E19 held, and the other feed search, go too.
-    expect(loaded.recentSearches).toEqual({});
-    expect(run.rejections).toContain('store.search_history.merge_rejected');
-    expect(run.defaultedRows).toContain('search-history-store (account 0)');
-    expect(run.disk.asyncStorage[sideKey('search-history-store', A0)]).toBe(bytes);
+    // The contacts searches E19 held, and both feed searches, as saved.
+    expect(loaded.recentSearches).toEqual((JSON.parse(bytes) as Row).state.recentSearches);
+    expect(run.rejections).toEqual([]);
+    expect(run.defaultedRows).not.toContain('search-history-store (account 0)');
+    expect(run.disk.asyncStorage[sideKey('search-history-store', A0)]).toBeUndefined();
   });
 
   it('keeps every surface’s searches when the long one is exactly 2048', async () => {

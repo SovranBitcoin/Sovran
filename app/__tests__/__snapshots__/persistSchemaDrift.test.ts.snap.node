@@ -5992,7 +5992,6 @@ exports[`persisted schema drift search-history-store schema matches the golden s
                   "type": "string",
                 },
                 "query": {
-                  "maxLength": 2048,
                   "type": "string",
                 },
                 "timestamp": {
@@ -6034,7 +6033,6 @@ exports[`persisted schema drift search-history-store schema matches the golden s
                   "type": "string",
                 },
                 "query": {
-                  "maxLength": 2048,
                   "type": "string",
                 },
                 "timestamp": {
