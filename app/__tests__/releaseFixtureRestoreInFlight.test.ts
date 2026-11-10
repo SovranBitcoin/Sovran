@@ -29,6 +29,9 @@ import { fixture as E19 } from './releaseFixtures/E19-0.1.2';
 import { zustandRow } from './releaseFixtures/format';
 import type { ReleaseFixture, SurvivingFact } from './releaseFixtures/format';
 
+// Each case starts the whole app over a disk; allow what the fixture runner allows.
+jest.setTimeout(120_000);
+
 const row = E19.asyncStorage['wallet-lifecycle'] as { state: object; version: number };
 
 const VARIANTS = [

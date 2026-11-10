@@ -41,6 +41,9 @@ import { fixture as E19 } from './releaseFixtures/E19-0.1.2';
 import { ACCOUNTS, IMPORTED, accountKey } from './releaseFixtures/format';
 import type { ReleaseFixture } from './releaseFixtures/format';
 
+// Each case starts the whole app over a disk; allow what the fixture runner allows.
+jest.setTimeout(120_000);
+
 const A0 = ACCOUNTS[0].pubkey;
 const A1 = ACCOUNTS[1].pubkey;
 

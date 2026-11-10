@@ -51,6 +51,9 @@ import upgraded from './releaseFixtures/E20-0.1.4.upgraded.json';
 import { ACCOUNTS } from './releaseFixtures/format';
 import type { ReleaseFixture } from './releaseFixtures/format';
 
+// Each case starts the whole app over a disk; allow what the fixture runner allows.
+jest.setTimeout(120_000);
+
 const A0 = ACCOUNTS[0].pubkey;
 /** The account E20 has selected: the journal belongs to the active profile. */
 const A1 = ACCOUNTS[1].pubkey;
