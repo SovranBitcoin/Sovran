@@ -323,13 +323,10 @@ async function importNsecSubmitImpl(
     return;
   }
   const trimmedValue = rawValue.trim();
-  // A key that is not one stays in the sheet beside its error, to be corrected.
-  let keepOpen = false;
   try {
     const success = await tryImportKeyImpl(manager, trimmedValue);
     if (!success) {
       io.setError('Enter nsec or 64-character hex key.');
-      keepOpen = true;
       return;
     }
     staticPopup('key-imported');
@@ -341,7 +338,7 @@ async function importNsecSubmitImpl(
     // Host suppresses `onDismiss` once an action commits, so
     // release the single-flight guard explicitly here.
     io.finalize();
-    if (!keepOpen) io.close();
+    io.close();
   }
 }
 
