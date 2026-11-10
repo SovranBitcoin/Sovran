@@ -97,7 +97,6 @@ jest.mock('@/shared/lib/popup', () => ({
   paramPopup: jest.fn(),
 }));
 
-import React from 'react';
 import { act, render } from '@testing-library/react-native';
 
 import { SovranColadaProvider } from '@/features/send/providers/Colada';
@@ -158,7 +157,10 @@ describe('payment links opened with the app', () => {
       await open(url);
 
       expect(navigations()).toHaveLength(1);
-      const [method, href] = navigations()[0] as [string, { pathname: string; params: { receiveHistoryEntry: string } }];
+      const [method, href] = navigations()[0] as [
+        string,
+        { pathname: string; params: { receiveHistoryEntry: string } },
+      ];
       expect(method).toBe('navigate');
       expect(href.pathname).toBe('/(receive-flow)/receiveToken');
       // QUIRK: the bearer token itself travels in the route params (navigation state).
