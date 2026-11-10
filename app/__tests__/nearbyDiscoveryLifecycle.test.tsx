@@ -359,7 +359,10 @@ describe('peers and wallet capabilities', () => {
 
     emit(
       'onBLEPrivateMessage',
-      privateMessage('abcdefabcdefabcd', mod.createNearbyCapability(PEER_KEY, PEER_NOISE, null, NOW))
+      privateMessage(
+        'abcdefabcdefabcd',
+        mod.createNearbyCapability(PEER_KEY, PEER_NOISE, null, NOW)
+      )
     );
 
     expect(mod.useBLEPeerDirectory.getState().peers[0]!.nostrPubkeyHex).toBe(
