@@ -96,13 +96,16 @@ async function findReceiveHistoryEntryForOperation(
   const direct = await manager.history.getHistoryEntryById(receiveHistoryId(operationId));
   if (direct?.type === 'receive') return direct as ReceiveHistoryEntry;
 
+  // This operation's own row wins wherever it sits in the page; a row that is
+  // merely new since the snapshot is the fallback.
   const after = await manager.history.getPaginatedHistory(0, 100);
+  const fromMint = after.filter(
+    (h): h is ReceiveHistoryEntry => h.type === 'receive' && h.mintUrl === mintUrl
+  );
   return (
-    after.find((h): h is ReceiveHistoryEntry => {
-      if (h.type !== 'receive' || h.mintUrl !== mintUrl) return false;
-      if (h.operationId === operationId) return true;
-      return !beforeIds.has(h.id);
-    }) ?? null
+    fromMint.find((h) => h.operationId === operationId) ??
+    fromMint.find((h) => !beforeIds.has(h.id)) ??
+    null
   );
 }
 
@@ -519,13 +522,14 @@ export function createExecuteMintQuote(
     for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
       try {
         const after: HistoryEntry[] = await manager.history.getPaginatedHistory(0, 100);
-        const persisted = after.find((h): h is MintHistoryEntry => {
-          if (h.type !== 'mint' || h.mintUrl !== mintUrl) return false;
-          // Preferred: deterministic quoteId match
-          if (mintOp.quoteId && h.quoteId === mintOp.quoteId) return true;
+        const fromMint = after.filter(
+          (h): h is MintHistoryEntry => h.type === 'mint' && h.mintUrl === mintUrl
+        );
+        const persisted =
+          // Preferred: this quote's own row, wherever it sits in the page
+          (mintOp.quoteId ? fromMint.find((h) => h.quoteId === mintOp.quoteId) : undefined) ??
           // Fallback: set difference on ids
-          return !beforeIds.has(h.id);
-        });
+          fromMint.find((h) => !beforeIds.has(h.id));
         if (persisted) {
           logger.info('payment.execute_mint_quote.found', {
             ...mintUrlFields(mintUrl),

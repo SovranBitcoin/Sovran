@@ -138,6 +138,17 @@ describe("createExecuteReceive", () => {
     await expect(receive(manager, async () => {})({ tokenString: TOKEN, mintUrl: MINT_URL, amount: 1 })).rejects.toBe(refused);
   });
 
+  it("returns this receive's row when another receive from the same mint was saved first", async () => {
+    const { api, manager, saved } = receiveManager({ execute: "finalizes" });
+    const other = { ...saved, id: "receive:other-op", operationId: "other-op" };
+    api.history.getHistoryEntryById.mockResolvedValue(null);
+    api.history.getPaginatedHistory.mockResolvedValueOnce([]).mockResolvedValue([other, saved]);
+
+    const result = await receive(manager, async () => {})({ tokenString: TOKEN, mintUrl: MINT_URL, amount: 1 });
+
+    expect(JSON.parse((result as { historyEntry: string }).historyEntry)).toEqual(saved);
+  });
+
   it("says so when there is no wallet", async () => {
     const execute = createExecuteReceive({
       getManager: () => null,
@@ -186,6 +197,32 @@ describe("createExecuteMintQuote", () => {
     const result = await execute({ mintUrl: MINT_URL, amount: 21, unit: "sat", method: "onchain" });
 
     expect(prepareMintQuote).toHaveBeenCalledWith(manager, "onchain", MINT_URL, 21, "sat");
+    expect(JSON.parse(result.historyEntry)).toMatchObject({ id: "mint:saved-id", quoteId: "quote-1" });
+  });
+
+  it("returns this quote's row when another quote from the same mint was saved first", async () => {
+    const row = (id: string, quoteId: string) => ({
+      id,
+      type: "mint",
+      mintUrl: MINT_URL,
+      unit: "sat",
+      quoteId,
+      amount: Amount.from(21),
+      state: "UNPAID",
+      createdAt: 10,
+      updatedAt: 10,
+    });
+    const { api, manager } = quoteManager([]);
+    api.history.getPaginatedHistory
+      .mockResolvedValueOnce([])
+      .mockResolvedValue([row("mint:other", "quote-other"), row("mint:saved-id", "quote-1")]);
+    const execute = createExecuteMintQuote({
+      getManager: () => manager,
+      prepareMintQuote: vi.fn().mockResolvedValue(prepared),
+    });
+
+    const result = await execute({ mintUrl: MINT_URL, amount: 21, unit: "sat" });
+
     expect(JSON.parse(result.historyEntry)).toMatchObject({ id: "mint:saved-id", quoteId: "quote-1" });
   });
 
