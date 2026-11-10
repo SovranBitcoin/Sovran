@@ -232,7 +232,7 @@ describe('the account wipe', () => {
 
     await wipeWhitenoiseStorageForAccounts([1, 2]);
 
-    const left = (await AsyncStorage.getAllKeys()).sort();
+    const left = [...(await AsyncStorage.getAllKeys())].sort();
     expect(left).toEqual(
       [
         'settings-store',
