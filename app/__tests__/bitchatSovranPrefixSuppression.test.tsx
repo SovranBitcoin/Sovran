@@ -10,26 +10,41 @@ import { BitchatBLEProvider } from '@/shared/providers/BitchatBLEProvider';
  * Sovran's own nearby formats travel as BitChat private messages with a
  * versioned prefix (features/nearPay/lib/nearbyCapability.ts `CAPABILITY_PREFIX`,
  * features/nearPay/lib/nearbyPayments.ts `NEARBY_PAYMENT_PREFIX`). The provider's
- * app-wide listener (shared/providers/BitchatBLEProvider.tsx) keeps those, and
- * a DM that is nothing but a token, out of the chat store. The prefixes come
- * from the real modules; only the native module and the hooks the provider
- * also mounts are stubbed.
+ * app-wide listener (shared/providers/BitchatBLEProvider.tsx) keeps the whole
+ * `sovran:` namespace, whatever its kind or version, and a DM that is nothing
+ * but a token, out of the chat store. The prefixes come from the real modules;
+ * only the native module and the hooks the provider also mounts are stubbed.
+ * The native module hands every message to every listener, so the stand-in
+ * for discovery's listener shows what the payment and capability handlers get.
  */
 
 type PrivateMessage = BLEPrivateMessageEvent;
 
-let mockListener: ((event: PrivateMessage) => void) | undefined;
+const mockListeners = new Set<(event: PrivateMessage) => void>();
 jest.mock('bitchat-module', () => ({
   startBLE: jest.fn(),
   addBLEDeliveryStatusListener: jest.fn(() => ({ remove: jest.fn() })),
   addBLEPrivateMessageListener: jest.fn((listener: (event: PrivateMessage) => void) => {
-    mockListener = listener;
-    return { remove: jest.fn() };
+    mockListeners.add(listener);
+    return { remove: () => mockListeners.delete(listener) };
   }),
   sendBLEPrivateMessage: jest.fn(),
 }));
 // The provider also mounts discovery and auto-redeem; each has its own tests.
-jest.mock('@/features/nearPay/hooks/useNearbyDiscovery', () => ({ useNearbyDiscovery: jest.fn() }));
+// Discovery's stand-in listens as the real hook does and records every message.
+const mockProtocolReceived: string[] = [];
+jest.mock('@/features/nearPay/hooks/useNearbyDiscovery', () => ({
+  useNearbyDiscovery: () => {
+    const { useEffect } = jest.requireActual<typeof import('react')>('react');
+    const native = jest.requireMock<typeof import('bitchat-module')>('bitchat-module');
+    useEffect(() => {
+      const subscription = native.addBLEPrivateMessageListener((event) => {
+        mockProtocolReceived.push(event.content);
+      });
+      return () => subscription.remove();
+    }, [native]);
+  },
+}));
 jest.mock('@/features/nearPay/hooks/useNutDropAutoRedeem', () => ({
   useNutDropAutoRedeem: jest.fn(),
 }));
@@ -67,9 +82,10 @@ function message(content: string): PrivateMessage {
 }
 
 /** Whether the provider put this message in the chat store. */
-async function shownAsChat(content: string): Promise<boolean> {
+async function shownAsChat(content: string, isOwn = false): Promise<boolean> {
   mockAppendIncoming.mockClear();
-  mockListener?.(message(content));
+  mockProtocolReceived.length = 0;
+  for (const listener of [...mockListeners]) listener({ ...message(content), isOwn });
   return mockAppendIncoming.mock.calls.length > 0;
 }
 
@@ -88,17 +104,22 @@ describe('a private BitChat message with a sovran: prefix', () => {
         </BitchatBLEProvider>
       );
     });
-    expect(mockListener).toBeDefined();
+    // The provider's chat listener and discovery's.
+    expect(mockListeners.size).toBe(2);
   });
 
   afterAll(() => renderer?.unmount());
 
-  it('keeps a version 1 nearby payment out of the chat', async () => {
-    expect(await shownAsChat(`sovran:payment:1:${PAYLOAD}`)).toBe(false);
+  it('keeps a version 1 nearby payment out of the chat and still hands it to the handlers', async () => {
+    const content = `sovran:payment:1:${PAYLOAD}`;
+    expect(await shownAsChat(content)).toBe(false);
+    expect(mockProtocolReceived).toEqual([content]);
   });
 
-  it('keeps a version 1 nearby capability out of the chat', async () => {
-    expect(await shownAsChat('sovran:nearby:1:{"kind":21118}')).toBe(false);
+  it('keeps a version 1 nearby capability out of the chat and still hands it to the handlers', async () => {
+    const content = 'sovran:nearby:1:{"kind":21118}';
+    expect(await shownAsChat(content)).toBe(false);
+    expect(mockProtocolReceived).toEqual([content]);
   });
 
   it('keeps a DM that is nothing but a token out of the chat, and shows ordinary chat', async () => {
@@ -113,14 +134,25 @@ describe('a private BitChat message with a sovran: prefix', () => {
     expect(await shownAsChat('see you at the meetup')).toBe(true);
   });
 
-  it('shows a version 2 nearby payment as chat', async () => {
-    // QUIRK: only the `:1:` prefixes are matched, so a later version's payment,
-    // proofs and all, is stored and shown as a chat bubble.
-    expect(await shownAsChat(`sovran:payment:2:${PAYLOAD}`)).toBe(true);
+  it('keeps a version 2 nearby payment out of the chat', async () => {
+    expect(await shownAsChat(`sovran:payment:2:${PAYLOAD}`)).toBe(false);
   });
 
-  it('shows a version 2 nearby capability as chat', async () => {
-    // QUIRK: as above, for the capability.
-    expect(await shownAsChat('sovran:nearby:2:{"kind":21118}')).toBe(true);
+  it('keeps a version 2 nearby capability out of the chat', async () => {
+    expect(await shownAsChat('sovran:nearby:2:{"kind":21118}')).toBe(false);
+  });
+
+  it('keeps a sovran: message of a kind this build does not know out of the chat', async () => {
+    expect(await shownAsChat('sovran:receipt:1:{}')).toBe(false);
+    expect(await shownAsChat('sovran:')).toBe(false);
+  });
+
+  it('keeps an echo of this phone’s own sovran: message out of the chat', async () => {
+    expect(await shownAsChat(`sovran:payment:2:${PAYLOAD}`, true)).toBe(false);
+  });
+
+  it('shows ordinary chat that only mentions sovran', async () => {
+    expect(await shownAsChat('try sovran: it is a wallet')).toBe(true);
+    expect(await shownAsChat('Sovran:payment is cool')).toBe(true);
   });
 });

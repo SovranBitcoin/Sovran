@@ -174,7 +174,7 @@ reports) keep their evidence, and link here for anything still open.
 | [F191](F191.md) | high | decision | A long name or picture cached from a Nostr profile makes the whole account list load empty |
 | [F192](F192.md) | medium | decision | One over-limit saved value empties a whole store: swaps, follows, own notes, relays, searches, mint details |
 | [F193](F193.md) | medium | decision | After a restart, a 0.1.3 payment to a re-encoded request waits until that request is shown again |
-| [F195](F195.md) | low | decision | A later version of Sovran's Bluetooth messages would show in chat with its proofs |
+| [F195](F195.md) | low | device | The native BitChat bridges record a later-version Sovran message's peer as a chat contact |
 | [F196](F196.md) | low | device | Six link schemes the app registers do nothing, and a signer link also raises a failed-link error |
 | [F197](F197.md) | medium | investigation | Receive requests can point payers at relays Sovran does not read |
 | [F198](F198.md) | medium | fix | The persistence scan and map miss native BitChat storage, keys passed as constants and files |
