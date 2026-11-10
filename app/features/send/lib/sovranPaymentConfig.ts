@@ -44,7 +44,7 @@ import {
   meltMethodForTarget,
   annotationKey,
   decodePaymentRequestInfo,
-  isValidEcashToken,
+  isWellFormedEcashToken,
   rawAnnotationKey,
 } from 'wallet';
 
@@ -702,7 +702,7 @@ export function createSovranScanSources(nfcAdapter?: NfcIOAdapter): ScanSources 
     clipboard: async () => {
       paymentLog.debug('payment.scan.clipboard.start');
       const rawText = (await Clipboard.getStringAsync()).trim();
-      const decodedText = isEncoded(rawText) ? decode(rawText, isValidEcashToken) : rawText;
+      const decodedText = isEncoded(rawText) ? decode(rawText, isWellFormedEcashToken) : rawText;
       if (!decodedText) {
         paymentLog.debug('payment.scan.clipboard.empty');
         return { empty: true };

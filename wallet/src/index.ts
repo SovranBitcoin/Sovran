@@ -245,11 +245,7 @@ export {
   requireAmount,
 } from "./amount";
 export type { AmountValue } from "./amount";
-export {
-  emptyBalanceBreakdown,
-  sumAmounts,
-  sumReservedSends,
-} from "./balance";
+export { emptyBalanceBreakdown, sumAmounts, sumReservedSends } from "./balance";
 export type { WalletBalanceBreakdown } from "./balance";
 
 // Adapter contracts
@@ -383,6 +379,7 @@ export {
 export {
   decodeEcashTokenMetadata,
   isValidEcashToken,
+  isWellFormedEcashToken,
   type EcashTokenMetadata,
 } from "./ecash";
 export {
@@ -581,7 +578,12 @@ export {
 } from "./lnurl";
 
 // Recipient identity resolution (Lightning Address → Nostr hex pubkey)
-export { fetchNip05Pubkey, parseNip05Identifier, verifyNip05, type Nip05Verification } from "./nip05";
+export {
+  fetchNip05Pubkey,
+  parseNip05Identifier,
+  verifyNip05,
+  type Nip05Verification,
+} from "./nip05";
 export { normalizeNostrPubkey, resolveRecipientPubkey } from "./recipient";
 
 // Cancellable-fetch primitives (timeout + AbortSignal). Hermes lacks

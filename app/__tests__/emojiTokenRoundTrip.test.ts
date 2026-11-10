@@ -1,6 +1,6 @@
 /** @jest-environment node */
 import { Amount, getEncodedToken } from '@cashu/cashu-ts';
-import { defaultDetectors, isValidEcashToken, parsePaymentInput } from 'wallet';
+import { defaultDetectors, isWellFormedEcashToken, parsePaymentInput } from 'wallet';
 
 import { CATEGORIES } from '@/shared/lib/popup/popups/emojiData';
 import { decode, encode, isEncoded } from '@/shared/lib/third-party/emoji';
@@ -12,7 +12,7 @@ import { decode, encode, isEncoded } from '@/shared/lib/third-party/emoji';
  * emojiPicker.tsx: the picker's answer is an option whose id is the emoji).
  * Pasting reads the clipboard as the scan source does
  * (features/send/lib/sovranPaymentConfig.ts, `createSovranScanSources`:
- * `isEncoded(rawText) ? decode(rawText, isValidEcashToken) : rawText`) and
+ * `isEncoded(rawText) ? decode(rawText, isWellFormedEcashToken) : rawText`) and
  * hands the text to the wallet's input parser.
  */
 
@@ -50,7 +50,7 @@ function encodeAs013(emoji: string, text: string): string {
 
 /** What a paste of the copied text gives the wallet. */
 function paste(copied: string) {
-  const text = isEncoded(copied) ? decode(copied, isValidEcashToken) : copied;
+  const text = isEncoded(copied) ? decode(copied, isWellFormedEcashToken) : copied;
   return { text, parsed: parsePaymentInput(text, defaultDetectors) };
 }
 
@@ -108,6 +108,20 @@ describe('a token copied as an emoji', () => {
     // A payload that really starts with byte 0x0F.
     for (const copied of [encode('🥜', '\u000Fnot a token'), encode('🛡️', '\u000Fnot a token')]) {
       expect(paste(copied).text).toBe('\u000Fnot a token');
+    }
+  });
+
+  it('does not repair a carrier around a token with no real mint or unsigned proofs', () => {
+    const cashuA = (token: unknown) =>
+      `cashuA${Buffer.from(JSON.stringify(token)).toString('base64url')}`;
+    const malformed = [
+      cashuA({ token: [{ mint: 'not a URL', proofs: [{ amount: 8, secret: 'x' }] }] }),
+      cashuA({ token: [{ mint: 'https://mint.example', proofs: [{ amount: 8, secret: 'x' }] }] }),
+    ];
+    for (const hidden of malformed) {
+      const old = encodeAs013('❤️', hidden);
+      expect(paste(old).text).toBe(decode(old));
+      expect(paste(old).parsed.type).toBe('unknown');
     }
   });
 
