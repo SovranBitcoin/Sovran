@@ -252,4 +252,9 @@ version or field was renamed, removed or tightened.
 | The eight stores above, with an over-limit value beside ordinary data | Writers cited per case in `releasedWriterBounds.test.ts`, at `d9ad12c4b` | `releasedWriterBounds.test.ts`: the app started three times over the 0.1.3 fixture with that one row; neighbours kept, nothing written to `:unreadable`; at-limit controls | `persistUnreadableGuard.test.ts`, the stores' resilience and capacity tests | NOT RUN: no simulator was started on this Mac | INCONCLUSIVE |
 | Every release fixture E01 to E20 | as before | `bun run test:upgrade`: 981 passed, 2 skipped | as before | as recorded above for earlier candidates | PASS in tests |
 
-Still open in the same family: `nut-drop-redeem-queue` (F174), wallpaper and location limits (F192).
+`nut-drop-redeem-queue` was repaired the same way, in its own section of `releasedWriterBounds.test.ts`: every
+token, mint address and unit is read at any length, a new Bluetooth token over the limits is refused before it is
+queued, and a queue an earlier build copied to `:unreadable` is merged back by token hash and the copy removed only
+once the merged queue is saved (`nutDropRedeemQueueRecovery.test.ts`). Real upgrade NOT RUN; INCONCLUSIVE.
+
+Still open in the same family: wallpaper and location limits (F192).

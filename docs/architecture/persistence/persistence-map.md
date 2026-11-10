@@ -219,7 +219,8 @@ keeps its own `PRAGMA user_version`. `T/persistenceSurface.test.ts` now pins tha
 old cache file.
 
 **Limits that a release's own writer could exceed.** Nine stores load as defaults when one saved value is over the
-reader's limit, in 0.1.0 to 0.1.3 and today: `T/releasedWriterBounds.test.ts`, F191, F192; the redeem queue is F174.
+reader's limit, in 0.1.0 to 0.1.3 and today: `T/releasedWriterBounds.test.ts`, F191, F192. The redeem queue now reads
+every token a release saved, and merges back a queue an earlier build set aside (`T/nutDropRedeemQueueRecovery.test.ts`).
 
 **What 0.1.3 and this build do not read of each other's messages** is in `.surgery/pass-1/surveys/wire-formats.md`:
 F193 (a 0.1.3 payment to a re-encoded Nostr payment request after a restart), F199 (Nut Drop).

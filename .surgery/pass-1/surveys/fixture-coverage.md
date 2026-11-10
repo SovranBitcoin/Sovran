@@ -93,7 +93,7 @@ Epoch columns give the fixtures that hold the key (verified from the dump), not 
 | `own-content-store` | E18–E20 | COVERED for a confirmed note | Fact from E18. A pending publish is not held (`status: 'confirmed'`, `E19-0.1.2.ts:710`). |
 | `owned-media-store` | E18–E20 | COVERED | Fact from E18. |
 | `recent-people-store` | E18–E20 | COVERED | Fact from E18. |
-| `nut-drop-redeem-queue` | E18–E20 | COVERED | Fact "the unredeemed nearby token of account 0" (a queued token, `status: 'untrusted-mint'`). Over-limit entry: `T/nutDropRedeemQueueOversize.test.tsx` characterizes the loss, F174. |
+| `nut-drop-redeem-queue` | E18–E20 | COVERED | Fact "the unredeemed nearby token of account 0" (a queued token, `status: 'untrusted-mint'`). Over-limit entry: repaired since this survey (`T/releasedWriterBounds.test.ts`, section 10). |
 | `feed-ignore-store`, `notification-policy-store` | E18–E20 | COVERED | Four and two facts from E18. |
 | `nip46-connections-store` | E18–E20 | COVERED | Three facts from E18 (app, standing permission, standing refusal). |
 | `nip46-activity-store` | E18–E20 | COVERED in E20; accepted loss in E18–E19 | Old entries age out after 30 days by design (known gap, `accepted`); E20 uses a year-2100 entry and passes. |
@@ -183,7 +183,7 @@ Epoch columns give the fixtures that hold the key (verified from the dump), not 
 
 6. **A store at its size limit.** Covered for `routstr-store` (`routstrOversizedUpgrade`, `persistedCapacity`),
    `scan-history-store` (`scanHistoryUpgrade`), `profile-store` (`profileStoreCapacity`). Characterized as a
-   loss for `nut-drop-redeem-queue` (F174). Not covered for the other bounded stores, `search-history-store`
+   loss for `nut-drop-redeem-queue` when surveyed; repaired since. Not covered for the other bounded stores, `search-history-store`
    among them, which the map itself flags; F48 (open) is the general entry. Not audited store by store here.
 
 7. **Coco's `.pre-v2` backup files** (`SQLite/coco*.db.pre-v2`, `-wal`, `-shm`): a copy of spendable proofs, written

@@ -154,7 +154,6 @@ reports) keep their evidence, and link here for anything still open.
 | [F171](F171.md) | low | upstream | Harness simulators appear as windows whenever Simulator.app is open |
 | [F172](F172.md) | medium | fix | Convert the remaining pick-one choices to the picker sheet |
 | [F173](F173.md) | high | decision | A Balance split in a unit other than sat reads sat balances, fees and proofs |
-| [F174](F174.md) | high | decision | A Bluetooth token over the redeem queue's size limits empties the whole queue on the next launch |
 | [F175](F175.md) | high | investigation | Giving up a profile flow after the splash is raised closes the wallet and leaves a blank app |
 | [F176](F176.md) | medium | decision | A sheet's primary action closes the sheet before the action can show an error |
 | [F177](F177.md) | medium | decision | Delete Account treats a refused deletion as complete |

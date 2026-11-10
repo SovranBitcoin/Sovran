@@ -127,11 +127,12 @@ Reverted: `2b9834542` (keep the key import sheet open on an invalid key) had no 
 
 ## Open findings
 
-Filed as follow-ups F173 to F190 (`docs/follow-ups/`), not fixed, each with its reason. The ones that involve money
-or saved data:
+Filed as follow-ups (`docs/follow-ups/`, from F173 on), not fixed, each with its reason; the redeem queue's has since
+been repaired. The ones that involve money or saved data:
 
 - **F173** A Balance split in a unit other than sat reads sat balances, fees and proofs. Owner's choice of repair.
-- **F174** A Bluetooth token over the queue's limits empties the redeem queue on the next launch. Saved data.
+- A Bluetooth token over the queue's limits emptied the redeem queue on the next launch. Saved data. Repaired on
+  `surgery/pass-1-queue` (below).
 - **F175** Giving up a profile flow after the splash closes the wallet and leaves a blank app. Traced, not run.
 - **F178** Forced recovery: timed-out mints keep restoring; two states have no way out.
 - **F180** Standing-quote work that outlives a profile switch can write into the next profile. Saved data.
@@ -228,17 +229,17 @@ every release fixture loads; **no real upgrade was run**, so by that skill's rul
 PASS. They sit in a pull request, not on `main`.
 
 Remaining: F193 (after a restart, a 0.1.3 payment to a re-drawn request waits until it is shown again), F195 (native
-bridges), F174 (redeem queue: plan below, not built), F192 (wallpaper and location limits).
+bridges), F192 (wallpaper and location limits).
 
-Redeem queue plan (proposal 3), awaiting approval: read every saved token, mint address and unit whatever its length;
-read over-long notes on an entry as absent; refuse an over-limit Bluetooth token before saving, as the message path
-does; on start, merge a queue found under `:unreadable` back in by token hash and remove that copy only after the
-merged queue is saved.
+Redeem queue (proposal 3), approved and built on `surgery/pass-1-queue`: every saved token, mint address and unit is
+read whatever its length; over-long or wrong-typed notes on an entry read as absent; an over-limit Bluetooth token is
+refused before saving, with the message path's check; after a load, a queue found under `:unreadable` is merged back
+in by token hash and that copy removed only after the merged queue is saved and read back. No real upgrade was run.
 
 ### Open findings from this pass
 
 F191 to F193 and F195 to F199 in `docs/follow-ups/`. Money first: F193 (0.1.3 payments to a Nostr request sit in the sender's pending
-send), F174 (redeem queue), F191 (account list), F197 (relay hints Sovran does not read; partly
+send), F191 (account list), F197 (relay hints Sovran does not read; partly
 inferred).
 
 ### Not verified in pass 1
