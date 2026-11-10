@@ -12,7 +12,12 @@ type WhitenoiseSetupState = {
   isLoading: boolean;
   isBootstrapping: boolean;
   error: string | null;
-  bootstrap: () => Promise<void>;
+  /**
+   * Publishes key packages up to the target. Resolves `true` only when that
+   * finished; `false` when it failed (see `error`); `undefined` when dropped
+   * because a bootstrap was already running.
+   */
+  bootstrap: () => Promise<boolean | undefined>;
 };
 
 async function readCount(client: MarmotClient): Promise<number> {
@@ -59,14 +64,14 @@ async function bootstrapImpl(
     setIsBootstrapping: (value: boolean) => void;
     setError: (value: string | null) => void;
   }
-): Promise<void> {
+): Promise<boolean> {
   if (!client) {
     io.setError('White Noise client not ready');
-    return;
+    return false;
   }
   if (relays.length === 0) {
     io.setError('No relays configured');
-    return;
+    return false;
   }
   io.setIsBootstrapping(true);
   io.setError(null);
@@ -85,10 +90,12 @@ async function bootstrapImpl(
     const finalCount = await readCount(client);
     io.setKeyPackageCount(finalCount);
     wnLog.info('whitenoise.setup.bootstrap.done', { count: finalCount });
+    return true;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     io.setError(message);
     wnLog.error('whitenoise.setup.bootstrap_failed', { error: message });
+    return false;
   } finally {
     io.setIsBootstrapping(false);
   }
