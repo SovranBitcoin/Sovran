@@ -89,7 +89,7 @@ export function WhitenoiseDMScreen({ pubkey }: { pubkey: string }) {
         onSend={(text) => {
           if (!useFeedIgnoreStore.getState().ignoredPubkeys.includes(pubkey)) return send(text);
         }}
-        composerDisabled={blocked || !isClientReady || isCreatingGroup}
+        composerDisabled={blocked || !isClientReady || isLoading || isCreatingGroup}
         composerPlaceholder={isCreatingGroup ? 'Creating encrypted group…' : 'Write here'}
         composerTestID="whitenoise-dm-input"
         banner={

@@ -431,6 +431,67 @@ describe('the first send creates the group', () => {
   });
 });
 
+describe('a send before the conversation has loaded', () => {
+  async function mountWhileLoading() {
+    const loading = deferred<undefined>();
+    fake.client.loadAllGroups.mockReturnValueOnce(loading.promise);
+    const view = await mount();
+    expect(view.result.current.isLoading).toBe(true);
+    return { ...view, loading };
+  }
+
+  it('with a saved group: is refused, creates and invites nothing and leaves the index alone; after loading it goes through that group', async () => {
+    const group = makeGroup([0x01, 0x02]);
+    fake.groups.set('0102', group);
+    await seedIndex('0102');
+    const { result, loading } = await mountWhileLoading();
+
+    await act(async () => {
+      await result.current.send('too early');
+    });
+
+    expect(fake.client.network.request).not.toHaveBeenCalled();
+    expect(fake.client.createGroup).not.toHaveBeenCalled();
+    expect(group.sendChatMessage).not.toHaveBeenCalled();
+    expect(result.current.messages).toEqual([]);
+    expect(await AsyncStorage.getItem(INDEX_KEY)).toBe('{"v":1,"d":"0102"}');
+
+    await act(async () => {
+      loading.resolve(undefined);
+    });
+    expect(result.current).toMatchObject({ isLoading: false, hasGroup: true });
+    await act(async () => {
+      await result.current.send('on time');
+    });
+
+    expect(fake.client.createGroup).not.toHaveBeenCalled();
+    expect(group.sendChatMessage).toHaveBeenCalledTimes(1);
+    expect(group.sendChatMessage).toHaveBeenCalledWith('on time');
+    expect(await AsyncStorage.getItem(INDEX_KEY)).toBe('{"v":1,"d":"0102"}');
+  });
+
+  it('with no saved group: is refused and creates nothing until loading has found none', async () => {
+    const { result, loading } = await mountWhileLoading();
+
+    await act(async () => {
+      await result.current.send('too early');
+    });
+
+    expect(fake.client.createGroup).not.toHaveBeenCalled();
+    expect(await AsyncStorage.getItem(INDEX_KEY)).toBeNull();
+
+    await act(async () => {
+      loading.resolve(undefined);
+    });
+    await act(async () => {
+      await result.current.send('first');
+    });
+
+    expect(fake.client.createGroup).toHaveBeenCalledTimes(1);
+    expect(await AsyncStorage.getItem(INDEX_KEY)).toBe('{"v":1,"d":"c0de"}');
+  });
+});
+
 describe('a send into an existing group', () => {
   async function mountWithGroup() {
     const group = makeGroup([0x01, 0x02]);

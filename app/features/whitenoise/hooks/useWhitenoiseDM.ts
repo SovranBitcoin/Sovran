@@ -68,6 +68,9 @@ export function useWhitenoiseDM(counterpartyPubkey: string): UseWhitenoiseDMStat
   // sendDmImpl also writes it directly to bridge the gap between createGroup
   // and the commit of setGroup(created).
   const groupRef = useLatestRef<WnGroup | null>(group);
+  // Until loading settles, `groupRef` cannot tell "no conversation yet" from
+  // "not read yet", so a send then would create a second group.
+  const isLoadingRef = useLatestRef(isLoading);
 
   // Resolve existing group by counterparty pubkey, hydrate persisted history.
   // The impls construct their own WhitenoiseDmIndex from accountIndex at call
@@ -153,6 +156,7 @@ export function useWhitenoiseDM(counterpartyPubkey: string): UseWhitenoiseDMStat
         counterpartyPubkey,
         accountIndex,
         groupRef,
+        isLoadingRef,
         setError,
         setIsCreatingGroup,
         setGroup,
@@ -263,6 +267,7 @@ interface SendDmCtx {
   counterpartyPubkey: string;
   accountIndex: WhitenoiseAccountIndex;
   groupRef: { current: WnGroup | null };
+  isLoadingRef: { current: boolean };
   setError: (value: string | null) => void;
   setIsCreatingGroup: (value: boolean) => void;
   setGroup: (value: WnGroup | null) => void;
@@ -277,12 +282,17 @@ async function sendDmImpl(ctx: SendDmCtx, text: string): Promise<void> {
     counterpartyPubkey,
     accountIndex,
     groupRef,
+    isLoadingRef,
     setError,
     setIsCreatingGroup,
     setGroup,
     setMessages,
   } = ctx;
   if (!text.trim()) return;
+  if (isLoadingRef.current) {
+    wnLog.warn('whitenoise.dm.send_refused_while_loading');
+    return;
+  }
   if (!client) {
     setError('White Noise client not ready');
     return;
