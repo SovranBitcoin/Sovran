@@ -164,20 +164,38 @@ test('a record from before the verification fields loads with them empty', async
   });
 });
 
-test('a restore error over 500 characters is saved, and the next launch loses the whole record', async () => {
+test('a restore error over 500 characters is saved clipped to 500, and the next launch keeps the record', async () => {
   state().markSeedCreatedNow();
   state().setRestoreStatus('failed', 'x'.repeat(501));
   await settle();
   const written = saved();
-  expect(written).toMatchObject({ seedCreatedAt: NOW, restoreStatus: 'failed' });
+  expect(written).toMatchObject({
+    seedCreatedAt: NOW,
+    restoreStatus: 'failed',
+    lastRestoreError: 'x'.repeat(500),
+  });
 
   await loadFromDisk(written);
 
-  // QUIRK: the writer does not cap the error, the schema rejects anything
-  // over 500 characters without a fallback, and a rejected field discards the
-  // whole record, seed stamp included, so the gate then treats the seed as one
-  // this install did not create. No caller passes an error today, so this is
-  // latent. A later fix should change this on purpose.
-  expect(state().seedCreatedAt).toBeNull();
-  expect(state().restoreStatus).toBe('unknown');
+  expect(state()).toMatchObject({
+    seedCreatedAt: NOW,
+    restoreStatus: 'failed',
+    lastRestoreError: 'x'.repeat(500),
+  });
+});
+
+test('a saved restore error over 500 characters loads as none, and the rest of the record stays', async () => {
+  await loadFromDisk({
+    seedCreatedAt: NOW,
+    restoreStatus: 'failed',
+    lastRestoreAt: NOW,
+    lastRestoreError: 'x'.repeat(501),
+  });
+
+  expect(state()).toMatchObject({
+    seedCreatedAt: NOW,
+    restoreStatus: 'failed',
+    lastRestoreAt: NOW,
+    lastRestoreError: null,
+  });
 });

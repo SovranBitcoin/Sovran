@@ -26,12 +26,13 @@
  * the schema rejects the whole blob. In both, the control case beside it holds
  * the same row with the value exactly at the limit, and loads whole.
  *
- * In every one of these stores the 0.1.3 READER already had the same limit as
- * today's (cited per case): the mismatch is between a released writer and
- * both readers, not a limit added after 0.1.3. What changed since 0.1.3 is
- * that the rejected bytes are now copied aside to `<store>:unreadable` before
- * the first overwrite (`shared/lib/persist/preserveUnreadable.ts`); 0.1.3 had
- * no such copy.
+ * In every one of these stores the 0.1.3 READER already had the limit (cited
+ * per case): the mismatch was between a released writer and its own reader,
+ * not a limit added after 0.1.3. Every store here is repaired except
+ * `wallpaper-store`, whose over-limit catalog is not shown to be reachable;
+ * there the rejected bytes are copied aside to `<store>:unreadable` before the
+ * first overwrite (`shared/lib/persist/preserveUnreadable.ts`), which 0.1.3
+ * did not do.
  *
  * References: `G/` = `app/shared/stores/global/`, `P/` =
  * `app/shared/stores/profile/`, `L/` = `app/shared/lib/`, all `@d9ad12c4b`
@@ -722,7 +723,9 @@ describe('wallpaper-store: a catalog with more albums or wallpapers than the lim
  * error string; `partialize` :66-71, version 1. Its only 0.1.3 callers pass
  * no error (`app/shared/blocks/AppGate.tsx:220,223`), so no released path is
  * known to write a long one: this pins the store boundary only. 0.1.3 read
- * limit :41; HEAD :47.
+ * limit :41, which rejected the whole record. Repaired: an over-long error is
+ * read as none, and `setRestoreStatus` clips a new one
+ * (`walletLifecycleTransitions.test.ts`).
  */
 describe('wallet-lifecycle: a restore error longer than 500', () => {
   const KEY = 'wallet-lifecycle';
@@ -734,20 +737,16 @@ describe('wallet-lifecycle: a restore error longer than 500', () => {
   };
   const withError = (lastRestoreError: string) => released(1, { ...LIFECYCLE, lastRestoreError });
 
-  it('loses when the seed was made, and the failed status, at 501 characters', async () => {
+  it('keeps when the seed was made, and the failed status, at 501 characters', async () => {
     const bytes = withError(longText(501));
-    const { run, loaded } = await startWith(KEY, bytes, KEY);
+    const { run, loaded, saved } = await startWith(KEY, bytes, KEY);
 
-    // QUIRK: `seedCreatedAt` (what tells this install apart from a reinstall)
-    // and the failed restore status are lost with the error text.
-    expect(loaded).toMatchObject({
-      seedCreatedAt: null,
-      restoreStatus: 'unknown',
-      lastRestoreAt: null,
-      lastRestoreError: null,
-    });
-    expect(run.rejections).toContain('store.wallet_lifecycle.merge_rejected');
-    expect(run.disk.asyncStorage[sideKey(KEY)]).toBe(bytes);
+    // `seedCreatedAt` (what tells this install apart from a reinstall) and the
+    // failed restore status survive; only the unreadable error text is gone.
+    expect(loaded).toMatchObject({ ...LIFECYCLE, lastRestoreError: null });
+    expect(saved!.state).toMatchObject({ ...LIFECYCLE, lastRestoreError: null });
+    expect(run.rejections).toEqual([]);
+    expect(run.disk.asyncStorage[sideKey(KEY)]).toBeUndefined();
   });
 
   it('keeps the record at exactly 500 characters', async () => {

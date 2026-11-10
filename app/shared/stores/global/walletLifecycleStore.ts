@@ -31,6 +31,9 @@ interface WalletLifecycleState {
   markRestoreComplete: () => void;
 }
 
+/** Longest restore error kept. */
+const MAX_RESTORE_ERROR = 500;
+
 const PersistedWalletLifecycleStore = z.object({
   seedCreatedAt: z.number().int().nonnegative().nullable().default(null),
   recoveryPhraseVerifiedAt: z.number().int().nonnegative().nullable().default(null).catch(null),
@@ -44,7 +47,9 @@ const PersistedWalletLifecycleStore = z.object({
     .default('unknown')
     .catch('unknown'),
   lastRestoreAt: z.number().int().nonnegative().nullable().default(null),
-  lastRestoreError: z.string().max(500).nullable().default(null),
+  // An error too long to read is read as none: rejecting it would discard the
+  // whole record, `seedCreatedAt` included. New errors are clipped on write.
+  lastRestoreError: z.string().max(MAX_RESTORE_ERROR).nullable().default(null).catch(null),
 });
 
 export const useWalletLifecycleStore = create<WalletLifecycleState>({
@@ -69,7 +74,10 @@ export const useWalletLifecycleStore = create<WalletLifecycleState>({
         set((s) => (s.seedCreatedAt == null ? { seedCreatedAt: Date.now() } : s)),
 
       setRestoreStatus: (status, error = null) =>
-        set({ restoreStatus: status, lastRestoreError: error }),
+        set({
+          restoreStatus: status,
+          lastRestoreError: error?.slice(0, MAX_RESTORE_ERROR) ?? null,
+        }),
 
       markRestoreComplete: () =>
         set({ restoreStatus: 'complete', lastRestoreAt: Date.now(), lastRestoreError: null }),
