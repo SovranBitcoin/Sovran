@@ -16,6 +16,7 @@ import { AppState } from 'react-native';
 import { meshTokenDedupeKey } from 'wallet';
 
 import { useNutDropAutoRedeem } from '@/features/nearPay/hooks/useNutDropAutoRedeem';
+import { paymentLog } from '@/shared/lib/logger';
 import {
   NUT_DROP_QUEUE_LIMITS,
   useNutDropRedeemQueueStore,
@@ -142,41 +143,45 @@ describe('Nut Drop redeem queue and an entry over the stored limits', () => {
     unmount();
   });
 
-  it('queues a Bluetooth token whose mint URL is longer than the stored limit', async () => {
+  it.each([
+    [
+      'mint address',
+      `https://mint.example/${'a'.repeat(NUT_DROP_QUEUE_LIMITS.mintUrl + 500)}`,
+      'sat',
+    ],
+    ['unit', NORMAL_MINT, 'u'.repeat(NUT_DROP_QUEUE_LIMITS.unit + 4)],
+  ])(
+    'refuses and logs a Bluetooth token whose %s is over the queue limits',
+    async (_what, mint, unit) => {
+      const warn = jest.spyOn(paymentLog, 'warn');
+      const { unmount } = renderHook(() => useNutDropAutoRedeem());
+      const token = bearerToken(mint, 4, '2', unit);
+
+      receiveOverBle(token);
+      await settle();
+
+      expect(useNutDropRedeemQueueStore.getState().byTokenHash).toEqual({});
+      expect(warn).toHaveBeenCalledWith(
+        'near_pay.redeem.ignored_over_limit',
+        expect.objectContaining({ senderPeerID: '0123456789abcdef' })
+      );
+      unmount();
+    }
+  );
+
+  it('keeps the queue whole on the next launch after refusing an over-limit token', async () => {
     const { unmount } = renderHook(() => useNutDropAutoRedeem());
-    const longMint = `https://mint.example/${'a'.repeat(NUT_DROP_QUEUE_LIMITS.mintUrl + 500)}`;
-    const token = bearerToken(longMint, 4, '2');
+    const good = bearerToken(NORMAL_MINT, 16, '4');
+    const oversize = bearerToken(`https://mint.example/${'b'.repeat(3000)}`, 2, '5');
 
-    receiveOverBle(token);
+    receiveOverBle(good);
+    receiveOverBle(oversize);
     await settle();
-
-    // QUIRK: the BLE writer does not check NUT_DROP_QUEUE_LIMITS (the DM writer does), so an
-    // entry the stored schema cannot read back is queued (stores-persistence D2). A fix that
-    // refuses it at enqueue should change this assertion on purpose.
-    expect(
-      useNutDropRedeemQueueStore.getState().byTokenHash[meshTokenDedupeKey(token)]
-    ).toMatchObject({
-      mintUrl: longMint,
-      status: 'pending',
-    });
     unmount();
-  });
 
-  it('queues a Bluetooth token whose unit is longer than the stored limit', async () => {
-    const { unmount } = renderHook(() => useNutDropAutoRedeem());
-    const longUnit = 'u'.repeat(NUT_DROP_QUEUE_LIMITS.unit + 4);
-    const token = bearerToken(NORMAL_MINT, 4, '3', longUnit);
-
-    receiveOverBle(token);
-    await settle();
-
-    // QUIRK: same missing limit check, for the unit (D2).
-    expect(
-      useNutDropRedeemQueueStore.getState().byTokenHash[meshTokenDedupeKey(token)]
-    ).toMatchObject({
-      unit: longUnit,
-    });
-    unmount();
+    const queue = await nextLaunchQueue();
+    expect(Object.keys(queue)).toEqual([meshTokenDedupeKey(good)]);
+    expect(mockDisk.has(SIDE_KEY)).toBe(false);
   });
 });
 

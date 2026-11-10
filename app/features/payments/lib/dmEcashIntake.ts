@@ -13,7 +13,7 @@
 
 import { classifyMeshToken, isValidEcashToken, meshTokenDedupeKey } from 'wallet';
 
-import { NUT_DROP_QUEUE_LIMITS } from '@/shared/stores/profile/nutDropRedeemQueueStore';
+import { fitsNutDropQueue } from '@/shared/stores/profile/nutDropRedeemQueueStore';
 
 /** The fields of a decrypted DM this module reads. */
 interface IncomingDm {
@@ -104,20 +104,9 @@ export async function intakeDmEcash(
   if (deps.queue.has(tokenHash)) return 'already-known';
 
   const unit = classified.unit ?? 'sat';
-  // What the queue stores has limits, and one entry past them fails the whole
-  // stored queue on the next launch. Such a token is left for the person to
+  // What the queue stores has limits, and an older release's reader fails its
+  // whole queue on one entry past them. Such a token is left for the person to
   // paste by hand; it never enters the queue.
-  if (
-    token.length > NUT_DROP_QUEUE_LIMITS.token ||
-    classified.mintUrl.length > NUT_DROP_QUEUE_LIMITS.mintUrl ||
-    unit.length > NUT_DROP_QUEUE_LIMITS.unit ||
-    tokenHash.length > NUT_DROP_QUEUE_LIMITS.tokenHash ||
-    !Number.isSafeInteger(classified.amount) ||
-    classified.amount < 0
-  ) {
-    return 'unsupported';
-  }
-
   const entry = {
     token,
     mintUrl: classified.mintUrl,
@@ -126,6 +115,7 @@ export async function intakeDmEcash(
     source: 'nostr' as const,
     senderPubkey: dm.senderPubkey,
   };
+  if (!fitsNutDropQueue(tokenHash, entry)) return 'unsupported';
   const trusted = await deps.isTrustedMint(entry.mintUrl);
   if (!deps.stillCurrent()) return 'abandoned';
   if (trusted === false) {

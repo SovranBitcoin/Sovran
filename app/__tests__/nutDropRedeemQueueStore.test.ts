@@ -1,4 +1,7 @@
-import { useNutDropRedeemQueueStore } from '@/shared/stores/profile/nutDropRedeemQueueStore';
+import {
+  NUT_DROP_QUEUE_LIMITS,
+  useNutDropRedeemQueueStore,
+} from '@/shared/stores/profile/nutDropRedeemQueueStore';
 import { persistRegistry } from '@/shared/lib/persist/persistConfig';
 
 jest.mock('@sovranbitcoin/schemas', () => ({
@@ -40,6 +43,34 @@ describe('nutDropRedeemQueueStore', () => {
     const entry = useNutDropRedeemQueueStore.getState().byTokenHash[HASH];
     expect(entry).toMatchObject({ ...ENTRY, status: 'pending', attempts: 0, nextAttemptAt: 0 });
     expect(Object.keys(useNutDropRedeemQueueStore.getState().byTokenHash)).toHaveLength(1);
+  });
+
+  it.each([
+    ['token', { token: 'c'.repeat(NUT_DROP_QUEUE_LIMITS.token + 1) }],
+    ['mint address', { mintUrl: `https://${'m'.repeat(NUT_DROP_QUEUE_LIMITS.mintUrl)}` }],
+    ['unit', { unit: 'u'.repeat(NUT_DROP_QUEUE_LIMITS.unit + 1) }],
+    ['amount', { amount: Number.MAX_SAFE_INTEGER + 2 }],
+  ])('refuses to save an entry whose %s is over the queue limits', (_what, over) => {
+    // The reader takes any length a release saved; new entries still fit the limits.
+    expect(useNutDropRedeemQueueStore.getState().enqueue(HASH, { ...ENTRY, ...over })).toBe(false);
+    expect(useNutDropRedeemQueueStore.getState().byTokenHash).toEqual({});
+  });
+
+  it('refuses an entry whose key is longer than a token hash', () => {
+    const key = 'f'.repeat(NUT_DROP_QUEUE_LIMITS.tokenHash + 1);
+    expect(useNutDropRedeemQueueStore.getState().enqueue(key, ENTRY)).toBe(false);
+    expect(useNutDropRedeemQueueStore.getState().byTokenHash).toEqual({});
+  });
+
+  it('saves an entry exactly at every limit', () => {
+    const atLimit = {
+      token: 'c'.repeat(NUT_DROP_QUEUE_LIMITS.token),
+      mintUrl: 'm'.repeat(NUT_DROP_QUEUE_LIMITS.mintUrl),
+      unit: 'u'.repeat(NUT_DROP_QUEUE_LIMITS.unit),
+      amount: Number.MAX_SAFE_INTEGER,
+    };
+    expect(useNutDropRedeemQueueStore.getState().enqueue(HASH, atLimit)).toBe(true);
+    expect(useNutDropRedeemQueueStore.getState().byTokenHash[HASH]).toMatchObject(atLimit);
   });
 
   it('schedules retries with growing backoff and fails after max attempts', () => {

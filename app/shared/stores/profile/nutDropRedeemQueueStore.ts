@@ -121,6 +121,25 @@ export const NUT_DROP_QUEUE_LIMITS = {
   lastError: 500,
 } as const;
 
+/**
+ * Whether a new entry fits the limits. The one check every writer makes before
+ * it enqueues, and `enqueue` makes again: an entry the reader of an older
+ * release could not hold would fail that release's whole queue.
+ */
+export function fitsNutDropQueue(
+  tokenHash: string,
+  entry: { token: string; mintUrl: string; unit: string; amount: number }
+): boolean {
+  return (
+    tokenHash.length <= NUT_DROP_QUEUE_LIMITS.tokenHash &&
+    entry.token.length <= NUT_DROP_QUEUE_LIMITS.token &&
+    entry.mintUrl.length <= NUT_DROP_QUEUE_LIMITS.mintUrl &&
+    entry.unit.length <= NUT_DROP_QUEUE_LIMITS.unit &&
+    Number.isSafeInteger(entry.amount) &&
+    entry.amount >= 0
+  );
+}
+
 /** An error as the queue stores it. A mint or proxy can answer with a whole
  *  page, and one entry past its limit fails the stored queue on next launch. */
 const clipError = (error: string) => error.slice(0, NUT_DROP_QUEUE_LIMITS.lastError);
@@ -185,6 +204,13 @@ export const useNutDropRedeemQueueStore = create<NutDropRedeemQueueStore>({
 
       enqueue: (tokenHash, entry) => {
         if (get().byTokenHash[tokenHash]) return false;
+        if (!fitsNutDropQueue(tokenHash, entry)) {
+          storeLog.warn('store.nut_drop_queue.enqueue_refused', {
+            tokenHash: tokenHash.slice(0, 12),
+            reason: 'over_limit',
+          });
+          return false;
+        }
         storeLog.info('store.nut_drop_queue.enqueue', {
           tokenHash: tokenHash.slice(0, 12),
           mintUrl: entry.mintUrl,

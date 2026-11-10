@@ -2,9 +2,6 @@
 import { intakeDmEcash, type DmEcashQueuePort } from '@/features/payments/lib/dmEcashIntake';
 
 const mockClassify = jest.fn();
-jest.mock('@/shared/stores/profile/nutDropRedeemQueueStore', () => ({
-  NUT_DROP_QUEUE_LIMITS: { tokenHash: 64, token: 60_000, mintUrl: 2048, unit: 16 },
-}));
 jest.mock('wallet', () => ({
   classifyMeshToken: (...args: unknown[]) => mockClassify(...args),
   meshTokenDedupeKey: (token: string) => `hash:${token}`,
