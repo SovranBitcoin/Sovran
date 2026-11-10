@@ -333,8 +333,8 @@ export const useNutDropRedeemQueueStore = create<NutDropRedeemQueueStore>({
       // entry already queued wins, so its status is never rolled back.
       recoverUnreadable: {
         owner: getActiveProfilePubkey,
-        merge: (recovered) => {
-          useNutDropRedeemQueueStore.setState((state) => ({
+        merge: (recovered): NutDropRedeemQueueStore => {
+          useNutDropRedeemQueueStore.setState((state: NutDropRedeemQueueState) => ({
             byTokenHash: { ...recovered.byTokenHash, ...state.byTokenHash },
           }));
           return useNutDropRedeemQueueStore.getState();

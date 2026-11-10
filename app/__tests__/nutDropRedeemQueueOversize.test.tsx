@@ -196,7 +196,10 @@ describe('Nut Drop redeem queue and an entry over the stored limits', () => {
  * limit checked) plus the queue's own fields. 0.1.3's `markStatus` and
  * `scheduleRetry` (:142-197) stored an error message unclipped.
  */
-function releasedEntry(token: string, fields: Record<string, unknown> = {}) {
+function releasedEntry(
+  token: string,
+  fields: Record<string, unknown> = {}
+): Record<string, unknown> & { token: string } {
   return {
     token,
     mintUrl: NORMAL_MINT,
