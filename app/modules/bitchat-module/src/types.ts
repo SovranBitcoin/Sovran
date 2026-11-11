@@ -87,22 +87,6 @@ export interface BLEPeer {
   walletCapabilityExpiresAt?: number;
 }
 
-/**
- * Payload dispatched on the `onBLEPeerIdentity` event when a peer hands us
- * their Nostr identity via bitchat's native favorite notification
- * (`[FAVORITED]:<npub>:<creq>`). `nostrPubkeyHex` is the peer's x-only pubkey (64-hex,
- * absent on an `[UNFAVORITED]` or an unparseable npub). iOS emits this for
- * immediacy; on both platforms the same value also appears on the polled
- * `BLEPeer.nostrPubkeyHex`, which the payment directory ignores until cryptographically verified.
- */
-export interface BLEPeerIdentityEvent {
-  peerID: string;
-  isFavorite: boolean;
-  nostrPubkeyHex?: string;
-  /** The peer's standing NUT-18 payment request (mints + P2PK lock key). */
-  creq?: string;
-}
-
 export interface BLEMessageEvent {
   id: string;
   content: string;
@@ -153,18 +137,6 @@ export interface BLEDeliveryStatusEvent {
   nickname?: string;
   /** Free-form reason or "<reached>/<total>" for partial deliveries. */
   reason?: string;
-}
-
-/**
- * Persisted summary of a BLE-mesh 1:1 chat counterparty. Returned by
- * `getBLEDmHistory(profileScope)` — used to surface peers we've previously
- * DM'd in the Contacts screen's Recent / All tabs even after the app has been killed.
- * `nickname` may be `''` if we never received an announce with one.
- */
-export interface BLEDmContact {
-  peerID: string;
-  nickname: string;
-  lastTimestamp: number;
 }
 
 /**

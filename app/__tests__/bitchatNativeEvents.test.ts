@@ -7,10 +7,8 @@
  * turns down is dropped.
  */
 import {
-  readBLEBackgroundTaskExpiring,
   readBLEDeliveryStatus,
   readBLEMessage,
-  readBLEPeerIdentity,
   readBLEPeerUpdate,
   readBLEPrivateMessage,
   readBLEState,
@@ -85,9 +83,6 @@ it('keeps a body as large as a nearby payment can be', () => {
 
 it('reads an optional field sent as null as absent', () => {
   expect(
-    readBLEPeerIdentity({ peerID: 'peer-a', isFavorite: false, nostrPubkeyHex: null })
-  ).toEqual({ peerID: 'peer-a', isFavorite: false });
-  expect(
     readBLEDeliveryStatus({ messageID: 'm1', status: 'sent', nickname: null, reason: null })
   ).toEqual({ messageID: 'm1', status: 'sent' });
   expect(readBLEPrivateMessage({ ...PRIVATE_MESSAGE, profileScope: null })).toEqual({
@@ -100,14 +95,7 @@ it('reads an optional field sent as null as absent', () => {
   });
 });
 
-it('keeps what a peer identity and a delivery status carry', () => {
-  const identity = {
-    peerID: 'peer-a',
-    isFavorite: true,
-    nostrPubkeyHex: 'a'.repeat(64),
-    creq: 'creqAfixture',
-  };
-  expect(readBLEPeerIdentity(identity)).toEqual(identity);
+it('keeps what a delivery status carries', () => {
   const status = { messageID: 'm1', status: 'delivered', nickname: 'Alice' };
   expect(readBLEDeliveryStatus(status)).toEqual(status);
   expect(readBLEDeliveryStatus({ messageID: 'm1', status: 'failed', reason: 'encode' })).toEqual({
@@ -120,7 +108,6 @@ it('keeps what a peer identity and a delivery status carry', () => {
 it('turns down a delivery status the app does not know, and one without a message', () => {
   expect(readBLEDeliveryStatus({ messageID: 'm1', status: 'teleported' })).toBeNull();
   expect(readBLEDeliveryStatus({ status: 'sent' })).toBeNull();
-  expect(readBLEPeerIdentity({ peerID: 'peer-a' })).toBeNull();
 });
 
 it('keeps the good entries of a peer list and turns down an unknown peer event', () => {
@@ -138,7 +125,7 @@ it('keeps the good entries of a peer list and turns down an unknown peer event',
   expect(readBLEPeerUpdate({ type: 'list', peers: Array(1025).fill('peer-a') })).toBeNull();
 });
 
-it('reads public, state, background and geohash events, and turns down malformed ones', () => {
+it('reads public, state and geohash events, and turns down malformed ones', () => {
   expect(readBLEMessage(PUBLIC_MESSAGE)).toEqual(PUBLIC_MESSAGE);
   expect(readBLEMessage({ ...PUBLIC_MESSAGE, isPrivate: undefined })).toBeNull();
   // iOS sends '' for a sender whose peer id it does not know.
@@ -146,8 +133,6 @@ it('reads public, state, background and geohash events, and turns down malformed
 
   expect(readBLEState({ state: 'poweredOn' })).toEqual({ state: 'poweredOn' });
   expect(readBLEState({ state: 5 })).toBeNull();
-  expect(readBLEBackgroundTaskExpiring({ handle: 3 })).toEqual({ handle: 3 });
-  expect(readBLEBackgroundTaskExpiring({ handle: '3' })).toBeNull();
 
   expect(readNostrMessage(GEOHASH_MESSAGE)).toEqual(GEOHASH_MESSAGE);
   expect(readNostrMessage({ ...GEOHASH_MESSAGE, senderPubkey: undefined })).toBeNull();
