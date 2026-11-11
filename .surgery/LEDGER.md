@@ -503,7 +503,8 @@ Surveys: Claude Opus 5.5 (four areas), Codex GPT-6.1 Sol and GPT-6 Astra (two ea
 parallel worktrees; merges, two small fixes and the restoring of two deletions that belonged to group C: Claude
 Fable 5.2. Reviews, each from the diff and tests: Codex GPT-6 Astra passed the dead-code round with no production
 regression; Codex GPT-6.1 Sol found one regression in the first round of merges (the store-load latch could miss a
-finished load, and a later settings re-read blanked the app gate), repaired in `772b1642b` and `1e433d64a`; Codex
+finished load, and a later settings re-read blanked the app gate), repaired in `772b1642b` and `1e433d64a`, which Codex GPT-6.1 Sol then
+passed, naming three timing differences with no known trigger (F242); Codex
 GPT-6 Astra passed the second round with two harmless timing differences. `persistence-release-safety`: no saved
 shape changed and every upgrade and drift test passes; no real upgrade was run, so the verdict is INCONCLUSIVE.
 
@@ -516,7 +517,6 @@ defects and four missing features), F242 (cuts stopped on, and the two wallet-co
 
 - Nothing was run on iOS or Android.
 - No real upgrade was run.
-- The review of the two store-load repairs had not returned when this was written; the Bluetooth label fix and the
-  restoring commit were not reviewed by another model.
+- The Bluetooth label fix and the restoring commit were not reviewed by another model.
 - `jevlint` saved checks were not run; `audit-commit` was not run per commit.
 - Some pin commits and intermediate commits do not type-check alone; the branch head passes every check.
