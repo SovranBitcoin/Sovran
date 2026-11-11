@@ -84,6 +84,7 @@ function toOwnSyncEvent(raw: {
  * (`sessionFor`), so nothing one account saw carries over to the next.
  */
 type OwnSyncSession = {
+  /** The account's pubkey: only events it signed are dispatched, and only while it is active. */
   owner: string;
   /** Event ids already dispatched for `owner`. */
   seen: Set<string>;
@@ -97,19 +98,15 @@ function sessionFor(current: OwnSyncSession | null, owner: string | undefined) {
   return { owner, seen: new Set<string>(), profileNewestAt: 0 };
 }
 
-function applyProfile(event: OwnSyncEvent, accountIndex: number): void {
-  const snapshot = parseOwnProfileSnapshot(event);
-  if (snapshot && useProfileStore.getState().getActiveProfile()?.pubkey === event.pubkey) {
-    ingestOwnProfileMetadata(snapshot, event.pubkey, accountIndex);
-  }
-}
-
 export function useOwnEventsSync(): void {
   useMuteListSync();
   useFollowSync();
   const { keys } = useNostrKeysContext();
   const pubkey = keys?.pubkey;
-  const activeAccountIndex = useProfileStore((s) => s.activeAccountIndex);
+  // Read for its changes only: the check below reads the store as it is now.
+  const activePubkey = useProfileStore(
+    (s) => s.profiles.find((p) => p.accountIndex === s.activeAccountIndex)?.pubkey
+  );
 
   // Stable per-pubkey filters (since computed once per pubkey, not per render).
   const filters = useMemo(() => {
@@ -132,14 +129,19 @@ export function useOwnEventsSync(): void {
     const session = sessionFor(sessionRef.current, pubkey);
     sessionRef.current = session;
     if (!session || !events?.length) return;
+    // The profile-scoped stores hold the active account's state. While the keys
+    // and the active account disagree (mid-switch) write nothing, and mark
+    // nothing seen, so the batch is dispatched once they agree.
+    const active = useProfileStore.getState().getActiveProfile();
+    if (!active || active.pubkey !== session.owner) return;
     const fresh: OwnSyncEvent[] = [];
     for (const raw of events) {
       const id = (raw as { id?: string }).id;
       if (!id || session.seen.has(id)) continue;
-      session.seen.add(id);
       const event = toOwnSyncEvent(raw as Parameters<typeof toOwnSyncEvent>[0]);
-      // A follow list replaces this account's saved one: only its own counts.
-      if (event.kind === Contacts && event.pubkey !== session.owner) continue;
+      // An event still held from the previous account's subscription.
+      if (event.pubkey !== session.owner) continue;
+      session.seen.add(id);
       fresh.push(event);
     }
     if (fresh.length === 0) return;
@@ -155,10 +157,7 @@ export function useOwnEventsSync(): void {
       for (const note of part.ownNotes) own.ingestSeen(note);
       ingestOwnMediaBlobs(part.ownNotes, session.owner);
     }
-    if (
-      part.latestContacts &&
-      useProfileStore.getState().getActiveProfile()?.pubkey === part.latestContacts.pubkey
-    ) {
+    if (part.latestContacts) {
       social.setContactsFromRelay({
         tags: part.latestContacts.tags,
         content: part.latestContacts.content,
@@ -167,7 +166,8 @@ export function useOwnEventsSync(): void {
       social.clearSettledFollowOptimistic();
     }
     if (part.latestProfile && part.latestProfile.created_at > session.profileNewestAt) {
-      applyProfile(part.latestProfile, activeAccountIndex);
+      const snapshot = parseOwnProfileSnapshot(part.latestProfile);
+      if (snapshot) ingestOwnProfileMetadata(snapshot, session.owner, active.accountIndex);
       session.profileNewestAt = part.latestProfile.created_at;
     }
 
@@ -179,5 +179,5 @@ export function useOwnEventsSync(): void {
       notes: part.ownNotes.length,
       deletions: part.deletedEventIds.length,
     });
-  }, [events, pubkey, activeAccountIndex]);
+  }, [events, pubkey, activePubkey]);
 }

@@ -303,7 +303,7 @@ describe('useOwnEventsSync', () => {
     unmount();
   });
 
-  it('writes the keys account events while another account is active', () => {
+  it('writes nothing while the keys and the active account disagree, and catches up after', () => {
     const { rerender, unmount } = mount();
     // The active account has moved to B; the keys provider still holds A's keys.
     useProfileStore.setState({ activeAccountIndex: 1 });
@@ -314,29 +314,32 @@ describe('useOwnEventsSync', () => {
       { id: id(62), kind: 3, pubkey: A, content: '', tags: [['p', B]], created_at: T },
     ]);
 
-    // QUIRK: likes, notes and deletions go into whichever account's stores are loaded, here
-    // B's (D7). Only the profile and the follow list check the active account. A fix that
-    // waits for the keys and the active account to agree should change this on purpose.
-    expect(liked('target-4')).toBe(id(60));
+    // The loaded stores are B's: none of A's events go into them.
+    expect(liked('target-4')).toBeUndefined();
     expect(latestProfileId()).toBeUndefined();
     expect(useNostrSocialStore.getState().contactsTags).toEqual([]);
+
+    // The switch is rolled back to A: the same batch is written now, once.
+    useProfileStore.setState({ activeAccountIndex: 0 });
+    act(() => rerender());
+    expect(liked('target-4')).toBe(id(60));
+    expect(latestProfileId()).toBe(id(61));
+    expect(useNostrSocialStore.getState().contactsTags).toEqual([['p', B]]);
     unmount();
   });
 
-  it('starts over for a new account, and dispatches its events afresh', () => {
+  it('starts over for a new account, and leaves the previous account events out of it', () => {
     const { rerender, unmount } = mount();
     const like = likeEvent(id(40), 'target-3');
     deliver(rerender, [like]);
 
     useNostrSocialStore.setState({ engagementByEventId: {} });
     activate(B, 1);
-    deliver(rerender, [like]);
+    // The subscription still holds A's like when B's first own event arrives.
+    deliver(rerender, [like, likeEvent(id(41), 'target-5', B)]);
 
-    // QUIRK: the hook does not check an event's author; after the account changes, a batch
-    // still holding the previous account's like is ingested for the new one. It relies on
-    // the subscription's `authors` filter (and the app reload on switch). A fix that drops
-    // foreign authors should change this assertion on purpose.
-    expect(liked('target-3')).toBe(id(40));
+    expect(liked('target-3')).toBeUndefined();
+    expect(liked('target-5')).toBe(id(41));
     unmount();
   });
 });
