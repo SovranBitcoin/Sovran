@@ -539,6 +539,48 @@ describe('rebalance engine — runs', () => {
       expect(recorder.statuses('b')).toEqual([]);
     });
 
+    it('opens no leg when the switch comes while the balances and fees are read', async () => {
+      const { engine, wallet, recorder } = setup();
+      const control = endsAtNextLeg();
+      wallet.port.worstCaseInputFee.mockImplementation(async () => {
+        control.state.switched = true;
+        return 0;
+      });
+      await expect(
+        engine.executeTransfer(STEP, { ...control, sink: recorder.sink })
+      ).resolves.toEqual({ status: 'aborted' });
+      expect(recorder.events.filter((event) => event.type === 'legOpened')).toEqual([]);
+      expect(wallet.port.createMintReceipt).not.toHaveBeenCalled();
+      expect(wallet.port.prepareMelt).not.toHaveBeenCalled();
+    });
+
+    it('opens no hop leg when the switch comes while the hop is being set up', async () => {
+      const route: RebalanceRoute = {
+        path: [SOURCE, MIDDLEMAN, DESTINATION],
+        pathNames: ['Source', 'Middleman', 'Destination'],
+        source: 'local_history',
+      };
+      const { engine, wallet, recorder } = setup({
+        balances: { [SOURCE]: 1000, [MIDDLEMAN]: 100, [DESTINATION]: 0 },
+        routes: [route],
+      });
+      const control = endsAtNextLeg();
+      wallet.port.executeMelt.mockRejectedValueOnce(new MintOperationError(20004, 'no_route'));
+      // The hop reads the balances and its fee, and asks for its invoice, before its leg opens.
+      wallet.port.probeMeltFeeReserve.mockImplementation(async () => {
+        if (wallet.port.prepareMelt.mock.calls.length > 0) control.state.switched = true;
+        return 0;
+      });
+      await expect(
+        engine.executeTransfer(STEP, { ...control, sink: recorder.sink })
+      ).resolves.toEqual({ status: 'aborted' });
+      expect(
+        recorder.events.filter((event) => event.type === 'legOpened').map((event) => event.legId)
+      ).toEqual(['step-1']);
+      expect(wallet.port.prepareMelt).toHaveBeenCalledTimes(1);
+      expect(wallet.port.releaseTrust).toHaveBeenCalledWith([MIDDLEMAN]);
+    });
+
     it('stops a middleman chain before its next hop', async () => {
       const route: RebalanceRoute = {
         path: [SOURCE, MIDDLEMAN, DESTINATION],

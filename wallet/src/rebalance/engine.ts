@@ -587,6 +587,9 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
       }
     }
 
+    // Asked last, after the reads and the invoice above: an account switch
+    // during them must open nothing.
+    if (!mayOpenLeg(run)) return { status: 'aborted' };
     sink.legOpened(hop.legId, {
       fromMintUrl: hopFrom,
       toMintUrl: hopTo,
@@ -849,6 +852,9 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
         return { status: 'skipped' };
       }
 
+      // Asked last, after every read above: an account switch during them
+      // must open nothing.
+      if (!mayOpenLeg(run)) return { status: 'aborted' };
       sink.legOpened(id, {
         fromMintUrl,
         toMintUrl,
@@ -1060,8 +1066,6 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
       return { status: 'busy' };
     }
     try {
-      // The wait for the lock can be long.
-      if (!mayOpenLeg(options)) return { status: 'aborted' };
       return await transfer({ step, ...options, unsettledMints: new Set() });
     } finally {
       lock.release();
