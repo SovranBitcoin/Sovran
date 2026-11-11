@@ -227,7 +227,11 @@ interface ReceiveScreenProps {
 }
 
 export function ReceiveScreen(props: ReceiveScreenProps) {
-  const [selectedTab, setSelectedTab] = useState<string>('Unified');
+  // Opens on the first tab the build ships: Unified when it composes several
+  // rails, otherwise the one rail there is (its tab strip is hidden).
+  const [selectedTab, setSelectedTab] = useState<string>(
+    () => computeReceiveTabs()[0] ?? 'Unified'
+  );
   const [lightningMode, setLightningMode] = useState<'address' | 'offer'>('address');
   // `props.unit` is the mint's REAL unit; the account adds the active side of
   // the testnut split, so `usd` → `tusd` (same unit, different mints) is a
@@ -442,9 +446,11 @@ function ReceiveScreenForUnit({
   }, [tabs, unit]);
 
   // If the open tab disappears (setting toggled off / capability change),
-  // snap back to Lightning so hidden content stops rendering.
+  // snap back to the first tab there is so hidden content stops rendering.
   useEffect(() => {
-    if (!(tabs as readonly string[]).includes(selectedTab)) setSelectedTab('Unified');
+    if (!(tabs as readonly string[]).includes(selectedTab)) {
+      setSelectedTab(tabs[0] ?? 'Unified');
+    }
   }, [tabs, selectedTab, setSelectedTab]);
 
   useEffect(() => {
