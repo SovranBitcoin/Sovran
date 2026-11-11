@@ -478,6 +478,51 @@ describe("what an NFC tap leaves behind when it ends", () => {
     expect(unitSwitches(switchUnit)).toEqual(["usd"]);
   });
 
+  // A BIP21 tag with a USD ecash request no mint can pay, beside a sat
+  // invoice: in USD the invoice asks for an amount, which a tap cannot give.
+  it("restores the unit when the tag's invoice asks for an amount", async () => {
+    let activeUnit = "sat";
+    const unitBalances = { sat: { [MINT2]: 1500 }, usd: { [MINT2]: 5000 } };
+    const switchUnit = vi.fn(async (next: string) => {
+      activeUnit = next;
+    });
+    const adapter = {
+      readPaymentRequest: vi.fn(async () => ""),
+      writeToken: vi.fn(async () => {}),
+      releaseSession: vi.fn(async () => {}),
+      isAvailable: vi.fn(async () => true),
+    };
+    const tm = createTestMachine({
+      getUnit: () => activeUnit,
+      getContext: () => ({
+        trustedMintUrls: [MINT1, MINT2],
+        mintBalances: unitBalances[activeUnit as "sat" | "usd"],
+        unitBalances,
+        proofAmounts: {},
+        mintMethodCapabilities: WALLETS.default.mintMethodCapabilities,
+        preferredMintUrl: MINT2,
+      }),
+      detectors: {
+        getPaymentRequestInfo: () => ({
+          unit: "usd",
+          amount: 60,
+          mints: [MINT2],
+          mintsPreferred: true,
+          hasSpendingCondition: false,
+        }),
+      },
+      nfcAdapter: adapter,
+      operations: { switchUnit, paymentRequestPayabilityFrom: refuseFees("fees") },
+    });
+    await tm.machine.scan!(
+      `bitcoin:?creq=${INPUTS.paymentRequestBasic}&lightning=${NFC_TAG_INVOICE}`,
+      { source: "nfc" },
+    );
+    tm.assertExecution({ code: "NFC_READ_FAILED" });
+    expect(adapter.releaseSession).toHaveBeenCalledTimes(1);
+    expect(unitSwitches(switchUnit)).toEqual(["usd", "sat"]);
+  });
+
   it("releases once when a tag without an amount asks for one", async () => {
     const { tm, adapter, switchUnit } = setup();
     await tm.machine.scan!(INPUTS.lightningAddress, { source: "nfc" });

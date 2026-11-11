@@ -1775,6 +1775,8 @@ export function createPaymentMachine(
             // NFC requires amount in payment request — if we reach enterAmount, the request lacked it
             await nfcAdapter.releaseSession();
             if (isStaleGeneration(sendGeneration, "nfc.releaseSession")) return;
+            await revertNfcUnit?.().catch(() => undefined);
+            if (isStaleGeneration(sendGeneration, "nfc.revertUnit")) return;
             setStep("error", {
               code: "NFC_READ_FAILED",
               message: "Payment request must include an amount for NFC payment",
