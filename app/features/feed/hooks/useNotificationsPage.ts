@@ -214,7 +214,6 @@ export function useNotificationsPage(args: NotificationsPageArgs): Notifications
     surface: 'notifications',
     key,
     viewerKey,
-    strategy: 'session',
     // The session is torn down on blur; a late first page would be wrong.
     abortOnBlur: true,
     classify: classifyPage,

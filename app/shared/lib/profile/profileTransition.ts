@@ -85,7 +85,7 @@ export async function clearTransitionGuardOnStartup(): Promise<void> {
 }
 
 // ── Registered controls (set at runtime by layout components) ────
-export type TransitionControls = {
+type TransitionControls = {
   resetStages: (options?: { keepStagesThatOutliveAccount?: boolean }) => void;
   cancelResetStages: () => void;
 };
@@ -181,23 +181,12 @@ export function isTransitionInFlight(): boolean {
 const COCO_CLEANUP_TIMEOUT_MS = 5_000;
 
 export async function cleanupCocoWithTimeout(): Promise<void> {
-  let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
   try {
-    await Promise.race([
-      CocoManager.cleanup(),
-      new Promise<void>((resolve) => {
-        timeoutHandle = setTimeout(() => {
-          log.warn('profile.orchestrator.cleanup_timeout', {
-            timeoutMs: COCO_CLEANUP_TIMEOUT_MS,
-          });
-          resolve();
-        }, COCO_CLEANUP_TIMEOUT_MS);
-      }),
-    ]);
+    if ((await settleWithin(CocoManager.cleanup(), COCO_CLEANUP_TIMEOUT_MS)) === TIMED_OUT) {
+      log.warn('profile.orchestrator.cleanup_timeout', { timeoutMs: COCO_CLEANUP_TIMEOUT_MS });
+    }
   } catch (error) {
     log.warn('profile.orchestrator.cleanup_failed', { error: redactError(error) });
-  } finally {
-    if (timeoutHandle) clearTimeout(timeoutHandle);
   }
 }
 
@@ -205,14 +194,12 @@ export async function cleanupCocoWithTimeout(): Promise<void> {
 interface TransitionLock {
   /**
    * Take the on-disk guard as well. False when a transition started in an
-   * earlier runtime is still recent; the caller then releases and gives up.
+   * earlier runtime is still recent: the lock is then already released, and
+   * the caller gives up.
    */
   takeDiskGuard(): Promise<boolean>;
-  /** Cover the app with the splash until `release`. */
-  holdSplash(
-    controls: Partial<TransitionControls>,
-    options?: Parameters<TransitionControls['resetStages']>[0]
-  ): void;
+  /** Cover the app with the splash, through the registered controls, until `release`. */
+  holdSplash(options?: Parameters<TransitionControls['resetStages']>[0]): void;
   /**
    * Give back everything this lock took: the splash if held, the in-memory
    * guard, the on-disk guard if taken. Every exit from a flow that is not a
@@ -232,32 +219,26 @@ export function acquireTransition(): TransitionLock | null {
   let diskGuardTaken = false;
   let cancelSplash: (() => void) | undefined;
   let splashHeld = false;
+  const release = async () => {
+    if (splashHeld) cancelSplash?.();
+    transitionInFlight = false;
+    if (diskGuardTaken) {
+      diskGuardTaken = false;
+      await endTransition();
+    }
+  };
   return {
     async takeDiskGuard() {
       diskGuardTaken = await beginTransition();
+      if (!diskGuardTaken) await release();
       return diskGuardTaken;
     },
-    holdSplash(controls, options) {
+    holdSplash(options) {
       splashHeld = true;
-      cancelSplash = controls.cancelResetStages;
-      controls.resetStages?.(options);
+      cancelSplash = registeredControls?.cancelResetStages;
+      registeredControls?.resetStages(options);
     },
-    async release() {
-      if (splashHeld) cancelSplash?.();
-      transitionInFlight = false;
-      if (diskGuardTaken) {
-        diskGuardTaken = false;
-        await endTransition();
-      }
-    },
-  };
-}
-
-/** The splash controls a caller passed, or the ones the layout registered. */
-export function splashControls(opts?: Partial<TransitionControls>): Partial<TransitionControls> {
-  return {
-    resetStages: opts?.resetStages ?? registeredControls?.resetStages,
-    cancelResetStages: opts?.cancelResetStages ?? registeredControls?.cancelResetStages,
+    release,
   };
 }
 

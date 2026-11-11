@@ -199,8 +199,8 @@ describe('MintListScreen rows', () => {
     expect(onInspectMint).toHaveBeenCalledWith('https://gamma.example');
   });
 
-  it('shows no inspect button when details are off', () => {
-    const { rows } = mount({ showDetailsButton: false });
+  it('shows no inspect button when the flow gives no inspect action', () => {
+    const { rows } = mount({ onInspectMint: undefined });
     for (const row of rows()) {
       expect(row.props.trailing).toBeNull();
       expect(row.props.trailingInteractive).toBe(false);

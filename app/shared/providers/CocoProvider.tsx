@@ -230,16 +230,8 @@ function restageWalletCredentials(cashuMnemonic: string | null): void {
 
 export function CocoProvider({ children }: CocoProviderProps) {
   useInitMount('CocoProvider');
-  const stage = useInitializationStage('coco', {
-    message: 'Initializing Coco...',
-    dependsOn: ['nostr'],
-    blocking: true,
-  });
-  const bgStage = useInitializationStage('coco-background', {
-    message: 'Background tasks...',
-    dependsOn: ['coco'],
-    blocking: false,
-  });
+  const stage = useInitializationStage('coco');
+  const bgStage = useInitializationStage('coco-background');
   const { keys, cashuMnemonic } = useNostrKeysContext();
   // Mirrored, not depended on: `privateKey` is a fresh `Uint8Array` on every
   // derivation, so making it a trigger would tear down and re-initialise

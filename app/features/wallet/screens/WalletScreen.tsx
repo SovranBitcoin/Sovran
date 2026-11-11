@@ -224,12 +224,6 @@ export function WalletScreen() {
     },
   };
 
-  const renderBalance = (floorScale: number) => (
-    <LayoutShiftProbe tag="account-carousel">
-      <Account minHeight={minBalanceHeight * floorScale} />
-    </LayoutShiftProbe>
-  );
-
   // Keep BootEntrance and the wallet body mounted across the search toggle so
   // the splash→QR morph never replays and closing search restores this screen.
   return (
@@ -248,7 +242,15 @@ export function WalletScreen() {
           <ScrollableGradientOverlay contentHeight={contentHeight} />
 
           <View style={styles.topArea}>
-            <HomeTop actions={actions} renderBalance={renderBalance} paymentsLocked={isSwapping} />
+            <HomeTop
+              actions={actions}
+              balance={
+                <LayoutShiftProbe tag="account-carousel">
+                  <Account minHeight={minBalanceHeight} />
+                </LayoutShiftProbe>
+              }
+              paymentsLocked={isSwapping}
+            />
           </View>
 
           <View

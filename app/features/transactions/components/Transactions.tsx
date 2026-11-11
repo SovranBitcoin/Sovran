@@ -108,6 +108,20 @@ interface Section {
   monthKey: string;
 }
 
+/** Day sections of an already newest-first list, newest day first. */
+function sectionsFor(items: TimelineItem[], prefix: string): Section[] {
+  const byDay = groupBy(items, (item) => formatDate(getTimelineCreatedAt(item), 'long-date'));
+  return Object.keys(byDay)
+    .map((title) => ({ title, createdAt: getTimelineCreatedAt(byDay[title][0]) }))
+    .sort((a, b) => b.createdAt - a.createdAt)
+    .map(({ title, createdAt }) => ({
+      title,
+      data: byDay[title],
+      index: `${prefix}-${title}`,
+      monthKey: monthKeyOf(createdAt),
+    }));
+}
+
 /** Imperative surface for the virtualized timeline (month pill jumps). */
 export interface TransactionsHandle {
   scrollToMonth: (monthKey: string) => void;
@@ -441,36 +455,10 @@ export const Transactions = React.memo(
 
     const sections = useMemo(() => {
       const buildSections = () => {
+        // Home shows only the newest day of each bucket; embedded mode keeps every day.
         const createSections = (items: TimelineItem[], prefix: string) => {
-          // Group by date string for display, but keep track of the original date for sorting
-          const groupedByDate = groupBy(items, (item) =>
-            formatDate(getTimelineCreatedAt(item), 'long-date')
-          );
-
-          // Create an array of {dateString, originalDate} pairs for proper sorting
-          const dateEntries = Object.keys(groupedByDate).map((dateString) => {
-            const firstItem = groupedByDate[dateString][0];
-            return {
-              dateString,
-              originalDate: new Date(getTimelineCreatedAt(firstItem)),
-            };
-          });
-
-          // Sort by original date in descending order (newest first)
-          const sortedDateEntries = [...dateEntries].sort(
-            (a, b) => b.originalDate.getTime() - a.originalDate.getTime()
-          );
-
-          // Embedded mode shows every date group (no one-day cap).
-          const datesToShow =
-            showMore && !embedded ? sortedDateEntries.slice(0, 1) : sortedDateEntries;
-
-          return datesToShow.map(({ dateString }) => ({
-            title: dateString,
-            data: groupedByDate[dateString],
-            index: `${prefix}-${dateString}`,
-            monthKey: monthKeyOf(getTimelineCreatedAt(groupedByDate[dateString][0])),
-          }));
+          const all = sectionsFor(items, prefix);
+          return showMore && !embedded ? all.slice(0, 1) : all;
         };
 
         const pendingSections = createSections(pending || [], 'pending');
@@ -522,24 +510,10 @@ export const Transactions = React.memo(
 
     // Embedded (per-person) list groups purely by date — no pending/confirmed/
     // expired split — so each date renders once under a single date header.
-    const embeddedSections = useMemo<Section[]>(() => {
-      if (!embedded) return [];
-      const groupedByDate = groupBy(sortedTimeline, (item) =>
-        formatDate(getTimelineCreatedAt(item), 'long-date')
-      );
-      const dateEntries = Object.keys(groupedByDate).map((dateString) => ({
-        dateString,
-        originalDate: new Date(getTimelineCreatedAt(groupedByDate[dateString][0])),
-      }));
-      return [...dateEntries]
-        .sort((a, b) => b.originalDate.getTime() - a.originalDate.getTime())
-        .map(({ dateString }) => ({
-          title: dateString,
-          data: groupedByDate[dateString],
-          index: `embedded-${dateString}`,
-          monthKey: monthKeyOf(getTimelineCreatedAt(groupedByDate[dateString][0])),
-        }));
-    }, [embedded, sortedTimeline]);
+    const embeddedSections = useMemo<Section[]>(
+      () => (embedded ? sectionsFor(sortedTimeline, 'embedded') : []),
+      [embedded, sortedTimeline]
+    );
 
     // Cancellable subset of the visible pending bucket: ecash sends only.
     // Used by the parent screen to drive the "Cancel N pending" footer.

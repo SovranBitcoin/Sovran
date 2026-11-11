@@ -65,6 +65,50 @@ beforeEach(() => {
 });
 
 describe('useCachedRead', () => {
+  it.each([
+    ['notifications', 'session'],
+    ['searchProfiles', 'aggregate'],
+    ['profiles', 'aggregate'],
+    ['feed', 'sequential'],
+    ['mintChanges', 'sequential'],
+    ['noteStats', 'http'],
+  ] as const)('logs a %s read with the %s strategy', async (surface, strategy) => {
+    const store = makeStore();
+    renderHook(() =>
+      useCachedRead<Page>({
+        store,
+        surface,
+        key: 'k',
+        viewerKey: 'v',
+        fetcher: () => new Promise(() => {}),
+      })
+    );
+    await flush();
+    const request = events('info').find((e) => e.event === `read.${surface}.request`);
+    expect(request?.params).toMatchObject({ strategy });
+  });
+
+  it('on a cold start paints the stored entry while it revalidates', async () => {
+    const store = makeStore(0);
+    store.setEntry('k', { items: ['yesterday'] }, { viewerKey: 'v' });
+    expect(store.isColdStart('k')).toBe(true);
+    const { result } = renderHook(() =>
+      useCachedRead<Page>({
+        store,
+        surface: 'feed',
+        key: 'k',
+        viewerKey: 'v',
+        fetcher: () => new Promise(() => {}),
+      })
+    );
+    await flush();
+    expect(result.current).toMatchObject({
+      status: 'revalidating',
+      source: 'cache',
+      data: { items: ['yesterday'] },
+    });
+  });
+
   it('a fresh entry serves with zero round-trips and logs serve-fresh', async () => {
     const store = makeStore();
     store.setEntry('k', { items: ['a'] }, { viewerKey: 'v' });

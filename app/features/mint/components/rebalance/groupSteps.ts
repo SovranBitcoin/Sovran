@@ -26,12 +26,37 @@ export interface StepState {
   routingDetail?: string;
 }
 
-export interface StepGroup {
+/** A run of consecutive items sharing a `chainId` (one chain card), or one standalone item. */
+export interface ChainGroup<T> {
   id: string;
   chainId: string | null;
-  steps: TransferStep[];
+  items: T[];
   /** Full ordered path when this is a middleman chain group. */
   chainPath?: string[];
+}
+
+/**
+ * Groups consecutive items sharing a `chainId`, keyed `chain-<chainId>`; a
+ * later run of the same chain starts a new group. Items without a `chainId`
+ * stand alone under their own id. Used by the plan cards and swap history.
+ */
+export function groupAdjacentChains<
+  T extends { id: string; chainId?: string; chainPath?: string[] },
+>(items: T[]): ChainGroup<T>[] {
+  const groups: ChainGroup<T>[] = [];
+  for (const item of items) {
+    const last = groups[groups.length - 1];
+    if (item.chainId && last?.chainId === item.chainId) last.items.push(item);
+    else if (item.chainId)
+      groups.push({
+        id: `chain-${item.chainId}`,
+        chainId: item.chainId,
+        items: [item],
+        chainPath: item.chainPath,
+      });
+    else groups.push({ id: item.id, chainId: null, items: [item] });
+  }
+  return groups;
 }
 
 /**
@@ -44,37 +69,8 @@ export interface StepGroup {
 export function groupStepsForDisplay(
   steps: TransferStep[],
   stepStates: Record<string, StepState>
-): StepGroup[] {
-  const groups: StepGroup[] = [];
-
-  for (const step of steps) {
-    const state = stepStates[step.id];
-
-    // Hide skipped originals (no chainId = not part of a chain itself)
-    if (state?.status === 'skipped' && !step.chainId) {
-      continue;
-    }
-
-    if (step.chainId) {
-      const last = groups[groups.length - 1];
-      if (last && last.chainId === step.chainId) {
-        last.steps.push(step);
-        continue;
-      }
-      groups.push({
-        id: `chain-${step.chainId}`,
-        chainId: step.chainId,
-        steps: [step],
-        chainPath: step.chainPath,
-      });
-    } else {
-      groups.push({
-        id: step.id,
-        chainId: null,
-        steps: [step],
-      });
-    }
-  }
-
-  return groups;
+): ChainGroup<TransferStep>[] {
+  return groupAdjacentChains(
+    steps.filter((step) => !(stepStates[step.id]?.status === 'skipped' && !step.chainId))
+  );
 }

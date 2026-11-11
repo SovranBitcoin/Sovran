@@ -110,7 +110,7 @@ function useSplashGeometry() {
 // on a fixed timer.
 //
 // IMPORTANT: we do NOT gate `await_init` on `useInitializationState`'s
-// `isInitializing`. The InitializationGate chain registers stages one-at-a-
+// `isInitializing`. The startup gate chain registers stages one-at-a-
 // time as each prior gate completes, so `isInitializing` flickers true→false
 // between every gate handoff. Watching for the first false would have us
 // hide the native splash before WalletScreen has even mounted, leaving the

@@ -93,6 +93,37 @@ export type SheetConfig = {
   e2eProbeKey?: string;
 };
 
+/**
+ * Hands a toast to the registered host and logs `shown`/`hidden` with the ids,
+ * `fields` and the caller's debug fields; with no host, warns with
+ * `refusalFields` and drops it.
+ */
+function submitToast(
+  config: Pick<CustomToastConfig, 'durationMs' | 'onShow' | 'onHide' | 'debugFields'>,
+  toastId: string,
+  component: (props: Record<string, unknown>) => React.ReactElement,
+  [shown, hidden]: [string, string],
+  fields: Record<string, unknown>,
+  refusalFields: Record<string, unknown>
+): void {
+  if (!toastManagerRef) {
+    popupLog.warn('popup.toast.manager_not_registered', refusalFields);
+    return;
+  }
+
+  let managerToastId: string | undefined;
+  const lifecycle = (event: string, callback: (() => void) | undefined) => () => {
+    popupLog.info(event, { toastId, managerToastId, ...fields, ...(config.debugFields ?? {}) });
+    callback?.();
+  };
+  managerToastId = toastManagerRef.show({
+    component,
+    duration: config.durationMs,
+    onShow: lifecycle(shown, config.onShow),
+    onHide: lifecycle(hidden, config.onHide),
+  });
+}
+
 export function showToast(config: ToastConfig) {
   const caller = getCallerFrame();
   const toastId = nextToastId();
@@ -108,14 +139,10 @@ export function showToast(config: ToastConfig) {
     ...(config.debugFields ?? {}),
   });
 
-  if (!toastManagerRef) {
-    popupLog.warn('popup.toast.manager_not_registered', { toastId, label: config.label, caller });
-    return;
-  }
-
-  let managerToastId: string | undefined;
-  managerToastId = toastManagerRef.show({
-    component: (props: Record<string, unknown>) =>
+  submitToast(
+    config,
+    toastId,
+    (props: Record<string, unknown>) =>
       React.createElement(
         React.Fragment,
         null,
@@ -130,30 +157,10 @@ export function showToast(config: ToastConfig) {
           icon: config.icon,
         })
       ),
-    duration: config.durationMs,
-    onShow: () => {
-      popupLog.info('popup.toast.shown', {
-        toastId,
-        managerToastId,
-        label: config.label,
-        variant: config.variant,
-        debugLabel: config.debugLabel,
-        ...(config.debugFields ?? {}),
-      });
-      config.onShow?.();
-    },
-    onHide: () => {
-      popupLog.info('popup.toast.hidden', {
-        toastId,
-        managerToastId,
-        label: config.label,
-        variant: config.variant,
-        debugLabel: config.debugLabel,
-        ...(config.debugFields ?? {}),
-      });
-      config.onHide?.();
-    },
-  });
+    ['popup.toast.shown', 'popup.toast.hidden'],
+    { label: config.label, variant: config.variant, debugLabel: config.debugLabel },
+    { toastId, label: config.label, caller }
+  );
 }
 
 export function showCustomToast(config: CustomToastConfig) {
@@ -172,14 +179,10 @@ export function showCustomToast(config: CustomToastConfig) {
     ...(config.debugFields ?? {}),
   });
 
-  if (!toastManagerRef) {
-    popupLog.warn('popup.toast.manager_not_registered', { toastId, componentName, caller });
-    return;
-  }
-
-  let managerToastId: string | undefined;
-  managerToastId = toastManagerRef.show({
-    component: (props: Record<string, unknown>) =>
+  submitToast(
+    config,
+    toastId,
+    (props: Record<string, unknown>) =>
       config.component({
         ...props,
         toastId,
@@ -188,28 +191,10 @@ export function showCustomToast(config: CustomToastConfig) {
       } as unknown as Record<string, unknown> & {
         hide: (ids?: string | string[] | 'all') => void;
       }),
-    duration: config.durationMs,
-    onShow: () => {
-      popupLog.info('popup.toast.custom_shown', {
-        toastId,
-        managerToastId,
-        componentName,
-        debugLabel: config.debugLabel,
-        ...(config.debugFields ?? {}),
-      });
-      config.onShow?.();
-    },
-    onHide: () => {
-      popupLog.info('popup.toast.custom_hidden', {
-        toastId,
-        managerToastId,
-        componentName,
-        debugLabel: config.debugLabel,
-        ...(config.debugFields ?? {}),
-      });
-      config.onHide?.();
-    },
-  });
+    ['popup.toast.custom_shown', 'popup.toast.custom_hidden'],
+    { componentName, debugLabel: config.debugLabel },
+    { toastId, componentName, caller }
+  );
 }
 
 export function showSheet(config: SheetConfig) {

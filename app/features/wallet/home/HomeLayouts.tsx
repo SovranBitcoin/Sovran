@@ -50,14 +50,10 @@ const circle = (action: HomeAction): CircleRowAction => ({
   ...(action.disabled ? { disabled: true } : {}),
 });
 
-export function HomeTop({
-  actions,
-  renderBalance,
-  paymentsLocked,
-}: HomeLayoutProps): React.ReactElement {
+export function HomeTop({ actions, balance, paymentsLocked }: HomeLayoutProps): React.ReactElement {
   return (
     <View style={styles.top}>
-      {renderBalance(1)}
+      {balance}
 
       <CircleActionRow
         actions={SHORTCUTS.map((id) => circle(actions[id]))}

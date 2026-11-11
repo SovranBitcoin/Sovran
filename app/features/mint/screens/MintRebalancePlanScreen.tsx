@@ -464,7 +464,7 @@ export function MintRebalancePlanScreen() {
         <Animated.View layout={LinearTransition.duration(280)}>
           <VStack gap={12} className="pb-1.5 pt-3.5">
             {groupStepsForDisplay(plan.steps, runPlan ? stepStates : {}).map((group) => {
-              if (group.chainId && group.steps.length > 1) {
+              if (group.chainId && group.items.length > 1) {
                 return (
                   <RebalanceChainCard
                     key={group.id}
@@ -479,7 +479,7 @@ export function MintRebalancePlanScreen() {
                 );
               }
 
-              const step = group.steps[0];
+              const step = group.items[0];
               const state = runPlan
                 ? stepStates[step.id] || PENDING_STEP_STATE
                 : PENDING_STEP_STATE;

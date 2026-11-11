@@ -128,11 +128,7 @@ export function NostrNDKProvider({
 
   // Non-blocking: starts after all blocking stages complete so it doesn't
   // compete for the JS thread during splash. App is already visible.
-  const stage = useInitializationStage('nostr-ndk', {
-    message: 'Initializing Nostr...',
-    dependsOn: ['coco'],
-    blocking: false,
-  });
+  const stage = useInitializationStage('nostr-ndk');
 
   // Hydrate the NIP-17 unwrap cache ahead of NDK init — the DM thread/contacts
   // decrypt path reads it synchronously, so a late hydration would race the

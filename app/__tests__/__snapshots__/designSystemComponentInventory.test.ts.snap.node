@@ -179,7 +179,6 @@ exports[`Design System component inventory tracks the complete reusable componen
     "shared/blocks/DrawerProfileChrome.tsx",
     "shared/blocks/GlobalMigrationGate.tsx",
     "shared/blocks/HeaderProfileButton.tsx",
-    "shared/blocks/InitializationGate.tsx",
     "shared/blocks/KeyRecoveryScreen.tsx",
     "shared/blocks/LegalDocumentScreen.tsx",
     "shared/blocks/NativeSplashLayoutGate.tsx",
@@ -290,6 +289,6 @@ exports[`Design System component inventory tracks the complete reusable componen
     "shared/ui/primitives/View/Stack.tsx",
     "shared/ui/primitives/icon-symbol.tsx",
   ],
-  "total": 284,
+  "total": 283,
 }
 `;

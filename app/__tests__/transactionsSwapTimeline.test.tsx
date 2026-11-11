@@ -401,4 +401,44 @@ describe('the wallet home and the embedded list', () => {
     // QUIRK: embedded hides the swap's legs too, with no group row in their place.
     expect(homeCards()).toEqual([[day(NOV_2), undefined, ['melt-pending', 'rx']]]);
   });
+
+  it('embedded keeps every day, newest first, with mixed statuses in time order inside each day', async () => {
+    await render({
+      showMore: true,
+      embedded: true,
+      history: [
+        entry('rx-oct', OCT_20),
+        entry('rx-nov2', NOV_2 - 1000),
+        entry('rx-nov3', NOV_3 - 1000),
+        entry('melt-pending-nov3', NOV_3, { type: 'melt', state: 'PENDING' }),
+        entry('melt-pending-nov2', NOV_2, { type: 'melt', state: 'PENDING' }),
+      ],
+    });
+
+    expect(homeCards()).toEqual([
+      [day(NOV_3), undefined, ['melt-pending-nov3', 'rx-nov3']],
+      [day(NOV_2), undefined, ['melt-pending-nov2', 'rx-nov2']],
+      [day(OCT_20), undefined, ['rx-oct']],
+    ]);
+  });
+
+  it('the virtualized list splits each status bucket by day, every day kept', async () => {
+    await render({
+      history: [
+        entry('rx-oct', OCT_20),
+        entry('rx-nov2', NOV_2 - 1000),
+        entry('rx-nov3', NOV_3 - 1000),
+        entry('melt-pending-nov3', NOV_3, { type: 'melt', state: 'PENDING' }),
+        entry('melt-pending-nov2', NOV_2, { type: 'melt', state: 'PENDING' }),
+      ],
+    });
+
+    expect(sections()).toEqual([
+      [day(NOV_3), '2026-11', ['melt-pending-nov3']],
+      [day(NOV_2), '2026-11', ['melt-pending-nov2']],
+      [day(NOV_3), '2026-11', ['rx-nov3']],
+      [day(NOV_2), '2026-11', ['rx-nov2']],
+      [day(OCT_20), '2026-10', ['rx-oct']],
+    ]);
+  });
 });

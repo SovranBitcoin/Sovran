@@ -24,7 +24,7 @@ import { Log } from '@/shared/lib/logger';
 
 import type { TransferStep } from './rebalancePlanner';
 import type { StepStatus } from './RebalanceStepRow';
-import type { StepState, StepGroup } from './groupSteps';
+import type { ChainGroup, StepState } from './groupSteps';
 
 interface MintInfo {
   name?: string;
@@ -32,7 +32,7 @@ interface MintInfo {
 }
 
 interface RebalanceChainCardProps {
-  group: StepGroup;
+  group: ChainGroup<TransferStep>;
   stepStates: Record<string, StepState>;
   mintInfoMap: Record<string, MintInfo | null>;
   unit: string;
@@ -51,7 +51,7 @@ export const RebalanceChainCard: React.FC<RebalanceChainCardProps> = ({
   onRetry,
   onSkip,
 }) => {
-  const { steps } = group;
+  const { items: steps } = group;
 
   const allDone = steps.every((s) => stepStates[s.id]?.status === 'done');
   const failedStep = steps.find((s) => stepStates[s.id]?.status === 'failed');
