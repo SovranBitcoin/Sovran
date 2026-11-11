@@ -55,25 +55,25 @@ export function RatingBarChart({
 
   const formattedScore = isValidScore ? score.toFixed(1) : '0.0';
   // Rolls the headline score when a background refresh replaces the cached one
-  // (the bar-fill reveal below stays a one-shot mount-entrance animation).
+  // (the fade and bar-fill reveal below are a one-shot mount entrance; a later
+  // score only moves the fill to its new share).
   const scoreRoll = useCountRollIn(formattedScore);
 
   const hasAnimatedRef = useRef(false);
   useEffect(() => {
-    if (isValidScore && !hasAnimatedRef.current) {
-      hasAnimatedRef.current = true;
-
-      fadeAnim.set(0);
-      barScaleAnim.set(0);
-
-      fadeAnim.set(withTiming(1, { duration: 400 }));
-      barScaleAnim.set(
-        withDelay(
-          200,
-          withTiming(goldPercentage, { duration: 800, easing: Easing.out(Easing.cubic) })
-        )
-      );
+    if (!isValidScore) return;
+    const fill = withTiming(goldPercentage, { duration: 800, easing: Easing.out(Easing.cubic) });
+    if (hasAnimatedRef.current) {
+      barScaleAnim.set(fill);
+      return;
     }
+    hasAnimatedRef.current = true;
+
+    fadeAnim.set(0);
+    barScaleAnim.set(0);
+
+    fadeAnim.set(withTiming(1, { duration: 400 }));
+    barScaleAnim.set(withDelay(200, fill));
   }, [isValidScore, goldPercentage, fadeAnim, barScaleAnim]);
 
   // Placeholders are the same Text at the same sizes (loading bars sized by a
