@@ -135,28 +135,6 @@ const de: TranslationMap = {
 
 const locales: Record<string, TranslationMap> = { en, ar, de };
 
-/**
- * Register additional locale translations at runtime.
- *
- * @example
- * registerLocale('fr', {
- *   INSUFFICIENT_BALANCE: 'Solde insuffisant',
- *   NO_BALANCE: 'Pas de solde',
- *   // ...
- * });
- */
-export function registerLocale(
-  lang: string,
-  translations: TranslationMap,
-): void {
-  logger.info('formatting.locale.register', {
-    lang,
-    translationCount: Object.keys(translations).length,
-    existingTranslationCount: Object.keys(locales[lang] ?? {}).length,
-  });
-  locales[lang] = { ...(locales[lang] ?? {}), ...translations };
-}
-
 // ---------------------------------------------------------------------------
 // Lookup
 // ---------------------------------------------------------------------------
