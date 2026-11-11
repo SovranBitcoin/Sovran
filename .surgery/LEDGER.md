@@ -7,7 +7,7 @@ State, not history. Passes run in order; one call runs one pass.
 | 0 Pin behaviour           | **Done** (2026-11-11). Every boundary the surveys listed has a pin; the gates are closed. Branch `surgery/pass-0-gates`.                                             |
 | 1 Persisted state         | **Done** (2026-11-11), proven on every release fixture; no real upgrade was run. Cuts on `surgery/pass-1-cuts` and `surgery/pass-1-queue`, not merged. See "Pass 1". |
 | 2 Implicit state machines | **Done** (2026-11-11). All sixteen approved conversions built on `surgery/pass-2` (one partly: the machine turn); not merged, nothing run on a device. See "Pass 2". |
-| 3 Deepen modules          | **Cutting** (groups A and B approved 2026-11-12; group C not approved). See "Pass 3".                                                                                |
+| 3 Deepen modules          | **Done** (2026-11-12). Groups A and B cut on `surgery/pass-3`: product code down 3,687 lines; not merged, nothing run on a device. See "Pass 3".                     |
 
 Pass 0 is on branch `surgery/pass-0`; pass 1's evidence is on `surgery/pass-1` and its cuts on `surgery/pass-1-cuts`, each stacked on the one before (worktree `../sovran-surgery`,
 based on `main` at `e5d70b590`). Neither is pushed. Until they merge, this file and the survey folders also sit
@@ -438,42 +438,42 @@ its turn functions and settled-step table should stay where they are.
 
 ### Decisions (owner, 2026-11-12)
 
-Groups A and B are approved. Group C is not: each row there needs a ruling first. The builders' brief is
+Groups A and B approved. Group C not approved: each row needs a ruling first. The builders' brief is
 `pass-3/CUT-BRIEF.md`.
 
-### Cuts
+### Cuts made
 
-Line counts are the surveyors' estimates of product lines removed, net. Group A deletes code nothing reaches. Group
-B gives a duplicated rule one owner. Group C needs a ruling first.
+Product code went from 373,414 to 369,727 lines (app, wallet and Nostr sources without tests). Every cut kept
+behaviour; nothing saved or sent changed.
 
-| #   | Cut                                                                                                      | Survey                            | Lines  | Risk                                                      |
-| --- | -------------------------------------------------------------------------------------------------------- | --------------------------------- | ------ | --------------------------------------------------------- |
-| A1  | Nostr package: the capability cache and recipe builders nothing sends                                    | `feed-social-nostr` 1             | 650    | None found; closes F190                                   |
-| A2  | Wallet package: hooks, options and flow definitions with no caller; the loader's page mode               | `wallet` 2, 13, 14                | 500    | None found                                                |
-| A3  | BitChat: a delivery module only its test imports, seven bridge wrappers, two store actions               | `messaging-signer-ai` 1           | 360    | Native side untouched                                     |
-| A4  | Routstr: API-key readers, branches and store actions unreachable since the top-up was deleted            | `messaging-signer-ai` 2           | 200    | Saved `apiKey` and `balance` fields stay as saved         |
-| A5  | Wallet: `inspect()` fields no screen reads; the trust-mint path the app never drives                     | `wallet` 3, 4                     | 280    | Machine; tests move to the error step                     |
-| A6  | Store actions and runtime state with no production caller (20 of 24; four are in C3)                     | `stores` 2                        | 140    | None saved                                                |
-| A7  | Small dead parameters and surface across feed loaders, theme draft, DM kinds, history unit, signer       | several                           | 150    | None found                                                |
-| B1  | One way to wait for a store to load (18 hand-written waits in five shapes)                               | `stores` 1                        | 90     | Startup order; one behaviour choice to keep as is         |
-| B2  | One reader for the active account's key and "still the same account" (15 inline copies)                  | `stores` 3                        | 30     | Account switch guards                                     |
-| B3  | One transaction filter value and route codec                                                             | `transactions-wallet-mint` 1      | 90-140 | Route params keep their encoding                          |
-| B4  | `HomeFeed` page 0 on `useCachedRead`, as `UserFeed` does                                                 | `feed-social-nostr` 2             | 150    | Feed loading; settles F185 and part of F221               |
-| B5  | `ColadaProvider`: drop props that duplicate the instance; one owner of the wallet context                | `wallet` 5, 6                     | 200    | Provider wiring                                           |
-| B6  | Machine: one `advance(event)`, pure NFC rules in `nfcTap.ts`, one preview-step builder                   | `wallet` 7, 8, 10                 | 120    | Payment machine, behaviour-preserving                     |
-| B7  | History: one date-section builder, one chain grouping, swap legs resolved once, one mint-info reader     | `transactions-wallet-mint` 2 to 6 | 100    | Totals and grouping keep their pins                       |
-| B8  | Own replaceable events: one signing step, one `created_at` rule, one "newest" rule                       | `feed-social-nostr` 4             | 35     | Nothing sent changes                                      |
-| B9  | AI: one owner for "the model a send goes to" (worked out six times)                                      | `messaging-signer-ai` 4           | 40     | Which model is paid for                                   |
-| B10 | `useBitChat` returns bubble-ready rows and owns retry                                                    | `messaging-signer-ai` 3           | 80     | Chat screens                                              |
-| B11 | Startup: fold the one-client initialization gate, fixed stage graph, one timeout helper, no splash knobs | `startup-settings` 1, 3, 4, 6     | 100    | Startup order; F175 constrains it                         |
-| B12 | Shared UI: details modal handshake, toast submission, cached-read options, read policy, popup factory    | `shared` 1, 2, 6, 7, 9            | 120    | Presentation                                              |
-| B13 | Payments: receive rails resolved once, route params parsed once, DM inbox fetch inside its paginator     | `payments` 1 to 5                 | 150    | Receive screens                                           |
-| B14 | Messaging and signer smalls: map hook, White Noise context and teardown, signer leases                   | `messaging-signer-ai` 6 to 15     | 150    | Mixed                                                     |
-| C1  | Wallet entry files export 135 values and 209 types nothing imports                                       | `wallet` 1                        | 300    | Needs: is the package meant to be published?              |
-| C2  | Facade `getOwnHistory` and `discoverMints` have no caller                                                | `feed-social-nostr` 3             | 380    | Needs: ADR 0003 planned the first as a seed               |
-| C3  | Four unused store actions that look like missing features                                                | `stores` 2                        | 30     | Needs: build or delete (F241)                             |
-| C4  | One writer for the saved profile list (four hand-built writers)                                          | `stores` 4                        | 25     | Writes saved data; second opinion and upgrade tests first |
-| C5  | One owner for read-change-publish of own replaceable lists                                               | `feed-social-nostr` 6, 10         | 160    | Changes what is published; F227 and F240 first            |
+| #   | Cut                                                                                                     | Outcome                                                                                                                         |
+| --- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| A1  | Nostr package: capability cache and request builders nothing sends                                      | Deleted (about 950 lines); the capability-cache follow-up is closed                                                             |
+| A2  | Wallet: hooks, options and flow definitions with no caller; the loader's page mode                      | Deleted (about 650)                                                                                                             |
+| A3  | BitChat: TypeScript nothing calls                                                                       | Deleted (about 330); native side untouched                                                                                      |
+| A4  | Routstr: API-key readers and branches unreachable since the top-up was deleted                          | Deleted (about 190); saved key, archive, migration and reclaim untouched                                                        |
+| A5  | Wallet: `inspect()` fields no screen reads; the machine's trust-mint path                               | Deleted (about 360); `inspect()` returns `step`, `isExecuting`, `details`                                                       |
+| A6  | Store actions and runtime state with no caller                                                          | Deleted (about 150); the four that look like missing features stay (C3)                                                         |
+| A7  | Small dead parameters and surface                                                                       | Deleted (about 150)                                                                                                             |
+| B1  | One way to wait for a store to load                                                                     | Made: `useStoreLoad`, `useStoreLoadLatched`, `useStoreLoadOutcome`, `onceLoaded`, `whenLoaded` in `persist/hydrationOutcome.ts` |
+| B2  | One reader for the active account's key and one capture                                                 | Made: `selectActivePubkey`, `activePubkey()`, `captureActiveProfile` in `profileStore`                                          |
+| B3  | One transaction filter value and route codec                                                            | Made, in `TransactionsFilterContext`                                                                                            |
+| B4  | `HomeFeed` page 0 on `useCachedRead`                                                                    | Not made: it would change what is fetched and when (F242); pins added                                                           |
+| B5  | `ColadaProvider` props that duplicate the instance                                                      | Made (about 230 lines); the second owner of the wallet context stays (F242)                                                     |
+| B6  | Machine: one `advanceNfc`, one `previewStep`                                                            | Made; `nfcTap.ts` and the lock-pubkey mirror not made (longer, or tests would change)                                           |
+| B7  | History and mint screens: sections, swap legs, chain grouping, mint pill and smalls                     | Seven of nine made                                                                                                              |
+| B8  | Own replaceable events: one `signOwnEvent`, one `created_at` rule, `supersedes` everywhere              | Made; the follow list's pre-sign check and the profile's signing step keep their differences                                    |
+| B9  | AI: one `selectLineup` and `useSelectedModel`                                                           | Made; the picker's different rule for an empty lineup is kept and pinned (F241)                                                 |
+| B10 | `useBitChat` as one transport table with bubble-ready rows and retry                                    | Made                                                                                                                            |
+| B11 | Startup: one migration gate, one `STAGES` table, one timeout helper, no splash options, disk guard      | Five of eight made                                                                                                              |
+| B12 | Shared UI: toasts, search input, cached reads, read policy, pill sizes, popup type                      | Six of eight made                                                                                                               |
+| B13 | Payments: receive capability and routes, DM inbox fetch and caches, one `prepareMintQuote`, camera scan | Eight made, the receive rails only in part                                                                                      |
+| B14 | Messaging and map: `useMerchantMap`, blocked-conversation guard, White Noise teardown and relays        | Five made; signer leases and one setup owner skipped (they change behaviour, F225 and F241)                                     |
+
+Group C stands as proposed: C1 (wallet entry files export 344 names nothing imports: is the package meant to be
+published?), C2 (facade `getOwnHistory` and `discoverMints` have no caller; ADR 0003 planned the first), C3 (four
+unused store actions that look like missing features, F241), C4 (one writer for the saved profile list), C5 (one
+owner for read-change-publish of own lists; F227 and F240 first).
 
 ### Behaviour changed in pass 3
 
@@ -494,16 +494,29 @@ Each with a test that failed first; none changes a saved shape or anything sent.
 | `c4e87d666` | A replaced signer connection kept its session allows, so re-pairing skipped the prompt    | Disconnect, block and replace all end the client's session   |
 | `0ccc36cbf` | The Bluetooth connection dot could come back on after leaving a chat                      | A late result changes nothing                                |
 
-Built by Claude Opus 5.5. Reviewed commit by commit by Codex GPT-6.1 Sol: eleven clean, one incomplete (the source
+The twelve fixes were built by Claude Opus 5.5 and reviewed commit by commit by Codex GPT-6.1 Sol: eleven clean, one incomplete (the source
 label had no entry for Bluetooth), fixed in `aaa1ea2e9` by Claude Fable 5.2 and not re-reviewed.
+
+### Models and review
+
+Surveys: Claude Opus 5.5 (four areas), Codex GPT-6.1 Sol and GPT-6 Astra (two each). Cuts: Claude Opus 5.5 in three
+parallel worktrees; merges, two small fixes and the restoring of two deletions that belonged to group C: Claude
+Fable 5.2. Reviews, each from the diff and tests: Codex GPT-6 Astra passed the dead-code round with no production
+regression; Codex GPT-6.1 Sol found one regression in the first round of merges (the store-load latch could miss a
+finished load, and a later settings re-read blanked the app gate), repaired in `772b1642b` and `1e433d64a`; Codex
+GPT-6 Astra passed the second round with two harmless timing differences. `persistence-release-safety`: no saved
+shape changed and every upgrade and drift test passes; no real upgrade was run, so the verdict is INCONCLUSIVE.
 
 ### Open findings from pass 3
 
 F240 (relay list and profile edits: marked published without being sent, or built on older data), F241 (smaller
-defects and four missing features).
+defects and four missing features), F242 (cuts stopped on, and the two wallet-context defects behind one of them).
 
 ### Not verified in pass 3
 
 - Nothing was run on iOS or Android.
-- The surveys' line counts are estimates; no cut has been tried.
-- The Bluetooth label fix was not reviewed by another model.
+- No real upgrade was run.
+- The review of the two store-load repairs had not returned when this was written; the Bluetooth label fix and the
+  restoring commit were not reviewed by another model.
+- `jevlint` saved checks were not run; `audit-commit` was not run per commit.
+- Some pin commits and intermediate commits do not type-check alone; the branch head passes every check.

@@ -11,7 +11,7 @@ Method: started from pass 0's `feed-social.md` and `nostr.md` candidate lists, r
 `nostr/src/facade/session/notifications-session.ts` with a fake source; no file written); everything else is
 "traced" (read end to end), not run. No test suite was run.
 
-Already filed and not repeated here (cited where they touch a candidate): F122, F125, F153, F185, F190, F203,
+Already filed and not repeated here (cited where they touch a candidate): F122, F125, F153, F185, the capability-cache item (since deleted), F203,
 F204, F02, F47.
 
 Shapes the repo already uses that a conversion should reuse, not reinvent:
@@ -45,7 +45,7 @@ Shapes the repo already uses that a conversion should reuse, not reinvent:
 | 12 | Feed pager lanes (`nostr/src/facade/feed-pager.ts`) | no | memory | S | leave |
 | 13 | Like/repost/zap overlays (`useNostrEngagement`, `nostrSocialStore` optimistic maps) | no new | persisted overlays | - | leave |
 | 14 | Image overlay open/close phase | possible, harmless | none | L | defer |
-| 15 | Capability cache (`nostr/src/capabilities.ts`) | yes (F190) | none, no caller | S | delete (F190) |
+| 15 | Capability cache (`nostr/src/capabilities.ts`) | yes (the capability-cache item (since deleted)) | none, no caller | S | delete (the capability-cache item (since deleted)) |
 
 ---
 
@@ -458,8 +458,8 @@ until it is pinned on a device.
 
 ## 15. Capability cache
 
-`nostr/src/capabilities.ts:43-69`: `cached?` and `pending?` with no generation. F190 (no caller; stale request
-repopulates after `clear()`). **Delete** per F190 rather than convert.
+`nostr/src/capabilities.ts:43-69`: `cached?` and `pending?` with no generation. the capability-cache item (since deleted) (no caller; stale request
+repopulates after `clear()`). **Delete** per the capability-cache item (since deleted) rather than convert.
 
 Also looked at and left: gift-wrap unwrap cache (`giftWrapCache.ts`, positive and negative persisted maps; F02 and F203
 item 4 decide its future), `useMuteListSync` (`loading` local per effect run; pinned "one refresh at a time"),

@@ -13,7 +13,7 @@ surface; the nostr findings below come from a grep of every `export` in `nostr/s
 (script output kept in the scratchpad, not in the repo). No test was run. Everything is "traced" (read end to end)
 unless it says otherwise.
 
-Already filed and cited, not repeated: F185, F190, F203, F204, F216, F221, F227, F239.
+Already filed and cited, not repeated: F185, the capability-cache item (since deleted), F203, F204, F216, F221, F227, F239.
 
 ---
 
@@ -113,7 +113,7 @@ What production uses from `nostr/recipes`: `naggFeedClient.ts:15-23` (eight name
 
 **Obligation today.** None on callers. On maintainers: these builders are kept type-correct and fixed with the rest
 (`6f806693d` changed the replaceable tie-break inside the unused `wallpapers.ts`), and their tests are read as
-"wire-contract" pins (pass 0 `nostr.md` row 5) although no request with those shapes is ever sent. F190 records the
+"wire-contract" pins (pass 0 `nostr.md` row 5) although no request with those shapes is ever sent. the capability-cache item (since deleted) records the
 capability cache's stale-request defect.
 
 **Proposed shape.** Delete the rows above, the `index.ts` re-exports of the emptied files, and the schema block in
@@ -130,7 +130,7 @@ capability cache's stale-request defect.
 
 **Pins.** None needed: nothing behaves differently. `bun run type-check` and the nostr suite are the gate.
 
-**Size.** M (twelve files, all deletions). Mechanical. F190 closes with it.
+**Size.** M (twelve files, all deletions). Mechanical. the capability-cache item (since deleted) closes with it.
 
 ## 2. `HomeFeed` page 0 on `useCachedRead`, load-more on its own controller
 
