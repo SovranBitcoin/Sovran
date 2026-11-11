@@ -62,6 +62,18 @@ describe.each([
     expect(result.current).toBe(true);
   });
 
+  it('opens for a load that finished, even when another read starts before it renders', () => {
+    const load = controlLoad(persist);
+    const { result } = renderHook(() => useLoaded());
+
+    act(() => {
+      load.finish();
+      load.startAgain();
+    });
+
+    expect(result.current).toBe(true);
+  });
+
   it('opens at once for a store that has already loaded', () => {
     const load = controlLoad(persist);
     load.finish();

@@ -1,4 +1,4 @@
-import { useCallback, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 
 /**
  * Whether a persisted store's saved data could be read, and the one way to
@@ -65,12 +65,21 @@ export function useStoreLoad(persist: Persist): StoreLoad {
   return useSyncExternalStore(subscribe, read, read);
 }
 
-/** True from the first render that sees the store loaded, for as long as the component stays mounted. */
+/**
+ * True once a load of the store finishes, for as long as the component stays
+ * mounted. Set by the load finishing, not by a render seeing it, so a read that
+ * starts before the next render cannot hide that the earlier one finished.
+ */
 export function useStoreLoadLatched(persist: Persist): boolean {
-  const loaded = useStoreLoad(persist) === 'loaded';
-  const [latched, setLatched] = useState(loaded);
-  if (loaded && !latched) setLatched(true);
-  return latched || loaded;
+  const [latched, setLatched] = useState(() => persist.hasHydrated());
+  useEffect(() => {
+    if (latched) return undefined;
+    const stop = persist.onFinishHydration(() => setLatched(true));
+    // It may have finished between the render and this effect.
+    if (persist.hasHydrated()) setLatched(true);
+    return stop;
+  }, [persist, latched]);
+  return latched;
 }
 
 interface WaitOptions {
