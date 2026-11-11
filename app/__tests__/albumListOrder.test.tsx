@@ -14,7 +14,6 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   removeItem: jest.fn(() => Promise.resolve()),
 }));
 
-import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 
 import { useAlbumList } from '@/features/theme/lib/useAlbumList';
