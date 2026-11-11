@@ -506,8 +506,10 @@ MUST NOT:
 
 Stuck-on-selectMint recovery: if the user dismissed the mint selector opened from
 the preview, `CONFIRM_MELT` restores `navigateToMeltPreview` from ctx -- but ONLY
-when both `flowCtx.mintUrl` and `flowCtx.amount` are truthy
-(`createMachine.ts:565-587`). When the guard fails (no mint ever chosen) the
+when the list was opened over a preview awaiting Pay (`mintListOverPreview`)
+and both `flowCtx.mintUrl` and `flowCtx.amount` are truthy. A list opened
+anywhere else (the screen after an NFC tap paid, say) restores nothing, so a
+paid payment's context never comes back as a preview. When the guard fails the
 machine fires `onMissingMintForAmount` and re-dispatches the `selectMint`
 handler — the confirm tap is never silently dropped.
 

@@ -571,3 +571,23 @@ describe("what an NFC tap leaves behind when it ends", () => {
     expect(unitSwitches(switchUnit)).toEqual(["usd"]);
   });
 });
+
+// The tag holds the token: the request is paid, and nothing done on the
+// screen that follows rebuilds it for Pay to send a second time.
+describe("a paid NFC tap", () => {
+  const sent = (tm: ReturnType<typeof createTestMachine>) =>
+    tm.operationCalls.filter(
+      (call) => call.name === "executeNfcSend" || call.name === "executePaymentRequest",
+    ).length;
+
+  it("is not sent again from the mint list", async () => {
+    const { tm } = setup();
+    await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
+    tm.assertStep("sendComplete");
+
+    await tm.machine.requestMintSelector();
+    await tm.machine.confirmPaymentRequest();
+
+    expect(sent(tm)).toBe(1);
+  });
+});

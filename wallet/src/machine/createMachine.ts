@@ -346,6 +346,11 @@ export function createPaymentMachine(
   let flowCtx: FlowContext = { unit: configUnit };
   const idleData: StepDataMap["idle"] = {};
   let stepData: StepDataMap[FlowStep] = idleData;
+  // Whether the open mint list was opened over a preview, which then still
+  // awaited Pay (a settled preview is final). Pay with the list dismissed
+  // restores that preview, and only that one. Cleared whenever the step
+  // leaves selectMint.
+  let mintListOverPreview = false;
   // The turn: one `send()` call holds the machine from `beginTurn` to
   // `finishTurn`. Only the functions under "Turn" below write these five.
   //
@@ -376,6 +381,7 @@ export function createPaymentMachine(
   ): void {
     step = nextStep;
     stepData = data as StepDataMap[FlowStep];
+    if (nextStep !== "selectMint") mintListOverPreview = false;
   }
 
   let cachedSnapshot: ExecutionState = deriveExecutionState("idle", idleData);
@@ -1072,19 +1078,20 @@ export function createPaymentMachine(
     //   unchanged (the user is already on the screen — no re-navigation needed).
     // On failure: step changes to chooseFallbackOption or error, and the handler is dispatched.
 
-    // If the user opened the mint selector from a terminal step and dismissed
+    // If the user opened the mint selector from a preview and dismissed it
     // without selecting, the step is stuck on selectMint while the UI is still
-    // showing the terminal screen. Restore the terminal step from context so
-    // the CONFIRM_* guards can match.
+    // showing the preview. Restore the preview from context so the CONFIRM_*
+    // guards can match. Only a list opened over a preview awaiting Pay
+    // restores one: a context left from a payment that went out (an NFC tap
+    // that paid) must never come back as a preview Pay sends again.
     if (
       step === "selectMint" &&
       (event.type === "CONFIRM_MELT" ||
         event.type === "CONFIRM_PAYMENT_REQUEST") &&
+      mintListOverPreview &&
       flowCtx.mintUrl &&
       flowCtx.amount
     ) {
-      // The selector only opens from a preview that still awaits Pay (see
-      // above), so the restored preview awaits Pay too.
       if (flowCtx.meltTarget) {
         setStep("navigateToMeltPreview", {
           mintUrl: flowCtx.mintUrl,
@@ -1501,6 +1508,11 @@ export function createPaymentMachine(
       }
       flowCtx = result.context;
       setStep(result.step, result.data);
+      if (event.type === "REQUEST_MINT_SELECTOR") {
+        mintListOverPreview =
+          prevStep === "navigateToMeltPreview" ||
+          prevStep === "navigateToPaymentRequest";
+      }
       if (step !== prevStep) {
         logger.info("machine.transition", {
           from: prevStep,
