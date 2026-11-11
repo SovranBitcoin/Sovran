@@ -951,7 +951,7 @@ export class CocoManager {
         recordWalletDatabaseCreated(accountIndex);
         // Opt-in with EXPO_PUBLIC_PERF_PROBES=1. An entry per coco call is
         // thousands a minute, which slows a dev build enough to matter.
-        this.instance =
+        const wallet =
           process.env.EXPO_PUBLIC_PERF_PROBES === '1'
             ? withCallTiming(manager, {
                 event: 'coco.call',
@@ -959,7 +959,24 @@ export class CocoManager {
                 namespaces: COCO_TIMED_NAMESPACES,
               })
             : manager;
-        await initPhase('CocoManager.initCorePlugins', () => this.instance!.initPlugins());
+        // The wallet is handed out only once its plugins have started. One
+        // whose plugins failed is closed here, so the next open starts afresh
+        // instead of being handed it.
+        try {
+          await initPhase('CocoManager.initCorePlugins', () => wallet.initPlugins());
+        } catch (error) {
+          await manager.dispose().catch(() => undefined);
+          if (this.db === db) this.db = null;
+          await db.closeAsync().catch(() => undefined);
+          throw error;
+        }
+        if (resetGeneration !== this.resetGeneration) {
+          await manager.dispose().catch(() => undefined);
+          if (this.db === db) this.db = null;
+          await this.discardAfterReset(db, dbName);
+          throw new Error('Wallet was reset while it was opening');
+        }
+        this.instance = wallet;
         initLog('CocoManager', 'Manager created');
         cashuLog.info('cashu.manager.initialized', {
           duration_ms: Math.round((performance.now() - initStart) * 100) / 100,

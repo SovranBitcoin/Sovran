@@ -195,3 +195,45 @@ describe('closing', () => {
     expect(closes()).toBe(1);
   });
 });
+
+// F217: the wallet is ready once its plugins have started, and a start that
+// failed is not handed to anyone.
+describe('starting the plugins', () => {
+  it('is not ready, and hands nobody the wallet, until its plugins have started', async () => {
+    const started = deferred();
+    jest.spyOn(Manager.prototype, 'initPlugins').mockImplementationOnce(() => started.promise);
+    const first = CocoManager.initialize();
+    for (let i = 0; i < 20 && opened.length === 0; i++) await tick();
+    await tick();
+
+    let joined = false;
+    const second = CocoManager.initialize().then((wallet) => {
+      joined = true;
+      return wallet;
+    });
+    await tick();
+    expect(CocoManager.isInitialized()).toBe(false);
+    expect(CocoManager.peekInstance()).toBeNull();
+    expect(joined).toBe(false);
+
+    started.resolve();
+    expect(await second).toBe(await first);
+    expect(CocoManager.isInitialized()).toBe(true);
+  });
+
+  it('closes a wallet whose plugins failed to start, and opens a new one next time', async () => {
+    const dispose = jest.spyOn(Manager.prototype, 'dispose');
+    jest
+      .spyOn(Manager.prototype, 'initPlugins')
+      .mockRejectedValueOnce(new Error('plugin failed'));
+    await expect(CocoManager.initialize()).rejects.toThrow('plugin failed');
+    expect(CocoManager.isInitialized()).toBe(false);
+    expect(CocoManager.peekInstance()).toBeNull();
+    expect(dispose).toHaveBeenCalledTimes(1);
+    expect(opened[0].closeAsync).toHaveBeenCalledTimes(1);
+
+    const wallet = await CocoManager.initialize();
+    expect(openDatabase).toHaveBeenCalledTimes(2);
+    expect(CocoManager.peekInstance()).toBe(wallet);
+  });
+});
