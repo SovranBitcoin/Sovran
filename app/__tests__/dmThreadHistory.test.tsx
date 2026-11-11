@@ -4,7 +4,11 @@ import { useDmThread } from '@/features/payments/hooks/useDmThread';
 import { useDmConversations } from '@/features/payments/hooks/useDmConversations';
 import { useDmLastMessageStore } from '@/shared/stores/profile/dmLastMessageStore';
 import type { DmEnvelopePage } from '@/features/payments/data/dmEnvelopeTypes';
-import { dmConversationsCache, dmThreadCache } from '@/features/payments/data/dmSnapshotCaches';
+import {
+  dmConversationsCache,
+  dmConversationsKey,
+  dmThreadCache,
+} from '@/features/payments/data/dmSnapshotCaches';
 
 const mockInbox = jest.fn();
 const mockDirect = jest.fn(async (..._args: unknown[]) => ({ envelopes: [], hasNextPage: false }));
@@ -309,6 +313,49 @@ describe('conversation list seeding', () => {
     expect(result.current.conversations.map((c) => c.counterparty)).toEqual(['newcomer', 'peer']);
     rerender({ live: false });
     expect(unsubscribe).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps a live arrival when an inbox read that began before it lands without it', async () => {
+    let finish!: (p: DmEnvelopePage) => void;
+    mockInbox.mockImplementation(() => new Promise<DmEnvelopePage>((r) => (finish = r)));
+    const { result } = renderHook(() => useDmConversations('viewer', key, { live: true }));
+    await waitFor(() => expect(mockInbox).toHaveBeenCalledTimes(1));
+    const onLive = mockLive.mock.calls[0][1] as (p: DmEnvelopePage) => void;
+
+    act(() => onLive(page('newcomer', 1, 2000)));
+    expect(result.current.conversations.map((c) => c.counterparty)).toEqual(['newcomer']);
+
+    // The first page was read before the arrival and does not hold it.
+    await act(async () => finish(page('peer', 1, 900)));
+    expect(result.current.conversations.map((c) => c.counterparty)).toEqual(['newcomer', 'peer']);
+
+    // Nor does a refresh answered from an older snapshot.
+    act(() => result.current.refresh());
+    await waitFor(() => expect(mockInbox).toHaveBeenCalledTimes(2));
+    await act(async () => finish(page('peer', 1, 900)));
+    expect(result.current.conversations.map((c) => c.counterparty)).toEqual(['newcomer', 'peer']);
+    expect(
+      dmConversationsCache.getEntry(dmConversationsKey('viewer'))?.data.map((c) => c.counterparty)
+    ).toEqual(['newcomer', 'peer']);
+  });
+
+  it('keeps the seeded rows when a live arrival lands before the first page', async () => {
+    useDmLastMessageStore.getState().recordLastMessage('a'.repeat(64), {
+      protocol: 'nip17',
+      atSeconds: 500,
+      isOwn: false,
+    });
+    mockInbox.mockImplementation(() => new Promise<DmEnvelopePage>(() => {}));
+    const { result } = renderHook(() => useDmConversations('viewer', key, { live: true }));
+    await waitFor(() => expect(mockLive).toHaveBeenCalledTimes(1));
+    const onLive = mockLive.mock.calls[0][1] as (p: DmEnvelopePage) => void;
+
+    act(() => onLive(page('newcomer', 1, 2000)));
+
+    expect(result.current.conversations.map((c) => c.counterparty)).toEqual([
+      'newcomer',
+      'a'.repeat(64),
+    ]);
   });
 });
 

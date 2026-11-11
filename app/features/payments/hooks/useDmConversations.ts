@@ -8,7 +8,8 @@
  * session) or the persisted last-message metadata (peer, protocol, time — no
  * text) seeds the rows, a refresh replaces them in place when its first page
  * lands, and while the list is on screen a live relay listener folds new
- * arrivals in through the same decrypt/bucket path.
+ * arrivals in through the same decrypt/bucket path. A live arrival is kept
+ * through that replacement: the page may have been read before it arrived.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { subscribeDmEnvelopesLive } from '../data/dmEnvelopeClient';
@@ -80,20 +81,34 @@ export function useDmConversations(
     initial.key === cacheKey ? initial.rows : []
   );
 
-  // Accumulator persists across pages so cross-page bucketing keeps "latest wins".
-  const bucketRef = useRef(new Map<string, DmConversation>());
+  // Accumulator persists across pages so cross-page bucketing keeps "latest
+  // wins". It starts from the rows on screen, so a live arrival before the
+  // first page joins the seed instead of replacing it.
+  const bucketRef = useRef<Map<string, DmConversation> | null>(null);
+  if (bucketRef.current === null) {
+    bucketRef.current = new Map(initial.rows.map((row) => [row.counterparty, row]));
+  }
+  // Live arrivals, newest per peer: what a first page read before they
+  // arrived would otherwise erase.
+  const liveRef = useRef(new Map<string, DmConversation>());
 
   const onReset = useCallback(() => {
     bucketRef.current = new Map();
+    liveRef.current = new Map();
     setConversations([]);
   }, []);
 
   const onPage = useCallback(
     (page: DmEnvelopePage, meta: DmPageMeta) => {
       if (!viewerPubkey || !viewerPrivateKey) return;
-      // A refresh's first page rebuilds the bucket; the seeded/snapshot rows
-      // stay on screen until this replacement is set below.
-      if (meta.first && meta.mode !== 'loadMore') bucketRef.current = new Map();
+      // A refresh's first page rebuilds the bucket, from the live arrivals;
+      // the seeded/snapshot rows stay on screen until this replacement is set
+      // below.
+      const bucket =
+        meta.first && meta.mode !== 'loadMore'
+          ? new Map(liveRef.current)
+          : (bucketRef.current ?? new Map<string, DmConversation>());
+      bucketRef.current = bucket;
       const decrypted = decryptDmEnvelopes(page.envelopes, viewerPubkey, viewerPrivateKey);
       const profile = useProfileStore.getState();
       const isCurrentProfile = profile.profiles.some(
@@ -110,19 +125,22 @@ export function useDmConversations(
         // One conversation per counterparty across protocols; the most recent
         // message wins (and sets the displayed protocol). Per-protocol threads
         // are opened from the profile's send-message picker.
-        const existing = bucketRef.current.get(dm.counterparty);
-        if (!existing || dm.createdAtSec > existing.lastMessageAtSec) {
-          bucketRef.current.set(dm.counterparty, {
-            counterparty: dm.counterparty,
-            lastMessagePreview: dm.content,
-            lastMessageIsOwn: dm.isOwn,
-            lastMessageAtSec: dm.createdAtSec,
-            protocol: dm.protocol,
-            newestMessageId: dm.id,
-          });
+        const row: DmConversation = {
+          counterparty: dm.counterparty,
+          lastMessagePreview: dm.content,
+          lastMessageIsOwn: dm.isOwn,
+          lastMessageAtSec: dm.createdAtSec,
+          protocol: dm.protocol,
+          newestMessageId: dm.id,
+        };
+        for (const target of meta.mode === 'live' ? [bucket, liveRef.current] : [bucket]) {
+          const existing = target.get(dm.counterparty);
+          if (!existing || dm.createdAtSec > existing.lastMessageAtSec) {
+            target.set(dm.counterparty, row);
+          }
         }
       }
-      const rows = sorted(bucketRef.current);
+      const rows = sorted(bucket);
       setConversations(rows);
       if (cacheKey) dmConversationsCache.setEntry(cacheKey, rows, { viewerKey: viewerPubkey });
     },
