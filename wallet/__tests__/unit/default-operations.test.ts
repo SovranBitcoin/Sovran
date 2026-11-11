@@ -1537,6 +1537,24 @@ describe("executeSend — reservation rescue (BTC-07)", () => {
     expect(mockManager.ops.send.cancel).toHaveBeenCalledWith("prepared-send-1");
   });
 
+  it("keeps the binding error when the cancel after it fails", async () => {
+    const mockManager = createMockManager();
+    mockManager.ops.send.cancel = vi
+      .fn()
+      .mockRejectedValue(new Error("mint unreachable"));
+    const ops = createDefaultOperations({
+      getManager: () => mockManager as unknown as Manager,
+      captureSendDelivery: () => async () => {
+        throw new Error("storage unavailable");
+      },
+    });
+    await expect(ops.executeSend!({ mintUrl: MINT1, amount: 100 })).rejects.toThrow(
+      "storage unavailable",
+    );
+    expect(mockManager.ops.send.execute).not.toHaveBeenCalled();
+    expect(mockManager.ops.send.cancel).toHaveBeenCalledWith("prepared-send-1");
+  });
+
   it("does not cancel when execute succeeds", async () => {
     const mockManager = createMockManager();
 

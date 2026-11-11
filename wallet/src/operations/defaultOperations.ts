@@ -757,7 +757,16 @@ export function createDefaultOperations(
         try {
           await bindDelivery(prepared.id);
         } catch (error) {
-          await mgr.ops.send.cancel(prepared.id);
+          // As in the rescue: a cancel that fails must not replace the error
+          // that caused it.
+          try {
+            await mgr.ops.send.cancel(prepared.id);
+          } catch (cancelErr) {
+            logger.warn("operations.executeSend.cancelAfterBindingFailed", {
+              operationId: prepared.id,
+              error: errField(cancelErr),
+            });
+          }
           throw error;
         }
       }
