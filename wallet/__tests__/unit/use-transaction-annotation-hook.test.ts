@@ -5,9 +5,7 @@
  * what a missing entry or missing annotation reads as.
  *
  * Writes go through the store adapter, the way the app writes (its own
- * persisted adapter). The provider's `useSetTransactionAnnotation` writer is
- * not pinned here: it reads the store through the provider's private context,
- * which a test cannot supply without mounting the whole provider.
+ * persisted adapter).
  */
 import { createRequire } from "node:module";
 import {

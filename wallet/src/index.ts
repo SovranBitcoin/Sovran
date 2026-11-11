@@ -5,11 +5,9 @@
 // Core factory (framework-agnostic entry point)
 export {
   createColada,
-  createMachineFromInstance,
   createWalletContextTracker,
   type ColadaConfig,
   type ColadaInstance,
-  type CreateMachineFromInstanceConfig,
   type WalletContextTracker,
 } from "./core";
 

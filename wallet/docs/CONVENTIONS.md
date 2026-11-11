@@ -106,12 +106,10 @@ return (
 );
 ```
 
-Amount-screen examples may include an amount config:
+The amount screen takes no config: the provider derives it.
 
 ```tsx
-const { entry, actions, suggestions } = useScreenActions('amountEntry', entrySeed, {
-  amountConfig,
-});
+const { entry, actions, suggestions } = useScreenActions('amountEntry', entrySeed);
 ```
 
 ## Ownership Language

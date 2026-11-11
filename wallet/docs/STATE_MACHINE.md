@@ -177,9 +177,8 @@ one turn at a time (see "How a turn flows").
 | `getStep()` | current `FlowStep` | |
 | `subscribe(listener)` | state-change bus | returns unsubscribe |
 
-React hooks: `usePaymentMachine` (low-level) and `usePaymentFlowMachine`
-(provider-bound, re-exported from `react/index.ts`); both return
-`PaymentMachine`. `useScreenActions` returns
+React hook: `usePaymentFlowMachine` (provider-bound, re-exported from
+`react/index.ts`) returns the provider's `PaymentMachine`. `useScreenActions` returns
 `{entry, error, actions, mintUrl, source, suggestions}` where `actions[name]` is
 a `BoundAction` with `.execute(params?)`.
 

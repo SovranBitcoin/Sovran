@@ -2,7 +2,8 @@
 // createColada — framework-agnostic factory
 //
 // Accepts a coco-cashu-core Manager and returns a fully operational instance
-// with built-in operations, WalletContext tracking, and the PaymentMachine.
+// with built-in operations and WalletContext tracking. `ColadaProvider` builds
+// the PaymentMachine from it.
 //
 // This is the primary entry point for integrating colada. The wallet
 // provides a Manager (from coco-cashu-core) and app-owned enrichment callbacks;
@@ -11,17 +12,8 @@
 
 import type { Manager } from "@cashu/coco-core";
 import type { AnnotationStoreAdapter } from "../annotations";
-import { createPaymentMachine } from "../machine/createMachine";
 import { logger, setLogger, type CocoLogger } from "../logger";
-import type {
-  MachineOperations,
-  NfcIOAdapter,
-  NotificationHandlerMap,
-  PaymentMachine,
-  ScanSources,
-  StepHandlerMap,
-  URDecoderLike,
-} from "../machine/types";
+import type { MachineOperations } from "../machine/types";
 import type {
   MintCatalogEntry,
   MintContactProfileResolver,
@@ -267,63 +259,4 @@ export function createColada(config: ColadaConfig): ColadaInstance {
       tracker.dispose();
     },
   };
-}
-
-export interface CreateMachineFromInstanceConfig {
-  instance: ColadaInstance;
-  handlers: StepHandlerMap;
-  notifications?: NotificationHandlerMap;
-  getOffline?: () => boolean;
-  getLocale?: () => string;
-  unit?: string;
-  nfcAdapter?: NfcIOAdapter;
-  scanSources?: ScanSources;
-  createURDecoder?: () => URDecoderLike;
-}
-
-export function createMachineFromInstance(
-  config: CreateMachineFromInstanceConfig,
-): PaymentMachine {
-  const {
-    instance,
-    handlers,
-    notifications,
-    getOffline,
-    getLocale,
-    unit = "sat",
-    nfcAdapter,
-    scanSources,
-    createURDecoder,
-  } = config;
-
-  logger.info("core.createMachineFromInstance.start", {
-    unit,
-    handlerCount: Object.keys(handlers).length,
-    notificationCount: Object.keys(notifications ?? {}).length,
-    hasOfflineGetter: !!getOffline,
-    hasLocaleGetter: !!getLocale,
-    hasNfcAdapter: !!nfcAdapter,
-    scanSourceCount: Object.keys(scanSources ?? {}).length,
-    hasUrDecoder: !!createURDecoder,
-    operationCount: Object.keys(instance.operations ?? {}).length,
-  });
-
-  const machine = createPaymentMachine({
-    handlers,
-    getContext: instance.tracker.getContext,
-    getUnit: () => unit,
-    getOffline: getOffline ?? (() => false),
-    getSatsPerUnitMinor: instance.config.getSatsPerUnitMinor,
-    getLocale: getLocale ?? (() => "en"),
-    unit,
-    operations: instance.operations as MachineOperations,
-    enableEcashSendMemo: instance.config.enableEcashSendMemo,
-    notifications,
-    createURDecoder,
-    scanSources,
-    nfcAdapter,
-  });
-
-  logger.info("core.createMachineFromInstance.ready");
-  return machine;
 }

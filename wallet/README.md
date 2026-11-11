@@ -10,7 +10,7 @@ The package has two public entry points:
 - `colada` for framework-agnostic machine, adapters, copy, history, chain,
   subscription, screen-action session, and capability helpers.
 - `colada/react` for `ColadaProvider`, `usePaymentFlowMachine`,
-  `useScreenActions`, `useExecutionState`, and `useColadaSubscriptions`.
+  `useScreenActions`, and `useExecutionState`.
 
 ## What Colada Owns
 
@@ -112,7 +112,7 @@ Important props:
 | `actions` | Wallet overrides for predefined `useScreenActions` actions. Defaults cover navigation, operations, copy, and share where possible. |
 | `screenActionsBridge` | App-owned bridge for extra action context, subscription binding, entry merge rules, decoration, locale, and source labels. |
 | `getOffline`, `getBtcPrice`, `getDisplayCurrency`, `getLocale` | Runtime getters read through refs so long-lived handlers see fresh values. |
-| `translations`, `paymentCopyOverrides` | Copy/i18n extensions for payment-state text. |
+| `translations` | Copy/i18n extensions for payment-state text. |
 | `clipboardAdapter`, `shareAdapter`, `imagePickerAdapter`, `nostrAdapter`, `nfcAdapter`, `chainAdapter`, `qrDecoderAdapter`, `loggerAdapter` | JSON-shaped native/platform seams. |
 | `scanSources` | Optional explicit scan-source map. When omitted, clipboard and image-picker adapters derive default sources. |
 | `deepLinks` | Reactive deep-link input and scheme filtering. Accepted Cashu links are scanned by the machine. |
@@ -249,8 +249,8 @@ React.
 
 ## Copy And Localization
 
-Use `createPaymentCopyResolver`, `resolvePaymentCopy`, `getPaymentCopy`,
-`registerPaymentCopyLocale`, and `paymentCopyOverrides` for payment-state text.
+Use `createPaymentCopyResolver` (with per-key `overrides`), `resolvePaymentCopy`,
+`getPaymentCopy`, and `registerPaymentCopyLocale` for payment-state text.
 
 Apps may override individual copy keys, but default payment copy belongs in
 Colada. New payment states should declare copy keys beside the state/action
@@ -263,8 +263,6 @@ logic instead of adding app-screen strings.
 - `subscribe(filter, listener)`
 - `subscribeAll(listener)`
 - `publish(event)`
-
-React consumers can use `useColadaSubscriptions()`.
 
 Events are JSON-shaped and typed by `ColadaSubscriptionEvent`, including
 `history.updated`, `melt.updated`, `mint.updated`, receive mint/key changes,

@@ -259,17 +259,13 @@ test('a rotation recorded from outside swaps the mounted quote; re-recording the
   expect(fake.manager.quotes.mint.create).toHaveBeenCalledTimes(1);
 });
 
-test('a failed load reports the error and refresh tries again', async () => {
+test('a failed load reports the error', async () => {
   fake.manager.quotes.mint.create.mockRejectedValueOnce(new Error('no route'));
   const { result } = renderHook(() => useReusableMintQuote(INPUT, store));
   await flush();
   expect(result.current.error).toEqual({ message: 'no route', authored: false });
   expect(result.current.isLoading).toBe(false);
   expect(result.current.quote).toBeNull();
-
-  await act(async () => result.current.refresh());
-  expect(result.current.error).toBeNull();
-  expect(result.current.quote?.quoteId).toBe('created-1');
 });
 
 test('a null input clears the quote, the loading flag and the error', async () => {

@@ -24,8 +24,6 @@ export interface UseReusableMintQuoteResult {
   isLoading: boolean;
   /** Why the last load failed; `authored` says whether the message can be shown as is. */
   error: FailureText | null;
-  /** Re-run get-or-create (e.g. after the quote expired). */
-  refresh: () => void;
   /**
    * Retire the standing quote and record a fresh one (onchain address-reuse
    * policy). Keeps showing the current quote until the replacement resolves.
@@ -202,8 +200,6 @@ export function useReusableMintQuote(
     });
   }, [mintUrl, method, unit]);
 
-  const refresh = useCallback(() => setGeneration((g) => g + 1), []);
-
   // The dep list names the refs too. It used to read
   // `[manager, mintUrl, method, unit]` while the body also reached
   // `identityStoreRef`/`mountedRef`, and a memo the compiler cannot preserve
@@ -227,5 +223,5 @@ export function useReusableMintQuote(
     [manager, mintUrl, method, unit, identityStoreRef, mountedRef],
   );
 
-  return { quote, isLoading, error, refresh, rotate };
+  return { quote, isLoading, error, rotate };
 }

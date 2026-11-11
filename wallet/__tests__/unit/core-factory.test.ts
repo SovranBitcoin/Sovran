@@ -400,30 +400,3 @@ describe('createWalletContextTracker', () => {
     tracker.dispose();
   });
 });
-
-// ---------------------------------------------------------------------------
-// createMachineFromInstance
-// ---------------------------------------------------------------------------
-
-describe('createMachineFromInstance', () => {
-  it('creates a working machine from an instance', async () => {
-    const { manager } = createMockManager();
-    const { createMachineFromInstance } = await import('../../src/core/createColada');
-
-    const instance = createColada({ manager });
-    await instance.tracker.refresh();
-
-    const machine = createMachineFromInstance({
-      instance,
-      handlers: {},
-      getOffline: () => false,
-      getLocale: () => 'en',
-    });
-
-    expect(machine).toBeDefined();
-    expect(machine.getContext).toBeDefined();
-    expect(machine.subscribe).toBeDefined();
-
-    instance.dispose();
-  });
-});

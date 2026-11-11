@@ -24,14 +24,9 @@ import { useLatestRef } from "./useLatestRef";
 import { createUnitPins } from "./unitPins";
 import {
   createInMemoryAnnotationStore,
-  encodeAnnotation,
-  type AnnotationEntryLike,
   type AnnotationStoreAdapter,
-  type TransactionAnnotation,
 } from "../annotations";
-import { annotationKey as deriveAnnotationKey } from "../annotations";
-import { createPaymentCopyResolver, registerPaymentCopyLocale } from "../copy";
-import type { PaymentCopyCatalog, PaymentCopyResolver } from "../copy";
+import { registerPaymentCopyLocale } from "../copy";
 import { registerLocale } from "../formatting/locales";
 import { errField, logger, setLogger } from "../logger";
 import { createPaymentMachine } from "../machine/createMachine";
@@ -155,8 +150,6 @@ export interface ColadaProviderProps {
   getDisplayCurrency?: () => { code: string; symbol: string } | null;
   getLocale?: () => string;
   translations?: Record<string, Record<string, string>>;
-  /** Per-key app copy overrides for the active locale. */
-  paymentCopyOverrides?: Partial<PaymentCopyCatalog>;
   clipboardAdapter?: ClipboardAdapter;
   shareAdapter?: ShareAdapter;
   imagePickerAdapter?: ImagePickerAdapter;
@@ -214,9 +207,6 @@ interface ColadaContextValue {
   getBtcPriceRef: React.MutableRefObject<(() => number) | undefined>;
   getDisplayCurrencyRef: React.MutableRefObject<
     (() => { code: string; symbol: string } | null) | undefined
-  >;
-  paymentCopyOverridesRef: React.MutableRefObject<
-    Partial<PaymentCopyCatalog> | undefined
   >;
   adaptersRef: React.MutableRefObject<ColadaAdapters>;
   getManagerRef: React.MutableRefObject<(() => Manager | null) | undefined>;
@@ -470,7 +460,6 @@ export function ColadaProvider({
   getDisplayCurrency: getDisplayCurrencyProp,
   getLocale: getLocaleProp,
   translations,
-  paymentCopyOverrides,
   clipboardAdapter,
   shareAdapter,
   imagePickerAdapter,
@@ -558,9 +547,6 @@ export function ColadaProvider({
   }, [baseOperations, nostrAdapter]);
 
   const getLocaleRef = useLatestRef(getLocale);
-  const paymentCopyOverridesRef = useLatestRef<
-    Partial<PaymentCopyCatalog> | undefined
-  >(paymentCopyOverrides);
   const adaptersRef = useLatestRef(adapters);
   // Prefer an explicit getManager prop; otherwise fall back to the manager the
   // createColada instance already holds, so wallets get read hooks for free.
@@ -858,7 +844,6 @@ export function ColadaProvider({
       getOfflineRef,
       getBtcPriceRef,
       getDisplayCurrencyRef,
-      paymentCopyOverridesRef,
       adaptersRef,
       getManagerRef,
       annotationStoreRef,
@@ -889,7 +874,6 @@ export function ColadaProvider({
       notificationsRef,
       operationsRef,
       optionDismissRef,
-      paymentCopyOverridesRef,
       screenActionHandlers,
       screenActionsBridge,
       shareContentRef,
@@ -917,10 +901,6 @@ export function useColadaContext(): ColadaContextValue {
     );
   }
   return ctx;
-}
-
-export function useColadaSubscriptions(): ColadaSubscriptionBus {
-  return useColadaContext().subscriptionBusRef.current;
 }
 
 type ColadaWalletContextSource = Pick<
@@ -980,62 +960,6 @@ export function useColadaManager(): Manager {
  */
 export function useAnnotationStore(): AnnotationStoreAdapter {
   return useColadaContext().annotationStoreRef.current;
-}
-
-export interface SetTransactionAnnotation {
-  /**
-   * Write an annotation patch. `target` is either an explicit key
-   * (`raw:...`, `quote:...`, `op:...`, `id:...`) or an entry whose canonical
-   * key is derived. Patches are additive at the field level.
-   */
-  set: (
-    target: string | AnnotationEntryLike,
-    patch: TransactionAnnotation,
-  ) => void;
-  /**
-   * Bridge a preview-time key (e.g. a `raw:` scan key) onto the final entry's
-   * key once it exists, so the annotation resolves for the persisted row.
-   */
-  linkAnnotation: (
-    fromKey: string,
-    toKey: string | AnnotationEntryLike,
-  ) => void;
-}
-
-/**
- * Writer for transaction annotations. The app calls this during payment flows
- * when it learns side-data coco never stores (counterparty, scan source, P2PK
- * lock, distribution, location, swap).
- */
-export function useSetTransactionAnnotation(): SetTransactionAnnotation {
-  const store = useAnnotationStore();
-  return useMemo<SetTransactionAnnotation>(
-    () => ({
-      set: (target, patch) => {
-        const key =
-          typeof target === "string" ? target : deriveAnnotationKey(target);
-        store.set(key, encodeAnnotation(patch));
-      },
-      linkAnnotation: (fromKey, toKey) => {
-        const record = store.get(fromKey);
-        if (!record) return;
-        const key =
-          typeof toKey === "string" ? toKey : deriveAnnotationKey(toKey);
-        store.set(key, record);
-      },
-    }),
-    [store],
-  );
-}
-
-export function usePaymentCopy(): PaymentCopyResolver {
-  const ctx = useContext(ColadaContext);
-  const locale = ctx?.getLocaleRef.current?.() ?? "en";
-  const overrides = ctx?.paymentCopyOverridesRef.current;
-  return useMemo(
-    () => createPaymentCopyResolver({ locale, overrides }),
-    [locale, overrides],
-  );
 }
 
 function usePaymentFlowContext(): ColadaContextValue {

@@ -8,16 +8,12 @@ export {
   useAnnotationStore,
   useColadaContext,
   useColadaManager,
-  useColadaSubscriptions,
   useColadaTrustedMintUrls,
-  usePaymentCopy,
   usePaymentFlowMachine,
-  useSetTransactionAnnotation,
   type DeepLinkConfig,
   type ColadaProviderProps,
   type PaymentFlowRefs,
   type ScreenActionsBridge,
-  type SetTransactionAnnotation,
 } from "./ColadaProvider";
 
 // Transaction list read model
@@ -79,9 +75,7 @@ export type {
 // Post-terminal screen actions
 export {
   useScreenActions,
-  useScreenActionsWithConfig,
   type BoundAction,
-  type UseScreenActionsConfig,
   type UseScreenActionsResult,
 } from "./useScreenActions";
 
@@ -90,12 +84,6 @@ export type {
   QuickSendSuggestion,
   QuickSendConfig,
 } from "../amount-actions/types";
-
-// Low-level machine hook (for wallets not using ColadaProvider)
-export {
-  usePaymentMachine,
-  type UsePaymentMachineConfig,
-} from "./usePaymentMachine";
 
 // Execution state subscription
 export { useExecutionState } from "./useExecutionState";
