@@ -416,16 +416,13 @@ describe('stopping a run', () => {
     expect(mockRestoreKeyset).toHaveBeenCalledTimes(1);
     expect(mockAddMint.mock.calls.map((call) => call[0])).toEqual([MINT_A]);
     expect(texts(renderer)).toContain('Recovery stopped');
-    expect(texts(renderer)).toContain('Cancelled');
+    // Mint A stopped before its second keyset: like mint B, it was not recovered.
+    expect(texts(renderer).filter((text) => text === 'Cancelled')).toHaveLength(2);
     expect(byTestId(renderer, 'recovery-swipe')).toHaveLength(1);
     expect(paramPopup).not.toHaveBeenCalled();
     expect(staticPopup).not.toHaveBeenCalled();
-    // QUIRK (F210): mint A stopped before its second keyset and mint B was never
-    // asked, yet the pending operations of both are deleted.
-    expect(jest.mocked(deleteMintOperation).mock.calls.map((call) => call[1])).toEqual([
-      'op-a',
-      'op-b',
-    ]);
+    // Neither mint was restored, so a later run still has their pending operations.
+    expect(deleteMintOperation).not.toHaveBeenCalled();
   });
 
   it('while searching discovered mints, asks no further batch and restores nothing', async () => {
@@ -473,7 +470,7 @@ describe('stopping a run', () => {
 });
 
 describe('the end of a run', () => {
-  it('QUIRK (F210): deletes the pending operations of a mint whose restore failed', async () => {
+  it('keeps the pending operations of a mint whose restore failed, and deletes those of the one restored', async () => {
     mockAddMint.mockImplementation(async (url: string) => {
       if (url === MINT_B) throw new Error('unreachable');
       return { mint: { mintUrl: url }, keysets: [{ id: KEYSET_1, unit: 'sat' }] };
@@ -487,9 +484,40 @@ describe('the end of a run', () => {
     await swipe(renderer);
 
     expect(texts(renderer)).toContain('Recovery Partial');
+    expect(jest.mocked(deleteMintOperation).mock.calls.map((call) => call[1])).toEqual(['op-a']);
+  });
+
+  it('keeps the pending operations of a mint whose keysets could not be restored', async () => {
+    mintsServe({ [MINT_B]: ['legacy-keyset'] });
+    mockListPending.mockResolvedValue([
+      { id: 'op-a', mintUrl: MINT_A },
+      { id: 'op-b', mintUrl: MINT_B },
+    ]);
+    const renderer = await mount();
+
+    await swipe(renderer);
+
+    expect(jest.mocked(deleteMintOperation).mock.calls.map((call) => call[1])).toEqual(['op-a']);
+  });
+
+  it('keeps an operation that appeared during the run, and one for a mint not in it', async () => {
+    mockListPending
+      .mockResolvedValueOnce([
+        { id: 'op-before', mintUrl: MINT_A },
+        { id: 'op-other', mintUrl: 'https://other.example' },
+      ])
+      .mockResolvedValue([
+        { id: 'op-before', mintUrl: MINT_A },
+        { id: 'op-other', mintUrl: 'https://other.example' },
+        { id: 'op-during', mintUrl: MINT_A },
+      ]);
+    const renderer = await mount();
+
+    await swipe(renderer);
+
+    expect(texts(renderer)).toContain('Recovery Complete');
     expect(jest.mocked(deleteMintOperation).mock.calls.map((call) => call[1])).toEqual([
-      'op-a',
-      'op-b',
+      'op-before',
     ]);
   });
 
@@ -619,6 +647,16 @@ describe('forced recovery at startup', () => {
     // has ended (F178), but a mint's outcome is final: its row stays timed out.
     expect(texts(renderer)).toContain('Timed out');
     expect(texts(renderer)).toContain('Recovered from 1 mint, but 1 failed.');
+  });
+
+  it('keeps the pending operations of a mint that timed out', async () => {
+    mockListPending.mockResolvedValue([
+      { id: 'op-a', mintUrl: MINT_A },
+      { id: 'op-b', mintUrl: MINT_B },
+    ]);
+    await runPastTimeout();
+
+    expect(jest.mocked(deleteMintOperation).mock.calls.map((call) => call[1])).toEqual(['op-b']);
   });
 
   it('accepts a reswipe while the timed-out restore is still running', async () => {

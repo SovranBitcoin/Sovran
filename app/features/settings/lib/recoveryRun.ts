@@ -24,6 +24,7 @@ import {
   countKnownFailures,
   createInitialMintStates,
   fundsFound,
+  isSuccess,
   isTerminal,
   type MintRecoveryState,
 } from '@/features/settings/lib/recoveryProgress';
@@ -214,6 +215,18 @@ export function startRecoveryRun(
   };
 }
 
+/** Ids of the pending mint operations now; none when they cannot be read, so none is deleted. */
+async function pendingMintOperationIds(
+  manager: ReturnType<typeof CocoManager.getInstance>
+): Promise<ReadonlySet<string>> {
+  try {
+    return new Set((await manager.ops.mint.listPending()).map((op) => op.id));
+  } catch (error) {
+    cashuLog.warn('recovery.cleanup.list_failed', { error: redactError(error) });
+    return new Set();
+  }
+}
+
 function rowsOf(run: RecoveryRun): MintRecoveryState[] {
   return run.phase === 'idle' ? [] : run.rows;
 }
@@ -237,6 +250,9 @@ async function recover(
   const probeMissUrls: string[] = [];
 
   const manager = CocoManager.getInstance();
+  // Pending mint operations are read before anything is restored: only those
+  // can be stale from before the run (see the cleanup below).
+  const pendingBefore = await pendingMintOperationIds(manager);
 
   // Shallow probe pass. Ask each unknown mint one cheap question — does
   // this seed have anything here — instead of running a full gap walk over
@@ -318,6 +334,7 @@ async function recover(
     let failedKeysets = 0;
     let alreadyRecoveredKeysets = 0;
     let skippedKeysets = 0;
+    let stoppedBeforeLastKeyset = false;
     let mintError: string | undefined;
     try {
       // Same call `wallet.restore` makes first, so this stays idempotent —
@@ -338,7 +355,10 @@ async function recover(
       });
 
       for (const keyset of keysets) {
-        if (stopRequested()) break;
+        if (stopRequested()) {
+          stoppedBeforeLastKeyset = true;
+          break;
+        }
         // Mirrors coco's normalizeUnit(keyset.unit ?? DEFAULT_UNIT).
         const unit = (keyset.unit ?? 'sat').toLowerCase();
         if (!isRestorableKeysetId(keyset.id)) {
@@ -408,6 +428,9 @@ async function recover(
     // `success: true`, which made "Recovery Partial" dead code and let the
     // screen claim it recovered from every mint while restore threw.
     //
+    // A mint stopped before its last keyset was not recovered: it is
+    // `skipped`, and its pending operations are kept for the next run.
+    //
     // A mint whose keysets were ALL screened out was never attempted, so it
     // is `skipped`, not `done` — otherwise a mint serving only legacy
     // non-NUT-02 ids (mint.minibits.cash) shows a green check and, in gate
@@ -426,14 +449,22 @@ async function recover(
             fundsFound: found,
             durationMs,
           }
-        : skippedKeysets > 0 && attemptedKeysets === 0
-          ? { ...base, status: 'skipped', reason: 'not-restorable', fundsFound: found, durationMs }
-          : {
-              ...base,
-              status: restoredSomething ? 'done' : 'already-recovered',
-              fundsFound: found,
-              durationMs,
-            }
+        : stoppedBeforeLastKeyset
+          ? { ...base, status: 'skipped', reason: 'cancelled' }
+          : skippedKeysets > 0 && attemptedKeysets === 0
+            ? {
+                ...base,
+                status: 'skipped',
+                reason: 'not-restorable',
+                fundsFound: found,
+                durationMs,
+              }
+            : {
+                ...base,
+                status: restoredSomething ? 'done' : 'already-recovered',
+                fundsFound: found,
+                durationMs,
+              }
     );
     cashuLog.info('recovery.mint.done', {
       ...mintUrlLogFields(mintUrl),
@@ -531,16 +562,24 @@ async function recover(
   // deterministic counter was out of sync with the mint, so their
   // outputData was generated against a counter the mint had already
   // signed. They will fail forever with `outputs already signed` and
-  // re-loop via the operation watcher. The proofs themselves were
-  // recovered by batchRestore above, so dropping these stale operations
-  // is non-destructive.
+  // re-loop via the operation watcher. Dropping one is non-destructive only
+  // where the proofs were recovered above: so only an operation that was
+  // pending before the run, on a mint this run restored. The others (a mint
+  // that failed, timed out or was skipped, and anything that appeared during
+  // the run) are kept for the next run.
   try {
+    const restored = new Set(
+      rows()
+        .filter((r) => isSuccess(r.status))
+        .map((r) => r.mint)
+    );
     const pendingOps = await manager.ops.mint.listPending();
-    if (pendingOps.length > 0) {
-      dispatch({ type: 'labelled', label: `Clearing ${pendingOps.length} stale operations` });
+    const stale = pendingOps.filter((op) => pendingBefore.has(op.id) && restored.has(op.mintUrl));
+    if (stale.length > 0) {
+      dispatch({ type: 'labelled', label: `Clearing ${stale.length} stale operations` });
       // Coco doesn't expose a public abandon API for pending operations,
       // so go through the typed seam in shared/lib/cashu/managerInternals.
-      for (const op of pendingOps) {
+      for (const op of stale) {
         await deleteMintOperation(manager, op.id).catch((e) =>
           cashuLog.warn('recovery.cleanup.delete_failed', {
             operationId: op.id,
@@ -550,8 +589,13 @@ async function recover(
         );
       }
       cashuLog.info('recovery.cleanup.dropped_stuck_pending_ops', {
-        count: pendingOps.length,
-        operationIds: pendingOps.map((o) => o.id),
+        count: stale.length,
+        operationIds: stale.map((o) => o.id),
+      });
+    }
+    if (stale.length < pendingOps.length) {
+      cashuLog.info('recovery.cleanup.kept_pending_ops', {
+        count: pendingOps.length - stale.length,
       });
     }
   } catch (cleanupErr) {
