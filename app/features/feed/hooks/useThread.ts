@@ -16,6 +16,7 @@ import type {
 import { getFeedClient } from '@/features/feed/data/useFeedClient';
 import { consumeThreadSeed, peekThreadSeed } from '@/features/feed/lib/threadSeedCache';
 import { buildNostrDataLayer } from '@/shared/lib/nostr/buildNostrDataLayer';
+import { noteMetricsFromStats } from '@/shared/lib/nostr/noteMetrics';
 import {
   bucketsFromThreadResult,
   buildThreadItemsFromResult,
@@ -71,12 +72,7 @@ function cachedThreadSeed(eventId: string): ThreadSeedBuckets | undefined {
 
   const metrics = new Map<string, NoteMetrics>();
   for (const [id, stats] of Object.entries(view.stats)) {
-    metrics.set(id, {
-      likeCount: stats.likes,
-      repostCount: stats.reposts,
-      replyCount: stats.replies,
-      satsZapped: stats.satsZapped,
-    });
+    metrics.set(id, noteMetricsFromStats(stats));
   }
 
   return {
@@ -519,12 +515,7 @@ async function runSpamAuditImpl(
     );
     const metrics = new Map<string, NoteMetrics>();
     for (const [id, s] of Object.entries(audit.stats)) {
-      metrics.set(id, {
-        likeCount: s.likes,
-        repostCount: s.reposts,
-        replyCount: s.replies,
-        satsZapped: s.satsZapped,
-      });
+      metrics.set(id, noteMetricsFromStats(s));
     }
     mergeIntoRef(profilesRef, profiles);
     mergeIntoRef(metricsRef, metrics);

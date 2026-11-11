@@ -7,6 +7,7 @@ import { DEMO_PROFILES } from '@/shared/stores/runtime/mockPresentationData';
 import type { NoteMetrics, ProfileInfo } from '@/features/feed/components/nostr/feedTypes';
 import { buildNostrDataLayer } from '@/shared/lib/nostr/buildNostrDataLayer';
 import { backfillProfile } from '@/shared/lib/nostr/fetchProfiles';
+import { noteMetricsFromStats } from '@/shared/lib/nostr/noteMetrics';
 import { peekNostrDataLayer } from '@/shared/lib/nostr/dataLayerRegistry';
 import {
   NOSTR_METADATA_STALE_TTL_MS,
@@ -221,15 +222,7 @@ export function useNoteStats(eventId: string | undefined): {
   const pending = usePendingProfile(cache?.pendingNoteStats, eventId);
   return useMemo(() => {
     if (record) {
-      return {
-        metrics: {
-          likeCount: record.likes,
-          repostCount: record.reposts,
-          replyCount: record.replies,
-          satsZapped: record.satsZapped,
-        },
-        status: 'cached' as const,
-      };
+      return { metrics: noteMetricsFromStats(record), status: 'cached' as const };
     }
     return { metrics: undefined, status: pending ? ('loading' as const) : ('absent' as const) };
   }, [record, pending]);
@@ -242,13 +235,7 @@ export function useNoteStats(eventId: string | undefined): {
  */
 export function readNoteMetrics(eventId: string): NoteMetrics | undefined {
   const stats = buildNostrDataLayer()?.cache.getNoteStats(eventId);
-  if (!stats) return undefined;
-  return {
-    likeCount: stats.likes,
-    repostCount: stats.reposts,
-    replyCount: stats.replies,
-    satsZapped: stats.satsZapped,
-  };
+  return stats ? noteMetricsFromStats(stats) : undefined;
 }
 
 /** Non-reactive read of one full profile record (for getState-style callers). */
