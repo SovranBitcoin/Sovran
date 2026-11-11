@@ -35,6 +35,11 @@ export function holdSwapGroup(groupId: string): () => void {
   };
 }
 
+/** Whether a run in this process owns any swap group: one swap runs at a time. */
+export function anySwapGroupHeld(): boolean {
+  return owners.size > 0;
+}
+
 export function swapGroupPhase(group: Pick<SwapGroup, 'id' | 'state'>): SwapGroupPhase {
   switch (group.state) {
     case 'running':

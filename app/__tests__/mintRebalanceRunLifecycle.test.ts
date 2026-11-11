@@ -154,8 +154,9 @@ const plan: RebalancePlan = {
   currentBalances: { [SOURCE]: 1000, [DESTINATION]: 0 },
   targetBalances: { [SOURCE]: 900, [DESTINATION]: 100 },
 };
+let mounted: { current: ReturnType<typeof useMintRebalanceOrchestrator> }[] = [];
 function mount(unit = 'sat') {
-  return renderHook(() =>
+  const hook = renderHook(() =>
     useMintRebalanceOrchestrator({
       unit,
       computedPlan: plan,
@@ -171,6 +172,8 @@ function mount(unit = 'sat') {
       minTransferThreshold: 5,
     })
   );
+  mounted.push(hook.result);
+  return hook;
 }
 beforeEach(() => {
   jest.useFakeTimers();
@@ -182,6 +185,9 @@ beforeEach(() => {
   mockManager = createManager();
 });
 afterEach(() => {
+  // A run still going holds its group for the process; end it with the test.
+  for (const result of mounted) act(() => result.current.handleCancelRun());
+  mounted = [];
   jest.clearAllTimers();
   jest.useRealTimers();
 });
@@ -276,8 +282,15 @@ test('pressing start twice in a row runs one swap', async () => {
   expect(mockManager.ops.melt.execute).toHaveBeenCalledTimes(1);
 });
 
-test('start is refused while another screen’s swap is still running', async () => {
-  mockStatus.active = { state: 'running', meta: {} };
+test('start is refused while another screen’s swap owns a run, whatever the toast shows', async () => {
+  keepRecipientPending();
+  const other = mount();
+  await act(async () => other.result.current.handleStart());
+  expect(other.result.current.runStatus).toBe('running');
+  jest.clearAllMocks();
+  // The other swap's toast was swiped away; its run still holds its group.
+  mockStatus.active = null;
+
   const { result } = mount();
   await act(async () => result.current.handleStart());
 
@@ -287,6 +300,16 @@ test('start is refused while another screen’s swap is still running', async ()
   expect(mockStatus.start).not.toHaveBeenCalled();
   expect(mockManager.ops.melt.execute).not.toHaveBeenCalled();
   expect(cashuLog.info).toHaveBeenCalledWith('mint.rebalance.start_blocked_by_active_swap');
+});
+
+test('a toast left running with no run behind it does not block a new start', async () => {
+  mockStatus.active = { state: 'running', meta: {} };
+  const { result } = mount();
+  await act(async () => result.current.handleStart());
+  await finishRun();
+
+  expect(mockManager.ops.melt.execute).toHaveBeenCalledTimes(1);
+  expect(result.current.runStatus).toBe('finished');
 });
 
 test('a finished swap left on the toast does not block a new start', async () => {

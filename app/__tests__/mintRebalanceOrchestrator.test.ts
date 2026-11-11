@@ -147,8 +147,9 @@ const plan: RebalancePlan = {
   currentBalances: { [SOURCE]: 1000, [DESTINATION]: 0 },
   targetBalances: { [SOURCE]: 900, [DESTINATION]: 100 },
 };
+let mounted: { current: ReturnType<typeof useMintRebalanceOrchestrator> }[] = [];
 function mount(unit = 'sat') {
-  return renderHook(() =>
+  const hook = renderHook(() =>
     useMintRebalanceOrchestrator({
       unit,
       computedPlan: plan,
@@ -164,6 +165,8 @@ function mount(unit = 'sat') {
       minTransferThreshold: 5,
     })
   );
+  mounted.push(hook.result);
+  return hook;
 }
 beforeEach(() => {
   jest.useFakeTimers();
@@ -175,6 +178,9 @@ beforeEach(() => {
   mockManager = createManager();
 });
 afterEach(() => {
+  // A run still going holds its group for the process; end it with the test.
+  for (const result of mounted) act(() => result.current.handleCancelRun());
+  mounted = [];
   jest.clearAllTimers();
   jest.useRealTimers();
 });
