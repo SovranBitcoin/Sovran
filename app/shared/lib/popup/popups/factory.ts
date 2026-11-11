@@ -1,20 +1,11 @@
-import type { ReactNode } from 'react';
 import { popup } from './engine';
-import type { PopupIcon } from '../icons';
-import type { PopupTextSegment } from '../format';
 import type { BaseOverrides, TextOverrides } from './types';
 
-type PopupType = 'success' | 'error' | 'warning' | 'info';
-type PopupVariant = 'toast' | 'sheet';
-
-type PopupSpec = {
-  message: string;
-  text?: string | ReactNode | PopupTextSegment[];
-  icon?: PopupIcon;
-  type?: PopupType;
-  variant?: PopupVariant;
-  buttons?: { text: string; page?: string; onPress?: () => void }[];
-};
+/** The part of a popup's configuration a named wrapper fixes. */
+type PopupSpec = Pick<
+  Parameters<typeof popup>[0],
+  'message' | 'text' | 'icon' | 'type' | 'variant' | 'buttons'
+>;
 
 /**
  * Build a popup wrapper that takes only optional overrides. Wrappers built
