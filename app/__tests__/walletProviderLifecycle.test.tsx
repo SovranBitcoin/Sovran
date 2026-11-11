@@ -5,7 +5,8 @@
  * machine: which deep links it hands to the machine and when, which handler
  * map a scan reaches after the factory is replaced, and whose unit pin is in
  * force while several screens are bound. The real provider, machine and
- * detectors run; only the clipboard scan source (an injected port) is a stub.
+ * detectors run; only the clipboard scan source (an injected port) and the
+ * createColada instance (a fixed wallet context) are stubs.
  */
 
 import TestRenderer, { act } from 'react-test-renderer';
@@ -15,7 +16,8 @@ import {
   usePaymentFlowMachine,
   type DeepLinkConfig,
 } from '../../wallet/src/react/ColadaProvider';
-import type { PaymentMachine, StepHandlerMap } from '../../wallet/src/machine/types';
+import type { ColadaInstance } from '../../wallet/src/core/createColada';
+import type { PaymentMachine, ScanSources, StepHandlerMap } from '../../wallet/src/machine/types';
 import type { WalletContext } from '../../wallet/src/types';
 
 const MINT = 'https://mint1.example.com';
@@ -30,7 +32,16 @@ const WALLET: WalletContext = {
   proofAmounts: {},
 } as unknown as WalletContext;
 
-const clipboardAdapter = { readText: async () => '', writeText: async () => {} };
+const scanSources: ScanSources = { clipboard: async () => ({ empty: true }) };
+
+const instance = {
+  config: { manager: null },
+  tracker: { getContext: () => WALLET },
+  getWalletContext: () => WALLET,
+  subscribeWalletContext: () => () => undefined,
+  operations: {},
+  dispose: () => undefined,
+} as unknown as ColadaInstance;
 
 type Received = { factory: string; token: string };
 
@@ -73,9 +84,10 @@ function Tree({
   return (
     <ColadaProvider
       handlers={handlers}
+      instance={instance}
       deepLinks={deepLinks}
       getUnit={getUnit}
-      clipboardAdapter={withScanSource ? clipboardAdapter : undefined}>
+      scanSources={withScanSource ? scanSources : undefined}>
       {binders.map((b) => (
         <Binder key={b.key} unit={b.unit} />
       ))}

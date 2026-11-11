@@ -26,7 +26,7 @@ docs instead of leaving examples that compile only against old APIs.
 - Use flat `ColadaProvider` props. Never document grouped `engine`,
   `callbacks`, `runtime`, or `platform` props.
 - Use adapter names from `ColadaProviderProps`, such as `clipboardAdapter`,
-  `shareAdapter`, `imagePickerAdapter`, and `chainAdapter`.
+  `shareAdapter`, and `chainAdapter`.
 - Show `useScreenActions(screenType, entryParam)` for terminal screens.
 - Show the third `useScreenActions` argument only for `amountEntry`.
 - Treat `sendToken.copy` emoji output as a copy variant. Never document a
@@ -69,6 +69,7 @@ Provider examples use flat props:
 
 ```tsx
 <ColadaProvider
+  instance={instance}
   handlers={createHandlers}
   operations={walletOperations}
   notifications={walletNotifications}

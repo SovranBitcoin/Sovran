@@ -145,8 +145,7 @@ function props() {
   return mockBaseProps.current as {
     handlers: (machine: unknown, refs: { getOptionDismiss: () => unknown }) => unknown;
     detectors: unknown;
-    instance: { dispose: () => void; operations: MachineOperations };
-    getManager: () => unknown;
+    instance: { dispose: () => void; operations: MachineOperations; config: { manager: unknown } };
     annotationStore: unknown;
     operations: MachineOperations & {
       npcAddressForPubkey: unknown;
@@ -219,13 +218,14 @@ describe('ports handed to the wallet provider', () => {
     expect(createSovranScreenActionsBridge).toHaveBeenCalledWith(
       expect.objectContaining({ manager: mockManagerHolder.current })
     );
-    expect(p.getManager()).toBe(mockManagerHolder.current);
+    expect(p.instance.config.manager).toBe(mockManagerHolder.current);
     expect(p.chainAdapter).toEqual(
       expect.objectContaining({ getAddressTransactions: expect.any(Function) })
     );
-    expect(createSovranNotifications).toHaveBeenCalledWith(
-      expect.objectContaining({ getManager: p.getManager })
-    );
+    const notificationsConfig = jest.mocked(createSovranNotifications).mock.calls[0]![0] as unknown as {
+      getManager: () => unknown;
+    };
+    expect(notificationsConfig.getManager()).toBe(mockManagerHolder.current);
   });
 
   it('builds the step handlers from the machine with the live manager', async () => {

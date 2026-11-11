@@ -74,13 +74,13 @@ function createHandlers(): StepHandlerMap {
 export function AppRoot() {
   return (
     <ColadaProvider
+      instance={instance}
       handlers={() => createHandlers()}
       operations={walletOperations}
       notifications={walletNotifications}
       actions={walletScreenActions}
       clipboardAdapter={clipboardAdapter}
       shareAdapter={shareAdapter}
-      imagePickerAdapter={imagePickerAdapter}
       chainAdapter={chainAdapter}
       navigation={{ goBack: () => router.back(), scanQr: openScanner }}
     >
@@ -106,19 +106,19 @@ Important props:
 | Prop | Purpose |
 | --- | --- |
 | `handlers` | Factory called with the `PaymentMachine`; returns `StepHandlerMap` navigation handlers. |
-| `instance` | Optional `createColada()` instance for framework-agnostic operation/context reuse. |
+| `instance` | Required `createColada()` instance: the wallet context, the Coco manager, the default operations, and the locale, offline, BTC price, display currency, fiat-rate and send-memo settings. |
 | `operations` | Wallet I/O the machine can run internally, such as send, receive, melt, mint quote, mint review, status checks, rollback, Nostr DM, and recipient profile lookup. |
 | `notifications` | Optional named callbacks for UX and lifecycle events. Missing handlers are no-ops. |
 | `actions` | Wallet overrides for predefined `useScreenActions` actions. Defaults cover navigation, operations, copy, and share where possible. |
 | `screenActionsBridge` | App-owned bridge for extra action context, subscription binding, entry merge rules, decoration, locale, and source labels. |
-| `getOffline`, `getBtcPrice`, `getDisplayCurrency`, `getLocale` | Runtime getters read through refs so long-lived handlers see fresh values. |
-| `translations` | Copy/i18n extensions for payment-state text. |
-| `clipboardAdapter`, `shareAdapter`, `imagePickerAdapter`, `nostrAdapter`, `nfcAdapter`, `chainAdapter`, `qrDecoderAdapter`, `loggerAdapter` | JSON-shaped native/platform seams. |
-| `scanSources` | Optional explicit scan-source map. When omitted, clipboard and image-picker adapters derive default sources. |
+| `annotationStore` | Persistence for per-transaction annotations. In memory when omitted. |
+| `getUnit` | The wallet's active unit, read on every flow reset. |
+| `clipboardAdapter`, `shareAdapter`, `nfcAdapter`, `chainAdapter`, `qrDecoderAdapter` | JSON-shaped native/platform seams. |
+| `scanSources` | Where `machine.scan()` reads clipboard, gallery and NFC input from. |
 | `deepLinks` | Reactive deep-link input and scheme filtering. Accepted Cashu links are scanned by the machine. |
 | `navigation` | Default screen-action navigation callbacks such as `goBack`, `scanQr`, `mintInfo`, and `addMint`. |
 
-Flat provider props win over values carried by `instance`.
+Settings live on `instance` only; the provider has no prop that repeats one.
 
 ## Nostr GraphQL Enrichment
 
@@ -311,7 +311,7 @@ with a concrete reason instead of pretending the path can execute.
 
 - `src/adapters/`: JSON-shaped native/platform contracts.
 - `src/react/ColadaProvider.tsx`: provider, context, flat prop API, deep-link
-  processing, scan-source derivation, and React hooks.
+  processing, and React hooks.
 - `src/machine/`: framework-agnostic payment machine, flow modules, transition
   helpers, and operation/notification types.
 - `src/screen-actions/`: action contracts, availability rules, default

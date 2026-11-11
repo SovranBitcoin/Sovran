@@ -11,7 +11,6 @@
 // ---------------------------------------------------------------------------
 
 import type { Manager } from "@cashu/coco-core";
-import type { AnnotationStoreAdapter } from "../annotations";
 import { logger, setLogger, type CocoLogger } from "../logger";
 import type { MachineOperations } from "../machine/types";
 import type {
@@ -42,13 +41,6 @@ type MintInfo = Awaited<ReturnType<Manager["mint"]["getMintInfo"]>>;
 
 export interface ColadaConfig {
   manager: Manager;
-
-  /**
-   * Persistence for transaction annotations (per-transaction side-data coco
-   * does not store). Framework-agnostic; the wallet owns persistence +
-   * profile-scoping. Read hooks fall back to an in-memory adapter when absent.
-   */
-  annotationStore?: AnnotationStoreAdapter;
 
   captureSendDelivery?: DefaultOperationsConfig["captureSendDelivery"];
   sendNostrDM?: (dm: { nprofile: string; message: string }) => Promise<void>;

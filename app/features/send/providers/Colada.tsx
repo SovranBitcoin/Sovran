@@ -714,7 +714,6 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
       handlers={handlers}
       detectors={buildDetectors}
       instance={instance}
-      getManager={getManager}
       annotationStore={transactionAnnotationAdapter}
       operations={operationsOverride}
       notifications={notifications}
