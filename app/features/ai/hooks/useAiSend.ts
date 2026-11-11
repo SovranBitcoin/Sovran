@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useRoutstrStore, type ChatAttachment } from '@/shared/stores/profile/routstrStore';
+import {
+  selectConversationId,
+  useRoutstrStore,
+  type ChatAttachment,
+} from '@/shared/stores/profile/routstrStore';
 import { useRoutstrFunds } from './useRoutstrFunds';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import {
@@ -162,7 +166,7 @@ export function useAiSend() {
   const removeMessages = useRoutstrStore((s) => s.removeMessages);
   const finalizeAssistantMessage = useRoutstrStore((s) => s.finalizeAssistantMessage);
   const setActiveBranch = useRoutstrStore((s) => s.setActiveBranch);
-  const updateCurrentSessionTitle = useRoutstrStore((s) => s.updateCurrentSessionTitle);
+  const updateSessionTitle = useRoutstrStore((s) => s.updateSessionTitle);
 
   // Each `streamIntoPlaceholder` aborts the prior stream, so backgrounding
   // mid-stream stops billing. There is no longer a balance promise to wait on:
@@ -190,6 +194,9 @@ export function useAiSend() {
    */
   const streamIntoPlaceholder = useCallback(
     async (params: {
+      /** The conversation the answer was asked in (`selectConversationId`
+       *  then): every write about it goes there, whichever is open now. */
+      conversationId: string | null;
       assistantMessageId: string;
       apiMessages: RoutstrChatMessage[];
       /** `image_url` parts included in `apiMessages` (drives the
@@ -202,7 +209,7 @@ export function useAiSend() {
        *  ran (a retry) or the model could not be priced. */
       shownSats?: number | null;
     }) => {
-      const { assistantMessageId, flowId } = params;
+      const { conversationId, assistantMessageId, flowId } = params;
       const shownSats = params.shownSats ?? null;
       let { apiMessages, imageCount } = params;
 
@@ -468,7 +475,7 @@ export function useAiSend() {
               // attempt to the same exchange.
               payment: {
                 groupId: i === 0 ? flowId : `${flowId}#${i + 1}`,
-                sessionId: useRoutstrStore.getState().currentSessionId ?? undefined,
+                sessionId: conversationId ?? undefined,
                 messageId: assistantMessageId,
                 model: candidate,
               },
@@ -812,7 +819,7 @@ export function useAiSend() {
           // arrives before the first chunk — so there is nothing to stamp on
           // afterwards. That second write was only ever needed because the old
           // figure came from a balance re-read that had to wait for the stream.
-          finalizeAssistantMessage(assistantMessageId, {
+          finalizeAssistantMessage(conversationId, assistantMessageId, {
             ...finalizePayload,
             thinkingDurationSec: thinkingSec,
             ...(displayedModel && displayedModel.modelId !== modelToUse
@@ -834,7 +841,7 @@ export function useAiSend() {
           chars: fullContent.length,
         });
 
-        if (!isAnonymous) updateCurrentSessionTitle();
+        if (conversationId !== null) updateSessionTitle(conversationId);
 
         // Snapshot what the affordability gate predicted for the model we
         // actually used, so this log can quote both numbers.
@@ -871,7 +878,7 @@ export function useAiSend() {
         if (useProfileStore.getState().activeAccountIndex !== profile) return;
         if (isAbortError(err) || controller.signal.aborted) {
           aiLog.info('ai.send.aborted', { flowId });
-          removeMessages(new Set([assistantMessageId]));
+          removeMessages(conversationId, new Set([assistantMessageId]));
           span.end({ outcome: 'aborted' });
           return;
         }
@@ -933,7 +940,7 @@ export function useAiSend() {
         setStatus({ isSending: false, streamingMessageId: null });
       }
     },
-    [isAnonymous, removeMessages, finalizeAssistantMessage, updateCurrentSessionTitle, walletSats]
+    [removeMessages, finalizeAssistantMessage, updateSessionTitle, walletSats]
   );
 
   const sendInner = useCallback(
@@ -1093,6 +1100,7 @@ export function useAiSend() {
       if (willStartNewSession) {
         createSession();
       }
+      const conversationId = selectConversationId(useRoutstrStore.getState());
 
       addMessage({ ...pendingUserMessage, pending: true });
       addMessage({
@@ -1105,6 +1113,7 @@ export function useAiSend() {
 
       try {
         await streamIntoPlaceholder({
+          conversationId,
           assistantMessageId,
           apiMessages,
           imageCount,
@@ -1116,7 +1125,7 @@ export function useAiSend() {
         // streaming round-trip resolves — success or error, the request
         // left our hands. Errors surface as a pill on the assistant
         // placeholder, not on the user bubble's check.
-        setMessagePending(userMessageId, false);
+        setMessagePending(conversationId, userMessageId, false);
       }
     },
     [
@@ -1170,6 +1179,7 @@ export function useAiSend() {
         return;
       }
 
+      const conversationId = selectConversationId(useRoutstrStore.getState());
       const timestamp = Date.now();
       const newAssistantId = `msg-${timestamp}-r`;
       const flowId = `ai-retry-${timestamp}`;
@@ -1190,6 +1200,7 @@ export function useAiSend() {
       }
 
       await streamIntoPlaceholder({
+        conversationId,
         assistantMessageId: newAssistantId,
         apiMessages,
         imageCount,

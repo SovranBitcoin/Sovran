@@ -462,6 +462,48 @@ describe('streaming an answer', () => {
     expect(getTurnError(assistantId)).toBeNull();
   });
 
+  it.each([
+    ['another conversation is opened', () => useRoutstrStore.getState().switchSession('other')],
+    ['a new conversation is started', () => void useRoutstrStore.getState().createSession()],
+  ])(
+    'an answer still streaming when %s lands in the conversation that asked',
+    async (_label, leave) => {
+      useRoutstrStore.setState({
+        isAnonymousMode: false,
+        sessions: [
+          { id: 'other', title: 'Other', createdAt: 1, messages: [msg('o1', 'user', null, 1)] },
+        ],
+      });
+      const { assistantId, sending } = await startSend('first question');
+      const asked = useRoutstrStore.getState().currentSessionId!;
+      await act(async () => live.push(content('the paid ')));
+
+      act(leave);
+      await act(async () => {
+        live.push(content('answer'));
+        live.end();
+        await sending();
+      });
+
+      const sessions = useRoutstrStore.getState().sessions;
+      const own = sessions.find((s) => s.id === asked)!;
+      expect(own.messages.map((m) => [m.role, m.content, m.pending ?? null])).toEqual([
+        ['user', 'first question', false],
+        ['assistant', 'the paid answer', null],
+      ]);
+      expect(own.messages.find((m) => m.id === assistantId)?.costSats).toBe(4);
+      expect(own.title).toBe('first question');
+      // The conversation now on screen is untouched.
+      expect(history().some((m) => m.id === assistantId)).toBe(false);
+      expect(sessions.find((s) => s.id === 'other')!.messages).toEqual([
+        msg('o1', 'user', null, 1),
+      ]);
+
+      act(() => useRoutstrStore.getState().switchSession(asked));
+      expect(history().find((m) => m.id === assistantId)?.content).toBe('the paid answer');
+    }
+  );
+
   it('a second send while one streams is dropped', async () => {
     const { hook } = await startSend();
 
