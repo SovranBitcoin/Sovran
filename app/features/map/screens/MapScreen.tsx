@@ -24,7 +24,7 @@ import { withAlpha } from '@/shared/lib/color';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useScreenInsets } from '@/shared/hooks/useScreenInsets';
 import { spacing } from '@/shared/styles/tokens';
-import { useCallback, useEffect, useInsertionEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { InteractionManager, Platform, StyleSheet, useWindowDimensions } from 'react-native';
 import { BITCOIN_ACCENT } from '@/shared/lib/brandColors';
 import { applySafetyOffset } from '@/shared/lib/map/locationPrivacy';
@@ -32,8 +32,7 @@ import { CircleActionButton } from '@/shared/ui/composed/CircleActionButton';
 import { Spinner } from '@/shared/ui/primitives/Spinner';
 import { Log, log, useLifecycleLogger } from '@/shared/lib/logger';
 import { StatsCard, type CategoryFilter } from '../components/StatsCard';
-import { useMapCamera } from '../hooks/useMapCamera';
-import { useMapMarkers } from '../hooks/useMapMarkers';
+import { useMerchantMap } from '../hooks/useMerchantMap';
 
 // Default to Europe (most BTC merchants)
 const DEFAULT_LAT = 48;
@@ -66,58 +65,24 @@ export function MapScreen() {
   const [isMapReady, setIsMapReady] = useState(false);
   const [category, setCategory] = useState<CategoryFilter>('all');
 
-  // Camera and markers form a callback cycle (camera-settle → marker update,
-  // marker click → camera move). useMapCamera is wired first through this
-  // forwarder, which the insertion effect below points at useMapMarkers'
-  // updateMarkersForCamera once both hooks have run.
-  const onCameraSettleRef = useRef<(lat: number, lon: number, zoom: number) => void>(() => {});
-  // KEPT as an explicit useCallback — identity contract, not an optimization.
-  // A fresh identity each render churns useMapCamera's memoized return, which
-  // the mount-only "get user location" effect depends on; re-running it
-  // re-reads GPS and snaps the camera back while the user is panning. The
-  // compiler would hold this identity now that the file compiles, but the
-  // contract is load-bearing enough to state rather than infer.
-  // ast-grep-ignore: no-manual-memo-tsx
-  const onCameraSettle = useCallback((lat: number, lon: number, zoom: number) => {
-    onCameraSettleRef.current(lat, lon, zoom);
-  }, []);
-
-  // Destructured, not held as `mapCamera.*`: a property load off a hook's
-  // returned object counts as touching a ref during render to React Compiler,
-  // and writing `mapRef.current` counts as mutating an immutable.
-  const { mapRef, getCamera, setCamera, handleCameraChange } = useMapCamera({
-    initial: { lat: DEFAULT_LAT, lon: DEFAULT_LON, zoom: DEFAULT_ZOOM },
-    aspectRatio,
-    onCameraSettle,
-  });
-
   const {
+    mapRef,
+    handleCameraChange,
     markers,
     visibleCount,
     totalCount,
-    isClusteringReady,
-    storeLoading,
+    loading,
     error,
-    setError,
-    fetchPlaces,
-    updateMarkersForCamera,
-    resolveMarker,
-    clusterManagerRef,
-  } = useMapMarkers({
+    retry,
+    moveTo,
+    zoomBy,
+    pressMarker,
+  } = useMerchantMap({
     category,
     aspectRatio,
     isMapReady,
-    getCamera: getCamera,
+    initial: { lat: DEFAULT_LAT, lon: DEFAULT_LON, zoom: DEFAULT_ZOOM },
   });
-
-  // Close the camera↔markers cycle after commit rather than during render:
-  // writing the ref in render is a Rules-of-React violation, and no settle
-  // callback can fire before the first paint anyway.
-  useInsertionEffect(() => {
-    onCameraSettleRef.current = updateMarkersForCamera;
-  });
-
-  const loading = storeLoading || !isClusteringReady;
 
   // Defer map rendering until after navigation transition
   useEffect(() => {
@@ -127,15 +92,6 @@ export function MapScreen() {
 
     return () => clearTimeout(timer);
   }, []);
-
-  // Fetch places on mount — DEFERRED
-  useEffect(() => {
-    const task = InteractionManager.runAfterInteractions(() => {
-      fetchPlaces().catch((err) => log.error('map.places.fetch_failed', { error: err }));
-    });
-
-    return () => task.cancel();
-  }, [fetchPlaces]);
 
   // Get user location on mount — DEFERRED and non-blocking
   useEffect(() => {
@@ -147,76 +103,30 @@ export function MapScreen() {
         const loc = await Location.getCurrentPositionAsync({});
         // Privacy: offset camera so it doesn't centre on exact position
         const safe = applySafetyOffset(loc.coords);
-        setCamera({ lat: safe.latitude, lon: safe.longitude, zoom: 12 });
-        updateMarkersForCamera(safe.latitude, safe.longitude, 12);
+        moveTo({ lat: safe.latitude, lon: safe.longitude, zoom: 12 });
       } catch (err) {
         log.error('map.location.error', { error: err });
       }
     });
 
     return () => task.cancel();
-  }, [setCamera, updateMarkersForCamera]);
+  }, [moveTo]);
 
   const handleMyLocation = async () => {
     try {
       const loc = await Location.getCurrentPositionAsync({});
       const safe = applySafetyOffset(loc.coords);
-      setCamera({ lat: safe.latitude, lon: safe.longitude, zoom: 15 });
-      updateMarkersForCamera(safe.latitude, safe.longitude, 15);
+      moveTo({ lat: safe.latitude, lon: safe.longitude, zoom: 15 });
     } catch (err) {
       log.error('map.location.error', { error: err });
     }
   };
 
-  const handleZoomIn = () => {
-    const { lat, lon, zoom } = getCamera();
-    const newZoom = Math.min(zoom + 2, 20);
-    setCamera({ lat, lon, zoom: newZoom });
-    updateMarkersForCamera(lat, lon, newZoom);
-  };
-
-  const handleZoomOut = () => {
-    const { lat, lon, zoom } = getCamera();
-    const newZoom = Math.max(zoom - 2, 1);
-    setCamera({ lat, lon, zoom: newZoom });
-    updateMarkersForCamera(lat, lon, newZoom);
-  };
-
-  const handleMarkerClick = async (marker: { id?: string }) => {
-    if (!marker.id) return;
-
-    const clusterMarker = resolveMarker(marker.id);
-    if (!clusterMarker) return;
-
-    if (clusterMarker.type === 'cluster' && clusterMarker.clusterId !== undefined) {
-      const manager = clusterManagerRef.current;
-      if (manager) {
-        // Supercluster's getClusterExpansionZoom returns the zoom at which
-        // this cluster's children become individually visible. We zoom one
-        // step past that so the children actually separate in the viewport
-        // instead of re-clustering at the threshold; capped at 18 to stay
-        // within Supercluster's maxZoom + 1.
-        const expansionZoom = manager.getClusterExpansionZoom(clusterMarker.clusterId);
-        const newZoom = Math.min(expansionZoom + 1, 18);
-        setCamera({
-          lat: clusterMarker.latitude,
-          lon: clusterMarker.longitude,
-          zoom: newZoom,
-        });
-        updateMarkersForCamera(clusterMarker.latitude, clusterMarker.longitude, newZoom);
-      }
-    } else if (clusterMarker.placeId) {
-      router.navigate({
-        pathname: '/(map-flow)/detail',
-        params: { placeId: clusterMarker.placeId.toString() },
-      });
+  const handleMarkerClick = (marker: { id?: string }) => {
+    const placeId = marker.id ? pressMarker(marker.id) : undefined;
+    if (placeId) {
+      router.navigate({ pathname: '/(map-flow)/detail', params: { placeId: placeId.toString() } });
     }
-  };
-
-  // Retry loads the places again; hiding the error alone would leave an empty map.
-  const handleRetry = () => {
-    setError(null);
-    fetchPlaces().catch((err) => log.error('map.places.fetch_failed', { error: err }));
   };
 
   const mapUnavailableOnAndroid = Platform.OS === 'android' && !HAS_ANDROID_GOOGLE_MAPS_KEY;
@@ -232,7 +142,7 @@ export function MapScreen() {
               : error}
           </Text>
           <Pressable
-            onPress={mapUnavailableOnAndroid ? () => router.back() : handleRetry}
+            onPress={mapUnavailableOnAndroid ? () => router.back() : retry}
             style={[styles.retryButton, { backgroundColor: accent }]}>
             <Text size={14} heavy style={{ color: '#fff' }}>
               {mapUnavailableOnAndroid ? 'Go back' : 'Retry'}
@@ -307,13 +217,13 @@ export function MapScreen() {
           <CircleActionButton
             icon="mdi:plus"
             systemIcon="plus"
-            onPress={handleZoomIn}
+            onPress={() => zoomBy(2)}
             testID="map-zoom-in"
           />
           <CircleActionButton
             icon="mdi:minus"
             systemIcon="minus"
-            onPress={handleZoomOut}
+            onPress={() => zoomBy(-2)}
             testID="map-zoom-out"
           />
         </VStack>

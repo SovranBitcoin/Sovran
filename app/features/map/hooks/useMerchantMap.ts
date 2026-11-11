@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { InteractionManager } from 'react-native';
 import { useShallow } from 'zustand/react/shallow';
 import { useIsFocused } from 'expo-router';
 import { useBTCMapStore } from '@/shared/stores/global/btcMapStore';
@@ -8,8 +9,12 @@ import {
   getOrBuildBTCMapClusterManager,
 } from '@/shared/lib/map/btcMapClusterCache';
 import { getIconsForCategory } from '@/shared/lib/map/categories';
-import { deferWork, mapLog } from '@/shared/lib/logger';
+import { useLatestRef } from '@/shared/hooks/useLatestRef';
+import { deferWork, log, mapLog } from '@/shared/lib/logger';
 import type { CategoryFilter } from '../components/StatsCard';
+import { useMapCamera } from './useMapCamera';
+
+type MapCamera = { lat: number; lon: number; zoom: number };
 
 type RenderedMarker = {
   id: string;
@@ -18,33 +23,41 @@ type RenderedMarker = {
   title: string;
 };
 
-type UseMapMarkersOptions = {
+type UseMerchantMapOptions = {
   category: CategoryFilter;
   aspectRatio: number;
   isMapReady: boolean;
-  getCamera: () => { lat: number; lon: number; zoom: number };
+  initial: MapCamera;
 };
 
-type UseMapMarkers = {
+type UseMerchantMap = Pick<ReturnType<typeof useMapCamera>, 'mapRef' | 'handleCameraChange'> & {
   markers: RenderedMarker[];
   visibleCount: number;
   totalCount: number;
-  isClusteringReady: boolean;
-  storeLoading: boolean;
+  /** The places are loading, or the first index for them is being built. */
+  loading: boolean;
   error: string | null;
-  setError: (e: string | null) => void;
-  fetchPlaces: () => Promise<unknown>;
-  updateMarkersForCamera: (lat: number, lon: number, zoom: number) => void;
-  resolveMarker: (id: string) => MapMarker | undefined;
-  clusterManagerRef: React.MutableRefObject<ClusterManager | null>;
+  /** Clear the error and load the places again. */
+  retry: () => void;
+  /** Move the camera and show the pins for it at once. */
+  moveTo: (camera: MapCamera) => void;
+  /** Zoom in (`delta` > 0, up to 20) or out (down to 1) from the current camera. */
+  zoomBy: (delta: number) => void;
+  /** A cluster zooms in until its children separate; a merchant gives its place id. */
+  pressMarker: (id: string) => number | undefined;
 };
 
-export function useMapMarkers({
+/**
+ * The merchant map: the BTC Map places loaded once on open, their cluster
+ * index, the camera, and the pins for it. Every camera move, the user's or a
+ * programmatic one, recomputes the pins.
+ */
+export function useMerchantMap({
   category,
   aspectRatio,
   isMapReady,
-  getCamera,
-}: UseMapMarkersOptions): UseMapMarkers {
+  initial,
+}: UseMerchantMapOptions): UseMerchantMap {
   const isFocused = useIsFocused();
   const { placesCache, storeLoading, error, fetchPlaces, setError } = useBTCMapStore(
     useShallow((s) => ({
@@ -154,6 +167,27 @@ export function useMapMarkers({
     [aspectRatio, clearMarkers]
   );
 
+  // A settle queued before the aspect ratio changed still queries with the latest one.
+  const latestUpdate = useLatestRef(updateMarkersForCamera);
+  const onCameraSettle = useCallback(
+    (lat: number, lon: number, zoom: number) => latestUpdate.current(lat, lon, zoom),
+    [latestUpdate]
+  );
+  const { mapRef, getCamera, setCamera, handleCameraChange } = useMapCamera({
+    initial,
+    aspectRatio,
+    onCameraSettle,
+  });
+
+  // Fetch places on mount — DEFERRED
+  useEffect(() => {
+    const task = InteractionManager.runAfterInteractions(() => {
+      fetchPlaces().catch((err) => log.error('map.places.fetch_failed', { error: err }));
+    });
+
+    return () => task.cancel();
+  }, [fetchPlaces]);
+
   // Initialize/update cluster manager when points change — DEFERRED.
   // On category switches, keep old markers visible while rebuilding; only mark
   // loading on initial load (no markers yet).
@@ -217,22 +251,66 @@ export function useMapMarkers({
     clearMarkers,
   ]);
 
-  const resolveMarker = useCallback(
-    (id: string) => markersRef.current.find((m) => m.id === id),
-    []
+  const moveTo = useCallback(
+    (camera: MapCamera) => {
+      setCamera(camera);
+      updateMarkersForCamera(camera.lat, camera.lon, camera.zoom);
+    },
+    [setCamera, updateMarkersForCamera]
   );
 
+  const zoomBy = useCallback(
+    (delta: number) => {
+      const { lat, lon, zoom } = getCamera();
+      moveTo({
+        lat,
+        lon,
+        zoom: delta > 0 ? Math.min(zoom + delta, 20) : Math.max(zoom + delta, 1),
+      });
+    },
+    [getCamera, moveTo]
+  );
+
+  const pressMarker = useCallback(
+    (id: string) => {
+      const marker = markersRef.current.find((m) => m.id === id);
+      if (marker?.type !== 'cluster' || marker.clusterId === undefined) return marker?.placeId;
+      const manager = clusterManagerRef.current;
+      if (manager) {
+        // Supercluster's getClusterExpansionZoom returns the zoom at which
+        // this cluster's children become individually visible. We zoom one
+        // step past that so the children actually separate in the viewport
+        // instead of re-clustering at the threshold; capped at 18 to stay
+        // within Supercluster's maxZoom + 1.
+        const expansionZoom = manager.getClusterExpansionZoom(marker.clusterId);
+        moveTo({
+          lat: marker.latitude,
+          lon: marker.longitude,
+          zoom: Math.min(expansionZoom + 1, 18),
+        });
+      }
+      return undefined;
+    },
+    [moveTo]
+  );
+
+  // Retry loads the places again; hiding the error alone would leave an empty map.
+  const retry = useCallback(() => {
+    setError(null);
+    fetchPlaces().catch((err) => log.error('map.places.fetch_failed', { error: err }));
+  }, [setError, fetchPlaces]);
+
   return {
+    mapRef,
+    handleCameraChange,
     markers,
     visibleCount,
     totalCount: filteredPoints.length,
-    isClusteringReady,
-    storeLoading,
+    loading: storeLoading || !isClusteringReady,
     error,
-    setError,
-    fetchPlaces,
-    updateMarkersForCamera,
-    resolveMarker,
-    clusterManagerRef,
+    retry,
+    moveTo,
+    zoomBy,
+    pressMarker,
   };
 }

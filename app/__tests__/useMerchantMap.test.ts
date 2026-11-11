@@ -1,5 +1,5 @@
 import { act, renderHook } from '@testing-library/react-native';
-import { useMapMarkers } from '@/features/map/hooks/useMapMarkers';
+import { useMerchantMap } from '@/features/map/hooks/useMerchantMap';
 import type { CategoryFilter } from '@/features/map/components/StatsCard';
 
 const mockPlace = { id: 1, lat: 1, lon: 2, icon: 'restaurant' };
@@ -22,10 +22,10 @@ const mockStore = {
   placesCache: { data: [mockPlace], timestamp: 1 },
   isLoading: false,
   error: null,
-  fetchPlaces: jest.fn(),
+  fetchPlaces: jest.fn(async () => undefined),
   setError: jest.fn(),
 };
-const getCamera = () => ({ lat: 0, lon: 0, zoom: 3 });
+const initial = { lat: 0, lon: 0, zoom: 3 };
 
 jest.mock('expo-router', () => ({ useIsFocused: () => mockFocused }));
 jest.mock('@/shared/stores/global/btcMapStore', () => ({
@@ -37,6 +37,7 @@ jest.mock('@/shared/lib/map/btcMapClusterCache', () => ({
   getCachedBTCMapClusterManager: (...args: unknown[]) => mockCached(...args),
 }));
 jest.mock('@/shared/lib/logger', () => ({
+  log: { error: jest.fn() },
   mapLog: { debug: jest.fn() },
   deferWork: (_name: string, work: () => void) => {
     const task = { work, cancelled: false };
@@ -57,7 +58,7 @@ function flushDeferred() {
 function mount() {
   return renderHook(
     ({ category }: { category: CategoryFilter }) =>
-      useMapMarkers({ category, aspectRatio: 1, isMapReady: true, getCamera }),
+      useMerchantMap({ category, aspectRatio: 1, isMapReady: true, initial }),
     { initialProps: { category: 'all' as CategoryFilter } }
   );
 }
@@ -74,7 +75,7 @@ test('empty filters clear tappable marker identity and returning to the same pin
   expect(result.current.markers).toHaveLength(1);
   rerender({ category: 'atm' });
   expect(result.current.markers).toEqual([]);
-  expect(result.current.resolveMarker('point-1')).toBeUndefined();
+  expect(result.current.pressMarker('point-1')).toBeUndefined();
   rerender({ category: 'all' });
   flushDeferred();
   expect(result.current.markers).toHaveLength(1);
@@ -103,7 +104,7 @@ test('a cached index renders on reopen without another deferred build window', (
   mockCached.mockReturnValue(mockManager);
   const { result } = mount();
   expect(result.current.markers).toHaveLength(1);
-  expect(result.current.isClusteringReady).toBe(true);
+  expect(result.current.loading).toBe(false);
   expect(mockTasks).toHaveLength(0);
   expect(mockBuild).not.toHaveBeenCalled();
 });
