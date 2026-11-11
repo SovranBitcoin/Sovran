@@ -73,6 +73,44 @@ describe('CONFIRM_MELT on a mint-less selectMint step (BTC-09)', () => {
     ).toBeUndefined();
   });
 
+  // The restored preview is what the handler is given when Pay finds its
+  // quote expired and shows a new one.
+  it('keeps the recipient on a melt preview restored after the list was dismissed', async () => {
+    const recipientPubkey = 'cd'.repeat(32);
+    let quotes = 0;
+    const tm = createTestMachine({
+      operations: {
+        quoteMelt: async () => ({
+          quoteId: `quote-${++quotes}`,
+          quoteAmount: 200,
+          feeReserve: 2,
+          unit: 'sat',
+          method: 'bolt11' as const,
+          mintUrl: MINT1,
+          meltTarget: INPUTS.lightningAddress,
+          flowAmount: 200,
+          expiresAt: quotes === 1 ? 1 : Math.floor(Date.now() / 1000) + 3600,
+        }),
+      },
+    });
+    await tm.machine.execute(INPUTS.lightningAddress, { reset: true });
+    await tm.machine.enterAmount({ value: 200, unit: 'sat' }, MINT1, { recipientPubkey });
+    tm.assertStep('navigateToMeltPreview');
+    const previews = () => tm.handlerCalls.filter((c) => c.step === 'navigateToMeltPreview');
+    expect(previews().at(-1)?.data).toMatchObject({ recipientPubkey });
+
+    await tm.machine.requestMintSelector();
+    tm.assertStep('selectMint');
+    await tm.machine.confirmMelt();
+
+    tm.assertStep('navigateToMeltPreview');
+    expect(previews()).toHaveLength(2);
+    expect(previews().at(-1)?.data).toMatchObject({
+      recipientPubkey,
+      meltQuote: { quoteId: 'quote-2' },
+    });
+  });
+
   // The preview's mint pill opens the list again while it is already open:
   // the list stays opened over the preview, so Pay still restores it.
   it('restores and pays a melt preview after the list was opened and dismissed twice', async () => {

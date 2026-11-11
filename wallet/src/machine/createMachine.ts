@@ -30,6 +30,7 @@ import {
   runRecipientPubkeyEffect,
 } from "./effects";
 import type { MachineEffectLink, MachineEffectNotification } from "./effects";
+import { previewStep } from "./resolveNext";
 import { transition } from "./transitions";
 import { meltMethodForTarget } from "../melt-target";
 import { meltQuotePreviewMatches } from "./meltQuotePreview";
@@ -1120,32 +1121,29 @@ export function createPaymentMachine(
       flowCtx.mintUrl &&
       flowCtx.amount
     ) {
-      if (flowCtx.meltTarget) {
-        setStep("navigateToMeltPreview", {
+      const destination = flowCtx.meltTarget
+        ? "meltQuote"
+        : flowCtx.paymentRequest
+          ? "paymentRequest"
+          : null;
+      if (destination) {
+        const preview = previewStep(destination, flowCtx, {
           mintUrl: flowCtx.mintUrl,
-          meltTarget: flowCtx.meltTarget,
           amount: flowCtx.amount,
           unit: flowCtx.unit,
-          phase: { kind: "preview" },
-          // Carry the pre-created quote (BTC-05) so Pay still executes
-          // against the quote whose fee the user saw.
-          ...(meltQuotePreviewMatches(flowCtx.meltQuotePreview, {
-            mintUrl: flowCtx.mintUrl,
-            meltTarget: flowCtx.meltTarget,
-            amount: flowCtx.amount,
-            unit: flowCtx.unit,
-          })
-            ? { meltQuote: flowCtx.meltQuotePreview }
-            : {}),
         });
-      } else if (flowCtx.paymentRequest) {
-        setStep("navigateToPaymentRequest", {
-          mintUrl: flowCtx.mintUrl,
-          paymentRequest: flowCtx.paymentRequest,
-          amount: flowCtx.amount,
-          unit: flowCtx.unit,
-          phase: { kind: "preview" },
-        });
+        if (preview.step === "navigateToMeltPreview") {
+          setStep(preview.step, {
+            ...preview.data,
+            // Carry the pre-created quote (BTC-05) so Pay still executes
+            // against the quote whose fee the user saw.
+            ...(meltQuotePreviewMatches(flowCtx.meltQuotePreview, preview.data)
+              ? { meltQuote: flowCtx.meltQuotePreview }
+              : {}),
+          });
+        } else {
+          setStep(preview.step, preview.data);
+        }
       }
       notify();
     } else if (
