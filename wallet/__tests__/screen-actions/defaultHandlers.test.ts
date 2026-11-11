@@ -1034,7 +1034,7 @@ describe("paymentRequest confirm outcome on the screen entry", () => {
     });
   });
 
-  it("marks the entry rolled back, with no Pay, when the ecash was taken back", async () => {
+  it("marks the entry rolled back, with Cancel but no Pay, when the ecash was taken back", async () => {
     const { mgr } = await confirmWith(async () => ({
       historyEntry: JSON.stringify({ id: "op-2", type: "send", state: "rolledBack" }),
       rolledBack: true,
@@ -1053,6 +1053,7 @@ describe("paymentRequest confirm outcome on the screen entry", () => {
       },
     });
     expect(mgr.inspect().confirm.available).toBe(false);
+    expect(mgr.inspect().cancel.available).toBe(true);
   });
 
   it("tells a tap locked out by a send in flight that it was ignored", async () => {

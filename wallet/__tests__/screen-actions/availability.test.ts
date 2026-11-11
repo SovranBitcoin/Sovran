@@ -256,7 +256,7 @@ describe("paymentRequestAvailability — each phase the entry can carry", () => 
     expect(actions.cancel.available).toBe(false);
   });
 
-  it("offers no Pay once the ecash was taken back", () => {
+  it("offers Cancel but no Pay once the ecash was taken back", () => {
     const actions = getAvailableActions("paymentRequest", {
       ...base,
       state: "rolledBack",
@@ -268,6 +268,18 @@ describe("paymentRequestAvailability — each phase the entry can carry", () => 
       },
     });
     expect(actions.confirm.available).toBe(false);
+    // Nothing went out: a rolled-back entry is not delivered.
+    expect(actions.cancel.available).toBe(true);
+  });
+
+  it("offers Pay and Cancel when the only operation id is the preview's own", () => {
+    const actions = getAvailableActions("paymentRequest", {
+      ...base,
+      operationId: "pr-preview-123",
+      metadata: { operationId: "pr-preview-123", phase: "preview" },
+    });
+    expect(actions.confirm.available).toBe(true);
+    expect(actions.cancel.available).toBe(true);
   });
 
   it("offers neither Pay nor Cancel for a delivered entry that kept the preview id", () => {

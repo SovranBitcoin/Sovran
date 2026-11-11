@@ -417,8 +417,8 @@ function paymentRequestAvailability(
       return actions(true, true);
     case "delivered":
     case "undelivered":
-    case "rolledBack":
       return actions(false, false);
+    case "rolledBack":
     case "unrecognised":
       return actions(false, true);
     default: {

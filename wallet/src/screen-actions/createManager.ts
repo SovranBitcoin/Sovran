@@ -21,6 +21,7 @@ import type {
 import { buildBip321OnchainUri } from "../bip321";
 import { looksLikeBitcoinAddress } from "../parse";
 import { extractP2PKPubkey } from "../p2pk";
+import { isPaymentRequestPreviewId } from "./paymentRequestPhase";
 import {
   entryStateRank,
   isTerminalFailureState,
@@ -646,7 +647,7 @@ export function shouldApplyEntryUpdate(
     if (co && uo && co === uo) return true;
 
     // Preview entries (no operationId yet) match by mintUrl + amount
-    const isPreview = currentId?.startsWith("pr-preview-") ?? false;
+    const isPreview = isPaymentRequestPreviewId(currentId);
     if (!isPreview) return false;
 
     // Preview entries (no operationId yet) match by mintUrl + amount. A

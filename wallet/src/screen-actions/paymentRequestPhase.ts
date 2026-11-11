@@ -20,8 +20,8 @@ export type PaymentRequestEntryPhase =
   /** Delivery failed and the ecash was taken back. */
   | { kind: "rolledBack" }
   /**
-   * A phase no writer produces, or one missing the operation id its writer
-   * always adds. Neither offers Pay nor claims the send went out.
+   * A phase no writer produces, or "undelivered" without the operation id
+   * its writer always adds. Neither offers Pay nor claims the send went out.
    */
   | { kind: "unrecognised" };
 
@@ -42,20 +42,33 @@ const metadataOf = (entry: Entry): Entry =>
 const stringOf = (value: unknown): string | undefined =>
   typeof value === "string" ? value : undefined;
 
+/**
+ * The app gives a payment request preview entry an id with this prefix. It
+ * names no operation: the confirm handler writes it as the operation id of a
+ * delivered or rolled-back entry when it knows no other.
+ */
+export const isPaymentRequestPreviewId = (id: unknown): boolean =>
+  typeof id === "string" && id.startsWith("pr-preview-");
+
+/** An operation id that names a real operation, not the preview's own id. */
+const realOperationId = (value: unknown): boolean =>
+  !!value && !isPaymentRequestPreviewId(value);
+
 /** Reads the phase an entry's strings say, once, for every reader. */
 export function decodePaymentRequestEntryPhase(
   entry: Entry,
 ): PaymentRequestEntryPhase {
   const metadata = metadataOf(entry);
   const phase = metadata.phase;
-  const operationId = entry.operationId || metadata.operationId;
+  const operationId =
+    realOperationId(entry.operationId) || realOperationId(metadata.operationId);
   switch (phase) {
     case "delivered":
       return { kind: "delivered" };
     case "undelivered":
       return operationId ? { kind: "undelivered" } : { kind: "unrecognised" };
     case "rolledBack":
-      return operationId ? { kind: "rolledBack" } : { kind: "unrecognised" };
+      return { kind: "rolledBack" };
     case "preview":
     case undefined:
       // An entry that has an operation id has run, whatever its phase says:
