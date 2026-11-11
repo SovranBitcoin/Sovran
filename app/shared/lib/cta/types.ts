@@ -1,4 +1,5 @@
 import type { LegacyClaimPrompt } from '@/shared/stores/global/legacyEcashStore';
+import type { RestoreStatus } from '@/shared/stores/global/walletRestorePhase';
 
 export type CtaId = 'update-required' | 'claim-old-ecash' | 'backup-recovery-phrase';
 export type CtaDismissals = Record<string, { at: number; version?: string; revision?: number }>;
@@ -10,7 +11,7 @@ export interface CtaContext {
     seedCreatedAt: number | null;
     recoveryPhraseVerifiedAt: number | null;
     recoveryPhraseVerifiedRevision?: number | null;
-    restoreStatus: string;
+    restoreStatus: RestoreStatus;
   };
   balanceTotalSat: number;
   backupStartedAt?: number | null;

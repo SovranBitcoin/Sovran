@@ -91,7 +91,7 @@ it('suppresses auto-show under automation and backup under Mock Mode', () => {
 it('requires an unverified, eligible lifecycle and balance or a known seed older than seven days', () => {
   for (const lifecycle of [
     { ...ctx.lifecycle, recoveryPhraseVerifiedAt: 0, recoveryPhraseVerifiedRevision: 2 },
-    { ...ctx.lifecycle, restoreStatus: 'pending' },
+    { ...ctx.lifecycle, restoreStatus: 'pending' as const },
   ])
     expect(selectNextCta({ ...ctx, latest: null, lifecycle })).toBeNull();
   for (const seedCreatedAt of [null, ctx.nowMs - 7 * DAY_MS]) {

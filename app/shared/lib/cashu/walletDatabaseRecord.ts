@@ -23,6 +23,7 @@ import {
   useProfileStore,
 } from '@/shared/stores/global/profileStore';
 import { useWalletLifecycleStore } from '@/shared/stores/global/walletLifecycleStore';
+import { isRestoreAsked } from '@/shared/stores/global/walletRestorePhase';
 
 const isRecorded = (accountIndex: number): boolean =>
   useProfileStore.getState().profiles.find((p) => p.accountIndex === accountIndex)
@@ -42,7 +43,8 @@ export function askForRestoreIfWalletDatabaseLost(accountIndex: number, wasEmpty
   cashuLog.warn('cashu.wallet_database.lost', { accountIndex });
   const ask = () => {
     const { restoreStatus, setRestoreStatus } = useWalletLifecycleStore.getState();
-    if (restoreStatus !== 'pending' && restoreStatus !== 'failed') setRestoreStatus('pending');
+    // Already on the recovery screen: a failed run keeps showing its error.
+    if (!isRestoreAsked(restoreStatus)) setRestoreStatus('pending');
   };
   const { persist } = useWalletLifecycleStore;
   if (persist.hasHydrated()) {

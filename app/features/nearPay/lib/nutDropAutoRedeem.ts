@@ -20,6 +20,7 @@ import { useNutDropRedeemQueueStore } from '@/shared/stores/profile/nutDropRedee
 import { setTransactionAnnotation } from '@/shared/stores/profile/transactionAnnotationStore';
 import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
 import { useWalletLifecycleStore } from '@/shared/stores/global/walletLifecycleStore';
+import { isSafeToMint } from '@/shared/stores/global/walletRestorePhase';
 import { paymentLog, mintUrlLogFields } from '@/shared/lib/logger';
 
 /**
@@ -35,8 +36,7 @@ import { paymentLog, mintUrlLogFields } from '@/shared/lib/logger';
  */
 
 function restoreSettled(): boolean {
-  const status = useWalletLifecycleStore.getState().restoreStatus;
-  return status === 'complete' || status === 'not-needed';
+  return isSafeToMint(useWalletLifecycleStore.getState().restoreStatus);
 }
 
 function getManager() {

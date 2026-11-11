@@ -10,17 +10,14 @@
  * contract so that cannot come back silently.
  */
 
-type RestoreStatus = 'unknown' | 'not-needed' | 'pending' | 'in-progress' | 'complete' | 'failed';
+import {
+  isRestoreAsked as blocksApp,
+  needsRestoreDecision,
+  type RestoreStatus,
+} from '@/shared/stores/global/walletRestorePhase';
 
-/** Mirrors AppGate's blocking condition. */
-function blocksApp(status: RestoreStatus): boolean {
-  return status === 'pending' || status === 'failed';
-}
-
-/** Mirrors AppGate's "already decided, skip re-evaluation" early return. */
-function skipsReevaluation(status: RestoreStatus): boolean {
-  return status === 'complete' || status === 'not-needed' || status === 'pending';
-}
+/** AppGate's "already decided, skip re-evaluation" early return. */
+const skipsReevaluation = (status: RestoreStatus) => !needsRestoreDecision(status);
 
 describe('restore gate status resolution', () => {
   it.each([
