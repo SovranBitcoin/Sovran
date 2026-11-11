@@ -192,6 +192,15 @@ async function acceptOnRelays({ event, relays }: { event: RelayEvent; relays?: s
   return ok({ accepted: accepted.map((url) => ({ url, ok: true })) });
 }
 
+/** This session's relay-list sync finding the account's list. */
+function discoverRelays(relays: Relay[], createdAt: number) {
+  useRelayListStore.getState().setFromRelay(
+    relays.map((relay) => ({ url: relay.url, read: true, write: true })),
+    createdAt
+  );
+  useRelayListStore.getState().markDiscovered(OWN);
+}
+
 function setup() {
   const signer = {
     sign: jest.fn(async () => undefined),
@@ -281,11 +290,8 @@ beforeEach(async () => {
   await useNostrSocialStore.persist.rehydrate();
   useRelayListStore.setState(useRelayListStore.getInitialState(), true);
   await useRelayListStore.persist.rehydrate();
-  // The account's relay list, as the relay-list sync takes it in.
-  useRelayListStore.getState().setFromRelay(
-    mockRelays.map((relay) => ({ url: relay.url, read: true, write: true })),
-    T
-  );
+  // The account's relay list, as this session's relay-list sync takes it in.
+  discoverRelays(mockRelays, T);
 });
 
 afterEach(() => {
@@ -970,10 +976,7 @@ describe("the account's relay list", () => {
     expect(mockPublish).not.toHaveBeenCalled();
     expect(social().optimisticFollowsByPubkey[Z]?.pending).toBe(true);
 
-    useRelayListStore.getState().setFromRelay(
-      mockRelays.map((relay) => ({ url: relay.url, read: true, write: true })),
-      T
-    );
+    discoverRelays(mockRelays, T);
     await requestFollowSync(ndk, OWN);
 
     expect(mockPublish).toHaveBeenCalledTimes(1);
@@ -986,20 +989,69 @@ describe("the account's relay list", () => {
     for (const url of DEFAULT_RELAYS) expect(heldBy(url)).toHaveLength(1);
   });
 
+  it("waits after a restart until this session's relay-list discovery has run, then builds on the relays it found", async () => {
+    // An earlier session saved the account's relay list; another device has
+    // since moved the account to other relays and published a newer follow list there.
+    const old = { url: 'wss://old.example' };
+    mockPoolOnly.push(old);
+    mockStored.set(old.url, [contacts(T - 100, [['p', X]])]);
+    relaysHold(
+      contacts(T, [
+        ['p', X],
+        ['p', W],
+      ])
+    );
+    useRelayListStore.setState(useRelayListStore.getInitialState(), true);
+    mockDisk.set(
+      'nostr-relay-list-store',
+      JSON.stringify({
+        version: 0,
+        state: {
+          entries: [{ url: old.url, read: true, write: true }],
+          updatedAt: T - 100,
+          hasPublished: true,
+          source: 'relay',
+        },
+      })
+    );
+    await useRelayListStore.persist.rehydrate();
+    expect(useRelayListStore.getState().entries).toEqual([{ url: old.url, read: true, write: true }]);
+    const { ndk } = setup();
+
+    tap(Z);
+    await requestFollowSync(ndk, OWN);
+
+    expect(mockFilters).toEqual([]);
+    expect(mockPublish).not.toHaveBeenCalled();
+    expect(heldBy(old.url)).toHaveLength(1);
+    expect(social().optimisticFollowsByPubkey[Z]?.pending).toBe(true);
+
+    discoverRelays(mockRelays, T);
+    await requestFollowSync(ndk, OWN);
+
+    expect(mockPublish.mock.calls[0][0].relays).toEqual(mockRelays.map((relay) => relay.url));
+    expect(publishedTags()).toEqual([
+      ['p', X],
+      ['p', W],
+      ['p', Z],
+    ]);
+    expect(heldBy(old.url)).toHaveLength(1);
+  });
+
   it('uses the defaults once the sync found no relay list for the account', async () => {
     await relayListNotLoaded();
     for (const url of DEFAULT_RELAYS) {
       mockPoolOnly.push({ url });
       mockStored.set(url, [contacts(T, [['p', X]])]);
     }
-    useRelayListStore.getState().markNoListFound(OTHER_ACCOUNT);
+    useRelayListStore.getState().markDiscovered(OTHER_ACCOUNT);
     const { ndk } = setup();
 
     tap(Z);
     await requestFollowSync(ndk, OWN);
     expect(mockPublish).not.toHaveBeenCalled();
 
-    useRelayListStore.getState().markNoListFound(OWN);
+    useRelayListStore.getState().markDiscovered(OWN);
     await requestFollowSync(ndk, OWN);
 
     expect(mockPublish.mock.calls[0][0].relays).toEqual([...DEFAULT_RELAYS]);

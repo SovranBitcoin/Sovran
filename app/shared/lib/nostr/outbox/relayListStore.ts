@@ -28,10 +28,11 @@ interface RelayListState {
   hasPublished: boolean;
   source: RelayListSource;
   /**
-   * In memory only, never saved: the account whose relay-list sync found no
-   * list on the network in this session, so the defaults are its real list.
+   * In memory only, never saved: the account whose relay list this session's
+   * sync has discovered, by finding it or by the relays answering there is
+   * none (the defaults are then its real list). A saved list may be stale.
    */
-  noListFoundFor: string | null;
+  discoveredFor: string | null;
 }
 
 interface RelayListActions {
@@ -43,8 +44,8 @@ interface RelayListActions {
   setMarker: (url: string, marker: { read: boolean; write: boolean }) => void;
   restoreDefaults: () => void;
   markPublished: (createdAtSec: number) => void;
-  /** This session's sync found no relay list for `pubkey` on the network. */
-  markNoListFound: (pubkey: string) => void;
+  /** This session's sync has the relays' answer about `pubkey`'s relay list. */
+  markDiscovered: (pubkey: string) => void;
 }
 
 type RelayListStore = RelayListState & RelayListActions;
@@ -109,7 +110,7 @@ export const useRelayListStore = create<RelayListStore>({
       updatedAt: 0,
       hasPublished: false,
       source: 'default',
-      noListFoundFor: null,
+      discoveredFor: null,
 
       setFromRelay: (entries, createdAtSec) => {
         // Last-writer-wins: ignore an older or equal list than what we hold.
@@ -146,8 +147,8 @@ export const useRelayListStore = create<RelayListStore>({
         set({ updatedAt: createdAtSec, hasPublished: true, source: 'relay' });
       },
 
-      markNoListFound: (pubkey) => {
-        set({ noListFoundFor: pubkey });
+      markDiscovered: (pubkey) => {
+        set({ discoveredFor: pubkey });
       },
     }),
     persistConfig({
@@ -176,15 +177,12 @@ export function getOwnWriteRelays(): string[] {
 }
 
 /**
- * `getOwnWriteRelays` once the account's relay list is known, otherwise
- * `null`. Known means loaded for it (saved, from a relay, or edited here), or
- * found missing on the network by this session's sync, so the defaults are the
- * real answer. A store that has not loaded holds no entries and reads as the
- * defaults, which may not be where the account's lists are.
+ * `getOwnWriteRelays` once this session's sync has discovered the account's
+ * relay list, otherwise `null`. A list saved by an earlier session is not
+ * enough: the account may have moved to other relays since, and a store that
+ * has not loaded reads as the defaults; either may not be where its lists are.
  */
 export function getKnownOwnWriteRelays(pubkey: string): string[] | null {
   if (!useRelayListStore.persist.hasHydrated()) return null;
-  const { entries, source, noListFoundFor } = useRelayListStore.getState();
-  const known = source !== 'default' || entries.length > 0 || noListFoundFor === pubkey;
-  return known ? getOwnWriteRelays() : null;
+  return useRelayListStore.getState().discoveredFor === pubkey ? getOwnWriteRelays() : null;
 }

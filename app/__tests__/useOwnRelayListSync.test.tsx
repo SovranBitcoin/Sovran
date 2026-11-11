@@ -8,19 +8,46 @@
  * last-writer rule (equal timestamps included), and what an unmount or
  * account change does to a sync in flight.
  *
- * Replaced: the NDK fetch, the publish seam, the pool seeding and storage.
+ * Replaced: the relays' answer (`mockFetchEvent`: a list, `null` for an
+ * end-of-stored-events with none, a rejection for a read that fails), the
+ * publish seam, the pool seeding, storage, AppState and the offline status.
  */
 import { act, renderHook } from '@testing-library/react-native';
 import { ResultAsync, errAsync, okAsync } from 'neverthrow';
 
 import { useOwnRelayListSync } from '@/shared/lib/nostr/outbox/useOwnRelayListSync';
-import { useRelayListStore } from '@/shared/lib/nostr/outbox/relayListStore';
+import {
+  getKnownOwnWriteRelays,
+  useRelayListStore,
+} from '@/shared/lib/nostr/outbox/relayListStore';
 import { DEFAULT_RELAYS } from '@/shared/lib/nostr/outbox/defaults';
 
 const mockFetchEvent = jest.fn();
 const mockPublishEvent = jest.fn();
 const mockSeedPool = jest.fn();
-let mockNdk: { fetchEvent: jest.Mock } | null;
+const mockConnectListeners = new Set<(relay: { url: string }) => void>();
+const mockAppStateListeners = new Set<(state: string) => void>();
+let mockOffline = false;
+let mockNdk: {
+  subscribe: (filter: unknown) => unknown;
+  pool: { on: (type: string, l: () => void) => void; off: (type: string, l: () => void) => void };
+} | null;
+
+/** An NDK subscription that answers with what `mockFetchEvent` resolves to. */
+function mockSubscription(filter: unknown) {
+  const listeners: Record<string, (event?: unknown) => void> = {};
+  return {
+    on: (type: string, listener: (event?: unknown) => void) => {
+      listeners[type] = listener;
+    },
+    stop: () => undefined,
+    start: async () => {
+      const answer = await mockFetchEvent(filter);
+      if (answer) listeners.event?.(answer);
+      listeners.eose?.();
+    },
+  };
+}
 
 jest.mock('@nostr-dev-kit/ndk-mobile', () => ({
   ...jest.requireActual('@nostr-dev-kit/ndk-mobile'),
@@ -36,6 +63,18 @@ jest.mock('@/shared/lib/nostr/publish', () => ({
 }));
 jest.mock('@/shared/lib/nostr/outbox/seedPool', () => ({
   seedPool: (...args: unknown[]) => mockSeedPool(...args),
+}));
+jest.mock('@/shared/providers/OfflineProvider', () => ({
+  useOfflineStatus: () => ({ isOffline: mockOffline }),
+}));
+jest.mock('react-native-web/dist/exports/AppState', () => ({
+  __esModule: true,
+  default: {
+    addEventListener: (_type: string, listener: (state: string) => void) => {
+      mockAppStateListeners.add(listener);
+      return { remove: () => mockAppStateListeners.delete(listener) };
+    },
+  },
 }));
 jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({
   createProfileScopedStorage: () => ({
@@ -83,7 +122,20 @@ beforeEach(() => {
   for (const level of ['debug', 'info', 'warn', 'error', 'log'] as const) {
     jest.spyOn(console, level).mockImplementation(() => undefined);
   }
-  mockNdk = { fetchEvent: mockFetchEvent };
+  mockConnectListeners.clear();
+  mockAppStateListeners.clear();
+  mockOffline = false;
+  mockNdk = {
+    subscribe: mockSubscription,
+    pool: {
+      on: (type, listener) => {
+        if (type === 'relay:connect') mockConnectListeners.add(listener);
+      },
+      off: (type, listener) => {
+        if (type === 'relay:connect') mockConnectListeners.delete(listener);
+      },
+    },
+  };
   mockFetchEvent.mockReset();
   mockFetchEvent.mockResolvedValue(null);
   mockPublishEvent.mockReset();
@@ -94,7 +146,7 @@ beforeEach(() => {
     updatedAt: 0,
     hasPublished: false,
     source: 'default',
-    noListFoundFor: null,
+    discoveredFor: null,
   });
 });
 
@@ -183,7 +235,7 @@ describe('reading the own relay list', () => {
       entries: [],
       hasPublished: false,
       source: 'default',
-      noListFoundFor: null,
+      discoveredFor: null,
     });
     expect(mockPublishEvent).not.toHaveBeenCalled();
   });
@@ -221,7 +273,7 @@ describe('first-run publish of the default relays', () => {
     const first = await mountAndWait(A);
     expect(store().hasPublished).toBe(false);
     // The defaults are the account's list all the same, for this session only.
-    expect(store().noListFoundFor).toBe(A);
+    expect(store().discoveredFor).toBe(A);
     first.unmount();
 
     await mountAndWait(A);
@@ -256,7 +308,7 @@ describe('unmount and account change', () => {
     expect(mockSeedPool).not.toHaveBeenCalled();
     // B's read found nothing, so B published the defaults.
     expect(mockPublishEvent).toHaveBeenCalledTimes(1);
-    expect(store().noListFoundFor).toBe(B);
+    expect(store().discoveredFor).toBe(B);
   });
 
   it('does not mark a publish that finished after unmount', async () => {
@@ -269,5 +321,71 @@ describe('unmount and account change', () => {
     view.unmount();
     await act(async () => publish.resolve());
     expect(store().hasPublished).toBe(false);
+  });
+});
+
+describe('a discovery that did not finish', () => {
+  const triggers = {
+    'returning to the foreground': () => {
+      for (const listener of mockAppStateListeners) listener('active');
+    },
+    'a relay connecting': () => {
+      for (const listener of mockConnectListeners) listener({ url: 'wss://both.example' });
+    },
+  };
+
+  it.each(Object.keys(triggers) as (keyof typeof triggers)[])(
+    'leaves the list unknown and is tried again on %s',
+    async (trigger) => {
+      mockFetchEvent.mockRejectedValueOnce(new Error('offline'));
+      const view = await mountAndWait(A);
+      expect(getKnownOwnWriteRelays(A)).toBeNull();
+
+      mockFetchEvent.mockResolvedValue(REMOTE);
+      await act(async () => triggers[trigger]());
+
+      expect(mockFetchEvent).toHaveBeenCalledTimes(2);
+      expect(getKnownOwnWriteRelays(A)).toEqual(['wss://both.example', 'wss://write.example']);
+      view.unmount();
+    }
+  );
+
+  it('treats a read no relay answered in 10 s as unanswered, not as no list', async () => {
+    mockFetchEvent.mockReturnValueOnce(new Promise(() => undefined));
+    const view = await mountAndWait(A);
+    await act(async () => {
+      jest.advanceTimersByTime(10_000);
+    });
+    expect(getKnownOwnWriteRelays(A)).toBeNull();
+    expect(mockPublishEvent).not.toHaveBeenCalled();
+
+    mockFetchEvent.mockResolvedValue(null);
+    await act(async () => triggers['returning to the foreground']());
+    expect(getKnownOwnWriteRelays(A)).toEqual([...DEFAULT_RELAYS]);
+    expect(mockPublishEvent).toHaveBeenCalledTimes(1);
+    view.unmount();
+  });
+
+  it('is tried again when the network comes back', async () => {
+    mockOffline = true;
+    mockFetchEvent.mockRejectedValueOnce(new Error('offline'));
+    const view = await mountAndWait(A);
+    expect(getKnownOwnWriteRelays(A)).toBeNull();
+
+    mockOffline = false;
+    mockFetchEvent.mockResolvedValue(REMOTE);
+    await act(async () => view.rerender({ pubkey: A, enabled: true }));
+
+    expect(mockFetchEvent).toHaveBeenCalledTimes(2);
+    expect(getKnownOwnWriteRelays(A)).toEqual(['wss://both.example', 'wss://write.example']);
+    view.unmount();
+  });
+
+  it('is not tried again once it has finished', async () => {
+    mockFetchEvent.mockResolvedValue(REMOTE);
+    const view = await mountAndWait(A);
+    await act(async () => triggers['returning to the foreground']());
+    expect(mockFetchEvent).toHaveBeenCalledTimes(1);
+    view.unmount();
   });
 });

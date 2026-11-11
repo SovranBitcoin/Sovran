@@ -14,8 +14,8 @@ import { useNostrSocialStore } from '@/shared/stores/profile/nostrSocialStore';
  * published: once the NDK and its signer are ready and the account's saved
  * state has loaded (which resumes a tap saved before the app closed), when the
  * network comes back, on each new tap, when a follow list or seed is taken in
- * (also one from the same second), when the account's relay list loads or
- * changes, when a write relay connects, and on returning to the foreground.
+ * (also one from the same second), when this session discovers the account's
+ * relay list or it changes, when a write relay connects, and on returning to the foreground.
  */
 export function useFollowSync() {
   const { ndk } = useNDK();
@@ -34,7 +34,7 @@ export function useFollowSync() {
       if (
         state.entries !== previous.entries ||
         state.source !== previous.source ||
-        state.noListFoundFor !== previous.noListFoundFor
+        state.discoveredFor !== previous.discoveredFor
       )
         request();
     });
