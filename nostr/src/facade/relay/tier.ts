@@ -481,12 +481,12 @@ export function filtersForSpec(
       // For-You can't be ranked on the floor — degrade to recent global notes.
       return [{ kinds: [1], limit: paging.limit ?? 30, ...bounds }];
     case 'following-popular':
-      // Needs the viewer's follow list (kind 3) resolved first — handled once the
-      // social-graph surface lands; until then, fall through.
+      // The floor cannot rank a follow feed: the pager asks this lane for
+      // `following-recent` instead, so this spec is not served here.
       return null;
     case 'following-recent':
-      // The floor can serve an explicit author list; a viewer anchor needs the
-      // viewer's kind-3 resolved first (same gap as following-popular).
+      // The floor can serve an explicit author list; `feedPage` resolves a
+      // viewer anchor to its kind-3 authors before it gets here.
       if (!spec.authors) return spec.viewerPubkey ? null : [{ kinds: [1], limit: paging.limit ?? 30, ...bounds }];
       if (spec.authors.length === 0) return null;
       return [{ kinds: [1], authors: spec.authors, limit: paging.limit ?? 30, ...bounds }];

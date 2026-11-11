@@ -16,7 +16,7 @@ import {
 } from '@/shared/stores/global/nostrMetadataCache';
 
 // ---------------------------------------------------------------------------
-// Reactive bindings over the authoritative nagg-ts entity cache.
+// Reactive bindings over the authoritative entity cache of the `nostr` package.
 //
 // A row reads its author/profile/metrics straight from the singleton cache and
 // re-renders ONLY when that specific key changes (subscribeKey) — so a feed-wide
@@ -101,7 +101,7 @@ export function useProfile(pubkey: string | undefined): {
 /**
  * The FULL cached profile record (name/displayName/picture/banner/nip05/lud16/
  * website/about) for a pubkey, read reactively from the single owner (the
- * nagg-ts entity cache). This is the seam the non-feed profile hooks
+ * `nostr` package's entity cache). This is the seam the non-feed profile hooks
  * (`useCachedNostrProfile`, `useNostrProfileMetadata*`) read through, so every
  * surface — feed rows and DMs/contacts/signer alike — renders the same record.
  */

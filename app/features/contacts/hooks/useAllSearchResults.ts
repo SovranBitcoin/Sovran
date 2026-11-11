@@ -1,7 +1,7 @@
 /**
  * @fileoverview Aggregate search hook for the "All" pill in Contacts search.
  *
- * Composes Nostr-profile contact hits (Nagg GraphQL via `useContactSearch`) with
+ * Composes Nostr-profile contact hits (the facade's profile search via `useContactSearch`) with
  * location-tier matches and geohash jump cards, so a single query like
  * "Province", "London", "Bluetooth", or a bare geohash surfaces the right
  * result regardless of category.

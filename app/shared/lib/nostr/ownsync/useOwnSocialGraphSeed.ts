@@ -1,6 +1,6 @@
 /**
  * @fileoverview `useOwnSocialGraphSeed` — one-shot seed of the viewer's follow
- * set from the tiered nagg-ts facade (nagg → Primal → raw relays), the
+ * set from the tiered `nostr` facade (nagg → Primal → raw relays), the
  * read-side companion to `useOwnEventsSync`.
  *
  * Per ADR 0003 the facade is the seed/backfill source; the relay subscription in

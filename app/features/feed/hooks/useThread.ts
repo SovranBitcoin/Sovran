@@ -51,7 +51,7 @@ function ownContentSeed(
 }
 
 /**
- * First-frame seed projected from the shared nagg-ts entity cache (populated by
+ * First-frame seed projected from the shared `nostr` entity cache (populated by
  * every feed/notifications read). When the tapped note was already seen, this
  * paints the post + its cached ancestor chain + author profiles/metrics with NO
  * network. It carries the post + its cached ancestor chain + cached direct reply

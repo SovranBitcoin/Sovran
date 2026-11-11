@@ -2,7 +2,7 @@
  * @fileoverview `useOverlaidContactSearch` — the canonical people-search assembly.
  *
  * Wraps `useContactSearch` (Nagg profile search via the facade) and overlays the
- * shared kind-0 metadata cache on top, so a search hit whose GraphQL row carries
+ * shared kind-0 metadata cache on top, so a search hit whose row carries
  * only a pubkey still renders with cached name/picture/nip05/lud16 instead of a
  * fallback gradient + abbreviated pubkey.
  *

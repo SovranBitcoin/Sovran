@@ -34,12 +34,13 @@ import {
 import { READ_DISABLED, readUnavailable } from './feedClient';
 
 // ---------------------------------------------------------------------------
-// Cache bridge: the nagg GraphQL fast-paths (thread, user feeds, posts-by-pubkey)
-// return app-shaped results WITHOUT writing to the shared entity cache the way
-// the facade reads do. These helpers write those results back into the singleton
-// cache, tagged 'nagg' (the source that served them), so a later read — opening a
-// reply as its own thread, revisiting a profile — serves them instantly. The
-// for-you/notifications facade paths already ingest; this closes the gap.
+// Cache bridge: a feed the facade has no spec for (a Following feed with no
+// viewer, an unknown spec) is still read from the nagg REST client, which
+// returns an app-shaped page WITHOUT writing to the shared entity cache the way
+// the facade reads do. These helpers write that page back into the singleton
+// cache, tagged 'nagg' (the source that served it), so a later read — opening a
+// reply as its own thread, revisiting a profile — serves it instantly. Every
+// facade path ingests inside the data layer; this closes the one gap.
 // ---------------------------------------------------------------------------
 
 function eventsFromAppFeedItem(item: FeedItem): FeedEvent[] {
@@ -59,8 +60,8 @@ function eventsFromAppFeedItem(item: FeedItem): FeedEvent[] {
 
 /** Write a parsed feed/user-feed page's notes/profiles/metrics into the shared cache. */
 function ingestFeedPageIntoCache(result: FeedParseResult): void {
-  // Dev-only: the nagg GraphQL feed paths (home fallback, profile feed, search)
-  // funnel through here, so badge every rendered note as 'nagg'. No-op in prod.
+  // Dev-only: the nagg REST feed fallback funnels through here, so badge every
+  // rendered note as 'nagg'. No-op in prod.
   if (__DEV__) {
     const ids: string[] = [];
     for (const item of result.orderedFeedItems) {
@@ -81,14 +82,13 @@ function ingestFeedPageIntoCache(result: FeedParseResult): void {
 // ---------------------------------------------------------------------------
 // Facade-backed feed client.
 //
-// Routes the home feeds (for-you / following-popular), user/profile feeds,
-// posts-by-pubkeys, and notifications through the tier-selecting nagg-ts
-// facade so the Settings → Network toggles actually change which source
-// (nagg → Primal → relays) serves each read — visible in the bridged nostr.*
-// logs — and so a down nagg degrades to Primal/relay instead of blanking the
-// surface. Threads keep nagg's viewer-ranked GraphQL gold path while nagg is
-// enabled (the app-view can't reproduce that ranking); enrichment and
-// following-replies still delegate to the legacy client.
+// Routes the home feeds, user/profile feeds, posts-by-pubkeys, notifications
+// and threads through the Nostr package's tier-selecting facade so the
+// Settings → Network toggles actually change which source (nagg → Primal →
+// relays) serves each read — visible in the bridged nostr.* logs — and so a
+// down nagg degrades to Primal/relay instead of blanking the surface. Only
+// enrichment and a feed the facade has no spec for still delegate to the nagg
+// REST client.
 //
 // The pure shape bridge lives in facadeFeedAdapter.
 // ---------------------------------------------------------------------------

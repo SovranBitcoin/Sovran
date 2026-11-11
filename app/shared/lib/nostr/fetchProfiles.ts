@@ -14,8 +14,9 @@ const profileFlights = new WeakMap<
 
 /**
  * Fetch kind-0 metadata for a set of pubkeys through the tier-selecting facade
- * (Primal `user_infos` → raw relays). Returns pubkey → metadata for the ones a
- * tier resolved; never throws. Empty when every tier is disabled or exhausted.
+ * (every enabled tier is asked at once; relays fill what Primal lacks).
+ * Returns pubkey → metadata for the ones a tier resolved; never throws. Empty
+ * when every tier is disabled or exhausted.
  */
 export async function fetchProfilesViaFacade(
   pubkeys: string[],
@@ -165,8 +166,8 @@ export function backfillProfile(layer: facade.NostrDataLayer, pubkey: string): v
  * Fetch one profile's header (kind-0 metadata + follow/follower/note counts +
  * joined date) through the tier-selecting facade. Primal serves it via
  * `user_profile`; the relay floor derives metadata + following-count. Returns
- * null when every tier is disabled/exhausted. Reputation is NOT here — it's
- * nagg-only and stays on the REST path.
+ * null when every tier is disabled/exhausted. The result also carries the
+ * reputation `score` and `rank` when a tier measured them.
  */
 export async function fetchProfileStatsViaFacade(
   pubkey: string,

@@ -39,7 +39,7 @@ const WRITE_BEHIND_DEBOUNCE_MS = 5_000;
 
 let loggerBridged = false;
 
-/** Route nagg-ts's structured logs into the app logger so the tier trace is visible. */
+/** Route the `nostr` package's structured logs into the app logger so the tier trace is visible. */
 function bridgeNostrLoggerOnce(): void {
   if (loggerBridged) return;
   loggerBridged = true;
