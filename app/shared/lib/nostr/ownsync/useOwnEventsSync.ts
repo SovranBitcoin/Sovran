@@ -30,6 +30,7 @@ import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { useNostrSocialStore } from '@/shared/stores/profile/nostrSocialStore';
 import { useOwnContentStore } from '@/shared/stores/profile/ownContentStore';
+import { useOwnProfileMetadataStore } from '@/shared/stores/profile/ownProfileMetadataStore';
 import { ingestOwnMediaBlobs } from '@/shared/stores/profile/ownedMediaStore';
 
 import { OWN_EVENT_KINDS, partitionOwnEvents, type OwnSyncEvent } from './partitionOwnEvents';
@@ -92,6 +93,12 @@ type OwnSyncSession = {
   /** The newest profile applied, by `supersedes`; one it does not supersede in a later batch is ignored. */
   profileNewest: { created_at: number; id: string } | null;
 };
+
+/** The saved own profile's time and id, the newest this account has applied before. */
+function savedProfileNewest(): OwnSyncSession['profileNewest'] {
+  const saved = useOwnProfileMetadataStore.getState().latest;
+  return saved && { created_at: saved.createdAt, id: saved.eventId };
+}
 
 /** Whether `profile` is newer than every profile `session` has applied. One without a time (read as 0) never is. */
 function admitsProfile(session: OwnSyncSession, profile: OwnSyncEvent): boolean {
@@ -176,6 +183,9 @@ export function useOwnEventsSync(): void {
       social.clearSettledFollowOptimistic();
     }
     const profile = part.latestProfile;
+    // A new session starts from the saved profile, so it never replaces it
+    // with one it would not have chosen had both arrived together.
+    session.profileNewest ??= savedProfileNewest();
     if (profile && admitsProfile(session, profile)) {
       const snapshot = parseOwnProfileSnapshot(profile);
       if (snapshot) ingestOwnProfileMetadata(snapshot, session.owner, active.accountIndex);

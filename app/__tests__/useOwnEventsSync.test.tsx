@@ -263,6 +263,19 @@ describe('useOwnEventsSync', () => {
     unmount();
   });
 
+  it('keeps the saved profile when a new session sees an equal-time one with a higher id', () => {
+    useOwnProfileMetadataStore.setState({
+      latest: { content: { name: 'Saved' }, createdAt: T, eventId: id('a') },
+    });
+    const { rerender, unmount } = mount();
+
+    deliver(rerender, [profileEvent(id('b'), T, 'B-id')]);
+
+    expect(latestProfileId()).toBe(id('a'));
+    expect(cachedName(0)).toBeUndefined();
+    unmount();
+  });
+
   it('dispatches an event id only once, even when relays deliver it again', () => {
     const { rerender, unmount } = mount();
     const like = likeEvent(id(10), 'target-1');
