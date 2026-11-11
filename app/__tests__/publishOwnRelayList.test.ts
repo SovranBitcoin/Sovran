@@ -12,7 +12,11 @@ import type NDK from '@nostr-dev-kit/ndk-mobile';
 import { errAsync, okAsync } from 'neverthrow';
 
 import { DEFAULT_RELAYS } from '@/shared/lib/nostr/outbox/defaults';
-import { publishRelayList, trackRelaysAsked } from '@/shared/lib/nostr/outbox/publishOwnRelayList';
+import {
+  publishOwnRelayList,
+  publishRelayList,
+  trackRelaysAsked,
+} from '@/shared/lib/nostr/outbox/publishOwnRelayList';
 import { useRelayListStore } from '@/shared/lib/nostr/outbox/relayListStore';
 import { forgetSilentRelays } from '@/shared/lib/nostr/ownReplaceableEvent';
 
@@ -247,4 +251,69 @@ describe('editing a list that is empty because nothing was ever chosen', () => {
     store().addRelay(MINE, { read: true, write: true });
     expect(store().entries.map((entry) => entry.url)).toEqual([MINE]);
   });
+});
+
+it('keeps a later edit pending when signer lookup was started for the earlier list', async () => {
+  const ndk = relayFake();
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  Object.assign(ndk, {
+    signer: {
+      user: async () => {
+        await gate;
+        return { pubkey: OWN };
+      },
+    },
+  });
+  const pending = publishOwnRelayList(ndk, OWN, store().entries);
+  store().addRelay('wss://during.example', { read: true, write: true });
+  release();
+  await pending;
+  expect(mockPublish).not.toHaveBeenCalled();
+  expect(store().source).toBe('local');
+  expect(store().entries.map((entry) => entry.url)).toEqual([MINE, 'wss://during.example']);
+});
+
+it('does not send when signing yields to a later edit', async () => {
+  const ndk = relayFake();
+  let calls = 0;
+  Object.assign(ndk, {
+    signer: {
+      user: async () => {
+        if (++calls === 2) store().addRelay('wss://during.example', { read: true, write: true });
+        return { pubkey: OWN };
+      },
+    },
+  });
+  await publishOwnRelayList(ndk, OWN, store().entries);
+  expect(mockPublish).not.toHaveBeenCalled();
+  expect(store().source).toBe('local');
+});
+
+it('does not mark accepted relay publication saved after its signer is replaced', async () => {
+  const ndk = relayFake();
+  mockPublish.mockImplementation(({ relays }: { relays: string[] }) => {
+    Object.assign(ndk, { signer: { user: async () => ({ pubkey: OWN }) } });
+    return okAsync({ accepted: relays.map((url) => ({ url, ok: true })) });
+  });
+  await publishOwnRelayList(ndk, OWN, store().entries);
+  expect(mockPublish).toHaveBeenCalledTimes(1);
+  expect(store()).toMatchObject({ source: 'local', updatedAt: 100 });
+});
+
+it('honors cancellation before sending first-run defaults', async () => {
+  const ndk = relayFake();
+  await publishOwnRelayList(ndk, OWN, store().entries, { stillWanted: () => false });
+  expect(mockPublish).not.toHaveBeenCalled();
+  expect(store().source).toBe('local');
+});
+
+it('does not send an older rendered list after the current entries changed', async () => {
+  const rendered = store().entries;
+  store().addRelay('wss://during.example', { read: true, write: true });
+  await publishOwnRelayList(relayFake(), OWN, rendered);
+  expect(mockPublish).not.toHaveBeenCalled();
+  expect(store().entries.map((entry) => entry.url)).toContain('wss://during.example');
 });
