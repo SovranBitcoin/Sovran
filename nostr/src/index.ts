@@ -9,5 +9,3 @@ export * from './transport';
 export * as recipes from './recipes';
 export * as tiers from './tiers';
 export * as facade from './facade';
-
-export { clearForYouCache } from './facade/relay/for-you/build';

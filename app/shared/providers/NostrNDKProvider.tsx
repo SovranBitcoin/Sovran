@@ -2,7 +2,6 @@ import {
   profileSwitchQuiescing,
   registerProfileSwitchService,
 } from '@/shared/lib/account/accountRegistry';
-import { clearForYouCache } from 'nostr';
 import { registerAccountScoped } from '@/shared/lib/account/accountRegistry';
 import { createContext, useContext, useEffect, useMemo, useRef, useState, ReactNode } from 'react';
 import { NDKCacheAdapterSqlite, NDKPrivateKeySigner, useNDK } from '@nostr-dev-kit/ndk-mobile';
@@ -234,5 +233,3 @@ export function NostrNDKProvider({
 
   return <NostrNDKContext.Provider value={contextValue}>{children}</NostrNDKContext.Provider>;
 }
-
-registerAccountScoped('nostr.for-you-cache', clearForYouCache);

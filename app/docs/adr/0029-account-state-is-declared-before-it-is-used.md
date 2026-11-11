@@ -86,7 +86,7 @@ The registry canary loads profile/session declarations from generated metadata,
 seeds store memory, and verifies resets, old durable blobs and new storage keys.
 Every loaded holder must supply an empty-state inspection or appear in the
 test's explicit uninspectable list with a reason. Inspection covers app-owned
-Maps and caches; package-private wallet/for-you holders and the monotonic cache
+Maps and caches; package-private wallet holders and the monotonic cache
 epoch remain named gaps. Seven holders additionally receive payload canaries.
 The dev leak scan inspects account store memory and
 storage for the previous pubkey, logging identifiers only; retained old-account

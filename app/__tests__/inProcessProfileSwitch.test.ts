@@ -286,7 +286,6 @@ it('canary resets every registered profile/session store and invokes every reach
   const uninspectable: Record<string, string> = {
     'cache.session-epoch':
       'A monotonic generation, not an account-data holder; disposal is observed.',
-    'nostr.for-you-cache': 'Package-private Map; nostr package edits are excluded from this task.',
     'wallet.reusable-quote-flights': 'Package-private flights; wallet package edits are excluded.',
     'wallet.melt-target': 'Wallet closure; manager and wallet edits are excluded.',
     'wallet.cashu-seed': 'Manager-private seed; manager edits are excluded.',
