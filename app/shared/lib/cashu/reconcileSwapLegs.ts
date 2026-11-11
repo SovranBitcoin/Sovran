@@ -1,4 +1,5 @@
 import { cashuLog, redactError } from '@/shared/lib/logger';
+import { swapGroupPhase } from '@/shared/lib/cashu/swapGroupPhase';
 import {
   useSwapTransactionsStore,
   type SwapLeg,
@@ -44,8 +45,10 @@ const LEFT_MID_FLIGHT: ReadonlySet<SwapLegLocalStatus | undefined> = new Set([
 export async function reconcileSwapLegs(manager: SwapLegOperations): Promise<void> {
   const unsettled: { groupId: string; leg: SwapLeg }[] = [];
   for (const group of Object.values(useSwapTransactionsStore.getState().groups)) {
+    const phase = swapGroupPhase(group);
+    const ended = phase === 'finished' || phase === 'cancelled';
     for (const leg of group.legs) {
-      const stale = group.state !== 'running' && LEFT_MID_FLIGHT.has(leg.localStatus);
+      const stale = ended && LEFT_MID_FLIGHT.has(leg.localStatus);
       if (leg.localStatus === 'settling' || leg.localStatus === 'paymentPending' || stale) {
         unsettled.push({ groupId: group.id, leg });
       }
