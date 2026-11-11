@@ -122,12 +122,3 @@ export async function executeRoutstrTopUp(
     return { success: false, error };
   }
 }
-
-/** Format a msats balance for display. */
-export function formatRoutstrBalance(msats: number): string {
-  if (msats >= 1000) {
-    const sats = Math.floor(msats / 1000);
-    return `${sats.toLocaleString()} sats`;
-  }
-  return `${msats} msats`;
-}

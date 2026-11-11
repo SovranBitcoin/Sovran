@@ -27,9 +27,6 @@ jest.mock('@/shared/lib/logger', () => ({
   storeLog: { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() },
   redactError: (error: unknown) => error,
 }));
-jest.mock('@/shared/stores/runtime/routstrTopUpStore', () => ({
-  useRoutstrTopUpStore: jest.fn(() => false),
-}));
 jest.mock('@/shared/ui/composed/AmountEntryView', () => {
   const ReactActual = jest.requireActual<typeof import('react')>('react');
   return {

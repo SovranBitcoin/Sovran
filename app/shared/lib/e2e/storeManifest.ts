@@ -60,7 +60,6 @@ import { useNotePickerStore } from '@/shared/stores/runtime/notePickerStore';
 import { usePickerSheetStore } from '@/shared/stores/runtime/pickerSheetStore';
 import { usePopupStore } from '@/shared/stores/runtime/popupStore';
 import { useRollbackStore } from '@/shared/stores/runtime/rollbackStore';
-import { useRoutstrTopUpStore } from '@/shared/stores/runtime/routstrTopUpStore';
 import { useSwapStatusStore } from '@/shared/stores/runtime/swapStatusStore';
 import { useBitchatDmMessagesStore } from '@/features/bitchat/stores/bitchatDmMessages';
 import { useFeedIgnoreStore } from '@/features/feed/stores/ignoreStore';
@@ -121,7 +120,6 @@ export const E2E_STORE_MANIFEST: Record<string, MirrorableStore> = {
   'runtime/secureStoreState': useSecureStoreState,
   'runtime/popupStore': usePopupStore,
   'runtime/rollbackStore': useRollbackStore,
-  'runtime/routstrTopUpStore': useRoutstrTopUpStore,
   'runtime/swapStatusStore': useSwapStatusStore,
   'bitchat/bitchatDmMessages': useBitchatDmMessagesStore,
   'feed/ignoreStore': useFeedIgnoreStore,

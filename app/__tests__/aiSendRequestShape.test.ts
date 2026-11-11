@@ -64,9 +64,6 @@ jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({
     removeItem: async () => {},
   }),
 }));
-jest.mock('@/shared/stores/runtime/routstrTopUpStore', () => ({
-  useRoutstrTopUpStore: { getState: jest.fn() },
-}));
 jest.mock('@/shared/stores/profile/mintStore', () => {
   const useMintStore = Object.assign(
     (selector: (s: { selectedMint: string }) => unknown) =>

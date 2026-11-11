@@ -617,14 +617,6 @@ export const storeRegistryManifest = [
     profileStorage: false,
   },
   {
-    file: 'shared/stores/runtime/routstrTopUpStore.ts',
-    name: 'useRoutstrTopUpStore',
-    scope: 'session',
-    persisted: false,
-    queryCache: false,
-    profileStorage: false,
-  },
-  {
     file: 'shared/stores/runtime/secureStoreState.ts',
     name: 'useSecureStoreState',
     scope: 'session',

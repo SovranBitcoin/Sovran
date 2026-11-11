@@ -84,8 +84,6 @@ import { chooseFallbackPaymentOption, choosePaymentOption } from './paymentOptio
 import { chooseProofs } from './proofSelectorPicker';
 import { chooseSendFallback } from './sendFallbackPicker';
 import { captureAndStoreLocation } from '@/shared/hooks/useTransactionLocation';
-import { executeRoutstrTopUp, formatRoutstrBalance } from '@/shared/lib/routstr/topUp';
-import { useRoutstrTopUpStore } from '@/shared/stores/runtime/routstrTopUpStore';
 import { useNearPaySessionStore } from '@/shared/stores/runtime/nearPayStore';
 import { useContactSendStore } from '@/shared/stores/runtime/contactSendStore';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
@@ -989,41 +987,6 @@ export function createSovranHandlers({
         hasLocktime: !!p2pkLock?.locktimeSec,
         refundKeyCount: p2pkLock?.refundKeys?.length ?? 0,
       });
-
-      // Routstr top-up: intercept the token and send it to the Routstr API
-      const topUpState = useRoutstrTopUpStore.getState();
-      if (topUpState.phase === 'active') {
-        try {
-          const entry = parseHistoryEntryOnce(historyEntry);
-          const token = entry ? sendEntryToken(entry) : null;
-          if (!token) throw new Error('Send history entry carries no token');
-          const encodedToken = getEncodedToken(token);
-          const result = await executeRoutstrTopUp(encodedToken);
-
-          if (result.success) {
-            const balanceStr = formatRoutstrBalance(result.balance);
-            if (result.isNewWallet) {
-              paramPopup('routstr-wallet-created', { balance: balanceStr });
-            } else {
-              paramPopup('routstr-top-up-success', { balance: balanceStr });
-            }
-            useRoutstrTopUpStore.getState().complete('success');
-          } else {
-            staticPopup('routstr-transaction-failed', {
-              failure: { service: 'routstr', error: result.error },
-            });
-            useRoutstrTopUpStore.getState().complete('failed');
-          }
-        } catch (e) {
-          paymentLog.error('payment.routstr_topup.error', {
-            error: e instanceof Error ? e.message : String(e),
-          });
-          staticPopup('routstr-transaction-failed', { failure: { service: 'routstr', error: e } });
-          useRoutstrTopUpStore.getState().complete('failed');
-        }
-        router.dismiss();
-        return;
-      }
 
       // Attach recipient identity and P2PK-lock presence to the executed
       // history entry so SendTokenScreen can render both indicators.
