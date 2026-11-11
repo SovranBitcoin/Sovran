@@ -49,7 +49,7 @@ async function render(paymentsLocked: boolean) {
     renderer = TestRenderer.create(
       <HomeTop
         actions={actions}
-        renderBalance={(floorScale) => <Balance minHeight={300 * floorScale} />}
+        balance={<Balance minHeight={300} />}
         paymentsLocked={paymentsLocked}
       />
     );

@@ -42,12 +42,8 @@ export type HomeActions = Readonly<Record<Exclude<HomeActionId, 'more'>, HomeAct
 
 export interface HomeLayoutProps {
   readonly actions: HomeActions;
-  /**
-   * The balance carousel. `floorScale` scales the phone-proportional minimum
-   * height the carousel reserves: 1 is the roomy original, 0 lets the balance
-   * take only the height of its own content.
-   */
-  readonly renderBalance: (floorScale: number) => React.ReactElement;
+  /** The balance carousel, drawn above the actions. */
+  readonly balance: React.ReactElement;
   /** A multi-leg swap is running: payment actions are inert. */
   readonly paymentsLocked: boolean;
 }
