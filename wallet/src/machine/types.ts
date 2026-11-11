@@ -1006,6 +1006,22 @@ export type NotificationHandlerMap = {
 // ---------------------------------------------------------------------------
 
 /**
+ * What taking back a send did. `reclaimed`: its ecash is back in the wallet,
+ * taken back now or before. `neverExecuted`: no token left the wallet (a
+ * prepared send was cancelled, or one was never prepared). `unknown`: it
+ * could not tell (no wallet, the send could not be looked up or was not
+ * found, or it was redeemed or is already being taken back), so the token
+ * may still be out.
+ */
+export type SendRollbackResult =
+  | { kind: "reclaimed" }
+  | { kind: "neverExecuted" }
+  | {
+      kind: "unknown";
+      reason: "noManager" | "lookupFailed" | "notFound" | "redeemed" | "rollingBack";
+    };
+
+/**
  * Async callbacks the machine executes for action steps (confirmSend,
  * createMintQuote, selectMint). When provided, the machine handles
  * success/failure routing and only dispatches external handlers for the
@@ -1141,10 +1157,12 @@ export interface MachineOperations {
     unit?: string;
   }) => Promise<{ token: string; historyEntry: string; operationId: string }>;
   /**
-   * Roll back a pending send operation. Called when NFC write-back fails
-   * after token creation to reclaim the ecash proofs.
+   * Take back a send: reclaim its ecash, or cancel it before it executed.
+   * Says what it did; a caller reads only `reclaimed` and `neverExecuted` as
+   * a token that is not outstanding. Throws when the cancel or the reclaim
+   * itself fails.
    */
-  rollbackSend?: (operationId: string) => Promise<void>;
+  rollbackSend?: (operationId: string) => Promise<SendRollbackResult>;
   /**
    * Whether a NUT-18 payment request can be paid from this mint at all —
    * the same gate `executeNfcSend` applies before reserving proofs, asked

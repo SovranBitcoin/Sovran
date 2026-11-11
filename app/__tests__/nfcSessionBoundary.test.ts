@@ -270,7 +270,7 @@ describe('a payment machine tap over the adapter', () => {
         executeMintQuote: jest.fn(),
         buildMintListItems: jest.fn(async () => []),
         executeNfcSend,
-        rollbackSend: jest.fn(async () => undefined),
+        rollbackSend: jest.fn(async () => ({ kind: 'reclaimed' as const })),
       },
       scanSources: { nfc: async () => ({ data: await adapter.readPaymentRequest() }) },
     });

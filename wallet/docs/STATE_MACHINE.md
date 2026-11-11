@@ -200,7 +200,7 @@ is not implemented in `defaultOperations.ts`.
 | `executePaymentRequest` | Create token + deliver over Nostr/HTTP; rollback on delivery failure. Optional. | always | Colada default |
 | `linkTransaction` | Link scanned input to a transaction id. Optional. | never (local) | app |
 | `executeNfcSend` | NFC POS token creation. Optional. | always | Colada default |
-| `rollbackSend` | Roll back a pending send. Optional. | conditional | Colada default |
+| `rollbackSend` | Take back a send; reports `reclaimed`, `neverExecuted` or `unknown` (could not tell, so the token may be out). Optional. | conditional | Colada default |
 | `checkSendStatus` | Poll a pending send. Optional. | conditional | Colada default |
 | `executeReceive` | Redeem an ecash token (`wallet.receive`). Optional. | always | Colada default |
 | `rollbackMelt` | Cancel a melt operation. Optional. | conditional | Colada default |
@@ -785,8 +785,9 @@ MUST:
 - NFC skips `enterSendMemo` entirely; it never prompts for a memo.
 - On a genuine `executeNfcSend` failure the effect rolls back the pending send
   via `operations.rollbackSend` before surfacing the error (`effects.ts:1085`).
-- When the write failed and that rollback failed or is missing
-  (`tokenOutstanding`), the token may have reached the terminal: the error
+- When the write failed and that rollback failed, could not tell what
+  happened (`unknown`) or is missing (`tokenOutstanding`), the token may have
+  reached the terminal: the error
   says so (`NFC_WRITE_OUTCOME_UNKNOWN`), and the flow context keeps nothing
   that could rebuild the request, as after a paid tap (`forgetNfcPayment`).
 
@@ -973,7 +974,9 @@ MUST / MUST NOT:
   `transitions.ts:384-387`.
 - Melt and payment-request flows must have no offline branch; they always attempt
   the mint. Send-token Cancel must short-circuit offline with
-  `onSendCancelFailed {offline:true}`. `defaultHandlers.ts:155-163`.
+  `onSendCancelFailed {offline:true}`. `defaultHandlers.ts:155-163`. A
+  cancel whose `rollbackSend` could not tell what happened (`unknown`)
+  reports `onSendCancelFailed`, never `onSendCancelled`.
 
 The en copy for `MINT_UNREACHABLE` is "Mint unreachable" (`locales.ts:29`); for
 `SEND_FAILED` it is "Failed to create token"; for `MINT_QUOTE_FAILED` it is

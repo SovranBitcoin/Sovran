@@ -1837,3 +1837,58 @@ describe("synthetic history entries keep the operation's unit", () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// rollbackSend — says what it did, so "could not tell" is never "rolled back"
+// ---------------------------------------------------------------------------
+
+describe("rollbackSend", () => {
+  function rollback(get: () => Promise<unknown>, withManager = true) {
+    const manager = createMockManager();
+    manager.ops.send.get = vi.fn(get);
+    const ops = createDefaultOperations({
+      getManager: () => (withManager ? (manager as unknown as Manager) : null),
+    });
+    return { result: ops.rollbackSend!("op-1"), manager };
+  }
+
+  it.each(["executing", "pending"])("reclaims a %s send", async (state) => {
+    const { result, manager } = rollback(async () => ({ id: "op-1", state }));
+    await expect(result).resolves.toEqual({ kind: "reclaimed" });
+    expect(manager.ops.send.reclaim).toHaveBeenCalledWith("op-1");
+  });
+
+  it("reports a send already taken back as reclaimed", async () => {
+    const { result, manager } = rollback(async () => ({ id: "op-1", state: "rolled_back" }));
+    await expect(result).resolves.toEqual({ kind: "reclaimed" });
+    expect(manager.ops.send.reclaim).not.toHaveBeenCalled();
+  });
+
+  it.each(["prepared", "init"])("reports a %s send as never executed", async (state) => {
+    const { result } = rollback(async () => ({ id: "op-1", state }));
+    await expect(result).resolves.toEqual({ kind: "neverExecuted" });
+  });
+
+  it("cancels a prepared send", async () => {
+    const { result, manager } = rollback(async () => ({ id: "op-1", state: "prepared" }));
+    await result;
+    expect(manager.ops.send.cancel).toHaveBeenCalledWith("op-1");
+  });
+
+  it.each([
+    { name: "it could not be looked up", get: async () => Promise.reject(new Error("db")) },
+    { name: "it was not found", get: async () => null },
+    { name: "it was redeemed", get: async () => ({ id: "op-1", state: "finalized" }) },
+    { name: "it is being taken back", get: async () => ({ id: "op-1", state: "rolling_back" }) },
+  ])("cannot tell when $name", async ({ get }) => {
+    const { result, manager } = rollback(get);
+    await expect(result).resolves.toMatchObject({ kind: "unknown" });
+    expect(manager.ops.send.reclaim).not.toHaveBeenCalled();
+    expect(manager.ops.send.cancel).not.toHaveBeenCalled();
+  });
+
+  it("cannot tell without a wallet", async () => {
+    const { result } = rollback(async () => ({ id: "op-1", state: "pending" }), false);
+    await expect(result).resolves.toMatchObject({ kind: "unknown" });
+  });
+});

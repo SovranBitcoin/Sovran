@@ -60,7 +60,7 @@ function walletFixture(options: { offline?: boolean } = {}) {
   >();
   const unsubscribeEntryUpdates = vi.fn();
   const operations = {
-    rollbackSend: vi.fn(async () => {}),
+    rollbackSend: vi.fn(async () => ({ kind: "reclaimed" as const })),
     checkSendStatus: vi.fn(async () => ({ state: "finalized" })),
     rollbackMelt: vi.fn(async () => {}),
     isMintTrusted: vi.fn(async () => true),

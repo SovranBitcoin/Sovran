@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { createScreenActionSession } from "../../src/screen-actions/session";
 import { createDefaultScreenActionHandlers } from "../../src/screen-actions/defaultHandlers";
+import type { SendRollbackResult } from "../../src/machine/types";
 
 describe("screen action pending feedback", () => {
   it.each(["success", "failure"] as const)(
@@ -10,8 +11,8 @@ describe("screen action pending feedback", () => {
       let reject!: (error: Error) => void;
       const rollbackSend = vi.fn(
         () =>
-          new Promise<void>((yes, no) => {
-            resolve = yes;
+          new Promise<SendRollbackResult>((yes, no) => {
+            resolve = () => yes({ kind: "reclaimed" });
             reject = no;
           }),
       );

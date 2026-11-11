@@ -75,7 +75,7 @@ function createMockConfig(overrides?: {
   const notifications: { event: string; args: unknown[] }[] = [];
   const ops: Partial<MachineOperations> = {
     checkSendStatus: vi.fn(async () => ({ state: "pending" })),
-    rollbackSend: vi.fn(async () => {}),
+    rollbackSend: vi.fn(async () => ({ kind: "reclaimed" as const })),
     executeReceive: vi.fn(async () => ({
       historyEntry: JSON.stringify({
         id: "rx-1",
@@ -437,6 +437,27 @@ describe("sendToken default handlers", () => {
           },
         ],
       });
+    });
+
+    // A cancel that could not tell what happened to the send (not found, a
+    // lookup that failed, a send redeemed or already being taken back) did
+    // not cancel it: the token may still be out.
+    it("does not say cancelled when it could not tell", async () => {
+      const { handlers, notifications } = createMockConfig({
+        operations: {
+          rollbackSend: vi.fn(async () => ({ kind: "unknown" as const, reason: "notFound" as const })),
+        },
+      });
+      const { mgr } = createManager("sendToken", handlers, {
+        type: "send",
+        operationId: "op-lost",
+        token: null,
+      });
+
+      await mgr.execute("cancel");
+
+      expect(notifications.map((n) => n.event)).toEqual(["onSendCancelFailed"]);
+      expect(notifications[0].args[0]).toMatchObject({ operationId: "op-lost" });
     });
 
     it("notifies onSendCancelFailed on error", async () => {

@@ -785,6 +785,26 @@ describe("an NFC tap whose token could not be taken back", () => {
     return tap;
   }
 
+  // Taking it back that returns without saying it did (the send could not
+  // be looked up, was not found, or is in a state it does not reclaim) is
+  // not a token taken back.
+  it("treats a take-back that could not tell as not taken back", async () => {
+    const tap = setup({
+      operations: {
+        rollbackSend: vi.fn(async () => ({ kind: "unknown" as const, reason: "notFound" as const })),
+      },
+    });
+    tap.adapter.writeToken.mockRejectedValueOnce(new Error("tag lost"));
+    await tap.tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
+    expect(tap.tm.machine.inspect()).toMatchObject({
+      code: "NFC_WRITE_FAILED",
+      message: expect.stringMatching(/may have reached the terminal/),
+    });
+    // Nothing is kept that could rebuild the request for Pay to send again.
+    expect(tap.tm.machine.getContext()).not.toHaveProperty("paymentRequest");
+    expect(tap.tm.machine.getContext()).not.toHaveProperty("amount");
+  });
+
   it("says the first token may have gone out", async () => {
     const { tm } = failedTap();
     await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });

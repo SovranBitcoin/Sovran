@@ -248,8 +248,24 @@ export function createDefaultScreenActionHandlers(
 
         logger.info("screenAction.sendToken.cancel.start", { operationId });
         try {
-          await ops.rollbackSend(operationId);
-          logger.info("screenAction.sendToken.cancel.done", { operationId });
+          const result = await ops.rollbackSend(operationId);
+          if (result.kind === "unknown") {
+            // Not found, unreadable, redeemed or already being taken back:
+            // the token may still be out, so it was not cancelled.
+            logger.warn("screenAction.sendToken.cancel.unknown", {
+              operationId,
+              reason: result.reason,
+            });
+            notify("onSendCancelFailed", {
+              operationId,
+              message: `Send not taken back: ${result.reason}`,
+            });
+            return;
+          }
+          logger.info("screenAction.sendToken.cancel.done", {
+            operationId,
+            result: result.kind,
+          });
           notify("onSendCancelled", { operationId });
         } catch (err) {
           const mintUnreachable = isMintOfflineError(err);

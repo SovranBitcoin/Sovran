@@ -759,7 +759,7 @@ describe('runNfcWriteBackEffect', () => {
 
   it('rolls back and releases the NFC session when write-back fails', async () => {
     const writeFailure = new Error('Tag removed');
-    const rollbackSend = vi.fn(async () => {});
+    const rollbackSend = vi.fn(async () => ({ kind: 'reclaimed' as const }));
     const releaseSession = vi.fn(async () => {});
 
     const result = await runNfcWriteBackEffect({
@@ -804,7 +804,7 @@ describe('runNfcWriteBackEffect', () => {
   // The tag holds the token, and the receiver may already have redeemed it:
   // the payment went out, and a session that will not close undoes nothing.
   it('reports the payment delivered when the session will not close after the write', async () => {
-    const rollbackSend = vi.fn(async () => {});
+    const rollbackSend = vi.fn(async () => ({ kind: 'reclaimed' as const }));
     const releaseSession = vi.fn(async () => {
       throw new Error('session already gone');
     });
@@ -834,7 +834,7 @@ describe('runNfcWriteBackEffect', () => {
   it('returns stale before writing when NFC send resolves after reset, takes the token back and releases the session', async () => {
     const writeToken = vi.fn(async () => {});
     const releaseSession = vi.fn(async () => {});
-    const rollbackSend = vi.fn(async () => {});
+    const rollbackSend = vi.fn(async () => ({ kind: 'reclaimed' as const }));
 
     const result = await runNfcWriteBackEffect({
       data: confirmPaymentRequestData,
@@ -887,7 +887,7 @@ describe('runNfcWriteBackEffect', () => {
   // reports failure, so its outcome is unknown and it is not taken back.
   it('does not take back a token whose write failed after reset', async () => {
     const releaseSession = vi.fn(async () => {});
-    const rollbackSend = vi.fn(async () => {});
+    const rollbackSend = vi.fn(async () => ({ kind: 'reclaimed' as const }));
 
     const result = await runNfcWriteBackEffect({
       data: confirmPaymentRequestData,
@@ -916,7 +916,7 @@ describe('runNfcWriteBackEffect', () => {
 
   it('reports a token written before the turn went stale as delivered, and releases the session', async () => {
     const releaseSession = vi.fn(async () => {});
-    const rollbackSend = vi.fn(async () => {});
+    const rollbackSend = vi.fn(async () => ({ kind: 'reclaimed' as const }));
 
     const result = await runNfcWriteBackEffect({
       data: confirmPaymentRequestData,

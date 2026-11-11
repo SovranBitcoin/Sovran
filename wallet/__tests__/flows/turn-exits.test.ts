@@ -1278,7 +1278,7 @@ describe("an NFC tap", () => {
         throw new Error("session already gone");
       }),
     });
-    const rollbackSend = vi.fn(async () => {});
+    const rollbackSend = vi.fn(async () => ({ kind: "reclaimed" as const }));
     const tm = build({ nfcAdapter: adapter, operations: { rollbackSend } });
     await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
 

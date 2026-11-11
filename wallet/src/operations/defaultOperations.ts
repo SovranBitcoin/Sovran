@@ -31,7 +31,11 @@ import type {
 import { getEncodedToken, operationHistoryId } from "@cashu/coco-core";
 import { emitPaymentRequestCreated } from "../paymentRequestEvents";
 import { normalizeP2pkLock, proofsHaveP2PK } from "../p2pk";
-import type { MachineOperations, StepDataMap } from "../machine/types";
+import type {
+  MachineOperations,
+  SendRollbackResult,
+  StepDataMap,
+} from "../machine/types";
 import type {
   MintCatalogEntry,
   MintContactProfileResolver,
@@ -1272,51 +1276,73 @@ export function createDefaultOperations(
       };
     },
 
-    rollbackSend: async (operationId) => {
+    rollbackSend: async (operationId): Promise<SendRollbackResult> => {
       const mgr = getManager();
       if (!mgr) {
         logger.warn("operations.rollbackSend.noManager", { operationId });
-        return;
+        return { kind: "unknown", reason: "noManager" };
       }
       logger.info("operations.rollbackSend.start", { operationId });
-      const operation = await mgr.ops.send.get(operationId).catch((e) => {
-        logger.warn("operations.rollbackSend.lookupFailed", {
-          operationId,
-          error: errField(e),
-        });
-        return null;
-      });
+      const lookup = await mgr.ops.send.get(operationId).then(
+        (operation) => ({ ok: true as const, operation }),
+        (e: unknown) => {
+          logger.warn("operations.rollbackSend.lookupFailed", {
+            operationId,
+            error: errField(e),
+          });
+          return { ok: false as const };
+        },
+      );
+      if (!lookup.ok) return { kind: "unknown", reason: "lookupFailed" };
+      const operation = lookup.operation;
       if (!operation) {
         logger.info("operations.rollbackSend.notFound", { operationId });
-        return;
+        return { kind: "unknown", reason: "notFound" };
       }
-      // Only swallow "already gone" — surface every other reclaim/cancel
-      // failure so the caller can warn the user that the mint may still
-      // hold the spent proofs in pending state. Silently telling the user
-      // a send was cancelled when reclaim failed leaves wallet state and
-      // mint state divergent.
-      if (operation.state === "prepared") {
-        logger.info("operations.rollbackSend.cancelPrepared", { operationId });
-        await mgr.ops.send.cancel(operationId);
-        logger.info("operations.rollbackSend.done", {
-          operationId,
-          action: "cancel",
-        });
-      } else if (["executing", "pending"].includes(operation.state)) {
-        logger.info("operations.rollbackSend.reclaim", {
-          state: operation.state,
-          operationId,
-        });
-        await mgr.ops.send.reclaim(operationId);
-        logger.info("operations.rollbackSend.done", {
-          operationId,
-          action: "reclaim",
-        });
-      } else {
-        logger.info("operations.rollbackSend.noop", {
-          operationId,
-          state: operation.state,
-        });
+      // A cancel or reclaim that fails throws, so the caller can warn that
+      // the mint may still hold the proofs as pending. Telling the user a
+      // send was cancelled when it was not leaves wallet and mint divergent.
+      switch (operation.state) {
+        case "init":
+          logger.info("operations.rollbackSend.neverPrepared", { operationId });
+          return { kind: "neverExecuted" };
+        case "prepared":
+          logger.info("operations.rollbackSend.cancelPrepared", { operationId });
+          await mgr.ops.send.cancel(operationId);
+          logger.info("operations.rollbackSend.done", {
+            operationId,
+            action: "cancel",
+          });
+          return { kind: "neverExecuted" };
+        case "executing":
+        case "pending":
+          logger.info("operations.rollbackSend.reclaim", {
+            state: operation.state,
+            operationId,
+          });
+          await mgr.ops.send.reclaim(operationId);
+          logger.info("operations.rollbackSend.done", {
+            operationId,
+            action: "reclaim",
+          });
+          return { kind: "reclaimed" };
+        case "rolled_back":
+          logger.info("operations.rollbackSend.alreadyRolledBack", { operationId });
+          return { kind: "reclaimed" };
+        case "finalized":
+        case "rolling_back":
+          logger.info("operations.rollbackSend.notReclaimable", {
+            operationId,
+            state: operation.state,
+          });
+          return {
+            kind: "unknown",
+            reason: operation.state === "finalized" ? "redeemed" : "rollingBack",
+          };
+        default: {
+          const unreachable: never = operation;
+          return unreachable;
+        }
       }
     },
 

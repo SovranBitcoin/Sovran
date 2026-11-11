@@ -1770,19 +1770,22 @@ export function runNfcWriteBackEffect({
   };
 
   // Takes back a token that never reached the tag. Best-effort: a failure is
-  // logged, and whether it worked is what the caller can report.
+  // logged, and whether it worked is what the caller can report. A take-back
+  // that could not tell what happened leaves the token outstanding.
   const rollBack = async (
     operationId: string,
     stale: boolean,
   ): Promise<boolean> => {
     if (!rollbackSend) return false;
     try {
-      await rollbackSend(operationId);
+      const result = await rollbackSend(operationId);
       logger.info('effects.nfcWriteBack.rollback.completed', {
         stale,
         operationIdPresent: operationId.length > 0,
+        result: result.kind,
+        ...(result.kind === 'unknown' ? { reason: result.reason } : {}),
       });
-      return true;
+      return result.kind !== 'unknown';
     } catch (rollbackErr) {
       logger.warn('effects.nfcWriteBack.rollback.failed', {
         stale,
