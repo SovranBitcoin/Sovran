@@ -563,18 +563,81 @@ describe('following someone', () => {
     expect(social().optimisticFollowsByPubkey[Z]?.pending).toBe(true);
   });
 
-  it('drops the follow and shows the error when the signer refuses', async () => {
+  it('keeps the follow, without an error, when signing fails', async () => {
+    // The app's only signer is the local key: a failure is never a refusal.
     relaysHold(contacts(T, [['p', X]]));
     const { ndk, signer } = setup();
-    signer.sign.mockRejectedValueOnce(new Error('Denied'));
+    signer.sign.mockRejectedValueOnce(new Error('Signing timed out'));
 
     tap(Z);
     await requestFollowSync(ndk, OWN);
 
     expect(mockPublish).not.toHaveBeenCalled();
+    expect(social().optimisticFollowsByPubkey[Z]).toMatchObject({ value: true, pending: true });
+    expect(mockPopup).not.toHaveBeenCalled();
+
+    await requestFollowSync(ndk, OWN);
+    expect(publishedTags()).toEqual([
+      ['p', X],
+      ['p', Z],
+    ]);
     expect(social().optimisticFollowsByPubkey).toEqual({});
-    expect(selectIsFollowingPubkey(Z)(social())).toBe(false);
-    expect(mockPopup).toHaveBeenCalledWith('engagement-update-failed', 'follow');
+  });
+
+  it('does not sign with a signer replaced during the read', async () => {
+    relaysHold(contacts(T, [['p', X]]));
+    const gate = deferred();
+    mockReadGate = gate.promise;
+    const { ndk, signer } = setup();
+    const replacement = { sign: jest.fn(async () => undefined), user: signer.user };
+
+    tap(Z);
+    const run = requestFollowSync(ndk, OWN);
+    for (let i = 0; i < 20 && mockFilters.length < mockRelays.length; i++) await Promise.resolve();
+    (ndk as unknown as { signer: unknown }).signer = replacement;
+    gate.resolve();
+    await run;
+
+    expect(signer.sign).not.toHaveBeenCalled();
+    expect(mockPublish).not.toHaveBeenCalled();
+    expect(social().optimisticFollowsByPubkey[Z]?.pending).toBe(true);
+  });
+
+  it('keeps the follow when the signer is replaced while signing', async () => {
+    relaysHold(contacts(T, [['p', X]]));
+    const { ndk, signer } = setup();
+    signer.sign.mockImplementationOnce(async () => {
+      (ndk as unknown as { signer: unknown }).signer = undefined;
+      throw new Error('Signer closed');
+    });
+
+    tap(Z);
+    await requestFollowSync(ndk, OWN);
+
+    expect(mockPublish).not.toHaveBeenCalled();
+    expect(social().optimisticFollowsByPubkey[Z]?.pending).toBe(true);
+    expect(mockPopup).not.toHaveBeenCalled();
+  });
+
+  it('does not mark the follow done when the signer is replaced while publishing', async () => {
+    relaysHold(contacts(T, [['p', X]]));
+    const { ndk, signer } = setup();
+    mockPublish.mockImplementationOnce(async (args: { event: RelayEvent }) => {
+      (ndk as unknown as { signer: unknown }).signer = { ...signer };
+      return acceptOnRelays(args);
+    });
+
+    tap(Z);
+    await requestFollowSync(ndk, OWN);
+
+    expect(mockPublish).toHaveBeenCalledTimes(1);
+    expect(social().optimisticFollowsByPubkey[Z]?.pending).toBe(true);
+    expect(social().followingPubkeys).toEqual({ [X]: true });
+
+    // The next pass finds the published list holds the follow.
+    await requestFollowSync(ndk, OWN);
+    expect(mockPublish).toHaveBeenCalledTimes(1);
+    expect(social().optimisticFollowsByPubkey).toEqual({});
   });
 
   it('keeps the follow while the account signer is not ready', async () => {

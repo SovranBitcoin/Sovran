@@ -22,7 +22,6 @@ import { z } from 'zod';
 
 import { nostrLog } from '@/shared/lib/logger';
 import { buildNostrDataLayer } from '@/shared/lib/nostr/buildNostrDataLayer';
-import { paramPopup } from '@/shared/lib/popup';
 import {
   selectContactList,
   selectFollowIntents,
@@ -277,18 +276,11 @@ async function syncOnce(ndk: NDK, ownPubkey: string): Promise<void> {
       event.created_at = Math.max(Math.floor(Date.now() / 1000), plan.base.createdAt + 1);
       event.tags = plan.tags;
       event.content = plan.base.content;
-      try {
-        await event.sign(signer);
-      } catch (error) {
-        scope.check();
-        // The signer refused: these taps will not be published.
-        nostrLog.warn('nostr.follow.sign_refused', {
-          error: error instanceof Error ? error : new Error(String(error)),
-        });
-        social().settleFollowIntents(intents);
-        paramPopup('engagement-update-failed', 'follow');
-        return;
-      }
+      // A signer replaced during the read never signs. Signing can fail but
+      // never refuses (the only signer is the account's own key), so a
+      // failure keeps the taps for the next pass.
+      if (ndk.signer !== signer) throw new Error('Account signer changed');
+      await event.sign(signer);
       scope.check();
       if (event.pubkey !== ownPubkey || ndk.signer !== signer)
         throw new Error('Account signer changed');
@@ -298,6 +290,8 @@ async function syncOnce(ndk: NDK, ownPubkey: string): Promise<void> {
       const published = await publishEvent({ ndk, event, resolveOn: 'all-settled' });
       scope.check();
       if (published.isErr()) throw new Error(`Follow list publish failed: ${published.error.type}`);
+      // Published, but not recorded for a signer that changed meanwhile: the next pass reads it back.
+      if (ndk.signer !== signer) throw new Error('Account signer changed');
       nostrLog.info('nostr.follow.published', {
         intents: Object.keys(intents).length,
         tags: plan.tags.length,
