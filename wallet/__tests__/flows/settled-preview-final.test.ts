@@ -1,13 +1,14 @@
 /**
- * settled-preview-final.test.ts — a settled preview stays settled
+ * settled-preview-final.test.ts — a settled payment stays settled
  *
- * Once a melt preview is paid, or a payment request preview delivered or left
- * undelivered (its ecash left and was not taken back), that flow is over: a
- * second Pay would pay twice. Every event type is listed below against those
- * three previews. An event either starts another flow (the step leaves the
- * preview) or changes nothing, and in neither case does a Pay on the old
- * preview send again. `Record<FlowEvent["type"], …>` makes a new event type
- * fail to compile here until it is placed in the table.
+ * Once a melt preview is paid, a payment request preview delivered or left
+ * undelivered (its ecash left and was not taken back), or an ecash send has
+ * made its token (`sendComplete`), that flow is over: a second Pay, or the
+ * same amount or mint again, would pay twice. Every event type is listed
+ * below against those four. An event either starts another flow (the step
+ * leaves the settled one) or changes nothing, and in neither case does the
+ * old payment go out again. `Record<FlowEvent["type"], …>` makes a new event
+ * type fail to compile here until it is placed in the table.
  */
 
 import { describe, expect, it } from "vitest";
@@ -41,23 +42,24 @@ function build(operations?: Partial<MachineOperations>) {
     operations: createMockOperations(operations, operationCalls),
     scanSources: {},
   });
-  const calls = (name: string) =>
-    operationCalls.filter((call) => call.name === name).length;
+  const calls = (names: readonly string[]) =>
+    operationCalls.filter((call) => names.includes(call.name)).length;
   return { machine, handlerCalls, calls };
 }
 
 type Built = ReturnType<typeof build>;
 
-/** A settled preview, how to reach it, and how to press Pay on it again. */
+/** A settled payment, how to reach it, and how to press Pay on it again. */
 type Settled = {
   name: string;
-  step: "navigateToMeltPreview" | "navigateToPaymentRequest";
+  step: "navigateToMeltPreview" | "navigateToPaymentRequest" | "sendComplete";
   input: string;
   optionKind: "lightningAddress" | "paymentRequest";
   amount: number;
   /** A mint the flow could be moved to. */
   otherMint: string;
-  operation: "executeMelt" | "executePaymentRequest";
+  /** The operations that pay it: either one counts. */
+  operation: readonly string[];
   operations?: Partial<MachineOperations>;
   reach: (tm: Built) => Promise<void>;
   pay: (tm: Built) => Promise<unknown>;
@@ -71,7 +73,7 @@ const SETTLED: Settled[] = [
     optionKind: "lightningAddress",
     amount: 200,
     otherMint: MINT2,
-    operation: "executeMelt",
+    operation: ["executeMelt"],
     reach: async ({ machine }) => {
       await machine.execute(INPUTS.lightningAddress, { reset: true });
       await machine.enterAmount({ value: 200, unit: "sat" }, MINT1);
@@ -87,7 +89,7 @@ const SETTLED: Settled[] = [
     amount: 100,
     // The request names MINT1 alone, so the only mint to move to is MINT1.
     otherMint: MINT1,
-    operation: "executePaymentRequest",
+    operation: ["executePaymentRequest"],
     reach: async ({ machine }) => {
       await machine.execute(INPUTS.paymentRequestBasic, { reset: true });
       expect((await machine.confirmPaymentRequest()).kind).toBe("delivered");
@@ -101,7 +103,7 @@ const SETTLED: Settled[] = [
     optionKind: "paymentRequest",
     amount: 100,
     otherMint: MINT1,
-    operation: "executePaymentRequest",
+    operation: ["executePaymentRequest"],
     operations: {
       executePaymentRequest: async () => {
         throw new PaymentRequestUndeliveredError("op-9", new Error("relay down"));
@@ -113,9 +115,30 @@ const SETTLED: Settled[] = [
     },
     pay: ({ machine }) => machine.confirmPaymentRequest(),
   },
+  {
+    // The send screen has no Pay: committing the same amount is its Pay.
+    name: "an ecash send that made its token",
+    step: "sendComplete",
+    input: INPUTS.paymentRequestBasic,
+    optionKind: "paymentRequest",
+    amount: 100,
+    otherMint: MINT2,
+    operation: ["executeSend", "executeOfflineSend"],
+    reach: async ({ machine }) => {
+      await machine.startSendEcash({ reset: true });
+      await machine.enterAmount({ value: 100, unit: "sat" }, MINT1, {
+        destination: "sendEcash",
+      });
+      expect(machine.getStep()).toBe("sendComplete");
+    },
+    pay: ({ machine }) =>
+      machine.enterAmount({ value: 100, unit: "sat" }, MINT1, {
+        destination: "sendEcash",
+      }),
+  },
 ];
 
-/** What each event does to a settled preview. */
+/** What each event does to a settled payment. */
 const EXPECTED: Record<FlowEvent["type"], "newFlow" | "unchanged"> = {
   EXECUTE: "newFlow",
   RESET: "newFlow",
@@ -242,7 +265,7 @@ describe.each(SETTLED)("$name", (s) => {
   );
 
   it.each(TYPES.filter((type) => EXPECTED[type] === "newFlow"))(
-    "%s leaves the settled preview for another flow",
+    "%s leaves the settled payment for another flow",
     async (type) => {
       for (const event of eventsOf(type, s)) {
         const tm = build(s.operations);
@@ -257,8 +280,9 @@ describe.each(SETTLED)("$name", (s) => {
   );
 
   // The new flow carries nothing of the old payment, so nothing done in it
-  // rebuilds the old preview for Pay to send again.
-  describe.each(FOLLOW_THROUGH)("then $name", (follow) => {
+  // rebuilds the old preview for Pay to send again. (After an ecash send, a
+  // new send of an amount is a new payment, so this is for previews only.)
+  describe.each(s.step === "sendComplete" ? [] : FOLLOW_THROUGH)("then $name", (follow) => {
     it.each(TYPES.filter((type) => EXPECTED[type] === "newFlow"))(
       "%s does not send the old payment again",
       async (type) => {

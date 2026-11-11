@@ -252,13 +252,15 @@ const INTENT_EVENTS = new Set<FlowEvent["type"]>([
 ]);
 
 /**
- * Whether an event may leave a settled preview (paid, delivered, or sent and
- * not taken back). Those that start another flow may. Any other event would
+ * Whether an event may leave a settled payment: a preview paid, delivered, or
+ * sent and not taken back, or an ecash send that made its token
+ * (`sendComplete`). Those that start another flow may. Any other event would
  * carry on the settled flow: re-resolve its amount or mint, re-choose its
  * option, reopen its mint list or Pay again, each rebuilding a preview that
- * Pay sends a second time. On a settled preview they change nothing.
+ * Pay sends a second time, or a send that makes a second token. On a settled
+ * payment they change nothing.
  */
-const LEAVES_SETTLED_PREVIEW: Record<FlowEvent["type"], boolean> = {
+const LEAVES_SETTLED_PAYMENT: Record<FlowEvent["type"], boolean> = {
   EXECUTE: true,
   RESET: true,
   START_SEND: true,
@@ -1124,19 +1126,20 @@ export function createPaymentMachine(
       unit: flowCtx.unit,
     });
 
-    // A settled preview is final for its flow: only another flow leaves it.
+    // A settled payment is final for its flow: only another flow leaves it.
     if (
-      (step === "navigateToMeltPreview" ||
-        step === "navigateToPaymentRequest") &&
-      !awaitsPay((stepData as StepDataMap[typeof step]).phase) &&
-      !LEAVES_SETTLED_PREVIEW[event.type]
+      (step === "sendComplete" ||
+        ((step === "navigateToMeltPreview" ||
+          step === "navigateToPaymentRequest") &&
+          !awaitsPay((stepData as StepDataMap[typeof step]).phase))) &&
+      !LEAVES_SETTLED_PAYMENT[event.type]
     ) {
       logger.info("machine.event.unhandled", {
         type: event.type,
         currentStep: step,
-        reason: "previewSettled",
+        reason: "paymentSettled",
       });
-      finishTurn(sendGeneration, "previewSettled", QUIET_EXIT);
+      finishTurn(sendGeneration, "paymentSettled", QUIET_EXIT);
       return;
     }
 

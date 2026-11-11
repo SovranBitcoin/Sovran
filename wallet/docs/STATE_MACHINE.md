@@ -495,12 +495,13 @@ MUST NOT:
   second Pay is ignored (for a Lightning address it would fetch a fresh
   invoice and pay twice). A failed attempt leaves the phase `preview`, so Pay
   after a failure still retries.
-- A settled preview (melt `settled`, payment request `settled` or
-  `undelivered`) is final for its flow. Only an event that starts another flow
-  (`EXECUTE`, `RESET`, a `START_*`, `SHOW_RECEIVE_QR`, `REVIEW_MINT`) leaves
-  it; every other event changes nothing, since re-resolving the amount, mint
-  or option would rebuild a preview that Pay sends again
-  (`LEAVES_SETTLED_PREVIEW`, `createMachine.ts`;
+- A settled payment (melt `settled`, payment request `settled` or
+  `undelivered`, and `sendComplete`, whose token exists) is final for its
+  flow. Only an event that starts another flow (`EXECUTE`, `RESET`, a
+  `START_*`, `SHOW_RECEIVE_QR`, `REVIEW_MINT`) leaves it; every other event
+  changes nothing, since re-resolving the amount, mint or option would rebuild
+  a preview that Pay sends again, or resolve an ecash send to `confirmSend`
+  and make a second token (`LEAVES_SETTLED_PAYMENT`, `createMachine.ts`;
   `__tests__/flows/settled-preview-final.test.ts`). Each leaving event starts
   from a fresh context that carries nothing of the settled payment
   (`REVIEW_MINT` keeps the context only when it interrupts a token receive),
