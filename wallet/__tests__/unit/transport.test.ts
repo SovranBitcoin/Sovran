@@ -385,6 +385,37 @@ describe("createMeshRedeemOrchestrator", () => {
     ]);
   });
 
+  it("receives waiting entries whose time has come and resumes interrupted ones, nothing else", async () => {
+    const entries: Record<string, MeshRedeemEntry> = {
+      due: entry({ token: "due" }),
+      retryDue: entry({ token: "retryDue", attempts: 2, nextAttemptAt: 1 }),
+      backingOff: entry({
+        token: "backingOff",
+        attempts: 1,
+        nextAttemptAt: Number.MAX_SAFE_INTEGER,
+      }),
+      interrupted: entry({ token: "interrupted", status: "redeeming" }),
+      redeemed: entry({ token: "redeemed", status: "redeemed" }),
+      spent: entry({ token: "spent", status: "spent" }),
+      untrusted: entry({ token: "untrusted", status: "untrusted-mint" }),
+      refused: entry({ token: "refused", status: "failed", attempts: 2 }),
+      exhausted: entry({ token: "exhausted", status: "failed", attempts: 5 }),
+    };
+    const queue = createQueue(entries);
+    const received: string[] = [];
+    const orchestrator = createMeshRedeemOrchestrator({
+      getManager: fakeManager(),
+      queue: queue.port,
+      now: () => 1000,
+      executeAutoRedeem: async ({ tokenString }) => {
+        received.push(tokenString);
+        return { historyEntryId: null };
+      },
+    });
+    await orchestrator.drain();
+    expect(received).toEqual(["due", "retryDue", "interrupted"]);
+  });
+
   it("a drain with nothing arriving during it runs once", async () => {
     const queue = createQueue({ h1: entry() });
     const prune = vi.fn();
