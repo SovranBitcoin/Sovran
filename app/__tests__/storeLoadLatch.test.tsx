@@ -3,7 +3,8 @@
  * connections, the settings, the prompts) stay loaded for as long as the
  * component is mounted: a later read of the same store (a retry, a migration
  * writing the row again) does not send the gate back to waiting. The plain
- * load hook follows every read.
+ * load hook follows every read; the outcome hook shows loading only before the
+ * first read finishes and on a reload.
  */
 
 import { act, renderHook } from '@testing-library/react-native';
@@ -11,9 +12,12 @@ import { act, renderHook } from '@testing-library/react-native';
 import { useNip46ConnectionsStore } from '@/features/nostrSigner/data/nip46ConnectionsStore';
 import {
   markHydrationFailed,
+  markHydrationLoaded,
   markHydrationStarted,
+  reloadStore,
   useStoreLoad,
   useStoreLoadLatched,
+  useStoreLoadOutcome,
 } from '@/shared/lib/persist/hydrationOutcome';
 import { useCtaStore } from '@/shared/stores/global/ctaStore';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
@@ -112,5 +116,36 @@ describe('the store load', () => {
     act(() => markHydrationStarted('wallet-lifecycle'));
     act(() => load.finish());
     expect(result.current).toBe('loaded');
+  });
+
+  it('keeps the latest finished outcome through a later read, and shows loading again on a reload', () => {
+    const load = controlLoad(store.persist);
+    jest.spyOn(store.persist, 'rehydrate').mockImplementation(async () => {
+      load.startAgain();
+      markHydrationStarted('wallet-lifecycle');
+    });
+    act(() => reloadStore(store.persist));
+    const { result } = renderHook(() => useStoreLoadOutcome(store.persist));
+    expect(result.current).toBe('loading');
+
+    act(() => {
+      markHydrationLoaded('wallet-lifecycle');
+      load.finish();
+    });
+    expect(result.current).toBe('loaded');
+
+    load.startAgain();
+    act(() => markHydrationStarted('wallet-lifecycle'));
+    expect(result.current).toBe('loaded');
+
+    act(() => markHydrationFailed('wallet-lifecycle'));
+    expect(result.current).toBe('failed');
+
+    // `loadRequiredStores` reads a failed store again without a reload.
+    act(() => markHydrationStarted('wallet-lifecycle'));
+    expect(result.current).toBe('failed');
+
+    act(() => reloadStore(store.persist));
+    expect(result.current).toBe('loading');
   });
 });

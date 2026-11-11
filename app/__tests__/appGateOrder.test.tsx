@@ -18,7 +18,12 @@ import { act, render, screen } from '@testing-library/react-native';
 import AppGate from '@/shared/blocks/AppGate';
 import { legalRevisions } from '@/shared/lib/legal/legalDocuments';
 import { retrieveMnemonic } from '@/shared/lib/nostr/secureStorage';
-import { markHydrationFailed, markHydrationStarted } from '@/shared/lib/persist/hydrationOutcome';
+import {
+  markHydrationFailed,
+  markHydrationLoaded,
+  markHydrationStarted,
+  reloadStore,
+} from '@/shared/lib/persist/hydrationOutcome';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useWalletLifecycleStore } from '@/shared/stores/global/walletLifecycleStore';
 import { useSecureStoreState } from '@/shared/stores/runtime/secureStoreState';
@@ -128,7 +133,13 @@ function given(state: {
   mockKeys = { isReady: true, isLoading: false, error: null, ...state.keys };
   const hydration = state.hydration ?? 'ready';
   jest.mocked(useSettingsStore.persist.hasHydrated).mockReturnValue(hydration === 'ready');
+  if (hydration === 'ready') markHydrationLoaded('settings-store');
   if (hydration === 'error') markHydrationFailed('settings-store');
+  if (hydration === 'loading') {
+    // A read is under way and none has finished since it began, as on a first launch or a retry.
+    jest.spyOn(useSettingsStore.persist, 'rehydrate').mockResolvedValue(undefined as never);
+    reloadStore(useSettingsStore.persist);
+  }
   useSettingsStore.setState({
     legalAcceptance: state.legal === undefined ? CURRENT : state.legal,
     termsAccepted: null,
@@ -199,6 +210,18 @@ describe('AppGate order', () => {
     await renderGate();
 
     expect(shown()).toBe('nothing');
+  });
+
+  it('keeps showing the wallet while settings are read again', async () => {
+    given({});
+    await renderGate();
+    expect(shown()).toBe('wallet');
+
+    // A later read, not a retry from the error page: a migration wrote the row again.
+    jest.mocked(useSettingsStore.persist.hasHydrated).mockReturnValue(false);
+    await act(async () => markHydrationStarted('settings-store'));
+
+    expect(shown()).toBe('wallet');
   });
 
   it('shows the settings error page, whose retry goes back to loading and rereads settings', async () => {

@@ -1,9 +1,11 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppState } from 'react-native';
 import { act, renderHook } from '@testing-library/react-native';
 import { err, ok } from 'neverthrow';
 
 import { getLatestVersion } from '@/shared/lib/apiClient';
 import { useLatestVersionFetch } from '@/shared/hooks/useLatestVersionFetch';
+import { markHydrationStarted, reloadStore } from '@/shared/lib/persist/hydrationOutcome';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 
 let mockBootDone = true;
@@ -50,9 +52,18 @@ beforeEach(async () => {
   mockGetLatestVersion.mockResolvedValue(ok({ version: '0.1.3' }));
 });
 
+afterEach(() => jest.restoreAllMocks());
+
 it('waits for boot and settings hydration, then persists success', async () => {
   mockBootDone = false;
-  const unread = jest.spyOn(useSettingsStore.persist, 'hasHydrated').mockReturnValue(false);
+  // Nothing has finished reading settings since this read began, as on a first launch.
+  let read!: (value: null) => void;
+  jest.mocked(AsyncStorage.getItem).mockReturnValueOnce(
+    new Promise((resolve) => {
+      read = resolve;
+    })
+  );
+  reloadStore(useSettingsStore.persist);
   const view = await mount();
   expect(mockGetLatestVersion).not.toHaveBeenCalled();
   mockBootDone = true;
@@ -62,10 +73,7 @@ it('waits for boot and settings hydration, then persists success', async () => {
   const payload = { version: '0.1.3', minVersion: '0.1.2', message: 'Please update' };
   mockGetLatestVersion.mockResolvedValueOnce(ok(payload));
   const beforeFetch = Date.now();
-  await act(async () => {
-    unread.mockRestore();
-    await useSettingsStore.persist.rehydrate();
-  });
+  await act(async () => read(null));
 
   expect(mockGetLatestVersion).toHaveBeenCalledTimes(1);
   expect(mockGetLatestVersion).toHaveBeenCalledWith({
@@ -79,6 +87,28 @@ it('waits for boot and settings hydration, then persists success', async () => {
   expect(useSettingsStore.getState().lastKnownAppVersion?.fetchedAt).toBeGreaterThanOrEqual(
     beforeFetch
   );
+});
+
+it('keeps its fetch going, and does not fetch again, while settings are read again', async () => {
+  let finish!: (value: Awaited<ReturnType<typeof getLatestVersion>>) => void;
+  mockGetLatestVersion.mockReturnValueOnce(
+    new Promise((resolve) => {
+      finish = resolve;
+    })
+  );
+  await mount();
+  expect(mockGetLatestVersion).toHaveBeenCalledTimes(1);
+
+  const unread = jest.spyOn(useSettingsStore.persist, 'hasHydrated').mockReturnValue(false);
+  await act(async () => markHydrationStarted('settings-store'));
+  expect(mockGetLatestVersion.mock.calls[0][0].signal?.aborted).toBe(false);
+
+  unread.mockRestore();
+  await act(async () => useSettingsStore.persist.rehydrate());
+  await act(async () => finish(ok({ version: '0.1.4' })));
+
+  expect(mockGetLatestVersion).toHaveBeenCalledTimes(1);
+  expect(useSettingsStore.getState().lastKnownAppVersion?.version).toBe('0.1.4');
 });
 
 it('retains the persisted version offline without fetching or changing its timestamp', async () => {

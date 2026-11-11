@@ -4,14 +4,14 @@ import * as Application from 'expo-application';
 import { getLatestVersion } from '@/shared/lib/apiClient';
 import { useBootMorphCompleted } from '@/shared/lib/qrButtonAnchor';
 import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
-import { useStoreLoad } from '@/shared/lib/persist/hydrationOutcome';
+import { useStoreLoadOutcome } from '@/shared/lib/persist/hydrationOutcome';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 
 const FETCH_INTERVAL_MS = 6 * 60 * 60 * 1000;
 export function useLatestVersionFetch(blockingUpdateShown = false) {
   const bootDone = useBootMorphCompleted();
   const { isOffline } = useOfflineStatus();
-  const hydration = useStoreLoad(useSettingsStore.persist);
+  const hydration = useStoreLoadOutcome(useSettingsStore.persist);
   const lastAttempt = useRef<number | null>(null);
   const forcedForGate = useRef(false);
   useEffect(() => {

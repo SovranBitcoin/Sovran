@@ -14,7 +14,11 @@ import type { LiveStore } from '@/shared/lib/account/accountRegistry';
 import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
 import { declaredStores } from '@/shared/lib/account/accountRegistry';
 import { guardUnreadable, unreadableKey } from '@/shared/lib/persist/preserveUnreadable';
-import { markHydrationFailed, markHydrationStarted } from '@/shared/lib/persist/hydrationOutcome';
+import {
+  markHydrationFailed,
+  markHydrationLoaded,
+  markHydrationStarted,
+} from '@/shared/lib/persist/hydrationOutcome';
 
 const DEFAULT_VERSION = 1;
 
@@ -327,7 +331,7 @@ export function persistConfig<TFull, TPartial>(
           turnDown();
           storeLog.warn(`store.${logKey}.rehydrate_failed`, { error: redactError(error) });
           markHydrationFailed(opts.name);
-        }
+        } else markHydrationLoaded(opts.name);
         opts.afterHydrate?.(state, error);
         const recovery = opts.recoverUnreadable;
         // Not after a load that was itself turned down: its own blob is the

@@ -9,6 +9,8 @@ import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
  * store to load waits for ever. This records the other outcome.
  */
 const failed = new Set<string>();
+/** How each store's latest finished read went. A read that starts leaves it as it was. */
+const lastOutcome = new Map<string, 'loaded' | 'failed'>();
 const listeners = new Set<() => void>();
 
 const notify = () => {
@@ -20,8 +22,14 @@ export function markHydrationStarted(name: string): void {
   notify();
 }
 
+export function markHydrationLoaded(name: string): void {
+  lastOutcome.set(name, 'loaded');
+  notify();
+}
+
 export function markHydrationFailed(name: string): void {
   failed.add(name);
+  lastOutcome.set(name, 'failed');
   notify();
 }
 
@@ -45,11 +53,12 @@ function loadOf(persist: Persist): StoreLoad {
   return failed.has(nameOf(persist)) ? 'failed' : 'loading';
 }
 
-/**
- * Where the store's current read stands. Follows every read: a later one shows
- * as `loading` again. Takes `useXStore.persist`: a hook cannot be passed as a value.
- */
-export function useStoreLoad(persist: Persist): StoreLoad {
+function outcomeOf(persist: Persist): StoreLoad {
+  const load = loadOf(persist);
+  return load === 'loading' ? (lastOutcome.get(nameOf(persist)) ?? 'loading') : load;
+}
+
+function useLoadOf(persist: Persist, view: (persist: Persist) => StoreLoad): StoreLoad {
   const subscribe = useCallback(
     (onChange: () => void) => {
       const stop = persist.onFinishHydration(onChange);
@@ -61,8 +70,33 @@ export function useStoreLoad(persist: Persist): StoreLoad {
     },
     [persist]
   );
-  const read = () => loadOf(persist);
+  const read = () => view(persist);
   return useSyncExternalStore(subscribe, read, read);
+}
+
+/**
+ * Where the store's current read stands. Follows every read: a later one shows
+ * as `loading` again. Takes `useXStore.persist`: a hook cannot be passed as a value.
+ */
+export function useStoreLoad(persist: Persist): StoreLoad {
+  return useLoadOf(persist, loadOf);
+}
+
+/**
+ * How the store's reads have gone: `loading` until the first finishes, and
+ * after `reloadStore` until that read finishes. A later read of any other kind
+ * (a migration writing the row again, `loadRequiredStores` retrying it) keeps
+ * the latest finished outcome until it finishes itself.
+ */
+export function useStoreLoadOutcome(persist: Persist): StoreLoad {
+  return useLoadOf(persist, outcomeOf);
+}
+
+/** Reads the store again, showing `loading` to `useStoreLoadOutcome` until the read finishes. */
+export function reloadStore(persist: Persist): void {
+  lastOutcome.delete(nameOf(persist));
+  notify();
+  void persist.rehydrate();
 }
 
 /**

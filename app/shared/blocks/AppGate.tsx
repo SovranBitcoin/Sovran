@@ -3,7 +3,11 @@ import { useSecureStoreState } from '@/shared/stores/runtime/secureStoreState';
 import React, { useEffect, useState } from 'react';
 
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
-import { useStoreLoad, useStoreLoadLatched } from '@/shared/lib/persist/hydrationOutcome';
+import {
+  reloadStore,
+  useStoreLoadLatched,
+  useStoreLoadOutcome,
+} from '@/shared/lib/persist/hydrationOutcome';
 import { hasCurrentLegalAcceptance } from '@/shared/lib/legal/legalDocuments';
 import { TermsAndConditionsScreen } from '@/features/onboarding/screens/TermsAndConditionsScreen';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
@@ -127,7 +131,7 @@ const AppGate: React.FC<AppGateProps> = ({ children }) => {
   const hasSeenOnboarding = useSettingsStore((state) => state.hasSeenOnboarding);
   const completeOnboarding = useSettingsStore((state) => state.completeOnboarding);
   const reinstallState = useReinstallDetection(hasSeenOnboarding);
-  const hydration = useStoreLoad(useSettingsStore.persist);
+  const hydration = useStoreLoadOutcome(useSettingsStore.persist);
   if (locked) return <KeyRecoveryScreen />;
   if (error && !isReady) return <KeyRecoveryScreen locked={false} />;
   if (hydration === 'loading') return null;
@@ -137,7 +141,7 @@ const AppGate: React.FC<AppGateProps> = ({ children }) => {
         <TermsAndConditionsScreen
           onClose={acceptLegalDocuments}
           settingsError
-          onRetry={() => void useSettingsStore.persist.rehydrate()}
+          onRetry={() => reloadStore(useSettingsStore.persist)}
         />
       </InsteadOfWallet>
     );
