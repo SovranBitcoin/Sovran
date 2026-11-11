@@ -604,20 +604,21 @@ describe('forced recovery at startup', () => {
     }
   }
 
-  it('times out a mint that never answers, moves on, and lets its late result rewrite the row', async () => {
+  it('times out a mint that never answers, moves on, and keeps it timed out when its late result comes', async () => {
     const { renderer, held } = await runPastTimeout();
 
     expect(mockAddMint.mock.calls.map((call) => call[0])).toEqual([MINT_A, MINT_B]);
     expect(texts(renderer)).toContain('Recovery Partial');
     expect(texts(renderer)).toContain('Timed out');
+    expect(texts(renderer)).toContain('Recovered from 1 mint, but 1 failed.');
 
     held.finishA();
     await advance(0);
 
-    // QUIRK (F178): the timeout cancelled nothing; the orphaned restore finishes after the
-    // run has ended and rewrites mint A's row from timed out to done.
-    expect(texts(renderer)).not.toContain('Timed out');
-    expect(texts(renderer)).toContain('Recovered from 2 mints, but 0 failed.');
+    // The timeout cancelled nothing, so the orphaned restore still finishes after the run
+    // has ended (F178), but a mint's outcome is final: its row stays timed out.
+    expect(texts(renderer)).toContain('Timed out');
+    expect(texts(renderer)).toContain('Recovered from 1 mint, but 1 failed.');
   });
 
   it('accepts a reswipe while the timed-out restore is still running', async () => {

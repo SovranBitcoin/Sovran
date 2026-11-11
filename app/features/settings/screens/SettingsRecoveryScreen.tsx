@@ -44,6 +44,7 @@ import {
   currentMintPosition,
   describeMintProgress,
   isSuccess,
+  isTerminal,
   mintStatusToCheckpoint,
   type MintRecoveryState,
   type RecoveryPhase,
@@ -294,6 +295,9 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
       setResults([...recoveryResults]);
 
       const patch = (i: number, next: Partial<MintRecoveryState>) => {
+        // A mint's outcome is final. A restore that timed out is not
+        // cancelled, and its late result must not rewrite the row.
+        if (isTerminal(recoveryResults[i]!.status)) return;
         recoveryResults[i] = { ...recoveryResults[i], ...next };
         setResults([...recoveryResults]);
       };
