@@ -105,13 +105,13 @@ interface SettingsState {
   middlemanRouting: MiddlemanRoutingSettings;
 }
 
-const DEFAULT_MIDDLEMAN_ROUTING: MiddlemanRoutingSettings = {
+const DEFAULT_MIDDLEMAN_ROUTING = {
   maxHops: 2,
   maxFee: 5,
   minSuccessRate: 0.9,
   requireLastOk: true,
   trustMode: 'trusted_only',
-};
+} as const satisfies MiddlemanRoutingSettings;
 
 // ⛔ DATA-LOSS FOOTGUN — read before adding or tightening any field below.
 //
@@ -149,14 +149,6 @@ const PersistedMiddlemanRouting = z.looseObject({
     .default('trusted_only')
     .catch('trusted_only'),
 });
-
-const DEFAULT_MIDDLEMAN_ROUTING_PERSISTED = {
-  maxHops: 2,
-  maxFee: 5,
-  minSuccessRate: 0.9,
-  requireLastOk: true,
-  trustMode: 'trusted_only',
-} as const;
 
 const PersistedLastKnownAppVersion = z
   .object({
@@ -218,9 +210,8 @@ const PersistedSettings = z.object({
     .default([])
     .catch(() => []),
   minTransferThreshold: z.number().int().nonnegative().default(5).catch(5),
-  middlemanRouting: PersistedMiddlemanRouting.default(DEFAULT_MIDDLEMAN_ROUTING_PERSISTED).catch(
-    DEFAULT_MIDDLEMAN_ROUTING_PERSISTED
-  ),
+  middlemanRouting:
+    PersistedMiddlemanRouting.default(DEFAULT_MIDDLEMAN_ROUTING).catch(DEFAULT_MIDDLEMAN_ROUTING),
 });
 
 /** Default settings used for initialization and reset. */
