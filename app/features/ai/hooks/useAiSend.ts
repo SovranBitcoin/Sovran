@@ -297,13 +297,7 @@ export function useAiSend() {
       const displayedModel = resolveSelectedEntry(provider.id, tier.id, balanceSats, lineup);
       const primaryEntry = selectFromChain(chain, balanceSats);
       if (!primaryEntry) {
-        // Two different absences wearing one shape. An empty plaintext chain
-        // means the catalogue never landed. An empty SEALED chain means it
-        // did, and this node serves nothing encrypted — the models we could
-        // reach are all plaintext, and the user asked for the opposite. Saying
-        // "the model list has not loaded" there would send them to retry a
-        // connection that is fine.
-        // Three absences wearing one shape, not two. A sealed chain that is
+        // Three absences wearing one shape. A sealed chain that is
         // empty against a real lineup means the node serves nothing encrypted.
         // A PLAINTEXT chain empty against a real lineup means the catalogue
         // landed and nothing in it is usable here — "the model list has not
