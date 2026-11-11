@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { facade } from 'nostr';
 import {
   Kind0MetadataSchema,
+  NOSTR_METADATA_STALE_TTL_MS,
   cachedProfileToMetadata,
   type NostrProfileMetadata,
 } from '@/shared/stores/global/nostrMetadataCache';
@@ -73,8 +74,6 @@ async function fetchProfilesLogged(
     return {};
   }
 }
-
-const STALE_TTL_MS = 24 * 60 * 60 * 1000;
 
 interface UseNostrProfileMetadataResult {
   metadata: NostrProfileMetadata | undefined;
@@ -311,7 +310,7 @@ export function useNostrProfileMetadataMany(
       if (attemptedAt !== undefined && now - attemptedAt < RETRY_ATTEMPT_WINDOW_MS) continue;
       if (mockMode && getMockProfileMetadata(pk)) continue;
       const record = records.get(pk);
-      if (!record || now - (record.fetchedAt ?? 0) > STALE_TTL_MS) out.push(pk);
+      if (!record || now - (record.fetchedAt ?? 0) > NOSTR_METADATA_STALE_TTL_MS) out.push(pk);
     }
     return out;
   }, [pubkeys, records, mockMode]);
