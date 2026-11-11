@@ -469,16 +469,16 @@ export function createPaymentMachine(
   }
 
   /**
-   * Links a settled payment to its scan and tells the wallet about it. The
-   * payment happened and its step already says so: a link or notification
-   * that throws is logged, and neither undoes the payment nor keeps the turn
-   * from finishing.
+   * Tells the wallet what an effect reported: links a settled payment to its
+   * scan, then sends its notifications. What happened has happened and its
+   * step already says so: a link or notification that throws is logged, and
+   * neither undoes the payment nor keeps the turn from finishing.
    */
   function announcePayment(news: {
-    links: MachineEffectLink[];
+    links?: MachineEffectLink[];
     notifications: MachineEffectNotification[];
   }): void {
-    for (const link of news.links) {
+    for (const link of news.links ?? []) {
       tell("linkTransaction", () =>
         operations?.linkTransaction?.({
           scannedInput: link.input,
@@ -1931,13 +1931,7 @@ export function createPaymentMachine(
                 announcePayment(effect.value);
                 end = { kind: "paid" };
               } else {
-                for (const notification of effect.error.notifications) {
-                  if (notification.type === "onNfcWriteFailed") {
-                    tell("onNfcWriteFailed", () =>
-                      notifications?.onNfcWriteFailed?.(notification.data),
-                    );
-                  }
-                }
+                announcePayment(effect.error);
 
                 setStep("error", effect.error.data);
                 // Its token may have reached the terminal: like an
@@ -2010,14 +2004,7 @@ export function createPaymentMachine(
                 logger.info("machine.send.success");
               }
               setStep(effect.value.step, effect.value.data);
-
-              for (const notification of effect.value.notifications) {
-                if (notification.type === "onTransactionCreated") {
-                  tell("onTransactionCreated", () =>
-                    notifications?.onTransactionCreated?.(notification.data),
-                  );
-                }
-              }
+              announcePayment(effect.value);
             } else {
               setStep(effect.value.step, effect.value.data);
             }
@@ -2069,14 +2056,7 @@ export function createPaymentMachine(
             if (effect.value.kind === "stale") return;
             logger.info("machine.createMintQuote.success");
             setStep(effect.value.step, effect.value.data);
-
-            for (const notification of effect.value.notifications) {
-              if (notification.type === "onTransactionCreated") {
-                tell("onTransactionCreated", () =>
-                  notifications?.onTransactionCreated?.(notification.data),
-                );
-              }
-            }
+            announcePayment(effect.value);
           } else {
             logger.warn("machine.createMintQuote.failed", {
               error: errField(effect.error.cause),
