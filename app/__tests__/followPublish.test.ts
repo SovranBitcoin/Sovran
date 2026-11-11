@@ -5,9 +5,11 @@
  * store and the follow worker (`followSync`) turns outstanding intents into one
  * follow list built on the newest list it can vouch for. Replaced: the relays
  * (a fake NDK subscription per write relay), the publish seam, the signer, the
- * active account, the indexers, the popup and storage.
+ * active account, the indexers, the popup and storage; for the hook, also the
+ * keys, NDK and offline providers and AppState.
  */
 import type NDK from '@nostr-dev-kit/ndk-mobile';
+import { act, renderHook, waitFor } from '@testing-library/react-native';
 import { err, ok } from 'neverthrow';
 
 import {
@@ -15,6 +17,7 @@ import {
   planFollowPublish,
   requestFollowSync,
 } from '@/shared/lib/nostr/followSync';
+import { useFollowSync } from '@/shared/lib/nostr/ownsync/useFollowSync';
 import {
   selectContactList,
   selectIsFollowingPubkey,
@@ -57,10 +60,13 @@ const mockPopup = jest.fn();
 const mockDisk = new Map<string, string>();
 let mockLayer: { getSocialGraph: jest.Mock } | null = null;
 let mockEventSeq = 0;
+let mockHookNdk: NDK | null = null;
+let mockOffline = false;
 
 jest.mock('@nostr-dev-kit/ndk-mobile', () => ({
   __esModule: true,
   default: class {},
+  useNDK: () => ({ ndk: mockHookNdk }),
   NDKSubscriptionCacheUsage: { ONLY_RELAY: 'ONLY_RELAY' },
   NDKRelaySet: {
     fromRelayUrls: (urls: string[]) => ({
@@ -113,6 +119,19 @@ jest.mock('@/shared/lib/logger', () => {
   const silent: object = new Proxy(() => undefined, { get: () => silent });
   return new Proxy({}, { get: (_target, key) => (key === '__esModule' ? false : silent) });
 });
+jest.mock('@/shared/providers/NostrKeysProvider', () => ({
+  useNostrKeysContext: () => ({ keys: { pubkey: 'a0'.repeat(32) } }),
+}));
+jest.mock('@/shared/providers/NostrNDKProvider', () => ({
+  useNostrNDKContext: () => ({ isInitialized: true }),
+}));
+jest.mock('@/shared/providers/OfflineProvider', () => ({
+  useOfflineStatus: () => ({ isOffline: mockOffline }),
+}));
+jest.mock('react-native-web/dist/exports/AppState', () => ({
+  __esModule: true,
+  default: { addEventListener: () => ({ remove: () => undefined }) },
+}));
 jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({
   createProfileScopedStorage: () => ({
     getItem: async (key: string) => mockDisk.get(key) ?? null,
@@ -207,6 +226,8 @@ beforeEach(async () => {
   mockPublish.mockImplementation(acceptOnRelays);
   mockPopup.mockReset();
   mockLayer = null;
+  mockHookNdk = null;
+  mockOffline = false;
   mockDisk.clear();
   useNostrSocialStore.setState(useNostrSocialStore.getInitialState(), true);
   await useNostrSocialStore.persist.rehydrate();
@@ -916,6 +937,34 @@ describe('an account with no follow list yet', () => {
 
     expect(mockPublish).not.toHaveBeenCalled();
     expect(social().optimisticFollowsByPubkey[Z]?.pending).toBe(true);
+  });
+});
+
+describe('the follow sync hook with the real worker', () => {
+  it('publishes a follow tapped offline once the network is back, and the next tap after it', async () => {
+    relaysHold(contacts(T, [['p', X]]));
+    const { ndk } = setup();
+    mockHookNdk = ndk;
+    mockOffline = true;
+    const view = renderHook(() => useFollowSync());
+
+    act(() => tap(Z));
+    await act(async () => undefined);
+    expect(mockPublish).not.toHaveBeenCalled();
+
+    mockOffline = false;
+    view.rerender({});
+    await waitFor(() => expect(social().optimisticFollowsByPubkey).toEqual({}));
+    expect(publishedTags()).toEqual([
+      ['p', X],
+      ['p', Z],
+    ]);
+
+    act(() => tap(X));
+    await waitFor(() => expect(mockPublish).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(social().optimisticFollowsByPubkey).toEqual({}));
+    expect(publishedTags(1)).toEqual([['p', Z]]);
+    view.unmount();
   });
 });
 
