@@ -63,9 +63,9 @@ export function useNostrTierHealth(relayMap: Record<string, RelayHealth>): Nostr
   const naggEnabled = config.nagg.enabled;
   const naggUrl = config.nagg.appViewBaseUrl;
   const primalEnabled = config.primal.enabled;
-  const primalUrls = config.primal.urls;
-  // Identity for the deps array — the list itself is rebuilt on every config read.
-  const primalUrlKey = primalUrls.join(',');
+  // Identity for the deps array — the list itself is rebuilt on every config
+  // read, so `runProbes` reads the hosts back from this key.
+  const primalUrlKey = config.primal.urls.join(',');
 
   const runProbes = useCallback(
     (trigger: 'focus' | 'interval' | 'pull') => {
@@ -73,6 +73,7 @@ export function useNostrTierHealth(relayMap: Record<string, RelayHealth>): Nostr
       const controller = new AbortController();
       abortRef.current = controller;
       const runId = ++runIdRef.current;
+      const primalUrls = primalUrlKey ? primalUrlKey.split(',') : [];
       log.debug('settings.network.health.refresh', { trigger });
       // Only a pull shows the spinner. `isRefreshing` drives the page's
       // RefreshControl, and setting it on focus and on every poll made iOS drag
@@ -129,7 +130,7 @@ export function useNostrTierHealth(relayMap: Record<string, RelayHealth>): Nostr
         });
       });
     },
-    [naggEnabled, naggUrl, primalEnabled, primalUrls, primalUrlKey]
+    [naggEnabled, naggUrl, primalEnabled, primalUrlKey]
   );
 
   useForegroundFocusEffect(
