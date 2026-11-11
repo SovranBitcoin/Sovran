@@ -22,6 +22,15 @@ type PaymentToastOwner =
 
 type BoundOwner = Exclude<PaymentToastOwner, { kind: 'pending' }>;
 
+function sameOwner(a: BoundOwner, b: BoundOwner): boolean {
+  switch (a.kind) {
+    case 'melt':
+      return b.kind === 'melt' && b.quoteId === a.quoteId;
+    case 'send':
+      return b.kind === 'send' && b.operationId === a.operationId;
+  }
+}
+
 interface PaymentStatusFields {
   /** The toast's handle (what its popup clears): quoteId, operationId, entry id or the starter's key. */
   id: string;
@@ -94,11 +103,32 @@ export function paymentInFlight(
   }
 }
 
+/**
+ * A wallet result left to a toast still in flight: a send or melt that
+ * finished while a toast whose payment was not yet known was on screen. It
+ * may be that toast's own, so it is held: the toast catches up with it once
+ * its flow binds it to that payment.
+ */
+interface HeldResult {
+  owner: BoundOwner;
+  /** The melt or send operation, for View. */
+  operationId: string;
+}
+
+/** Results held at once; the oldest goes first. */
+const MAX_HELD_RESULTS = 20;
+
 type PaymentStatusStore = {
   active: ActivePaymentStatus | null;
+  held: HeldResult[];
+  /** Hold a finished payment's result for a toast that may yet be bound to it. */
+  holdResult: (result: HeldResult) => void;
   setActive: (payment: ActivePaymentStatus | null) => void;
   clearActive: (id?: string) => void;
-  /** Bind the toast its starter opened under `key` to the payment's id, once it is known. */
+  /**
+   * Bind the toast its starter opened under `key` to the payment's id, once
+   * it is known. A result already held for that payment confirms it.
+   */
   bindOwner: (key: string, owner: BoundOwner) => void;
   setWaiting: (id: string, copy: { title: string; subtitle: string }) => void;
   setDelivered: (id: string) => void;
@@ -134,6 +164,16 @@ export const usePaymentStatusStore = create<PaymentStatusStore>({
   scope: 'session',
 })((set) => ({
   active: null,
+  held: [],
+  holdResult: (result) =>
+    set((s) => {
+      paymentLog.info('payment.status.hold_result', {
+        owner: result.owner.kind,
+        held: s.held.length + 1,
+      });
+      const others = s.held.filter((h) => !sameOwner(h.owner, result.owner));
+      return { held: [...others, result].slice(-MAX_HELD_RESULTS) };
+    }),
   setActive: (payment) => {
     set((s) => {
       paymentLog.info(
@@ -178,12 +218,29 @@ export const usePaymentStatusStore = create<PaymentStatusStore>({
         logSkip('payment.status.bind_owner.skipped', s, key, 'not_pending_for_key');
         return s;
       }
+      const result = s.held.find((h) => sameOwner(h.owner, owner));
       paymentLog.info('payment.status.bind_owner', {
         id: active.id,
         variant: active.variant,
         owner: owner.kind,
+        caughtUp: !!result,
       });
-      return { active: { ...active, owner } };
+      if (!result) return { active: { ...active, owner } };
+      const held = s.held.filter((h) => h !== result);
+      // Its payment finished before the toast knew it: it is confirmed now,
+      // unless it already ended or is waiting on the person.
+      if (active.state !== 'processing' && active.state !== 'delivered') {
+        return { active: { ...active, owner }, held };
+      }
+      return {
+        active: {
+          ...withoutStatusCopy(active),
+          owner,
+          state: 'confirmed' as const,
+          operationId: result.operationId,
+        },
+        held,
+      };
     }),
   setWaiting: (id, copy) =>
     set((s) => {

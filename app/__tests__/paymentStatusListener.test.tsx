@@ -439,6 +439,79 @@ describe('usePaymentStatusListener', () => {
     unmount();
   });
 
+  it('confirms a payment request whose send finished before its flow bound the toast to it', () => {
+    const { unmount } = mount();
+    usePaymentStatusStore.getState().setActive({
+      variant: 'payment-request',
+      id: 'pr-toast',
+      owner: { kind: 'pending', key: 'pr-toast' },
+      mintUrl: MINT,
+      amount: 5,
+      unit: 'sat',
+      state: 'processing',
+    });
+    // Delivered over HTTP: the send finishes while the toast is still held under its key.
+    act(() =>
+      fake.emit('send:finalized', {
+        mintUrl: MINT,
+        operationId: 'unrelated-send',
+        operation: { amount: 5, unit: 'sat' },
+      })
+    );
+    act(() =>
+      fake.emit('send:finalized', {
+        mintUrl: MINT,
+        operationId: 'pr-send',
+        operation: { amount: 5, unit: 'sat' },
+      })
+    );
+    expect(active()).toMatchObject({ id: 'pr-toast', state: 'processing' });
+
+    // The flow then binds its toast to its send and says it was delivered.
+    act(() => {
+      const store = usePaymentStatusStore.getState();
+      store.bindOwner('pr-toast', { kind: 'send', operationId: 'pr-send' });
+      store.setDelivered('pr-toast');
+    });
+
+    // The toast catches up with its send, and only its own.
+    expect(active()).toMatchObject({
+      id: 'pr-toast',
+      owner: { kind: 'send', operationId: 'pr-send' },
+      state: 'confirmed',
+      operationId: 'pr-send',
+    });
+    unmount();
+  });
+
+  it('confirms a melt whose own melt finished before its flow bound the toast to its quote', () => {
+    const { unmount } = mount();
+    usePaymentStatusStore.getState().setActive({
+      variant: 'melt',
+      id: 'melt-toast',
+      owner: { kind: 'pending', key: 'melt-toast' },
+      mintUrl: MINT,
+      amount: 300,
+      unit: 'sat',
+      state: 'processing',
+    });
+    act(() =>
+      fake.emit('melt-op:finalized', {
+        mintUrl: MINT,
+        operationId: 'mo-a',
+        operation: { quoteId: 'mq-a', amount: 300, unit: 'sat', method: 'bolt11' },
+      })
+    );
+    expect(active()).toMatchObject({ id: 'melt-toast', state: 'processing' });
+
+    act(() =>
+      usePaymentStatusStore.getState().bindOwner('melt-toast', { kind: 'melt', quoteId: 'mq-a' })
+    );
+
+    expect(active()).toMatchObject({ id: 'melt-toast', state: 'confirmed', operationId: 'mo-a' });
+    unmount();
+  });
+
   it('raises a new confirmed send toast in the unit of a background send', () => {
     const { unmount } = mount();
 

@@ -744,12 +744,14 @@ export function usePaymentStatusListener(): void {
       }
       if (paymentInFlight(active, ['send', 'payment-request'])) {
         // Another payment is still being sent and this may not be its send:
-        // it keeps the surface, and its own events or its flow end it.
+        // it keeps the surface, and its own events or its flow end it. The
+        // result is held, for that toast once its flow binds it to this send.
         paymentLog.info('hook.payment_status.send_left_to_payment_in_flight', {
           operationId,
           activeId: active?.id ?? null,
           activeVariant: active?.variant ?? null,
         });
+        store.holdResult({ owner: { kind: 'send', operationId }, operationId });
         return;
       }
 
@@ -897,6 +899,7 @@ export function usePaymentStatusListener(): void {
             quoteId: operation.quoteId,
             activeId: active?.id ?? null,
           });
+          store.holdResult({ owner: { kind: 'melt', quoteId: operation.quoteId }, operationId });
         } else {
           // Background melt (no active toast) — show new confirmed toast
           const amount = amountToNumber(operation.amount);
