@@ -132,6 +132,8 @@ it.each(['0.1.3', '0.1.10'])(
     mockNativeVersion = version;
     useSettingsStore.setState({ lastKnownAppVersion: cached });
     await mount();
+    expect(mockGetLatestVersion).not.toHaveBeenCalled();
+    expect(useSettingsStore.getState().lastKnownAppVersion).toEqual(cached);
   }
 );
 

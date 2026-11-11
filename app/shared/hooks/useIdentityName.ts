@@ -4,10 +4,10 @@ import { resolveIdentityName, type IdentityNameInputs } from '@/shared/lib/ident
 
 /**
  * Resolves a single pubkey to a human-readable name using the canonical
- * hierarchy (see {@link resolveIdentityName}). Reads from the shared
- * `nostrMetadataCache` synchronously and triggers a single SWR
- * subscription if the entry is missing or stale — same semantics as
- * `useNostrProfileMetadata`. Always returns a non-empty `displayName`,
+ * hierarchy (see {@link resolveIdentityName}). Reads the profile through
+ * `useNostrProfileMetadata`, synchronously from the shared entity cache,
+ * which fetches it if the entry is missing or stale. Always returns a
+ * non-empty `displayName`,
  * including while the kind-0 fetch is in flight (falls through to the
  * deterministic word pair).
  *

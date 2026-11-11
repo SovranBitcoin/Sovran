@@ -175,9 +175,9 @@ describe('pricelist polling', () => {
       feed.resume('online');
       expect(fetcher).toHaveBeenCalledTimes(1);
       const signal = fetcher.mock.calls[0][0]?.signal;
-      onLoading.mockClear();
       feed.stop();
       expect(signal?.aborted).toBe(true);
+      onLoading.mockClear();
       complete(success ? ok(payload) : err(new Error('late failure')));
       await settle();
       feed.resume('foreground');
@@ -188,6 +188,17 @@ describe('pricelist polling', () => {
       expect(jest.getTimerCount()).toBe(0);
     }
   );
+
+  it('stopping mid-request ends loading', async () => {
+    const { feed, fetcher, onLoading } = makeFeed();
+    fetcher.mockReturnValue(new Promise(() => {}));
+    feed.start();
+    await settle();
+    expect(onLoading).toHaveBeenLastCalledWith(true);
+    feed.stop();
+    await settle();
+    expect(onLoading).toHaveBeenLastCalledWith(false);
+  });
 
   it.each([true, false])('clears scheduled work on stop (success=%s)', async (success) => {
     const { feed, fetcher } = makeFeed();

@@ -5,11 +5,11 @@ sequencing, payment-state copy, screen-action availability, subscription events,
 chain helpers, and adapter-shaped side effects. Wallet apps own presentation,
 routing, storage, native modules, and product-specific enrichment.
 
-The package has two public entry points:
+The package (`wallet` in this workspace) has two main entry points:
 
-- `colada` for framework-agnostic machine, adapters, copy, history, chain,
+- `wallet` for framework-agnostic machine, adapters, copy, history, chain,
   subscription, screen-action session, and capability helpers.
-- `colada/react` for `ColadaProvider`, `usePaymentFlowMachine`,
+- `wallet/react` for `ColadaProvider`, `usePaymentFlowMachine`,
   `useScreenActions`, and `useExecutionState`.
 
 ## What Colada Owns
@@ -48,8 +48,8 @@ notifications, screen actions, adapters, deep links, and a
 
 ```tsx
 import React from 'react';
-import { ColadaProvider, usePaymentFlowMachine } from 'colada/react';
-import type { StepHandlerMap, WalletContext } from 'colada';
+import { ColadaProvider, usePaymentFlowMachine } from 'wallet/react';
+import type { StepHandlerMap, WalletContext } from 'wallet';
 
 function createHandlers(): StepHandlerMap {
   return {
@@ -326,8 +326,8 @@ with a concrete reason instead of pretending the path can execute.
 
 ## Working Rules
 
-- Prefer root imports from `colada` for framework-agnostic helpers and
-  `colada/react` for React hooks.
+- Prefer root imports from `wallet` for framework-agnostic helpers and
+  `wallet/react` for React hooks.
 - Keep app screens declarative: render the step or entry Colada hands back.
 - Put native/platform dependencies behind adapters.
 - Put app-specific entry enrichment in `screenActionsBridge`.

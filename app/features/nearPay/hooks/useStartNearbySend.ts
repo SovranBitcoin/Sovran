@@ -61,7 +61,6 @@ export function useStartNearbySend(screenUnit?: string) {
         creq: peer.creq,
         nostrPubkeyHex: plan.recipientPubkey,
         walletCapabilityExpiresAt: peer.walletCapabilityExpiresAt,
-        delivery: { locked: true },
       },
       'route'
     );

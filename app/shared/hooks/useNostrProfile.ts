@@ -87,13 +87,6 @@ function countsMissing(profile: ProfileCounts): boolean {
 }
 
 /**
- * Fill the counts nagg did not have from the other sources, in order: Primal
- * `user_profile` (followers + following) → the profile's own kind-3 off the
- * relays (following only; followers need a reverse index relays lack). The
- * counts a source cannot supply stay undefined — never 0 — so the header shows
- * a placeholder instead of a wrong number.
- */
-/**
  * Fill the counts nagg did not have from the other sources CONCURRENTLY —
  * Primal `user_profile` (followers + following) and the profile's own kind-3
  * (following) — applying each as it lands through `onCounts`, so the pills

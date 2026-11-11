@@ -107,8 +107,11 @@ export function createPricelistFeed({
     stop: () => {
       stopped = true;
       clearTimer();
-      request?.abort();
+      if (!request) return;
+      request.abort();
       request = null;
+      // The aborted poll returns before its own `onLoading(false)`.
+      onLoading(false);
     },
   };
 }

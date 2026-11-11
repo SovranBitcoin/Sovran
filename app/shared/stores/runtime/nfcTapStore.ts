@@ -5,8 +5,8 @@
  * drives the pulse indicator on the wallet NFC button.
  * `phase` — where the current tap is in its lifecycle; drives the
  * nfc-tap sheet's title/subtitle. Phases past 'reading' come from
- * colada's onNfcPaymentProgress notification ('selecting' today;
- * 'creating'/'writing' once executeNfcSend write-back is wired).
+ * colada's onNfcPaymentProgress notification ('selecting', then
+ * 'creating' and 'writing' during the NFC write-back).
  *
  * Not persisted — listening is per-session and per-screen-focus.
  */

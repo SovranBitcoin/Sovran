@@ -10,9 +10,10 @@ import { resolveIdentityName } from '@/shared/lib/identity';
  * user's *own* account pubkeys (i.e. an entry in `profileStore`). Reads
  * the locally-cached Nostr metadata (no relay fetch) and falls through
  * to the deterministic word pair via `resolveIdentityName`. For foreign
- * pubkeys use `useIdentityName` instead — it consults the SWR-backed
- * `nostrMetadataCache`. In presentation Mock Mode, the reviewed public snapshot
- * can supply display metadata without creating an account or changing keys.
+ * pubkeys use `useIdentityName` instead — it reads the shared entity cache
+ * and fetches a missing or stale profile. In presentation Mock Mode, the
+ * reviewed public snapshot can supply display metadata without creating an
+ * account or changing keys.
  */
 export function useProfileDisplay(pubkey: string): {
   displayName: string;

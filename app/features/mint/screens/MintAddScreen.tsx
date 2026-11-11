@@ -51,8 +51,6 @@ import type { GetInfoResponse } from '@cashu/cashu-ts';
 // Height constant for currency tabs (same as MintListScreen)
 const CURRENCY_TABS_HEIGHT = MINT_CURRENCY_TABS_HEIGHT;
 
-// MintStatCell removed — stats now rendered inline
-
 interface PseudoMint {
   url: string;
   isPseudoMint: true;
@@ -369,7 +367,7 @@ export function MintAddScreen() {
     }
   }, [validationState, validatedUrl, customMintInfo]);
 
-  // Server-side mint search
+  // Mint discovery: one cached list, filtered here by query and currency
   const {
     results: searchResults,
     loading: searchLoading,

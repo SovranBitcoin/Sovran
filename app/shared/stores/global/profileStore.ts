@@ -70,11 +70,11 @@ interface ProfileState {
 }
 
 interface ProfileActions {
-  /** Add a new profile entry (idempotent — skips if accountIndex already exists) */
   /**
    * Record a profile. Returns whether it is in the list afterwards — `true`
-   * for a fresh add AND for one already present, `false` only when the list is
-   * at `MAX_PROFILES` and this one is new. Callers must not assume success:
+   * for a fresh add AND for one already present, `false` when another key
+   * already holds this account index, or when the list is at `MAX_PROFILES`
+   * and this one is new. Callers must not assume success:
    * proceeding to switch into a profile that was refused leaves the app
    * running as an account the store does not know about.
    */

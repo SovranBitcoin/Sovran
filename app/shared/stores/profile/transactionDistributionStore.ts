@@ -24,7 +24,7 @@
  * never engaged, and the inferred 'displayed' clobbered the real action.
  *
  * Both `useTransactionSource` (Transaction.tsx) and
- * `screenActionsBridge.getSourceLabel` (Colada.tsx) compute the
+ * `getSourceLabel` (createSovranScreenActionsBridge.ts) compute the
  * read key with the same convention.
  *
  * Lifecycle:
@@ -33,8 +33,8 @@
  *    inference cannot overwrite it. This makes the inference a safe
  *    fallback rather than a clobber.
  *  - The 'displayed' fallback is written by a global subscription to coco's
- *    `mint-op:quote-state-changed` event in `Colada.tsx` when a quote
- *    transitions to PAID/ISSUED and no source has been recorded yet.
+ *    `mint-quote:updated` event in `createSovranScreenActionsBridge.ts` when
+ *    a quote's payment is observed and no source has been recorded yet.
  */
 
 import { defineStore as create } from '@/shared/lib/persist/defineStore';
@@ -75,8 +75,6 @@ interface TransactionDistributionActions {
    * entries pass `quoteId`, for everything else pass `historyEntry.id`.
    */
   setDistribution: (key: string, source: DistributionSource) => void;
-  /** Get the distribution entry for a key, or null. */
-  getDistribution: (key: string) => DistributionEntry | null;
 }
 
 type TransactionDistributionStore = TransactionDistributionState & TransactionDistributionActions;
@@ -92,7 +90,7 @@ const PersistedDistributionEntry = z.looseObject({
 
 const PersistedTransactionDistributionStore = z.object({
   // An entry with an unrecognized `source` (written by a newer build) is
-  // dropped alone — `getDistribution` already treats a missing key as "never
+  // dropped alone — readers already treat a missing key as "never
   // recorded" — instead of failing the whole-blob parse, which would wipe
   // every recorded distribution (persist merge discards the blob).
   distributions: tolerantRecord(z.string().max(256), PersistedDistributionEntry),
@@ -131,10 +129,6 @@ export const useTransactionDistributionStore = create<TransactionDistributionSto
               },
             },
           }));
-        },
-
-        getDistribution: (key: string) => {
-          return get().distributions[key] ?? null;
         },
       }),
       persistConfig({
