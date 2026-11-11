@@ -252,6 +252,32 @@ it('restores route selections and resets every draft before applying defaults', 
   });
 });
 
+it('opens on the defaults for empty route values, and sends the currency in lower case', async () => {
+  mockParams = { currency: 'USD', paymentType: '', status: '', mintUrl: '' };
+  act(() => {
+    renderer = TestRenderer.create(<FiltersScreen />);
+  });
+  expect(control('filter-currency-usd').props.accessibilityState.checked).toBe(true);
+  expect(control('filter-type-all').props.accessibilityState.checked).toBe(true);
+  expect(control('filter-status-all').props.accessibilityState.checked).toBe(true);
+  expect(control('filter-mint-all').props.accessibilityState.checked).toBe(true);
+  await press('filters-apply');
+  expect(mockDismissTo).toHaveBeenCalledWith({
+    pathname: '/transactions',
+    params: {
+      filterCurrency: 'usd',
+      filterPaymentType: 'all',
+      filterDirection: 'all',
+      filterStatus: 'All',
+      filterSource: 'all',
+      filterLock: 'all',
+      filterCounterparty: 'all',
+      filterZap: 'all',
+      filterMintUrl: 'all',
+    },
+  });
+});
+
 it('counts a test account the way the transaction list scopes it', async () => {
   // A testnut mint keeps its proofs in unit `sat`; the TSAT account is that mint's side
   // of the split, as the list's `belongsToAccount` scope decides.
