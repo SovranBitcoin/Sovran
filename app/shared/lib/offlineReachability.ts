@@ -57,15 +57,14 @@ type ResolveOfflineOptions = {
 /** Any answer over TLS proves a path to the internet, whatever the server thinks of the request. */
 const answered = () => true;
 
-function toHttpsUrl(url: string, from: 'wss:' | 'https:'): string | null {
-  try {
-    const parsed = new URL(url);
-    if (parsed.protocol !== from) return null;
-    parsed.protocol = 'https:';
-    return parsed.toString();
-  } catch {
-    return null;
-  }
+/**
+ * `url` as an HTTPS address when it uses `scheme`, else `null`. Plain string
+ * work on purpose: React Native's own `URL` cannot have its protocol changed.
+ */
+function toHttpsUrl(url: string, scheme: 'wss' | 'https'): string | null {
+  const match = /^([a-z][a-z0-9+.-]*):\/\/([^\s/?#]+[^\s]*)$/i.exec(url.trim());
+  if (!match || match[1].toLowerCase() !== scheme) return null;
+  return `https://${match[2]}`;
 }
 
 /**
@@ -96,7 +95,7 @@ export function defaultReachabilityProbes(): ReachabilityProbe[] {
 
   if (hasFeature('nostr')) {
     const relayUrls = getOwnWriteRelays()
-      .map((url) => toHttpsUrl(url, 'wss:'))
+      .map((url) => toHttpsUrl(url, 'wss'))
       .filter((url): url is string => url !== null)
       .slice(0, MAX_RELAY_PROBES);
     for (const url of relayUrls) {
@@ -112,7 +111,7 @@ export function defaultReachabilityProbes(): ReachabilityProbe[] {
   }
 
   const mintUrl = useMintStore.getState().selectedMint;
-  const mintInfoUrl = mintUrl ? toHttpsUrl(mintUrl, 'https:') : null;
+  const mintInfoUrl = mintUrl ? toHttpsUrl(mintUrl, 'https') : null;
   if (mintInfoUrl) {
     probes.push({
       name: 'mint',
