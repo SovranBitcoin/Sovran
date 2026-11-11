@@ -63,6 +63,8 @@ type OwnEventRead = {
   outcome: OwnEventReadOutcome;
   /** The newest valid event any relay returned, also when the read did not complete. */
   newest: NDKEvent | undefined;
+  /** The relays asked: on `complete`, every one of them answered. */
+  relays: string[];
 };
 
 /** Newest valid own event of `kind` across the write relays, waiting for each relay's answer. */
@@ -72,7 +74,7 @@ export async function readNewestOwnEvent(
   kind: number
 ): Promise<OwnEventRead> {
   const relayUrls = [...new Set(getOwnWriteRelays())];
-  if (relayUrls.length === 0) return { outcome: 'no-relays', newest: undefined };
+  if (relayUrls.length === 0) return { outcome: 'no-relays', newest: undefined, relays: [] };
   return new Promise<OwnEventRead>((resolve) => {
     let newest: NDKEvent | undefined;
     let settled = false;
@@ -83,7 +85,7 @@ export async function readNewestOwnEvent(
       settled = true;
       clearTimeout(timer);
       for (const subscription of subscriptions) subscription.stop();
-      resolve({ outcome, newest });
+      resolve({ outcome, newest, relays: relayUrls });
     };
     const timer = setTimeout(() => finish('timed-out'), READ_TIMEOUT_MS);
     try {

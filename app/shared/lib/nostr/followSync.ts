@@ -219,7 +219,8 @@ async function syncOnce(ndk: NDK, ownPubkey: string): Promise<void> {
 
       const signer = await matchingSigner(ndk, ownPubkey);
       scope.check();
-      const read = decodeRead(await readNewestOwnEvent(ndk, ownPubkey, Contacts));
+      const raw = await readNewestOwnEvent(ndk, ownPubkey, Contacts);
+      const read = decodeRead(raw);
       scope.check();
       // Only a complete read's list is kept; the store ignores it if it knows a newer one.
       if (read.status === 'found')
@@ -287,7 +288,14 @@ async function syncOnce(ndk: NDK, ownPubkey: string): Promise<void> {
       // A list or seed arrived while signing, also one dated the same second: build again on it.
       if (!sameSavedList(atBase, savedList())) continue;
 
-      const published = await publishEvent({ ndk, event, resolveOn: 'all-settled' });
+      // Exactly the relays the complete read covered: a relay that was not read
+      // may hold a newer list, and this one would replace it there.
+      const published = await publishEvent({
+        ndk,
+        event,
+        relays: raw.relays,
+        resolveOn: 'all-settled',
+      });
       scope.check();
       if (published.isErr()) throw new Error(`Follow list publish failed: ${published.error.type}`);
       // Published, but not recorded for a signer that changed meanwhile: the next pass reads it back.

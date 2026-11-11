@@ -331,6 +331,27 @@ describe('following someone', () => {
     ]);
   });
 
+  it('sends the list only to the relays it read, never over a list on another relay in the pool', async () => {
+    relaysHold(contacts(T, [['p', X]]));
+    // A relay in the pool, not a write relay, holds a newer list the read never asked.
+    const other = { url: 'wss://three.example' };
+    mockPoolOnly.push(other);
+    const newer = contacts(T + 10, [
+      ['p', X],
+      ['p', W],
+    ]);
+    mockStored.set(other.url, [newer]);
+    const { ndk } = setup();
+
+    tap(Z);
+    await requestFollowSync(ndk, OWN);
+
+    expect(mockPublish).toHaveBeenCalledTimes(1);
+    expect(mockPublish.mock.calls[0][0].relays).toEqual(mockRelays.map((relay) => relay.url));
+    expect(heldBy(other.url)).toEqual([newer]);
+    for (const relay of mockRelays) expect(heldBy(relay.url)).toHaveLength(2);
+  });
+
   it('unfollows by removing only that entry', async () => {
     const tags = [
       ['p', X, 'wss://hint.example'],
