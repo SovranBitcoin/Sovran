@@ -496,6 +496,25 @@ describe('a chain that replaces a direct leg', () => {
     expect(header()).toMatchObject({ amount: 1570, color: 'success' });
     expect(renderer.root.findAllByType('TransferCard' as never)).toHaveLength(1);
   });
+
+  it('expanded, gives a chain split by a standalone leg two cards, in saved order', async () => {
+    const hop = (id: string) =>
+      leg(id, { amount: 100, chainId: 'ch1', chainPath: [A, B, C], meltQuoteId: `melt-${id}` });
+    seedGroup({
+      legs: [hop('hop1'), leg('solo', { amount: 100, meltQuoteId: 'melt-solo' }), hop('hop2')],
+    });
+
+    await render();
+    await expand();
+
+    const cards = renderer.root
+      .findAllByType('TransferCard' as never)
+      .map((card) =>
+        card.findAllByType('TransferEntryRow' as never).map((r) => r.props.testID as string)
+      );
+    expect(cards).toEqual([['swap-leg-melt-hop1'], ['swap-leg-melt-solo'], ['swap-leg-melt-hop2']]);
+    expect(details()).toMatchObject({ Steps: '3' });
+  });
 });
 
 describe('a swap in a unit other than sat', () => {
