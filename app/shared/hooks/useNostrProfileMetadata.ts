@@ -46,7 +46,7 @@ async function fetchProfilesLogged(
     gen: 0,
   });
   try {
-    const profiles = await fetchProfilesViaFacade(pubkeys, { refresh: true, readId });
+    const profiles = await fetchProfilesViaFacade(pubkeys, { readId });
     const count = Object.keys(profiles).length;
     readEvents.done({
       readId,

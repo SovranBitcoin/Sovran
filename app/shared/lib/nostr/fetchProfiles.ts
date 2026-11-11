@@ -5,8 +5,7 @@ import { buildNostrDataLayer } from '@/shared/lib/nostr/buildNostrDataLayer';
 
 type ProfileMetadata = facade.ProfileMetadata;
 type ProfileBatch = Record<string, ProfileMetadata>;
-// Only automatic, uncancelled revalidation shares work. Explicit cancellable
-// reads retain their caller's lifetime; account/tier changes get a new layer.
+// Overlapping lookups of one key share one read; account/tier changes get a new layer.
 const profileFlights = new WeakMap<
   facade.NostrDataLayer,
   Map<string, Promise<ProfileMetadata | undefined>>
@@ -15,12 +14,13 @@ const profileFlights = new WeakMap<
 /**
  * Fetch kind-0 metadata for a set of pubkeys through the tier-selecting facade
  * (every enabled tier is asked at once; relays fill what Primal lacks).
- * Returns pubkey → metadata for the ones a tier resolved; never throws. Empty
- * when every tier is disabled or exhausted.
+ * Always asks the tiers, never answers from the cache alone. Returns pubkey →
+ * metadata for the ones a tier resolved; never throws. Empty when every tier is
+ * disabled or exhausted.
  */
 export async function fetchProfilesViaFacade(
   pubkeys: string[],
-  options: { refresh?: boolean; readId?: string; signal?: AbortSignal } = {}
+  options: { readId?: string } = {}
 ): Promise<Record<string, ProfileMetadata>> {
   if (pubkeys.length === 0) return {};
   const layer = buildNostrDataLayer();
@@ -31,11 +31,12 @@ export async function fetchProfilesViaFacade(
 async function fetchProfilesFromLayer(
   layer: facade.NostrDataLayer,
   pubkeys: string[],
-  options: { refresh?: boolean; readId?: string; signal?: AbortSignal }
+  options: { readId?: string } = {}
 ): Promise<ProfileBatch> {
   const fetch = async (keys: string[]): Promise<ProfileBatch> => {
     const result = await layer.getProfiles({
       pubkeys: keys,
+      refresh: true,
       ...options,
     });
     return result.match(
@@ -55,21 +56,16 @@ async function fetchProfilesFromLayer(
     // A partial aggregate is not a miss. Wait for this key's remaining
     // sources so joining screens do not spend retry attempts on one read.
     if (layer.cache.pendingProfiles.has(key)) {
-      const settled = await new Promise<boolean>((resolve) => {
-        const finish = (settled: boolean) => {
+      await new Promise<void>((resolve) => {
+        const finish = () => {
           unsubscribe();
-          options.signal?.removeEventListener('abort', onAbort);
-          resolve(settled);
+          resolve();
         };
-        const onAbort = () => finish(false);
         const unsubscribe = layer.cache.pendingProfiles.subscribeKey(key, () => {
-          if (!layer.cache.pendingProfiles.has(key)) finish(true);
+          if (!layer.cache.pendingProfiles.has(key)) finish();
         });
-        options.signal?.addEventListener('abort', onAbort, { once: true });
-        if (options.signal?.aborted) finish(false);
-        else if (!layer.cache.pendingProfiles.has(key)) finish(true);
+        if (!layer.cache.pendingProfiles.has(key)) finish();
       });
-      if (!settled) return undefined;
     }
     const record = layer.cache.getProfile(key);
     if (record === previous || !record?.seenAt) return undefined;
@@ -82,19 +78,6 @@ async function fetchProfilesFromLayer(
     } = record;
     return metadata;
   };
-  if (!options.refresh || options.signal) {
-    const previous = new Map(pubkeys.map((key) => [key, layer.cache.getProfile(key)]));
-    const profiles = await fetch(pubkeys);
-    const entries = await Promise.all(
-      pubkeys.map(
-        async (key) => [key, await resolveProfile(key, profiles, previous.get(key))] as const
-      )
-    );
-    return Object.fromEntries(
-      entries.filter((entry): entry is readonly [string, ProfileMetadata] => entry[1] !== undefined)
-    );
-  }
-
   const flights =
     profileFlights.get(layer) ?? new Map<string, Promise<ProfileMetadata | undefined>>();
   profileFlights.set(layer, flights);
@@ -149,7 +132,7 @@ export function backfillProfile(layer: facade.NostrDataLayer, pubkey: string): v
     });
     if (keys.length === 0) return;
     try {
-      await fetchProfilesFromLayer(layer, keys, { refresh: true });
+      await fetchProfilesFromLayer(layer, keys);
     } catch (error) {
       log.warn('nostr.profiles.backfill_failed', () => ({ count: keys.length, error }));
     } finally {

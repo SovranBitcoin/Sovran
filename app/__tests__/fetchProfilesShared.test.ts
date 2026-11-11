@@ -31,8 +31,8 @@ it('shares overlapping Home and row enrichment while fetching only new keys', as
   mockLayer = facade.createNostrDataLayer({
     tiers: [facade.relay.createRelayTier({ connection: { request } })],
   });
-  const home = fetchProfilesViaFacade([alice, bob], { refresh: true });
-  const row = fetchProfilesViaFacade([bob, carol], { refresh: true });
+  const home = fetchProfilesViaFacade([alice, bob]);
+  const row = fetchProfilesViaFacade([bob, carol]);
   answer.resolve(
     [alice, bob, carol].map((pubkey) => ({
       id: pubkey,
@@ -56,12 +56,12 @@ it('releases a completed miss so a later lookup can retry', async () => {
   mockLayer = facade.createNostrDataLayer({
     tiers: [facade.relay.createRelayTier({ connection: { request } })],
   });
-  expect(await fetchProfilesViaFacade([alice], { refresh: true })).toEqual({});
-  expect(await fetchProfilesViaFacade([alice], { refresh: true })).toEqual({});
+  expect(await fetchProfilesViaFacade([alice])).toEqual({});
+  expect(await fetchProfilesViaFacade([alice])).toEqual({});
   expect(request).toHaveBeenCalledTimes(2);
 });
 
-it('does not join another account or a caller-owned cancellation signal', async () => {
+it('does not join another account', async () => {
   const answer = deferred<facade.relay.RawRelayEvent[]>();
   const request = jest.fn(async () => ok(await answer.promise));
   const createLayer = () =>
@@ -69,23 +69,16 @@ it('does not join another account or a caller-owned cancellation signal', async 
       tiers: [facade.relay.createRelayTier({ connection: { request } })],
     });
   mockLayer = createLayer();
-  const first = fetchProfilesViaFacade([alice], { refresh: true });
-  const controller = new AbortController();
-  const cancellable = fetchProfilesViaFacade([alice], { refresh: true, signal: controller.signal });
+  const first = fetchProfilesViaFacade([alice]);
   mockLayer = createLayer();
-  const switched = fetchProfilesViaFacade([alice], { refresh: true });
+  const switched = fetchProfilesViaFacade([alice]);
   answer.resolve([
     { id: alice, pubkey: alice, kind: 0, created_at: 1, content: '{"name":"Alice"}' },
   ]);
-  for (const result of await Promise.all([first, cancellable, switched])) {
+  for (const result of await Promise.all([first, switched])) {
     expect(result[alice]?.name).toBe('Alice');
   }
-  expect(request).toHaveBeenCalledTimes(3);
-  expect(request).toHaveBeenNthCalledWith(
-    2,
-    [{ kinds: [0], authors: [alice] }],
-    expect.objectContaining({ signal: controller.signal })
-  );
+  expect(request).toHaveBeenCalledTimes(2);
 });
 
 it('shares late gap filling after the first aggregate answer has returned', async () => {
@@ -106,17 +99,16 @@ it('shares late gap filling after the first aggregate answer has returned', asyn
         facade.relay.createRelayTier({ connection: { request: relay } }),
       ],
     });
-    const first = fetchProfilesViaFacade([alice, bob], { refresh: true });
+    const first = fetchProfilesViaFacade([alice, bob]);
     await jest.advanceTimersByTimeAsync(800);
     expect(mockLayer.cache.getProfile(alice)?.name).toBe('Alice');
-    const joined = fetchProfilesViaFacade([bob], { refresh: true });
+    const joined = fetchProfilesViaFacade([bob]);
     expect(relay).toHaveBeenCalledTimes(1);
     slow.resolve([{ id: bob, pubkey: bob, kind: 0, created_at: 1, content: '{"name":"Bob"}' }]);
     await jest.advanceTimersByTimeAsync(0);
     expect((await first)[bob]?.name).toBe('Bob');
     expect((await joined)[bob]?.name).toBe('Bob');
     expect(mockLayer.cache.getProfile(bob)?.name).toBe('Bob');
-    expect((await fetchProfilesViaFacade([bob]))[bob]?.name).toBe('Bob');
     expect(relay).toHaveBeenCalledTimes(1);
   } finally {
     jest.useRealTimers();
@@ -143,7 +135,7 @@ it('keeps a mounted row eligible to retry after shared slow sources miss', async
         facade.relay.createRelayTier({ connection: { request: relay } }),
       ],
     });
-    const home = fetchProfilesViaFacade([alice, bob], { refresh: true });
+    const home = fetchProfilesViaFacade([alice, bob]);
     const row = renderHook(() => useNostrProfileMetadata(bob));
     await act(async () => {
       await jest.advanceTimersByTimeAsync(8800);
@@ -170,7 +162,7 @@ it('keeps a mounted row eligible to retry after shared slow sources miss', async
 it('retains seeded display data without treating a failed refresh as resolution', async () => {
   mockLayer = facade.createNostrDataLayer({ tiers: [] });
   mockLayer.cache.ingestProfileMetadata({ [alice]: { name: 'Seeded Alice' } }, 0, 'relay');
-  expect(await fetchProfilesViaFacade([alice], { refresh: true })).toEqual({});
+  expect(await fetchProfilesViaFacade([alice])).toEqual({});
   expect(mockLayer.cache.getProfile(alice)?.name).toBe('Seeded Alice');
 });
 
@@ -195,7 +187,7 @@ it('waits past a cached seed in a partial answer for the remaining kind-0 source
     });
     mockLayer.cache.ingestProfileInfos({ [bob]: { name: 'Seed Bob' } }, 'cache');
     let settled = false;
-    const fetch = fetchProfilesViaFacade([alice, bob], { refresh: true }).then((profiles) => {
+    const fetch = fetchProfilesViaFacade([alice, bob]).then((profiles) => {
       settled = true;
       return profiles;
     });
@@ -213,46 +205,6 @@ it('waits past a cached seed in a partial answer for the remaining kind-0 source
     ]);
     await jest.advanceTimersByTimeAsync(0);
     expect((await fetch)[bob]).toMatchObject({ name: 'Bob', picture: 'real.png' });
-  } finally {
-    jest.useRealTimers();
-  }
-});
-
-it('drops a pending cached seed when an explicit caller cancels its wait', async () => {
-  jest.useFakeTimers();
-  try {
-    const slow = deferred<facade.relay.RawRelayEvent[]>();
-    mockLayer = facade.createNostrDataLayer({
-      tiers: [
-        facade.primal.createPrimalTier({
-          connection: {
-            request: async () =>
-              ok([
-                { id: alice, pubkey: alice, kind: 0, created_at: 1, content: '{"name":"Alice"}' },
-              ]),
-          },
-        }),
-        facade.relay.createRelayTier({
-          connection: { request: async () => ok(await slow.promise) },
-        }),
-      ],
-    });
-    mockLayer.cache.ingestProfileInfos({ [bob]: { name: 'Seed Bob' } }, 'cache');
-    const controller = new AbortController();
-    let settled = false;
-    const fetch = fetchProfilesViaFacade([alice, bob], {
-      refresh: true,
-      signal: controller.signal,
-    }).then((profiles) => {
-      settled = true;
-      return profiles;
-    });
-    await jest.advanceTimersByTimeAsync(800);
-    expect(settled).toBe(false);
-    controller.abort();
-    expect((await fetch)[bob]).toBeUndefined();
-    slow.resolve([]);
-    await jest.advanceTimersByTimeAsync(0);
   } finally {
     jest.useRealTimers();
   }

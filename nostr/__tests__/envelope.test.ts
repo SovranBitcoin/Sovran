@@ -5,7 +5,7 @@ import {
   NaggProfilesEnvelopeSchema,
   aggregateValue,
   noteMetricsFromAggregates,
-  noteStatsFromEnvelope,
+  noteMetricsMapFromAggregates,
   profileInfoMapFromEnvelope,
   profileMetadataByPubkey,
   resolveAnchors,
@@ -138,14 +138,14 @@ describe('aggregate accessors', () => {
     expect(aggregateValue(aggregates, ROOT_ID, 'likeCount')).toBeUndefined();
   });
 
-  test('noteStatsFromEnvelope rebuilds the per-id stats map (POST /nostr/events/aggregates)', () => {
+  test('noteMetricsMapFromAggregates rebuilds the per-id stats map (POST /nostr/events/aggregates)', () => {
     const envelope = NaggEnvelopeSchema.parse({
       order: [],
       orderBy: 'created_at',
       events: [],
       aggregates: { [NOTE_ID]: { k7_e: { actors: 5 }, k9735_e: { sources: 2, value_total: 42 } } },
     });
-    const stats = noteStatsFromEnvelope(envelope);
+    const stats = noteMetricsMapFromAggregates(envelope.aggregates);
     expect(stats[NOTE_ID]).toMatchObject({
       likeCount: 5,
       repostCount: 0,

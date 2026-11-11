@@ -815,11 +815,6 @@ export function notificationsPageFromEnvelope(
 // Simple per-route reconstructions
 // ---------------------------------------------------------------------------
 
-/** v1's `/nostr/notes/stats` map, now served by `POST /nostr/events/aggregates`. */
-export function noteStatsFromEnvelope(envelope: NaggEnvelope): Record<string, NaggNoteMetrics> {
-  return noteMetricsMapFromAggregates(envelope.aggregates);
-}
-
 /** v1's enrichment side maps (`/nostr/events` + `/nostr/profiles` consumers). */
 export type NaggEnrichment = {
   metrics: Record<string, NaggNoteMetrics>;

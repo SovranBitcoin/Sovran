@@ -11,8 +11,8 @@ import {
 import {
   NaggEnvelopeSchema,
   NaggNotificationsEnvelopeSchema,
-  noteStatsFromEnvelope,
   feedPageFromEnvelope,
+  noteMetricsMapFromAggregates,
 } from '../src/envelope';
 
 const NOTE_ID = 'a'.repeat(64);
@@ -212,7 +212,7 @@ describe('eventsAggregatesAppView', () => {
     };
     const parsed = NaggEnvelopeSchema.safeParse(body);
     expect(parsed.success).toBe(true);
-    const stats = noteStatsFromEnvelope(parsed.data!);
+    const stats = noteMetricsMapFromAggregates(parsed.data!.aggregates);
     expect(stats[NOTE_ID]).toEqual({
       likeCount: 5,
       repostCount: 2,
