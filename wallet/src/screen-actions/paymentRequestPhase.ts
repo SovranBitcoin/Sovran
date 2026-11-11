@@ -50,9 +50,12 @@ const stringOf = (value: unknown): string | undefined =>
 export const isPaymentRequestPreviewId = (id: unknown): boolean =>
   typeof id === "string" && id.startsWith("pr-preview-");
 
-/** An operation id that names a real operation, not the preview's own id. */
+/**
+ * An operation id that names a real operation: a non-empty string, as every
+ * writer writes it, and not the preview's own id.
+ */
 const realOperationId = (value: unknown): boolean =>
-  !!value && !isPaymentRequestPreviewId(value);
+  typeof value === "string" && value.length > 0 && !isPaymentRequestPreviewId(value);
 
 /** Reads the phase an entry's strings say, once, for every reader. */
 export function decodePaymentRequestEntryPhase(
