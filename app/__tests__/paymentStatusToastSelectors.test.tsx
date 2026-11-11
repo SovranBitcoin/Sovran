@@ -74,8 +74,8 @@ jest.mock('@/shared/stores/runtime/nearPayStore', () => ({
     selector({ radarVisible: false }),
 }));
 jest.mock('@/shared/stores/global/settingsStore', () => ({
-  useSettingsStore: (selector: (state: { getDisplayBtc: () => number }) => unknown) =>
-    selector({ getDisplayBtc: () => 0 }),
+  useSettingsStore: (selector: (state: { displayBtc: number }) => unknown) =>
+    selector({ displayBtc: 0 }),
 }));
 jest.mock('@/shared/lib/cashu/manager', () => ({
   CocoManager: {

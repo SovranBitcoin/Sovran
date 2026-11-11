@@ -103,17 +103,6 @@ describe('editing the draft', () => {
     expect(state().blocks.map((b) => b.id)).toEqual([firstTextId(), two]);
   });
 
-  it('moves blocks and ignores a move outside the list', () => {
-    const one = state().addMediaBlock({ kind: 'media', mediaKind: 'image' });
-    const text = firstTextId();
-    state().moveBlock(1, 0);
-    expect(state().blocks.map((b) => b.id)).toEqual([one, text]);
-
-    state().moveBlock(0, 5);
-    state().moveBlock(-1, 0);
-    expect(state().blocks.map((b) => b.id)).toEqual([one, text]);
-  });
-
   it('records each mentioned pubkey once', () => {
     state().addMention('x');
     state().addMention('y');

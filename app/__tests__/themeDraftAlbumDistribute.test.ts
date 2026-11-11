@@ -24,7 +24,7 @@ function entry(themeName: string, createdAt: number): WallpaperCatalogEntry {
 
 describe('themeDraft.setAlbum distribution', () => {
   beforeEach(() => {
-    useThemeDraft.getState().beginDraft(UNITS);
+    useThemeDraft.getState().beginDraft();
   });
 
   it("assigns 'dark' to every unit when the built-in Colors album is applied", () => {

@@ -573,7 +573,6 @@ interface RoutstrActions {
    *  asked) in one write, so a question and its answer's placeholder are
    *  saved together or not at all, whichever conversation is open now. */
   addMessages: (conversationId: string | null, messages: RoutstrMessage[]) => void;
-  updateMessage: (id: string, content: string) => void;
   /** Toggle a message's transient `pending` flag in the conversation it was
    *  sent in (`selectConversationId` when it was sent), whichever one is open
    *  now. Used by `useAiSend` to flip the user-bubble spinner → check once
@@ -627,8 +626,6 @@ interface RoutstrActions {
    */
   observeProviders: (source: ProviderSource, providers: Record<string, ProviderClaim>) => void;
   setUserNode: (nodeBaseUrl: string | null) => void;
-  /** Record a payment before it leaves, so its change stays recoverable. */
-  beginPayment: (id: string, payment: PendingPayment) => void;
   /** Forget a payment whose change is home, or which was never taken. */
   settlePayment: (id: string) => void;
   isCacheStale: (nowMs?: number) => boolean;
@@ -645,25 +642,6 @@ type SessionMirrorState = Pick<
   RoutstrState,
   'conversationHistory' | 'isAnonymousMode' | 'currentSessionId' | 'sessions'
 >;
-
-/**
- * Set `conversationHistory` to `messages` and mirror the same list into the
- * current session, unless anonymous mode is on (sessions stay untouched).
- */
-function withSessionMirror(
-  state: SessionMirrorState,
-  messages: RoutstrMessage[]
-): Partial<SessionMirrorState> {
-  if (state.isAnonymousMode || !state.currentSessionId) {
-    return { conversationHistory: messages };
-  }
-  return {
-    conversationHistory: messages,
-    sessions: state.sessions.map((session) =>
-      session.id === state.currentSessionId ? { ...session, messages } : session
-    ),
-  };
-}
 
 /**
  * The conversation on screen: the saved session's id, or `null` for one that
@@ -1245,16 +1223,6 @@ export const useRoutstrStore = create<RoutstrStore>({ name: 'routstr-store', sco
         );
       },
 
-      updateMessage: (id: string, content: string) => {
-        storeLog.debug('store.routstr.update_message', { id, contentLength: content.length });
-        set((state) =>
-          withSessionMirror(
-            state,
-            state.conversationHistory.map((msg) => (msg.id === id ? { ...msg, content } : msg))
-          )
-        );
-      },
-
       finalizeAssistantMessage: (conversationId, id, fields) => {
         storeLog.debug('store.routstr.finalize_assistant', {
           id,
@@ -1462,10 +1430,6 @@ export const useRoutstrStore = create<RoutstrStore>({ name: 'routstr-store', sco
             : {}),
         });
         return true;
-      },
-
-      beginPayment: (id, payment) => {
-        set((state) => ({ pendingPayments: { ...state.pendingPayments, [id]: payment } }));
       },
 
       settlePayment: (id) => {

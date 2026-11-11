@@ -32,7 +32,7 @@ interface ThemeDraftState {
 
 interface ThemeDraftActions {
   /** Start a draft, snapshotting the current themeStore state. */
-  beginDraft: (unitIds: UnitId[]) => void;
+  beginDraft: () => void;
   /** Replace the album and re-randomise unit wallpapers from its pool. */
   setAlbum: (albumSlug: string, unitIds: UnitId[]) => void;
   /** Override a single unit in the draft. */
@@ -44,8 +44,6 @@ interface ThemeDraftActions {
    * the main themeStore resolver (which walks album → fallback).
    */
   resolveUnitTheme: (unitId: UnitId) => string;
-  /** Revert draft to committed themeStore state. */
-  resetDraft: () => void;
   /** Drop the draft entirely. */
   discard: () => void;
   /** Whether the current draft differs from the committed store state. */
@@ -130,7 +128,7 @@ export const useThemeDraft = create<ThemeDraftStore>({ name: 'useThemeDraft', sc
     unitWallpapers: {},
     mode: 'dark',
 
-    beginDraft: (_unitIds) => {
+    beginDraft: () => {
       // Snapshot verbatim from the store. Do NOT pre-fill resolved defaults
       // for unassigned units — that would immediately mark the draft as dirty
       // (every unit would differ from the store's empty map). Instead, the
@@ -170,15 +168,6 @@ export const useThemeDraft = create<ThemeDraftStore>({ name: 'useThemeDraft', sc
       const themeState = useThemeStore.getState();
       const catalog = useWallpaperStore.getState().catalog;
       return resolveUnitWallpaper(unitId, themeState, catalog);
-    },
-
-    resetDraft: () => {
-      const snap = snapshotFromStore();
-      set({
-        activeAlbumSlug: snap.activeAlbumSlug,
-        unitWallpapers: snap.unitWallpapers,
-        mode: snap.mode,
-      });
     },
 
     discard: () => {

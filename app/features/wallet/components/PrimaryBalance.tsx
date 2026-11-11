@@ -218,7 +218,7 @@ export function PrimaryBalance({
   const balanceSize = glass ? BALANCE_TEXT_SIZE : appStyle.type.balance;
   const balanceLineHeight = glass ? BALANCE_TEXT_LINE_HEIGHT : Math.round(balanceSize * 1.15);
   const sectionGap = glass ? BALANCE_SECTION_GAP : appStyle.space.related;
-  const displayBtc = useSettingsStore((state) => state.getDisplayBtc());
+  const displayBtc = useSettingsStore((state) => state.displayBtc);
   const setDisplayBtc = useSettingsStore((state) => state.setDisplayBtc);
   const displayCurrency = useSettingsStore((state) => state.displayCurrency);
   const mockMode = useSettingsStore((state) => state.mockMode);

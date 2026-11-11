@@ -78,9 +78,11 @@ test('markSeedCreatedNow stamps the seed once and never moves the stamp', () => 
   expect(state().seedCreatedAt).toBe(NOW);
 });
 
-test('setRestoreStatus records an error with a failure and clears it otherwise', () => {
-  state().setRestoreStatus('failed', 'mint unreachable');
-  expect(state()).toMatchObject({ restoreStatus: 'failed', lastRestoreError: 'mint unreachable' });
+test('setRestoreStatus clears the error an older build saved', () => {
+  useWalletLifecycleStore.setState({
+    restoreStatus: 'failed',
+    lastRestoreError: 'mint unreachable',
+  });
 
   state().setRestoreStatus('pending');
   expect(state()).toMatchObject({ restoreStatus: 'pending', lastRestoreError: null });
@@ -88,7 +90,10 @@ test('setRestoreStatus records an error with a failure and clears it otherwise',
 
 test('markRestoreComplete marks complete, stamps the time and clears the last error', () => {
   state().markSeedCreatedNow();
-  state().setRestoreStatus('failed', 'mint unreachable');
+  useWalletLifecycleStore.setState({
+    restoreStatus: 'failed',
+    lastRestoreError: 'mint unreachable',
+  });
   jest.spyOn(Date, 'now').mockReturnValue(NOW + 5_000);
 
   state().markRestoreComplete();
@@ -161,26 +166,6 @@ test('a record from before the verification fields loads with them empty', async
     recoveryPhraseVerifiedRevision: null,
     lastRestoreAt: null,
     lastRestoreError: null,
-  });
-});
-
-test('a restore error over 500 characters is saved clipped to 500, and the next launch keeps the record', async () => {
-  state().markSeedCreatedNow();
-  state().setRestoreStatus('failed', 'x'.repeat(501));
-  await settle();
-  const written = saved();
-  expect(written).toMatchObject({
-    seedCreatedAt: NOW,
-    restoreStatus: 'failed',
-    lastRestoreError: 'x'.repeat(500),
-  });
-
-  await loadFromDisk(written);
-
-  expect(state()).toMatchObject({
-    seedCreatedAt: NOW,
-    restoreStatus: 'failed',
-    lastRestoreError: 'x'.repeat(500),
   });
 });
 

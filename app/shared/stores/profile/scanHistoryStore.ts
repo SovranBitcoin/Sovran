@@ -61,25 +61,6 @@ interface ScanHistoryEntry {
 
 interface ScanHistoryState {
   entries: ScanHistoryEntry[];
-  /**
-   * Indexed view of `entries` keyed by `transactionId` so row + detail
-   * selectors can resolve a scan in O(1) instead of scanning `entries`
-   * once per mounted row. Maintained by `addScan`/`linkTransaction` and
-   * rebuilt from `entries` after rehydration; not persisted. Direct
-   * `setState({ entries })` (test-only) won't refresh it — call an action
-   * or seed `entriesByTransactionId` alongside.
-   */
-  entriesByTransactionId: Record<string, ScanHistoryEntry>;
-}
-
-function buildEntriesByTransactionId(
-  entries: ScanHistoryEntry[]
-): Record<string, ScanHistoryEntry> {
-  const byTx: Record<string, ScanHistoryEntry> = {};
-  for (const entry of entries) {
-    if (entry.transactionId) byTx[entry.transactionId] = entry;
-  }
-  return byTx;
 }
 
 interface ScanHistoryActions {
@@ -154,7 +135,6 @@ export const useScanHistoryStore = create<ScanHistoryStore>({
     persist(
       (set) => ({
         entries: [],
-        entriesByTransactionId: {},
 
         addScan: ({ raw, type, source, inputType, container, optionKinds }) => {
           // Too long to be worth keeping; a history of these fills storage.
@@ -192,10 +172,7 @@ export const useScanHistoryStore = create<ScanHistoryStore>({
               // Tail-evict oldest by scannedAt once the cap is breached. Stable when under cap.
               nextEntries = newestScans([...state.entries, newEntry]);
             }
-            return {
-              entries: nextEntries,
-              entriesByTransactionId: buildEntriesByTransactionId(nextEntries),
-            };
+            return { entries: nextEntries };
           });
         },
 
@@ -209,10 +186,7 @@ export const useScanHistoryStore = create<ScanHistoryStore>({
             if (index === -1) return state;
             const nextEntries = [...state.entries];
             nextEntries[index] = { ...nextEntries[index], transactionId };
-            return {
-              entries: nextEntries,
-              entriesByTransactionId: buildEntriesByTransactionId(nextEntries),
-            };
+            return { entries: nextEntries };
           });
         },
       }),
@@ -221,11 +195,6 @@ export const useScanHistoryStore = create<ScanHistoryStore>({
         storage: profileStorage,
         schema: PersistedScanHistoryStore,
         partialize: (state) => ({ entries: state.entries }),
-        afterHydrate: (state) => {
-          if (state) {
-            state.entriesByTransactionId = buildEntriesByTransactionId(state.entries);
-          }
-        },
       })
     )
   )

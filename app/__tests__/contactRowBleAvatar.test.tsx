@@ -27,7 +27,7 @@ jest.mock('@/shared/lib/date', () => ({
 jest.mock('@/shared/stores/global/settingsStore', () => {
   const state = {
     language: 'en',
-    getDisplayBtc: () => 'sats',
+    displayBtc: 'sats',
   };
   const useSettingsStore = Object.assign(
     jest.fn((selector?: (value: typeof state) => unknown) => (selector ? selector(state) : state)),

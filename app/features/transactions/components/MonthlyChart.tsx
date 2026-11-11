@@ -242,7 +242,7 @@ function MonthlyChart({ history, unit: accountUnit = 'sat', mode }: MonthlyChart
   ] as const);
   const { width: screenWidth } = useWindowDimensions();
   const mockMode = useSettingsStore((s) => s.mockMode);
-  const displayPreference = useSettingsStore((s) => s.getDisplayBtc());
+  const displayPreference = useSettingsStore((s) => s.displayBtc);
   const quoteIdToGroup = useSwapTransactionsStore((s) => s.quoteIdToGroup);
 
   const config = MODE_CONFIG[mode];

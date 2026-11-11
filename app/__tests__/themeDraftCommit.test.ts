@@ -81,7 +81,7 @@ beforeEach(() => {
 test('Apply waits for the primary wallpaper download before saving the theme', async () => {
   const pending = deferred();
   mockedDownload.mockImplementationOnce(() => pending.promise);
-  draft().beginDraft([PRIMARY]);
+  draft().beginDraft();
   draft().setUnitWallpaper(PRIMARY, 'pine');
 
   const applying = draft().commit();
@@ -99,7 +99,7 @@ test('Apply waits for the primary wallpaper download before saving the theme', a
 });
 
 test('Apply saves the album, every unit wallpaper and the mode, then ends the draft', async () => {
-  draft().beginDraft([PRIMARY, 'usd']);
+  draft().beginDraft();
   draft().setUnitWallpaper(PRIMARY, 'pine');
   draft().setUnitWallpaper('usd', 'oak');
   draft().setMode('light');
@@ -126,7 +126,7 @@ test('the other units’ wallpapers are downloaded once each, skipping the prima
       birch: { ...entry('birch'), localUri: 'file:///wallpapers/birch.jpg', downloadedAt: 1 },
     },
   });
-  draft().beginDraft([]);
+  draft().beginDraft();
   draft().setUnitWallpaper(PRIMARY, 'pine');
   draft().setUnitWallpaper('usd', 'oak');
   draft().setUnitWallpaper('eur', 'oak');
@@ -146,7 +146,7 @@ test('a primary already on the phone is not downloaded again', async () => {
       pine: { ...entry('pine'), localUri: 'file:///wallpapers/pine.jpg', downloadedAt: 1 },
     },
   });
-  draft().beginDraft([]);
+  draft().beginDraft();
   draft().setUnitWallpaper(PRIMARY, 'pine');
 
   await draft().commit();
@@ -157,7 +157,7 @@ test('a primary already on the phone is not downloaded again', async () => {
 
 test('Apply saves the theme even when the primary wallpaper download failed, and does not retry it', async () => {
   mockedDownload.mockRejectedValueOnce(new Error('blossom unreachable'));
-  draft().beginDraft([]);
+  draft().beginDraft();
   draft().setUnitWallpaper(PRIMARY, 'pine');
 
   await expect(draft().commit()).resolves.toBe(true);
@@ -179,7 +179,7 @@ test('Cancel during the primary download leaves the saved theme as it was', asyn
   });
   const pending = deferred();
   mockedDownload.mockImplementationOnce(() => pending.promise);
-  draft().beginDraft([PRIMARY]);
+  draft().beginDraft();
   draft().setUnitWallpaper(PRIMARY, 'pine');
   draft().setMode('light');
 
@@ -198,13 +198,13 @@ test('Cancel during the primary download leaves the saved theme as it was', asyn
 test('a cancelled Apply that finishes late leaves a draft opened since alone', async () => {
   const pending = deferred();
   mockedDownload.mockImplementationOnce(() => pending.promise);
-  draft().beginDraft([PRIMARY]);
+  draft().beginDraft();
   draft().setUnitWallpaper(PRIMARY, 'pine');
 
   const applying = draft().commit();
   await Promise.resolve();
   draft().discard();
-  draft().beginDraft([PRIMARY]);
+  draft().beginDraft();
   draft().setUnitWallpaper(PRIMARY, 'birch');
   pending.resolve('file:///wallpapers/pine.jpg');
 
@@ -215,7 +215,7 @@ test('a cancelled Apply that finishes late leaves a draft opened since alone', a
 });
 
 test('a primary wallpaper missing from the catalog is saved without a download', async () => {
-  draft().beginDraft([]);
+  draft().beginDraft();
   draft().setUnitWallpaper(PRIMARY, 'gone');
 
   await draft().commit();
@@ -224,27 +224,23 @@ test('a primary wallpaper missing from the catalog is saved without a download',
   expect(theme().unitWallpapers).toEqual({ [PRIMARY]: 'gone' });
 });
 
-test('a draft starts as the saved theme, is dirty only after a change, and reset reverts it', () => {
+test('a draft starts as the saved theme and is dirty only after a change', () => {
   useThemeStore.setState({
     activeAlbumSlug: 'forest',
     unitWallpapers: { [PRIMARY]: 'pine' },
     mode: 'light',
   });
-  draft().beginDraft([PRIMARY]);
+  draft().beginDraft();
   expect(draft()).toMatchObject({ active: true, activeAlbumSlug: 'forest', mode: 'light' });
   expect(draft().isDirty()).toBe(false);
 
   draft().setUnitWallpaper(PRIMARY, 'oak');
   expect(draft().isDirty()).toBe(true);
   expect(draft().resolveUnitTheme(PRIMARY)).toBe('oak');
-
-  draft().resetDraft();
-  expect(draft().isDirty()).toBe(false);
-  expect(draft().unitWallpapers).toEqual({ [PRIMARY]: 'pine' });
 });
 
 test('choosing the solid-colour album puts every unit on the fallback palette', () => {
-  draft().beginDraft([]);
+  draft().beginDraft();
   draft().setAlbum(BUILTIN_COLORS_ALBUM_SLUG, [PRIMARY, 'usd']);
 
   expect(draft().unitWallpapers).toEqual({ [PRIMARY]: FALLBACK_THEME, usd: FALLBACK_THEME });
@@ -256,7 +252,7 @@ test('discard leaves the saved theme as it was', () => {
     unitWallpapers: { [PRIMARY]: 'pine' },
     mode: 'dark',
   });
-  draft().beginDraft([]);
+  draft().beginDraft();
   draft().setUnitWallpaper(PRIMARY, 'oak');
   draft().discard();
 

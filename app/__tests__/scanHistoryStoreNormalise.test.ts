@@ -20,7 +20,7 @@ jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({
 
 describe('useScanHistoryStore.addScan', () => {
   beforeEach(() => {
-    useScanHistoryStore.setState({ entries: [], entriesByTransactionId: {} });
+    useScanHistoryStore.setState({ entries: [] });
   });
 
   it('dedupes scheme-prefixed and bare forms onto a single entry', () => {
@@ -82,7 +82,6 @@ describe('useScanHistoryStore.addScan', () => {
         source: 'qr' as const,
         scannedAt: 1_000_000 + i,
       })),
-      entriesByTransactionId: {},
     });
 
     useScanHistoryStore.getState().addScan({ raw: 'newest', type: 'unknown', source: 'qr' });
@@ -96,35 +95,30 @@ describe('useScanHistoryStore.addScan', () => {
   });
 });
 
-describe('useScanHistoryStore.entriesByTransactionId', () => {
+describe('useScanHistoryStore.linkTransaction', () => {
   beforeEach(() => {
-    useScanHistoryStore.setState({ entries: [], entriesByTransactionId: {} });
+    useScanHistoryStore.setState({ entries: [] });
   });
 
-  it('linkTransaction populates the index for O(1) lookup by transactionId', () => {
+  it('records the transaction on the matching scan', () => {
     const { addScan, linkTransaction } = useScanHistoryStore.getState();
     addScan({ raw: 'lnbc1foo', type: 'lightning', source: 'qr' });
     linkTransaction('lnbc1foo', 'tx-123');
 
-    const { entries, entriesByTransactionId } = useScanHistoryStore.getState();
-    expect(entriesByTransactionId['tx-123']).toBe(entries[0]);
-    expect(entriesByTransactionId['tx-123'].raw).toBe('lnbc1foo');
+    expect(useScanHistoryStore.getState().entries[0]).toMatchObject({
+      raw: 'lnbc1foo',
+      transactionId: 'tx-123',
+    });
   });
 
-  it('addScan dedupe path keeps the index in sync with the merged entry ref', () => {
+  it('a later scan of the same string keeps the link and takes the new source', () => {
     const { addScan, linkTransaction } = useScanHistoryStore.getState();
     addScan({ raw: 'lnbc1foo', type: 'lightning', source: 'qr' });
     linkTransaction('lnbc1foo', 'tx-123');
     addScan({ raw: 'lnbc1foo', type: 'lightning', source: 'nfc' });
 
-    const { entries, entriesByTransactionId } = useScanHistoryStore.getState();
-    expect(entriesByTransactionId['tx-123']).toBe(entries[0]);
-    expect(entriesByTransactionId['tx-123'].source).toBe('nfc');
-  });
-
-  it('skips entries with no transactionId', () => {
-    const { addScan } = useScanHistoryStore.getState();
-    addScan({ raw: 'lnbc1foo', type: 'lightning', source: 'qr' });
-    expect(Object.keys(useScanHistoryStore.getState().entriesByTransactionId)).toHaveLength(0);
+    const { entries } = useScanHistoryStore.getState();
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({ transactionId: 'tx-123', source: 'nfc' });
   });
 });

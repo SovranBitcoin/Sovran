@@ -268,9 +268,7 @@ interface SettingsActions {
   setLastKnownAppVersion: (version: NonNullable<SettingsState['lastKnownAppVersion']>) => void;
   // Display settings
   setDisplayBtc: (display: number) => void;
-  getDisplayBtc: () => number;
   setDisplayCurrency: (currency: DisplayCurrency) => void;
-  getDisplayCurrency: () => DisplayCurrency;
 
   // Experimental features
   setExperimental: (experimental: boolean) => void;
@@ -289,7 +287,6 @@ interface SettingsActions {
 
   // Terms acceptance
   acceptLegalDocuments: () => void;
-  isTermsAccepted: () => boolean;
 
   // Onboarding
   completeOnboarding: () => void;
@@ -322,7 +319,7 @@ type SettingsStore = SettingsState & SettingsActions;
 export const useSettingsStore = create<SettingsStore>({ name: 'settings-store', scope: 'global' })(
   subscribeWithSelector(
     persist(
-      (set, get) => ({
+      (set) => ({
         ...DEFAULT_SETTINGS,
 
         setLastKnownAppVersion: (version) => {
@@ -340,12 +337,10 @@ export const useSettingsStore = create<SettingsStore>({ name: 'settings-store', 
           storeLog.info('store.settings.set_display_btc', { display });
           set({ displayBtc: display });
         },
-        getDisplayBtc: () => get().displayBtc,
         setDisplayCurrency: (currency: DisplayCurrency) => {
           storeLog.info('store.settings.set_display_currency', { currency });
           set({ displayCurrency: currency });
         },
-        getDisplayCurrency: () => get().displayCurrency,
 
         // Experimental
         setExperimental: (experimental: boolean) => {
@@ -407,7 +402,6 @@ export const useSettingsStore = create<SettingsStore>({ name: 'settings-store', 
             },
           }));
         },
-        isTermsAccepted: () => get().termsAccepted?.termsAccepted === true,
 
         // Onboarding
         completeOnboarding: () => {

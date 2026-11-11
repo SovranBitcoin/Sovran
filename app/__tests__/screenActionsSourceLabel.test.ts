@@ -48,7 +48,7 @@ function sourceLabel(entry: Record<string, unknown>): string | null {
 
 beforeEach(() => {
   useTransactionAnnotationStore.setState({ annotations: {} });
-  useScanHistoryStore.setState({ entries: [], entriesByTransactionId: {} });
+  useScanHistoryStore.setState({ entries: [] });
   useTransactionDistributionStore.setState({ distributions: {} });
 });
 
