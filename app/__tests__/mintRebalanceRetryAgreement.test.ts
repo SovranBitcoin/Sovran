@@ -10,6 +10,7 @@ import { useMintRebalanceOrchestrator } from '@/features/mint/hooks/useMintRebal
 import type { RebalancePlan } from '@/features/mint/components/rebalance/rebalancePlanner';
 import { useSwapTransactionsStore } from '@/shared/stores/profile/swapTransactionsStore';
 import { useSwapStatusStore } from '@/shared/stores/runtime/swapStatusStore';
+import { storeLog } from '@/shared/lib/logger';
 
 jest.mock('@cashu/coco-react', () => ({ useManager: () => mockManager }));
 jest.mock('@/shared/lib/cashu/manager', () => ({
@@ -186,4 +187,6 @@ it('ends the group, its leg, the toast and the screen as finished after a retry 
   const toast = useSwapStatusStore.getState().active;
   expect(toast?.state).toBe('done');
   expect(toast?.legs[0]).toEqual({ id: 'step-1', label: expect.any(String), status: 'done' });
+  // Every leg and group move the run made is one the saved tables allow.
+  expect(storeLog.warn).not.toHaveBeenCalled();
 });

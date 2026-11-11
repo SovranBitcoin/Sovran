@@ -136,11 +136,13 @@ export function createRebalanceStepSink({
       const swapLegId = swapLegIds[legId];
       const localStatus = update.status ? toSwapLegStatus(update.status) : null;
       if (!groupId || !swapLegId || !localStatus) return;
-      swapStore().setLegStatus(groupId, swapLegId, {
-        localStatus,
-        errorMessage:
-          localStatus === 'failed' ? describeError(update.error, 'cashu').text : undefined,
-      });
+      swapStore().setLegStatus(
+        groupId,
+        swapLegId,
+        localStatus === 'failed'
+          ? { localStatus, errorMessage: describeError(update.error, 'cashu').text }
+          : { localStatus }
+      );
     },
     mintReceiptCreated(legId, receipt) {
       const swapLegId = swapLegIds[legId];

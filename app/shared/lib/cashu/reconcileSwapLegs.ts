@@ -4,6 +4,7 @@ import {
   useSwapTransactionsStore,
   type SwapLeg,
   type SwapLegLocalStatus,
+  type SwapLegStatusUpdate,
 } from '@/shared/stores/profile/swapTransactionsStore';
 
 /** What a leg's own Coco operation looks like, as far as this needs to know. */
@@ -66,28 +67,28 @@ export async function reconcileSwapLegs(manager: SwapLegOperations): Promise<voi
     try {
       let status = leg.localStatus;
       /** Write only while the leg still says what this pass read. */
-      const move = (localStatus: SwapLegLocalStatus, errorMessage?: string) => {
+      const move = (update: SwapLegStatusUpdate) => {
         const store = useSwapTransactionsStore.getState();
         const current = store.groups[groupId]?.legs.find((saved) => saved.id === leg.id);
         if (current?.localStatus !== status) return false;
-        store.setLegStatus(groupId, leg.id, { localStatus, errorMessage });
-        status = localStatus;
+        store.setLegStatus(groupId, leg.id, update);
+        status = update.localStatus;
         return true;
       };
 
       if (leg.meltOperationId) {
         const melt = await manager.ops.melt.get(leg.meltOperationId);
         if (melt?.state === 'rolled_back') {
-          move('failed', MELT_ROLLED_BACK);
+          move({ localStatus: 'failed', errorMessage: MELT_ROLLED_BACK });
           continue;
         }
         if (status !== 'settling') {
-          if (melt?.state !== 'finalized' || !move('settling')) continue;
+          if (melt?.state !== 'finalized' || !move({ localStatus: 'settling' })) continue;
         }
       }
       if (status === 'settling' && leg.mintOperationId) {
         const mint = await manager.ops.mint.get(leg.mintOperationId);
-        if (mint?.state === 'finalized' && !mint.error) move('done');
+        if (mint?.state === 'finalized' && !mint.error) move({ localStatus: 'done' });
       }
     } catch (error) {
       // A read is idempotent; the next run tries this leg again.

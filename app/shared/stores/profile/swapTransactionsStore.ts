@@ -46,6 +46,30 @@ export type SwapLegLocalStatus =
   | 'done'
   | 'failed';
 
+/**
+ * What a saved leg can become next, in the order the rebalance engine moves a
+ * transfer (an invoice, then the melt, then the destination's mint) plus the
+ * reconciler's moves from Coco's operations. Done is final. A failed leg goes
+ * again only through a new attempt, which starts with a new invoice.
+ */
+const LEG_MOVES: Record<SwapLegLocalStatus, readonly SwapLegLocalStatus[]> = {
+  pending: ['creatingInvoice', 'invoiceReady', 'melting', 'failed'],
+  creatingInvoice: ['invoiceReady', 'failed'],
+  // A melt whose inputs fell short is prepared again for a smaller invoice.
+  invoiceReady: ['melting', 'verifying', 'paymentPending', 'failed'],
+  melting: ['invoiceReady', 'verifying', 'paymentPending', 'settling', 'failed'],
+  verifying: ['settling', 'done', 'failed'],
+  paymentPending: ['settling', 'failed'],
+  settling: ['done', 'failed'],
+  done: [],
+  failed: ['creatingInvoice'],
+};
+
+/** A leg status to save; an error message belongs to a failure only. */
+export type SwapLegStatusUpdate =
+  | { localStatus: 'failed'; errorMessage?: string }
+  | { localStatus: Exclude<SwapLegLocalStatus, 'failed'> };
+
 export interface SwapLeg {
   id: string;
   fromMintUrl: string;
@@ -160,11 +184,8 @@ interface SwapTransactionsActions {
     params: { quoteId: string; operationId: string }
   ) => void;
 
-  setLegStatus: (
-    groupId: string,
-    legId: string,
-    params: { localStatus: SwapLegLocalStatus; errorMessage?: string }
-  ) => void;
+  /** Move a leg along `LEG_MOVES`; a move the table does not list is refused. */
+  setLegStatus: (groupId: string, legId: string, update: SwapLegStatusUpdate) => void;
 
   getGroup: (groupId: string) => SwapGroup | null;
 }
@@ -347,7 +368,9 @@ export const useSwapTransactionsStore = create<SwapTransactionsStore>({
         });
       },
 
-      setLegStatus: (groupId, legId, { localStatus, errorMessage }) => {
+      setLegStatus: (groupId, legId, update) => {
+        const { localStatus } = update;
+        const errorMessage = update.localStatus === 'failed' ? update.errorMessage : undefined;
         storeLog.debug('store.swap_tx.set_leg_status', {
           groupId,
           legId,
@@ -355,13 +378,29 @@ export const useSwapTransactionsStore = create<SwapTransactionsStore>({
           errorMessage,
         });
         set((state) =>
-          patchLeg(state, groupId, legId, (leg) => ({
-            ...leg,
-            localStatus,
-            errorMessage:
-              clipErrorMessage(errorMessage) ??
-              (localStatus === 'failed' ? leg.errorMessage : undefined),
-          }))
+          patchLeg(state, groupId, legId, (leg) => {
+            const from = leg.localStatus;
+            if (
+              from !== undefined &&
+              from !== localStatus &&
+              !LEG_MOVES[from].includes(localStatus)
+            ) {
+              storeLog.warn('store.swap_tx.leg_move_refused', {
+                groupId,
+                legId,
+                from,
+                to: localStatus,
+              });
+              return leg;
+            }
+            return {
+              ...leg,
+              localStatus,
+              errorMessage:
+                clipErrorMessage(errorMessage) ??
+                (localStatus === 'failed' ? leg.errorMessage : undefined),
+            };
+          })
         );
       },
 
