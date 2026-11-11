@@ -129,7 +129,7 @@ jest.mock('@/shared/lib/logger', () => {
 
 const URL = 'https://mint.example';
 function row(over: Partial<MintSearchRow> = {}): MintSearchRow {
-  return {
+  const value: MintSearchRow = {
     url: URL,
     name: 'Example',
     supported_units: ['sat'],
@@ -142,15 +142,13 @@ function row(over: Partial<MintSearchRow> = {}): MintSearchRow {
     review_score: 4,
     review_count: 3,
     info: { icon_url: 'https://mint.example/icon.png', contact: [] },
-    ...over,
-  } as MintSearchRow;
+  };
+  return { ...value, ...over };
 }
-const seedMetadata = (entry: Partial<MintMetadataEntry> | null) =>
+const seedMetadata = (entry: MintMetadataEntry | null) =>
   act(() => {
     useMintMetadataStore.setState({
-      byMintUrl: entry
-        ? { [normalizeMintUrlKey(URL)]: { url: URL, ...entry } as MintMetadataEntry }
-        : {},
+      byMintUrl: entry ? { [normalizeMintUrlKey(URL)]: entry } : {},
     });
   });
 

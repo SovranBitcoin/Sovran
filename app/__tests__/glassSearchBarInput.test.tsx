@@ -31,8 +31,9 @@ jest.mock('expo-glass-effect', () => ({ GlassView: mockHost('Glass') }));
 jest.mock('@/shared/lib/version', () => ({ supportsLiquidGlass: () => false }));
 jest.mock('@/shared/hooks/useThemeColor', () => ({
   useThemeColor: (token: string | readonly string[]) =>
-    typeof token === 'string' ? '#000000' : token.map(() => '#000000'),
+    typeof token === 'string' ? 'c' : token.map(() => 'c'),
 }));
+jest.mock('@/shared/lib/color', () => ({ withAlpha: (c: string) => c }));
 jest.mock('@/shared/ui/primitives/View/View', () => ({ View: mockHost('View') }));
 jest.mock('@/shared/lib/logger', () => ({
   Log: ({ children }: { children: React.ReactNode }) => children,
@@ -49,10 +50,23 @@ function mount(Bar: Bar, props: Partial<Props> & Pick<Props, 'onChangeText'>) {
   act(() => {
     renderer = TestRenderer.create(element());
   });
-  return (over: Partial<Props>) => act(() => renderer.update(element(over)));
+  return (over: Partial<Props>) => {
+    act(() => {
+      renderer.update(element(over));
+    });
+  };
 }
 const input = () => renderer.root.findByType('Input' as never);
-const type = (text: string) => act(() => input().props.onChangeText(text));
+const type = (text: string) => {
+  act(() => {
+    input().props.onChangeText(text);
+  });
+};
+const advance = (ms: number) => {
+  act(() => {
+    jest.advanceTimersByTime(ms);
+  });
+};
 
 beforeEach(() => jest.useFakeTimers());
 afterEach(() => {
@@ -95,11 +109,11 @@ describe.each([
     mount(Bar, { onChangeText, debounceMs: 300 });
 
     type('a');
-    act(() => jest.advanceTimersByTime(200));
+    advance(200);
     type('ab');
-    act(() => jest.advanceTimersByTime(299));
+    advance(299);
     expect(onChangeText).not.toHaveBeenCalled();
-    act(() => jest.advanceTimersByTime(1));
+    advance(1);
 
     expect(onChangeText.mock.calls).toEqual([['ab']]);
   });
@@ -111,7 +125,7 @@ describe.each([
 
     type('abc');
     update({ clearKey: 1, seedText: 'usd' });
-    act(() => jest.advanceTimersByTime(1000));
+    advance(1000);
 
     expect(onChangeText).not.toHaveBeenCalled();
     expect(input()).not.toBe(before);
@@ -125,7 +139,7 @@ describe.each([
 
     type('abc');
     update({ onChangeText: second });
-    act(() => jest.advanceTimersByTime(300));
+    advance(300);
 
     expect(first).not.toHaveBeenCalled();
     expect(second.mock.calls).toEqual([['abc']]);
@@ -136,8 +150,10 @@ describe.each([
     mount(Bar, { onChangeText, debounceMs: 300 });
 
     type('abc');
-    act(() => renderer.unmount());
-    act(() => jest.advanceTimersByTime(1000));
+    act(() => {
+      renderer.unmount();
+    });
+    advance(1000);
 
     expect(onChangeText).not.toHaveBeenCalled();
   });

@@ -8,12 +8,16 @@
  *
  * Neither cancels the work: it may still finish after the deadline.
  */
+import { switchStep } from '@/shared/lib/profile/inProcessProfileSwitch';
+import { cleanupCocoWithTimeout } from '@/shared/lib/profile/profileTransition';
+
 const mockCleanup = jest.fn<Promise<void>, []>();
 const mockWarn = jest.fn();
 
-jest.mock('@react-native-async-storage/async-storage', () =>
-  require('@react-native-async-storage/async-storage/jest/async-storage-mock')
-);
+jest.mock('@react-native-async-storage/async-storage', () => ({
+  __esModule: true,
+  default: { getItem: jest.fn(), setItem: jest.fn(), removeItem: jest.fn() },
+}));
 jest.mock('@/shared/lib/logger', () => ({
   log: {
     info: jest.fn(),
@@ -33,9 +37,6 @@ jest.mock('@/shared/stores/global/profileStore', () => ({
 }));
 jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({}));
 jest.mock('@/shared/lib/account/accountRegistry', () => ({}));
-
-import { switchStep } from '@/shared/lib/profile/inProcessProfileSwitch';
-import { cleanupCocoWithTimeout } from '@/shared/lib/profile/profileTransition';
 
 type Outcome = { value?: unknown; error?: unknown } | 'pending';
 function track(promise: Promise<unknown>) {

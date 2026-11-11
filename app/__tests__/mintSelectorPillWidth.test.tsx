@@ -29,10 +29,11 @@ jest.mock(
     );
     return {
       __esModule: true,
-      default: (props: { width?: number; contentHeight?: number }) =>
-        R.createElement('PillProbe', {
+      default: function PillProbe(props: { width?: number; contentHeight?: number }) {
+        return R.createElement('PillProbe', {
           buttonWidth: useBalancePillDimensions(props).buttonWidth,
-        }),
+        });
+      },
     };
   },
   { virtual: true }

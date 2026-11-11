@@ -31,7 +31,8 @@ import {
 
 const wallpaper = (themeName: string, albumSlug: string, createdAt: number) =>
   ({ themeName, albumSlug, createdAt }) as unknown as WallpaperCatalogEntry;
-const album = (slug: string, coverThemeName?: string) => ({
+type Album = ReturnType<typeof useWallpaperStore.getState>['albums'][number];
+const album = (slug: string, coverThemeName?: string): Album => ({
   slug,
   displayName: slug,
   description: '',
@@ -57,7 +58,7 @@ beforeEach(() => {
         wallpaper('river', 'water', 2),
       ],
       albums: [album('flowers'), album('water', 'river-cover'), album('empty')],
-    } as never);
+    });
   });
   act(() => {
     TestRenderer.create(<Probe />);

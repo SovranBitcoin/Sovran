@@ -56,7 +56,7 @@ jest.mock('@/shared/stores/global/settingsStore', () => {
 });
 
 type Props = React.ComponentProps<typeof BalancePillFlat>;
-const base: Props = { title: 'Mint', balance: 1, unit: 'sat' } as Props;
+const base: Props = { title: 'Mint', balance: 1, unit: 'sat' };
 
 function drawn(Pill: typeof BalancePillFlat, props: Partial<Props>) {
   let renderer!: TestRenderer.ReactTestRenderer;

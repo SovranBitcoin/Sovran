@@ -70,8 +70,9 @@ function setup() {
     require('@/shared/stores/global/profileStore') as typeof import('@/shared/stores/global/profileStore');
   const { restartApp } =
     require('@/shared/lib/profile/appRestart') as typeof import('@/shared/lib/profile/appRestart');
-  const { registerTransitionControls } =
-    require('@/shared/lib/profile/profileTransition') as typeof import('@/shared/lib/profile/profileTransition');
+  const { registerTransitionControls } = jest.requireActual<
+    typeof import('@/shared/lib/profile/profileTransition')
+  >('@/shared/lib/profile/profileTransition');
   useProfileStore.setState({
     activeAccountIndex: 0,
     profiles: [
