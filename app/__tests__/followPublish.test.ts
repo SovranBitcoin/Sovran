@@ -7,6 +7,11 @@
  * (a fake NDK subscription per write relay), the publish seam, the signer, the
  * active account, the indexers, the popup and storage; for the hook, also the
  * keys, NDK and offline providers and AppState.
+ *
+ * The fakes behave like relays for what is proven here: each relay holds its
+ * own lists, a read asks one relay, and a publish lands only on the relays it
+ * was sent to (with none named, every relay in the pool, as `publishEvent`
+ * does).
  */
 import type NDK from '@nostr-dev-kit/ndk-mobile';
 import { act, renderHook, waitFor } from '@testing-library/react-native';
@@ -42,9 +47,14 @@ type RelayEvent = {
   id: string;
 };
 
+/** The account's write relays. */
 const mockRelays: Relay[] = [{ url: 'wss://one.example' }, { url: 'wss://two.example' }];
+/** Relays in the pool that are not write relays. */
+const mockPoolOnly: Relay[] = [];
 /** Each relay's stored kind 3s; a relay missing here never answers. */
 const mockStored = new Map<string, RelayEvent[]>();
+/** Relays that answer reads but refuse every publish. */
+const mockRefusing = new Set<string>();
 const mockFilters: unknown[] = [];
 let mockReadGate: Promise<void> = Promise.resolve();
 const mockProfile = {
@@ -70,7 +80,7 @@ jest.mock('@nostr-dev-kit/ndk-mobile', () => ({
   NDKSubscriptionCacheUsage: { ONLY_RELAY: 'ONLY_RELAY' },
   NDKRelaySet: {
     fromRelayUrls: (urls: string[]) => ({
-      relays: new Set(mockRelays.filter((relay) => urls.includes(relay.url))),
+      relays: new Set([...mockRelays, ...mockPoolOnly].filter((relay) => urls.includes(relay.url))),
     }),
   },
   NDKEvent: class {
@@ -154,10 +164,23 @@ function relaysHold(...events: RelayEvent[]) {
   for (const relay of mockRelays) mockStored.set(relay.url, events);
 }
 
-/** The publish seam's default: every answering write relay stores the list. */
-async function acceptOnRelays({ event }: { event: RelayEvent }) {
-  for (const [url, stored] of mockStored) mockStored.set(url, [...stored, { ...event }]);
-  return ok({});
+/** What one relay holds. */
+function heldBy(url: string): RelayEvent[] {
+  return mockStored.get(url) ?? [];
+}
+
+/**
+ * The publish seam: the list lands on each relay it is sent to (with none
+ * named, every relay in the pool) that answers and does not refuse it.
+ */
+async function acceptOnRelays({ event, relays }: { event: RelayEvent; relays?: string[] }) {
+  const targets = relays?.length
+    ? relays
+    : [...mockRelays, ...mockPoolOnly].map((relay) => relay.url);
+  const accepted = targets.filter((url) => mockStored.has(url) && !mockRefusing.has(url));
+  for (const url of accepted) mockStored.set(url, [...heldBy(url), { ...event }]);
+  if (accepted.length === 0) return err({ type: 'all-failed', relayResults: [] });
+  return ok({ accepted: accepted.map((url) => ({ url, ok: true })) });
 }
 
 function setup() {
@@ -219,6 +242,8 @@ function switchAccount() {
 beforeEach(async () => {
   jest.useRealTimers();
   mockStored.clear();
+  mockPoolOnly.length = 0;
+  mockRefusing.clear();
   mockFilters.length = 0;
   mockReadGate = Promise.resolve();
   mockProfile.activeAccountIndex = 0;
