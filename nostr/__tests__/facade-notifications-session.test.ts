@@ -252,6 +252,81 @@ describe('notifications session', () => {
     session.close();
   });
 
+  it('a source whose first page fails is not asked again for the rest of the session', async () => {
+    const nagg = source('nagg', [
+      failed({ type: 'network', message: 'timed out', cause: undefined }),
+      answered(bundle([flatItem('n1', 'alice', 'reply', 30)], { createdAt: 30, id: 'n1' })),
+    ]);
+    const timers = manualTimers();
+    const session = createNotificationsSession({
+      request: REQUEST,
+      sources: [nagg],
+      scheduleAfter: timers.scheduleAfter,
+    });
+    await session.firstPage();
+    // QUIRK: a failed first page is read as "no history" (F221). Asking again
+    // would fetch this source's newest rows, which the next reveal sorts in
+    // above rows already on screen. Only a refresh (a new session) asks again.
+    expect(session.hasMore()).toBe(false);
+    await session.loadMore();
+    expect(nagg.requests).toHaveLength(1);
+    session.close();
+  });
+
+  it('a source that cannot serve notifications is not asked again after the first page', async () => {
+    const nagg = source('nagg', [unsupported()]);
+    const relay = source('relay', [
+      answered(bundle([flatItem('r1', 'bob', 'reply', 25)], { createdAt: 25, id: 'r1' })),
+    ]);
+    const timers = manualTimers();
+    const session = createNotificationsSession({
+      request: REQUEST,
+      sources: [nagg, relay],
+      scheduleAfter: timers.scheduleAfter,
+    });
+    await session.firstPage();
+    await session.loadMore();
+    expect(nagg.requests).toHaveLength(1);
+    expect(relay.requests).toHaveLength(2);
+    session.close();
+  });
+
+  it('a source still on its first page at paint is left out of paging until it answers', async () => {
+    let resolveNagg!: (o: TierOutcome<NotificationsBundle>) => void;
+    let naggCalls = 0;
+    const nagg = source('nagg', () => {
+      naggCalls += 1;
+      if (naggCalls === 1) return new Promise((resolve) => (resolveNagg = resolve));
+      return Promise.resolve(answered(bundle([flatItem('n2', 'dave', 'reply', 5)], null)));
+    });
+    const relay = source('relay', [
+      answered(bundle([flatItem('r1', 'bob', 'reaction', 20)], null)),
+    ]);
+    const timers = manualTimers();
+    const session = createNotificationsSession({
+      request: REQUEST,
+      sources: [nagg, relay],
+      scheduleAfter: timers.scheduleAfter,
+    });
+    const paint = session.firstPage();
+    await Promise.resolve();
+    timers.fireAll(400);
+    await paint;
+    expect(session.hasMore()).toBe(false);
+    await session.loadMore();
+    expect(nagg.requests).toHaveLength(1);
+
+    resolveNagg(answered(bundle([flatItem('n1', 'carol', 'reply', 15)], { createdAt: 15, id: 'n1' })));
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(session.hasMore()).toBe(true);
+    await session.loadMore();
+    expect(nagg.requests).toHaveLength(2);
+    expect(nagg.requests[1]?.cursor).toEqual({ createdAt: 15, id: 'n1' });
+    expect(session.hasMore()).toBe(false);
+    session.close();
+  });
+
   it('serves an artificial pool-only page when all sources are exhausted', async () => {
     const nagg = source('nagg', [
       answered(bundle([flatItem('n1', 'alice', 'reply', 30)], null)), // null cursor → exhausted
