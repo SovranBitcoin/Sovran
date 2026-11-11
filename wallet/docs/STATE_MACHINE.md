@@ -293,9 +293,12 @@ payment-request confirm holders) is written only by the functions in that
 section. `__tests__/flows/turn-exits.test.ts` pins every exit. Once a payment
 settles its step records it first; a link or notification that throws
 afterwards is logged (`announcePayment`), and a listener or handler that
-throws reaches the caller only after the turn finished. An NFC tap checks its
-turn after every await, releasing the tag session and restoring the unit
-included. A `confirmPaymentRequest()` call's result is settled only by its own
+throws reaches the caller only after the turn finished. An NFC tap's tag
+session and unit switch are one `NfcTap`, opened as its EXECUTE turn starts and
+ended in one place after the auto-resolve loop: every way out, a throw
+included, releases the session unless the write-back already did and switches
+the unit back unless the tap paid. The tap checks its turn after every await,
+and a tap a reset overtook releases and restores nothing. A `confirmPaymentRequest()` call's result is settled only by its own
 turn, so a tap that sent nothing resolves `ignored`.
 
 Gather order is fixed: amount -> mint -> proofs -> terminal
