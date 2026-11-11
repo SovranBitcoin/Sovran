@@ -17,7 +17,11 @@ interface OperationSnapshot {
 interface SwapLegOperations {
   ops: {
     mint: { get(operationId: string): Promise<OperationSnapshot | null> };
-    melt: { get(operationId: string): Promise<OperationSnapshot | null> };
+    melt: {
+      get(operationId: string): Promise<OperationSnapshot | null>;
+      /** Rolls a melt that was never sent back under its operation lock; throws once it may have been. */
+      cancel(operationId: string, reason?: string): Promise<void>;
+    };
   };
 }
 
@@ -29,9 +33,12 @@ const MELT_ROLLED_BACK = 'The payment did not go through. The funds are back in 
  *
  * - A leg whose melt Coco settled unpaid (rolled back, or failed with its
  *   inputs given back) is `failed`, whatever it said before. So is a
- *   `paymentPending` leg whose melt was only ever prepared: the engine gave
- *   up on it unsent, and nothing else sends it. Before that point a run that
- *   was cancelled may still send a prepared melt, so it proves nothing.
+ *   `paymentPending` leg whose melt was never sent, once Coco has cancelled
+ *   that melt: the engine gave up on it unsent, but its ecash stays reserved,
+ *   and a call that still holds it could send it, until it is cancelled. A
+ *   melt Coco will not cancel leaves the leg as it is. Before that point a
+ *   run that was cancelled may still send a prepared melt, so it proves
+ *   nothing.
  * - `paymentPending` (the melt was sent, its outcome unknown), and a leg a
  *   run that is gone left at `melting`, `verifying` or `invoiceReady` with a
  *   melt, becomes `settling` once the melt is finalized.
@@ -75,14 +82,15 @@ export async function reconcileSwapLegs(
     try {
       let status = leg.localStatus;
       /**
-       * Write only while the leg is still the attempt this pass read: the
+       * Act only while the leg is still the attempt this pass read: the
        * same status and the same operations. A retry can prepare a new melt
        * or mint and keep, or come back to, the same status.
        */
-      const move = (update: SwapLegStatusUpdate) => {
+      const stillRead = () => {
         if (!isCurrent()) return false;
-        const store = useSwapTransactionsStore.getState();
-        const current = store.groups[groupId]?.legs.find((saved) => saved.id === leg.id);
+        const current = useSwapTransactionsStore
+          .getState()
+          .groups[groupId]?.legs.find((saved) => saved.id === leg.id);
         if (
           !current ||
           current.localStatus !== status ||
@@ -92,18 +100,28 @@ export async function reconcileSwapLegs(
           legChangedWhileRead = true;
           return false;
         }
-        store.setLegStatus(groupId, leg.id, update);
+        return true;
+      };
+      const move = (update: SwapLegStatusUpdate) => {
+        if (!stillRead()) return false;
+        useSwapTransactionsStore.getState().setLegStatus(groupId, leg.id, update);
         status = update.localStatus;
         return true;
       };
 
       if (leg.meltOperationId) {
         const melt = await manager.ops.melt.get(leg.meltOperationId);
-        const didNotPay =
-          !!melt &&
-          (meltSettledUnpaid(melt.state) ||
-            (status === 'paymentPending' && meltNeverSent(melt.state)));
-        if (didNotPay) {
+        if (melt && meltSettledUnpaid(melt.state)) {
+          move({ localStatus: 'failed', errorMessage: MELT_ROLLED_BACK });
+          continue;
+        }
+        if (melt && status === 'paymentPending' && meltNeverSent(melt.state)) {
+          if (!stillRead()) continue;
+          // Throws when Coco will not cancel it; the leg is then left for the next pass.
+          await manager.ops.melt.cancel(
+            leg.meltOperationId,
+            'Swap leg given up before it was sent'
+          );
           move({ localStatus: 'failed', errorMessage: MELT_ROLLED_BACK });
           continue;
         }
@@ -116,7 +134,7 @@ export async function reconcileSwapLegs(
         if (mint?.state === 'finalized' && !mint.error) move({ localStatus: 'done' });
       }
     } catch (error) {
-      // A read is idempotent; the next run tries this leg again.
+      // A read, and a cancel Coco refused, change nothing; the next run tries this leg again.
       cashuLog.warn('swap.reconcile.read_failed', { legId: leg.id, error: redactError(error) });
     }
   }

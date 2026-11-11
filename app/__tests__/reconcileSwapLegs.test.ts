@@ -34,7 +34,10 @@ function manager(operations: { mint?: Operation; melt?: Operation }) {
   return {
     ops: {
       mint: { get: jest.fn(async () => operations.mint ?? null) },
-      melt: { get: jest.fn(async () => operations.melt ?? null) },
+      melt: {
+        get: jest.fn(async () => operations.melt ?? null),
+        cancel: jest.fn(async (_operationId: string, _reason?: string) => {}),
+      },
     },
   };
 }
@@ -110,15 +113,80 @@ it.each(['pending', 'executing', 'rolling_back'])(
   }
 );
 
-it.each([
-  ['only prepared: the engine gave up on it before it was ever sent', 'prepared'],
-  ['failed, its inputs given back', 'failed'],
-])('marks a pending payment failed when its melt reads %s', async (_name, state) => {
+it('marks a pending payment failed when its melt failed, its inputs given back', async () => {
   const leg = savedLeg('paymentPending');
+  const coco = manager({ melt: { state: 'failed' } });
 
-  await reconcileSwapLegs(manager({ melt: { state } }));
+  await reconcileSwapLegs(coco);
 
   expect(leg()).toMatchObject({ localStatus: 'failed', errorMessage: expect.any(String) });
+  expect(coco.ops.melt.cancel).not.toHaveBeenCalled();
+});
+
+describe('a pending payment whose melt was never sent (the engine gave up on it unsent)', () => {
+  it.each(['prepared', 'init'])(
+    'cancels the %s melt through Coco first, and fails the leg once it is cancelled',
+    async (state) => {
+      const leg = savedLeg('paymentPending');
+      const coco = manager({ melt: { state } });
+      coco.ops.melt.cancel.mockImplementation(async () => {
+        // Until the cancel has returned, the melt could still be sent.
+        expect(leg().localStatus).toBe('paymentPending');
+      });
+
+      await reconcileSwapLegs(coco);
+
+      expect(coco.ops.melt.cancel).toHaveBeenCalledWith('melt-op', expect.any(String));
+      expect(leg()).toMatchObject({ localStatus: 'failed', errorMessage: expect.any(String) });
+    }
+  );
+
+  it.each(['prepared', 'init'])(
+    'leaves the leg pending when Coco will not cancel the %s melt',
+    async (state) => {
+      // Coco refuses a melt another call has started sending, and an init one.
+      const leg = savedLeg('paymentPending');
+      const coco = manager({ melt: { state } });
+      coco.ops.melt.cancel.mockRejectedValue(
+        new Error(`Cannot cancel operation in state 'executing'. Expected 'prepared'.`)
+      );
+
+      await reconcileSwapLegs(coco);
+
+      expect(leg().localStatus).toBe('paymentPending');
+    }
+  );
+
+  it('does not cancel once this pass has been replaced', async () => {
+    const leg = savedLeg('paymentPending');
+    const coco = manager({ melt: { state: 'prepared' } });
+    let current = true;
+    coco.ops.melt.get.mockImplementation(async () => {
+      current = false;
+      return { state: 'prepared' };
+    });
+
+    await reconcileSwapLegs(coco, () => current);
+
+    expect(coco.ops.melt.cancel).not.toHaveBeenCalled();
+    expect(leg().localStatus).toBe('paymentPending');
+  });
+
+  it('does not cancel a melt whose leg changed while it was read', async () => {
+    const leg = savedLeg('paymentPending', { mint: 'mint-1', melt: 'melt-1' });
+    const coco = manager({});
+    coco.ops.melt.get.mockImplementation(async () => {
+      useSwapTransactionsStore
+        .getState()
+        .setLegStatus(leg.groupId, leg.legId, { localStatus: 'settling' });
+      return { state: 'prepared' };
+    });
+
+    await reconcileSwapLegs(coco);
+
+    expect(coco.ops.melt.cancel).not.toHaveBeenCalled();
+    expect(leg().localStatus).toBe('settling');
+  });
 });
 
 it('marks a leg a finished run left at melting failed when its melt failed', async () => {
