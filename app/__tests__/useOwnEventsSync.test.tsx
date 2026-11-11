@@ -25,15 +25,32 @@ type RawEvent = {
   created_at: number;
 };
 
+type Filter = { authors: string[]; kinds: number[]; since?: number; limit?: number };
+
 let mockEvents: RawEvent[] = [];
 let mockPubkey: string | undefined;
 const mockSubscribeFilters: unknown[] = [];
+/** When set, the fake relay returns only events some filter asks for, as a relay would. */
+let mockRelayHonoursFilters = false;
+
+function mockMatches(filters: Filter[] | null, event: RawEvent): boolean {
+  return (filters ?? []).some(
+    (filter) =>
+      filter.authors.includes(event.pubkey) &&
+      filter.kinds.includes(event.kind) &&
+      event.created_at >= (filter.since ?? 0)
+  );
+}
 
 jest.mock('@nostr-dev-kit/ndk-mobile', () => ({
   ...jest.requireActual('@nostr-dev-kit/ndk-mobile'),
-  useSubscribe: ({ filters }: { filters: unknown }) => {
+  useSubscribe: ({ filters }: { filters: Filter[] | null }) => {
     mockSubscribeFilters.push(filters);
-    return { events: mockEvents };
+    return {
+      events: mockRelayHonoursFilters
+        ? mockEvents.filter((event) => mockMatches(filters, event))
+        : mockEvents,
+    };
   },
 }));
 jest.mock('@/shared/providers/NostrKeysProvider', () => ({
@@ -112,9 +129,10 @@ beforeEach(() => {
   }
   mockEvents = [];
   mockSubscribeFilters.length = 0;
+  mockRelayHonoursFilters = false;
   activate(A, 0);
   useOwnProfileMetadataStore.setState({ latest: null });
-  useNostrSocialStore.setState({ engagementByEventId: {} });
+  useNostrSocialStore.setState(useNostrSocialStore.getInitialState(), true);
   useOwnContentStore.setState({ byId: {} });
 });
 
@@ -123,21 +141,61 @@ afterEach(() => {
 });
 
 describe('useOwnEventsSync', () => {
-  it('subscribes to every own kind for the last year, live', () => {
+  it('asks for the newest profile and follow list with no window, and a year of the rest, live', () => {
     jest.spyOn(Date, 'now').mockReturnValue(T * 1000);
     const { unmount } = mount();
 
-    // QUIRK: the one-year `since` is applied to the replaceable kinds 0 and 3 as well, which
-    // relays may honour by returning nothing for an older profile or follow list. A change
-    // to per-kind filters should change this assertion on purpose.
     expect(mockSubscribeFilters.at(-1)).toEqual([
+      { authors: [A], kinds: [0], limit: 1 },
+      { authors: [A], kinds: [3], limit: 1 },
       {
         authors: [A],
-        kinds: [0, 1, 3, 5, 6, 7],
+        kinds: [1, 5, 6, 7],
         since: T - 365 * 24 * 60 * 60,
         limit: 5000,
       },
     ]);
+    unmount();
+  });
+
+  it('receives a follow list last changed more than a year ago', () => {
+    jest.spyOn(Date, 'now').mockReturnValue(T * 1000);
+    mockRelayHonoursFilters = true;
+    const { rerender, unmount } = mount();
+    const old = T - 2 * 365 * 24 * 60 * 60;
+
+    deliver(rerender, [
+      { id: id(50), kind: 3, pubkey: A, content: '', tags: [['p', B]], created_at: old },
+      profileEvent(id(51), old, 'Old profile'),
+    ]);
+
+    expect(useNostrSocialStore.getState().contactsTags).toEqual([['p', B]]);
+    expect(useNostrSocialStore.getState().contactsUpdatedAt).toBe(old);
+    expect(latestProfileId()).toBe(id(51));
+    unmount();
+  });
+
+  it('refuses a follow list written by another account', () => {
+    const { rerender, unmount } = mount();
+
+    deliver(rerender, [
+      { id: id(52), kind: 3, pubkey: B, content: '', tags: [['p', A]], created_at: T },
+    ]);
+
+    expect(useNostrSocialStore.getState().contactsTags).toEqual([]);
+    expect(useNostrSocialStore.getState().followingPubkeys).toEqual({});
+    unmount();
+  });
+
+  it('keeps its own follow list when another account wrote a newer one in the same batch', () => {
+    const { rerender, unmount } = mount();
+
+    deliver(rerender, [
+      { id: id(53), kind: 3, pubkey: A, content: '', tags: [['p', B]], created_at: T },
+      { id: id(54), kind: 3, pubkey: B, content: '', tags: [['p', A]], created_at: T + 5 },
+    ]);
+
+    expect(useNostrSocialStore.getState().contactsTags).toEqual([['p', B]]);
     unmount();
   });
 

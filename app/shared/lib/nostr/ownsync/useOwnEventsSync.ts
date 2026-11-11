@@ -43,7 +43,14 @@ const SYNC_KINDS = hasFeature('feed')
   ? OWN_EVENT_KINDS
   : OWN_EVENT_KINDS.filter((kind) => kind === Metadata || kind === Contacts);
 
-/** Backfill window for our own events. Replaceable kinds (0/3) ignore it. */
+/** Kinds kept as history; the profile and follow list are replaceable and asked for alone. */
+const HISTORY_KINDS = SYNC_KINDS.filter((kind) => kind !== Metadata && kind !== Contacts);
+
+/**
+ * Backfill window for the history kinds only. A relay applies `since` to every
+ * kind, so a profile or follow list last changed before it would never arrive;
+ * those two have their own unwindowed filters, newest only.
+ */
 const BACKFILL_SEC = 365 * 24 * 60 * 60; // 1 year
 const PER_KIND_LIMIT = 5000;
 
@@ -87,7 +94,13 @@ export function useOwnEventsSync(): void {
   const filters = useMemo(() => {
     if (!pubkey) return null;
     const since = Math.floor(Date.now() / 1000) - BACKFILL_SEC;
-    return [{ authors: [pubkey], kinds: SYNC_KINDS, since, limit: PER_KIND_LIMIT }];
+    return [
+      { authors: [pubkey], kinds: [Metadata], limit: 1 },
+      { authors: [pubkey], kinds: [Contacts], limit: 1 },
+      ...(HISTORY_KINDS.length > 0
+        ? [{ authors: [pubkey], kinds: HISTORY_KINDS, since, limit: PER_KIND_LIMIT }]
+        : []),
+    ];
   }, [pubkey]);
 
   const { events } = useSubscribe({ filters, opts: OWN_SUBSCRIBE_OPTS });
@@ -109,7 +122,10 @@ export function useOwnEventsSync(): void {
       const id = (raw as { id?: string }).id;
       if (!id || processedRef.current.has(id)) continue;
       processedRef.current.add(id);
-      fresh.push(toOwnSyncEvent(raw as Parameters<typeof toOwnSyncEvent>[0]));
+      const event = toOwnSyncEvent(raw as Parameters<typeof toOwnSyncEvent>[0]);
+      // A follow list replaces this account's saved one: only its own counts.
+      if (event.kind === Contacts && event.pubkey !== pubkey) continue;
+      fresh.push(event);
     }
     if (fresh.length === 0) return;
 
@@ -124,7 +140,10 @@ export function useOwnEventsSync(): void {
       for (const note of part.ownNotes) own.ingestSeen(note);
       ingestOwnMediaBlobs(part.ownNotes, pubkey);
     }
-    if (part.latestContacts) {
+    if (
+      part.latestContacts &&
+      useProfileStore.getState().getActiveProfile()?.pubkey === part.latestContacts.pubkey
+    ) {
       social.setContactsFromRelay({
         tags: part.latestContacts.tags,
         content: part.latestContacts.content,
