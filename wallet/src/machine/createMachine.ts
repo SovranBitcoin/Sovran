@@ -414,24 +414,23 @@ export function createPaymentMachine(
 
   /**
    * The one way out of a turn. Returns false, doing nothing, when a reset or
-   * a superseding event took the machine from it. By default the turn stops
-   * executing and tells listeners; `executing: "keep"` leaves
-   * `inspect().isExecuting` as it is and `notify: false` tells no one.
+   * a superseding event took the machine from it. The turn stops executing
+   * and tells listeners, unless `notify: false`.
    */
   function finishTurn(
     generation: number,
     op: string,
-    exit: { executing?: "keep"; notify?: false } = {},
+    exit: { notify?: false } = {},
   ): boolean {
     if (isStaleGeneration(generation, op)) return false;
-    if (!exit.executing) setExecuting(false, false);
+    setExecuting(false, false);
     sendLocked = false;
     if (exit.notify !== false) notify();
     return true;
   }
 
   /** Frees the machine and leaves `inspect()` and its listeners alone. */
-  const QUIET_EXIT = { executing: "keep", notify: false } as const;
+  const QUIET_EXIT = { notify: false } as const;
 
   /**
    * A reset: strands the running turn, restarts the flow, then frees the
@@ -1467,7 +1466,7 @@ export function createPaymentMachine(
           type: event.type,
           currentStep: step,
         });
-        finishTurn(sendGeneration, "transition.unchanged", { executing: "keep" });
+        finishTurn(sendGeneration, "transition.unchanged");
         return;
       }
       flowCtx = result.context;
@@ -2153,9 +2152,8 @@ export function createPaymentMachine(
         }
       }
 
-      const trackExecuting = !INPUT_STEPS.has(step);
-      if (trackExecuting) setExecuting(true);
-      else notify();
+      if (INPUT_STEPS.has(step)) notify();
+      else setExecuting(true);
 
       try {
         await dispatchHandler(step, stepData);
@@ -2174,12 +2172,7 @@ export function createPaymentMachine(
       } finally {
         // A superseded turn returns here, which also swallows its handler's
         // throw; otherwise the throw reaches the safety net below.
-        const finished = finishTurn(
-          sendGeneration,
-          "dispatchHandler.finally",
-          trackExecuting ? {} : { executing: "keep" },
-        );
-        if (!finished) return;
+        if (!finishTurn(sendGeneration, "dispatchHandler.finally")) return;
       }
     } catch (err) {
       // Safety net: finish the turn so the machine doesn't stay held if
