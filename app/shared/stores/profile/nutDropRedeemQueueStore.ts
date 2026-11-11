@@ -238,10 +238,14 @@ export const useNutDropRedeemQueueStore = create<NutDropRedeemQueueStore>({
           status,
           error,
         });
+        // A received token keeps no error from an attempt before it.
+        const { lastError, ...rest } = existing;
+        const kept = status === 'redeemed' ? undefined : lastError;
+        const nextError = error ? clipError(error) : kept;
         set((state) => ({
           byTokenHash: {
             ...state.byTokenHash,
-            [tokenHash]: { ...existing, status, ...(error ? { lastError: clipError(error) } : {}) },
+            [tokenHash]: { ...rest, status, ...(nextError ? { lastError: nextError } : {}) },
           },
         }));
       },

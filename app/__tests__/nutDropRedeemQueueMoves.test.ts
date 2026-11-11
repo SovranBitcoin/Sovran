@@ -22,10 +22,14 @@ jest.mock('@/shared/lib/logger', () => ({
   log: { info: jest.fn(), debug: jest.fn(), warn: jest.fn(), error: jest.fn() },
   redactError: (e: unknown) => e,
 }));
+// Every value the store saves, newest last.
+const mockSaved: string[] = [];
 jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({
   createProfileScopedStorage: () => ({
     getItem: async () => null,
-    setItem: async () => {},
+    setItem: async (_name: string, value: string) => {
+      mockSaved.push(value);
+    },
     removeItem: async () => {},
   }),
   getActiveProfilePubkey: () => 'a'.repeat(64),
@@ -190,6 +194,24 @@ describe('moves the queue accepts', () => {
     store().requeue(HASH);
     expect(current()).toMatchObject({ status: 'pending', attempts: 0, nextAttemptAt: 0 });
     expect(current()).not.toHaveProperty('lastError');
+  });
+});
+
+describe('a token received after a failed attempt', () => {
+  it('keeps no error from the earlier attempt, in memory or in what is saved next', async () => {
+    at('pending');
+    store().scheduleRetry(HASH, 'mint unreachable');
+    store().markStatus(HASH, 'redeeming');
+    expect(current()?.lastError).toBe('mint unreachable');
+    store().markStatus(HASH, 'redeemed');
+    expect(current()?.status).toBe('redeemed');
+    expect(current()).not.toHaveProperty('lastError');
+    await new Promise((resolve) => setImmediate(resolve));
+    const saved = JSON.parse(mockSaved.at(-1) ?? '{}') as {
+      state: { byTokenHash: Record<string, object> };
+    };
+    expect(saved.state.byTokenHash[HASH]).toMatchObject({ status: 'redeemed' });
+    expect(saved.state.byTokenHash[HASH]).not.toHaveProperty('lastError');
   });
 });
 
