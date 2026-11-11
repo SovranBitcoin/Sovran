@@ -77,11 +77,6 @@
       "count": 1
     }
   },
-  "features/settings/screens/SettingsRecoveryScreen.tsx": {
-    "@typescript-eslint/consistent-type-assertions": {
-      "count": 1
-    }
-  },
   "features/theme/components/UnitPreviewCard.tsx": {
     "no-restricted-syntax": {
       "count": 6
