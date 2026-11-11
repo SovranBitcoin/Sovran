@@ -54,7 +54,7 @@ import {
 import { formatDate } from '@/shared/lib/date';
 import { formatAmount } from '@/shared/lib/currency';
 import { getMintDisplayName } from '@/shared/lib/url';
-import { swapGroupPhase, type SwapGroupPhase } from '@/shared/lib/cashu/swapGroupPhase';
+import { swapGroupOutcome, type SwapGroupOutcome } from '@/shared/lib/cashu/swapGroupPhase';
 import { useSwapMintInfo } from '../hooks/useSwapMintInfo';
 import { getTransactionActionDirection } from '@/features/transactions/lib/transactionPresentation';
 import Icon from 'assets/icons';
@@ -202,18 +202,17 @@ const CollapsedLegGroup = React.memo(({ legGroup, mintInfoMap }: CollapsedLegGro
 });
 CollapsedLegGroup.displayName = 'CollapsedLegGroup';
 
-/** The Status line: a run with no owner still reads Running until it is reconciled. */
-function statusLabel(phase: SwapGroupPhase): string {
-  switch (phase) {
-    case 'running':
-    case 'interrupted':
+/** The Status line: a swap whose money may still move reads Running until it is reconciled. */
+function statusLabel(outcome: SwapGroupOutcome): string {
+  switch (outcome) {
+    case 'inProgress':
       return 'Running';
     case 'finished':
       return 'Complete';
     case 'cancelled':
       return 'Cancelled';
     default: {
-      const exhaustive: never = phase;
+      const exhaustive: never = outcome;
       return exhaustive;
     }
   }
@@ -350,7 +349,7 @@ export function SwapTransactionScreen({ groupId }: Props) {
 
     // Don't compute fees until mint history is loaded — otherwise received=0
     // makes it look like everything was lost to fees.
-    const ready = hasMintHistory || swapGroupPhase(group) === 'cancelled';
+    const ready = hasMintHistory || swapGroupOutcome(group) === 'cancelled';
 
     return {
       totalReceived: received,
@@ -372,17 +371,17 @@ export function SwapTransactionScreen({ groupId }: Props) {
     );
   }
 
-  const phase = swapGroupPhase(group);
+  const outcome = swapGroupOutcome(group);
   log.debug('tx.swap.display', {
     groupId,
-    phase,
+    outcome,
     legCount: legGroups.length,
     totalReceived,
     totalFees,
   });
 
   const unit = group.unit || 'sat';
-  const isFailed = phase === 'cancelled';
+  const isFailed = outcome === 'cancelled';
   const headerColor = isFailed ? danger : success;
   const fiatAmount = formatAmount(
     { amount: totalReceived || totalSent, unit },
@@ -573,7 +572,7 @@ export function SwapTransactionScreen({ groupId }: Props) {
           items={[
             {
               title: 'Status',
-              value: statusLabel(phase),
+              value: statusLabel(outcome),
             },
             { title: 'Steps', value: String(stepCount) },
             ...(totalFees > 0

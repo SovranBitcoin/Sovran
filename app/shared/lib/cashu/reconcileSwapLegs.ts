@@ -1,5 +1,5 @@
 import { cashuLog, redactError } from '@/shared/lib/logger';
-import { swapGroupPhase } from '@/shared/lib/cashu/swapGroupPhase';
+import { legMoneyMayMove, swapGroupPhase } from '@/shared/lib/cashu/swapGroupPhase';
 import {
   useSwapTransactionsStore,
   type SwapLeg,
@@ -44,7 +44,7 @@ const LEFT_MID_FLIGHT: ReadonlySet<SwapLegLocalStatus | undefined> = new Set([
  * still outstanding, not a failed swap.
  *
  * A group saved as running that no run owns (`interrupted`) is then ended
- * once every leg is at rest: `finished` when every leg reached an outcome,
+ * once no leg's money may still move: `finished` when every leg reached an outcome,
  * `cancelled` when one stopped before it sent anything.
  */
 export async function reconcileSwapLegs(manager: SwapLegOperations): Promise<void> {
@@ -99,40 +99,12 @@ export async function reconcileSwapLegs(manager: SwapLegOperations): Promise<voi
   for (const groupId of interrupted) endInterruptedGroup(groupId);
 }
 
-/**
- * Whether nothing more can happen to this leg's money without a run. A melt
- * is prepared only once the leg's invoice is ready, and sent only after that,
- * so a leg before that point sent nothing; a leg that has a melt it may have
- * sent waits for that melt's outcome.
- */
-function atRest(leg: SwapLeg): boolean {
-  switch (leg.localStatus) {
-    case 'done':
-    case 'failed':
-    case 'pending':
-    case 'creatingInvoice':
-      return true;
-    case undefined:
-    case 'invoiceReady':
-      return !leg.meltOperationId;
-    case 'melting':
-    case 'verifying':
-    case 'paymentPending':
-    case 'settling':
-      return false;
-    default: {
-      const exhaustive: never = leg.localStatus;
-      return exhaustive;
-    }
-  }
-}
-
-/** End an interrupted group whose legs are all at rest, as its legs prove it went. */
+/** End an interrupted group once no leg's money may still move, as its legs prove it went. */
 function endInterruptedGroup(groupId: string): void {
   const store = useSwapTransactionsStore.getState();
   const group = store.groups[groupId];
   // Read again: a run may have taken the group up while operations were read.
-  if (!group || swapGroupPhase(group) !== 'interrupted' || !group.legs.every(atRest)) return;
+  if (!group || swapGroupPhase(group) !== 'interrupted' || group.legs.some(legMoneyMayMove)) return;
   const reachedOutcome = group.legs.every(
     (leg) => leg.localStatus === 'done' || leg.localStatus === 'failed'
   );

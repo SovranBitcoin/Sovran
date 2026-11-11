@@ -1,4 +1,4 @@
-import type { SwapGroup } from '@/shared/stores/profile/swapTransactionsStore';
+import type { SwapGroup, SwapLeg } from '@/shared/stores/profile/swapTransactionsStore';
 
 /**
  * Where a saved swap group is, as read in this process:
@@ -42,5 +42,60 @@ export function swapGroupPhase(group: Pick<SwapGroup, 'id' | 'state'>): SwapGrou
     case 'finished':
     case 'cancelled':
       return group.state;
+  }
+}
+
+/**
+ * Whether this leg's money may still move: its melt may yet be sent or paid,
+ * or its destination has not been seen to issue. A melt is prepared only once
+ * the leg's invoice is ready, so a leg before that point sent nothing, and a
+ * leg at `invoiceReady` (or saved with no status) has sent something only if
+ * it has a melt.
+ */
+export function legMoneyMayMove(leg: Pick<SwapLeg, 'localStatus' | 'meltOperationId'>): boolean {
+  switch (leg.localStatus) {
+    case 'melting':
+    case 'verifying':
+    case 'paymentPending':
+    case 'settling':
+      return true;
+    case undefined:
+    case 'invoiceReady':
+      return !!leg.meltOperationId;
+    case 'pending':
+    case 'creatingInvoice':
+    case 'done':
+    case 'failed':
+      return false;
+    default: {
+      const exhaustive: never = leg.localStatus;
+      return exhaustive;
+    }
+  }
+}
+
+/**
+ * What a saved group shows the person: `inProgress` while a run owns it, it
+ * was interrupted, or any leg's money may still move, whatever the group was
+ * saved as. A run that ended (an abort, Cancel) can leave a leg mid-payment.
+ */
+export type SwapGroupOutcome = 'inProgress' | 'finished' | 'cancelled';
+
+export function swapGroupOutcome(
+  group: Pick<SwapGroup, 'id' | 'state' | 'legs'>
+): SwapGroupOutcome {
+  if (group.legs.some(legMoneyMayMove)) return 'inProgress';
+  const phase = swapGroupPhase(group);
+  switch (phase) {
+    case 'running':
+    case 'interrupted':
+      return 'inProgress';
+    case 'finished':
+    case 'cancelled':
+      return phase;
+    default: {
+      const exhaustive: never = phase;
+      return exhaustive;
+    }
   }
 }

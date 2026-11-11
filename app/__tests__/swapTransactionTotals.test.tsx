@@ -335,6 +335,30 @@ describe('a swap with a failed leg', () => {
     expect(details()).toMatchObject({ Status: 'Running' });
   });
 
+  it.each([
+    ['cancelled', 'melting'],
+    ['cancelled', 'verifying'],
+    ['finished', 'melting'],
+    ['finished', 'invoiceReady'],
+  ] as const)(
+    'a %s group with a leg still %s reads Running and shows no fee',
+    async (state, localStatus) => {
+      seedGroup({
+        state,
+        legs: [
+          leg('l1', { amount: 700, localStatus, meltQuoteId: 'melt1', meltOperationId: 'op-1' }),
+        ],
+      });
+      mockHistory = [historyEntry('melt', 'melt1', -710)];
+
+      await render();
+
+      // The melt may still be paid: nothing is lost to fees yet, and nothing is over.
+      expect(details()).toMatchObject({ Status: 'Running' });
+      expect(details()).not.toHaveProperty('Total Fees');
+    }
+  );
+
   it('a cancelled group with no history shows no fee', async () => {
     seedGroup({
       state: 'cancelled',

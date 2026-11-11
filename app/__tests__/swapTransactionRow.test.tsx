@@ -36,8 +36,15 @@ jest.mock('@/shared/lib/logger', () => {
   };
 });
 
-function leg(localStatus: SwapLeg['localStatus']): SwapLeg {
-  return { id: `leg-${localStatus}`, fromMintUrl: 'a', toMintUrl: 'b', amount: 10, localStatus };
+function leg(localStatus: SwapLeg['localStatus'], over: Partial<SwapLeg> = {}): SwapLeg {
+  return {
+    id: `leg-${localStatus}`,
+    fromMintUrl: 'a',
+    toMintUrl: 'b',
+    amount: 10,
+    localStatus,
+    ...over,
+  };
 }
 
 function statusOf(state: SwapGroup['state'], legs: SwapLeg[]) {
@@ -83,6 +90,29 @@ it.each([
     [leg('pending')],
     ['Completed', 'success'],
   ],
+  [
+    'a cancelled group with an invoice and no melt',
+    'cancelled',
+    [leg('invoiceReady')],
+    ['Completed', 'success'],
+  ],
 ] as const)('%s', (_name, state, legs, expected) => {
   expect(statusOf(state, [...legs])).toEqual(expected);
+});
+
+describe('a leg whose melt or mint can still complete keeps the swap pending, however the group was saved', () => {
+  it.each([
+    ['melting', leg('melting', { meltOperationId: 'melt-op' })],
+    ['verifying', leg('verifying', { meltOperationId: 'melt-op' })],
+    ['settling', leg('settling')],
+    ['paymentPending', leg('paymentPending')],
+    ['invoiceReady with a melt', leg('invoiceReady', { meltOperationId: 'melt-op' })],
+  ])('%s', (_name, moving) => {
+    for (const state of ['running', 'finished', 'cancelled'] as const) {
+      expect([state, statusOf(state, [leg('done'), moving])]).toEqual([
+        state,
+        ['Pending', 'foreground'],
+      ]);
+    }
+  });
 });
