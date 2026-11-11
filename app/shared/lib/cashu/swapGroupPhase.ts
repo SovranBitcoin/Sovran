@@ -14,7 +14,7 @@ import type { SwapGroup, SwapLeg } from '@/shared/stores/profile/swapTransaction
  * `interrupted` is never saved: it is the saved `running` plus the absence
  * of an owner, decided here where the group is read.
  */
-export type SwapGroupPhase = 'running' | 'interrupted' | 'finished' | 'cancelled';
+type SwapGroupPhase = 'running' | 'interrupted' | 'finished' | 'cancelled';
 
 /** Group id → how many holds this process has on it. */
 const owners = new Map<string, number>();
