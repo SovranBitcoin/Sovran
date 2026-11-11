@@ -496,15 +496,21 @@ it('strict Coco cleanup rejects swallowed teardown failures while default cleanu
     dispose,
   };
   // Synthetic manager only: no native database, proofs, wallet or network.
-  Reflect.set(CocoManager, 'instance', instance);
+  const open = () =>
+    Reflect.set(CocoManager, 'life', {
+      phase: 'ready',
+      instance,
+      db: { closeAsync: jest.fn().mockResolvedValue(undefined) },
+    });
+  open();
   await expect(CocoManager.cleanup({ requireSuccess: true })).rejects.toThrow(
     'Coco teardown incomplete'
   );
   expect(dispose).toHaveBeenCalledTimes(1);
-  Reflect.set(CocoManager, 'instance', instance);
+  open();
   await expect(CocoManager.cleanup()).resolves.toBeUndefined();
   expect(dispose).toHaveBeenCalledTimes(2);
-  Reflect.set(CocoManager, 'instance', instance);
+  open();
   const defaultPending = CocoManager.cleanup();
   const joinedAssertion = expect(CocoManager.cleanup({ requireSuccess: true })).rejects.toThrow(
     'Coco teardown incomplete'

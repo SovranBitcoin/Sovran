@@ -83,7 +83,7 @@ function database() {
     getFirstAsync: async () => ({ c: 0 }),
     execAsync: async () => undefined,
     runAsync: async () => undefined,
-    closeAsync: jest.fn(async () => undefined),
+    closeAsync: jest.fn(async (): Promise<void> => undefined),
   };
 }
 type Database = ReturnType<typeof database>;
