@@ -66,11 +66,12 @@ const mockTransactions = {
   tagMintQuote: jest.fn(),
   tagMelt: jest.fn(),
   finalizeGroup: jest.fn(),
+  reopenGroup: jest.fn(),
 };
 const mockStatus = {
-  active: null as { state: string } | null,
-  start: jest.fn(() => {
-    mockStatus.active = { state: 'running' };
+  active: null as { state: string; meta: { groupId?: string } } | null,
+  start: jest.fn((params: { meta: { groupId?: string } }) => {
+    mockStatus.active = { state: 'running', meta: params.meta };
   }),
   setActiveLeg: jest.fn(),
   setLegDone: jest.fn(),
@@ -80,6 +81,7 @@ const mockStatus = {
   settleUnknown: jest.fn(),
   fail: jest.fn(),
   cancel: jest.fn(),
+  resume: jest.fn(),
 };
 let destinationBalance = 0;
 let mintState = 'pending';
@@ -275,7 +277,7 @@ test('pressing start twice in a row runs one swap', async () => {
 });
 
 test('start is refused while another screen’s swap is still running', async () => {
-  mockStatus.active = { state: 'running' };
+  mockStatus.active = { state: 'running', meta: {} };
   const { result } = mount();
   await act(async () => result.current.handleStart());
 
@@ -288,7 +290,7 @@ test('start is refused while another screen’s swap is still running', async ()
 });
 
 test('a finished swap left on the toast does not block a new start', async () => {
-  mockStatus.active = { state: 'completed' };
+  mockStatus.active = { state: 'completed', meta: {} };
   const { result } = mount();
   await act(async () => result.current.handleStart());
   await finishRun();
@@ -323,17 +325,18 @@ test('retrying a step after cancelling runs it again and ends the run as finishe
   });
   await finishRun();
 
-  // QUIRK: a single-step retry after a cancel sets the run to 'finished' over
-  // 'cancelled', while the swap group stays finalized as cancelled.
+  // The retry reopens the cancelled group and its toast, and ends both as it ends.
   expect(result.current.runStatus).toBe('finished');
   expect(mockManager.ops.melt.execute).toHaveBeenCalledTimes(2);
   expect(result.current.stepStates['step-1'].status).toBe('done');
   expect(mockStatus.setLegDone).toHaveBeenCalledWith('step-1');
-  expect(mockTransactions.finalizeGroup).toHaveBeenLastCalledWith('group-1', 'cancelled');
-  expect(mockStatus.complete).not.toHaveBeenCalled();
+  expect(mockTransactions.reopenGroup).toHaveBeenCalledWith('group-1');
+  expect(mockTransactions.finalizeGroup).toHaveBeenLastCalledWith('group-1', 'finished');
+  expect(mockStatus.resume).toHaveBeenCalled();
+  expect(mockStatus.complete).toHaveBeenCalledTimes(1);
 });
 
-test('QUIRK: a run that throws fails the toast and leaves its group and the screen running', async () => {
+test('a run that throws ends its group as cancelled, fails the toast and stops the screen', async () => {
   mockStatus.setActiveLeg.mockImplementationOnce(() => {
     throw new Error('toast exploded');
   });
@@ -343,11 +346,11 @@ test('QUIRK: a run that throws fails the toast and leaves its group and the scre
 
   expect(mockStatus.fail).toHaveBeenCalledWith(expect.any(String));
   expect(cashuLog.warn).toHaveBeenCalledWith('mint.rebalance.run_failed', expect.anything());
-  expect(mockTransactions.finalizeGroup).not.toHaveBeenCalled();
-  expect(result.current.runStatus).toBe('running');
+  expect(mockTransactions.finalizeGroup).toHaveBeenCalledWith('group-1', 'cancelled');
+  expect(result.current.runStatus).toBe('cancelled');
 });
 
-test('QUIRK: a run aborted by a wallet change leaves its group, the toast and the screen running', async () => {
+test('a run aborted by a wallet change ends its group and the toast as cancelled', async () => {
   keepRecipientPending();
   const { result, rerender } = mount();
   await act(async () => result.current.handleStart());
@@ -360,11 +363,12 @@ test('QUIRK: a run aborted by a wallet change leaves its group, the toast and th
     await jest.advanceTimersByTimeAsync(16000);
   });
 
-  expect(mockTransactions.finalizeGroup).not.toHaveBeenCalled();
+  expect(mockTransactions.finalizeGroup).toHaveBeenCalledTimes(1);
+  expect(mockTransactions.finalizeGroup).toHaveBeenCalledWith('group-1', 'cancelled');
+  expect(mockStatus.cancel).toHaveBeenCalledTimes(1);
   expect(mockStatus.complete).not.toHaveBeenCalled();
-  expect(mockStatus.cancel).not.toHaveBeenCalled();
   expect(mockStatus.fail).not.toHaveBeenCalled();
-  expect(result.current.runStatus).toBe('running');
+  expect(result.current.runStatus).toBe('cancelled');
 });
 
 test('retry-failed runs a failed step again', async () => {

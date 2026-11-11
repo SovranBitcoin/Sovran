@@ -16,6 +16,7 @@ import { cashuLog } from '@/shared/lib/logger';
 import { swapStatusPopup } from '@/shared/lib/popup';
 import { useSwapTransactionsStore } from '@/shared/stores/profile/swapTransactionsStore';
 import { useSwapStatusStore } from '@/shared/stores/runtime/swapStatusStore';
+import { holdSwapGroup } from '@/shared/lib/cashu/swapGroupPhase';
 import type { MiddlemanRoutingSettings } from '@/shared/stores/global/settingsStore';
 import {
   MIN_FEE_RESERVE,
@@ -71,13 +72,54 @@ type StartRun = (
   report: (result: RunResult) => void
 ) => Promise<RunResult>;
 
-/** Report a settled transfer on the unified Swap status toast. */
-function reportSwapLeg(step: TransferStep, outcome: RebalanceTransferOutcome) {
+/**
+ * The run this screen owns. While it is the screen's current run the engine
+ * keeps going and the swap group reads as running; ending it, by its report,
+ * a throw or Cancel, gives the group up.
+ */
+interface OwnedRun {
+  groupId: string | null;
+  release: () => void;
+}
+
+/** The Swap status toast, when it belongs to this group. */
+function toastFor(groupId: string | null) {
   const swapStatus = useSwapStatusStore.getState();
-  if (outcome.status === 'done') swapStatus.setLegDone(step.id);
-  else if (outcome.status === 'skipped') swapStatus.setLegSkipped(step.id);
+  return groupId && swapStatus.active?.meta.groupId === groupId ? swapStatus : null;
+}
+
+/** Report a settled transfer on the unified Swap status toast. */
+function reportSwapLeg(
+  toast: ReturnType<typeof toastFor>,
+  step: TransferStep,
+  outcome: RebalanceTransferOutcome
+) {
+  if (!toast) return;
+  if (outcome.status === 'done') toast.setLegDone(step.id);
+  else if (outcome.status === 'skipped') toast.setLegSkipped(step.id);
   else if (outcome.status === 'failed') {
-    swapStatus.setLegFailed(step.id, describeError(outcome.error, 'cashu').text);
+    toast.setLegFailed(step.id, describeError(outcome.error, 'cashu').text);
+  }
+}
+
+/** One transfer's outcome as the result of a run of that transfer alone. */
+function toRunResult(outcome: RebalanceTransferOutcome): RunResult {
+  switch (outcome.status) {
+    case 'aborted':
+      return { status: 'aborted' };
+    case 'done':
+    case 'skipped':
+      return { status: 'finished', anyFailed: false, anyPending: false };
+    case 'pending':
+    case 'settling':
+      return { status: 'finished', anyFailed: false, anyPending: true };
+    case 'failed':
+    case 'busy':
+      return { status: 'finished', anyFailed: true, anyPending: false };
+    default: {
+      const exhaustive: never = outcome;
+      return exhaustive;
+    }
   }
 }
 
@@ -107,16 +149,41 @@ export function useMintRebalanceOrchestrator({
   // One lock per screen: transfers from a retry never overlap a running one.
   const [lock] = useState(createRebalanceLock);
 
-  const runIdRef = useRef(0);
-  const abortRef = useRef(false);
-  const isRunningRef = useRef(false);
+  const runRef = useRef<OwnedRun | null>(null);
   const swapGroupIdRef = useRef<string | null>(null);
   const swapLegIdByStepIdRef = useRef<Record<string, string>>({});
   const isRunActive = useCallback(
-    (runId: number) =>
-      !abortRef.current && runIdRef.current === runId && managerRef.current === manager,
+    (run: OwnedRun) => runRef.current === run && managerRef.current === manager,
     [manager]
   );
+
+  /**
+   * Make a new run this screen's current one. Its swap group reads as running
+   * while it is; a group an earlier run ended is reopened for it, with its
+   * toast, so the retry's end is the one they show.
+   */
+  const claimRun = useCallback((): OwnedRun => {
+    const groupId = swapGroupIdRef.current;
+    if (groupId) useSwapTransactionsStore.getState().reopenGroup(groupId);
+    toastFor(groupId)?.resume();
+    const run = { groupId, release: groupId ? holdSwapGroup(groupId) : () => {} };
+    runRef.current = run;
+    return run;
+  }, []);
+
+  /** Stop owning `run`; false when it was no longer the current run (Cancel ended it). */
+  const giveUpRun = useCallback((run: OwnedRun) => {
+    run.release();
+    if (runRef.current !== run) return false;
+    runRef.current = null;
+    return true;
+  }, []);
+
+  /** End the swap group and the screen for a run that did not get through its steps. */
+  const closeCancelled = useCallback((groupId: string | null) => {
+    setRunStatus('cancelled');
+    if (groupId) useSwapTransactionsStore.getState().finalizeGroup(groupId, 'cancelled');
+  }, []);
 
   const plan = useMemo(() => runPlan ?? computedPlan, [runPlan, computedPlan]);
 
@@ -197,37 +264,39 @@ export function useMintRebalanceOrchestrator({
 
   /**
    * Run one engine action to its end and report it. `start` is the action;
-   * `currentRunId` is read when the engine asks whether the run is still
-   * wanted, because a rerouted run only gets its id once its mints are trusted.
-   * `start` may report the result itself before it returns: a rerouted run
-   * does, so the screen is not kept waiting while trust is given back.
+   * `currentRun` is read when the engine asks whether the run is still
+   * wanted, because a rerouted run is claimed again once its mints are
+   * trusted. `start` may report the result itself before it returns: a
+   * rerouted run does, so the screen is not kept waiting while trust is given
+   * back.
    */
   const runSteps = useCallback(
-    async (start: StartRun, currentRunId: () => number) => {
+    async (start: StartRun, currentRun: () => OwnedRun) => {
       let reported = false;
-      // Reporting ends the run for the screen: the lock, the status, the swap
-      // history group and the toast.
+      // Reporting ends the run for the screen, the swap history group and the
+      // toast, unless Cancel already ended it.
       const report = (result: RunResult) => {
         if (reported) return;
         reported = true;
-        isRunningRef.current = false;
-        if (result.status === 'aborted') return;
-
+        const run = currentRun();
+        if (!giveUpRun(run)) return;
+        const toast = toastFor(run.groupId);
+        if (result.status === 'aborted') {
+          // The wallet changed under the run (an account switch).
+          closeCancelled(run.groupId);
+          toast?.cancel();
+          return;
+        }
         setRunStatus('finished');
-        if (swapGroupIdRef.current) {
-          useSwapTransactionsStore.getState().finalizeGroup(swapGroupIdRef.current, 'finished');
+        if (run.groupId) {
+          useSwapTransactionsStore.getState().finalizeGroup(run.groupId, 'finished');
         }
-        // Retry runs may have no active swap (handleStart's start() not
-        // called); the store actions also early-return on `!active`.
-        const swapStatus = useSwapStatusStore.getState();
-        if (swapStatus.active) {
-          if (result.anyFailed) swapStatus.fail();
-          else if (result.anyPending) swapStatus.settleUnknown(PAYMENT_PENDING_DETAIL);
-          else swapStatus.complete();
-        }
+        if (result.anyFailed) toast?.fail();
+        else if (result.anyPending) toast?.settleUnknown(PAYMENT_PENDING_DETAIL);
+        else toast?.complete();
       };
       const callbacks: Parameters<StartRun>[0] = {
-        isActive: () => isRunActive(currentRunId()),
+        isActive: () => isRunActive(currentRun()),
         isSettled: (stepId) => {
           const status = stepStatesRef.current[stepId]?.status;
           // Settling and payment-pending count: the money has left or may
@@ -241,27 +310,27 @@ export function useMintRebalanceOrchestrator({
         },
         sinkFor,
         // Flip the toast pip to "active" before the transfer starts.
-        onTransferStart: (step) => useSwapStatusStore.getState().setActiveLeg(step.id),
-        onTransferSettled: reportSwapLeg,
+        onTransferStart: (step) => toastFor(currentRun().groupId)?.setActiveLeg(step.id),
+        onTransferSettled: (step, outcome) =>
+          reportSwapLeg(toastFor(currentRun().groupId), step, outcome),
       };
       try {
         report(await start(callbacks, report));
       } catch (err) {
-        if (useSwapStatusStore.getState().active) {
-          useSwapStatusStore.getState().fail(describeError(err, 'cashu').text);
+        const run = currentRun();
+        if (giveUpRun(run)) {
+          closeCancelled(run.groupId);
+          toastFor(run.groupId)?.fail(describeError(err, 'cashu').text);
         }
         throw err;
-      } finally {
-        isRunningRef.current = false;
       }
     },
-    [isRunActive, sinkFor]
+    [closeCancelled, giveUpRun, isRunActive, sinkFor]
   );
 
   const handleStart = useCallback(() => {
-    // Per-instance ref-based guard (this screen mount).
-    if (isRunningRef.current) return;
-    if (runStatus === 'running') return;
+    // Per-instance guard (this screen mount).
+    if (runRef.current) return;
     // Cross-instance guard: a prior screen mount may still be running an
     // orchestration (the user backed out and reopened). Refuse to start a
     // second concurrent swap so coco's mint/melt services don't overlap.
@@ -270,19 +339,15 @@ export function useMintRebalanceOrchestrator({
       return;
     }
 
-    isRunningRef.current = true;
-    abortRef.current = false;
-    const runId = (runIdRef.current += 1);
-
     // Freeze the plan snapshot
     const snapshot = computedPlan;
     setRunPlan(snapshot);
 
     // Start a swap group for this run (used for Transactions grouping)
     swapLegIdByStepIdRef.current = {};
-    swapGroupIdRef.current = useSwapTransactionsStore
-      .getState()
-      .startGroup({ unit, title: 'Swap' });
+    const groupId = useSwapTransactionsStore.getState().startGroup({ unit, title: 'Swap' });
+    swapGroupIdRef.current = groupId;
+    const run = claimRun();
 
     setStepStates(createInitialStepStates(snapshot.steps));
     setRunStatus('running');
@@ -292,7 +357,7 @@ export function useMintRebalanceOrchestrator({
     // running, so the user sees one progress notification instead of N.
     const totalAmount = snapshot.steps.reduce((sum, s) => sum + (s.amount ?? 0), 0);
     useSwapStatusStore.getState().start({
-      id: `swap-${runId}-${Date.now()}`,
+      id: groupId,
       legs: snapshot.steps.map((s) => ({
         id: s.id,
         label: `${extractDomain(s.fromMintUrl)} → ${extractDomain(s.toMintUrl)}`,
@@ -301,7 +366,7 @@ export function useMintRebalanceOrchestrator({
         unit,
         totalAmount,
         // Backs the toast's "View" button so completion → tap → SwapTransactionScreen.
-        groupId: swapGroupIdRef.current ?? undefined,
+        groupId,
       },
     });
     swapStatusPopup();
@@ -311,38 +376,36 @@ export function useMintRebalanceOrchestrator({
     // failure on the toast.
     runSteps(
       (callbacks) => engine.runTransfers(snapshot.steps, callbacks),
-      () => runId
+      () => run
     ).catch((error: unknown) => {
-      cashuLog.warn('mint.rebalance.run_failed', { runId, error });
+      cashuLog.warn('mint.rebalance.run_failed', { groupId, error });
     });
-  }, [computedPlan, runStatus, runSteps, unit, engine]);
+  }, [claimRun, computedPlan, runSteps, unit, engine]);
 
   const handleRetry = useCallback(
     async (step: TransferStep) => {
-      if (isRunningRef.current) return;
-      if (runStatus === 'running') return;
+      if (runRef.current) return;
 
-      isRunningRef.current = true;
-      abortRef.current = false;
-      const runId = (runIdRef.current += 1);
+      const run = claimRun();
       setRunStatus('running');
       updateStepState(step.id, {
         status: 'pending',
         errorMessage: undefined,
         routeSuggestion: undefined,
       });
-      try {
-        const outcome = await engine.executeTransfer(step, {
-          isActive: () => isRunActive(runId),
-          sink: sinkFor(step),
-        });
-        reportSwapLeg(step, outcome);
-      } finally {
-        isRunningRef.current = false;
-      }
-      setRunStatus('finished');
+      await runSteps(
+        async (callbacks) => {
+          const outcome = await engine.executeTransfer(step, {
+            isActive: callbacks.isActive,
+            sink: callbacks.sinkFor(step),
+          });
+          callbacks.onTransferSettled?.(step, outcome);
+          return toRunResult(outcome);
+        },
+        () => run
+      );
     },
-    [engine, isRunActive, sinkFor, updateStepState, runStatus]
+    [claimRun, engine, runSteps, updateStepState]
   );
 
   const handleSkip = useCallback(
@@ -355,12 +418,9 @@ export function useMintRebalanceOrchestrator({
 
   const handleRetryFailed = useCallback(async () => {
     if (!runPlan) return;
-    if (isRunningRef.current) return;
-    if (runStatus === 'running') return;
+    if (runRef.current) return;
 
-    isRunningRef.current = true;
-    abortRef.current = false;
-    const runId = (runIdRef.current += 1);
+    const run = claimRun();
     setRunStatus('running');
 
     // Reset only failed steps to pending
@@ -369,15 +429,14 @@ export function useMintRebalanceOrchestrator({
     const steps = runPlan.steps;
     await runSteps(
       (callbacks) => engine.runTransfers(steps, callbacks),
-      () => runId
+      () => run
     );
-  }, [runPlan, runStatus, runSteps, engine]);
+  }, [claimRun, runPlan, runSteps, engine]);
 
   const handleRouteThrough = useCallback(
     async (step: TransferStep) => {
       if (!runPlan) return;
-      if (isRunningRef.current) return;
-      if (runStatus === 'running') return;
+      if (runRef.current) return;
 
       const suggestion = stepStatesRef.current[step.id]?.routeSuggestion;
       if (!suggestion || suggestion.status !== 'found' || !suggestion.path) return;
@@ -385,13 +444,13 @@ export function useMintRebalanceOrchestrator({
       const chainPath = suggestion.path;
       if (chainPath.length < 3) return; // Need at least A → via → B
 
-      isRunningRef.current = true;
+      // Held while the intermediaries are trusted, so nothing else starts.
+      let run = claimRun();
 
       // One engine action: it makes a step per hop, trusts the intermediaries
       // for the run, and runs them. The original step stays visible (skipped)
       // with one row per hop after it.
       const steps = runPlan.steps;
-      let runId = runIdRef.current;
       await runSteps(
         (callbacks, report) =>
           engine.routeThrough(step, chainPath, steps, {
@@ -400,32 +459,29 @@ export function useMintRebalanceOrchestrator({
             makeId: mintLocalId,
             onRerouted: (hops) => {
               insertChainRows(step.id, hops);
-              abortRef.current = false;
-              runId = runIdRef.current += 1;
+              // The run starts here. A Cancel pressed while the intermediaries
+              // were being trusted does not stop it: it is claimed again.
+              if (runRef.current !== run) run = claimRun();
               setRunStatus('running');
             },
           }),
-        () => runId
+        () => run
       );
     },
-    [runPlan, runStatus, runSteps, engine, insertChainRows]
+    [claimRun, runPlan, runSteps, engine, insertChainRows]
   );
 
   const handleCancelRun = useCallback(() => {
     // Stops scheduling new steps and UI updates; an in-flight melt continues
     // and coco settles it.
-    abortRef.current = true;
-    runIdRef.current += 1;
-    isRunningRef.current = false;
-    setRunStatus('cancelled');
-
-    if (swapGroupIdRef.current) {
-      useSwapTransactionsStore.getState().finalizeGroup(swapGroupIdRef.current, 'cancelled');
-    }
+    const run = runRef.current;
+    if (run) giveUpRun(run);
+    const groupId = run?.groupId ?? swapGroupIdRef.current;
+    closeCancelled(groupId);
     // Flip the SwapStatusToast to its terminal 'cancelled' state; the runner
     // returns early on abort, so its complete()/fail() never fires.
-    useSwapStatusStore.getState().cancel();
-  }, []);
+    toastFor(groupId)?.cancel();
+  }, [closeCancelled, giveUpRun]);
 
   return {
     plan,

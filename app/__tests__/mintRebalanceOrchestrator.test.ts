@@ -59,11 +59,12 @@ const mockTransactions = {
   tagMintQuote: jest.fn(),
   tagMelt: jest.fn(),
   finalizeGroup: jest.fn(),
+  reopenGroup: jest.fn(),
 };
 const mockStatus = {
-  active: null as { state: string } | null,
-  start: jest.fn(() => {
-    mockStatus.active = { state: 'running' };
+  active: null as { state: string; meta: { groupId?: string } } | null,
+  start: jest.fn((params: { meta: { groupId?: string } }) => {
+    mockStatus.active = { state: 'running', meta: params.meta };
   }),
   setActiveLeg: jest.fn(),
   setLegDone: jest.fn(),
@@ -73,6 +74,7 @@ const mockStatus = {
   settleUnknown: jest.fn(),
   fail: jest.fn(),
   cancel: jest.fn(),
+  resume: jest.fn(),
 };
 let destinationBalance = 0;
 let mintState = 'pending';

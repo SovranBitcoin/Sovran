@@ -20,7 +20,18 @@ import { storeLog } from '@/shared/lib/logger';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
 import { tolerantRecord } from '@/shared/lib/persist/tolerant';
 
-type SwapGroupState = 'running' | 'finished' | 'cancelled';
+export type SwapGroupState = 'running' | 'finished' | 'cancelled';
+
+/**
+ * What a saved group can become next. A run ends its group once; a retry
+ * reopens it as running and ends it again. Finished and cancelled never
+ * replace each other.
+ */
+const GROUP_MOVES: Record<SwapGroupState, readonly SwapGroupState[]> = {
+  running: ['finished', 'cancelled'],
+  finished: ['running'],
+  cancelled: ['running'],
+};
 
 export type SwapLegLocalStatus =
   | 'pending'
@@ -106,9 +117,32 @@ function patchLeg(
   };
 }
 
+/** Move one group along `GROUP_MOVES`; returns the original state when it cannot. */
+function moveGroup(
+  state: SwapTransactionsState,
+  groupId: string,
+  nextState: SwapGroupState
+): SwapTransactionsState {
+  const group = state.groups[groupId];
+  if (!group || group.state === nextState) return state;
+  if (!GROUP_MOVES[group.state].includes(nextState)) {
+    storeLog.warn('store.swap_tx.group_move_refused', {
+      groupId,
+      from: group.state,
+      to: nextState,
+    });
+    return state;
+  }
+  storeLog.info('store.swap_tx.move_group', { groupId, from: group.state, to: nextState });
+  return { ...state, groups: { ...state.groups, [groupId]: { ...group, state: nextState } } };
+}
+
 interface SwapTransactionsActions {
   startGroup: (params: { unit: string; title?: string }) => string;
+  /** End a running group; a group that already ended keeps its end. */
   finalizeGroup: (groupId: string, state: Exclude<SwapGroupState, 'running'>) => void;
+  /** Mark an ended group running again, for a retry of its legs. */
+  reopenGroup: (groupId: string) => void;
 
   addLeg: (
     groupId: string,
@@ -235,20 +269,8 @@ export const useSwapTransactionsStore = create<SwapTransactionsStore>({
         return id;
       },
 
-      finalizeGroup: (groupId, nextState) => {
-        storeLog.info('store.swap_tx.finalize_group', { groupId, nextState });
-        set((state) => {
-          const group = state.groups[groupId];
-          if (!group) return state;
-          return {
-            ...state,
-            groups: {
-              ...state.groups,
-              [groupId]: { ...group, state: nextState },
-            },
-          };
-        });
-      },
+      finalizeGroup: (groupId, nextState) => set((state) => moveGroup(state, groupId, nextState)),
+      reopenGroup: (groupId) => set((state) => moveGroup(state, groupId, 'running')),
 
       addLeg: (groupId, leg) => {
         const legId = mintLocalId('leg');

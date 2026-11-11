@@ -150,3 +150,39 @@ describe('swap leg patching', () => {
     expect(untouched.legs.every((l) => l.localStatus === undefined)).toBe(true);
   });
 });
+
+describe('swap group moves', () => {
+  const stateOf = (groupId: string) => useSwapTransactionsStore.getState().getGroup(groupId)!.state;
+
+  it('ends a running group once: finished and cancelled never replace each other', () => {
+    const { groupId } = freshGroup();
+    const store = useSwapTransactionsStore.getState();
+
+    store.finalizeGroup(groupId, 'cancelled');
+    store.finalizeGroup(groupId, 'finished');
+
+    expect(stateOf(groupId)).toBe('cancelled');
+  });
+
+  it('reopens an ended group for a retry, which then ends it again', () => {
+    const { groupId } = freshGroup();
+    const store = useSwapTransactionsStore.getState();
+    store.finalizeGroup(groupId, 'cancelled');
+
+    store.reopenGroup(groupId);
+    expect(stateOf(groupId)).toBe('running');
+    store.finalizeGroup(groupId, 'finished');
+
+    expect(stateOf(groupId)).toBe('finished');
+  });
+
+  it('leaves a running group running when asked to reopen it, and ignores a missing group', () => {
+    const { groupId } = freshGroup();
+    const before = useSwapTransactionsStore.getState().groups;
+
+    useSwapTransactionsStore.getState().reopenGroup(groupId);
+    useSwapTransactionsStore.getState().finalizeGroup('missing-group', 'finished');
+
+    expect(useSwapTransactionsStore.getState().groups).toBe(before);
+  });
+});
