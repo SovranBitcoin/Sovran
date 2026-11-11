@@ -1,4 +1,4 @@
-import NDK, { NDKEvent, NDKRelaySet, NDKSubscriptionCacheUsage } from '@nostr-dev-kit/ndk-mobile';
+import NDK, { NDKEvent } from '@nostr-dev-kit/ndk-mobile';
 import { z } from 'zod';
 import { useFeedIgnoreStore, normalizeIgnoreHex } from '@/features/feed/stores/ignoreStore';
 import {
@@ -9,57 +9,20 @@ import {
   type ReportReason,
 } from '@/features/feed/lib/moderation';
 import type { NostrEventId, NostrPubkeyHex } from '@/shared/lib/protocolIds';
-import { useProfileStore } from '@/shared/stores/global/profileStore';
+import {
+  captureProfile,
+  matchingSigner,
+  readNewestOwnEvent,
+  validOwnEvent,
+} from './ownReplaceableEvent';
 import { publishEvent } from './publish';
 import { getOwnWriteRelays } from './outbox/relayListStore';
 
 const Tags = z.array(z.array(z.string())).max(20_000);
 const queues = new WeakMap<NDK, Promise<unknown>>();
 
-/** Watches transitions, including switching away and back while a signer is open. */
-function captureProfile(pubkey: string) {
-  const initial = useProfileStore.getState();
-  let current =
-    initial.profiles.find((p) => p.accountIndex === initial.activeAccountIndex)?.pubkey === pubkey;
-  const dispose = useProfileStore.subscribe((state) => {
-    if (
-      state.activeAccountIndex !== initial.activeAccountIndex ||
-      state.profiles.find((p) => p.accountIndex === state.activeAccountIndex)?.pubkey !== pubkey
-    )
-      current = false;
-  });
-  return {
-    check: () => {
-      if (!current) throw new Error('Profile changed');
-    },
-    dispose,
-  };
-}
-
-function validMuteEvent(event: NDKEvent, pubkey: string): boolean {
-  try {
-    return (
-      event.kind === 10000 &&
-      event.pubkey === pubkey &&
-      Number.isSafeInteger(event.created_at) &&
-      (event.created_at ?? -1) >= 0 &&
-      event.id === event.getEventHash() &&
-      event.verifySignature(false) === true
-    );
-  } catch {
-    return false;
-  }
-}
-
-async function matchingSigner(ndk: NDK, pubkey: string) {
-  const signer = ndk.signer;
-  if (!signer || (await signer.user()).pubkey !== pubkey || ndk.signer !== signer)
-    throw new Error('Account signer is not ready');
-  return signer;
-}
-
 export async function decodeMuteList(ndk: NDK, event: NDKEvent, pubkey: string): Promise<MuteList> {
-  if (!validMuteEvent(event, pubkey)) throw new Error('Invalid mute list');
+  if (!validOwnEvent(event, pubkey, 10000)) throw new Error('Invalid mute list');
   if (event.content.length > 1_000_000 || event.created_at! > Math.floor(Date.now() / 1000) + 60)
     throw new Error('Unsupported mute list');
   let privateTags: string[][] = [];
@@ -77,56 +40,11 @@ export async function decodeMuteList(ndk: NDK, event: NDKEvent, pubkey: string):
 
 /** Fetch before editing a replaceable event; never replace unreadable encrypted entries. */
 async function readMuteList(ndk: NDK, pubkey: string): Promise<MuteList | null> {
-  const relayUrls = [...new Set(getOwnWriteRelays())];
-  if (relayUrls.length === 0) throw new Error('No mute-list relays configured');
-  const latest = await new Promise<NDKEvent | undefined>((resolve, reject) => {
-    let newest: NDKEvent | undefined;
-    let settled = false;
-    const pending = new Set(relayUrls);
-    const subscriptions: ReturnType<NDK['subscribe']>[] = [];
-    const finish = (error?: Error) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      for (const subscription of subscriptions) subscription.stop();
-      if (error) reject(error);
-      else resolve(newest);
-    };
-    const timer = setTimeout(() => finish(new Error('Mute-list read timed out')), 12_000);
-    try {
-      for (const url of relayUrls) {
-        // A multi-relay NDK subscription may emit EOSE before all relays finish,
-        // and emits it only once. Independent reads require every relay's actual
-        // response before a replaceable list can safely be edited.
-        const relays = NDKRelaySet.fromRelayUrls([url], ndk);
-        const subscription = ndk.subscribe(
-          { kinds: [10000], authors: [pubkey] },
-          { cacheUsage: NDKSubscriptionCacheUsage.ONLY_RELAY, closeOnEose: false },
-          relays,
-          false
-        );
-        subscriptions.push(subscription);
-        subscription.on('event', (event: NDKEvent) => {
-          if (settled || !validMuteEvent(event, pubkey)) return;
-          if (
-            !newest ||
-            event.created_at! > newest.created_at! ||
-            (event.created_at === newest.created_at && event.id < newest.id)
-          )
-            newest = event;
-        });
-        subscription.on('eose', () => {
-          if (![...relays.relays].every((relay) => subscription.eosesSeen.has(relay))) return;
-          pending.delete(url);
-          if (pending.size === 0) finish();
-        });
-        void subscription.start().catch(() => finish(new Error('Mute-list subscription failed')));
-      }
-    } catch {
-      finish(new Error('Mute-list subscription failed'));
-    }
-  });
-  return latest ? decodeMuteList(ndk, latest, pubkey) : null;
+  const read = await readNewestOwnEvent(ndk, pubkey, 10000);
+  if (read.outcome === 'no-relays') throw new Error('No mute-list relays configured');
+  if (read.outcome === 'timed-out') throw new Error('Mute-list read timed out');
+  if (read.outcome === 'failed') throw new Error('Mute-list subscription failed');
+  return read.newest ? decodeMuteList(ndk, read.newest, pubkey) : null;
 }
 
 export async function syncMuteList(ndk: NDK, pubkey: string): Promise<void> {

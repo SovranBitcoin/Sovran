@@ -176,7 +176,7 @@ export function AiChatScreen() {
   );
   const canAttachImages = !mockMode && resolvedEntry?.visionInput === true;
 
-  const { send, retry, isSending, streamingMessageId } = useAiSend();
+  const { send, retry, isSending } = useAiSend();
 
   // KEPT as explicit useMemos — identity contract, not an optimization.
   // The compiler declines to cache these (each scope would span an
@@ -370,7 +370,6 @@ export function AiChatScreen() {
     <RNView style={MESSAGE_ROW_STYLE}>
       <AiMessageBubble
         message={item}
-        isStreaming={item.id === streamingMessageId}
         onRetry={isSending ? undefined : handleRetry}
         onContinue={isSending ? undefined : handleContinue}
         branchNav={branchNavById.get(item.id)}

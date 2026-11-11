@@ -29,7 +29,7 @@ import {
 } from '../lib/chatErrorActions';
 import { useModelPicker } from '../hooks/useModelPicker';
 import { useNavigateToAddFunds } from '../lib/navigateToAddFunds';
-import type { TurnError } from '../lib/turnErrors';
+import type { TurnError } from '../lib/turns';
 
 interface AiTurnErrorPillProps {
   /** The failed assistant message this pill stands in for. */

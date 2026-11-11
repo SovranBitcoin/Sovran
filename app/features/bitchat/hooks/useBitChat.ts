@@ -478,8 +478,9 @@ export function useBitChat(
           });
 
           // Watchdog: if this message hasn't reached at least `sent` within
-          // BLE_DM_STUCK_TIMEOUT_MS, mark it `failed` so the bubble surfaces
-          // a tap-to-retry instead of spinning forever.
+          // BLE_DM_STUCK_TIMEOUT_MS, mark it unconfirmed (saved as `failed`,
+          // reason `timeout`) so the bubble surfaces a tap-to-retry instead
+          // of spinning forever.
           //
           // Deliberately does NOT call `resetBLEPrivateChat` + restart the
           // handshake on its own — upstream's `NoiseRateLimiter` enforces
@@ -491,20 +492,12 @@ export function useBitChat(
           // fails. User-initiated retry (the bubble tap) spaces attempts
           // out enough to stay under the limit.
           const watchdog = setTimeout(() => {
-            const current = useBitchatDmMessagesStore
-              .getState()
-              .getForPeer(dmPeerID)
-              .find((m) => m.id === messageID);
-            if (current?.deliveryStatus !== 'sending') return;
+            // The store's table moves only a message still sending.
+            if (!useBitchatDmMessagesStore.getState().markTimedOut(messageID)) return;
             bitchatLog.warn('bitchat.hook.ble_dm_stuck', {
               peerID: dmPeerID,
               messageID,
               timeoutMs: BLE_DM_STUCK_TIMEOUT_MS,
-            });
-            useBitchatDmMessagesStore.getState().applyDeliveryStatus({
-              messageID,
-              status: 'failed',
-              reason: 'timeout',
             });
           }, BLE_DM_STUCK_TIMEOUT_MS);
 

@@ -359,6 +359,23 @@ describe('the first send creates the group', () => {
     expect(result.current.messages).toHaveLength(1);
   });
 
+  it('a send callback kept from before the group existed sends into the group the first send made', async () => {
+    const { result } = await mount();
+    const send = result.current.send;
+
+    await act(async () => {
+      await send('one');
+    });
+    await act(async () => {
+      await send('two');
+    });
+
+    expect(fake.client.createGroup).toHaveBeenCalledTimes(1);
+    const created = (await fake.client.createGroup.mock.results[0]!.value) as FakeGroup;
+    expect(created.sendChatMessage.mock.calls).toEqual([['one'], ['two']]);
+    expect(await AsyncStorage.getItem(INDEX_KEY)).toBe('{"v":1,"d":"c0de"}');
+  });
+
   it('stops before creating anything when the peer has no key package, and shows why', async () => {
     fake.client.network.request.mockResolvedValue([]);
     const { result } = await mount();
@@ -470,6 +487,83 @@ describe('a send before the conversation has loaded', () => {
     expect(await AsyncStorage.getItem(INDEX_KEY)).toBe('{"v":1,"d":"0102"}');
   });
 
+  it('while the saved history is read: the group is open and listening, and a send is refused', async () => {
+    const group = makeGroup([0x01, 0x02]);
+    const history = deferred<{ rumor: Rumor }[]>();
+    group.history.loadMessages.mockReturnValueOnce(history.promise);
+    fake.groups.set('0102', group);
+    await seedIndex('0102');
+    const { result } = await mount();
+
+    expect(result.current).toMatchObject({ isLoading: true, hasGroup: true });
+    expect(fake.client.network.subscription).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      await result.current.send('too early');
+    });
+    expect(group.sendChatMessage).not.toHaveBeenCalled();
+
+    await act(async () => {
+      history.resolve([]);
+    });
+    await act(async () => {
+      await result.current.send('on time');
+    });
+    expect(group.sendChatMessage).toHaveBeenCalledWith('on time');
+  });
+
+  it('after the groups could not be loaded: a send reads the conversation again and sends into the group it finds', async () => {
+    fake.client.loadAllGroups.mockRejectedValueOnce(new Error('group state unreadable'));
+    const group = makeGroup([0x01, 0x02]);
+    fake.groups.set('0102', group);
+    await seedIndex('0102');
+    const { result } = await mount();
+    expect(result.current.error).toBe('group state unreadable');
+
+    await act(async () => {
+      await result.current.send('hello');
+    });
+
+    expect(fake.client.loadAllGroups).toHaveBeenCalledTimes(2);
+    expect(fake.client.createGroup).not.toHaveBeenCalled();
+    expect(group.sendChatMessage).toHaveBeenCalledWith('hello');
+    expect(await AsyncStorage.getItem(INDEX_KEY)).toBe('{"v":1,"d":"0102"}');
+    expect(result.current).toMatchObject({ error: null, hasGroup: true, isLoading: false });
+  });
+
+  it('after the groups could not be loaded: a send that reads again and finds no group creates one', async () => {
+    fake.client.loadAllGroups.mockRejectedValueOnce(new Error('group state unreadable'));
+    const { result } = await mount();
+
+    await act(async () => {
+      await result.current.send('hello');
+    });
+
+    expect(fake.client.createGroup).toHaveBeenCalledTimes(1);
+    expect(await AsyncStorage.getItem(INDEX_KEY)).toBe('{"v":1,"d":"c0de"}');
+    expect(result.current).toMatchObject({ error: null, hasGroup: true });
+  });
+
+  it('after the groups could not be loaded: a send whose second read fails too is refused with the error', async () => {
+    fake.client.loadAllGroups
+      .mockRejectedValueOnce(new Error('group state unreadable'))
+      .mockRejectedValueOnce(new Error('still unreadable'));
+    await seedIndex('0102');
+    const { result } = await mount();
+
+    await act(async () => {
+      await result.current.send('hello');
+    });
+
+    expect(fake.client.network.request).not.toHaveBeenCalled();
+    expect(fake.client.createGroup).not.toHaveBeenCalled();
+    expect(await AsyncStorage.getItem(INDEX_KEY)).toBe('{"v":1,"d":"0102"}');
+    expect(result.current).toMatchObject({
+      error: 'still unreadable',
+      hasGroup: false,
+      messages: [],
+    });
+  });
+
   it('with no saved group: is refused and creates nothing until loading has found none', async () => {
     const { result, loading } = await mountWhileLoading();
 
@@ -534,6 +628,64 @@ describe('a send in the moment the client arrives', () => {
     });
     expect(fake.client.createGroup).not.toHaveBeenCalled();
     expect(group.sendChatMessage).toHaveBeenCalledWith('on time');
+  });
+});
+
+describe('a conversation switched to another peer', () => {
+  it("keeps a message whose group was still being created for the first peer out of the second peer's thread", async () => {
+    const OTHER = 'c'.repeat(64);
+    const creating = deferred<FakeGroup>();
+    fake.client.createGroup.mockReturnValueOnce(creating.promise);
+    const view = renderHook((props: { peer: string }) => useWhitenoiseDM(props.peer), {
+      wrapper,
+      initialProps: { peer: PEER },
+    });
+    await act(async () => undefined);
+
+    let sending!: Promise<unknown>;
+    act(() => {
+      sending = view.result.current.send('for the first peer');
+    });
+    await act(async () => undefined);
+    expect(view.result.current.isCreatingGroup).toBe(true);
+
+    await act(async () => {
+      view.rerender({ peer: OTHER });
+    });
+    expect(view.result.current).toMatchObject({ isLoading: false, hasGroup: false, messages: [] });
+
+    const group = makeGroup([0xc0, 0xde]);
+    await act(async () => {
+      creating.resolve(group);
+      await sending;
+    });
+
+    expect(view.result.current.messages).toEqual([]);
+  });
+});
+
+describe('a client replaced while the conversation is open', () => {
+  it("stops listening to the old client's group, and a failed read for the new client shows no group", async () => {
+    const old = makeGroup([0x01, 0x02]);
+    fake.groups.set('0102', old);
+    await seedIndex('0102');
+    const view = await mount();
+    expect(view.result.current.hasGroup).toBe(true);
+
+    const next = makeClient();
+    next.client.loadAllGroups.mockRejectedValue(new Error('group state unreadable'));
+    contextClient = next.client;
+    await act(async () => {
+      view.rerender({});
+    });
+
+    expect(old.listenerCount()).toBe(0);
+    expect(next.client.network.subscription).not.toHaveBeenCalled();
+    expect(view.result.current).toMatchObject({
+      hasGroup: false,
+      isLoading: false,
+      error: 'group state unreadable',
+    });
   });
 });
 

@@ -1,3 +1,9 @@
+/** The failure recorded on an answer's turn, if it failed. */
+function getTurnError(messageId: string) {
+  const turn = getTurn(messageId);
+  return turn?.phase === 'failed' ? turn.error : null;
+}
+
 jest.mock('@/features/ai/lib/navigateToAddFunds', () => ({
   useNavigateToAddFunds: () => jest.fn(),
 }));
@@ -9,7 +15,7 @@ import { sendMessage, checkBalance, ROUTSTR_MAX_COMPLETION_TOKENS } from '@/shar
 import { refreshRoutstrLineup } from '@/shared/lib/routstr/refreshLineup';
 import { staticPopup } from '@/shared/lib/popup';
 import { confirmSpend } from '@/features/ai/lib/spendConfirm';
-import { getTurnError, resetTurnErrors } from '@/features/ai/lib/turnErrors';
+import { getTurn, resetTurns } from '@/features/ai/lib/turns';
 import { chatErrorActions } from '@/features/ai/lib/chatErrorActions';
 import { resetModelAvailability } from '@/features/ai/lib/modelAvailability';
 import { ERROR_COPY } from '@/shared/lib/errors/catalog';
@@ -139,7 +145,7 @@ describe('AI send lineup recovery', () => {
   });
   beforeEach(async () => {
     jest.clearAllMocks();
-    resetTurnErrors();
+    resetTurns();
     resetModelAvailability();
     await useRoutstrStore.persist.rehydrate();
     const lineup = emptyLineup();
@@ -515,13 +521,16 @@ describe('AI send lineup recovery', () => {
     expect(chatErrorActions('routstr.not_found')).toContain('retry');
   });
 
-  it('keeps an aborted turn out of the conversation — it did not fail', async () => {
+  it('keeps an aborted turn as one to ask again — it did not fail', async () => {
     const abort = Object.assign(new Error('Aborted'), { name: 'AbortError' });
     sendMock.mockRejectedValueOnce(abort);
     await send();
-    expect(useRoutstrStore.getState().conversationHistory).toEqual([
+    const history = useRoutstrStore.getState().conversationHistory;
+    expect(history).toEqual([
       expect.objectContaining({ role: 'user', pending: false }),
+      expect.objectContaining({ role: 'assistant', content: '' }),
     ]);
+    expect(getTurn(history[1].id)).toEqual({ phase: 'interrupted', text: '' });
   });
 
   it('carries the exact shortfall on a wallet 402 rather than a bare top-up prompt', async () => {

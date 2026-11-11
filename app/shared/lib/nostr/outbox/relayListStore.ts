@@ -27,6 +27,12 @@ interface RelayListState {
   /** True once a `kind:10002` has been published for this profile. */
   hasPublished: boolean;
   source: RelayListSource;
+  /**
+   * In memory only, never saved: the account whose relay list this session's
+   * sync has discovered, by finding it or by the relays answering there is
+   * none (the defaults are then its real list). A saved list may be stale.
+   */
+  discoveredFor: string | null;
 }
 
 interface RelayListActions {
@@ -38,6 +44,8 @@ interface RelayListActions {
   setMarker: (url: string, marker: { read: boolean; write: boolean }) => void;
   restoreDefaults: () => void;
   markPublished: (createdAtSec: number) => void;
+  /** This session's sync has the relays' answer about `pubkey`'s relay list. */
+  markDiscovered: (pubkey: string) => void;
 }
 
 type RelayListStore = RelayListState & RelayListActions;
@@ -102,6 +110,7 @@ export const useRelayListStore = create<RelayListStore>({
       updatedAt: 0,
       hasPublished: false,
       source: 'default',
+      discoveredFor: null,
 
       setFromRelay: (entries, createdAtSec) => {
         // Last-writer-wins: ignore an older or equal list than what we hold.
@@ -137,6 +146,10 @@ export const useRelayListStore = create<RelayListStore>({
       markPublished: (createdAtSec) => {
         set({ updatedAt: createdAtSec, hasPublished: true, source: 'relay' });
       },
+
+      markDiscovered: (pubkey) => {
+        set({ discoveredFor: pubkey });
+      },
     }),
     persistConfig({
       name: 'nostr-relay-list-store',
@@ -161,4 +174,15 @@ export function getOwnWriteRelays(): string[] {
   const { entries } = useRelayListStore.getState();
   const write = entries.filter((e) => e.write).map((e) => e.url);
   return write.length > 0 ? write : [...DEFAULT_RELAYS];
+}
+
+/**
+ * `getOwnWriteRelays` once this session's sync has discovered the account's
+ * relay list, otherwise `null`. A list saved by an earlier session is not
+ * enough: the account may have moved to other relays since, and a store that
+ * has not loaded reads as the defaults; either may not be where its lists are.
+ */
+export function getKnownOwnWriteRelays(pubkey: string): string[] | null {
+  if (!useRelayListStore.persist.hasHydrated()) return null;
+  return useRelayListStore.getState().discoveredFor === pubkey ? getOwnWriteRelays() : null;
 }

@@ -440,6 +440,58 @@ describe('Bluetooth direct message (ble-dm)', () => {
     expect(thread()[0]).toMatchObject({ deliveryStatus: 'sent', isPending: false });
   });
 
+  it('a late sent, then delivered, after the 15 s watchdog wins: the row shows delivered', async () => {
+    const { result } = await mount(undefined, 'ble-dm', { dm: { peerID: BLE_PEER } });
+    await act(async () => {
+      await result.current.sendMessage('hello peer');
+    });
+    act(() => {
+      jest.advanceTimersByTime(15_000);
+    });
+    const messageID = thread()[0]!.id;
+
+    expect(thread()[0]).toMatchObject({ deliveryStatus: 'failed', failureReason: 'timeout' });
+
+    // The 15 s mark means "not confirmed yet": a later report wins (F212).
+    act(() => {
+      useBitchatDmMessagesStore.getState().applyDeliveryStatus({ messageID, status: 'sent' });
+    });
+    expect(thread()[0]).toMatchObject({ deliveryStatus: 'sent', isPending: false });
+    expect(thread()[0]).not.toHaveProperty('failureReason', 'timeout');
+    act(() => {
+      useBitchatDmMessagesStore.getState().applyDeliveryStatus({ messageID, status: 'delivered' });
+    });
+    expect(thread()[0]).toMatchObject({ deliveryStatus: 'delivered', isPending: false });
+  });
+
+  it('a retry of an unconfirmed message that is then reported delivered leaves two delivered copies', async () => {
+    const { result } = await mount(undefined, 'ble-dm', { dm: { peerID: BLE_PEER } });
+    await act(async () => {
+      await result.current.sendMessage('hello peer');
+    });
+    act(() => {
+      jest.advanceTimersByTime(15_000);
+    });
+    // "Tap to retry" sends the same text again as a new message.
+    await act(async () => {
+      await result.current.sendMessage('hello peer');
+    });
+    const [original, copy] = thread();
+
+    act(() => {
+      const store = useBitchatDmMessagesStore.getState();
+      store.applyDeliveryStatus({ messageID: original!.id, status: 'delivered' });
+      store.applyDeliveryStatus({ messageID: copy!.id, status: 'delivered' });
+    });
+
+    // The peer got the text twice; both rows show delivered and nothing marks
+    // the second as a repeat.
+    expect(thread().map((m) => [m.content, m.deliveryStatus])).toEqual([
+      ['hello peer', 'delivered'],
+      ['hello peer', 'delivered'],
+    ]);
+  });
+
   it('the watchdog fires after the chat is closed', async () => {
     const { result, unmount } = await mount(undefined, 'ble-dm', { dm: { peerID: BLE_PEER } });
     await act(async () => {

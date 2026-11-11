@@ -1,7 +1,7 @@
 /**
  * @jest-environment node
  *
- * Two startup syncs for the person's own Nostr account:
+ * Three startup syncs for the person's own Nostr account:
  *
  * - `useOwnSocialGraphSeed` reads the follow list once per account from the
  *   tiered data layer and seeds the real social store through its
@@ -9,12 +9,17 @@
  * - `useMuteListSync` restores the mute list once the NDK, keys and the
  *   ignore store are ready, and again on every return to the foreground.
  *
- * Replaced: the keys provider, the data layer, the NDK hooks, the mute-list
+ * - `useFollowSync` starts the follow worker once the social store has
+ *   loaded, on each tap, when a follow list arrives and on each return to the
+ *   foreground.
+ *
+ * Replaced: the follow worker, the keys provider, the data layer, the NDK hooks, the mute-list
  * fetch, the relay list and the ignore store's hydration, and AppState.
  */
 import { act, renderHook } from '@testing-library/react-native';
 import { err, ok } from 'neverthrow';
 
+import { useFollowSync } from '@/shared/lib/nostr/ownsync/useFollowSync';
 import { useMuteListSync } from '@/shared/lib/nostr/ownsync/useMuteListSync';
 import { useOwnSocialGraphSeed } from '@/shared/lib/nostr/ownsync/useOwnSocialGraphSeed';
 import { useNostrSocialStore } from '@/shared/stores/profile/nostrSocialStore';
@@ -23,6 +28,7 @@ let mockPubkey: string | undefined;
 let mockLayer: { getSocialGraph: jest.Mock } | null;
 let mockNdk: object | null;
 let mockInitialized = true;
+let mockOffline = false;
 let mockHydrated = true;
 let mockWriteRelays = ['wss://w1.example'];
 const mockSyncMuteList = jest.fn();
@@ -39,17 +45,30 @@ jest.mock('@nostr-dev-kit/ndk-mobile', () => ({ useNDK: () => ({ ndk: mockNdk })
 jest.mock('@/shared/providers/NostrNDKProvider', () => ({
   useNostrNDKContext: () => ({ isInitialized: mockInitialized }),
 }));
+jest.mock('@/shared/providers/OfflineProvider', () => ({
+  useOfflineStatus: () => ({ isOffline: mockOffline }),
+}));
 jest.mock('@/shared/lib/nostr/moderation', () => ({
   syncMuteList: (...args: unknown[]) => mockSyncMuteList(...args),
 }));
+const mockRequestFollowSync = jest.fn();
+jest.mock('@/shared/lib/nostr/followSync', () => ({
+  requestFollowSync: (...args: unknown[]) => mockRequestFollowSync(...args),
+}));
 jest.mock('@/shared/lib/nostr/outbox/relayListStore', () => ({
-  useRelayListStore: (select: (s: { entries: { url: string; write: boolean }[] }) => unknown) =>
-    select({
-      entries: [
-        ...mockWriteRelays.map((url) => ({ url, write: true })),
-        { url: 'wss://read-only.example', write: false },
-      ],
-    }),
+  useRelayListStore: Object.assign(
+    (select: (s: { entries: { url: string; write: boolean }[] }) => unknown) =>
+      select({
+        entries: [
+          ...mockWriteRelays.map((url) => ({ url, write: true })),
+          { url: 'wss://read-only.example', write: false },
+        ],
+      }),
+    {
+      subscribe: () => () => undefined,
+      persist: { onFinishHydration: () => () => undefined },
+    }
+  ),
 }));
 jest.mock('@/features/feed/stores/ignoreStore', () => ({
   useFeedIgnoreStore: {
@@ -98,8 +117,9 @@ beforeEach(() => {
   }
   mockPubkey = A;
   mockLayer = { getSocialGraph: jest.fn(async () => graph([F1], 100)) };
-  mockNdk = { id: 'ndk' };
+  mockNdk = { id: 'ndk', pool: { on: () => undefined, off: () => undefined } };
   mockInitialized = true;
+  mockOffline = false;
   mockHydrated = true;
   mockWriteRelays = ['wss://w1.example'];
   mockSyncMuteList.mockReset();
@@ -284,5 +304,101 @@ describe('useMuteListSync', () => {
     view.unmount();
     expect(mockAppStateListeners.size).toBe(0);
     expect(mockHydrationListeners.size).toBe(0);
+  });
+});
+
+describe('useFollowSync', () => {
+  let socialHydrated = true;
+  const socialHydrationListeners = new Set<() => void>();
+
+  beforeEach(() => {
+    mockRequestFollowSync.mockReset();
+    socialHydrated = true;
+    socialHydrationListeners.clear();
+    jest.spyOn(useNostrSocialStore.persist, 'hasHydrated').mockImplementation(() => socialHydrated);
+    jest.spyOn(useNostrSocialStore.persist, 'onFinishHydration').mockImplementation((listener) => {
+      const wrapped = () => listener(useNostrSocialStore.getState());
+      socialHydrationListeners.add(wrapped);
+      return () => socialHydrationListeners.delete(wrapped);
+    });
+  });
+
+  const calls = () => mockRequestFollowSync.mock.calls.map(([ndk, pubkey]) => [ndk, pubkey]);
+  const foreground = (state = 'active') =>
+    act(async () => {
+      for (const listener of [...mockAppStateListeners]) listener(state);
+    });
+
+  it('resumes saved follows once the account is ready, with the NDK and the account', async () => {
+    renderHook(() => useFollowSync());
+    await act(async () => undefined);
+    expect(calls()).toEqual([[mockNdk, A]]);
+  });
+
+  it('waits for the social store to load, then resumes', async () => {
+    socialHydrated = false;
+    renderHook(() => useFollowSync());
+    expect(mockRequestFollowSync).not.toHaveBeenCalled();
+    socialHydrated = true;
+    await act(async () => {
+      for (const listener of socialHydrationListeners) listener();
+    });
+    expect(calls()).toEqual([[mockNdk, A]]);
+  });
+
+  it('waits for the NDK to initialize', async () => {
+    mockInitialized = false;
+    renderHook(() => useFollowSync());
+    await act(async () => undefined);
+    expect(mockRequestFollowSync).not.toHaveBeenCalled();
+  });
+
+  it('starts once the NDK and its signer are ready, without a tap', async () => {
+    mockInitialized = false;
+    const view = renderHook(() => useFollowSync());
+    await act(async () => undefined);
+    expect(mockRequestFollowSync).not.toHaveBeenCalled();
+    mockInitialized = true;
+    view.rerender({});
+    await act(async () => undefined);
+    expect(calls()).toEqual([[mockNdk, A]]);
+  });
+
+  it('starts again when the network comes back, without a tap or a return to the foreground', async () => {
+    mockOffline = true;
+    const view = renderHook(() => useFollowSync());
+    await act(async () => undefined);
+    expect(mockRequestFollowSync).not.toHaveBeenCalled();
+    mockOffline = false;
+    view.rerender({});
+    await act(async () => undefined);
+    expect(calls()).toEqual([[mockNdk, A]]);
+  });
+
+  it('starts on a tap and when a follow list arrives, not on other social writes', async () => {
+    renderHook(() => useFollowSync());
+    mockRequestFollowSync.mockClear();
+    act(() => useNostrSocialStore.getState().setFollowIntent(F1, true));
+    expect(mockRequestFollowSync).toHaveBeenCalledTimes(1);
+    act(() =>
+      useNostrSocialStore
+        .getState()
+        .setContactsFromRelay({ tags: [['p', F2]], content: '', createdAtSec: 500, eventId: 'e1' })
+    );
+    expect(mockRequestFollowSync).toHaveBeenCalledTimes(2);
+    act(() => useNostrSocialStore.getState().markDeleteRequested('note-1'));
+    expect(mockRequestFollowSync).toHaveBeenCalledTimes(2);
+  });
+
+  it('starts again on each return to the foreground and stops listening on unmount', async () => {
+    const view = renderHook(() => useFollowSync());
+    await foreground('background');
+    await foreground('active');
+    expect(mockRequestFollowSync).toHaveBeenCalledTimes(2);
+    view.unmount();
+    expect(mockAppStateListeners.size).toBe(0);
+    expect(socialHydrationListeners.size).toBe(0);
+    act(() => useNostrSocialStore.getState().setFollowIntent(F2, true));
+    expect(mockRequestFollowSync).toHaveBeenCalledTimes(2);
   });
 });

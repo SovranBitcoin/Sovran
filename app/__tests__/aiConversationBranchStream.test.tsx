@@ -26,11 +26,12 @@ import {
   getSiblingInfo,
   withSynthesisedParents,
 } from '@/features/ai/lib/branching';
-import { useStreamingContent, useStreamingReasoning } from '@/features/ai/lib/streamingBuffer';
-import { getTurnError, resetTurnErrors } from '@/features/ai/lib/turnErrors';
+import { getTurn, readAnswer, resetTurns, useTurn, type Turn } from '@/features/ai/lib/turns';
 import { resetModelAvailability } from '@/features/ai/lib/modelAvailability';
 import { sendMessage, checkBalance } from '@/shared/lib/routstr/api';
 import { refreshRoutstrLineup } from '@/shared/lib/routstr/refreshLineup';
+import { encodeChatImage } from '@/features/ai/lib/attachments';
+import { confirmSpend } from '@/features/ai/lib/spendConfirm';
 import { emptyLineup, type LineupEntry } from '@/shared/lib/routstr/lineup';
 import { useRoutstrStore, type RoutstrMessage } from '@/shared/stores/profile/routstrStore';
 
@@ -44,20 +45,28 @@ jest.mock('@/shared/lib/routstr/api', () => ({
   checkBalance: jest.fn(),
 }));
 jest.mock('@/shared/lib/routstr/refreshLineup', () => ({ refreshRoutstrLineup: jest.fn() }));
+let mockAccount = 0;
 jest.mock('@/shared/stores/global/profileStore', () => ({
-  useProfileStore: { getState: () => ({ activeAccountIndex: 0 }) },
+  useProfileStore: { getState: () => ({ activeAccountIndex: mockAccount }) },
 }));
 jest.mock('@/shared/lib/routstr/securePersistence', () => ({
   createRoutstrPersistence: () =>
     jest.requireMock('@/shared/lib/cashu/profileScopedStorage').createProfileScopedStorage(),
 }));
-jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({
-  createProfileScopedStorage: () => ({
-    getItem: async () => null,
-    setItem: async () => {},
-    removeItem: async () => {},
-  }),
-}));
+jest.mock('@/shared/lib/cashu/profileScopedStorage', () => {
+  // What a relaunch reads; set on the mock, since the store loads on import.
+  const saved = { value: null as string | null };
+  return {
+    saved,
+    createProfileScopedStorage: () => ({
+      getItem: async () => saved.value,
+      setItem: async () => {},
+      removeItem: async () => {},
+    }),
+  };
+});
+const savedBlob = (): { value: string | null } =>
+  jest.requireMock('@/shared/lib/cashu/profileScopedStorage').saved;
 jest.mock('@/shared/stores/profile/mintStore', () => {
   const useMintStore = Object.assign(
     (selector: (s: { selectedMint: string }) => unknown) =>
@@ -166,6 +175,19 @@ function arrangeStream(cost = 4) {
   });
 }
 const tick = () => act(async () => undefined);
+
+/** What the bubble shows live for a turn: its text and reasoning while asked or streamed. */
+function liveOf(turn: Turn | undefined) {
+  if (turn?.phase === 'streaming') return { text: turn.text, thinking: turn.reasoning };
+  if (turn?.phase === 'asking') return { text: '', thinking: '' };
+  return { text: null, thinking: null };
+}
+
+/** The failure recorded on an answer's turn, if it failed. */
+function getTurnError(messageId: string) {
+  const turn = getTurn(messageId);
+  return turn?.phase === 'failed' ? turn.error : null;
+}
 const history = () => useRoutstrStore.getState().conversationHistory;
 
 function msg(
@@ -180,8 +202,10 @@ function msg(
 
 beforeEach(async () => {
   jest.clearAllMocks();
-  resetTurnErrors();
+  mockAccount = 0;
+  resetTurns();
   resetModelAvailability();
+  savedBlob().value = null;
   await useRoutstrStore.persist.rehydrate();
   const lineup = emptyLineup();
   lineup.openai.auto = entry('model-auto');
@@ -353,16 +377,14 @@ describe('streaming an answer', () => {
     });
     await tick();
     const assistantId = history()[1]!.id;
-    const bubble = renderHook(() => ({
-      text: useStreamingContent(assistantId),
-      thinking: useStreamingReasoning(assistantId),
-    }));
+    const bubble = renderHook(() => liveOf(useTurn(assistantId)));
     return { hook, bubble, assistantId, sending: () => sending };
   }
 
-  it('the bubble reads each chunk from the live buffer while the store keeps an empty placeholder', async () => {
+  it('the bubble reads each chunk from the turn while the store keeps an empty placeholder', async () => {
     const { bubble, assistantId, hook } = await startSend();
-    expect(hook.result.current).toMatchObject({ isSending: true, streamingMessageId: assistantId });
+    expect(hook.result.current.isSending).toBe(true);
+    expect(getTurn(assistantId)?.phase).toBe('asking');
     expect(bubble.result.current).toEqual({ text: '', thinking: '' });
 
     await act(async () => live.push(reasoning('let me think')));
@@ -374,7 +396,7 @@ describe('streaming an answer', () => {
     expect(history()[0]).toMatchObject({ role: 'user', content: 'hello', pending: true });
   });
 
-  it('on completion writes content, reasoning and cost to the store once and clears the live buffer', async () => {
+  it('on completion writes content, reasoning and cost to the store once and settles the turn', async () => {
     const { bubble, assistantId, hook, sending } = await startSend();
 
     await act(async () => {
@@ -392,7 +414,34 @@ describe('streaming an answer', () => {
     });
     expect(history()[0]!.pending).toBe(false);
     expect(bubble.result.current).toEqual({ text: null, thinking: null });
-    expect(hook.result.current).toMatchObject({ isSending: false, streamingMessageId: null });
+    expect(hook.result.current.isSending).toBe(false);
+    // The saved message holds the answer, so its turn is dropped and it reads from there.
+    expect(getTurn(assistantId)).toBeUndefined();
+    expect(readAnswer(history()[1]!, getTurn(assistantId))).toEqual({
+      phase: 'done',
+      truncation: null,
+    });
+  });
+
+  it('a failure after the answer settled does not mark the finished answer failed', async () => {
+    const { updateSessionTitle } = useRoutstrStore.getState();
+    useRoutstrStore.setState({
+      isAnonymousMode: false,
+      updateSessionTitle: () => {
+        throw new Error('title');
+      },
+    });
+    const { assistantId, sending } = await startSend();
+
+    await act(async () => {
+      live.push(content('Done.'));
+      live.end();
+      await sending();
+    });
+
+    useRoutstrStore.setState({ updateSessionTitle });
+    expect(getTurn(assistantId)).toBeUndefined();
+    expect(readAnswer(history()[1]!, getTurn(assistantId)).phase).toBe('done');
   });
 
   it('what is saved mid-stream: the session holds the pending question and an empty answer', async () => {
@@ -415,8 +464,67 @@ describe('streaming an answer', () => {
     ]);
   });
 
-  it('an abort mid-stream (the screen unmounting) removes the answer placeholder and its partial text', async () => {
-    const { hook, bubble, assistantId, sending } = await startSend();
+  it('never saves a question without its answer, so a kill leaves one to ask again', async () => {
+    useRoutstrStore.setState({ isAnonymousMode: false });
+    const saved: RoutstrMessage[][] = [];
+    const stop = useRoutstrStore.subscribe((state) => {
+      const blob = useRoutstrStore.persist.getOptions().partialize!(state) as {
+        sessions: { messages: RoutstrMessage[] }[];
+      };
+      for (const session of blob.sessions) saved.push(session.messages);
+    });
+    await startSend('kept?');
+    stop();
+
+    for (const messages of saved) {
+      for (const question of messages.filter((m) => m.role === 'user' && m.pending))
+        expect(messages.some((m) => m.parentId === question.id)).toBe(true);
+    }
+    expect(saved.length).toBeGreaterThan(0);
+  });
+
+  it('reads a question saved as sending, by a kill or an older build, as an answer to ask again', async () => {
+    savedBlob().value = JSON.stringify({
+      version: 3,
+      state: {
+        currentSessionId: 's1',
+        sessions: [
+          {
+            id: 's1',
+            title: 'Saved',
+            createdAt: 1,
+            messages: [
+              { ...msg('u1', 'user', null, 1, 'asked before the kill'), pending: true },
+              msg('a1', 'assistant', 'u1', 2, ''),
+            ],
+          },
+        ],
+      },
+    });
+    useRoutstrStore.setState({ isAnonymousMode: false });
+    await useRoutstrStore.persist.rehydrate();
+
+    const [question, answer] = history();
+    expect(question).toMatchObject({ id: 'u1', pending: false });
+    expect(readAnswer(answer!, getTurn('a1'))).toEqual({ phase: 'interrupted', text: '' });
+
+    arrangeStream();
+    const { result } = renderHook(useAiSend);
+    let retrying!: Promise<unknown>;
+    act(() => {
+      retrying = result.current.retry('a1');
+    });
+    await tick();
+    await act(async () => {
+      live.push(content('answered now'));
+      live.end();
+      await retrying;
+    });
+    expect(history().at(-1)).toMatchObject({ parentId: 'u1', content: 'answered now' });
+  });
+
+  it('leaving the screen mid-answer keeps the answer so far, as one that can be asked again', async () => {
+    const { hook, assistantId, sending } = await startSend();
     await act(async () => live.push(content('half an ans')));
 
     hook.unmount();
@@ -424,10 +532,58 @@ describe('streaming an answer', () => {
       await sending();
     });
 
-    expect(history().map((m) => m.role)).toEqual(['user']);
-    expect(history().some((m) => m.id === assistantId)).toBe(false);
-    expect(getTurnError(assistantId)).toBeNull();
-    expect(bubble.result.current).toEqual({ text: null, thinking: null });
+    expect(history().map((m) => [m.role, m.content, m.pending ?? null])).toEqual([
+      ['user', 'hello', false],
+      ['assistant', '', null],
+    ]);
+    expect(getTurn(assistantId)).toEqual({ phase: 'interrupted', text: 'half an ans' });
+
+    // Back on the screen, the answer can be asked again.
+    arrangeStream();
+    const again = renderHook(useAiSend);
+    let retrying!: Promise<unknown>;
+    act(() => {
+      retrying = again.result.current.retry(assistantId);
+    });
+    await tick();
+    await act(async () => {
+      live.push(content('a whole answer'));
+      live.end();
+      await retrying;
+    });
+    expect(history().at(-1)).toMatchObject({
+      parentId: history()[0]!.id,
+      content: 'a whole answer',
+    });
+  });
+
+  it('a stream stopped by a newer one keeps the answer it had so far', async () => {
+    useRoutstrStore.setState({
+      conversationHistory: [
+        msg('u1', 'user', null, 1, 'first question'),
+        msg('a1', 'assistant', 'u1', 2, 'first answer'),
+      ],
+    });
+    arrangeStream();
+    const hook = renderHook(useAiSend);
+    let retrying!: Promise<unknown>;
+    act(() => {
+      retrying = hook.result.current.retry('a1');
+    });
+    await tick();
+    const older = history().at(-1)!.id;
+    await act(async () => live.push(content('regenerat')));
+
+    arrangeStream();
+    act(() => {
+      void hook.result.current.send('second question');
+    });
+    await act(async () => {
+      await retrying;
+    });
+
+    expect(history().some((m) => m.id === older)).toBe(true);
+    expect(getTurn(older)).toEqual({ phase: 'interrupted', text: 'regenerat' });
   });
 
   it('a failure mid-stream keeps the placeholder empty with an error pill; the streamed text is lost', async () => {
@@ -459,6 +615,85 @@ describe('streaming an answer', () => {
     expect(getTurnError(assistantId)).toBeNull();
   });
 
+  it.each([
+    ['another conversation is opened', () => useRoutstrStore.getState().switchSession('other')],
+    ['a new conversation is started', () => void useRoutstrStore.getState().createSession()],
+  ])(
+    'an answer still streaming when %s lands in the conversation that asked',
+    async (_label, leave) => {
+      useRoutstrStore.setState({
+        isAnonymousMode: false,
+        sessions: [
+          { id: 'other', title: 'Other', createdAt: 1, messages: [msg('o1', 'user', null, 1)] },
+        ],
+      });
+      const { assistantId, sending } = await startSend('first question');
+      const asked = useRoutstrStore.getState().currentSessionId!;
+      await act(async () => live.push(content('the paid ')));
+
+      act(leave);
+      await act(async () => {
+        live.push(content('answer'));
+        live.end();
+        await sending();
+      });
+
+      const sessions = useRoutstrStore.getState().sessions;
+      const own = sessions.find((s) => s.id === asked)!;
+      expect(own.messages.map((m) => [m.role, m.content, m.pending ?? null])).toEqual([
+        ['user', 'first question', false],
+        ['assistant', 'the paid answer', null],
+      ]);
+      expect(own.messages.find((m) => m.id === assistantId)?.costSats).toBe(4);
+      expect(own.title).toBe('first question');
+      // The conversation now on screen is untouched.
+      expect(history().some((m) => m.id === assistantId)).toBe(false);
+      expect(sessions.find((s) => s.id === 'other')!.messages).toEqual([
+        msg('o1', 'user', null, 1),
+      ]);
+
+      act(() => useRoutstrStore.getState().switchSession(asked));
+      expect(history().find((m) => m.id === assistantId)?.content).toBe('the paid answer');
+    }
+  );
+
+  it('a send that overlaps a regenerated answer keeps its own live text and sending state', async () => {
+    useRoutstrStore.setState({
+      conversationHistory: [
+        msg('u1', 'user', null, 1, 'first question'),
+        msg('a1', 'assistant', 'u1', 2, 'first answer'),
+      ],
+    });
+    arrangeStream();
+    const hook = renderHook(useAiSend);
+    act(() => {
+      void hook.result.current.retry('a1');
+    });
+    await tick();
+    const older = live;
+    await act(async () => older.push(content('regenerat')));
+
+    // The composer's send starts a second stream, which stops the first.
+    arrangeStream();
+    let sending!: Promise<unknown>;
+    act(() => {
+      sending = hook.result.current.send('second question');
+    });
+    await tick();
+    const newer = history().at(-1)!.id;
+    const bubble = renderHook(() => liveOf(useTurn(newer)).text);
+    await act(async () => live.push(content('still here')));
+
+    expect(bubble.result.current).toBe('still here');
+    expect(hook.result.current.isSending).toBe(true);
+
+    await act(async () => {
+      live.end();
+      await sending;
+    });
+    expect(history().at(-1)).toMatchObject({ id: newer, content: 'still here' });
+  });
+
   it('a second send while one streams is dropped', async () => {
     const { hook } = await startSend();
 
@@ -469,4 +704,171 @@ describe('streaming an answer', () => {
     expect(sendMock).toHaveBeenCalledTimes(1);
     expect(history()).toHaveLength(2);
   });
+});
+
+describe('what happens while a send or regenerate is still getting ready', () => {
+  const photo = { localUri: 'file:///photo.jpg', mimeType: 'image/jpeg', width: 1, height: 1 };
+  const first = [
+    { ...msg('u1', 'user', null, 1, 'what is this?'), attachments: [photo] },
+    msg('a1', 'assistant', 'u1', 2, 'a cat'),
+  ];
+  const other = [msg('o1', 'user', null, 1, 'other'), msg('o2', 'assistant', 'o1', 2, 'reply')];
+  const session = (id: string, messages: RoutstrMessage[]) => ({
+    id,
+    title: id,
+    createdAt: 1,
+    messages,
+    activeChildren: {},
+  });
+
+  /** Image encoding that finishes only when the test says so. */
+  function holdEncoding() {
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    jest.mocked(encodeChatImage).mockImplementation(async () => {
+      await held;
+      return 'data:image/jpeg;base64,AAAA';
+    });
+    return () => act(async () => release());
+  }
+
+  /** Let the send or regenerate run its course; a request it started is answered at once. */
+  async function settle(pending: Promise<unknown>) {
+    for (let i = 0; i < 5; i++) await tick();
+    if (sendMock.mock.calls.length > 0) live.end();
+    await act(async () => {
+      await pending;
+    });
+  }
+
+  beforeEach(() => {
+    useRoutstrStore.setState({
+      isAnonymousMode: false,
+      sessions: [session('s1', first), session('s2', other)],
+      currentSessionId: 's1',
+      conversationHistory: first,
+      activeChildren: {},
+    });
+    arrangeStream();
+  });
+
+  const messagesOf = (id: string) =>
+    useRoutstrStore.getState().sessions.find((s) => s.id === id)!.messages;
+
+  it('a send whose conversation is switched away while its image encodes is not sent, and waits in its own conversation', async () => {
+    const release = holdEncoding();
+    const { result } = renderHook(useAiSend);
+    let sending!: Promise<unknown>;
+    act(() => {
+      sending = result.current.send('and this?', [photo]);
+    });
+    await tick();
+    act(() => useRoutstrStore.getState().switchSession('s2'));
+    await release();
+    await settle(sending);
+
+    expect(sendMock).not.toHaveBeenCalled();
+    expect(messagesOf('s2')).toEqual(other);
+    expect(history()).toEqual(other);
+    const s1 = messagesOf('s1');
+    expect(s1.map((m) => [m.role, m.content, m.parentId])).toEqual([
+      ['user', 'what is this?', null],
+      ['assistant', 'a cat', 'u1'],
+      ['user', 'and this?', 'a1'],
+      ['assistant', '', s1[2]!.id],
+    ]);
+    expect(readAnswer(s1[3]!, getTurn(s1[3]!.id)).phase).toBe('interrupted');
+  });
+
+  it('a send whose conversation is switched away while its spend sheet is open is not sent, and waits in its own conversation', async () => {
+    useRoutstrStore.setState({ confirmSpend: true });
+    jest.mocked(confirmSpend).mockImplementationOnce(async () => {
+      useRoutstrStore.getState().switchSession('s2');
+      return true;
+    });
+    const { result } = renderHook(useAiSend);
+    let sending!: Promise<unknown>;
+    act(() => {
+      sending = result.current.send('and this?');
+    });
+    await settle(sending);
+
+    expect(sendMock).not.toHaveBeenCalled();
+    expect(messagesOf('s2')).toEqual(other);
+    expect(messagesOf('s1').map((m) => [m.role, m.content])).toEqual([
+      ['user', 'what is this?'],
+      ['assistant', 'a cat'],
+      ['user', 'and this?'],
+      ['assistant', ''],
+    ]);
+  });
+
+  it('a regenerate whose conversation is switched away while its image encodes is not sent', async () => {
+    const release = holdEncoding();
+    const { result } = renderHook(useAiSend);
+    let retrying!: Promise<unknown>;
+    act(() => {
+      retrying = result.current.retry('a1');
+    });
+    await tick();
+    act(() => useRoutstrStore.getState().switchSession('s2'));
+    await release();
+    await settle(retrying);
+
+    expect(sendMock).not.toHaveBeenCalled();
+    expect(messagesOf('s2')).toEqual(other);
+    expect(messagesOf('s1')).toEqual(first);
+  });
+
+  it.each(['send', 'retry'] as const)(
+    'a %s whose account is switched while its image encodes is not sent',
+    async (action) => {
+      const release = holdEncoding();
+      const { result } = renderHook(useAiSend);
+      let pending!: Promise<unknown>;
+      act(() => {
+        pending =
+          action === 'send'
+            ? result.current.send('and this?', [photo])
+            : result.current.retry('a1');
+      });
+      await tick();
+      mockAccount = 1;
+      await release();
+      await settle(pending);
+
+      expect(sendMock).not.toHaveBeenCalled();
+      expect(messagesOf('s1')).toEqual(first);
+    }
+  );
+
+  it.each(['send', 'retry'] as const)(
+    'a %s whose screen closes while its image encodes is not sent, and the question stays to be asked again',
+    async (action) => {
+      const release = holdEncoding();
+      const hook = renderHook(useAiSend);
+      let pending!: Promise<unknown>;
+      act(() => {
+        pending =
+          action === 'send'
+            ? hook.result.current.send('and this?', [photo])
+            : hook.result.current.retry('a1');
+      });
+      await tick();
+      hook.unmount();
+      await release();
+      await settle(pending);
+
+      expect(sendMock).not.toHaveBeenCalled();
+      const s1 = messagesOf('s1');
+      if (action === 'retry') expect(s1).toEqual(first);
+      else {
+        expect(s1.slice(2).map((m) => [m.role, m.content])).toEqual([
+          ['user', 'and this?'],
+          ['assistant', ''],
+        ]);
+        expect(readAnswer(s1[3]!, getTurn(s1[3]!.id)).phase).toBe('interrupted');
+      }
+    }
+  );
 });

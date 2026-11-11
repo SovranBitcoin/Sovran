@@ -1,5 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { useRoutstrStore, type ChatAttachment } from '@/shared/stores/profile/routstrStore';
+import { useCallback, useEffect, useRef } from 'react';
+import {
+  selectConversationId,
+  useRoutstrStore,
+  type ChatAttachment,
+} from '@/shared/stores/profile/routstrStore';
 import { useRoutstrFunds } from './useRoutstrFunds';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import {
@@ -41,24 +45,12 @@ import {
 import { confirmSpend } from '../lib/spendConfirm';
 import { evaluateSendGate } from '../lib/sendGate';
 import { reservedSatsForSend } from '../lib/reserve';
-import { clearTurnTruncation, recordTurnTruncation } from '../lib/turnTruncation';
 import { useHeldMints } from './useHeldMints';
 import { assembleApiMessages, stripImageParts } from '../lib/assembleApiMessages';
 import { encodeChatImage } from '../lib/attachments';
 import { deriveActivePath, getAncestorsExclusive } from '../lib/branching';
 import { useNavigateToAddFunds } from '../lib/navigateToAddFunds';
-import { clearTurnError, recordTurnError } from '../lib/turnErrors';
-import {
-  clearStreaming,
-  setStreamingReasoning,
-  setStreamingText,
-  startStreaming,
-} from '../lib/streamingBuffer';
-
-interface SendStatus {
-  isSending: boolean;
-  streamingMessageId: string | null;
-}
+import { dispatchTurn, useAnyTurnLive } from '../lib/turns';
 
 /** Minimum interval between streaming-token haptics. Streamers can fire >50
  * tokens/sec; without throttling the device feels like a buzzing wall. 80ms
@@ -122,6 +114,44 @@ function availableChain(
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
 /**
+ * Run a send or regenerate with its request's controller, held in `preparing`
+ * (what closing the screen aborts) until the stream takes it or the run ends.
+ */
+async function withRequestController(
+  preparing: Set<AbortController>,
+  run: (controller: AbortController) => Promise<void>
+): Promise<void> {
+  const controller = new AbortController();
+  preparing.add(controller);
+  try {
+    await run(controller);
+  } finally {
+    preparing.delete(controller);
+  }
+}
+
+/** The account and conversation a send or regenerate belongs to, taken before its first wait. */
+type Owner = { account: number; anonymous: boolean; conversationId: string | null };
+
+function currentOwner(): Owner {
+  const state = useRoutstrStore.getState();
+  return {
+    account: useProfileStore.getState().activeAccountIndex,
+    anonymous: state.isAnonymousMode,
+    conversationId: selectConversationId(state),
+  };
+}
+
+/** What moved since `owner` was taken: a request then would be sent for the wrong one. */
+function ownerChange(owner: Owner): 'none' | 'account' | 'conversation' {
+  const now = currentOwner();
+  if (now.account !== owner.account) return 'account';
+  if (now.anonymous !== owner.anonymous || now.conversationId !== owner.conversationId)
+    return 'conversation';
+  return 'none';
+}
+
+/**
  * Encapsulates the routstr send + stream + balance-refresh flow for the AI
  * tab. Two entry points share the same streaming core:
  *
@@ -134,9 +164,11 @@ const r2 = (n: number) => Math.round(n * 100) / 100;
  *     new branch immediately.
  *
  * Both flows:
- *   - Stream tokens through the module-level `streamingBuffer` instead of
- *     `routstrStore.updateMessage`, so per-token AsyncStorage writes are
- *     avoided (those caused the "sudden reveal" lag).
+ *   - Move the answer's turn (`turns`) through asking, streaming and how it
+ *     settled, by its message id, so a stream only ever touches its own
+ *     answer. Tokens stream there instead of into `routstrStore`, so
+ *     per-token AsyncStorage writes are avoided (those caused the "sudden
+ *     reveal" lag).
  *   - Persist the final assistant payload (content + reasoning + thinking
  *     duration + cost) in ONE atomic write via `finalizeAssistantMessage`,
  *     preserving the placeholder's id / parentId / role / timestamp.
@@ -149,25 +181,24 @@ const r2 = (n: number) => Math.round(n * 100) / 100;
  *     `UserMessagesScreen`).
  */
 export function useAiSend() {
-  const [status, setStatus] = useState<SendStatus>({
-    isSending: false,
-    streamingMessageId: null,
-  });
+  const isSending = useAnyTurnLive();
 
   const isAnonymous = useRoutstrStore((s) => s.isAnonymousMode);
   const currentSessionId = useRoutstrStore((s) => s.currentSessionId);
   const createSession = useRoutstrStore((s) => s.createSession);
-  const addMessage = useRoutstrStore((s) => s.addMessage);
+  const addMessages = useRoutstrStore((s) => s.addMessages);
   const setMessagePending = useRoutstrStore((s) => s.setMessagePending);
-  const removeMessages = useRoutstrStore((s) => s.removeMessages);
   const finalizeAssistantMessage = useRoutstrStore((s) => s.finalizeAssistantMessage);
   const setActiveBranch = useRoutstrStore((s) => s.setActiveBranch);
-  const updateCurrentSessionTitle = useRoutstrStore((s) => s.updateCurrentSessionTitle);
+  const updateSessionTitle = useRoutstrStore((s) => s.updateSessionTitle);
 
   // Each `streamIntoPlaceholder` aborts the prior stream, so backgrounding
   // mid-stream stops billing. There is no longer a balance promise to wait on:
   // the cost of a request is returned by the request itself.
   const streamControllerRef = useRef<AbortController | null>(null);
+  // Each send or regenerate still getting ready (encoding images, the spend
+  // sheet): its request's controller, so closing the screen stops it too.
+  const preparingRef = useRef(new Set<AbortController>());
 
   const navigateToAddFunds = useNavigateToAddFunds();
   const funds = useRoutstrFunds();
@@ -175,21 +206,27 @@ export function useAiSend() {
   const walletSats = funds?.balanceSats ?? 0;
   const heldMints = useHeldMints();
 
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    const preparing = preparingRef.current;
+    return () => {
       streamControllerRef.current?.abort();
-    },
-    []
-  );
+      for (const controller of preparing) controller.abort();
+    };
+  }, []);
 
   /**
    * Drives a single placeholder assistant message to completion: walks the
-   * candidate chain, streams tokens into `streamingBuffer`, finalises the
+   * candidate chain, streams tokens into its turn, finalises the
    * persisted message, and stamps cost asynchronously off the post-stream
    * balance diff. Both `send` and `retry` funnel through here.
    */
   const streamIntoPlaceholder = useCallback(
     async (params: {
+      /** The conversation the answer was asked in (`selectConversationId`
+       *  then): every write about it goes there, whichever is open now. */
+      conversationId: string | null;
+      /** The request's controller, made when the send or regenerate started. */
+      controller: AbortController;
       assistantMessageId: string;
       apiMessages: RoutstrChatMessage[];
       /** `image_url` parts included in `apiMessages` (drives the
@@ -202,7 +239,7 @@ export function useAiSend() {
        *  ran (a retry) or the model could not be priced. */
       shownSats?: number | null;
     }) => {
-      const { assistantMessageId, flowId } = params;
+      const { conversationId, assistantMessageId, flowId, controller } = params;
       const shownSats = params.shownSats ?? null;
       let { apiMessages, imageCount } = params;
 
@@ -265,13 +302,13 @@ export function useAiSend() {
         });
         // Same contract as a failed request: the turn stays in the
         // conversation and says, in place, why it could not run.
-        recordTurnError(assistantMessageId, { id, text: ERROR_COPY[id] });
+        dispatchTurn(assistantMessageId, { type: 'failed', error: { id, text: ERROR_COPY[id] } });
         return;
       }
 
       streamControllerRef.current?.abort();
-      const controller = new AbortController();
       streamControllerRef.current = controller;
+      preparingRef.current.delete(controller);
 
       // Same-tier chain across the other providers as runtime fallback for
       // connect-time failures — or, on a sealed selection, the encrypted
@@ -315,15 +352,9 @@ export function useAiSend() {
         });
       let candidateChain = candidateEntries.map((e) => e.modelId);
 
-      setStatus({ isSending: true, streamingMessageId: assistantMessageId });
-      // Captures `Date.now()` for the live "Thinking for X seconds"
-      // counter rendered by the bubble. Resets text + reasoning channels
-      // so a previous stream's tail can't leak into this one.
-      startStreaming(assistantMessageId);
-      // A placeholder that is streaming is not a failed one. Ids are fresh per
-      // send and per retry, so this only ever matters if one is re-driven.
-      clearTurnError(assistantMessageId);
-      clearTurnTruncation(assistantMessageId);
+      // Captures `Date.now()` for the live "Thinking for X seconds" counter
+      // rendered by the bubble.
+      dispatchTurn(assistantMessageId, { type: 'asked', startedAtMs: Date.now() });
 
       // Hoisted so the catch block (402 popup) can reference whichever
       // candidate we were last attempting when the request failed.
@@ -346,6 +377,10 @@ export function useAiSend() {
         { warnAtMs: 15_000, errorAtMs: 60_000 }
       );
 
+      // Set once the answer settles. Its turn may then be gone (a finished
+      // answer reads from its saved message), so a failure after that, in the
+      // title or the cost log, must not give it a new, failed one.
+      let settled = false;
       try {
         // Text chars + image-part count — never serialises base64 payloads
         // into a log line.
@@ -468,7 +503,7 @@ export function useAiSend() {
               // attempt to the same exchange.
               payment: {
                 groupId: i === 0 ? flowId : `${flowId}#${i + 1}`,
-                sessionId: useRoutstrStore.getState().currentSessionId ?? undefined,
+                sessionId: conversationId ?? undefined,
                 messageId: assistantMessageId,
                 model: candidate,
               },
@@ -710,10 +745,6 @@ export function useAiSend() {
             }
             chunksWithReasoning++;
             fullReasoning += reasoning;
-            // Push the live reasoning to the streaming buffer so the bubble
-            // can render the model's thought process as it arrives, instead
-            // of waiting for stream completion to surface it.
-            setStreamingReasoning(assistantMessageId, fullReasoning);
           }
 
           if (content) {
@@ -728,13 +759,21 @@ export function useAiSend() {
             }
             chunksWithContent++;
             fullContent += content;
-            setStreamingText(assistantMessageId, fullContent);
 
             if (now - lastHapticAt >= HAPTIC_THROTTLE_MS) {
               lastHapticAt = now;
               void EnhancedHaptics.navigateHaptic();
             }
           }
+
+          // The bubble renders the reasoning and the text as they arrive,
+          // instead of waiting for the stream to end.
+          if (reasoning || content)
+            dispatchTurn(assistantMessageId, {
+              type: 'streamed',
+              text: fullContent,
+              reasoning: fullReasoning,
+            });
 
           if (now - lastProgressAt >= STREAM_PROGRESS_INTERVAL_MS) {
             const windowMs = now - lastProgressAt;
@@ -761,7 +800,6 @@ export function useAiSend() {
         // content rather than as a failure — the content is real — and the
         // bubble offers to carry on from there.
         const truncated = isBudgetTruncation(finishReason);
-        if (truncated) recordTurnTruncation(assistantMessageId, { budgetTokens: sentMaxTokens });
         const totalMs = streamEnd - sendStart;
         const streamMs = firstChunkAt > 0 ? streamEnd - firstChunkAt : 0;
         aiLog.info('ai.stream.complete', {
@@ -812,7 +850,7 @@ export function useAiSend() {
           // arrives before the first chunk — so there is nothing to stamp on
           // afterwards. That second write was only ever needed because the old
           // figure came from a balance re-read that had to wait for the stream.
-          finalizeAssistantMessage(assistantMessageId, {
+          finalizeAssistantMessage(conversationId, assistantMessageId, {
             ...finalizePayload,
             thinkingDurationSec: thinkingSec,
             ...(displayedModel && displayedModel.modelId !== modelToUse
@@ -828,13 +866,23 @@ export function useAiSend() {
             ...(costSats != null && costSats > 0 ? { costSats } : {}),
           });
         }
+        settled = true;
+        dispatchTurn(
+          assistantMessageId,
+          finalizePayload
+            ? {
+                type: 'answered',
+                truncation: truncated ? { budgetTokens: sentMaxTokens } : null,
+              }
+            : { type: 'interrupted' }
+        );
         aiLog.info('ai.send.assistant_finalized', {
           flowId,
           messageId: assistantMessageId,
           chars: fullContent.length,
         });
 
-        if (!isAnonymous) updateCurrentSessionTitle();
+        if (conversationId !== null) updateSessionTitle(conversationId);
 
         // Snapshot what the affordability gate predicted for the model we
         // actually used, so this log can quote both numbers.
@@ -869,9 +917,16 @@ export function useAiSend() {
         span.end({ outcome: 'ok', chunks: chunkCount, chars: fullContent.length });
       } catch (err: any) {
         if (useProfileStore.getState().activeAccountIndex !== profile) return;
+        if (settled) {
+          aiLog.warn('ai.send.failed_after_answer', { flowId });
+          span.end({ outcome: 'ok' });
+          return;
+        }
         if (isAbortError(err) || controller.signal.aborted) {
           aiLog.info('ai.send.aborted', { flowId });
-          removeMessages(new Set([assistantMessageId]));
+          // The answer stays, with what had arrived, and can be asked again:
+          // a question must never be left with no answer and nothing to press.
+          dispatchTurn(assistantMessageId, { type: 'interrupted' });
           span.end({ outcome: 'aborted' });
           return;
         }
@@ -918,10 +973,13 @@ export function useAiSend() {
               ? `${friendlyName} reserves ${requiredSats} sats per request; ${availableSats} available. Add at least ${shortfallSats} sats.`
               : `${friendlyName} reserves more per request than your wallet holds.`;
         }
-        recordTurnError(assistantMessageId, {
-          id: presentation.id,
-          text: presentation.text,
-          ...(detail != null ? { detail } : {}),
+        dispatchTurn(assistantMessageId, {
+          type: 'failed',
+          error: {
+            id: presentation.id,
+            text: presentation.text,
+            ...(detail != null ? { detail } : {}),
+          },
         });
         aiLog.info('ai.turn_error.shown', {
           flowId,
@@ -929,15 +987,16 @@ export function useAiSend() {
           errorId: presentation.id,
         });
       } finally {
-        clearStreaming();
-        setStatus({ isSending: false, streamingMessageId: null });
+        // Left without settling (the account changed under it): it ended
+        // without an answer. Only this turn: a newer stream owns its own.
+        dispatchTurn(assistantMessageId, { type: 'interrupted' });
       }
     },
-    [isAnonymous, removeMessages, finalizeAssistantMessage, updateCurrentSessionTitle, walletSats]
+    [finalizeAssistantMessage, updateSessionTitle, walletSats]
   );
 
-  const sendInner = useCallback(
-    async (userMessage: string, attachments?: ChatAttachment[]) => {
+  const prepareSend = useCallback(
+    async (controller: AbortController, userMessage: string, attachments?: ChatAttachment[]) => {
       // Every precondition in one place, decided before the optimistic bubbles
       // go in: declining after them would leave a user message with no answer
       // and nothing to retry. The gate is pure and exhaustive, so each way a
@@ -945,8 +1004,8 @@ export function useAiSend() {
       // provider, a mint the provider refuses and a declined confirmation used
       // to be indistinguishable from outside.
       const trimmed = userMessage.trim();
+      const owner = currentOwner();
       const storeNow = useRoutstrStore.getState();
-      const owner = useProfileStore.getState().activeAccountIndex;
       const quotedFunds = latestFunds.current;
       const activeProvider = storeNow.userNodeBaseUrl;
       // Quoted from the same chain the send will walk, refused models last, so
@@ -989,6 +1048,27 @@ export function useAiSend() {
         timestamp,
         ...(attachments && attachments.length > 0 ? { attachments } : {}),
       };
+      const answerPlaceholder = {
+        id: assistantMessageId,
+        parentId: userMessageId,
+        role: 'assistant' as const,
+        content: '',
+        timestamp: timestamp + 1,
+      };
+      // Checked after every wait before the request. An account or
+      // conversation that moved meanwhile would get the answer, and the bill,
+      // for a question asked elsewhere; a screen that closed has no one to
+      // show it to. Nothing is sent; a question asked in a saved conversation
+      // is left there, unanswered, to be asked again.
+      const whyNotSend = () => {
+        const change = ownerChange(owner);
+        return change === 'none' && controller.signal.aborted ? 'closed' : change;
+      };
+      const leaveQuestion = (reason: 'conversation' | 'closed') => {
+        aiLog.info('ai.send.not_sent', { flowId, reason });
+        if (owner.conversationId !== null)
+          addMessages(owner.conversationId, [pendingUserMessage, answerPlaceholder]);
+      };
       // Assembly (incl. the inline-image window and per-attachment encoding)
       // is shared with retry via `assembleApiMessages` so the two flows can't
       // diverge — and now also shared with the quote, so the priced request
@@ -1000,6 +1080,15 @@ export function useAiSend() {
       const { messages: apiMessages, imageCount } = trimmed
         ? await assembleApiMessages([...activePath, pendingUserMessage], encodeChatImage)
         : { messages: [], imageCount: 0 };
+      const afterAssembly = whyNotSend();
+      if (afterAssembly === 'account') {
+        aiLog.info('ai.send.not_sent', { flowId, reason: afterAssembly });
+        return;
+      }
+      if (afterAssembly !== 'none') {
+        leaveQuestion(afterAssembly);
+        return;
+      }
 
       // The node's admission gate for this body, computed the way the node
       // computes it. `null` when the model carries no usable pricing, which
@@ -1065,10 +1154,15 @@ export function useAiSend() {
             reserveKnown: gate.reserveKnown,
           });
           if (!allowed) return;
+          const afterSheet = whyNotSend();
+          if (afterSheet === 'conversation' || afterSheet === 'closed') {
+            leaveQuestion(afterSheet);
+            return;
+          }
           const current = useRoutstrStore.getState();
           const currentFunds = latestFunds.current;
           if (
-            useProfileStore.getState().activeAccountIndex !== owner ||
+            useProfileStore.getState().activeAccountIndex !== owner.account ||
             current.userNodeBaseUrl !== activeProvider ||
             current.selectedProvider !== storeNow.selectedProvider ||
             current.selectedTier !== storeNow.selectedTier ||
@@ -1093,18 +1187,16 @@ export function useAiSend() {
       if (willStartNewSession) {
         createSession();
       }
+      const conversationId = selectConversationId(useRoutstrStore.getState());
 
-      addMessage({ ...pendingUserMessage, pending: true });
-      addMessage({
-        id: assistantMessageId,
-        parentId: userMessageId,
-        role: 'assistant',
-        content: '',
-        timestamp: timestamp + 1,
-      });
+      // One write: a question is never saved without its answer, so one left
+      // by a kill reads as an answer to ask again.
+      addMessages(conversationId, [{ ...pendingUserMessage, pending: true }, answerPlaceholder]);
 
       try {
         await streamIntoPlaceholder({
+          conversationId,
+          controller,
           assistantMessageId,
           apiMessages,
           imageCount,
@@ -1116,14 +1208,14 @@ export function useAiSend() {
         // streaming round-trip resolves — success or error, the request
         // left our hands. Errors surface as a pill on the assistant
         // placeholder, not on the user bubble's check.
-        setMessagePending(userMessageId, false);
+        setMessagePending(conversationId, userMessageId, false);
       }
     },
     [
       isAnonymous,
       currentSessionId,
       createSession,
-      addMessage,
+      addMessages,
       setMessagePending,
       streamIntoPlaceholder,
       walletSats,
@@ -1138,6 +1230,13 @@ export function useAiSend() {
   // `streamIntoPlaceholder` before the disabled flag commits, billing the
   // user twice and corrupting the active branch tree. `useSingleFlight`
   // drops the duplicate at the ref level.
+  const sendInner = useCallback(
+    (userMessage: string, attachments?: ChatAttachment[]) =>
+      withRequestController(preparingRef.current, (controller) =>
+        prepareSend(controller, userMessage, attachments)
+      ),
+    [prepareSend]
+  );
   const send = useSingleFlight(sendInner);
 
   /**
@@ -1147,8 +1246,9 @@ export function useAiSend() {
    * sibling (follow-up exchanges) drop out of view immediately and can be
    * brought back via the bubble's chevron nav.
    */
-  const retryInner = useCallback(
-    async (messageId: string) => {
+  const prepareRetry = useCallback(
+    async (controller: AbortController, messageId: string) => {
+      const owner = currentOwner();
       const stateNow = useRoutstrStore.getState();
       const original = stateNow.conversationHistory.find((m) => m.id === messageId);
       if (!original || original.role !== 'assistant') {
@@ -1169,19 +1269,32 @@ export function useAiSend() {
         aiLog.warn('ai.retry.no_context', { messageId });
         return;
       }
+      // The answer stays in its own conversation, to be asked again from
+      // there, when the account or conversation moved or the screen closed.
+      const change = ownerChange(owner);
+      if (change !== 'none' || controller.signal.aborted) {
+        aiLog.info('ai.retry.not_sent', {
+          messageId,
+          reason: change === 'none' ? 'closed' : change,
+        });
+        return;
+      }
 
+      const { conversationId } = owner;
       const timestamp = Date.now();
       const newAssistantId = `msg-${timestamp}-r`;
       const flowId = `ai-retry-${timestamp}`;
       const parentId = original.parentId ?? null;
 
-      addMessage({
-        id: newAssistantId,
-        parentId,
-        role: 'assistant',
-        content: '',
-        timestamp,
-      });
+      addMessages(conversationId, [
+        {
+          id: newAssistantId,
+          parentId,
+          role: 'assistant',
+          content: '',
+          timestamp,
+        },
+      ]);
       // Flip immediately so the chat list shows the streaming sibling as
       // the active branch. The user can navigate back to the original via
       // the bubble's chevron nav.
@@ -1190,6 +1303,8 @@ export function useAiSend() {
       }
 
       await streamIntoPlaceholder({
+        conversationId,
+        controller,
         assistantMessageId: newAssistantId,
         apiMessages,
         imageCount,
@@ -1197,13 +1312,20 @@ export function useAiSend() {
         retriedFromMessageId: messageId,
       });
     },
-    [addMessage, setActiveBranch, streamIntoPlaceholder]
+    [addMessages, setActiveBranch, streamIntoPlaceholder]
   );
 
   // Retry shares the double-tap exposure with `send`: a rapid tap on the
   // regenerate chevron would spawn two sibling assistants and bill twice.
+  const retryInner = useCallback(
+    (messageId: string) =>
+      withRequestController(preparingRef.current, (controller) =>
+        prepareRetry(controller, messageId)
+      ),
+    [prepareRetry]
+  );
   const retry = useSingleFlight(retryInner);
 
   const balance = useRoutstrStore((s) => s.balance);
-  return { send, retry, ...status, balance };
+  return { send, retry, isSending, balance };
 }

@@ -166,31 +166,59 @@ describe('delivery status', () => {
     expect(thread()[0].deliveryStatus).toBe('read');
   });
 
-  it('a failure keeps its reason and a later delivery does not move it', () => {
+  it('an unconfirmed message refuses a late sending and takes a native failure, then a delivery', () => {
     store().appendOutgoing(outgoing('o1', 1), PEER_A);
+    expect(store().markTimedOut('o1')).toBe(true);
+    status('o1', 'sending');
+    expect(thread()[0]).toMatchObject({ deliveryStatus: 'failed', failureReason: 'timeout' });
+
     status('o1', 'failed', 'peer_unreachable');
     expect(thread()[0]).toMatchObject({
       deliveryStatus: 'failed',
       failureReason: 'peer_unreachable',
     });
-
-    // 'failed' ranks highest, so nothing after it moves the message.
     status('o1', 'delivered');
-    expect(thread()[0]).toMatchObject({
-      deliveryStatus: 'failed',
-      failureReason: 'peer_unreachable',
-    });
+    expect(thread()[0]).toMatchObject({ deliveryStatus: 'delivered', isPending: false });
+    expect(thread()[0].failureReason).toBeUndefined();
   });
 
-  it('a late failure overrides a message already delivered', () => {
-    store().appendOutgoing(outgoing('o1', 1), PEER_A);
-    status('o1', 'delivered');
-    status('o1', 'failed', 'timeout');
+  it.each(['delivered', 'read'] as const)(
+    'a failure keeps its reason, and a later %s report wins over it (the report is proof)',
+    (report) => {
+      store().appendOutgoing(outgoing('o1', 1), PEER_A);
+      status('o1', 'failed', 'peer_unreachable');
+      expect(thread()[0]).toMatchObject({
+        deliveryStatus: 'failed',
+        failureReason: 'peer_unreachable',
+      });
+      status('o1', 'failed', 'other_reason');
+      expect(thread()[0].failureReason).toBe('other_reason');
 
-    // QUIRK: 'failed' is always accepted, even after the peer acknowledged
-    // delivery, so a delivered message can be shown as failed. A later fix
-    // should change this assertion on purpose.
-    expect(thread()[0]).toMatchObject({ deliveryStatus: 'failed', failureReason: 'timeout' });
+      status('o1', report);
+      expect(thread()[0]).toMatchObject({ deliveryStatus: report, isPending: false });
+      expect(thread()[0].failureReason).toBeUndefined();
+
+      // A failure, a sent or a sending after it moves it no more.
+      status('o1', 'failed', 'peer_unreachable');
+      status('o1', 'sent');
+      status('o1', 'sending');
+      expect(thread()[0].deliveryStatus).toBe(report);
+    }
+  );
+
+  it('a late failure leaves a message the peer acknowledged delivered or read', () => {
+    store().appendOutgoing(outgoing('o1', 1), PEER_A);
+    store().appendOutgoing(outgoing('o2', 2), PEER_A);
+    status('o1', 'delivered');
+    status('o2', 'read');
+    status('o1', 'failed', 'peer_unreachable');
+    status('o2', 'failed', 'peer_unreachable');
+
+    // Delivered is final: the peer's acknowledgement outranks any later failure.
+    expect(thread().map((m) => [m.deliveryStatus, m.failureReason])).toEqual([
+      ['delivered', undefined],
+      ['read', undefined],
+    ]);
   });
 
   it('a partial delivery counts as sent', () => {
@@ -237,8 +265,8 @@ describe('after a restart', () => {
 
     await relaunch();
 
-    // QUIRK: a 'sent' message the native side already handed off is treated
-    // the same as one that never left. A later fix should change this on purpose.
+    // Both are saved as failed with reason app_restart, as every release has
+    // written them; that reads back as unconfirmed, not as a final failure.
     expect(thread().map((m) => [m.id, m.deliveryStatus, m.failureReason, m.isPending])).toEqual([
       ['in', undefined, undefined, undefined],
       ['sending', 'failed', 'app_restart', false],
@@ -246,6 +274,69 @@ describe('after a restart', () => {
       ['delivered', 'delivered', undefined, false],
     ]);
     expect(thread(PEER_B)[0].deliveryStatus).toBe('read');
+
+    status('sent', 'delivered');
+    expect(thread()[2]).toMatchObject({ deliveryStatus: 'delivered', isPending: false });
+    expect(thread()[2]).not.toHaveProperty('failureReason', 'app_restart');
+  });
+
+  it('reads back every saved status and reason, and writes back only the restart demotion', async () => {
+    store().appendIncoming(incoming('seed', 0));
+    await settle();
+    const key = [...mockAsync.keys()].find((k) => k.startsWith('bitchat-dm-messages-store'))!;
+    const saved = JSON.parse(mockAsync.get(key)!);
+    const own = (id: string, deliveryStatus: string, failureReason?: string) => ({
+      ...outgoing(id, 1),
+      isPending: deliveryStatus === 'sending',
+      deliveryStatus,
+      ...(failureReason ? { failureReason } : {}),
+    });
+    saved.state.byPeer = {
+      [PEER_A]: [
+        own('sending', 'sending'),
+        own('sent', 'sent'),
+        own('delivered', 'delivered'),
+        own('read', 'read'),
+        own('timeout', 'failed', 'timeout'),
+        own('restart', 'failed', 'app_restart'),
+        own('native', 'failed', 'handshake-timeout'),
+        own('bare', 'failed'),
+      ],
+    };
+    useBitchatDmMessagesStore.setState({ byPeer: {} });
+    await settle();
+    mockAsync.set(key, JSON.stringify(saved));
+    await useBitchatDmMessagesStore.persist.rehydrate();
+    await settle();
+
+    const rows = (list: BleDmMessage[]) =>
+      list.map((m) => [m.id, m.deliveryStatus, m.failureReason, m.isPending]);
+    const expected = [
+      ['sending', 'failed', 'app_restart', false],
+      ['sent', 'failed', 'app_restart', false],
+      ['delivered', 'delivered', undefined, false],
+      ['read', 'read', undefined, false],
+      ['timeout', 'failed', 'timeout', false],
+      ['restart', 'failed', 'app_restart', false],
+      ['native', 'failed', 'handshake-timeout', false],
+      ['bare', 'failed', undefined, false],
+    ];
+    expect(rows(thread())).toEqual(expected);
+    expect(rows(JSON.parse(mockAsync.get(key)!).state.byPeer[PEER_A])).toEqual(expected);
+
+    // A late delivery wins over every saved failure, an unconfirmed one (a
+    // saved timeout or restart) and a native one alike: the report is proof.
+    for (const m of thread()) status(m.id, 'delivered');
+    expect(thread().map((m) => m.deliveryStatus)).toEqual([
+      'delivered',
+      'delivered',
+      'delivered',
+      'read',
+      'delivered',
+      'delivered',
+      'delivered',
+      'delivered',
+    ]);
   });
 
   it('loads a saved status this release does not know as failed', async () => {

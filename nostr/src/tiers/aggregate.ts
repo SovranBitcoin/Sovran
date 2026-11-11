@@ -90,7 +90,8 @@ const rankOf = (tier: NostrTier): number => {
 
 const DEFAULT_MIN_ITEMS = 1;
 const DEFAULT_CAP_MS = 600;
-const DEFAULT_SOURCE_TIMEOUT_MS = 10_000;
+/** The default bookkeeping ceiling per source (`sourceTimeoutMs`). */
+export const DEFAULT_SOURCE_TIMEOUT_MS = 10_000;
 
 const defaultScheduleAfter = (ms: number, fire: () => void): (() => void) => {
   const timer = setTimeout(fire, ms);
