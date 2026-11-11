@@ -30,6 +30,8 @@ const mockScreenNavigation = {
 };
 
 let mockBalance = 100;
+/** What the wallet holds in units other than sat, in each unit's smallest part. */
+let mockOtherUnits: Record<string, number> = {};
 jest.mock('heroui-native', () => {
   const React = require('react');
   const host = (name: string) =>
@@ -60,9 +62,15 @@ jest.mock('@/shared/hooks/useGuardedRouter', () => {
   return { guardedRouter, useGuardedRouter: () => guardedRouter };
 });
 jest.mock('expo-application', () => ({ nativeApplicationVersion: '1.0.0' }));
-jest.mock('wallet/react', () => ({ useColadaBalance: () => ({ total: mockBalance }) }), {
-  virtual: true,
-});
+jest.mock(
+  'wallet/react',
+  () => ({
+    useColadaBalance: (unit = 'sat') => ({
+      total: unit === 'sat' ? mockBalance : (mockOtherUnits[unit] ?? 0),
+    }),
+  }),
+  { virtual: true }
+);
 jest.mock('@/shared/lib/qrButtonAnchor', () => ({ useBootMorphCompleted: () => true }));
 jest.mock('@/shared/providers/OfflineProvider', () => ({
   useOfflineStatus: () => ({ isOffline: false }),
@@ -143,6 +151,7 @@ beforeEach(async () => {
   useProfileStore.setState({ activeAccountIndex: 0 });
   mockPush.mockClear();
   mockBalance = 100;
+  mockOtherUnits = {};
   delete process.env.EXPO_PUBLIC_E2E_STATE_MIRROR;
 });
 afterEach(() => {
@@ -216,6 +225,24 @@ it('reacts to balance and verification changes without showing in Mock Mode', as
   await act(async () => useWalletLifecycleStore.getState().markRecoveryPhraseVerified());
   await act(async () => useSettingsStore.setState({ mockMode: false }));
   expect(mockPush).not.toHaveBeenCalled();
+});
+it('does not ask a new wallet holding only dollars to back up', () => {
+  mockBalance = 0;
+  mockOtherUnits = { usd: 500 };
+  render(<HostWithScreen />);
+  expect(mockPush).not.toHaveBeenCalled();
+});
+it('tells a week-old wallet holding only dollars to back up without mentioning money', () => {
+  mockBalance = 0;
+  mockOtherUnits = { usd: 500 };
+  useWalletLifecycleStore.setState({ seedCreatedAt: Date.now() - 8 * 24 * 60 * 60 * 1000 });
+  const view = render(<HostWithScreen id="backup-recovery-phrase" />);
+  expect(mockPush).toHaveBeenCalledWith({
+    pathname: '/(prompt-flow)/cta',
+    params: { id: 'backup-recovery-phrase' },
+  });
+  expect(view.queryByText(/You have money here now/)).toBeNull();
+  expect(view.getByText(/Write down your recovery phrase/)).toBeTruthy();
 });
 it('suppresses automation but allows preview, close and reopening a dismissed CTA', async () => {
   process.env.EXPO_PUBLIC_E2E_STATE_MIRROR = '1';
