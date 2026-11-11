@@ -185,7 +185,7 @@ export function useOwnEventsSync(): void {
     const profile = part.latestProfile;
     // A new session starts from the saved profile, so it never replaces it
     // with one it would not have chosen had both arrived together.
-    session.profileNewest ??= savedProfileNewest();
+    if (!session.profileNewest) session.profileNewest = savedProfileNewest();
     if (profile && admitsProfile(session, profile)) {
       const snapshot = parseOwnProfileSnapshot(profile);
       if (snapshot) ingestOwnProfileMetadata(snapshot, session.owner, active.accountIndex);
