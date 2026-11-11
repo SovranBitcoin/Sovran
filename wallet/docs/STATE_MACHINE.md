@@ -925,7 +925,7 @@ runConfirmSendEffect
   |        -> sendComplete (createdOffline:true)
   |
   +-- forceLocalSend && executeOfflineSend (and not A)? --YES--> Path B forceLocalSend
-  |        synthesize MintFetchError (createOfflineSendError)
+  |        synthesize MintFetchError (createOfflineError)
   |        -> handleConfirmSendFailure:
   |             exact match  -> executeOfflineSend -> sendComplete (offlineFallback)
   |             non-exact + suggestion -> chooseProofs
@@ -942,9 +942,9 @@ runConfirmSendEffect
 `isMintOfflineError` (`src/errors.ts:8-13`) is the SOLE classifier turning a
 failure into "Mint unreachable". It returns true for `NetworkError`,
 `HttpResponseError` with status >= 500, or any `Error` whose
-`name === 'MintFetchError'`. `createOfflineSendError` and
-`createOfflineMintQuoteError` both set `error.name = 'MintFetchError'`
-(`effects.ts`) so the synthetic forced-offline error classifies as
+`name === 'MintFetchError'`. `createOfflineError` (`effects.ts`), used for a
+forced-offline send and an offline mint quote, sets
+`error.name = 'MintFetchError'` so the synthetic forced-offline error classifies as
 mint-unreachable and resolves to `t('MINT_UNREACHABLE')` ("Mint unreachable").
 `executeOfflineSend`'s own `needsSwap` rejection throws a PLAIN `Error` (not a
 `MintFetchError`), so it surfaces as `SEND_FAILED`, not `MINT_UNREACHABLE`.
@@ -979,7 +979,7 @@ MUST / MUST NOT:
   before calling `executeMintQuote`.
 - `mintUnreachableConfirmed` must not be set when `forceLocalSend` or
   `shouldCreateLocalTokenFirst` is true. `buildMintUnreachableContextPatch`.
-- `createOfflineSendError` / `createOfflineMintQuoteError` must keep
+- `createOfflineError` must keep
   `name === 'MintFetchError'`.
 - `transition()` must stamp `offline` onto every `result.context` (when the
   provider value is non-null) so fresh contexts see the real-time value.
@@ -1109,7 +1109,7 @@ during verification and the invariant rests on source review.
       contract; classifier `errors.ts:11`). Untested at the Colada boundary
       because it depends on out-of-package wallet I/O.
 - [ ] Synthetic offline errors keep `name:'MintFetchError'`
-      (`createOfflineSendError`, `createOfflineMintQuoteError`).
+      (`createOfflineError`).
 - [ ] `offline` stamped onto every result context (`transitions.ts:384-387`).
 
 ### Context / mint selection
@@ -1216,7 +1216,7 @@ pre-send mint-reachability probe.
 - Current: the auto `offlineFallback` exact send runs only when
   `isMintOfflineError(cause)` AND an exact local match exists
   (`handleConfirmSendFailure`). Because the forced-local path synthesizes a
-  `MintFetchError` (`createOfflineSendError`), the only
+  `MintFetchError` (`createOfflineError`), the only
   cause that can reach `handleConfirmSendFailure` as NON-mint-offline is a real
   online `executeSend` failure (`runConfirmSendEffect`).
 - Current: a non-exact failure of ANY cause reaches `chooseProofs` when a

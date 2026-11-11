@@ -481,17 +481,14 @@ function toMintReviewInfoEffectError(
   };
 }
 
-function createOfflineMintQuoteError(locale: string): Error {
+/** The error a mint out of reach throws, made here for work known to be offline. */
+function createOfflineError(
+  locale: string,
+  logEvent: 'effects.mintQuote.offlineBlocked' | 'effects.send.offlineErrorCreated',
+): Error {
   const error = new Error(t('MINT_UNREACHABLE', locale));
   error.name = 'MintFetchError';
-  logger.info('effects.mintQuote.offlineBlocked');
-  return error;
-}
-
-function createOfflineSendError(locale: string): Error {
-  const error = new Error(t('MINT_UNREACHABLE', locale));
-  error.name = 'MintFetchError';
-  logger.info('effects.send.offlineErrorCreated');
+  logger.info(logEvent);
   return error;
 }
 
@@ -1171,7 +1168,11 @@ export function runMintQuoteEffect({
       unit: data.unit,
     });
     return errAsync(
-      toMintQuoteEffectError(createOfflineMintQuoteError(locale), data, locale),
+      toMintQuoteEffectError(
+        createOfflineError(locale, 'effects.mintQuote.offlineBlocked'),
+        data,
+        locale,
+      ),
     );
   }
 
@@ -1994,7 +1995,7 @@ export function runConfirmSendEffect({
     });
     return errAsync({
       kind: 'failed',
-      cause: createOfflineSendError(locale),
+      cause: createOfflineError(locale, 'effects.send.offlineErrorCreated'),
       data: {
         code: 'SEND_FAILED',
         message: t('MINT_UNREACHABLE', locale),
@@ -2050,7 +2051,7 @@ export function runConfirmSendEffect({
       localProofSend: context.localProofSend === true,
     });
     return handleConfirmSendFailure({
-      cause: createOfflineSendError(locale),
+      cause: createOfflineError(locale, 'effects.send.offlineErrorCreated'),
       config,
       locale,
       forceLocalSend,

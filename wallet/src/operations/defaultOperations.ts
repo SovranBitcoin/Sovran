@@ -459,6 +459,36 @@ function ensureSendEntryToken(historyEntry: string, token: CoreToken): string {
   return JSON.stringify({ ...parsed, token });
 }
 
+/**
+ * What a send hands back: its history row (there after execute), or an entry
+ * built from the operation when the row is not there yet. Either carries the
+ * token.
+ */
+async function sendEntryWithToken(
+  mgr: Manager,
+  operation: SendOperationLike,
+  token: CoreToken,
+  logPrefix: "executeSend" | "executeOfflineSend",
+): Promise<{ historyEntry: string }> {
+  const historyEntry = await findSendHistoryEntryByOperationId(
+    mgr,
+    operation.id,
+  );
+  if (historyEntry) {
+    logger.info(`operations.${logPrefix}.historyFound`, {
+      operationId: operation.id,
+    });
+    return { historyEntry: ensureSendEntryToken(historyEntry, token) };
+  }
+
+  logger.warn(`operations.${logPrefix}.historyMissing`, {
+    operationId: operation.id,
+  });
+  return {
+    historyEntry: JSON.stringify(buildSyntheticSendEntry(operation, token)),
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Payment request rollback helpers
 // ---------------------------------------------------------------------------
@@ -796,29 +826,7 @@ export function createDefaultOperations(
         hadMemo: !!normalizeMemo(memo),
       });
 
-      // Try history first (should be there after execute), fall back to
-      // constructing from the operation result to avoid a race.
-      const historyEntry = await findSendHistoryEntryByOperationId(
-        mgr,
-        operation.id,
-      );
-      if (historyEntry) {
-        logger.info("operations.executeSend.historyFound", {
-          operationId: operation.id,
-        });
-        return {
-          historyEntry: ensureSendEntryToken(historyEntry, tokenWithMemo),
-        };
-      }
-
-      logger.warn("operations.executeSend.historyMissing", {
-        operationId: operation.id,
-      });
-      return {
-        historyEntry: JSON.stringify(
-          buildSyntheticSendEntry(operation, tokenWithMemo),
-        ),
-      };
+      return sendEntryWithToken(mgr, operation, tokenWithMemo, "executeSend");
     },
 
     executeOfflineSend: async ({ mintUrl, amount, memo }) => {
@@ -852,27 +860,12 @@ export function createDefaultOperations(
         proofCount: token.proofs.length,
       });
 
-      const historyEntry = await findSendHistoryEntryByOperationId(
+      return sendEntryWithToken(
         mgr,
-        operation.id,
+        operation,
+        tokenWithMemo,
+        "executeOfflineSend",
       );
-      if (historyEntry) {
-        logger.info("operations.executeOfflineSend.historyFound", {
-          operationId: operation.id,
-        });
-        return {
-          historyEntry: ensureSendEntryToken(historyEntry, tokenWithMemo),
-        };
-      }
-
-      logger.warn("operations.executeOfflineSend.historyMissing", {
-        operationId: operation.id,
-      });
-      return {
-        historyEntry: JSON.stringify(
-          buildSyntheticSendEntry(operation, tokenWithMemo),
-        ),
-      };
     },
 
     executeMintQuote: async ({ mintUrl, amount, unit: _unit, method = "bolt11" }) => {
