@@ -578,6 +578,31 @@ describe('a send in the moment the client arrives', () => {
   });
 });
 
+describe('a client replaced while the conversation is open', () => {
+  it("stops listening to the old client's group, and a failed read for the new client shows no group", async () => {
+    const old = makeGroup([0x01, 0x02]);
+    fake.groups.set('0102', old);
+    await seedIndex('0102');
+    const view = await mount();
+    expect(view.result.current.hasGroup).toBe(true);
+
+    const next = makeClient();
+    next.client.loadAllGroups.mockRejectedValue(new Error('group state unreadable'));
+    contextClient = next.client;
+    await act(async () => {
+      view.rerender({});
+    });
+
+    expect(old.listenerCount()).toBe(0);
+    expect(next.client.network.subscription).not.toHaveBeenCalled();
+    expect(view.result.current).toMatchObject({
+      hasGroup: false,
+      isLoading: false,
+      error: 'group state unreadable',
+    });
+  });
+});
+
 describe('a send into an existing group', () => {
   async function mountWithGroup() {
     const group = makeGroup([0x01, 0x02]);
