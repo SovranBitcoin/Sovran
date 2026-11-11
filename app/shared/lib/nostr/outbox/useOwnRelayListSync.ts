@@ -59,6 +59,7 @@ async function syncOwnRelayList(
 ): Promise<'discovered' | 'unanswered'> {
   try {
     let read: Awaited<ReturnType<typeof readNewestOwnEvent>>;
+    let attempts = 0;
     do {
       const current = relayListRelays(pubkey);
       if (!current) return 'unanswered';
@@ -67,6 +68,7 @@ async function syncOwnRelayList(
         relays: [...asked],
         leaveOutSilent: true,
       });
+      attempts++;
       if (isCancelled()) return 'unanswered';
 
       if (read.newest) {
@@ -79,7 +81,7 @@ async function syncOwnRelayList(
         );
       }
       // A relay that stays silent is read without after a few reads in a row.
-    } while (worthReadingAgain(read));
+    } while (worthReadingAgain(read, attempts));
     const { newest } = read;
     // Only every relay's answer, but those left out as silent, makes the list
     // known, or says there is none.

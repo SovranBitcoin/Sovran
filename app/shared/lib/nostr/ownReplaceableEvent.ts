@@ -136,9 +136,12 @@ export function forgetSilentRelays() {
 /**
  * Whether reading again can complete where `read` did not: a relay it waited
  * for did not answer and has not yet been silent long enough to be left out.
+ * Stop after the exclusion threshold plus one attempt even when alternating
+ * answers keep resetting each relay: an edit must eventually return waiting.
  */
-export function worthReadingAgain(read: OwnEventRead): boolean {
+export function worthReadingAgain(read: OwnEventRead, attempts = 1): boolean {
   return (
+    attempts < SILENT_READS_BEFORE_LEFT_OUT + 1 &&
     read.outcome === 'timed-out' &&
     read.silent.some((url) => silentReads(url) <= SILENT_READS_BEFORE_LEFT_OUT)
   );
@@ -266,8 +269,11 @@ export async function readForEdit(
 ): Promise<ReadForEdit> {
   if (!relays) return { status: 'waiting', reason: 'relay-list-unknown' };
   let read: OwnEventRead;
-  do read = await readNewestOwnEvent(ndk, pubkey, kind, { relays, leaveOutSilent: true });
-  while (worthReadingAgain(read));
+  let attempts = 0;
+  do {
+    read = await readNewestOwnEvent(ndk, pubkey, kind, { relays, leaveOutSilent: true });
+    attempts++;
+  } while (worthReadingAgain(read, attempts));
   if (read.outcome !== 'complete') return { status: 'waiting', reason: read.outcome };
   return { status: 'read', newest: read.newest, relays: read.relays, asked: read.asked };
 }

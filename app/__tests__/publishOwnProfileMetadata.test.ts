@@ -631,3 +631,30 @@ it('excludes after sequential same-clock failures and restores on a late answer'
   clock.mockRestore();
   jest.useRealTimers();
 });
+
+it('returns waiting after bounded alternating relay timeouts without publishing a partial base', async () => {
+  jest.useFakeTimers();
+  mockKnown = [RELAY, 'wss://alternating.example/'];
+  const ndk = makeNdk();
+  let attempt = 0;
+  ndk.onStart.mockImplementation(async (subscription) => {
+    if (subscription.url === RELAY) attempt++;
+    if ((attempt % 2 === 0) === (subscription.url === RELAY)) subscription.eose();
+    else subscription.emit('event', kind0('c'.repeat(64), 20, { about: 'partial' }));
+  });
+  let settled = false;
+  const pending = publish(ndk).then((result) => {
+    settled = true;
+    return result;
+  });
+  await jest.advanceTimersByTimeAsync(48_001);
+  const bounded = settled;
+  // Always drain the pre-fix worker too, so a red assertion leaves no flight behind.
+  ndk.onStart.mockImplementation(async (subscription) => subscription.eose());
+  await jest.advanceTimersByTimeAsync(12_001);
+  const result = await pending;
+  jest.useRealTimers();
+  expect(bounded).toBe(true);
+  expect(result._unsafeUnwrapErr().type).toBe('base-unavailable');
+  expect(publishEvent).not.toHaveBeenCalled();
+});

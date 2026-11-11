@@ -669,3 +669,20 @@ describe('a discovery that did not finish', () => {
     view.unmount();
   });
 });
+
+it('stops discovery after alternating relay timeouts and waits for a wakeup', async () => {
+  let calls = 0;
+  mockGate = async () => {
+    const attempt = Math.floor(calls++ / DEFAULT_RELAYS.length);
+    mockRelays.set(DAMUS, attempt % 2 === 0 ? 'silent' : { events: [] });
+    mockRelays.set(NOS, attempt % 2 === 1 ? 'silent' : { events: [] });
+  };
+  const view = await mountAndWait(A);
+  for (let i = 0; i < 4; i++) await waitOutRead();
+  const reads = mockAsked.length;
+  await waitOutRead();
+  expect(mockAsked.length).toBe(reads);
+  expect(getKnownOwnWriteRelays(A)).toBeNull();
+  expect(mockPublishEvent).not.toHaveBeenCalled();
+  view.unmount();
+});
