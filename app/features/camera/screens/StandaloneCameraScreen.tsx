@@ -14,6 +14,7 @@ import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { withGlassHeaderItems } from '@/navigation/headerItems';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useColadaContext } from 'wallet/react';
+import { holdNfcReader } from '@/shared/lib/nfc';
 import { Log, log, useLifecycleLogger } from '@/shared/lib/logger';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 
@@ -48,7 +49,8 @@ export function StandaloneCameraScreen() {
     if (!nfcFiredRef.current) {
       nfcFiredRef.current = true;
       log.info('camera.nfc.auto_start');
-      void machine.scan?.(undefined, { source: 'nfc' });
+      const releaseReader = holdNfcReader('explicit');
+      void Promise.resolve(machine.scan?.(undefined, { source: 'nfc' })).finally(releaseReader);
     }
   }, [shouldAutoStartNfc, machine]);
 

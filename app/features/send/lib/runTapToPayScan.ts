@@ -14,7 +14,7 @@
 
 import { Platform } from 'react-native';
 
-import { releaseSession, setNfcTagConnectedListener } from '@/shared/lib/nfc';
+import { holdNfcReader, nfcReader, releaseSession } from '@/shared/lib/nfc';
 import { showActionSheet } from '@/shared/lib/popup';
 import { paymentLog } from '@/shared/lib/logger';
 import { usePopupStore } from '@/shared/stores/runtime/popupStore';
@@ -32,22 +32,31 @@ const delay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve,
 
 const tapSheetOpen = () => isTapSheet(usePopupStore.getState().current);
 
+const writingBack = () => {
+  const reader = nfcReader();
+  return reader.holder !== 'idle' && reader.writingBack;
+};
+
 export async function runTapToPayScan(scan: () => Promise<unknown> | unknown): Promise<void> {
   if (Platform.OS !== 'android') {
-    await scan();
+    const releaseReader = holdNfcReader('explicit');
+    try {
+      await scan();
+    } finally {
+      releaseReader();
+    }
     return;
   }
 
-  let listening = true;
   useNfcTapStore.getState().setPhase('armed');
-  setNfcTagConnectedListener(() => {
-    if (listening) useNfcTapStore.getState().setPhase('reading');
-  });
+  const releaseReader = holdNfcReader('explicit', () =>
+    useNfcTapStore.getState().setPhase('reading')
+  );
   const unsubscribePopup = usePopupStore.subscribe((state, prev) => {
-    if (!listening || !isTapSheet(prev.current) || state.current != null) return;
+    if (!isTapSheet(prev.current) || state.current != null) return;
     const { phase } = useNfcTapStore.getState();
     paymentLog.info('send.nfc.tap_sheet_dismissed', { phase });
-    if (phase !== 'creating' && phase !== 'writing') void releaseSession();
+    if (!writingBack()) void releaseSession();
   });
   showActionSheet('nfc-tap', {});
 
@@ -59,9 +68,8 @@ export async function runTapToPayScan(scan: () => Promise<unknown> | unknown): P
       await scan();
     }
   } finally {
-    listening = false;
     unsubscribePopup();
-    setNfcTagConnectedListener(null);
+    releaseReader();
     useNfcTapStore.getState().setPhase('armed');
   }
 }

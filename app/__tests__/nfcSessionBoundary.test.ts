@@ -14,7 +14,7 @@
 import NfcManager from 'react-native-nfc-manager';
 
 import { createNfcAdapter, writeTokenToNFC } from '@/shared/lib/nfc';
-import { setNfcTagConnectedListener } from '@/shared/lib/nfc/session';
+import { holdNfcReader } from '@/shared/lib/nfc/reader';
 import { buildTextNdef, decodeNdefText } from '@/shared/lib/nfc/ndef';
 
 type Tag = {
@@ -132,7 +132,6 @@ beforeEach(() => {
   mockNative.enabled = true;
   mockNative.request = null;
   mockTag.current = { cc: cc(), ndef: [0, 0], log: [] };
-  setNfcTagConnectedListener(null);
 });
 
 describe('refusals before a session', () => {
@@ -177,11 +176,12 @@ describe('the session', () => {
     );
   });
 
-  it('tells the tag-connected listener once a tag is in the field', async () => {
+  it('tells whoever holds the reader once a tag is in the field', async () => {
     const connected = jest.fn();
-    setNfcTagConnectedListener(connected);
+    const releaseReader = holdNfcReader('explicit', connected);
     mockTag.current = terminalWith(CREQ);
     await createNfcAdapter().readPaymentRequest();
+    releaseReader();
     expect(connected).toHaveBeenCalledTimes(1);
   });
 

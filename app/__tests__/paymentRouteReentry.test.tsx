@@ -80,7 +80,8 @@ jest.mock('@/shared/lib/nfc', () => ({
   writeTokenToNFC: jest.fn(),
   NfcError: class NfcError extends Error {},
   isUserCancelError: () => false,
-  isAmbientNfcCycle: () => false,
+  nfcReader: () => ({ holder: 'idle' }),
+  nfcTapProgressed: jest.fn(),
 }));
 jest.mock('@/shared/lib/migrations/dataMigrations', () => ({
   runDataMigrations: jest.fn(async () => undefined),

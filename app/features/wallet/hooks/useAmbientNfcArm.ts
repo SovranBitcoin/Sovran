@@ -21,21 +21,16 @@
  * is focused in the foreground again: the system drops the session while the
  * app is away, and a focus effect alone would not notice. The held native
  * session is cancelled, so other NFC apps and flows are unaffected. Each
- * cycle is one machine.scan(source: 'nfc') call: it times out quietly after
- * 30s (suppressed by the ambient flag in the nfc scan source) and re-arms.
+ * cycle is one machine.scan(source: 'nfc') call holding the NFC reader as
+ * 'ambient': it times out quietly after 30s (the nfc scan source keeps an
+ * ambient holder's failures quiet) and re-arms.
  */
 
 import { useCallback } from 'react';
 import { Platform } from 'react-native';
 import { useForegroundFocusEffect } from '@/shared/hooks/useForegroundFocusEffect';
 
-import {
-  isNfcEnabled,
-  isNfcSupported,
-  releaseSession,
-  setAmbientNfcCycle,
-  setNfcTagConnectedListener,
-} from '@/shared/lib/nfc';
+import { holdNfcReader, isNfcEnabled, isNfcSupported, releaseSession } from '@/shared/lib/nfc';
 import { showActionSheet } from '@/shared/lib/popup';
 import { usePopupStore } from '@/shared/stores/runtime/popupStore';
 import { useNfcTapStore } from '@/shared/stores/runtime/nfcTapStore';
@@ -57,10 +52,13 @@ interface AmbientNfcMachine {
 
 /**
  * One armed scan, verbatim from the re-arming loop: waits on machine.scan
- * (source 'nfc'), swallows the quiet 30s timeout, and always drops the
- * ambient-cycle flag.
+ * (source 'nfc'), swallows the quiet 30s timeout, and always releases the
+ * cycle's hold on the reader.
  */
-async function runAmbientNfcScan(machine: AmbientNfcMachine): Promise<void> {
+async function runAmbientNfcScan(
+  machine: AmbientNfcMachine,
+  releaseReader: () => void
+): Promise<void> {
   try {
     await machine.scan?.(undefined, { source: 'nfc' });
   } catch (err) {
@@ -68,7 +66,7 @@ async function runAmbientNfcScan(machine: AmbientNfcMachine): Promise<void> {
       error: err instanceof Error ? err.message : String(err),
     });
   } finally {
-    setAmbientNfcCycle(false);
+    releaseReader();
   }
 }
 
@@ -103,13 +101,14 @@ export function useAmbientNfcArm(machine: AmbientNfcMachine): void {
       // A tag entered the field: flip the sheet to 'Reading' and surface it
       // if nothing else is showing (ambient tap with the sheet closed) and
       // the user hasn't dismissed it this focus session.
-      setNfcTagConnectedListener(() => {
-        if (!active) return;
+      const onTagConnected = () => {
         useNfcTapStore.getState().setPhase('reading');
         if (!userDismissedSheet && usePopupStore.getState().current == null) {
           showActionSheet('nfc-tap', {});
         }
-      });
+      };
+      // The running cycle's hold on the reader; disarming drops it at once.
+      let releaseReader = () => {};
 
       const loop = async () => {
         if (!(await isNfcSupported())) return;
@@ -139,12 +138,12 @@ export function useAmbientNfcArm(machine: AmbientNfcMachine): void {
             continue;
           }
           setArmed(true);
-          setAmbientNfcCycle(true);
+          releaseReader = holdNfcReader('ambient', onTagConnected);
           // Root-entry reset (sovran-payments): wallet focused +
           // no payment popup up means no flow is active, so clearing stale
           // amount/mint context before a read can enter the machine is safe.
           clearPaymentContext('wallet.nfc_ambient');
-          await runAmbientNfcScan(machineRef.current);
+          await runAmbientNfcScan(machineRef.current, releaseReader);
           if (!active) break;
           await delay(REARM_DELAY_MS);
         }
@@ -154,7 +153,7 @@ export function useAmbientNfcArm(machine: AmbientNfcMachine): void {
       return () => {
         active = false;
         unsubscribePopup();
-        setNfcTagConnectedListener(null);
+        releaseReader();
         useNfcTapStore.getState().setArmed(false);
         setPhase('armed');
         // Don't leave a sheet claiming "listening" after the listener is

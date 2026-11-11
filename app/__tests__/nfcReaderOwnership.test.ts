@@ -18,7 +18,7 @@ import {
   createSovranNotifications,
   createSovranScanSources,
 } from '@/features/send/lib/sovranPaymentConfig';
-import { NfcError, setAmbientNfcCycle } from '@/shared/lib/nfc';
+import { NfcError, holdNfcReader, nfcReader } from '@/shared/lib/nfc';
 import { acquireSession } from '@/shared/lib/nfc/session';
 import { paramPopup } from '@/shared/lib/popup';
 import { usePopupStore } from '@/shared/stores/runtime/popupStore';
@@ -144,7 +144,6 @@ beforeEach(() => {
   jest.clearAllMocks();
   originalOS = Platform.OS;
   Object.defineProperty(Platform, 'OS', { value: 'android', configurable: true });
-  setAmbientNfcCycle(false);
   usePopupStore.setState({ current: null, isOpen: false });
   useNfcTapStore.setState({ armed: false, phase: 'armed' });
 });
@@ -159,11 +158,11 @@ describe('the NFC scan source', () => {
       failingRead(new NfcError('NFC is disabled in system settings', 'NOT_ENABLED'))
     ).nfc!;
 
-    setAmbientNfcCycle(true);
+    const releaseAmbient = holdNfcReader('ambient');
     expect(await nfc()).toEqual({ empty: true });
     expect(paramPopup).not.toHaveBeenCalled();
+    releaseAmbient();
 
-    setAmbientNfcCycle(false);
     expect(await nfc()).toEqual({ empty: true });
     expect(paramPopup).toHaveBeenCalledWith('nfc-error', {
       title: 'NFC is turned off',
@@ -174,11 +173,33 @@ describe('the NFC scan source', () => {
   it('drops a garbled ambient read and reports it to an explicit press', async () => {
     const nfc = createSovranScanSources(failingRead(new Error('not a payment tag'))).nfc!;
 
-    setAmbientNfcCycle(true);
+    const releaseAmbient = holdNfcReader('ambient');
     expect(await nfc()).toEqual({ empty: true });
+    releaseAmbient();
 
-    setAmbientNfcCycle(false);
     expect(await nfc()).toEqual({ error: new Error('not a payment tag') });
+  });
+});
+
+describe('the reader', () => {
+  // The wallet blurs: its ambient cycle's hold is dropped at once, though the
+  // cycle's scan settles later. A press taken meanwhile is explicit, and the
+  // late release leaves it so.
+  it('belongs to the latest flow to take it, whatever an earlier hold does after', async () => {
+    const nfc = createSovranScanSources(
+      failingRead(new NfcError('NFC is disabled in system settings', 'NOT_ENABLED'))
+    ).nfc!;
+    const releaseAmbientCycle = holdNfcReader('ambient');
+    releaseAmbientCycle();
+    const releasePress = holdNfcReader('explicit');
+
+    releaseAmbientCycle();
+    expect(nfcReader()).toEqual({ holder: 'explicit', writingBack: false });
+    expect(await nfc()).toEqual({ empty: true });
+    expect(paramPopup).toHaveBeenCalledTimes(1);
+
+    releasePress();
+    expect(nfcReader()).toEqual({ holder: 'idle' });
   });
 });
 

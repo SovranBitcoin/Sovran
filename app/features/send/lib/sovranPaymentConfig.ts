@@ -57,7 +57,13 @@ import {
   resolvePrimaryReceiveP2PKPublicKey,
 } from '@sovranbitcoin/coco-cashu-plugin-p2pk-import';
 import { decode, isEncoded } from '@/shared/lib/third-party/emoji';
-import { writeTokenToNFC, NfcError, isUserCancelError, isAmbientNfcCycle } from '@/shared/lib/nfc';
+import {
+  writeTokenToNFC,
+  NfcError,
+  isUserCancelError,
+  nfcReader,
+  nfcTapProgressed,
+} from '@/shared/lib/nfc';
 import { useNfcTapStore } from '@/shared/stores/runtime/nfcTapStore';
 import { usePopupStore } from '@/shared/stores/runtime/popupStore';
 import { buildModalProfileHref } from '@/shared/lib/nav/profileRoutes';
@@ -470,6 +476,7 @@ export function createSovranNotifications(
     // etc.). 'creating'/'writing' only fire once executeNfcSend write-back
     // is wired; harmless to map them now.
     onNfcPaymentProgress: ({ phase }) => {
+      nfcTapProgressed(phase);
       useNfcTapStore.getState().setPhase(phase);
     },
 
@@ -745,7 +752,7 @@ export function createSovranScanSources(nfcAdapter?: NfcIOAdapter): ScanSources 
           // Ambient cycles (wallet-screen listening loop) re-arm every ~30s,
           // so their per-cycle failures must stay quiet; explicit presses
           // keep the popups.
-          const ambient = isAmbientNfcCycle();
+          const ambient = nfcReader().holder === 'ambient';
           const closeTapSheet = () => {
             const popup = usePopupStore.getState();
             if (

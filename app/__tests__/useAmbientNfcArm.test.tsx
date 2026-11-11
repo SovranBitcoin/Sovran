@@ -14,13 +14,7 @@ import { AppState, Platform } from 'react-native';
 import { act, renderHook } from '@testing-library/react-native';
 
 import { useAmbientNfcArm } from '@/features/wallet/hooks/useAmbientNfcArm';
-import {
-  isNfcEnabled,
-  isNfcSupported,
-  releaseSession,
-  setAmbientNfcCycle,
-  setNfcTagConnectedListener,
-} from '@/shared/lib/nfc';
+import { holdNfcReader, isNfcEnabled, isNfcSupported, releaseSession } from '@/shared/lib/nfc';
 import { showActionSheet } from '@/shared/lib/popup';
 import { clearPaymentContext } from '@/shared/stores/runtime/clearPaymentContext';
 import { usePopupStore } from '@/shared/stores/runtime/popupStore';
@@ -50,8 +44,7 @@ jest.mock('@/shared/lib/nfc', () => ({
   isNfcEnabled: jest.fn(),
   isNfcSupported: jest.fn(),
   releaseSession: jest.fn(async () => undefined),
-  setAmbientNfcCycle: jest.fn(),
-  setNfcTagConnectedListener: jest.fn(),
+  holdNfcReader: jest.fn(),
 }));
 jest.mock('@/shared/lib/popup', () => ({ showActionSheet: jest.fn() }));
 jest.mock('@/shared/stores/runtime/clearPaymentContext', () => ({
@@ -89,14 +82,25 @@ function setForeground(state: 'active' | 'background') {
   act(() => appStateListeners.forEach((listener) => listener(state)));
 }
 
+/** Releases of the reader holds the hook took, one mock per hold. */
+let releases: jest.Mock[] = [];
+/** Whether the latest hold on the reader is still held. */
+const holding = () => releases.length > 0 && releases.at(-1)!.mock.calls.length === 0;
+
 function tagArrives() {
-  const listener = jest.mocked(setNfcTagConnectedListener).mock.calls.at(-1)![0] as () => void;
+  const listener = jest.mocked(holdNfcReader).mock.calls.at(-1)![1]!;
   act(() => listener());
 }
 
 beforeEach(() => {
   jest.useFakeTimers();
   jest.clearAllMocks();
+  releases = [];
+  jest.mocked(holdNfcReader).mockImplementation(() => {
+    const release = jest.fn();
+    releases.push(release);
+    return release;
+  });
   originalOS = Platform.OS;
   Object.defineProperty(Platform, 'OS', { value: 'android', configurable: true });
   Object.defineProperty(AppState, 'currentState', { value: 'active', configurable: true });
@@ -142,14 +146,15 @@ describe('arming', () => {
     expect(useNfcTapStore.getState().armed).toBe(false);
   });
 
-  it('arms, clears the payment context, marks the cycle ambient and asks for an NFC scan', async () => {
+  it('arms, clears the payment context, holds the reader as ambient and asks for an NFC scan', async () => {
     const { scan } = heldScan();
     renderHook(() => useAmbientNfcArm({ scan }));
     await flush();
 
     expect(useNfcTapStore.getState().armed).toBe(true);
     expect(clearPaymentContext).toHaveBeenCalledWith('wallet.nfc_ambient');
-    expect(setAmbientNfcCycle).toHaveBeenCalledWith(true);
+    expect(holdNfcReader).toHaveBeenCalledWith('ambient', expect.any(Function));
+    expect(holding()).toBe(true);
     expect(scan).toHaveBeenCalledTimes(1);
     expect(scan).toHaveBeenCalledWith(undefined, { source: 'nfc' });
   });
@@ -161,7 +166,7 @@ describe('arming', () => {
     renderHook(() => useAmbientNfcArm({ scan }));
     await flush();
     expect(scan).toHaveBeenCalledTimes(1);
-    expect(setAmbientNfcCycle).toHaveBeenLastCalledWith(false);
+    expect(holding()).toBe(false);
 
     await flush(599);
     expect(scan).toHaveBeenCalledTimes(1);
@@ -277,7 +282,7 @@ describe('a tag arriving', () => {
 });
 
 describe('disarming', () => {
-  it('on blur releases the session, unhooks the tag listener, resets the store and closes its sheet', async () => {
+  it('on blur releases the session and the reader, resets the store and closes its sheet', async () => {
     const { scan } = heldScan();
     renderHook(() => useAmbientNfcArm({ scan }));
     await flush();
@@ -287,7 +292,7 @@ describe('disarming', () => {
     act(() => mockFocus.blur!());
 
     expect(releaseSession).toHaveBeenCalledTimes(1);
-    expect(setNfcTagConnectedListener).toHaveBeenLastCalledWith(null);
+    expect(holding()).toBe(false);
     expect(useNfcTapStore.getState()).toMatchObject({ armed: false, phase: 'armed' });
     expect(usePopupStore.getState().current).toBeNull();
   });
