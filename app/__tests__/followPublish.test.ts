@@ -153,6 +153,16 @@ function contacts(created_at: number, tags: string[][], content = ''): RelayEven
   return { kind: 3, pubkey: OWN, created_at, tags, content, id: `${created_at}`.padStart(64, '0') };
 }
 
+/** The own-events sync taking in a list a relay sent. */
+function saveList(event: RelayEvent) {
+  social().setContactsFromRelay({
+    tags: event.tags,
+    content: event.content,
+    createdAtSec: event.created_at,
+    eventId: event.id,
+  });
+}
+
 function relayEvent(raw: RelayEvent) {
   const { NDKEvent } = jest.requireMock('@nostr-dev-kit/ndk-mobile');
   return Object.assign(new NDKEvent(), raw);
@@ -276,7 +286,7 @@ describe('following someone', () => {
       ['p', Y],
       ['p', Y, 'wss://duplicate.example'],
     ];
-    social().setContactsFromRelay({ tags, content: '{"relays":1}', createdAtSec: T });
+    saveList(contacts(T, tags, '{"relays":1}'));
     relaysHold(contacts(T, tags, '{"relays":1}'));
     const { ndk } = setup();
 
@@ -296,6 +306,7 @@ describe('following someone', () => {
     expect(selectContactList(social())).toEqual({
       status: 'known',
       updatedAt: mockPublish.mock.calls[0][0].event.created_at,
+      eventId: mockPublish.mock.calls[0][0].event.id,
     });
   });
 
@@ -317,7 +328,7 @@ describe('following someone', () => {
   });
 
   it('builds on a newer list another client published, read just now', async () => {
-    social().setContactsFromRelay({ tags: [['p', X]], content: '', createdAtSec: T });
+    saveList(contacts(T, [['p', X]]));
     mockStored.set(mockRelays[0].url, [contacts(T, [['p', X]])]);
     mockStored.set(mockRelays[1].url, [
       contacts(T + 10, [
@@ -365,7 +376,7 @@ describe('following someone', () => {
       ['p', Y, '', 'yolanda'],
     ];
     relaysHold(contacts(T, tags));
-    social().setContactsFromRelay({ tags, content: '', createdAtSec: T });
+    saveList(contacts(T, tags));
     const { ndk } = setup();
 
     tap(X);
@@ -407,14 +418,12 @@ describe('following someone', () => {
         ['p', Y],
       ])
     );
-    social().setContactsFromRelay({
-      tags: [
+    saveList(
+      contacts(T, [
         ['p', X, 'wss://hint.example'],
         ['p', Y],
-      ],
-      content: '',
-      createdAtSec: T,
-    });
+      ])
+    );
     await requestFollowSync(ndk, OWN);
 
     expect(publishedTags()).toEqual([
@@ -556,7 +565,7 @@ describe('following someone', () => {
 
   it('waits rather than build on the saved list when a write relay does not answer', async () => {
     jest.useFakeTimers();
-    social().setContactsFromRelay({ tags: [['p', X]], content: '', createdAtSec: T });
+    saveList(contacts(T, [['p', X]]));
     mockStored.set(mockRelays[0].url, [contacts(T - 5, [])]);
     const { ndk } = setup();
 
@@ -606,7 +615,7 @@ describe('following someone', () => {
   });
 
   it('waits when the relays hold no list though one was saved before', async () => {
-    social().setContactsFromRelay({ tags: [['p', X]], content: '', createdAtSec: T });
+    saveList(contacts(T, [['p', X]]));
     relaysHold();
     const { ndk } = setup();
 
@@ -620,11 +629,7 @@ describe('following someone', () => {
   it('waits rather than build on old raw tags a newer seed with the same follows vouched for', async () => {
     // The saved raw list is older; a seed with the same people is newer, so the
     // saved fields decode as one list at the seed's time.
-    social().setContactsFromRelay({
-      tags: [['p', X, 'wss://old.example']],
-      content: 'old',
-      createdAtSec: T,
-    });
+    saveList(contacts(T, [['p', X, 'wss://old.example']], 'old'));
     social().seedFollowsFromFacade({ follows: [X], createdAtSec: T + 10 });
     relaysHold(contacts(T, [['p', X, 'wss://old.example']], 'old'));
     const { ndk } = setup();
@@ -739,7 +744,7 @@ describe('following someone', () => {
     const { ndk, signer } = setup();
     signer.sign.mockImplementationOnce(async () => {
       mockStored.set(mockRelays[1].url, [contacts(T, [['p', X]]), rival]);
-      social().setContactsFromRelay({ tags: rival.tags, content: '', createdAtSec: T });
+      saveList(rival);
     });
 
     tap(Z);
@@ -765,11 +770,7 @@ describe('following someone', () => {
       await acceptOnRelays(args);
       // Another client's list, dated after ours, lands before ours is recorded.
       for (const relay of mockRelays) mockStored.set(relay.url, [newer]);
-      social().setContactsFromRelay({
-        tags: newer.tags,
-        content: '',
-        createdAtSec: newer.created_at,
-      });
+      saveList(newer);
       return ok({});
     });
     const { ndk } = setup();
@@ -800,11 +801,7 @@ describe('following someone', () => {
         id: '0'.repeat(64),
       };
       for (const relay of mockRelays) mockStored.get(relay.url)!.push(rival);
-      social().setContactsFromRelay({
-        tags: rival.tags,
-        content: '',
-        createdAtSec: rival.created_at,
-      });
+      saveList(rival);
       return ok({});
     });
     const { ndk } = setup();
@@ -819,6 +816,61 @@ describe('following someone', () => {
       ['p', Z],
     ]);
     expect(social().optimisticFollowsByPubkey).toEqual({});
+  });
+
+  it('keeps a list from the same second with a lower id over the one the write relays return', async () => {
+    const loser = { ...contacts(T, [['p', X]]), id: '9'.repeat(64) };
+    const winner = {
+      ...contacts(T, [
+        ['p', X],
+        ['p', W],
+      ]),
+      id: '1'.repeat(64),
+    };
+    // The own-events sync took in the winner from a relay the write relays are not.
+    saveList(winner);
+    relaysHold(loser);
+    const { ndk } = setup();
+
+    tap(Z);
+    await requestFollowSync(ndk, OWN);
+
+    expect(mockPublish).not.toHaveBeenCalled();
+    expect(social().optimisticFollowsByPubkey[Z]?.pending).toBe(true);
+    expect(social().contactsTags).toEqual(winner.tags);
+    expect(social().followingPubkeys).toEqual({ [X]: true, [W]: true });
+  });
+
+  it('waits when a saved list from the same second differs from the read and its id is not known', async () => {
+    // Saved by an earlier session: the store keeps no id.
+    mockDisk.set(
+      'nostr-social-store',
+      JSON.stringify({
+        version: 2,
+        state: {
+          contactsTags: [
+            ['p', X],
+            ['p', W],
+          ],
+          contactsContent: '',
+          contactsUpdatedAt: T,
+          followingPubkeys: { [X]: true, [W]: true },
+        },
+      })
+    );
+    await useNostrSocialStore.persist.rehydrate();
+    relaysHold(contacts(T, [['p', X]]));
+    const { ndk } = setup();
+
+    tap(Z);
+    await requestFollowSync(ndk, OWN);
+
+    expect(mockPublish).not.toHaveBeenCalled();
+    expect(social().contactsTags).toEqual([
+      ['p', X],
+      ['p', W],
+    ]);
+    expect(social().optimisticFollowsByPubkey[Z]?.pending).toBe(true);
   });
 
   it('waits rather than build on a list dated in the future', async () => {
@@ -1181,7 +1233,7 @@ describe('switching account while a follow is being published', () => {
         ['p', W],
       ])
     );
-    social().setContactsFromRelay({ tags: [['p', X]], content: '', createdAtSec: T });
+    saveList(contacts(T, [['p', X]]));
     const gate = deferred();
     mockReadGate = gate.promise;
     const { ndk } = setup();
@@ -1253,8 +1305,8 @@ describe('the plan', () => {
 
   it('builds only on the list a complete read returned', () => {
     const intents = { [Z]: { value: true, pending: true, updatedAt: 1 } };
-    const list = { tags: [['p', X]], content: 'c', createdAt: T };
-    const saved = { status: 'known' as const, updatedAt: T };
+    const list = { tags: [['p', X]], content: 'c', createdAt: T, id: '5'.repeat(64) };
+    const saved = { status: 'known' as const, updatedAt: T, eventId: list.id };
     expect(planFollowPublish({ intents, known: saved, read: { status: 'incomplete' } })).toEqual({
       step: 'wait',
       reason: 'read-incomplete',

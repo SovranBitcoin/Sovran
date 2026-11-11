@@ -100,10 +100,12 @@ describe('nostrSocialStore follow list', () => {
       ],
       content: 'c',
       createdAtSec: T,
+      eventId: 'e1',
     });
     expect(selectContactList(useNostrSocialStore.getState())).toEqual({
       status: 'known',
       updatedAt: T,
+      eventId: 'e1',
     });
     // A newer seed, also one with no follows, moves the stamp on.
     useNostrSocialStore.getState().seedFollowsFromFacade({ follows: [], createdAtSec: T + 1 });
@@ -113,11 +115,34 @@ describe('nostrSocialStore follow list', () => {
     });
   });
 
+  it('keeps the lower id of two lists from the same second, in whichever order they arrive', () => {
+    const social = () => useNostrSocialStore.getState();
+    const low = { tags: [['p', X]], content: 'low', createdAtSec: T, eventId: '1'.repeat(64) };
+    const high = { tags: [], content: 'high', createdAtSec: T, eventId: '9'.repeat(64) };
+
+    social().setContactsFromRelay(low);
+    social().setContactsFromRelay(high);
+    expect(social()).toMatchObject({ contactsContent: 'low', followingPubkeys: { [X]: true } });
+
+    useNostrSocialStore.setState(useNostrSocialStore.getInitialState(), true);
+    social().setContactsFromRelay(high);
+    social().setContactsFromRelay(low);
+    expect(social()).toMatchObject({ contactsContent: 'low', followingPubkeys: { [X]: true } });
+    expect(selectContactList(social())).toEqual({
+      status: 'known',
+      updatedAt: T,
+      eventId: low.eventId,
+    });
+  });
+
   it('counts a list that was loaded empty, or follows saved without a stamp, as known', () => {
-    useNostrSocialStore.getState().setContactsFromRelay({ tags: [], content: '', createdAtSec: T });
+    useNostrSocialStore
+      .getState()
+      .setContactsFromRelay({ tags: [], content: '', createdAtSec: T, eventId: 'e1' });
     expect(selectContactList(useNostrSocialStore.getState())).toEqual({
       status: 'known',
       updatedAt: T,
+      eventId: 'e1',
     });
     useNostrSocialStore.setState(useNostrSocialStore.getInitialState(), true);
     useNostrSocialStore.setState({ followingPubkeys: { [X]: true } });

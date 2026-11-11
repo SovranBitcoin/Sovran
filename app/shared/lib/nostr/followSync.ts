@@ -17,7 +17,7 @@
 import type NDK from '@nostr-dev-kit/ndk-mobile';
 import { NDKEvent } from '@nostr-dev-kit/ndk-mobile';
 import { Contacts } from 'nostr-tools/kinds';
-import type { facade } from 'nostr';
+import { supersedes, type facade } from 'nostr';
 import { z } from 'zod';
 
 import { nostrLog } from '@/shared/lib/logger';
@@ -43,7 +43,7 @@ type FollowIntents = ReturnType<typeof selectFollowIntents>;
 type IndexedList = 'none' | 'exists' | 'unanswered';
 
 /** A follow list as signed: the base a publish builds on. */
-type ReadList = { tags: string[][]; content: string; createdAt: number };
+type ReadList = { tags: string[][]; content: string; createdAt: number; id: string };
 
 /**
  * How this run's read of the write relays ended. Only a complete read says
@@ -59,13 +59,19 @@ type FollowPlan =
   | { step: 'idle' }
   | {
       step: 'wait';
-      reason: 'read-incomplete' | 'unusable-list' | 'newer-known' | 'list-elsewhere' | 'no-list';
+      reason:
+        | 'read-incomplete'
+        | 'unusable-list'
+        | 'newer-known'
+        | 'same-second-unknown'
+        | 'list-elsewhere'
+        | 'no-list';
     }
   | { step: 'ask-indexers' }
   | { step: 'already-applied' }
   | { step: 'publish'; base: ReadList; tags: string[][] };
 
-const EMPTY_LIST: ReadList = { tags: [], content: '', createdAt: 0 };
+const EMPTY_LIST: ReadList = { tags: [], content: '', createdAt: 0, id: '' };
 
 /** The list's tags with only the intents applied; every other entry stays as read. */
 export function applyFollowIntents(tags: string[][], intents: FollowIntents): string[][] {
@@ -78,9 +84,10 @@ export function applyFollowIntents(tags: string[][], intents: FollowIntents): st
 
 /**
  * Pure: what to do with the outstanding intents, given this run's read and
- * the list the store knows (after a complete read's list was saved). Both a
- * publish and settling a tap the list already holds stand only on the list a
- * complete read returned. Known-empty needs every write relay to have
+ * the list the store knew before it. Both a publish and settling a tap the
+ * list already holds stand only on the list a complete read returned, and
+ * only when the store knows no list that relays keep over it: a newer one, or
+ * one from the same second with a lower id (or whose id it does not know). Known-empty needs every write relay to have
  * answered with no list, no list or seed ever loaded for the account, and
  * every enabled indexer settled without a list and without failing
  * (`askIndexers`).
@@ -99,12 +106,21 @@ export function planFollowPublish(input: {
       return { step: 'wait', reason: 'read-incomplete' };
     case 'unusable':
       return { step: 'wait', reason: 'unusable-list' };
-    case 'found':
-      // A seed or a list newer than any write relay holds: the read is stale.
-      if (known.status === 'known' && known.updatedAt > read.list.createdAt)
-        return { step: 'wait', reason: 'newer-known' };
-      base = read.list;
+    case 'found': {
+      const { list } = read;
+      if (known.status === 'known') {
+        const held = { created_at: known.updatedAt, id: known.eventId ?? '' };
+        // A seed or a list newer than any write relay holds: the read is stale.
+        if (known.updatedAt > list.createdAt) return { step: 'wait', reason: 'newer-known' };
+        if (known.updatedAt === list.createdAt) {
+          if (known.eventId === undefined) return { step: 'wait', reason: 'same-second-unknown' };
+          if (supersedes(held, { created_at: list.createdAt, id: list.id }))
+            return { step: 'wait', reason: 'newer-known' };
+        }
+      }
+      base = list;
       break;
+    }
     case 'empty':
       // A list or seed was loaded for the account but no write relay has it.
       if (known.status === 'known') return { step: 'wait', reason: 'list-elsewhere' };
@@ -124,6 +140,7 @@ export function planFollowPublish(input: {
 }
 
 const ContactEvent = z.object({
+  id: z.string(),
   tags: z.array(z.array(z.string())),
   content: z.string(),
   created_at: z.number().int().nonnegative(),
@@ -143,8 +160,8 @@ function decodeRead(read: { outcome: OwnEventReadOutcome; newest: unknown }): Li
   const parsed = ContactEvent.safeParse(read.newest);
   if (!parsed.success || parsed.data.created_at > Math.floor(Date.now() / 1000) + MAX_FUTURE_SEC)
     return { status: 'unusable' };
-  const { tags, content, created_at } = parsed.data;
-  return { status: 'found', list: { tags, content, createdAt: created_at } };
+  const { tags, content, created_at, id } = parsed.data;
+  return { status: 'found', list: { tags, content, createdAt: created_at, id } };
 }
 
 /**
@@ -164,6 +181,29 @@ function savedList() {
 
 function sameSavedList(a: ReturnType<typeof savedList>, b: ReturnType<typeof savedList>) {
   return a.every((field, index) => field === b[index]);
+}
+
+/**
+ * The list the store knows, before this read is kept. One from the same
+ * second whose id the store does not know (it was loaded from storage) is
+ * named as the read's list only when the store holds exactly the read's tags,
+ * content and follows: building on the read then loses nothing it holds.
+ */
+function knownBefore(read: ListRead): ContactList {
+  const state = useNostrSocialStore.getState();
+  const known = selectContactList(state);
+  if (known.status !== 'known' || known.eventId !== undefined || read.status !== 'found')
+    return known;
+  const { list } = read;
+  const follows = new Set(list.tags.filter((tag) => tag[0] === 'p' && tag[1]).map((tag) => tag[1]));
+  const followed = Object.keys(state.followingPubkeys);
+  const holdsRead =
+    known.updatedAt === list.createdAt &&
+    state.contactsContent === list.content &&
+    JSON.stringify(state.contactsTags) === JSON.stringify(list.tags) &&
+    followed.length === follows.size &&
+    followed.every((pubkey) => follows.has(pubkey));
+  return holdsRead ? { ...known, eventId: list.id } : known;
 }
 
 /** Whether the account's write relays are still the ones `read` asked. */
@@ -238,24 +278,11 @@ async function syncOnce(ndk: NDK, ownPubkey: string): Promise<void> {
       const raw = await readNewestOwnEvent(ndk, ownPubkey, Contacts);
       const read = decodeRead(raw);
       scope.check();
-      // Only a complete read's list is kept; the store ignores it if it knows a newer one.
-      if (read.status === 'found')
-        social().setContactsFromRelay({
-          tags: read.list.tags,
-          content: read.list.content,
-          createdAtSec: read.list.createdAt,
-        });
-      const atBase = savedList();
 
       let intents = selectFollowIntents(social());
       const planOf = (indexed?: IndexedList) => {
         intents = selectFollowIntents(social());
-        return planFollowPublish({
-          intents,
-          read,
-          known: selectContactList(social()),
-          indexed,
-        });
+        return planFollowPublish({ intents, read, known: knownBefore(read), indexed });
       };
       let plan = planOf();
       if (plan.step === 'ask-indexers') {
@@ -277,8 +304,6 @@ async function syncOnce(ndk: NDK, ownPubkey: string): Promise<void> {
           });
           return;
         case 'already-applied':
-          social().settleFollowIntents(intents);
-          continue;
         case 'publish':
           break;
         default: {
@@ -286,6 +311,21 @@ async function syncOnce(ndk: NDK, ownPubkey: string): Promise<void> {
           throw new Error(`Unhandled follow plan ${String(unreachable)}`);
         }
       }
+
+      // The plan stands on this read, so it is kept now, never before the plan:
+      // the store takes it unless a list relays keep over it arrived meanwhile.
+      if (read.status === 'found')
+        social().setContactsFromRelay({
+          tags: read.list.tags,
+          content: read.list.content,
+          createdAtSec: read.list.createdAt,
+          eventId: read.list.id,
+        });
+      if (plan.step === 'already-applied') {
+        social().settleFollowIntents(intents);
+        continue;
+      }
+      const atBase = savedList();
 
       const event = new NDKEvent(ndk);
       event.kind = Contacts;
@@ -329,6 +369,7 @@ async function syncOnce(ndk: NDK, ownPubkey: string): Promise<void> {
         tags: plan.tags,
         content: plan.base.content,
         createdAtSec: event.created_at,
+        eventId: event.id,
       });
       social().settleFollowIntents(intents);
     }

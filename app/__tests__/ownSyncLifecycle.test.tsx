@@ -383,7 +383,7 @@ describe('useFollowSync', () => {
     act(() =>
       useNostrSocialStore
         .getState()
-        .setContactsFromRelay({ tags: [['p', F2]], content: '', createdAtSec: 500 })
+        .setContactsFromRelay({ tags: [['p', F2]], content: '', createdAtSec: 500, eventId: 'e1' })
     );
     expect(mockRequestFollowSync).toHaveBeenCalledTimes(2);
     act(() => useNostrSocialStore.getState().markDeleteRequested('note-1'));

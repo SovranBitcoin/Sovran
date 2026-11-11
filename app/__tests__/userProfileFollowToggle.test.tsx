@@ -96,7 +96,12 @@ describe('the profile Follow button', () => {
   });
 
   it('unfollows someone already followed, and follows again on the next tap', () => {
-    social().setContactsFromRelay({ tags: [['p', Z]], content: '', createdAtSec: 1 });
+    social().setContactsFromRelay({
+      tags: [['p', Z]],
+      content: '',
+      createdAtSec: 1,
+      eventId: 'e1',
+    });
     const { result } = renderHook(() => useFollowToggle(Z, OWN));
 
     act(() => result.current());

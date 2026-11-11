@@ -1,4 +1,5 @@
 import { defineStore as create } from '@/shared/lib/persist/defineStore';
+import { supersedes } from 'nostr';
 import { persist } from 'zustand/middleware';
 import { z } from 'zod';
 
@@ -56,14 +57,17 @@ type FollowOptimisticState = {
  *
  * - `unknown`: no list and no seed was ever loaded for the account.
  * - `known`: a list (from relays) or a seed (from nagg or Primal) was loaded;
- *   `updatedAt` is the newest one's `created_at`.
+ *   `updatedAt` is the newest one's `created_at`, and `eventId` the id of the
+ *   list behind it when this session took that list in. The saved fields hold
+ *   no id, so after a restart, and after a seed, it is not known.
  *
  * Decoded from the saved fields, which stay as they are. The saved raw tags
  * are never a base for a publish: the stamp is shared with seeds, so they can
  * be older than `updatedAt` says. `followSync` builds only on the list a
  * complete relay read just returned.
  */
-export type ContactList = { status: 'unknown' } | { status: 'known'; updatedAt: number };
+export type ContactList =
+  { status: 'unknown' } | { status: 'known'; updatedAt: number; eventId: string | undefined };
 
 type EngagementOptimisticState = {
   value: boolean;
@@ -110,6 +114,13 @@ interface NostrSocialState {
   /** unix seconds (kind-3 `created_at`); persisted under this name */
   contactsUpdatedAt: number;
   followingPubkeys: Record<string, true>;
+  /**
+   * In memory only, never saved: the id of the relay list whose `tags` are
+   * `contactsTags`, so a list from the same second can be told apart (the
+   * lower id wins). It names the held list only while `tags` is the very array
+   * the store holds: a load from storage replaces that array, a seed clears it.
+   */
+  contactsEvent: { id: string; tags: string[][] } | null;
 
   /**
    * Target event id → our engagement record (liked / reposted / replied). One
@@ -138,6 +149,7 @@ interface NostrSocialActions {
     tags: string[][];
     content: string;
     createdAtSec: number;
+    eventId: string;
   }) => void;
   /**
    * Seed the read-side follow set from the tiered facade's social-graph bundle
@@ -218,6 +230,11 @@ type NostrSocialStore = NostrSocialState & NostrSocialActions;
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/** The id of the held list, when this session took it in. */
+function heldContactsEventId(state: NostrSocialState): string | undefined {
+  return state.contactsEvent?.tags === state.contactsTags ? state.contactsEvent.id : undefined;
+}
 
 function extractFollowingFromTags(tags: string[][]): Record<string, true> {
   const map: Record<string, true> = {};
@@ -357,6 +374,7 @@ const INITIAL_STATE: NostrSocialState = {
   contactsContent: '',
   contactsUpdatedAt: 0,
   followingPubkeys: {},
+  contactsEvent: null,
   engagementByEventId: {},
   deletedRepostOriginalIds: {},
   deletedNoteIds: {},
@@ -445,9 +463,21 @@ export const useNostrSocialStore = create<NostrSocialStore>({
 
       // ---- contacts ----
 
-      setContactsFromRelay: ({ tags, content, createdAtSec }) => {
+      setContactsFromRelay: ({ tags, content, createdAtSec, eventId }) => {
         set((state) => {
-          if (createdAtSec < state.contactsUpdatedAt) {
+          // Of two lists from the same second the lower id wins, as on relays.
+          // Without the held list's id (loaded from storage, or a seed) the
+          // newer arrival is taken, and `followSync` waits rather than build on it.
+          const held = heldContactsEventId(state);
+          if (
+            createdAtSec < state.contactsUpdatedAt ||
+            (createdAtSec === state.contactsUpdatedAt &&
+              held !== undefined &&
+              !supersedes(
+                { created_at: createdAtSec, id: eventId },
+                { created_at: createdAtSec, id: held }
+              ))
+          ) {
             storeLog.debug('social.contacts.stale', {
               createdAtSec,
               current: state.contactsUpdatedAt,
@@ -465,6 +495,7 @@ export const useNostrSocialStore = create<NostrSocialStore>({
             contactsContent: content,
             contactsUpdatedAt: createdAtSec,
             followingPubkeys: following,
+            contactsEvent: { id: eventId, tags },
           };
         });
       },
@@ -488,7 +519,11 @@ export const useNostrSocialStore = create<NostrSocialStore>({
             createdAtSec,
           });
           // Read side only — no `contactsTags`/`content`; the relay sub owns those.
-          return { followingPubkeys: following, contactsUpdatedAt: createdAtSec };
+          return {
+            followingPubkeys: following,
+            contactsUpdatedAt: createdAtSec,
+            contactsEvent: null,
+          };
         });
       },
 
@@ -774,7 +809,9 @@ export function selectContactList(state: NostrSocialState): ContactList {
     state.contactsTags.length > 0 ||
     !!state.contactsContent ||
     Object.keys(state.followingPubkeys).length > 0;
-  return loaded ? { status: 'known', updatedAt: state.contactsUpdatedAt } : { status: 'unknown' };
+  return loaded
+    ? { status: 'known', updatedAt: state.contactsUpdatedAt, eventId: heldContactsEventId(state) }
+    : { status: 'unknown' };
 }
 
 /** Follows and unfollows the person asked for that no published list holds yet. */

@@ -179,6 +179,7 @@ export function useOwnEventsSync(): void {
         tags: part.latestContacts.tags,
         content: part.latestContacts.content,
         createdAtSec: part.latestContacts.created_at,
+        eventId: part.latestContacts.id,
       });
       social.clearSettledFollowOptimistic();
     }
