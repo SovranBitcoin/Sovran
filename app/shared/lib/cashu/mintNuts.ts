@@ -18,7 +18,16 @@ function methodsOf(nuts: MintNuts | undefined, nut: string): NutMethod[] {
   if (!entry || typeof entry !== 'object') return [];
   const methods = (entry as { methods?: unknown }).methods;
   if (!Array.isArray(methods)) return [];
-  return methods.filter((m): m is NutMethod => !!m && typeof m === 'object');
+  const out: NutMethod[] = [];
+  for (const m of methods as unknown[]) {
+    if (!m || typeof m !== 'object') continue;
+    const { method, unit } = m as { method?: unknown; unit?: unknown };
+    out.push({
+      method: typeof method === 'string' ? method : undefined,
+      unit: typeof unit === 'string' ? unit : undefined,
+    });
+  }
+  return out;
 }
 
 function uniqueLower(values: (string | undefined)[]): string[] {
