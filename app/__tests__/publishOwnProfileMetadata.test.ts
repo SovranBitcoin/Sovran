@@ -70,6 +70,7 @@ jest.mock('@/shared/lib/nostr/outbox/relayListStore', () => ({
   getOwnWriteRelays: () => [],
   getKnownOwnWriteRelays: () => mockKnown,
 }));
+const mockSign = jest.fn(async (..._args: unknown[]) => {});
 jest.mock('@nostr-dev-kit/ndk-mobile', () => ({
   __esModule: true,
   default: jest.fn(),
@@ -80,7 +81,7 @@ jest.mock('@nostr-dev-kit/ndk-mobile', () => ({
   },
   NDKEvent: class {
     id = 'e'.repeat(64);
-    sign = jest.fn(async () => {});
+    sign = (...args: unknown[]) => mockSign(...args);
   },
 }));
 
@@ -161,6 +162,7 @@ async function readsTimeOut(reads: number) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockSign.mockReset().mockResolvedValue(undefined);
   forgetSilentRelays();
   mockKnown = [RELAY];
   useOwnProfileMetadataStore.setState({ latest: null, optimistic: null });
@@ -657,4 +659,52 @@ it('returns waiting after bounded alternating relay timeouts without publishing 
   expect(bounded).toBe(true);
   expect(result._unsafeUnwrapErr().type).toBe('base-unavailable');
   expect(publishEvent).not.toHaveBeenCalled();
+});
+
+it.each(['identity verification', 'signing'])(
+  'waits if a newer profile arrives during %s, then retries on that profile',
+  async (phase) => {
+    const before = { content: { about: 'Old' }, createdAt: 20, eventId: 'c'.repeat(64) };
+    const newer = { content: { about: 'Newest' }, createdAt: 21, eventId: 'b'.repeat(64) };
+    useOwnProfileMetadataStore.getState().setLatest(before);
+    const ndk = makeNdk();
+    const update = () => useOwnProfileMetadataStore.getState().setLatest(newer);
+    jest.mocked(verifyNip05).mockImplementation(async () => {
+      if (phase === 'identity verification') update();
+      return { status: 'verified', identifier: 'alice@example.com' };
+    });
+    mockSign.mockImplementationOnce(async () => {
+      if (phase === 'signing') update();
+    });
+    const save = () =>
+      publishOwnProfileMetadata({
+        ndk,
+        pubkey,
+        accountIndex: 0,
+        patch: { name: 'New', nip05: 'alice@example.com' },
+        initialLoad: { status: 'found', snapshot: before },
+      });
+    const result = await save();
+    expect(publishEvent).not.toHaveBeenCalled();
+    expect(result._unsafeUnwrapErr().type).toBe('base-unavailable');
+    expect(useOwnProfileMetadataStore.getState().optimistic).toBeNull();
+    jest
+      .mocked(verifyNip05)
+      .mockResolvedValue({ status: 'verified', identifier: 'alice@example.com' });
+    expect((await save()).isOk()).toBe(true);
+    const { event } = jest.mocked(publishEvent).mock.calls[0][0];
+    expect(JSON.parse(event.content)).toMatchObject({ about: 'Newest', name: 'New' });
+    expect(event.created_at).toBeGreaterThan(newer.createdAt);
+  }
+);
+
+it('does not commit profile success after its signer was replaced during publish', async () => {
+  const ndk = makeNdk();
+  jest.mocked(publishEvent).mockImplementation(() => {
+    Object.assign(ndk, { signer: { user: async () => ({ pubkey }) } });
+    return okAsync(accepted);
+  });
+  expect((await publish(ndk))._unsafeUnwrapErr().type).toBe('profile-changed');
+  expect(mockUpdate).not.toHaveBeenCalled();
+  expect(useOwnProfileMetadataStore.getState().latest).toBeNull();
 });
