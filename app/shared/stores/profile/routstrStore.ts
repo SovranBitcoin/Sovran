@@ -575,7 +575,9 @@ interface RoutstrActions {
   setBalance: (balance: number) => void;
   clearBalance: () => void;
 
-  addMessage: (message: RoutstrMessage) => void;
+  /** Add messages to the conversation on screen in one write, so a question
+   *  and its answer's placeholder are saved together or not at all. */
+  addMessages: (messages: RoutstrMessage[]) => void;
   updateMessage: (id: string, content: string) => void;
   /** Toggle a message's transient `pending` flag in the conversation it was
    *  sent in (`selectConversationId` when it was sent), whichever one is open
@@ -1259,9 +1261,9 @@ export const useRoutstrStore = create<RoutstrStore>({ name: 'routstr-store', sco
         set({ balance: null });
       },
 
-      addMessage: (message: RoutstrMessage) => {
-        storeLog.debug('store.routstr.add_message', { role: message.role });
-        set((state) => withSessionMirror(state, [...state.conversationHistory, message]));
+      addMessages: (messages) => {
+        storeLog.debug('store.routstr.add_message', { roles: messages.map((m) => m.role) });
+        set((state) => withSessionMirror(state, [...state.conversationHistory, ...messages]));
       },
 
       setMessagePending: (conversationId, id, pending) => {

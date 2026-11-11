@@ -148,7 +148,7 @@ export function useAiSend() {
   const isAnonymous = useRoutstrStore((s) => s.isAnonymousMode);
   const currentSessionId = useRoutstrStore((s) => s.currentSessionId);
   const createSession = useRoutstrStore((s) => s.createSession);
-  const addMessage = useRoutstrStore((s) => s.addMessage);
+  const addMessages = useRoutstrStore((s) => s.addMessages);
   const setMessagePending = useRoutstrStore((s) => s.setMessagePending);
   const finalizeAssistantMessage = useRoutstrStore((s) => s.finalizeAssistantMessage);
   const setActiveBranch = useRoutstrStore((s) => s.setActiveBranch);
@@ -1100,14 +1100,18 @@ export function useAiSend() {
       }
       const conversationId = selectConversationId(useRoutstrStore.getState());
 
-      addMessage({ ...pendingUserMessage, pending: true });
-      addMessage({
-        id: assistantMessageId,
-        parentId: userMessageId,
-        role: 'assistant',
-        content: '',
-        timestamp: timestamp + 1,
-      });
+      // One write: a question is never saved without its answer, so one left
+      // by a kill reads as an answer to ask again.
+      addMessages([
+        { ...pendingUserMessage, pending: true },
+        {
+          id: assistantMessageId,
+          parentId: userMessageId,
+          role: 'assistant',
+          content: '',
+          timestamp: timestamp + 1,
+        },
+      ]);
 
       try {
         await streamIntoPlaceholder({
@@ -1130,7 +1134,7 @@ export function useAiSend() {
       isAnonymous,
       currentSessionId,
       createSession,
-      addMessage,
+      addMessages,
       setMessagePending,
       streamIntoPlaceholder,
       walletSats,
@@ -1183,13 +1187,15 @@ export function useAiSend() {
       const flowId = `ai-retry-${timestamp}`;
       const parentId = original.parentId ?? null;
 
-      addMessage({
-        id: newAssistantId,
-        parentId,
-        role: 'assistant',
-        content: '',
-        timestamp,
-      });
+      addMessages([
+        {
+          id: newAssistantId,
+          parentId,
+          role: 'assistant',
+          content: '',
+          timestamp,
+        },
+      ]);
       // Flip immediately so the chat list shows the streaming sibling as
       // the active branch. The user can navigate back to the original via
       // the bubble's chevron nav.
@@ -1206,7 +1212,7 @@ export function useAiSend() {
         retriedFromMessageId: messageId,
       });
     },
-    [addMessage, setActiveBranch, streamIntoPlaceholder]
+    [addMessages, setActiveBranch, streamIntoPlaceholder]
   );
 
   // Retry shares the double-tap exposure with `send`: a rapid tap on the

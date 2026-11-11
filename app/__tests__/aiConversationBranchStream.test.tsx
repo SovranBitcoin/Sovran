@@ -26,7 +26,7 @@ import {
   getSiblingInfo,
   withSynthesisedParents,
 } from '@/features/ai/lib/branching';
-import { getTurn, resetTurns, useTurn, type Turn } from '@/features/ai/lib/turns';
+import { getTurn, readAnswer, resetTurns, useTurn, type Turn } from '@/features/ai/lib/turns';
 import { resetModelAvailability } from '@/features/ai/lib/modelAvailability';
 import { sendMessage, checkBalance } from '@/shared/lib/routstr/api';
 import { refreshRoutstrLineup } from '@/shared/lib/routstr/refreshLineup';
@@ -50,13 +50,20 @@ jest.mock('@/shared/lib/routstr/securePersistence', () => ({
   createRoutstrPersistence: () =>
     jest.requireMock('@/shared/lib/cashu/profileScopedStorage').createProfileScopedStorage(),
 }));
-jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({
-  createProfileScopedStorage: () => ({
-    getItem: async () => null,
-    setItem: async () => {},
-    removeItem: async () => {},
-  }),
-}));
+jest.mock('@/shared/lib/cashu/profileScopedStorage', () => {
+  // What a relaunch reads; set on the mock, since the store loads on import.
+  const saved = { value: null as string | null };
+  return {
+    saved,
+    createProfileScopedStorage: () => ({
+      getItem: async () => saved.value,
+      setItem: async () => {},
+      removeItem: async () => {},
+    }),
+  };
+});
+const savedBlob = (): { value: string | null } =>
+  jest.requireMock('@/shared/lib/cashu/profileScopedStorage').saved;
 jest.mock('@/shared/stores/runtime/routstrTopUpStore', () => ({
   useRoutstrTopUpStore: { getState: jest.fn() },
 }));
@@ -197,6 +204,7 @@ beforeEach(async () => {
   jest.clearAllMocks();
   resetTurns();
   resetModelAvailability();
+  savedBlob().value = null;
   await useRoutstrStore.persist.rehydrate();
   const lineup = emptyLineup();
   lineup.openai.auto = entry('model-auto');
@@ -427,6 +435,65 @@ describe('streaming an answer', () => {
       ['user', 'saved?', true],
       ['assistant', '', null],
     ]);
+  });
+
+  it('never saves a question without its answer, so a kill leaves one to ask again', async () => {
+    useRoutstrStore.setState({ isAnonymousMode: false });
+    const saved: RoutstrMessage[][] = [];
+    const stop = useRoutstrStore.subscribe((state) => {
+      const blob = useRoutstrStore.persist.getOptions().partialize!(state) as {
+        sessions: { messages: RoutstrMessage[] }[];
+      };
+      for (const session of blob.sessions) saved.push(session.messages);
+    });
+    await startSend('kept?');
+    stop();
+
+    for (const messages of saved) {
+      for (const question of messages.filter((m) => m.role === 'user' && m.pending))
+        expect(messages.some((m) => m.parentId === question.id)).toBe(true);
+    }
+    expect(saved.length).toBeGreaterThan(0);
+  });
+
+  it('reads a question saved as sending, by a kill or an older build, as an answer to ask again', async () => {
+    savedBlob().value = JSON.stringify({
+      version: 3,
+      state: {
+        currentSessionId: 's1',
+        sessions: [
+          {
+            id: 's1',
+            title: 'Saved',
+            createdAt: 1,
+            messages: [
+              { ...msg('u1', 'user', null, 1, 'asked before the kill'), pending: true },
+              msg('a1', 'assistant', 'u1', 2, ''),
+            ],
+          },
+        ],
+      },
+    });
+    useRoutstrStore.setState({ isAnonymousMode: false });
+    await useRoutstrStore.persist.rehydrate();
+
+    const [question, answer] = history();
+    expect(question).toMatchObject({ id: 'u1', pending: false });
+    expect(readAnswer(answer!, getTurn('a1'))).toEqual({ phase: 'interrupted', text: '' });
+
+    arrangeStream();
+    const { result } = renderHook(useAiSend);
+    let retrying!: Promise<unknown>;
+    act(() => {
+      retrying = result.current.retry('a1');
+    });
+    await tick();
+    await act(async () => {
+      live.push(content('answered now'));
+      live.end();
+      await retrying;
+    });
+    expect(history().at(-1)).toMatchObject({ parentId: 'u1', content: 'answered now' });
   });
 
   it('leaving the screen mid-answer keeps the answer so far, as one that can be asked again', async () => {
