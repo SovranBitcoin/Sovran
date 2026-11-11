@@ -124,8 +124,8 @@ export function ThemePreviewScreen() {
 
   const handleApply = useCallback(async () => {
     log.info('theme.preview.apply', { albumSlug: activeAlbumSlug });
-    await commit();
-    router.back();
+    // A Cancel during the download already closed the editor.
+    if (await commit()) router.back();
   }, [commit, activeAlbumSlug]);
 
   const handleUnitPress = useCallback((unitId: string) => {

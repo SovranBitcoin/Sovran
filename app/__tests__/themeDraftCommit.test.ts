@@ -160,7 +160,7 @@ test('Apply saves the theme even when the primary wallpaper download failed, and
   draft().beginDraft([]);
   draft().setUnitWallpaper(PRIMARY, 'pine');
 
-  await expect(draft().commit()).resolves.toBeUndefined();
+  await expect(draft().commit()).resolves.toBe(true);
 
   // QUIRK (D3): the failed download is swallowed and the wallpaper is saved
   // anyway, so the chrome never switches to it and nothing downloads it later.
@@ -169,6 +169,49 @@ test('Apply saves the theme even when the primary wallpaper download failed, and
   expect(useWallpaperStore.getState().downloaded.pine).toBeUndefined();
   expect(mockedDownload).toHaveBeenCalledTimes(1);
   expect(draft().active).toBe(false);
+});
+
+test('Cancel during the primary download leaves the saved theme as it was', async () => {
+  useThemeStore.setState({
+    activeAlbumSlug: null,
+    unitWallpapers: { [PRIMARY]: 'oak' },
+    mode: 'dark',
+  });
+  const pending = deferred();
+  mockedDownload.mockImplementationOnce(() => pending.promise);
+  draft().beginDraft([PRIMARY]);
+  draft().setUnitWallpaper(PRIMARY, 'pine');
+  draft().setMode('light');
+
+  const applying = draft().commit();
+  await Promise.resolve();
+  draft().discard();
+  pending.resolve('file:///wallpapers/pine.jpg');
+
+  const applied = await applying;
+  expect(theme()).toMatchObject({ unitWallpapers: { [PRIMARY]: 'oak' }, mode: 'dark' });
+  expect(draft().active).toBe(false);
+  // Apply reports that nothing was applied, so the screen does not navigate again.
+  expect(applied).toBe(false);
+});
+
+test('a cancelled Apply that finishes late leaves a draft opened since alone', async () => {
+  const pending = deferred();
+  mockedDownload.mockImplementationOnce(() => pending.promise);
+  draft().beginDraft([PRIMARY]);
+  draft().setUnitWallpaper(PRIMARY, 'pine');
+
+  const applying = draft().commit();
+  await Promise.resolve();
+  draft().discard();
+  draft().beginDraft([PRIMARY]);
+  draft().setUnitWallpaper(PRIMARY, 'birch');
+  pending.resolve('file:///wallpapers/pine.jpg');
+
+  const applied = await applying;
+  expect(theme().unitWallpapers).toEqual({});
+  expect(draft()).toMatchObject({ active: true, unitWallpapers: { [PRIMARY]: 'birch' } });
+  expect(applied).toBe(false);
 });
 
 test('a primary wallpaper missing from the catalog is saved without a download', async () => {
