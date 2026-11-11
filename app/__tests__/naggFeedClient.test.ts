@@ -225,6 +225,35 @@ describe('createNaggFeedClient (app-view REST)', () => {
     expect(urls.some((u) => u.includes('/v1/nostr/profiles?'))).toBe(true);
   });
 
+  it.each(['following-popular', 'following-recent'])(
+    'answers a %s feed opened without an account key with an empty page and no request',
+    async (id) => {
+      const { getFeedClient } = jest.requireActual<
+        typeof import('@/features/feed/data/useFeedClient')
+      >('@/features/feed/data/useFeedClient');
+      const { emptyFeedParseResult } = jest.requireActual<
+        typeof import('@/features/feed/data/feedClient')
+      >('@/features/feed/data/feedClient');
+
+      const first = await getFeedClient().getFeed({
+        spec: JSON.stringify({ id, kind: 'notes', hours: 24 }),
+        userPubkey: undefined,
+        limit: 30,
+      });
+      const more = await getFeedClient().getFeed({
+        spec: JSON.stringify({ id, kind: 'notes', hours: 24 }),
+        userPubkey: undefined,
+        limit: 30,
+        loadMore: true,
+        seen: [],
+      });
+
+      expect(first).toEqual(emptyFeedParseResult());
+      expect(more).toEqual(emptyFeedParseResult());
+      expect(mockFetch).not.toHaveBeenCalled();
+    }
+  );
+
   it('never issues a GraphQL request', async () => {
     mockFetch.mockResolvedValue(
       restResponse({
