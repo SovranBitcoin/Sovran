@@ -92,7 +92,7 @@ export function AppRoot() {
 export function SendEntryScreen({ walletContext }: { walletContext: WalletContext }) {
   const machine = usePaymentFlowMachine({ walletContext, unit: 'sat' });
 
-  return <Button title="Paste or scan" onPress={() => machine.scan(undefined, { source: 'paste' })} />;
+  return <Button title="Paste or scan" onPress={() => machine.scan(undefined, { source: 'clipboard' })} />;
 }
 ```
 

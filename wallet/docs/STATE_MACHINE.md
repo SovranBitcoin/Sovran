@@ -77,7 +77,7 @@ Source paths are relative to the Colada package root.
 | Platform adapters (clipboard, share, NFC, scan sources) | the app owns | `src/adapters/types.ts` |
 | Secret storage, seed derivation, P2PK key rotation policy | the app owns | reacts to `onP2PKReceiveCompleted` |
 | `linkTransaction`, `sendNostrDM`, `resolveRecipientProfile` | the app owns | not implemented in `defaultOperations.ts:10-11` |
-| Offline detection source (`getOffline`) | the app owns the value; Colada owns the routing | `src/core/createColada.ts`, `effects.ts:1181` |
+| Offline detection source (`getOffline`) | the app owns the value; Colada owns the routing | `src/core/createColada.ts`, `runConfirmSendEffect` in `effects.ts` |
 
 Colada is agnostic of `@cashu/coco-core`: `ScreenActionContext.manager` is typed
 `unknown` and the wallet casts it (`src/screen-actions/types.ts`). Colada must
@@ -156,7 +156,7 @@ one turn at a time (see "How a turn flows").
 
 | Method | Wraps | Notes |
 | --- | --- | --- |
-| `send(event)` | core dispatcher | `createMachine.ts:547-1219` |
+| `send(event)` | core dispatcher | `send` -> `runTurn` in `createMachine.ts` |
 | `execute(input, {reset?})` | `EXECUTE` | `{reset}` calls `resetInternal` first |
 | `scan(data?, opts?)` | `processScanData` -> `execute` | OPTIONAL; present only with `createURDecoder`/`scanSources` |
 | `enterAmount(amount, mintUrl, opts?)` | `AMOUNT_ENTERED` | carries destination, methods, offline, meltTarget, recipients, display |
@@ -339,12 +339,12 @@ already closed never replaces the rows of the one now open.
 
 ### handlerExecuting / notify cycle
 
-`INPUT_STEPS` (`createMachine.ts:163-170`) gate `isExecuting`: no spinner while
+`INPUT_STEPS` (`createMachine.ts`) gate `isExecuting`: no spinner while
 the user is inputting. For all other steps, `handlerExecuting` is toggled
 `true`/`false` around the handler dispatch with a `notify()` on each edge, so the
-screen sees a loading edge for action and navigate steps. `inspect()` returns a
-stable reference between notifications and only promotes a new reference when the
-`ExecutionState` actually changes.
+screen sees a loading edge for action and navigate steps. `inspect()` returns
+the same reference between notifications; every notification builds a new one
+(`notify`), whether or not the `ExecutionState` changed.
 
 ### Recipient resolution
 
@@ -385,7 +385,7 @@ START_SEND_ECASH / EXECUTE / AMOUNT_ENTERED
 | `operations.executeSend` | online (path C) | always |
 | `notifications.onTransactionCreated` | on `sendComplete` | n/a |
 
-Failure + fallback (`effects.ts:734-837`): an online `executeSend` failure with a
+Failure + fallback (`handleConfirmSendFailure` in `effects.ts`): an online `executeSend` failure with a
 mint-offline cause + exact local proofs + `executeOfflineSend` runs the
 offlineFallback send (`createdOffline:true`). A failure with non-exact proofs but
 a round-up/round-down suggestion routes to `chooseProofs` instead of a hard
@@ -404,9 +404,9 @@ MUST:
   re-enter `resolveFromContext`. `transitions.ts:282-329`.
 - The offlineFallback path runs `executeOfflineSend` only when the cause is a
   mint-offline error, `executeOfflineSend` exists, `proofAmounts` is non-empty,
-  and the amount is an exact local match. `effects.ts:753-763`.
+  and the amount is an exact local match. `handleConfirmSendFailure`.
 - Every async send branch short-circuits to `stale` on a generation bump.
-  `effects.ts:742,769,790,1196,1233`.
+  `runConfirmSendEffect`, `handleConfirmSendFailure`.
 - `executeSend`/`executeOfflineSend` never return a tokenless entry; the history
   entry is enriched or synthesized to carry the token.
   `defaultOperations.ts:373-379,399-405`.
@@ -427,7 +427,7 @@ MUST NOT:
 - Online ecash sends must not pre-show `chooseProofs`; only a send failure may
   surface it. `resolveNext.ts:166-169`.
 - `mintUnreachableConfirmed` must not be set for a deliberate local/offline send
-  (`forceLocalSend`) or a local-first attempt. `effects.ts:717-732`.
+  (`forceLocalSend`) or a local-first attempt. `buildMintUnreachableContextPatch`.
 - The dev-only mock-fail send toggle must not take effect in production.
   `defaultOperations.ts:341-351`.
 
@@ -485,7 +485,7 @@ MUST:
 - The LNURL callback must be https (or http only for `.onion`); `.onion` hosts
   throw `LNURL_TOR_REQUIRED` up front. `lnurl.ts:115-130,172-177`.
 - On `CONFIRM_MELT` success the step stays `navigateToMeltPreview` with its
-  phase `settled { historyEntry }`. `createMachine.ts:634`; `effects.ts:504-510`.
+  phase `settled { historyEntry }`. `createMachine.ts:634`; `buildConfirmMeltResult`.
 - `FlowContext.amount` is ALWAYS denominated in `ctx.unit`. Scanned fixed
   amounts (BIP-321 `amount=`, fixed bolt11/bolt12) are sat-denominated, so on a
   fiat-unit account the seeding arms re-denominate ONCE via the live pricelist
@@ -570,7 +570,7 @@ terminal `MINT_QUOTE_FAILED`; no retry.
 MUST:
 
 - Offline mint quotes are rejected before any I/O; `executeMintQuote` is never
-  called offline. `effects.ts:852-856`. This gate uses the machine `getOffline`
+  called offline. `runMintQuoteEffect`. This gate uses the machine `getOffline`
   provider only, NOT `ctx.offline`.
 - Onchain mint quotes are unsupported; `executeMintQuote` throws on `'onchain'`
   and always prepares `'bolt11'`. `defaultOperations.ts:411-413,418`.
@@ -579,7 +579,7 @@ MUST:
   payment. `defaultOperations.ts:437`.
 - `onTransactionCreated` fires only when the parsed `historyEntry` has an id; a
   malformed entry silently drops the wallet's only minting handoff signal.
-  `effects.ts:415-416`.
+  `buildTransactionCreatedNotifications`.
 
 MUST NOT:
 
@@ -792,7 +792,8 @@ MUST:
 
 - NFC skips `enterSendMemo` entirely; it never prompts for a memo.
 - On a genuine `executeNfcSend` failure the effect rolls back the pending send
-  via `operations.rollbackSend` before surfacing the error (`effects.ts:1085`).
+  via `operations.rollbackSend` before surfacing the error
+  (`runNfcWriteBackEffect`).
 - When the write failed and that rollback failed, could not tell what
   happened (`unknown`) or is missing (`tokenOutstanding`), the token may have
   reached the terminal: the error
@@ -899,7 +900,10 @@ ctx.offline (stamped per event from getOffline, transitions.ts:385) --+--> colla
 ctx.localProofSend (set when user accepts an exact proof suggestion) --/
 
 appOffline      = getOffline() || context.offline === true
-forceLocalSend  = appOffline || context.localProofSend === true     (effects.ts:1181-1182)
+forceLocalSend  = !p2pkLocked && (appOffline
+                                  || context.localProofSend === true
+                                  || context.mintUnreachableConfirmed === true)
+                                                        (runConfirmSendEffect)
 ```
 
 `getOffline` defaults to `() => false` if the app injects none. `ctx.offline` is
@@ -911,10 +915,10 @@ sendEcash destination (`transitions.ts:279`).
 ### Three send paths
 
 ```
-runConfirmSendEffect (effects.ts:1164-1255)
+runConfirmSendEffect
   |
   | hasExactLocalProofs = proofAmounts.length>0 && composeSatoshis exactMatch
-  | shouldCreateLocalTokenFirst = hasExactLocalProofs && !!executeOfflineSend
+  | shouldCreateLocalTokenFirst = !p2pkLocked && hasExactLocalProofs && !!executeOfflineSend
   |
   +-- shouldCreateLocalTokenFirst? --YES--> Path A localFirst
   |        executeOfflineSend (runs even when ONLINE)
@@ -940,7 +944,7 @@ failure into "Mint unreachable". It returns true for `NetworkError`,
 `HttpResponseError` with status >= 500, or any `Error` whose
 `name === 'MintFetchError'`. `createOfflineSendError` and
 `createOfflineMintQuoteError` both set `error.name = 'MintFetchError'`
-(`effects.ts:395-405`) so the synthetic forced-offline error classifies as
+(`effects.ts`) so the synthetic forced-offline error classifies as
 mint-unreachable and resolves to `t('MINT_UNREACHABLE')` ("Mint unreachable").
 `executeOfflineSend`'s own `needsSwap` rejection throws a PLAIN `Error` (not a
 `MintFetchError`), so it surfaces as `SEND_FAILED`, not `MINT_UNREACHABLE`.
@@ -972,11 +976,11 @@ contract.
 MUST / MUST NOT:
 
 - `runMintQuoteEffect` must short-circuit when `getOffline()` is true and reject
-  before calling `executeMintQuote`. `effects.ts:852-856`.
+  before calling `executeMintQuote`.
 - `mintUnreachableConfirmed` must not be set when `forceLocalSend` or
-  `shouldCreateLocalTokenFirst` is true. `effects.ts:717-732`.
+  `shouldCreateLocalTokenFirst` is true. `buildMintUnreachableContextPatch`.
 - `createOfflineSendError` / `createOfflineMintQuoteError` must keep
-  `name === 'MintFetchError'`. `effects.ts:395-405`.
+  `name === 'MintFetchError'`.
 - `transition()` must stamp `offline` onto every `result.context` (when the
   provider value is non-null) so fresh contexts see the real-time value.
   `transitions.ts:384-387`.
@@ -1008,7 +1012,7 @@ The en copy for `MINT_UNREACHABLE` is "Mint unreachable" (`locales.ts:29`); for
 | `MINT_SELECTED` with a new `destination` | rebuild keeping `unit` + event mint/amount/destination + whitelisted prior fields (methods, paymentRequest, meltTarget, recipients, display). `transitions.ts:231-245` |
 | `OPTION_CHOSEN` | explicitly clears `destination`/methods/`supportedMintUrls`/`paymentRequest`/`meltTarget` before re-extracting. `transitions.ts:113-123` |
 | `REQUEST_MINT_SELECTOR` (no destination) | drops everything but `unit`. `contextResolution.ts:250` |
-| `RESET` | `{step:'idle', context:{unit}}`; bumps `flowGeneration`. `transitions.ts:393-394` |
+| `RESET` | `{step:'idle', context:{unit}}` (`transition`, case `RESET`). `machine.reset()` does not send the event: it calls `resetInternal`, which bumps `flowGeneration`. |
 
 ### Amount survival across mint change
 
@@ -1046,11 +1050,11 @@ during verification and the invariant rests on source review.
 - [ ] After `PROOFS_CHOSEN`, no re-entry to `resolveFromContext`
       (`transitions.ts:282-329`).
 - [ ] offlineFallback only on mint-offline + exact + `executeOfflineSend`
-      (`effects.ts:753-763`).
+      (`handleConfirmSendFailure`).
 - [ ] `mintUnreachableConfirmed` excluded for `forceLocalSend` /
-      `shouldCreateLocalTokenFirst` (`effects.ts:717-732`).
+      `shouldCreateLocalTokenFirst` (`buildMintUnreachableContextPatch`).
 - [ ] Stale-generation short-circuit on every async branch
-      (`effects.ts:742,769,790,1196,1233`).
+      (`runConfirmSendEffect`, `handleConfirmSendFailure`).
 - [ ] Mock-fail send disabled in production (`defaultOperations.ts:341-351`).
 
 ### Melt
@@ -1067,11 +1071,11 @@ during verification and the invariant rests on source review.
 
 ### Mint quote
 
-- [ ] Offline mint quote rejected before I/O (`effects.ts:852-856`).
+- [ ] Offline mint quote rejected before I/O (`runMintQuoteEffect`).
 - [ ] Onchain unsupported; always prepares `bolt11`
       (`defaultOperations.ts:411-418`).
 - [ ] Machine never awaits invoice payment; `onTransactionCreated` is the handoff
-      (`effects.ts:434-447`).
+      (`buildTransactionCreatedNotifications`).
 
 ### Receive / redeem
 
@@ -1099,12 +1103,13 @@ during verification and the invariant rests on source review.
 
 ### Offline keystone
 
-- [ ] `appOffline` / `forceLocalSend` 3-way OR (`effects.ts:1181-1182`).
+- [ ] `appOffline` / `forceLocalSend` 3-way OR, never for a locked send
+      (`runConfirmSendEffect`).
 - [ ] `executeOfflineSend` exact-match must not contact the mint (Section 7
       contract; classifier `errors.ts:11`). Untested at the Colada boundary
       because it depends on out-of-package wallet I/O.
 - [ ] Synthetic offline errors keep `name:'MintFetchError'`
-      (`effects.ts:395-405`).
+      (`createOfflineSendError`, `createOfflineMintQuoteError`).
 - [ ] `offline` stamped onto every result context (`transitions.ts:384-387`).
 
 ### Context / mint selection
@@ -1114,7 +1119,7 @@ during verification and the invariant rests on source review.
 - [ ] Destination change rebuilds context (`transitions.ts:178-194,231-245`).
 - [ ] `OPTION_CHOSEN` clears stale intent-specific fields
       (`transitions.ts:113-123`).
-- [ ] `RESET` reduces to `{unit}` and bumps generation (`transitions.ts:393-394`).
+- [ ] `RESET` reduces to `{unit}` (`transition`, case `RESET`); `reset()` bumps the generation (`resetInternal`).
 
 ### Integration boundary
 
@@ -1195,7 +1200,7 @@ pre-send mint-reachability probe.
   `ctx.offline === true` (`resolveNext.ts:166-169`). With the device online and
   the mint unreachable, the flow attempts `executeSend`; only on failure does
   `handleConfirmSendFailure` surface `chooseProofs` (non-exact + suggestion) or
-  an `offlineFallback` exact send (`effects.ts:753-828`).
+  an `offlineFallback` exact send.
 - Current: `chooseProofs` carries no reason for why it appeared; its step data
   (`types.ts:120-134`) has no offline / mint-unreachable field and
   `buildChooseProofsData` sets none (`amountFallback.ts:58-78`). The only
@@ -1210,14 +1215,14 @@ pre-send mint-reachability probe.
 
 - Current: the auto `offlineFallback` exact send runs only when
   `isMintOfflineError(cause)` AND an exact local match exists
-  (`effects.ts:753-763`). Because the forced-local path synthesizes a
-  `MintFetchError` (`createOfflineSendError`, `effects.ts:401-404`), the only
+  (`handleConfirmSendFailure`). Because the forced-local path synthesizes a
+  `MintFetchError` (`createOfflineSendError`), the only
   cause that can reach `handleConfirmSendFailure` as NON-mint-offline is a real
-  online `executeSend` failure (`effects.ts:1231-1254`).
+  online `executeSend` failure (`runConfirmSendEffect`).
 - Current: a non-exact failure of ANY cause reaches `chooseProofs` when a
-  suggestion exists (`effects.ts:808-828`); but an EXACT-match online failure
+  suggestion exists; but an EXACT-match online failure
   whose cause is not mint-offline falls straight to a hard `SEND_FAILED`
-  (`effects.ts:830-836`) -- no offline send is attempted.
+  -- no offline send is attempted.
 - Target: for ecash, any send failure with usable local proofs should attempt
   the local exact send or offer `chooseProofs`, regardless of the cause's
   classification, so a flaky-network swap failure degrades to offline instead of
@@ -1226,9 +1231,9 @@ pre-send mint-reachability probe.
 ### 11.3 Payment request when the mint is offline (device online) -- gap
 
 - Current: the payment-request confirm path is offline-blind by type --
-  `RunConfirmPaymentRequestEffectConfig` has no `getOffline`
-  (`effects.ts:294-299`), unlike the mint-quote and send effect configs
-  (`effects.ts:272,282`). `operations.executePaymentRequest` creates the token
+  `RunConfirmPaymentRequestEffectConfig` has no `getOffline`, unlike the
+  mint-quote and send effect configs (`RunMintQuoteEffectConfig`,
+  `RunConfirmSendEffectConfig`). `operations.executePaymentRequest` creates the token
   via `mgr.ops.send.prepare`/`execute` (`defaultOperations.ts:938-985`), so an
   unreachable mint fails the send; there is no local-first / round fallback for
   `paymentRequest` (`buildChooseAmountFallback` returns null for it,
