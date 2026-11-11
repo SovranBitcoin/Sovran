@@ -75,7 +75,17 @@ function summarizeReachability(result: OfflineReachabilityResult) {
     probeStatusCode: successfulProbe?.status ?? lastProbe?.status,
     probeError: lastProbe?.ok ? undefined : lastProbe?.error,
     probeCount: result.probes.length,
-    probeDurationMs: result.probes.reduce((total, probe) => total + probe.durationMs, 0),
+    // The targets are asked at once, so the check took as long as the slowest.
+    probeDurationMs: result.probes.reduce(
+      (longest, probe) => Math.max(longest, probe.durationMs),
+      0
+    ),
+    // Which target's answer made the verdict "online"; absent when offline.
+    answeredBy: result.answeredBy,
+    // Every target that had answered or failed by the verdict, e.g. "nagg:404,relay:200".
+    probeOutcomes: result.probes
+      .map((probe) => `${probe.name}:${probe.status ?? probe.error ?? 'failed'}`)
+      .join(','),
   };
 }
 

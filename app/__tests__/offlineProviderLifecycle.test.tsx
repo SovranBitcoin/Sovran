@@ -165,7 +165,9 @@ it('logs each change with the reason and the target that decided it', async () =
     probeStatusCode: undefined,
     probeError: 'timeout',
     probeCount: 2,
-    probeDurationMs: 1540,
+    probeDurationMs: 1500,
+    answeredBy: undefined,
+    probeOutcomes: 'nagg:404,second:timeout',
   });
 
   jest.mocked(resolveOfflineReachability).mockResolvedValue({
@@ -175,6 +177,7 @@ it('logs each change with the reason and the target that decided it', async () =
       { name: 'nagg', host: 'nagg.example', ok: false, status: 404, durationMs: 40 },
       { name: 'second', host: 'second.example', ok: true, status: 200, durationMs: 120 },
     ],
+    answeredBy: 'second',
   });
   await act(async () => {
     await jest.advanceTimersByTimeAsync(3000);
@@ -189,6 +192,8 @@ it('logs each change with the reason and the target that decided it', async () =
     probeStatusCode: 200,
     probeError: undefined,
     probeCount: 2,
-    probeDurationMs: 160,
+    probeDurationMs: 120,
+    answeredBy: 'second',
+    probeOutcomes: 'nagg:404,second:200',
   });
 });
