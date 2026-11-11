@@ -1,6 +1,7 @@
 import { describe, test, expect } from 'vitest';
 import { createNaggClient } from '../src/transport';
-import { createNaggTier, createNostrDataLayer, pendingFeedTier } from '../src/facade';
+import { createNaggTier, createNostrDataLayer } from '../src/facade';
+import { pendingFeedTier } from './pendingFeedTier';
 
 // A v2 envelope (the ONE shape nagg's REST app-view emits) with two notes in
 // ranked order [newer, older] so we can assert the facade renders by the

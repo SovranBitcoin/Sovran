@@ -8,7 +8,8 @@ import {
   type RawRelayEvent,
   type NostrFilter,
 } from '../src/facade/relay';
-import { createNostrDataLayer, pendingFeedTier } from '../src/facade';
+import { createNostrDataLayer } from '../src/facade';
+import { pendingFeedTier } from './pendingFeedTier';
 import type { NaggError } from '../src/errors';
 
 const ID_A = 'a'.repeat(64);

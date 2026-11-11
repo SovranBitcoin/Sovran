@@ -5,9 +5,9 @@ import {
   createNaggTier,
   createNostrDataLayer,
   mergeSearchHit,
-  pendingFeedTier,
   profileSearchHitsFromKind0,
 } from '../src/facade';
+import { pendingFeedTier } from './pendingFeedTier';
 import { createRelayTier, type RelayConnection, type RawRelayEvent } from '../src/facade/relay';
 import { createPrimalTier, type PrimalConnection, type RawPrimalEvent } from '../src/facade/primal';
 import type { NaggError } from '../src/errors';

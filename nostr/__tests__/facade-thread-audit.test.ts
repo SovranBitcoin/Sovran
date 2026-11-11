@@ -1,6 +1,7 @@
 import { describe, test, expect } from 'vitest';
 import { ok, type Result } from 'neverthrow';
-import { createNostrDataLayer, pendingFeedTier } from '../src/facade';
+import { createNostrDataLayer } from '../src/facade';
+import { pendingFeedTier } from './pendingFeedTier';
 import { createPrimalTier, type PrimalConnection, type RawPrimalEvent } from '../src/facade/primal';
 import { createRelayTier, type RelayConnection, type RawRelayEvent } from '../src/facade/relay';
 import type { NaggError } from '../src/errors';
