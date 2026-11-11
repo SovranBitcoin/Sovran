@@ -264,7 +264,7 @@ data carries the code as set; `inspect().details` reports it unchanged.
 send(event)
   -> beginTurn: dropped while money moves or, without fresh intent, while
      another turn runs; otherwise takes the lock -> sendGeneration
-  -> resolve offline once: offline = getOffline?.() ?? false   (createMachine.ts:777)
+  -> resolve offline once: offline = currentOffline()   (getOffline, else false)
   -> CONFIRM_MELT / CONFIRM_PAYMENT_REQUEST: handled directly in send()
   -> else transition(event, step, ctx, ...)
         handleExecute / handleAmountEntered / handleMintSelected / ...
@@ -322,8 +322,9 @@ Gather order is fixed: amount -> mint -> proofs -> terminal
 `flowGeneration` is incremented by a reset and by an event that supersedes a
 running turn (fresh intent while a resolve is in flight). A turn that begins
 on a free machine does not bump the generation; it snapshots it
-(`sendGeneration = flowGeneration`). Every async effect captures
-`isStale = (op) => isStaleGeneration(sendGeneration, op)`. After any `await`, a
+(`sendGeneration = flowGeneration`). Every async effect captures the turn's
+`stale = (op) => isStaleGeneration(sendGeneration, op)` as its `isStale`. After
+any `await`, a
 stale generation returns `kind:'stale'` and the machine returns early without a
 `setStep`. This is the guard that stops a superseded send/quote (after `reset()`,
 `startX({reset:true})`, or `execute(..,{reset:true})`) from clobbering newer

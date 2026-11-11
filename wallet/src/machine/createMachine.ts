@@ -241,6 +241,9 @@ export function createPaymentMachine(
     scanSources,
     nfcAdapter,
   } = config;
+  const currentUnit = () => getUnit?.() ?? configUnit;
+  const currentLocale = () => getLocale?.() ?? "en";
+  const currentOffline = () => getOffline?.() ?? false;
 
   let urDecoder: ReturnType<NonNullable<typeof createURDecoder>> | null =
     createURDecoder?.() ?? null;
@@ -306,7 +309,7 @@ export function createPaymentMachine(
 
   function resetInternal() {
     abandonTurn(() => {
-      flowCtx = { unit: getUnit?.() ?? configUnit };
+      flowCtx = { unit: currentUnit() };
       setStep("idle", {});
     });
     processedScanInput = null;
@@ -802,7 +805,7 @@ export function createPaymentMachine(
     }
 
     const { message, authored } = isMintOfflineError(err)
-      ? { message: t("MINT_UNREACHABLE", getLocale?.() ?? "en"), authored: true }
+      ? { message: t("MINT_UNREACHABLE", currentLocale()), authored: true }
       : failureText(
           err,
           `${variant === "melt" ? "Melt" : "Payment request"} failed`,
@@ -1054,6 +1057,7 @@ export function createPaymentMachine(
       if (origin?.nfc) origin.nfc.taken = "dropped";
       return;
     }
+    const stale = (op: string) => isStaleGeneration(sendGeneration, op);
     // This caller's result holder, taken before anything awaits: only this
     // turn's own send settles it, so a tap that sends nothing stays
     // `ignored` whatever a later turn delivers.
@@ -1182,7 +1186,7 @@ export function createPaymentMachine(
           const refreshed = await runMeltQuotePreviewEffect({
             data,
             operation: operations.quoteMelt,
-            isStale: (op) => isStaleGeneration(sendGeneration, op),
+            isStale: stale,
           });
           if (refreshed.isOk()) {
             if (refreshed.value.kind === "stale") return;
@@ -1233,7 +1237,7 @@ export function createPaymentMachine(
           data,
           operation: operations.executeMelt,
           context: flowCtx,
-          isStale: (op) => isStaleGeneration(sendGeneration, op),
+          isStale: stale,
         });
       } finally {
         endCommit(sendGeneration);
@@ -1295,7 +1299,7 @@ export function createPaymentMachine(
           data,
           operation: operations.executePaymentRequest,
           context: flowCtx,
-          isStale: (op) => isStaleGeneration(sendGeneration, op),
+          isStale: stale,
         });
       } finally {
         endCommit(sendGeneration);
@@ -1362,7 +1366,7 @@ export function createPaymentMachine(
     // (so a second Pay cannot race the navigation), then finish the turn.
     // Inline rather than a helper, so Pay settles as soon as the turn ends.
     if (settledPayment) {
-      if (isStaleGeneration(sendGeneration, settledPayment.finalize)) return;
+      if (stale(settledPayment.finalize)) return;
       try {
         setExecuting(false);
         if (step !== settledPayment.fromStep) {
@@ -1380,7 +1384,7 @@ export function createPaymentMachine(
     try {
       let postDispatchTask: Promise<void> | null = null;
       let walletCtx = getContext();
-      let unit = getUnit?.() ?? configUnit;
+      let unit = currentUnit();
       let nfcError: StepDataMap["error"] | undefined;
       const nfcTap: NfcTap | null =
         event.type === "EXECUTE" && origin?.nfc && nfcAdapter
@@ -1442,7 +1446,7 @@ export function createPaymentMachine(
             if (!funded) {
               nfcError = {
                 code: "UNIT_NOT_FUNDED",
-                message: t("UNIT_NOT_FUNDED", getLocale?.() ?? "en", {
+                message: t("UNIT_NOT_FUNDED", currentLocale(), {
                   unit: requestedUnit.toUpperCase(),
                 }),
               };
@@ -1458,10 +1462,10 @@ export function createPaymentMachine(
               if (switched.isErr()) {
                 nfcError = {
                   code: "NFC_READ_FAILED",
-                  message: t("NFC_UNIT_SWITCH_FAILED", getLocale?.() ?? "en"),
+                  message: t("NFC_UNIT_SWITCH_FAILED", currentLocale()),
                 };
               }
-              unit = getUnit?.() ?? configUnit;
+              unit = currentUnit();
               if (switched.isOk()) {
                 nfcTap.unitSwitch = {
                   unit,
@@ -1470,7 +1474,7 @@ export function createPaymentMachine(
                   },
                 };
               }
-              if (isStaleGeneration(sendGeneration, "nfc.switchUnit")) {
+              if (stale("nfc.switchUnit")) {
                 await endNfcTap(nfcTap, { kind: "stopped" }, sendGeneration);
                 return;
               }
@@ -1488,7 +1492,7 @@ export function createPaymentMachine(
       // Resolve current offline status once per event. Passed into
       // transition() so every code path (EXECUTE, AMOUNT_ENTERED, etc.)
       // sees the real-time value from the provider.
-      const offline = getOffline?.() ?? false;
+      const offline = currentOffline();
 
       const eventForTransition =
         event.type === "AMOUNT_ENTERED"
@@ -1655,6 +1659,30 @@ export function createPaymentMachine(
         // the reason, so re-selection never lands on them again.
         const nfcRefusedMints = new Map<string, string>();
         const nfcPayableMints = new Set<string>();
+        // Moves the tap's flow on by one event, keeping it tagged as NFC.
+        // Every event the loop sends moves to a step, so "unchanged" (false)
+        // is not reached.
+        const advanceNfc = (
+          nfcEvent: FlowEvent,
+          walletCtxForEvent = readContext(),
+        ): boolean => {
+          const r = transition(
+            step,
+            flowCtx,
+            nfcEvent,
+            detectors,
+            walletCtxForEvent,
+            currentUnit(),
+            offline,
+            enableEcashSendMemo,
+            getSatsPerUnitMinor,
+          );
+          if ("kind" in r) return false;
+          flowCtx = r.context;
+          flowCtx.source = "nfc";
+          setStep(r.step, r.data);
+          return true;
+        };
 
         // Loop because auto-resolving one step (e.g. chooseOption) may produce
         // another step (e.g. selectMint) that also needs auto-resolution.
@@ -1692,24 +1720,7 @@ export function createPaymentMachine(
                   optionCount: options.length,
                   hasInvoiceFallback: !!invoiceAlternative,
                 });
-                const walletCtxInner = readContext();
-                const unitInner = getUnit?.() ?? configUnit;
-                const r = transition(
-                  step,
-                  flowCtx,
-                  { type: "OPTION_CHOSEN", option: best.option },
-                  detectors,
-                  walletCtxInner,
-                  unitInner,
-                  offline,
-                  enableEcashSendMemo,
-                  getSatsPerUnitMinor,
-                );
-                // This event always moves to a step; "unchanged" is not reached.
-                if ("kind" in r) break;
-                flowCtx = r.context;
-                flowCtx.source = "nfc";
-                setStep(r.step, r.data);
+                if (!advanceNfc({ type: "OPTION_CHOSEN", option: best.option })) break;
                 continue;
               }
               // No viable option
@@ -1759,7 +1770,7 @@ export function createPaymentMachine(
                     })
                   : { payable: true as const };
                 // Overtaken: the tap's end lets go of the tag and the unit.
-                if (isStaleGeneration(sendGeneration, "nfc.payability")) {
+                if (stale("nfc.payability")) {
                   end = { kind: "stopped" };
                   break;
                 }
@@ -1784,23 +1795,14 @@ export function createPaymentMachine(
                 tell("onNfcPaymentProgress", () =>
                   notifications?.onNfcPaymentProgress?.({ phase: "selecting" }),
                 );
-                const unitInner = getUnit?.() ?? configUnit;
-                const r = transition(
-                  step,
-                  flowCtx,
-                  { type: "MINT_SELECTED", mintUrl: best.mintUrl },
-                  detectors,
-                  walletCtxInner,
-                  unitInner,
-                  offline,
-                  enableEcashSendMemo,
-                  getSatsPerUnitMinor,
-                );
-                // This event always moves to a step; "unchanged" is not reached.
-                if ("kind" in r) break;
-                flowCtx = r.context;
-                flowCtx.source = "nfc";
-                setStep(r.step, r.data);
+                if (
+                  !advanceNfc(
+                    { type: "MINT_SELECTED", mintUrl: best.mintUrl },
+                    walletCtxInner,
+                  )
+                ) {
+                  break;
+                }
                 continue;
               }
               if (nfcAlternative) {
@@ -1816,23 +1818,14 @@ export function createPaymentMachine(
                 nfcAlternative = null;
                 flowCtx = alternative.ctx;
                 setStep("chooseOption", alternative.data);
-                const unitInner = getUnit?.() ?? configUnit;
-                const r = transition(
-                  step,
-                  flowCtx,
-                  { type: "OPTION_CHOSEN", option: alternative.option.option },
-                  detectors,
-                  walletCtxInner,
-                  unitInner,
-                  offline,
-                  enableEcashSendMemo,
-                  getSatsPerUnitMinor,
-                );
-                // This event always moves to a step; "unchanged" is not reached.
-                if ("kind" in r) break;
-                flowCtx = r.context;
-                flowCtx.source = "nfc";
-                setStep(r.step, r.data);
+                if (
+                  !advanceNfc(
+                    { type: "OPTION_CHOSEN", option: alternative.option.option },
+                    walletCtxInner,
+                  )
+                ) {
+                  break;
+                }
                 continue;
               }
               // Every funded mint was refused and there is nothing else on the
@@ -1875,7 +1868,7 @@ export function createPaymentMachine(
                   unit: data.unit,
                 });
                 // Overtaken: the tap's end lets go of the tag and the unit.
-                if (isStaleGeneration(sendGeneration, "nfc.payability")) {
+                if (stale("nfc.payability")) {
                   end = { kind: "stopped" };
                   continue;
                 }
@@ -1885,24 +1878,7 @@ export function createPaymentMachine(
                     ...mintUrlFields(data.mintUrl),
                     reason: payability.reason,
                   });
-                  const walletCtxInner = readContext();
-                  const unitInner = getUnit?.() ?? configUnit;
-                  const r = transition(
-                    step,
-                    flowCtx,
-                    { type: "REQUEST_MINT_SELECTOR" },
-                    detectors,
-                    walletCtxInner,
-                    unitInner,
-                    offline,
-                    enableEcashSendMemo,
-                    getSatsPerUnitMinor,
-                  );
-                  // This event always moves to a step; "unchanged" is not reached.
-                  if ("kind" in r) break;
-                  flowCtx = r.context;
-                  flowCtx.source = "nfc";
-                  setStep(r.step, r.data);
+                  if (!advanceNfc({ type: "REQUEST_MINT_SELECTOR" })) break;
                   continue;
                 }
               }
@@ -1926,8 +1902,8 @@ export function createPaymentMachine(
                       notifications?.onNfcPaymentProgress?.(progress),
                     );
                   },
-                  isStale: (op) => isStaleGeneration(sendGeneration, op),
-                  locale: getLocale?.() ?? "en",
+                  isStale: stale,
+                  locale: currentLocale(),
                 });
               } finally {
                 endCommit(sendGeneration);
@@ -2008,9 +1984,9 @@ export function createPaymentMachine(
               operations,
               context: flowCtx,
               proofAmounts,
-              getOffline: () => getOffline?.() ?? false,
-              getLocale: () => getLocale?.() ?? "en",
-              isStale: (op) => isStaleGeneration(sendGeneration, op),
+              getOffline: currentOffline,
+              getLocale: currentLocale,
+              isStale: stale,
             });
           } finally {
             endCommit(sendGeneration);
@@ -2081,9 +2057,9 @@ export function createPaymentMachine(
             data,
             operations,
             context: flowCtx,
-            getOffline: () => getOffline?.() ?? false,
-            getLocale: () => getLocale?.() ?? "en",
-            isStale: (op) => isStaleGeneration(sendGeneration, op),
+            getOffline: currentOffline,
+            getLocale: currentLocale,
+            isStale: stale,
           });
 
           if (effect.isOk()) {
@@ -2117,7 +2093,7 @@ export function createPaymentMachine(
           const effect = await runPaymentRequestReceiveEffect({
             data,
             operations,
-            isStale: (op) => isStaleGeneration(sendGeneration, op),
+            isStale: stale,
           });
 
           if (effect.isOk()) {
@@ -2161,8 +2137,8 @@ export function createPaymentMachine(
           step: reviewStep,
           data: reviewData,
           operation: operations.buildMintReviewInfo,
-          getLocale: () => getLocale?.() ?? "en",
-          isStale: (op) => isStaleGeneration(sendGeneration, op),
+          getLocale: currentLocale,
+          isStale: stale,
         });
 
         if (effect.isOk()) {
@@ -2205,7 +2181,7 @@ export function createPaymentMachine(
           const effect = await runMeltQuotePreviewEffect({
             data,
             operation: operations.quoteMelt,
-            isStale: (op) => isStaleGeneration(sendGeneration, op),
+            isStale: stale,
           });
           if (effect.isOk()) {
             if (effect.value.kind === "stale") return;
@@ -2242,7 +2218,7 @@ export function createPaymentMachine(
 
       try {
         await dispatchHandler(step, stepData);
-        if (isStaleGeneration(sendGeneration, "dispatchHandler")) return;
+        if (stale("dispatchHandler")) return;
         if (postDispatchTask) {
           // Preserve the existing selectMint timing: handlers receive fallback
           // rows first, then immediately-settled enrichment can land before the
@@ -2251,7 +2227,7 @@ export function createPaymentMachine(
             postDispatchTask,
             new Promise<void>((resolve) => setTimeout(resolve, 0)),
           ]);
-          if (isStaleGeneration(sendGeneration, "dispatchHandler.postTask"))
+          if (stale("dispatchHandler.postTask"))
             return;
         }
       } finally {
@@ -2262,7 +2238,7 @@ export function createPaymentMachine(
     } catch (err) {
       // Safety net: finish the turn so the machine doesn't stay held if
       // transition() or an operation throws before the inner finally runs.
-      if (isStaleGeneration(sendGeneration, "machine.transition.safetyNet")) return;
+      if (stale("machine.transition.safetyNet")) return;
       logger.warn("machine.transition.safetyNet", { error: errField(err) });
       finishTurn(sendGeneration, "machine.transition.safetyNet");
     }
