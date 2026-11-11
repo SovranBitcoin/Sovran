@@ -3,7 +3,6 @@ import { View } from 'react-native';
 import { Host, Button as SwiftUIButton } from '@expo/ui/swift-ui';
 import { environment, frame, glassEffect } from '@expo/ui/swift-ui/modifiers';
 
-import { HEADER_LAYOUT } from '@/features/wallet/lib/walletHeader';
 import { useColorScheme } from '@/shared/hooks/useColorScheme';
 import BalanceDisplay from './BalanceDisplay';
 import type { BalancePillProps } from './BalancePill.types';
@@ -33,16 +32,13 @@ export default function BalancePillLiquid({
   onPress,
   width,
   height,
-  contentWidth: contentWidthOverride,
-  contentHeight: contentHeightOverride,
+  // Liquid derives the row width from the button width; an explicit one is ignored.
+  contentWidth: _contentWidth,
+  contentHeight,
   ...display
 }: BalancePillProps): React.ReactElement {
-  const dimensions = useBalancePillDimensions({
-    width,
-    contentWidth: contentWidthOverride,
-    contentHeight: contentHeightOverride,
-  });
-  const h = height ?? HEADER_LAYOUT.BUTTON_HEIGHT;
+  const dimensions = useBalancePillDimensions({ width, height, contentHeight });
+  const h = dimensions.buttonHeight;
   const colorScheme = useColorScheme();
 
   const buttonModifiers = [

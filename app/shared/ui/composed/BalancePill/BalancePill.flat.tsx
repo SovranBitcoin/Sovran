@@ -3,7 +3,6 @@ import { StyleSheet } from 'react-native';
 
 import { PressableFeedback } from 'heroui-native';
 
-import { HEADER_LAYOUT } from '@/features/wallet/lib/walletHeader';
 import { View } from '@/shared/ui/primitives/View/View';
 import BalanceDisplay from './BalanceDisplay';
 import type { BalancePillProps } from './BalancePill.types';
@@ -18,17 +17,13 @@ export default function BalancePillFlat({
   width,
   height,
   contentWidth: contentWidthOverride,
-  contentHeight: contentHeightOverride,
+  contentHeight,
   ...display
 }: BalancePillProps): React.ReactElement {
   const chrome = useControlChrome();
-  const dimensions = useBalancePillDimensions({
-    width,
-    contentWidth: contentWidthOverride,
-    contentHeight: contentHeightOverride,
-  });
+  const dimensions = useBalancePillDimensions({ width, height, contentHeight });
 
-  const cardHeight = height ?? HEADER_LAYOUT.BUTTON_HEIGHT;
+  const cardHeight = dimensions.buttonHeight;
   const cardRadius = cardHeight / 2;
   const fallbackContentWidth =
     contentWidthOverride ?? Math.max(0, dimensions.buttonWidth - HORIZONTAL_PADDING * 2);
