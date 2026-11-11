@@ -41,6 +41,7 @@ import type {
   Destination,
   ExecutionState,
   FlowContext,
+  FlowEvent,
   FlowStep,
   SendFallbackId,
   MeltQuoteMethod,
@@ -228,7 +229,7 @@ const INPUT_STEPS = new Set<FlowStep>([
  * processed immediately. CONFIRM_MELT / CONFIRM_PAYMENT_REQUEST are
  * deliberately absent — while money is moving, a later tap must never win.
  */
-const INTENT_EVENTS = new Set<import("./types").FlowEvent["type"]>([
+const INTENT_EVENTS = new Set<FlowEvent["type"]>([
   "EXECUTE",
   "OPTION_CHOSEN",
   "AMOUNT_ENTERED",
@@ -287,23 +288,24 @@ export function createPaymentMachine(
   let flowCtx: FlowContext = { unit: configUnit };
   const idleData: StepDataMap["idle"] = {};
   let stepData: StepDataMap[FlowStep] = idleData;
-  let handlerExecuting = false;
-  let sendLocked = false;
-  // True only while an irreversible operation is actually executing
-  // (send/melt/payment-request delivery, NFC write-back). Distinguishes
-  // "locked because money is moving" (events must drop) from "locked because
-  // a resolve effect is slow" (fresh user intent supersedes, see
-  // INTENT_EVENTS).
-  // Generation that currently owns an irreversible operation. A reset may
-  // start a newer flow before the old promise settles, so an older finally
-  // must never clear the newer generation's commit guard.
-  let commitGeneration: number | null = null;
+  // The turn: one `send()` call holds the machine from `beginTurn` to
+  // `finishTurn`. Only the functions under "Turn" below write these five.
+  //
+  // `flowGeneration` names the running turn and every async result of its
+  // flow. A reset or a superseding event bumps it, so each continuation of
+  // the older turn finds itself stale at its next check and returns: it owns
+  // nothing any more, and must not free the newer turn's lock.
   let flowGeneration = 0;
-  // Per-call result holders for `confirmPaymentRequest`. Each invocation
-  // pushes its own holder before awaiting `send`; the CONFIRM_PAYMENT_REQUEST
-  // handler snapshots and drains holders right after acquiring `sendLocked`,
-  // so concurrent callers blocked by the lock keep their own default and
-  // never observe another call's outcome.
+  let sendLocked = false;
+  // `inspect().isExecuting`: a step's work or its handler is running.
+  let handlerExecuting = false;
+  // Generation whose irreversible operation is executing (send, melt,
+  // payment-request delivery, NFC write-back): every event is dropped, fresh
+  // intent included, while it is the current generation.
+  let commitGeneration: number | null = null;
+  // Result holders of `confirmPaymentRequest` calls no turn has taken yet.
+  // A call registers before `send`; a payment-request turn takes them all
+  // right after it begins, so a caller the lock drops keeps its `ignored`.
   let pendingPaymentRequestConfirms: {
     outcome: PaymentRequestConfirmOutcome;
   }[] = [];
@@ -320,14 +322,11 @@ export function createPaymentMachine(
   let cachedSnapshot: ExecutionState = deriveExecutionState("idle", idleData);
 
   function resetInternal() {
-    flowGeneration += 1;
+    abandonTurn();
     flowCtx = { unit: getUnit?.() ?? configUnit };
     setStep("idle", {});
-    handlerExecuting = false;
-    sendLocked = false;
     processedScanInput = null;
     lastScanSource = undefined;
-    pendingPaymentRequestConfirms = [];
     if (createURDecoder) {
       urDecoder = createURDecoder();
     }
@@ -352,6 +351,126 @@ export function createPaymentMachine(
     };
     listeners.forEach((fn) => fn());
   };
+
+  // ───────────────────────────────────────────────────────────────────────
+  // Turn
+  // ───────────────────────────────────────────────────────────────────────
+
+  /**
+   * The one way into a turn. Returns its generation, or null when the event
+   * is dropped: money is moving, or another turn holds the machine and the
+   * event carries no fresh intent. Fresh intent during a resolve supersedes
+   * the running turn and takes its lock.
+   */
+  function beginTurn(type: FlowEvent["type"]): number | null {
+    if (sendLocked) {
+      const commitInFlight = commitGeneration === flowGeneration;
+      if (commitInFlight || !INTENT_EVENTS.has(type)) {
+        logger.info("machine.event.ignored", {
+          reason: commitInFlight ? "commit-in-flight" : "locked",
+          type,
+        });
+        return null;
+      }
+      flowGeneration += 1;
+      setExecuting(false, false);
+      logger.info("machine.event.superseded", { type, currentStep: step });
+    }
+    sendLocked = true;
+    return flowGeneration;
+  }
+
+  /**
+   * The one way out of a turn. Returns false, doing nothing, when a reset or
+   * a superseding event took the machine from it. By default the turn stops
+   * executing and tells listeners; `executing: "keep"` leaves
+   * `inspect().isExecuting` as it is, `notify: false` tells no one, and
+   * `guard: "none"` frees the machine without asking whether this turn still
+   * holds it (one exit does, see its QUIRK).
+   */
+  function finishTurn(
+    generation: number,
+    op: string,
+    exit: { executing?: "keep"; notify?: false; guard?: "none" } = {},
+  ): boolean {
+    if (!exit.guard && isStaleGeneration(generation, op)) return false;
+    if (!exit.executing) setExecuting(false, false);
+    sendLocked = false;
+    if (exit.notify !== false) notify();
+    return true;
+  }
+
+  /** Frees the machine and leaves `inspect()` and its listeners alone. */
+  const QUIET_EXIT = { executing: "keep", notify: false } as const;
+
+  /** A reset: strands the running turn and frees the machine. */
+  function abandonTurn(): void {
+    flowGeneration += 1;
+    pendingPaymentRequestConfirms = [];
+    finishTurn(flowGeneration, "reset", { notify: false });
+  }
+
+  function setExecuting(value: boolean, announce = true): void {
+    handlerExecuting = value;
+    if (announce) notify();
+  }
+
+  function beginCommit(generation: number): void {
+    commitGeneration = generation;
+  }
+
+  /** A reset may hand a newer turn the commit first; only its owner clears it. */
+  function endCommit(generation: number): void {
+    if (commitGeneration === generation) commitGeneration = null;
+  }
+
+  type ConfirmHolder = (typeof pendingPaymentRequestConfirms)[number];
+
+  function registerConfirm(): ConfirmHolder {
+    const holder: ConfirmHolder = { outcome: { kind: "ignored" } };
+    pendingPaymentRequestConfirms.push(holder);
+    return holder;
+  }
+
+  function unregisterConfirm(holder: ConfirmHolder): void {
+    const idx = pendingPaymentRequestConfirms.indexOf(holder);
+    if (idx >= 0) pendingPaymentRequestConfirms.splice(idx, 1);
+  }
+
+  /** Takes every registered confirm holder; returns how to settle them. */
+  function takeConfirms(): (outcome: PaymentRequestConfirmOutcome) => void {
+    const holders = pendingPaymentRequestConfirms;
+    pendingPaymentRequestConfirms = [];
+    return (outcome) => {
+      for (const h of holders) h.outcome = outcome;
+    };
+  }
+
+  /**
+   * After a melt or a payment request settled: stop executing, run the
+   * handler of the step the result moved to while still holding the machine
+   * (so a second Pay cannot race the navigation), then finish the turn.
+   */
+  async function finishPayment(
+    generation: number,
+    fromStep: FlowStep,
+    variant: "melt" | "paymentRequest",
+  ): Promise<void> {
+    const [operation, confirm] =
+      variant === "melt"
+        ? ["executeMelt", "confirmMelt"]
+        : ["executePaymentRequest", "confirmPaymentRequest"];
+    if (isStaleGeneration(generation, `${operation}.finalize`)) return;
+    setExecuting(false);
+    try {
+      if (step !== fromStep) {
+        await dispatchHandler(step, stepData);
+        notify();
+      }
+    } finally {
+      finishTurn(generation, `${confirm}.unlock`, QUIET_EXIT);
+    }
+  }
 
   // ───────────────────────────────────────────────────────────────────────
   // Recipient identity resolvers (fire-and-forget)
@@ -814,28 +933,11 @@ export function createPaymentMachine(
     return task;
   }
 
-  const send = async (event: import("./types").FlowEvent): Promise<void> => {
-    if (sendLocked) {
-      const commitInFlight = commitGeneration === flowGeneration;
-      if (commitInFlight || !INTENT_EVENTS.has(event.type)) {
-        logger.info("machine.event.ignored", {
-          reason: commitInFlight ? "commit-in-flight" : "locked",
-          type: event.type,
-        });
-        return;
-      }
-      // Supersede the in-flight resolve work: the generation bump strands
-      // every continuation of the prior send() at its next stale check (it
-      // returns without unlocking — this call now owns the lock).
-      flowGeneration += 1;
-      handlerExecuting = false;
-      logger.info("machine.event.superseded", {
-        type: event.type,
-        currentStep: step,
-      });
-    }
-    sendLocked = true;
-    const sendGeneration = flowGeneration;
+  // Every exit of a turn goes through `finishTurn`, except a stale
+  // continuation, which returns: it owns nothing.
+  const send = async (event: FlowEvent): Promise<void> => {
+    const sendGeneration = beginTurn(event.type);
+    if (sendGeneration === null) return;
     logger.info("machine.event.received", {
       type: event.type,
       currentStep: step,
@@ -856,7 +958,7 @@ export function createPaymentMachine(
       !awaitsPay((stepData as StepDataMap[typeof step]).phase)
     ) {
       logger.warn("machine.mintSelector.alreadySettled", { currentStep: step });
-      sendLocked = false;
+      finishTurn(sendGeneration, "mintSelector.alreadySettled", QUIET_EXIT);
       return;
     }
 
@@ -921,9 +1023,9 @@ export function createPaymentMachine(
       try {
         await dispatchHandler(step, stepData);
       } finally {
-        handlerExecuting = false;
-        sendLocked = false;
-        notify();
+        // QUIRK: frees the machine even when fresh intent took it over while
+        // the handler ran, so the newer turn loses its lock (turn-exits test).
+        finishTurn(sendGeneration, "confirm.noMintSelected", { guard: "none" });
       }
       return;
     }
@@ -940,7 +1042,7 @@ export function createPaymentMachine(
         // Lightning address it fetches a fresh invoice). A failed attempt
         // leaves the preview, so Pay after a failure still retries.
         logger.warn("machine.confirm.alreadySettled", { type: event.type });
-        sendLocked = false;
+        finishTurn(sendGeneration, "confirmMelt.alreadySettled", QUIET_EXIT);
         return;
       }
       if (
@@ -950,8 +1052,7 @@ export function createPaymentMachine(
       ) {
         // The previous approval expired. Show the new quote and require a
         // second tap, even when the fee happens to be unchanged.
-        handlerExecuting = true;
-        notify();
+        setExecuting(true);
         try {
           const refreshed = await runMeltQuotePreviewEffect({
             data,
@@ -975,11 +1076,7 @@ export function createPaymentMachine(
           }
           await dispatchHandler(step, stepData);
         } finally {
-          if (!isStaleGeneration(sendGeneration, "confirmMelt.refreshQuote")) {
-            handlerExecuting = false;
-            sendLocked = false;
-            notify();
-          }
+          finishTurn(sendGeneration, "confirmMelt.refreshQuote");
         }
         return;
       }
@@ -988,8 +1085,7 @@ export function createPaymentMachine(
         amount: data.amount,
         meltTargetLength: data.meltTarget?.length ?? 0,
       });
-      handlerExecuting = true;
-      notify();
+      setExecuting(true);
 
       void notifications?.onPaymentProcessing?.({
         variant: "melt",
@@ -1001,7 +1097,7 @@ export function createPaymentMachine(
         ...(flowCtx.meltQuoteMethod ? { method: flowCtx.meltQuoteMethod } : {}),
       });
 
-      commitGeneration = sendGeneration;
+      beginCommit(sendGeneration);
       let effect: Awaited<ReturnType<typeof runConfirmMeltEffect>>;
       try {
         effect = await runConfirmMeltEffect({
@@ -1011,9 +1107,11 @@ export function createPaymentMachine(
           isStale: (op) => isStaleGeneration(sendGeneration, op),
         });
       } finally {
-        if (commitGeneration === sendGeneration) commitGeneration = null;
+        endCommit(sendGeneration);
       }
 
+      // QUIRK: nothing frees the machine if a link, a notification or a
+      // listener throws from here to `finishPayment` (turn-exits test).
       if (effect.isOk()) {
         if (effect.value.kind === "stale") return;
         logger.info("machine.melt.success", { ...mintUrlFields(data.mintUrl) });
@@ -1050,24 +1148,7 @@ export function createPaymentMachine(
         );
       }
 
-      if (isStaleGeneration(sendGeneration, "executeMelt.finalize")) return;
-      handlerExecuting = false;
-      notify();
-
-      // Hold sendLocked across dispatchHandler so a re-entrant CONFIRM_MELT
-      // can't race the navigation. Mirrors the main-path try/finally below
-      // (search for "Wrap the main transition path"); previously the lock was
-      // released before dispatch, leaving an asymmetric window.
-      try {
-        if (step !== originalStep) {
-          await dispatchHandler(step, stepData);
-          notify();
-        }
-      } finally {
-        if (!isStaleGeneration(sendGeneration, "confirmMelt.unlock")) {
-          sendLocked = false;
-        }
-      }
+      await finishPayment(sendGeneration, originalStep, "melt");
       return;
     }
 
@@ -1082,26 +1163,18 @@ export function createPaymentMachine(
         // Already delivered, or sent and not taken back: sending again would
         // pay twice. The caller's outcome stays `ignored`.
         logger.warn("machine.confirm.alreadySettled", { type: event.type });
-        sendLocked = false;
+        finishTurn(sendGeneration, "confirmPaymentRequest.alreadySettled", QUIET_EXIT);
         return;
       }
-      // Snapshot holders registered before this handler ran. Concurrent
-      // callers that arrive during the await below hit the sendLocked guard
-      // and resolve through their own holder (which never reaches this
-      // snapshot) — the prior closure-variable design leaked one call's
-      // result to a subsequent locked-out caller.
-      const holders = pendingPaymentRequestConfirms;
-      pendingPaymentRequestConfirms = [];
-      const settle = (outcome: PaymentRequestConfirmOutcome) => {
-        for (const h of holders) h.outcome = outcome;
-      };
+      // Callers that arrive during the await below are dropped by the lock
+      // and keep their own holder, which this turn never took.
+      const settle = takeConfirms();
       logger.info("machine.confirmPaymentRequest.start", {
         ...mintUrlFields(data.mintUrl),
         amount: data.amount,
         paymentRequestLength: data.paymentRequest.length,
       });
-      handlerExecuting = true;
-      notify();
+      setExecuting(true);
 
       void notifications?.onPaymentProcessing?.({
         variant: "paymentRequest",
@@ -1110,7 +1183,7 @@ export function createPaymentMachine(
         unit: data.unit,
       });
 
-      commitGeneration = sendGeneration;
+      beginCommit(sendGeneration);
       let effect: Awaited<ReturnType<typeof runConfirmPaymentRequestEffect>>;
       try {
         effect = await runConfirmPaymentRequestEffect({
@@ -1120,9 +1193,11 @@ export function createPaymentMachine(
           isStale: (op) => isStaleGeneration(sendGeneration, op),
         });
       } finally {
-        if (commitGeneration === sendGeneration) commitGeneration = null;
+        endCommit(sendGeneration);
       }
 
+      // QUIRK: as for a melt, nothing frees the machine if something throws
+      // from here to `finishPayment`.
       if (effect.isOk()) {
         if (effect.value.kind === "stale") return;
 
@@ -1189,31 +1264,12 @@ export function createPaymentMachine(
         });
       }
 
-      if (isStaleGeneration(sendGeneration, "executePaymentRequest.finalize"))
-        return;
-      handlerExecuting = false;
-      notify();
-
-      // Hold sendLocked across dispatchHandler so a re-entrant
-      // CONFIRM_PAYMENT_REQUEST can't race the navigation. Same try/finally
-      // shape as CONFIRM_MELT above and the main path's wrapper below.
-      try {
-        if (step !== originalStep) {
-          await dispatchHandler(step, stepData);
-          notify();
-        }
-      } finally {
-        if (
-          !isStaleGeneration(sendGeneration, "confirmPaymentRequest.unlock")
-        ) {
-          sendLocked = false;
-        }
-      }
+      await finishPayment(sendGeneration, originalStep, "paymentRequest");
       return;
     }
 
-    // Wrap the main transition path so sendLocked is always released,
-    // even if transition() or an operation throws unexpectedly.
+    // Wrap the main transition path so the turn always finishes, even if
+    // transition() or an operation throws unexpectedly.
     try {
       let postDispatchTask: Promise<void> | null = null;
       let walletCtx = getContext();
@@ -1357,10 +1413,7 @@ export function createPaymentMachine(
           type: event.type,
           currentStep: step,
         });
-        if (!isStaleGeneration(sendGeneration, "transition.unchanged")) {
-          sendLocked = false;
-          notify();
-        }
+        finishTurn(sendGeneration, "transition.unchanged", { executing: "keep" });
         return;
       }
       flowCtx = result.context;
@@ -1720,10 +1773,9 @@ export function createPaymentMachine(
               }
             }
             // Auto-execute: create token → write back to NFC tag
-            handlerExecuting = true;
-            notify();
+            setExecuting(true);
 
-            commitGeneration = sendGeneration;
+            beginCommit(sendGeneration);
             let effect: Awaited<ReturnType<typeof runNfcWriteBackEffect>>;
             try {
               effect = await runNfcWriteBackEffect({
@@ -1738,7 +1790,7 @@ export function createPaymentMachine(
                 isStale: (op) => isStaleGeneration(sendGeneration, op),
               });
             } finally {
-              if (commitGeneration === sendGeneration) commitGeneration = null;
+              endCommit(sendGeneration);
             }
 
             if (effect.isOk()) {
@@ -1773,11 +1825,13 @@ export function createPaymentMachine(
               await revertNfcUnit?.().catch(() => undefined);
             }
 
-            handlerExecuting = false;
+            setExecuting(false, false);
             nfcResolved = true;
           } else {
             // Terminal step that isn't navigateToPaymentRequest (e.g. navigateToMeltPreview,
             // error, receiveToken) — release NFC session and proceed normally.
+            // QUIRK: no stale check after these awaits, so a reset meanwhile
+            // lets this turn carry on (turn-exits test).
             await nfcAdapter.releaseSession();
             await revertNfcUnit?.().catch(() => undefined);
             nfcResolved = true;
@@ -1804,9 +1858,8 @@ export function createPaymentMachine(
             hasExactLocalProofs,
             localFirst: shouldCreateLocalTokenFirst,
           });
-          handlerExecuting = true;
-          notify();
-          commitGeneration = sendGeneration;
+          setExecuting(true);
+          beginCommit(sendGeneration);
           let effect: Awaited<ReturnType<typeof runConfirmSendEffect>>;
           try {
             effect = await runConfirmSendEffect({
@@ -1819,7 +1872,7 @@ export function createPaymentMachine(
               isStale: (op) => isStaleGeneration(sendGeneration, op),
             });
           } finally {
-            if (commitGeneration === sendGeneration) commitGeneration = null;
+            endCommit(sendGeneration);
           }
 
           if (effect.isOk()) {
@@ -1866,8 +1919,7 @@ export function createPaymentMachine(
               setStep("error", effect.error.data);
             }
           }
-          handlerExecuting = false;
-          notify();
+          setExecuting(false);
         } else if (step === "createMintQuote") {
           const data = stepData as StepDataMap["createMintQuote"];
           logger.info("machine.createMintQuote.start", {
@@ -1875,8 +1927,7 @@ export function createPaymentMachine(
             amount: data.amount,
             method: data.method ?? "bolt11",
           });
-          handlerExecuting = true;
-          notify();
+          setExecuting(true);
           // NOTE: deliberately NOT enrolled in the commit generation — the
           // back-nav resubmit flow (INTENT_EVENTS supersede) is the designed
           // behavior for quote creation (see back-nav-reentry tests): the
@@ -1908,16 +1959,14 @@ export function createPaymentMachine(
             });
             setStep("error", effect.error.data);
           }
-          handlerExecuting = false;
-          notify();
+          setExecuting(false);
         } else if (step === "createPaymentRequestReceive") {
           const data = stepData as StepDataMap["createPaymentRequestReceive"];
           logger.info("machine.createPaymentRequestReceive.start", {
             amount: data.amount,
             unit: data.unit,
           });
-          handlerExecuting = true;
-          notify();
+          setExecuting(true);
           // Deliberately NOT commit-generation enrolled — same rationale as
           // createMintQuote above (supersede-on-resubmit is designed).
           const effect = await runPaymentRequestReceiveEffect({
@@ -1936,8 +1985,7 @@ export function createPaymentMachine(
             });
             setStep("error", effect.error.data);
           }
-          handlerExecuting = false;
-          notify();
+          setExecuting(false);
         } else if (step === "selectMint") {
           const data = stepData as StepDataMap["selectMint"];
           if (!data.mintListItems) {
@@ -1962,8 +2010,7 @@ export function createPaymentMachine(
           reviewStep === "reviewMint"
             ? (stepData as StepDataMap["reviewMint"])
             : (stepData as StepDataMap["openMint"]);
-        handlerExecuting = true;
-        notify();
+        setExecuting(true);
 
         const effect = await runMintReviewInfoEffect({
           step: reviewStep,
@@ -1983,15 +2030,13 @@ export function createPaymentMachine(
         } else {
           setStep("error", effect.error.data);
         }
-        handlerExecuting = false;
-        notify();
+        setExecuting(false);
       }
 
       // Trust mint operation: when MINT_TRUSTED transitions to receiveToken,
       // call operations.trustMint first. On failure, redirect to error.
       if (reviewMintData && operations?.trustMint && step === "receiveToken") {
-        handlerExecuting = true;
-        notify();
+        setExecuting(true);
 
         const effect = await runTrustMintEffect({
           data: reviewMintData,
@@ -2005,8 +2050,7 @@ export function createPaymentMachine(
         } else {
           setStep("error", effect.error.data);
         }
-        handlerExecuting = false;
-        notify();
+        setExecuting(false);
       }
 
       // Quote-first melt preview (BTC-05): create the melt quote BEFORE the
@@ -2032,8 +2076,7 @@ export function createPaymentMachine(
             setStep("navigateToMeltPreview", { ...data, meltQuote: matching });
           }
         } else {
-          handlerExecuting = true;
-          notify();
+          setExecuting(true);
           const effect = await runMeltQuotePreviewEffect({
             data,
             operation: operations.quoteMelt,
@@ -2056,8 +2099,7 @@ export function createPaymentMachine(
               error: errField(effect.error.cause),
             });
           }
-          handlerExecuting = false;
-          notify();
+          setExecuting(false);
         }
       }
 
@@ -2071,10 +2113,8 @@ export function createPaymentMachine(
       }
 
       const trackExecuting = !INPUT_STEPS.has(step);
-      if (trackExecuting) {
-        handlerExecuting = true;
-      }
-      notify();
+      if (trackExecuting) setExecuting(true);
+      else notify();
 
       try {
         await dispatchHandler(step, stepData);
@@ -2091,23 +2131,21 @@ export function createPaymentMachine(
             return;
         }
       } finally {
-        if (isStaleGeneration(sendGeneration, "dispatchHandler.finally"))
-          return;
-        if (trackExecuting) {
-          handlerExecuting = false;
-        }
-        sendLocked = false;
-        notify();
+        // A superseded turn returns here, which also swallows its handler's
+        // throw; otherwise the throw reaches the safety net below.
+        const finished = finishTurn(
+          sendGeneration,
+          "dispatchHandler.finally",
+          trackExecuting ? {} : { executing: "keep" },
+        );
+        if (!finished) return;
       }
     } catch (err) {
-      // Safety net: release sendLocked so the machine doesn't permanently lock
-      // if transition() or an operation throws before the inner finally runs.
-      if (isStaleGeneration(sendGeneration, "machine.transition.safetyNet"))
-        return;
-      logger.warn("machine.transition.safetyNet", { error: errField(err) });
-      sendLocked = false;
-      handlerExecuting = false;
-      notify();
+      // Safety net: finish the turn so the machine doesn't stay held if
+      // transition() or an operation throws before the inner finally runs.
+      if (finishTurn(sendGeneration, "machine.transition.safetyNet")) {
+        logger.warn("machine.transition.safetyNet", { error: errField(err) });
+      }
     }
   };
 
@@ -2360,20 +2398,12 @@ export function createPaymentMachine(
 
   const confirmMelt = () => send({ type: "CONFIRM_MELT" });
   const confirmPaymentRequest = async (): Promise<PaymentRequestConfirmOutcome> => {
-    // Per-call holder isolates this caller's result from any concurrent
-    // confirmPaymentRequest the lock blocks. The handler writes only to
-    // holders it snapshotted before its await, so a locked-out caller's
-    // holder retains its default `ignored`.
-    const holder: { outcome: PaymentRequestConfirmOutcome } = {
-      outcome: { kind: "ignored" },
-    };
-    pendingPaymentRequestConfirms.push(holder);
+    const holder = registerConfirm();
     try {
       await send({ type: "CONFIRM_PAYMENT_REQUEST" });
       return holder.outcome;
     } finally {
-      const idx = pendingPaymentRequestConfirms.indexOf(holder);
-      if (idx >= 0) pendingPaymentRequestConfirms.splice(idx, 1);
+      unregisterConfirm(holder);
     }
   };
 

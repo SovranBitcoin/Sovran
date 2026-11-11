@@ -151,7 +151,7 @@ Other carriers:
 ### 3.3 Machine methods
 
 `PaymentMachine` (`src/machine/types.ts`). All dispatch through `send(event)`,
-guarded by `sendLocked`.
+one turn at a time (see "How a turn flows").
 
 | Method | Wraps | Notes |
 | --- | --- | --- |
@@ -264,7 +264,8 @@ back to `UNSUPPORTED_INPUT` (`createMachine.ts:119-134`).
 
 ```
 send(event)
-  -> sendLocked acquired; sendGeneration = flowGeneration (snapshot)
+  -> beginTurn: dropped while money moves or, without fresh intent, while
+     another turn runs; otherwise takes the lock -> sendGeneration
   -> resolve offline once: offline = getOffline?.() ?? false   (createMachine.ts:777)
   -> CONFIRM_MELT / CONFIRM_PAYMENT_REQUEST: handled directly in send()
   -> else transition(event, step, ctx, ...)
@@ -275,30 +276,41 @@ send(event)
         -> or {kind:'unchanged'} when the step does not handle the event
            (a stray PROOFS_CHOSEN / SEND_MEMO_SUBMITTED, MINT_TRUSTED with no
            review token, a CONFIRM_* off its step): step, data and context
-           stay, nothing is dispatched, sendLocked released
+           stay, nothing is dispatched, the turn finishes
   -> setStep(step, data); flowCtx = merged context
   -> if step is confirmSend/createMintQuote AND operations present:
         intercept -> run async effect -> setStep(result | error)
   -> if step not in INPUT_STEPS: handlerExecuting=true; notify();
         dispatchHandler(step, data); handlerExecuting=false; notify()
   -> if step === 'error': fire notifications[code] fire-and-forget
-  -> sendLocked released
+  -> finishTurn
 ```
+
+Every exit of a turn goes through `finishTurn` (`createMachine.ts`, section
+"Turn"), which frees the lock only while the turn still owns it. The turn's
+state (generation, lock, `isExecuting`, the commit generation and the
+payment-request confirm holders) is written only by the functions in that
+section. `__tests__/flows/turn-exits.test.ts` pins every exit, including the
+quirks left as they are: Pay with no mint chosen frees the machine without the
+ownership check, a throw between a melt or payment request result and its
+handler leaves the machine held, and an NFC tap does not check its turn after
+releasing the tag session.
 
 Gather order is fixed: amount -> mint -> proofs -> terminal
 (`resolveNext.ts:256-264`).
 
 ### Generations and staleness
 
-`flowGeneration` is incremented ONLY in `resetInternal`
-(`createMachine.ts:227`). A plain `send()` does not bump the generation; it
-snapshots it (`sendGeneration = flowGeneration`). Every async effect captures
+`flowGeneration` is incremented by a reset and by an event that supersedes a
+running turn (fresh intent while a resolve is in flight). A turn that begins
+on a free machine does not bump the generation; it snapshots it
+(`sendGeneration = flowGeneration`). Every async effect captures
 `isStale = (op) => isStaleGeneration(sendGeneration, op)`. After any `await`, a
 stale generation returns `kind:'stale'` and the machine returns early without a
 `setStep`. This is the guard that stops a superseded send/quote (after `reset()`,
 `startX({reset:true})`, or `execute(..,{reset:true})`) from clobbering newer
-state or double-firing notifications. A newer EXECUTE without `reset` runs at the
-same generation and does NOT supersede an in-flight effect by generation.
+state or double-firing notifications. A stale continuation owns nothing: it
+returns without freeing the lock a newer turn holds.
 
 ### handlerExecuting / notify cycle
 
