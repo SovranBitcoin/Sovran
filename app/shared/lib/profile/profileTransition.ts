@@ -197,11 +197,8 @@ interface TransitionLock {
    * earlier runtime is still recent; the caller then releases and gives up.
    */
   takeDiskGuard(): Promise<boolean>;
-  /** Cover the app with the splash until `release`. */
-  holdSplash(
-    controls: Partial<TransitionControls>,
-    options?: Parameters<TransitionControls['resetStages']>[0]
-  ): void;
+  /** Cover the app with the splash, through the registered controls, until `release`. */
+  holdSplash(options?: Parameters<TransitionControls['resetStages']>[0]): void;
   /**
    * Give back everything this lock took: the splash if held, the in-memory
    * guard, the on-disk guard if taken. Every exit from a flow that is not a
@@ -226,10 +223,10 @@ export function acquireTransition(): TransitionLock | null {
       diskGuardTaken = await beginTransition();
       return diskGuardTaken;
     },
-    holdSplash(controls, options) {
+    holdSplash(options) {
       splashHeld = true;
-      cancelSplash = controls.cancelResetStages;
-      controls.resetStages?.(options);
+      cancelSplash = registeredControls?.cancelResetStages;
+      registeredControls?.resetStages(options);
     },
     async release() {
       if (splashHeld) cancelSplash?.();
@@ -239,14 +236,6 @@ export function acquireTransition(): TransitionLock | null {
         await endTransition();
       }
     },
-  };
-}
-
-/** The splash controls a caller passed, or the ones the layout registered. */
-export function splashControls(opts?: Partial<TransitionControls>): Partial<TransitionControls> {
-  return {
-    resetStages: opts?.resetStages ?? registeredControls?.resetStages,
-    cancelResetStages: opts?.cancelResetStages ?? registeredControls?.cancelResetStages,
   };
 }
 

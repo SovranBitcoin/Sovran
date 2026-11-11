@@ -11,7 +11,6 @@ import {
   acquireTransition,
   isTransitionInFlight,
   registerTransitionControls,
-  splashControls,
 } from '@/shared/lib/profile/profileTransition';
 
 jest.mock('@react-native-async-storage/async-storage', () => {
@@ -82,9 +81,7 @@ it('refuses the on-disk guard while another runtime’s transition is recent, an
 
 it('holds and releases quietly when the layout has registered no splash controls', async () => {
   const lock = acquireTransition()!;
-  expect(() =>
-    lock.holdSplash(splashControls(), { keepStagesThatOutliveAccount: true })
-  ).not.toThrow();
+  expect(() => lock.holdSplash({ keepStagesThatOutliveAccount: true })).not.toThrow();
   await lock.release();
   expect(isTransitionInFlight()).toBe(false);
 });
@@ -99,7 +96,7 @@ it('drops the splash on release only when this flow was holding it', async () =>
   expect(cancelResetStages).not.toHaveBeenCalled();
 
   const lock = acquireTransition()!;
-  lock.holdSplash(splashControls(), { keepStagesThatOutliveAccount: true });
+  lock.holdSplash({ keepStagesThatOutliveAccount: true });
   expect(resetStages.mock.calls).toEqual([[{ keepStagesThatOutliveAccount: true }]]);
   await lock.release();
   expect(cancelResetStages).toHaveBeenCalledTimes(1);

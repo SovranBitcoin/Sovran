@@ -7,9 +7,8 @@
  *
  * Transition guard uses AsyncStorage so it survives native restarts and is cleared on next startup.
  *
- * Callers can optionally supply resetStages/cancelResetStages (via registerTransitionControls)
- * to show a splash overlay during the transition. If not registered, transitions proceed without
- * the splash overlay.
+ * The splash shown during a transition uses the controls the layout registered
+ * (registerTransitionControls). If none are registered, transitions proceed without it.
  *
  * Key derivation (getKeysForAccount) is registered at runtime by a component inside
  * AccountScopedProviders via registerKeyDerivation(). This avoids prop-threading from
@@ -59,11 +58,9 @@ import {
   keyDerivation,
   persistSwitchTargetToDisk,
   settleWithin,
-  splashControls,
   teardownAndRestart,
   TIMED_OUT,
   type KeyDerivationFn,
-  type TransitionControls,
 } from './profileTransition';
 import {
   runInProcessProfileSwitch,
@@ -109,8 +106,6 @@ export async function switchToExistingProfile(opts: {
    * never opened: there is nothing to wait for, and the switch always restarts.
    */
   fromStoppedAccount?: boolean;
-  resetStages?: TransitionControls['resetStages'];
-  cancelResetStages?: TransitionControls['cancelResetStages'];
 }): Promise<boolean> {
   if (isTransitionInFlight()) {
     log.warn('profile.orchestrator.switch_blocked_in_flight');
@@ -145,7 +140,7 @@ export async function switchToExistingProfile(opts: {
     }
     const inProcess =
       !opts.fromStoppedAccount && useSettingsStore.getState().inProcessProfileSwitch;
-    lock.holdSplash(splashControls(opts), { keepStagesThatOutliveAccount: inProcess });
+    lock.holdSplash({ keepStagesThatOutliveAccount: inProcess });
     usePopupStore.getState().close();
 
     // Validate the target up front — the same existence check
@@ -280,8 +275,6 @@ async function holdUntilReopened(message: string): Promise<void> {
 
 export async function createAndSwitchProfile(opts?: {
   getKeysForAccount?: KeyDerivationFn;
-  resetStages?: TransitionControls['resetStages'];
-  cancelResetStages?: TransitionControls['cancelResetStages'];
 }): Promise<boolean> {
   const getKeysForAccount = opts?.getKeysForAccount ?? keyDerivation();
 
@@ -299,7 +292,7 @@ export async function createAndSwitchProfile(opts?: {
     return false;
   }
   try {
-    lock.holdSplash(splashControls(opts));
+    lock.holdSplash();
     usePopupStore.getState().close();
 
     const profileStore = useProfileStore.getState();
@@ -395,7 +388,7 @@ export async function importAndSwitchProfile(opts: {
   }
   try {
     const inProcess = useSettingsStore.getState().inProcessProfileSwitch;
-    lock.holdSplash(splashControls(), { keepStagesThatOutliveAccount: inProcess });
+    lock.holdSplash({ keepStagesThatOutliveAccount: inProcess });
     usePopupStore.getState().close();
 
     if (!(await storeImportedNsec(opts.pubkeyHex, opts.nsec))) {
@@ -587,10 +580,7 @@ export async function recoverMnemonicSession(mnemonic: string): Promise<boolean>
  * Clears: all Zustand stores, all AsyncStorage, all SecureStore keys,
  * all SQLite databases. Nothing survives.
  */
-export async function deleteAllProfiles(opts?: {
-  resetStages?: TransitionControls['resetStages'];
-  cancelResetStages?: TransitionControls['cancelResetStages'];
-}): Promise<boolean> {
+export async function deleteAllProfiles(): Promise<boolean> {
   const lock = acquireTransition();
   if (!lock) return false;
   if (!(await lock.takeDiskGuard())) {
@@ -600,7 +590,7 @@ export async function deleteAllProfiles(opts?: {
   // Set once the first irreversible deletion starts.
   let erasing = false;
   try {
-    lock.holdSplash(splashControls(opts));
+    lock.holdSplash();
     usePopupStore.getState().close();
 
     const profiles = useProfileStore.getState().profiles;
