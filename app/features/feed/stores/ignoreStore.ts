@@ -32,8 +32,6 @@ type FeedIgnoreActions = {
   ignorePubkey: (pubkey: string) => void;
   unignorePubkey: (pubkey: string) => void;
   ignoreEvent: (eventId: string) => void;
-  unignoreEvent: (eventId: string) => void;
-  clearIgnoredFeedItems: () => void;
   receiveMuteList: (list: MuteList, settled?: Record<string, boolean>) => void;
   setDmFilterEnabled: (enabled: boolean) => void;
   setDmFilterWords: (words: string) => void;
@@ -177,17 +175,6 @@ export const useFeedIgnoreStore = create<FeedIgnoreStore>({
         });
         set({ ignoredEventIds });
       },
-
-      unignoreEvent: (eventId) => {
-        const ignoredEventIds = removeHex(get().ignoredEventIds, eventId, MAX_IGNORED_EVENT_IDS);
-        storeLog.info('feed.ignore.event.clear', {
-          eventId: normalizeIgnoreHex(eventId)?.slice(0, 8),
-          count: ignoredEventIds.length,
-        });
-        set({ ignoredEventIds });
-      },
-
-      clearIgnoredFeedItems: () => set({ ignoredPubkeys: [], ignoredEventIds: [] }),
     }),
     persistConfig({
       name: 'feed-ignore-store',
