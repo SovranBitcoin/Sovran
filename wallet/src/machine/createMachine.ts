@@ -272,6 +272,10 @@ export function createPaymentMachine(
   // restores that preview, and only that one. Opening the list again while
   // it is open keeps it. Cleared whenever the step leaves selectMint.
   let mintListOverPreview = false;
+  // Counts the mint lists begun loading. Each open list begins one, so only
+  // the latest belongs to the list now open: a flow's generation outlives a
+  // picker, and an earlier picker's list can finish loading under a later one.
+  let mintListLoad = 0;
   // The turn: one `send()` call holds the machine from `beginTurn` to
   // `finishTurn`. Only the functions under "Turn" below write these five.
   //
@@ -928,6 +932,7 @@ export function createPaymentMachine(
     generation: number,
   ): Promise<void> | null {
     if (!operations?.buildMintListItems) return null;
+    const load = ++mintListLoad;
 
     const task = (async () => {
       const effect = await runMintListEnrichmentEffect({
@@ -935,6 +940,12 @@ export function createPaymentMachine(
         operation: operations.buildMintListItems,
         isStale: (op) => isStaleGeneration(generation, op),
       });
+      if (load !== mintListLoad) {
+        logger.info("machine.selectMint.enrichment.superseded", {
+          scope: data.scope ?? null,
+        });
+        return;
+      }
 
       if (effect.isOk()) {
         if (effect.value.kind === "stale") return;

@@ -331,6 +331,12 @@ stale generation returns `kind:'stale'` and the machine returns early without a
 state or double-firing notifications. A stale continuation owns nothing: it
 returns without freeing the lock a newer turn holds.
 
+A generation names a flow, not a turn or a picker: later turns of the same flow
+share it. The mint list loads in the background past its turn, so it carries
+its own count (`mintListLoad`): each `selectMint` that opens begins a load, and
+only the latest load is applied, so a list that finished loading for a picker
+already closed never replaces the rows of the one now open.
+
 ### handlerExecuting / notify cycle
 
 `INPUT_STEPS` (`createMachine.ts:163-170`) gate `isExecuting`: no spinner while
