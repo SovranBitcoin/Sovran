@@ -1,5 +1,7 @@
 import type { facade } from 'nostr';
 
+import { noteMetricsFromStats } from '@/shared/lib/nostr/noteMetrics';
+
 import type { FeedEvent, NoteMetrics, ProfileInfo } from '../components/nostr/feedTypes';
 
 type FacadePageEnrichment = Pick<facade.ResolvedFeedPage, 'stats' | 'profiles' | 'quoted'>;
@@ -7,12 +9,7 @@ type FacadePageEnrichment = Pick<facade.ResolvedFeedPage, 'stats' | 'profiles' |
 export function mapFacadePageEnrichment(page: FacadePageEnrichment) {
   const metricsMap = new Map<string, NoteMetrics>();
   for (const [id, stats] of Object.entries(page.stats)) {
-    metricsMap.set(id, {
-      likeCount: stats.likes,
-      repostCount: stats.reposts,
-      replyCount: stats.replies,
-      satsZapped: stats.satsZapped,
-    });
+    metricsMap.set(id, noteMetricsFromStats(stats));
   }
 
   const profilesMap = new Map<string, ProfileInfo>(

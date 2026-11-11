@@ -24,9 +24,8 @@ import {
 // backfills OLDER notes from the same authors (recency-ranked, still per-author
 // capped per block), so the feed paginates indefinitely instead of dead-ending.
 //
-// Pagination channel: the app's facade only round-trips `cursor.createdAt` (it
-// hardcodes the cursor id to '' — facadeFeedClient), so we carry the next OFFSET
-// into the corpus through `createdAt`. The app treats it opaquely: a `> 0`
+// Pagination channel: we carry the next OFFSET into the corpus through
+// `cursor.createdAt` (the cursor id is ''). The app treats it opaquely: a `> 0`
 // "has-more" gate it echoes straight back, the same way nagg's own For-You uses
 // a sentinel. Page 0 (no/zero cursor) serves the head; a positive cursor is the
 // offset to resume from.

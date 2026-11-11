@@ -2,6 +2,7 @@ import { facade } from 'nostr';
 
 import { buildThreadStructure } from '@/features/feed/lib/buildThreadStructure';
 import type { FeedEvent, NoteMetrics, ProfileInfo } from '../components/nostr/feedTypes';
+import { noteMetricsFromStats } from '@/shared/lib/nostr/noteMetrics';
 import { recordDebugTiers } from '@/shared/stores/runtime/debugTierStore';
 import type { ReadStatusMeta, ThreadRequest, ThreadResult } from './feedClient';
 
@@ -140,12 +141,7 @@ export function resolvedThreadToResult(
     profiles.set(pk, { name: p.name, ...(p.picture ? { picture: p.picture } : {}) });
   }
   for (const [id, s] of Object.entries(thread.stats)) {
-    metrics.set(id, {
-      likeCount: s.likes,
-      repostCount: s.reposts,
-      replyCount: s.replies,
-      satsZapped: s.satsZapped,
-    });
+    metrics.set(id, noteMetricsFromStats(s));
   }
 
   const pageSize = request.limit ?? replyEvents.length;

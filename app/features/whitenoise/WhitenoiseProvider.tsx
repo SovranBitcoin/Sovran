@@ -22,9 +22,8 @@ type WhitenoiseHandle = {
    * release. `unmount`: drop the listeners — defense-in-depth against a
    * detached subtree emitting into the dead client — and zero the signer's
    * owned copy of the nsec at once, since Hermes does not zero freed memory
-   * on GC (audit 33.json F-004). One shared `try` means a throwing
-   * `removeAllListeners` skips the disposal below it — long-standing
-   * behaviour, preserved here — but nothing escapes the unmount.
+   * on GC (audit 33.json F-004). The key copy is zeroed even when a
+   * `removeAllListeners` throws, and nothing escapes the unmount.
    */
   close: (mode: 'switch' | 'unmount') => Promise<void>;
 };
@@ -87,12 +86,13 @@ function createWhitenoiseHandle({
         try {
           client.removeAllListeners();
           reader.value.removeAllListeners();
-          disposeSigner();
           wnLog.info('whitenoise.client.disposed', { accountIndex });
         } catch (err) {
           wnLog.warn('whitenoise.client.dispose_failed', {
             error: err instanceof Error ? err.message : String(err),
           });
+        } finally {
+          disposeSigner();
         }
       },
     };

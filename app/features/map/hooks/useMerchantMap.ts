@@ -10,7 +10,7 @@ import {
 } from '@/shared/lib/map/btcMapClusterCache';
 import { getIconsForCategory } from '@/shared/lib/map/categories';
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
-import { deferWork, log, mapLog } from '@/shared/lib/logger';
+import { deferWork, mapLog } from '@/shared/lib/logger';
 import type { CategoryFilter } from '../components/StatsCard';
 import { useMapCamera } from './useMapCamera';
 
@@ -182,7 +182,7 @@ export function useMerchantMap({
   // Fetch places on mount — DEFERRED
   useEffect(() => {
     const task = InteractionManager.runAfterInteractions(() => {
-      fetchPlaces().catch((err) => log.error('map.places.fetch_failed', { error: err }));
+      fetchPlaces().catch((err) => mapLog.error('map.places.fetch_failed', { error: err }));
     });
 
     return () => task.cancel();
@@ -297,7 +297,7 @@ export function useMerchantMap({
   // Retry loads the places again; hiding the error alone would leave an empty map.
   const retry = useCallback(() => {
     setError(null);
-    fetchPlaces().catch((err) => log.error('map.places.fetch_failed', { error: err }));
+    fetchPlaces().catch((err) => mapLog.error('map.places.fetch_failed', { error: err }));
   }, [setError, fetchPlaces]);
 
   return {

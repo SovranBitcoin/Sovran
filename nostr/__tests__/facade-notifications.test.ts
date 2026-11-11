@@ -1,7 +1,8 @@
 import { describe, test, expect } from 'vitest';
 import { ok, type Result } from 'neverthrow';
 import { createNaggClient } from '../src/transport';
-import { createNaggTier, createNostrDataLayer, pendingFeedTier } from '../src/facade';
+import { createNaggTier, createNostrDataLayer } from '../src/facade';
+import { pendingFeedTier } from './pendingFeedTier';
 import { createRelayTier, type RelayConnection, type RawRelayEvent, type NostrFilter } from '../src/facade/relay';
 import type { NaggError } from '../src/errors';
 

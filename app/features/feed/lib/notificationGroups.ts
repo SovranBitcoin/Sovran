@@ -162,8 +162,8 @@ export function buildNotificationListItems(
       continue;
     }
 
-    // Fallback: client-side grouping for ungrouped transports (raw relays /
-    // GraphQL) that don't carry server group metadata. Group across the WHOLE
+    // Fallback: client-side grouping for ungrouped transports (raw relays)
+    // that don't carry server group metadata. Group across the WHOLE
     // page by reason+target — not just consecutive runs — then demote any
     // single-member group back to a row below.
     const key = `${reason}:${batchKeyFor(notification, reason)}`;

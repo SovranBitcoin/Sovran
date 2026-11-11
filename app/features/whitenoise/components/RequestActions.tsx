@@ -9,8 +9,6 @@ interface RequestActionsProps {
   onAccept: () => void;
   onDecline: () => void;
   isBusy?: boolean;
-  /** Hide the labels and use a more compact form (icon-only, future). */
-  compact?: boolean;
 }
 
 /**

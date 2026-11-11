@@ -201,9 +201,12 @@ export async function executeDeletePost({
       store.fail('No relay accepted the deletion');
     }
   } catch (e) {
-    nostrLog.warn('nostr.delete.error', { eventId: event.id.slice(0, 8) });
+    // The failed toast is the report; the caller does not wait on this promise.
+    nostrLog.warn('nostr.delete.error', {
+      eventId: event.id.slice(0, 8),
+      message: e instanceof Error ? e.message : String(e),
+    });
     store.fail();
-    throw e;
   } finally {
     inFlight.delete(event.id);
   }

@@ -7,6 +7,7 @@ import {
   resolveAllTiers,
   auditAcrossTiers,
   applyOrderingManifest,
+  tierRank,
   type ReadProvenance,
   type TierAggregate,
   type TierCandidate,
@@ -655,12 +656,6 @@ const AGGREGATE_CAP_MS = {
   noteStats: 800,
 } as const;
 
-const TIER_RANK_ORDER: readonly NostrTier[] = ['nagg', 'primal', 'relay', 'cache'];
-function tierRank(tier: NostrTier): number {
-  const index = TIER_RANK_ORDER.indexOf(tier);
-  return index < 0 ? TIER_RANK_ORDER.length : index;
-}
-
 function provenanceOf<T>(readId: string, agg: TierAggregate<T>): ReadProvenance {
   return {
     readId,
@@ -686,7 +681,10 @@ function mergeProfileBundles(
   next: ProfilesBundle,
   tier: NostrTier,
 ): ProfilesBundle {
-  if (!acc) return { profiles: { ...next.profiles } };
+  if (!acc) {
+    for (const metadata of Object.values(next.profiles)) rankOwners.set(metadata, tier);
+    return { profiles: { ...next.profiles } };
+  }
   const profiles = { ...acc.profiles };
   for (const [pubkey, metadata] of Object.entries(next.profiles)) {
     const existing = profiles[pubkey];
@@ -705,14 +703,15 @@ function rankOwner(metadata: object): NostrTier {
 }
 
 /** Union by note id; a better-ranked tier's counts replace a worse one's, a worse one only adds ids. */
-function mergeNoteStatsByRank(
+export function mergeNoteStatsByRank(
   acc: NoteStatsMap | undefined,
   next: NoteStatsMap,
   tier: NostrTier,
 ): NoteStatsMap {
   if (!acc) {
-    rankOwners.set(next, tier);
-    return { ...next };
+    const first: NoteStatsMap = { ...next };
+    rankOwners.set(first, tier);
+    return first;
   }
   const accTier = rankOwner(acc);
   const nextWins = tierRank(tier) <= tierRank(accTier);
@@ -833,8 +832,9 @@ function mergeMintReviews(): (
 /** The newest kind-3 wins the follows/relays/mutes (rank breaks ties); profiles union. */
 function mergeSocialGraph(acc: SocialGraph | undefined, next: SocialGraph, tier: NostrTier): SocialGraph {
   if (!acc) {
-    rankOwners.set(next, tier);
-    return { ...next, profiles: { ...next.profiles } };
+    const first: SocialGraph = { ...next, profiles: { ...next.profiles } };
+    rankOwners.set(first, tier);
+    return first;
   }
   const accTier = rankOwner(acc);
   const nextWins =

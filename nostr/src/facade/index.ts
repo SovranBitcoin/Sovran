@@ -11,7 +11,6 @@ export * from "./search";
 export * from "./note-stats";
 export * from "./strategy";
 export * from "./nagg-tier";
-export * from "./placeholders";
 export * from "./data-layer";
 export * from "./event";
 export * from "./cache/store";

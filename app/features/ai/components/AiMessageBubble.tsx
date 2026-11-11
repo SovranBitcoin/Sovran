@@ -10,7 +10,7 @@ import { Spinner } from '@/shared/ui/primitives/Spinner';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { popup } from '@/shared/lib/popup';
+import { popup, staticPopup } from '@/shared/lib/popup';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
 import { formatRelative } from '@/shared/lib/date';
 import { readAnswer, useTurn, type Turn, type TurnError } from '../lib/turns';
@@ -414,8 +414,10 @@ function AssistantBubble({ message, onRetry, onContinue, branchNav }: AiMessageB
 
   const handleCopy = useCallback(async () => {
     if (!displayedContent) return;
-    await Clipboard.setStringAsync(displayedContent);
-    popup({ message: 'Copied', icon: 'icon:lets-icons:copy', type: 'success' });
+    await Clipboard.setStringAsync(displayedContent).then(
+      () => popup({ message: 'Copied', icon: 'icon:lets-icons:copy', type: 'success' }),
+      () => staticPopup('copy-failed')
+    );
   }, [displayedContent]);
 
   const handleRetry = useCallback(() => {

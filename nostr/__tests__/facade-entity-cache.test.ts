@@ -1,4 +1,4 @@
-import { ingestProfiles } from "../src/facade/cache/ingest";
+import { ingestProfiles, ingestSearchHits } from "../src/facade/cache/ingest";
 import { describe, it, expect, vi } from "vitest";
 import { createNormalizingStore } from "../src/facade/cache/store";
 import { createNostrEntityCache } from "../src/facade/cache/entity-cache";
@@ -264,5 +264,18 @@ describe("profile fetch time", () => {
     } finally {
       clock.mockRestore();
     }
+  });
+});
+
+describe("ingestSearchHits", () => {
+  it("writes a hit that only says which AI providers the person runs", () => {
+    const cache = createNostrEntityCache();
+    const pubkey = "c".repeat(64);
+    ingestSearchHits(
+      cache,
+      [{ pubkey, metadata: {}, rank: null, score: null, followers: null, follows: null, operatesAiProviders: ["provider-x"] }],
+      "nagg",
+    );
+    expect(cache.getProfileStats(pubkey)?.operatesAiProviders).toEqual(["provider-x"]);
   });
 });

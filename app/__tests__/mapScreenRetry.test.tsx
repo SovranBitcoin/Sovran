@@ -41,7 +41,7 @@ jest.mock('@/shared/lib/logger', () => ({
   Log: ({ children }: { children: React.ReactNode }) => children,
   useLifecycleLogger: jest.fn(),
   log: { error: jest.fn(), info: jest.fn() },
-  mapLog: { debug: jest.fn() },
+  mapLog: { debug: jest.fn(), error: jest.fn() },
   deferWork: () => ({ cancel: jest.fn() }),
 }));
 jest.mock('@/shared/ui/primitives/Pressable', () => ({ Pressable: 'Pressable' }));

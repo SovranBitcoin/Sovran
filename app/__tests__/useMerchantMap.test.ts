@@ -38,7 +38,7 @@ jest.mock('@/shared/lib/map/btcMapClusterCache', () => ({
 }));
 jest.mock('@/shared/lib/logger', () => ({
   log: { error: jest.fn() },
-  mapLog: { debug: jest.fn() },
+  mapLog: { debug: jest.fn(), error: jest.fn() },
   deferWork: (_name: string, work: () => void) => {
     const task = { work, cancelled: false };
     mockTasks.push(task);

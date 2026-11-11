@@ -24,8 +24,6 @@ const SOURCE_TYPES: Partial<Record<ErrorService, TypeRules>> = {
   nagg: [
     ['endpoint_required', 'nagg.not_configured'],
     ['schema', 'nagg.invalid_response'],
-    ['missing_data', 'nagg.invalid_response'],
-    ['graphql', 'nagg.unknown'],
   ],
   // Which mint paid is not a transport detail: a Routstr node redeems tokens
   // from a published list and refuses the rest, so these two say "change mint
