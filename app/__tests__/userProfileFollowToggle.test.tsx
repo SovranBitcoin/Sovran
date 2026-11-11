@@ -142,6 +142,7 @@ describe('what the Follow button shows', () => {
   it('shows Following once a published list holds the follow, Follow otherwise', () => {
     expect(followButtonFace(true)).toEqual({
       label: 'Following',
+      accessibilityLabel: 'Following',
       icon: 'mdi:check',
       systemIcon: 'checkmark',
       isActive: true,
@@ -150,12 +151,36 @@ describe('what the Follow button shows', () => {
     expect(followButtonFace(false)).toMatchObject({ label: 'Follow', filled: true });
   });
 
-  it('shows a follow no published list holds yet exactly as a published one', () => {
+  it('says a follow no published list holds yet is waiting to sync', () => {
     const { result } = renderHook(() => useFollowToggle(Z, OWN));
     act(() => result.current());
-    expect(social().optimisticFollowsByPubkey[Z]?.pending).toBe(true);
+    const pending = social().optimisticFollowsByPubkey[Z]?.pending ?? false;
+    expect(pending).toBe(true);
 
-    // QUIRK (F227): nothing tells a follow waiting to sync from a published one.
-    expect(followButtonFace(selectIsFollowingPubkey(Z)(social()))).toEqual(followButtonFace(true));
+    const face = followButtonFace(selectIsFollowingPubkey(Z)(social()), pending);
+    expect(face).toMatchObject({
+      label: 'Following · syncing',
+      accessibilityLabel: 'Following, waiting to sync',
+      icon: 'mdi:clock-outline',
+      isActive: true,
+    });
+    expect(face).not.toEqual(followButtonFace(true));
+  });
+
+  it('says an unfollow no published list holds yet is waiting to sync', () => {
+    social().setContactsFromRelay({
+      tags: [['p', Z]],
+      content: '',
+      createdAtSec: 1,
+      eventId: 'e1',
+    });
+    const { result } = renderHook(() => useFollowToggle(Z, OWN));
+    act(() => result.current());
+
+    expect(followButtonFace(selectIsFollowingPubkey(Z)(social()), true)).toMatchObject({
+      label: 'Unfollowed · syncing',
+      accessibilityLabel: 'Unfollowed, waiting to sync',
+      filled: true,
+    });
   });
 });

@@ -551,10 +551,26 @@ function TopFollowers({
   );
 }
 
-/** What the Follow button shows for the follow state the store holds. */
-export function followButtonFace(isFollowing: boolean) {
+/**
+ * What the Follow button shows for the follow state the store holds. A tap no
+ * published list holds yet (`syncing`) says so, with a clock for the check,
+ * so it never looks like a follow other people can see.
+ */
+export function followButtonFace(isFollowing: boolean, syncing = false) {
+  if (syncing)
+    return {
+      label: isFollowing ? 'Following · syncing' : 'Unfollowed · syncing',
+      accessibilityLabel: isFollowing
+        ? 'Following, waiting to sync'
+        : 'Unfollowed, waiting to sync',
+      icon: 'mdi:clock-outline',
+      systemIcon: 'clock',
+      isActive: isFollowing,
+      filled: !isFollowing,
+    };
   return {
     label: isFollowing ? 'Following' : 'Follow',
+    accessibilityLabel: isFollowing ? 'Following' : 'Follow',
     icon: isFollowing ? 'mdi:check' : 'la:user-plus',
     systemIcon: isFollowing ? 'checkmark' : 'person.badge.plus',
     isActive: isFollowing,
@@ -576,6 +592,7 @@ function BannerWithAvatar({
   isResolving,
   showFollowButton,
   isFollowing,
+  followSyncing,
   onToggleFollow,
   onSendMoney,
   onShareQr,
@@ -602,6 +619,8 @@ function BannerWithAvatar({
   isResolving: boolean;
   showFollowButton: boolean;
   isFollowing: boolean;
+  /** The last tap is not in a published follow list yet. */
+  followSyncing: boolean;
   onToggleFollow: () => void;
   onSendMoney: () => void;
   /** Opens the share page holding this profile's npub QR, and its Lightning
@@ -891,7 +910,7 @@ function BannerWithAvatar({
               // following → `isActive` tinted pill. Both honored across
               // liquid-glass, blur and flat.
               <CapsuleButton
-                {...followButtonFace(isFollowing)}
+                {...followButtonFace(isFollowing, followSyncing)}
                 onPress={onToggleFollow}
                 fitContent
                 height={34}
@@ -1075,7 +1094,7 @@ export function UserProfileScreen() {
     isResolving: isMetadataResolving,
   } = useNostrProfileMetadata(pubkey);
 
-  // A tap not yet in a published follow list (for the logs; the button shows it as done).
+  // A tap not yet in a published follow list: the button says it is waiting to sync.
   const followPending = useNostrSocialStore(
     (state) => !!(pubkey && state.optimisticFollowsByPubkey[pubkey]?.pending)
   );
@@ -1488,6 +1507,7 @@ export function UserProfileScreen() {
                 // every time you open your own profile.
                 showFollowButton={!!nostrKeys?.pubkey && !isOwnProfile && !!pubkey}
                 isFollowing={isFollowingProfile}
+                followSyncing={followPending}
                 onToggleFollow={handleToggleFollow}
                 onSendMoney={handleSendMoney}
                 onShareQr={handleShareQr}
