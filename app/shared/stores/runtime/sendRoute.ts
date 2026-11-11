@@ -8,7 +8,7 @@ import type { NearPayRecipient } from './nearPayStore';
  * handed over on screen. The amount screen says which before the send and
  * `sendComplete` acts on it after, both from this one value.
  */
-export type SendRoute =
+type SendRoute =
   | { kind: 'nearby'; recipient: NearPayRecipient }
   | { kind: 'contact'; target: ContactSendTarget }
   | { kind: 'handOff' };
