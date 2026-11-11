@@ -14,10 +14,16 @@ jest.mock('@/features/payments/data/dmEnvelopeClient', () => ({
   fetchDmConversation: (...args: unknown[]) => mockDirect(...args),
   subscribeDmEnvelopesLive: (...args: unknown[]) => mockLive(...args),
 }));
+// What ran, in order: each cache hydration (with its viewer) and each decrypt.
+const mockSteps: string[] = [];
 jest.mock('@/shared/lib/nostr/giftWrapCache', () => ({
-  giftWrapCache: { cache: { hydrate: async () => {} } },
+  giftWrapCache: {
+    cache: { hydrate: async (viewer: string) => void mockSteps.push(`nip17:${viewer}`) },
+  },
 }));
-jest.mock('@/shared/lib/nostr/nip04Cache', () => ({ nip04Cache: { hydrate: async () => {} } }));
+jest.mock('@/shared/lib/nostr/nip04Cache', () => ({
+  nip04Cache: { hydrate: async (viewer: string) => void mockSteps.push(`nip04:${viewer}`) },
+}));
 jest.mock('@/shared/lib/logger', () => {
   const sink = { info: jest.fn(), warn: jest.fn(), debug: jest.fn(), error: jest.fn() };
   return {
@@ -49,7 +55,7 @@ jest.mock('@/shared/stores/runtime/mockDataStore', () => ({
 }));
 jest.mock('@/features/payments/data/dmDecryptPipeline', () => ({
   decryptDmEnvelopes: (envelopes: DmEnvelopePage['envelopes']) =>
-    envelopes.map((e) => ({
+    (mockSteps.push('decrypt'), envelopes).map((e) => ({
       id: e.id,
       counterparty: e.pubkey,
       senderPubkey: e.pubkey,
@@ -76,6 +82,7 @@ function page(peer: string, count: number, newest: number): DmEnvelopePage {
 beforeEach(async () => {
   jest.clearAllMocks();
   mockInbox.mockReset();
+  mockSteps.length = 0;
   mockDirect.mockClear();
   mockLive.mockReset().mockReturnValue(() => {});
   dmThreadCache.clear();
@@ -352,5 +359,34 @@ describe.each([
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.hasMore).toBe(false);
     expect(mockInbox).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('decryption caches', () => {
+  it.each([
+    ['nip17', ['nip17:viewer']],
+    ['nip04', ['nip04:viewer']],
+  ] as const)(
+    'a %s thread warms only its own cache, before decrypting',
+    async (protocol, warmed) => {
+      mockInbox.mockResolvedValue(page('peer', 1, 1000));
+      const { result } = renderHook(() =>
+        useDmThread({
+          counterparty: 'peer',
+          viewerPubkey: 'viewer',
+          viewerPrivateKey: key,
+          protocol,
+        })
+      );
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      expect(mockSteps).toEqual([...warmed, 'decrypt']);
+    }
+  );
+
+  it('the conversation list warms both caches before decrypting', async () => {
+    mockInbox.mockResolvedValue(page('peer', 1, 1000));
+    const { result } = renderHook(() => useDmConversations('viewer', key));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(mockSteps).toEqual(['nip17:viewer', 'nip04:viewer', 'decrypt']);
   });
 });
