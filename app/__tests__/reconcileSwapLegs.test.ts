@@ -129,6 +129,30 @@ it.each(['melting', 'verifying'] as const)(
   }
 );
 
+it.each(['melting', 'verifying'] as const)(
+  'QUIRK: a leg a run that never ended left at %s is never reconciled, and its group stays running',
+  async (status) => {
+    // The group is saved `running` and no run in this process owns it: the
+    // app was killed mid-run, or the run threw or was aborted (F211).
+    const leg = savedLeg(status);
+    const coco = manager({ melt: { state: 'finalized' }, mint: { state: 'finalized' } });
+
+    await reconcileSwapLegs(coco);
+
+    expect(leg().localStatus).toBe(status);
+    expect(useSwapTransactionsStore.getState().groups[leg.groupId].state).toBe('running');
+  }
+);
+
+it('QUIRK: a settling leg of a group no run owns reaches done while its group stays running', async () => {
+  const leg = savedLeg('settling');
+
+  await reconcileSwapLegs(manager({ mint: { state: 'finalized' } }));
+
+  expect(leg().localStatus).toBe('done');
+  expect(useSwapTransactionsStore.getState().groups[leg.groupId].state).toBe('running');
+});
+
 it('does not overwrite a leg that changed while its operation was being read', async () => {
   const leg = savedLeg('settling');
   const coco = manager({});

@@ -329,6 +329,42 @@ test('retrying a step after cancelling runs it again and ends the run as finishe
   expect(mockManager.ops.melt.execute).toHaveBeenCalledTimes(2);
   expect(result.current.stepStates['step-1'].status).toBe('done');
   expect(mockStatus.setLegDone).toHaveBeenCalledWith('step-1');
+  expect(mockTransactions.finalizeGroup).toHaveBeenLastCalledWith('group-1', 'cancelled');
+  expect(mockStatus.complete).not.toHaveBeenCalled();
+});
+
+test('QUIRK: a run that throws fails the toast and leaves its group and the screen running', async () => {
+  mockStatus.setActiveLeg.mockImplementationOnce(() => {
+    throw new Error('toast exploded');
+  });
+  const { result } = mount();
+  await act(async () => result.current.handleStart());
+  await finishRun();
+
+  expect(mockStatus.fail).toHaveBeenCalledWith(expect.any(String));
+  expect(cashuLog.warn).toHaveBeenCalledWith('mint.rebalance.run_failed', expect.anything());
+  expect(mockTransactions.finalizeGroup).not.toHaveBeenCalled();
+  expect(result.current.runStatus).toBe('running');
+});
+
+test('QUIRK: a run aborted by a wallet change leaves its group, the toast and the screen running', async () => {
+  keepRecipientPending();
+  const { result, rerender } = mount();
+  await act(async () => result.current.handleStart());
+  await act(async () => {
+    await jest.advanceTimersByTimeAsync(100);
+  });
+  mockManager = createManager();
+  rerender({});
+  await act(async () => {
+    await jest.advanceTimersByTimeAsync(16000);
+  });
+
+  expect(mockTransactions.finalizeGroup).not.toHaveBeenCalled();
+  expect(mockStatus.complete).not.toHaveBeenCalled();
+  expect(mockStatus.cancel).not.toHaveBeenCalled();
+  expect(mockStatus.fail).not.toHaveBeenCalled();
+  expect(result.current.runStatus).toBe('running');
 });
 
 test('retry-failed runs a failed step again', async () => {

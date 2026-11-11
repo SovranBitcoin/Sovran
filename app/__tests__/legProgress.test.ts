@@ -45,6 +45,25 @@ describe('createLegProgressStore', () => {
     expect(store.getState().active).toMatchObject({ state: 'failed', errorMessage: 'nope' });
   });
 
+  it('QUIRK: a failed leg that later succeeds keeps its old error', () => {
+    const store = createLegProgressStore<Record<string, never>>({ name: 't', log: stubLog });
+    store.getState().start({ id: 'x', legs: [{ id: 'a' }], meta: {} });
+    store.getState().setLegFailed('a', 'mint offline');
+    store.getState().setLegDone('a');
+    expect(store.getState().active?.legs[0]).toMatchObject({
+      status: 'done',
+      errorMessage: 'mint offline',
+    });
+  });
+
+  it('QUIRK: a final state can be overwritten by another', () => {
+    const store = createLegProgressStore<Record<string, never>>({ name: 't', log: stubLog });
+    store.getState().start({ id: 'x', legs: [{ id: 'a' }], meta: {} });
+    store.getState().cancel();
+    store.getState().complete();
+    expect(store.getState().active?.state).toBe('done');
+  });
+
   it('cancel() sets a terminal cancelled state', () => {
     const store = createLegProgressStore<Record<string, never>>({ name: 't', log: stubLog });
     store.getState().start({ id: 'x', legs: [{ id: 'a' }], meta: {} });

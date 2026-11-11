@@ -327,6 +327,14 @@ describe('a swap with a failed leg', () => {
     expect(details()).toMatchObject({ 'Total Fees': '20 sat' });
   });
 
+  it('a group still saved as running reads Running', async () => {
+    seedGroup({ state: 'running', legs: [leg('l1', { amount: 700, localStatus: 'melting' })] });
+
+    await render();
+
+    expect(details()).toMatchObject({ Status: 'Running' });
+  });
+
   it('a cancelled group with no history shows no fee', async () => {
     seedGroup({
       state: 'cancelled',
