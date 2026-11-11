@@ -30,7 +30,6 @@ import {
 } from '@/features/transactions';
 import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
-import type { ButtonHandlerButton } from '@/shared/ui/composed/ButtonHandler';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { Notice } from '@/shared/ui/composed/Notice';
 import { DetailsSection } from '@/shared/ui/composed/DetailsSection';
@@ -42,13 +41,11 @@ const QUOTE_CARD_HORIZONTAL_MARGIN = 16;
 
 interface LightningReceiveScreenProps {
   mintHistoryEntry: MintHistoryEntry | string;
-  extraButtons?: ButtonHandlerButton[];
   onRequestMintList?: () => void;
 }
 
 export function LightningReceiveScreen({
   mintHistoryEntry,
-  extraButtons = [],
   onRequestMintList,
 }: LightningReceiveScreenProps) {
   useLifecycleLogger('LightningReceiveScreen');
@@ -128,7 +125,6 @@ export function LightningReceiveScreen({
               onPress: () => actions.share.execute(),
               condition: actions.share.available,
             },
-            ...extraButtons.map((button) => ({ ...button, condition: !isPaid })),
           ]}
         />
       </HStack>

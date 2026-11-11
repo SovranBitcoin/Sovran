@@ -15,7 +15,6 @@ import { useMintInfo } from '@/shared/hooks/useMintInfo';
 import { paymentLog } from '@/shared/lib/logger';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 import { ScreenErrorState, ScreenLoadingState } from '@/shared/ui/composed/ScreenStates';
-import type { ButtonHandlerButton } from '@/shared/ui/composed/ButtonHandler';
 
 import { OnchainReceiveScreen, type OnchainReceiveEntry } from './OnchainReceiveScreen';
 
@@ -27,29 +26,22 @@ const ParamsSchema = z.object({
 interface OnchainReceiveRouteProps {
   /** Log scope for invalid-params telemetry; e.g. `'receive-flow.onchainReceive'`. */
   where: string;
-  extraButtons?: ButtonHandlerButton[];
   onRequestMintList?: () => void;
 }
 
-export function OnchainReceiveRoute({
-  where,
-  extraButtons = [],
-  onRequestMintList,
-}: OnchainReceiveRouteProps) {
+export function OnchainReceiveRoute({ where, onRequestMintList }: OnchainReceiveRouteProps) {
   const params = useRouteParams(ParamsSchema, { where });
   if (!params) return null;
   paymentLog.info('receive.onchain.route_ready', {
     where,
     mintHistoryEntryLength: params.mintHistoryEntry.length,
     unit: params.unit ?? null,
-    extraButtonCount: extraButtons.length,
     hasMintListCallback: !!onRequestMintList,
   });
 
   return (
     <OnchainReceiveRouteContent
       mintHistoryEntry={params.mintHistoryEntry}
-      extraButtons={extraButtons}
       onRequestMintList={onRequestMintList}
     />
   );
@@ -57,11 +49,9 @@ export function OnchainReceiveRoute({
 
 function OnchainReceiveRouteContent({
   mintHistoryEntry,
-  extraButtons,
   onRequestMintList,
 }: {
   mintHistoryEntry: string;
-  extraButtons: ButtonHandlerButton[];
   onRequestMintList?: () => void;
 }) {
   const screenOptions = useMemo(() => ({ title: 'Receive onchain' }), []);
@@ -113,7 +103,6 @@ function OnchainReceiveRouteContent({
         source={source}
         mintUrl={mintUrl}
         mintInfo={mintInfo}
-        extraButtons={extraButtons}
         onRequestMintList={onRequestMintList}
       />
     </>
