@@ -238,9 +238,14 @@ function createQueue(initial: Record<string, MeshRedeemEntry>) {
     port: {
       prune: () => {},
       entries: () => initial,
-      markStatus: (hash: string, status: string) =>
-        statuses.push([hash, status]),
-      scheduleRetry: (hash: string) => retries.push(hash),
+      markStatus: (hash: string, status: string): boolean => {
+        statuses.push([hash, status]);
+        return true;
+      },
+      scheduleRetry: (hash: string): "pending" | "failed" | null => {
+        retries.push(hash);
+        return "pending";
+      },
     },
     statuses,
     retries,
@@ -344,8 +349,90 @@ describe("createMeshRedeemOrchestrator", () => {
     expect(queue.statuses).toContainEqual(["fatal", "failed"]);
   });
 
+  it("does not start a receive the queue refused to start", async () => {
+    const queue = createQueue({ h1: entry() });
+    queue.port.markStatus = (hash, status) => {
+      queue.statuses.push([hash, status]);
+      return status !== "redeeming";
+    };
+    const execute = vi.fn(async () => ({ historyEntryId: null }));
+    const onRedeeming = vi.fn();
+    const orchestrator = createMeshRedeemOrchestrator({
+      getManager: fakeManager(),
+      queue: queue.port,
+      executeAutoRedeem: execute,
+      onRedeeming,
+    });
+    await orchestrator.drain();
+    expect(execute).not.toHaveBeenCalled();
+    expect(onRedeeming).not.toHaveBeenCalled();
+    expect(queue.statuses).toEqual([["h1", "redeeming"]]);
+  });
+
+  it("does not report a receive the queue refused to record", async () => {
+    const queue = createQueue({ h1: entry() });
+    queue.port.markStatus = (hash, status) => {
+      queue.statuses.push([hash, status]);
+      return status !== "redeemed";
+    };
+    const onRedeemed = vi.fn();
+    const onFailed = vi.fn();
+    const orchestrator = createMeshRedeemOrchestrator({
+      getManager: fakeManager(),
+      queue: queue.port,
+      executeAutoRedeem: async () => ({ historyEntryId: "hist1" }),
+      onRedeemed,
+      onFailed,
+    });
+    await orchestrator.drain();
+    expect(onRedeemed).not.toHaveBeenCalled();
+    expect(onFailed).not.toHaveBeenCalled();
+  });
+
+  it("reports a failed attempt as the queue recorded it, and not when it refused", async () => {
+    const entries = {
+      spent: entry({ token: "spent" }),
+      fatal: entry({ token: "fatal" }),
+      net: entry({ token: "net" }),
+      exhausted: entry({ token: "exhausted", attempts: 4 }),
+      refused: entry({ token: "refused" }),
+    };
+    const queue = createQueue(entries);
+    queue.port.markStatus = (hash, status) =>
+      !(hash === "refused" && status !== "redeeming");
+    queue.port.scheduleRetry = (hash) =>
+      hash === "exhausted" ? "failed" : hash === "refused" ? null : "pending";
+    const errors: Record<string, Error> = {
+      spent: new Error("Token was already spent"),
+      fatal: new Error("proof verification failed"),
+      net: new Error("fetch failed: network down"),
+      exhausted: new Error("fetch failed: network down"),
+      refused: new Error("fetch failed: network down"),
+    };
+    const onFailed = vi.fn();
+    const orchestrator = createMeshRedeemOrchestrator({
+      getManager: fakeManager(),
+      queue: queue.port,
+      executeAutoRedeem: async ({ tokenString }) => {
+        throw errors[tokenString];
+      },
+      onFailed,
+    });
+    await orchestrator.drain();
+    expect(
+      onFailed.mock.calls.map(([hash, , recorded]) => [hash, recorded]),
+    ).toEqual([
+      ["spent", "spent"],
+      ["fatal", "failed"],
+      ["net", "retrying"],
+      ["exhausted", "failed"],
+    ]);
+  });
+
   it("a drop queued while a drain runs is redeemed by one more run after it", async () => {
-    const entries: Record<string, MeshRedeemEntry> = { a: entry({ token: "a" }) };
+    const entries: Record<string, MeshRedeemEntry> = {
+      a: entry({ token: "a" }),
+    };
     const queue = createQueue(entries);
     const prune = vi.fn();
     queue.port.prune = prune;
@@ -355,7 +442,8 @@ describe("createMeshRedeemOrchestrator", () => {
       getManager: fakeManager(),
       queue: queue.port,
       executeAutoRedeem: async ({ tokenString: token }) => {
-        if (token === "a") await new Promise<void>((resolve) => (releaseA = resolve));
+        if (token === "a")
+          await new Promise<void>((resolve) => (releaseA = resolve));
         redeemed.push(token);
         // The fixture's queue does not move statuses; settle the entry so
         // a later run does not pick it again.

@@ -123,30 +123,29 @@ function getOrchestrator(): MeshRedeemOrchestrator {
         unit: entry.unit,
       });
     },
-    onFailed: (tokenHash, entry, kind) => {
+    onFailed: (tokenHash, entry, recorded) => {
       paymentLog.warn('near_pay.redeem.queue.failed', {
         tokenHash: tokenHash.slice(0, 12),
         ...mintUrlLogFields(entry.mintUrl),
         amount: entry.amount,
         unit: entry.unit,
-        kind,
+        recorded,
         activeId: usePaymentStatusStore.getState().active?.id ?? null,
         activeState: usePaymentStatusStore.getState().active?.state ?? null,
       });
-      // Network/retryable failures are queued for another redeem attempt, so
-      // keep the visible toast pending instead of presenting a terminal error.
       if (usePaymentStatusStore.getState().active?.id !== tokenHash) {
         paymentLog.info('near_pay.redeem.toast_update_suppressed', {
           tokenHash: tokenHash.slice(0, 12),
-          kind,
+          recorded,
           reason: 'active_id_mismatch',
         });
         return;
       }
-      if (kind === 'network' || kind === 'retryable') {
+      // Back in line for another attempt, so keep the visible toast pending
+      // instead of presenting a terminal error.
+      if (recorded === 'retrying') {
         paymentLog.info('near_pay.redeem.toast_waiting', {
           tokenHash: tokenHash.slice(0, 12),
-          kind,
           expectedNext: 'retry_when_online_or_backoff_elapsed',
         });
         usePaymentStatusStore.getState().setWaiting(tokenHash, RECEIVE_PENDING_TOAST_COPY);
@@ -156,7 +155,9 @@ function getOrchestrator(): MeshRedeemOrchestrator {
         .getState()
         .setFailed(
           tokenHash,
-          kind === 'spent' ? new Error('Token was already redeemed') : new Error('Redeem failed')
+          recorded === 'spent'
+            ? new Error('Token was already redeemed')
+            : new Error('Redeem failed')
         );
     },
     onRedeemed: (tokenHash, entry, historyEntryId) => {

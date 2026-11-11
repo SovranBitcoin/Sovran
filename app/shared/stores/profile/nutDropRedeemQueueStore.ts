@@ -77,13 +77,17 @@ interface NutDropRedeemQueueActions {
     >,
     status?: MeshRedeemArrival
   ) => boolean;
-  /** Refused, and logged, when the entry's status is not one the move may start from. */
+  /**
+   * True when recorded. Refused, and logged, when the entry's status is not
+   * one the move may start from.
+   */
   markStatus: (
     tokenHash: string,
     status: Exclude<MeshRedeemStatus, 'pending'>,
     error?: string
-  ) => void;
-  scheduleRetry: (tokenHash: string, error: string) => void;
+  ) => boolean;
+  /** The status recorded (in line again, or failed once out of attempts), or null when refused. */
+  scheduleRetry: (tokenHash: string, error: string) => 'pending' | 'failed' | null;
   /**
    * Put a parked entry (`untrusted-mint`, `failed`) back in line with a clean
    * attempt count: its mint has since been trusted, or the person asked to try
@@ -245,7 +249,7 @@ export const useNutDropRedeemQueueStore = create<NutDropRedeemQueueStore>({
 
       markStatus: (tokenHash, status, error) => {
         const existing = get().byTokenHash[tokenHash];
-        if (!existing || !allowsMove(tokenHash, existing, status)) return;
+        if (!existing || !allowsMove(tokenHash, existing, status)) return false;
         storeLog.info('store.nut_drop_queue.status', {
           tokenHash: tokenHash.slice(0, 12),
           status,
@@ -261,6 +265,7 @@ export const useNutDropRedeemQueueStore = create<NutDropRedeemQueueStore>({
             [tokenHash]: { ...rest, status, ...(nextError ? { lastError: nextError } : {}) },
           },
         }));
+        return true;
       },
 
       requeue: (tokenHash) => {
@@ -294,7 +299,7 @@ export const useNutDropRedeemQueueStore = create<NutDropRedeemQueueStore>({
 
       scheduleRetry: (tokenHash, error) => {
         const existing = get().byTokenHash[tokenHash];
-        if (!existing || !allowsMove(tokenHash, existing, 'retry')) return;
+        if (!existing || !allowsMove(tokenHash, existing, 'retry')) return null;
         const attempts = existing.attempts + 1;
         if (attempts >= MESH_REDEEM_MAX_ATTEMPTS) {
           storeLog.warn('store.nut_drop_queue.exhausted', {
@@ -308,7 +313,7 @@ export const useNutDropRedeemQueueStore = create<NutDropRedeemQueueStore>({
               [tokenHash]: { ...existing, status: 'failed', attempts, lastError: clipError(error) },
             },
           }));
-          return;
+          return 'failed';
         }
         const backoff = Math.min(BASE_BACKOFF_MS * 2 ** (attempts - 1), MAX_BACKOFF_MS);
         const nextAttemptAt = Date.now() + backoff;
@@ -331,6 +336,7 @@ export const useNutDropRedeemQueueStore = create<NutDropRedeemQueueStore>({
             },
           },
         }));
+        return 'pending';
       },
 
       prune: () => {

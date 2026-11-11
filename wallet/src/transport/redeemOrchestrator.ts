@@ -36,17 +36,32 @@ export interface MeshRedeemQueuePort {
   /** Drop expired entries (the store owns its TTL policy). */
   prune(): void;
   entries(): Record<string, MeshRedeemEntry>;
-  /** Refused by the store when the entry's status is not one the move may start from. */
+  /**
+   * True when recorded. Refused by the store when the entry's status is not
+   * one the move may start from.
+   */
   markStatus(
     tokenHash: string,
     status: Exclude<MeshRedeemStatus, "pending">,
     error?: string,
-  ): void;
-  /** Exponential backoff + terminal `failed` after max attempts (store-owned policy). */
-  scheduleRetry(tokenHash: string, error: string): void;
+  ): boolean;
+  /**
+   * Exponential backoff + terminal `failed` after max attempts (store-owned
+   * policy). Returns the status recorded, or null when refused.
+   */
+  scheduleRetry(
+    tokenHash: string,
+    error: string,
+  ): Extract<MeshRedeemStatus, "pending" | "failed"> | null;
 }
 
 export type MeshRedeemErrorKind = "spent" | "network" | "retryable" | "fatal";
+
+/**
+ * What the queue recorded for a failed attempt: back in line for another try,
+ * spent, or held (refused by the mint, or out of attempts).
+ */
+export type MeshRedeemFailure = "retrying" | "spent" | "failed";
 
 export function classifyMeshRedeemError(err: unknown): MeshRedeemErrorKind {
   const message = err instanceof Error ? err.message : String(err);
@@ -80,17 +95,23 @@ export interface MeshRedeemOrchestratorConfig {
   now?: () => number;
   /** Entry began redeeming (app mounts its processing toast here). */
   onRedeeming?: (tokenHash: string, entry: MeshRedeemEntry) => void;
-  /** Entry redeemed (push the mesh `redeemed` status + confirm UI here). */
+  /**
+   * Entry recorded redeemed (push the mesh `redeemed` status + confirm UI
+   * here). Not called when the queue refused to record it.
+   */
   onRedeemed?: (
     tokenHash: string,
     entry: MeshRedeemEntry,
     historyEntryId: string | null,
   ) => void;
-  /** Terminal or retry-scheduled failure (flip the toast here). */
+  /**
+   * A failed attempt, as the queue recorded it (flip the toast here). Not
+   * called when the queue refused to record it.
+   */
   onFailed?: (
     tokenHash: string,
     entry: MeshRedeemEntry,
-    kind: MeshRedeemErrorKind,
+    recorded: MeshRedeemFailure,
     message: string,
   ) => void;
 }
@@ -183,43 +204,85 @@ export function createMeshRedeemOrchestrator(
         continue;
       }
 
-      config.queue.markStatus(tokenHash, "redeeming");
+      if (!config.queue.markStatus(tokenHash, "redeeming")) {
+        // Moved since this run read the queue: no longer this run's to receive.
+        refused(tokenHash, "redeeming");
+        continue;
+      }
       config.onRedeeming?.(tokenHash, entry);
+      let historyEntryId: string | null;
       try {
-        const { historyEntryId } = await config.executeAutoRedeem({
+        ({ historyEntryId } = await config.executeAutoRedeem({
           tokenString: entry.token,
           mintUrl: entry.mintUrl,
           manager,
-        });
-        if (config.getManager() !== manager) return;
-        config.queue.markStatus(tokenHash, "redeemed");
-        logger.info("transport.redeem.success", {
-          tokenHash: tokenHash.slice(0, 12),
-          amount: entry.amount,
-          ...mintUrlFields(entry.mintUrl),
-        });
-        config.onRedeemed?.(tokenHash, entry, historyEntryId);
+        }));
       } catch (err) {
         if (config.getManager() !== manager) return;
-        const kind = classifyMeshRedeemError(err);
         const message = err instanceof Error ? err.message : String(err);
-        logger.warn("transport.redeem.attemptFailed", {
+        const recorded = recordFailure(tokenHash, err, message);
+        if (recorded) config.onFailed?.(tokenHash, entry, recorded, message);
+        else refused(tokenHash, "failure");
+        continue;
+      }
+      if (config.getManager() !== manager) return;
+      if (!config.queue.markStatus(tokenHash, "redeemed")) {
+        refused(tokenHash, "redeemed");
+        continue;
+      }
+      logger.info("transport.redeem.success", {
+        tokenHash: tokenHash.slice(0, 12),
+        amount: entry.amount,
+        ...mintUrlFields(entry.mintUrl),
+      });
+      try {
+        config.onRedeemed?.(tokenHash, entry, historyEntryId);
+      } catch (err) {
+        // The token is received and recorded; the rest of the run goes on.
+        logger.warn("transport.redeem.onRedeemedFailed", {
           tokenHash: tokenHash.slice(0, 12),
-          kind,
-          error: message,
+          error: err instanceof Error ? err.message : String(err),
         });
-        if (kind === "spent") {
-          // Duplicate delivery race (an equivalent token already redeemed)
-          // or the sender reclaimed. Nothing actionable.
-          config.queue.markStatus(tokenHash, "spent", message);
-        } else if (kind === "network" || kind === "retryable") {
-          config.queue.scheduleRetry(tokenHash, message);
-        } else {
-          config.queue.markStatus(tokenHash, "failed", message);
-        }
-        config.onFailed?.(tokenHash, entry, kind, message);
       }
     }
+  }
+
+  /** Records a failed receive; returns what was recorded, or null when refused. */
+  function recordFailure(
+    tokenHash: string,
+    err: unknown,
+    message: string,
+  ): MeshRedeemFailure | null {
+    const kind = classifyMeshRedeemError(err);
+    logger.warn("transport.redeem.attemptFailed", {
+      tokenHash: tokenHash.slice(0, 12),
+      kind,
+      error: message,
+    });
+    switch (kind) {
+      case "spent":
+        // Duplicate delivery race (an equivalent token already redeemed)
+        // or the sender reclaimed. Nothing actionable.
+        return config.queue.markStatus(tokenHash, "spent", message)
+          ? "spent"
+          : null;
+      case "network":
+      case "retryable": {
+        const status = config.queue.scheduleRetry(tokenHash, message);
+        return status === "pending" ? "retrying" : status;
+      }
+      case "fatal":
+        return config.queue.markStatus(tokenHash, "failed", message)
+          ? "failed"
+          : null;
+    }
+  }
+
+  function refused(tokenHash: string, move: string): void {
+    logger.warn("transport.redeem.recordRefused", {
+      tokenHash: tokenHash.slice(0, 12),
+      move,
+    });
   }
 
   return { drain };

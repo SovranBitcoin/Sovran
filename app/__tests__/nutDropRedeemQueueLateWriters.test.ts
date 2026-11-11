@@ -2,11 +2,11 @@
  * @jest-environment node
  */
 /**
- * Writers of the redeem queue whose answer arrives after the entry has moved
- * on, run against the real queue store and the real orchestrator with a fake
- * mint. The wallet transport test's queue records calls without applying the
- * queue's moves; this one applies them, so an entry left where no drain, retry
- * or review will pick it up shows here.
+ * The real queue store and the real orchestrator, with a fake mint. The wallet
+ * transport test's queue records calls without applying the queue's moves;
+ * this one applies them, so an entry left where no drain, retry or review will
+ * pick it up shows here, and so does a toast that says something other than
+ * what the queue recorded.
  */
 import { Amount, getEncodedToken } from '@cashu/cashu-ts';
 import { meshTokenDedupeKey } from 'wallet';
@@ -35,6 +35,12 @@ const SENDER = 'c'.repeat(64);
 const mockManager = { mint: { isTrustedMint: async () => true } };
 const mockExecuteAutoRedeem = jest.fn();
 const mockSetTransactionAnnotation = jest.fn();
+const mockAppState = { currentState: 'background' };
+const mockToast = {
+  active: null as { id: string } | null,
+  setWaiting: jest.fn(),
+  setFailed: jest.fn(),
+};
 
 jest.mock('wallet/operations', () => ({
   createDefaultOperations: () => ({ executeAutoRedeem: mockExecuteAutoRedeem }),
@@ -45,7 +51,7 @@ jest.mock('@/shared/lib/cashu/manager', () => ({
 jest.mock('@/shared/lib/cashu/offlineReceiveDleq', () => ({
   requireOfflineTokenDleq: async () => undefined,
 }));
-jest.mock('react-native', () => ({ AppState: { currentState: 'background' } }));
+jest.mock('react-native', () => ({ AppState: mockAppState }));
 jest.mock('bitchat-module', () => ({ getBLEPeers: jest.fn(() => []) }));
 jest.mock('@/features/bitchat/hooks/useBLEPeers', () => ({
   useBLEPeerDirectory: { getState: () => ({ peers: [] }) },
@@ -59,10 +65,12 @@ jest.mock('@/shared/stores/profile/transactionAnnotationStore', () => ({
 jest.mock('@/shared/stores/runtime/paymentStatusStore', () => ({
   usePaymentStatusStore: {
     getState: () => ({
-      active: null,
-      setActive: jest.fn(),
-      setWaiting: jest.fn(),
-      setFailed: jest.fn(),
+      active: mockToast.active,
+      setActive: (active: { id: string }) => {
+        mockToast.active = active;
+      },
+      setWaiting: mockToast.setWaiting,
+      setFailed: mockToast.setFailed,
     }),
   },
 }));
@@ -112,6 +120,10 @@ const flush = () => new Promise((resolve) => setImmediate(resolve));
 beforeEach(() => {
   mockExecuteAutoRedeem.mockReset();
   mockSetTransactionAnnotation.mockReset();
+  mockAppState.currentState = 'background';
+  mockToast.active = null;
+  mockToast.setWaiting.mockReset();
+  mockToast.setFailed.mockReset();
   useNutDropRedeemQueueStore.setState({ byTokenHash: {} });
 });
 
@@ -200,5 +212,42 @@ describe('a message intake that answers after the Bluetooth copy started redeemi
     spent.resolve(true);
     expect(await intake).toBe('already-known');
     expect(current()?.status).toBe('pending');
+  });
+});
+
+describe('the toast for a queued token says what the queue recorded', () => {
+  function queued(attempts: number) {
+    mockAppState.currentState = 'active';
+    useNutDropRedeemQueueStore.setState({
+      byTokenHash: {
+        [HASH]: {
+          token: TOKEN,
+          mintUrl: MINT_URL,
+          amount: 21,
+          unit: 'sat',
+          status: 'pending',
+          attempts,
+          nextAttemptAt: 0,
+          receivedAt: Date.now(),
+        },
+      },
+    });
+    mockExecuteAutoRedeem.mockRejectedValue(new Error('fetch failed: network down'));
+  }
+
+  it('waits while the token is back in line for another attempt', async () => {
+    queued(1);
+    await drainNutDropRedeemQueue();
+    expect(current()?.status).toBe('pending');
+    expect(mockToast.setWaiting).toHaveBeenCalledTimes(1);
+    expect(mockToast.setFailed).not.toHaveBeenCalled();
+  });
+
+  it('fails once the last attempt has run out and the token is held', async () => {
+    queued(4);
+    await drainNutDropRedeemQueue();
+    expect(current()).toMatchObject({ status: 'failed', attempts: 5 });
+    expect(mockToast.setWaiting).not.toHaveBeenCalled();
+    expect(mockToast.setFailed).toHaveBeenCalledWith(HASH, new Error('Redeem failed'));
   });
 });
