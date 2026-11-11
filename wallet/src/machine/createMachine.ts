@@ -133,7 +133,6 @@ const INTENT_EVENTS = new Set<FlowEvent["type"]>([
   "START_RECEIVE",
   "SHOW_RECEIVE_QR",
   "REVIEW_MINT",
-  "RESET",
 ]);
 
 /**
@@ -147,7 +146,6 @@ const INTENT_EVENTS = new Set<FlowEvent["type"]>([
  */
 const LEAVES_SETTLED_PAYMENT: Record<FlowEvent["type"], boolean> = {
   EXECUTE: true,
-  RESET: true,
   START_SEND: true,
   START_SEND_ECASH: true,
   START_RECEIVE_LIGHTNING: true,

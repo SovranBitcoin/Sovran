@@ -25,7 +25,6 @@
  * Event types tested:
  *
  *   GLOBAL EVENTS (handled from any step):
- *     RESET            → idle (clears all context)
  *     EXECUTE          → varies (parse input → resolve intent → route)
  *     START_SEND_ECASH → enterAmount or selectMint or error
  *     START_RECEIVE_LIGHTNING → enterAmount (destination: mintQuote)
@@ -106,39 +105,6 @@ function txOutcome(
 
 /** The minimal idle context — just the unit. */
 const idle: FlowContext = { unit: UNIT };
-
-// ---------------------------------------------------------------------------
-// RESET — global event
-// ---------------------------------------------------------------------------
-
-/**
- * RESET is the machine's "escape hatch". From ANY step, at ANY time,
- * RESET returns to idle with a clean context. This is critical for:
- *   - User tapping "Cancel" or "Back" during a flow
- *   - The app clearing state when the payment sheet dismisses
- *   - Recovery from stuck states
- *
- * The ONLY context field preserved is `unit` — the currency unit is
- * a session-level setting, not a flow-level one.
- */
-describe('transition — RESET', () => {
-  it('returns to idle from any step', () => {
-    // Start in enterAmount with accumulated context (amount, mintUrl).
-    // RESET should wipe everything and return to idle.
-    const result = tx('enterAmount', { ...idle, amount: 100, mintUrl: MINT1 }, { type: 'RESET' });
-    expect(result.step).toBe('idle');
-    // Amount from the previous flow should be gone
-    expect(result.context.amount).toBeUndefined();
-  });
-
-  it('clears the context', () => {
-    // Even complex context fields like `parsed` (the parsed input) should
-    // be wiped. Only `unit` survives a RESET.
-    const result = tx('error', { ...idle, parsed: {} as any }, { type: 'RESET' });
-    expect(result.context.parsed).toBeUndefined();
-    expect(result.context.unit).toBe(UNIT);
-  });
-});
 
 // ---------------------------------------------------------------------------
 // EXECUTE — global event
@@ -1709,13 +1675,12 @@ describe('payment-request mint preference transitions', () => {
     expect(result.step).toBe('selectMint');
     expect(result.context.supportedMintUrls).toBeUndefined();
   });
-  it('clears preferred ranking on option change and RESET', () => {
+  it('clears preferred ranking on option change', () => {
     const current = tx('idle', idle, { type: 'EXECUTE', input: request(true) }, wallet);
     const strictOption = parsePaymentInput(request(false), defaultDetectors).options[0];
     const changed = tx('chooseOption', current.context, { type: 'OPTION_CHOSEN', option: strictOption }, wallet);
     expect(changed.context.preferredMintUrls).toBeUndefined();
     expect(changed.context.supportedMintUrls).toEqual([MINT1]);
-    expect(tx(current.step, current.context, { type: 'RESET' }, wallet).context.preferredMintUrls).toBeUndefined();
   });
 });
 

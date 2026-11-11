@@ -719,8 +719,6 @@ export function transition(
           getSatsPerUnitMinor,
         ),
       );
-    case "RESET":
-      return stamp({ step: "idle", context: { unit }, data: {} as any });
     case "REQUEST_MINT_SELECTOR":
       return stamp(requestMintSelector(event, currentCtx, walletCtx));
     case "START_SEND_ECASH":

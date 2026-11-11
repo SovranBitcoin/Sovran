@@ -230,16 +230,17 @@ signal that the flow has given up -- a `chooseFallbackOption` step may follow.
 
 ### 3.6 Events
 
-All 14 `FlowEvent` types are dispatched via `send()`
+All 15 `FlowEvent` types are dispatched via `send()`
 (`src/machine/types.ts:355-412`):
 
 `EXECUTE`, `OPTION_CHOSEN`, `AMOUNT_ENTERED`, `MINT_SELECTED`, `PROOFS_CHOSEN`,
-`SEND_MEMO_SUBMITTED`, `REQUEST_MINT_SELECTOR`, `START_SEND_ECASH`,
-`START_RECEIVE_LIGHTNING`, `START_RECEIVE`, `REVIEW_MINT`,
-`CONFIRM_MELT`, `CONFIRM_PAYMENT_REQUEST`, `RESET`.
+`SEND_MEMO_SUBMITTED`, `REQUEST_MINT_SELECTOR`, `START_SEND`, `START_SEND_ECASH`,
+`START_RECEIVE_LIGHTNING`, `START_RECEIVE`, `SHOW_RECEIVE_QR`, `REVIEW_MINT`,
+`CONFIRM_MELT`, `CONFIRM_PAYMENT_REQUEST`. There is no reset event:
+`machine.reset()` calls `resetInternal`.
 
 Global events (handled from any state, `transitions.ts:390-441`): `EXECUTE`,
-`RESET`, `REQUEST_MINT_SELECTOR`, `SEND_MEMO_SUBMITTED`, `START_SEND_ECASH`,
+`REQUEST_MINT_SELECTOR`, `SEND_MEMO_SUBMITTED`, `START_SEND_ECASH`,
 `START_RECEIVE_LIGHTNING`, `START_RECEIVE`, `REVIEW_MINT`.
 State-specific events (`transitions.ts:444-453`): `OPTION_CHOSEN`,
 `AMOUNT_ENTERED`, `MINT_SELECTED`, `PROOFS_CHOSEN`. These four are not actually
@@ -526,7 +527,7 @@ MUST NOT:
   a new quote and only the following Pay executes.
 - A settled payment (melt `settled`, payment request `settled` or
   `undelivered`, and `sendComplete`, whose token exists) is final for its
-  flow. Only an event that starts another flow (`EXECUTE`, `RESET`, a
+  flow. Only an event that starts another flow (`EXECUTE`, a
   `START_*`, `SHOW_RECEIVE_QR`, `REVIEW_MINT`) leaves it; every other event
   changes nothing, since re-resolving the amount, mint or option would rebuild
   a preview that Pay sends again, or resolve an ecash send to `confirmSend`
@@ -1025,7 +1026,7 @@ The en copy for `MINT_UNREACHABLE` is "Mint unreachable" (`locales.ts:29`); for
 | `MINT_SELECTED` with a new `destination` | rebuild keeping `unit` + event mint/amount/destination + whitelisted prior fields (methods, paymentRequest, meltTarget, recipients, display). `transitions.ts:231-245` |
 | `OPTION_CHOSEN` | explicitly clears `destination`/methods/`supportedMintUrls`/`paymentRequest`/`meltTarget` before re-extracting. `transitions.ts:113-123` |
 | `REQUEST_MINT_SELECTOR` (no destination) | drops everything but `unit`. `contextResolution.ts:250` |
-| `RESET` | `{step:'idle', context:{unit}}` (`transition`, case `RESET`). `machine.reset()` does not send the event: it calls `resetInternal`, which bumps `flowGeneration`. |
+| `machine.reset()` (not an event) | `resetInternal`: `{step:'idle', context:{unit}}`, and bumps `flowGeneration`. |
 
 ### Amount survival across mint change
 
@@ -1132,7 +1133,7 @@ during verification and the invariant rests on source review.
 - [ ] Destination change rebuilds context (`transitions.ts:178-194,231-245`).
 - [ ] `OPTION_CHOSEN` clears stale intent-specific fields
       (`transitions.ts:113-123`).
-- [ ] `RESET` reduces to `{unit}` (`transition`, case `RESET`); `reset()` bumps the generation (`resetInternal`).
+- [ ] `reset()` reduces the context to `{unit}` and bumps the generation (`resetInternal`).
 
 ### Integration boundary
 

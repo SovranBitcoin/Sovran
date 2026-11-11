@@ -141,7 +141,6 @@ const SETTLED: Settled[] = [
 /** What each event does to a settled payment. */
 const EXPECTED: Record<FlowEvent["type"], "newFlow" | "unchanged"> = {
   EXECUTE: "newFlow",
-  RESET: "newFlow",
   START_SEND: "newFlow",
   START_SEND_ECASH: "newFlow",
   START_RECEIVE_LIGHTNING: "newFlow",
@@ -163,7 +162,6 @@ function eventsOf(type: FlowEvent["type"], s: Settled): FlowEvent[] {
   switch (type) {
     case "EXECUTE":
       return [{ type, input: INPUTS.cashuTokenV3 }];
-    case "RESET":
     case "START_SEND":
     case "START_RECEIVE_LIGHTNING":
     case "START_RECEIVE":

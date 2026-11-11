@@ -507,7 +507,7 @@ export interface FlowContext {
   offline?: boolean;
   /** Original raw input string from scan/execute. Available after EXECUTE. */
   rawInput?: string;
-  /** Scan source hint. Persisted for the flow's lifetime (cleared on RESET). */
+  /** Scan source hint. Persisted for the flow's lifetime (cleared on reset). */
   source?: string;
   /** Original annotated options from BIP321 multi-option flow. Captured on first OPTION_CHOSEN. */
   originalOptions?: AnnotatedOption[];
@@ -635,8 +635,7 @@ export type FlowEvent =
   | { type: "SHOW_RECEIVE_QR" }
   | { type: "REVIEW_MINT"; mintUrl: string; token: string }
   | { type: "CONFIRM_MELT" }
-  | { type: "CONFIRM_PAYMENT_REQUEST" }
-  | { type: "RESET" };
+  | { type: "CONFIRM_PAYMENT_REQUEST" };
 
 // ---------------------------------------------------------------------------
 // Step Handler Map — wallet provides one handler per step

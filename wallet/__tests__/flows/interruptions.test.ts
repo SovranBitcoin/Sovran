@@ -20,8 +20,8 @@
  *   2. Execute a new input (overriding the current flow)
  *   3. Start a new flow (send/receive)
  *
- * This is possible because RESET and EXECUTE are GLOBAL events — they
- * work from any step. The machine wrapper also supports startSendEcash
+ * This is possible because reset() works from any step and EXECUTE is a
+ * GLOBAL event. The machine wrapper also supports startSendEcash
  * and startReceiveLightning from any step (they internally reset first).
  *
  * Testing strategy:
