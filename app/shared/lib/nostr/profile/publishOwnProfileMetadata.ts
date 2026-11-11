@@ -6,11 +6,13 @@ import { parseProfileMetadata, supersedes } from 'nostr';
 import { withSkippedPersistWrites } from '@/shared/lib/cashu/profileScopedStorage';
 import { nostrLog } from '@/shared/lib/logger';
 import { buildNostrDataLayer } from '@/shared/lib/nostr/buildNostrDataLayer';
-import { publishEvent } from '@/shared/lib/nostr/publish/publishEvent';
 import type { PublishError, PublishResult } from '@/shared/lib/nostr/publish/types';
-import { getOwnWriteRelays } from '@/shared/lib/nostr/outbox/relayListStore';
-import { nextReplaceableCreatedAt } from '@/shared/lib/nostr/ownReplaceableEvent';
-import { resolveWriteRelays } from '@/shared/lib/nostr/outbox/resolveWriteRelays';
+import {
+  MAX_FUTURE_SEC,
+  nextReplaceableCreatedAt,
+  publishToRelaysRead,
+  readForEdit,
+} from '@/shared/lib/nostr/ownReplaceableEvent';
 import { activePubkey, useProfileStore } from '@/shared/stores/global/profileStore';
 import {
   OwnProfileSnapshotSchema,
@@ -35,10 +37,6 @@ export function applyProfilePatch(
   }
   return content;
 }
-// A base beyond this skew window is logged (clock_skew) but still superseded
-// by +1; capping below it would make every later edit unpublishable.
-export const PROFILE_CREATED_AT_MAX_SKEW_SECONDS = 300;
-
 /** Which of two kind-0 snapshots stands, by the rule relays apply. */
 const standsOver = (a: OwnProfileSnapshot, b: OwnProfileSnapshot) =>
   supersedes(
@@ -91,7 +89,11 @@ export function ingestOwnProfileMetadata(
 export type OwnProfileLoadResult =
   { status: 'found'; snapshot: OwnProfileSnapshot } | { status: 'absent' | 'unavailable' };
 
-/** Only actual relay EOSE can establish absence; SDK timeouts cannot. */
+/**
+ * The profile for the editor's fields, from the pool within three seconds.
+ * Only actual relay EOSE can establish absence; SDK timeouts cannot. A save
+ * does not build on this alone: it reads the account's relays in full first.
+ */
 export async function loadOwnProfileMetadata(
   ndk: NDK,
   pubkey: string
@@ -194,19 +196,26 @@ export function publishOwnProfileMetadata({
     if (signerUser.isErr()) return err(signerUser.error);
     if (!isOwner() || signerUser.value.pubkey !== pubkey || ndk.signer !== signer)
       return err({ type: 'profile-changed' });
-    const loaded = await loadOwnProfileMetadata(ndk, pubkey);
+    // Build only on a complete read of the account's relays (a relay silent
+    // read after read left out), as for every own list; anything less waits.
+    const read = await readForEdit(ndk, pubkey, 0);
     if (!isOwner()) return err({ type: 'profile-changed' });
-    const base =
-      loaded.status === 'found'
-        ? loaded.snapshot
-        : initialLoad.status === 'found'
-          ? initialLoad.snapshot
-          : null;
+    if (read.status === 'waiting') return err({ type: 'base-unavailable' });
+    const remote = read.newest ? parseOwnProfileSnapshot(read.newest) : null;
+    if (read.newest && !remote) return err({ type: 'base-unavailable' });
+    // The newest of what the relays read hold, what this device last confirmed
+    // and what the editor opened on: the save never builds on an older one.
+    const latest = useOwnProfileMetadataStore.getState().latest;
+    const base = [remote, latest, initialLoad.status === 'found' ? initialLoad.snapshot : null]
+      .filter((snapshot): snapshot is OwnProfileSnapshot => snapshot !== null)
+      .reduce<OwnProfileSnapshot | null>(
+        (newest, snapshot) => (!newest || standsOver(snapshot, newest) ? snapshot : newest),
+        null
+      );
     const profile = useProfileStore.getState().getActiveProfile();
     if (
       !base &&
       (initialLoad.status !== 'absent' ||
-        loaded.status !== 'absent' ||
         profile?.cachedDisplayName !== undefined ||
         profile?.cachedPicture !== undefined)
     )
@@ -216,7 +225,9 @@ export function publishOwnProfileMetadata({
     event.pubkey = pubkey;
     const nowSeconds = Math.floor(Date.now() / 1000);
     event.created_at = nextReplaceableCreatedAt(base?.createdAt, nowSeconds);
-    if (base && base.createdAt > nowSeconds + PROFILE_CREATED_AT_MAX_SKEW_SECONDS)
+    // A base dated ahead is still superseded by +1 (and logged): refusing it
+    // would make every later edit unpublishable.
+    if (base && base.createdAt > nowSeconds + MAX_FUTURE_SEC)
       nostrLog.warn('nostr.profile.publish.clock_skew', {
         deltaSeconds: base.createdAt - nowSeconds,
       });
@@ -248,12 +259,8 @@ export function publishOwnProfileMetadata({
         patch.name !== undefined &&
         patch.name !== (base?.content.display_name ?? base?.content.name),
     });
-    const result = await publishEvent({
-      ndk,
-      event,
-      relays: resolveWriteRelays({ ownWriteRelays: getOwnWriteRelays() }),
-      resolveOn: 'optimistic',
-    });
+    // Exactly the relays read: one that was not read may hold a newer profile.
+    const result = await publishToRelaysRead(ndk, event, read.relays, 'optimistic');
     if (result.isErr()) return err(result.error);
     if (isOwner())
       ingestOwnProfileMetadata(

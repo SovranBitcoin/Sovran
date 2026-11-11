@@ -43,7 +43,8 @@ interface RelayListActions {
   removeRelay: (url: string) => void;
   setMarker: (url: string, marker: { read: boolean; write: boolean }) => void;
   restoreDefaults: () => void;
-  markPublished: (createdAtSec: number) => void;
+  /** A list dated `createdAtSec` holding `entries` was accepted by a relay: it is the saved list. */
+  markPublished: (createdAtSec: number, entries: RelayListEntry[]) => void;
   /** This session's sync has the relays' answer about `pubkey`'s relay list. */
   markDiscovered: (pubkey: string) => void;
 }
@@ -75,8 +76,17 @@ const PersistedRelayListStore = z.object({
   source: z.enum(['default', 'relay', 'local']).default('default').catch('default'),
 });
 
-function defaultEntries(): RelayListEntry[] {
+export function defaultEntries(): RelayListEntry[] {
   return DEFAULT_RELAYS.map((url) => ({ url, read: true, write: true }));
+}
+
+/**
+ * The list an edit starts from. An empty list the person did not empty
+ * themselves is the defaults, which is what this app writes to
+ * (`getOwnWriteRelays`): adding one relay to it keeps them.
+ */
+function editable(state: RelayListState): RelayListEntry[] {
+  return state.entries.length === 0 && state.source !== 'local' ? defaultEntries() : state.entries;
 }
 
 /** Whether writing `url` would add a new relay to a list already holding `MAX_RELAYS`. */
@@ -120,22 +130,22 @@ export const useRelayListStore = create<RelayListStore>({
       },
 
       addRelay: (url, marker) => {
-        if (wouldOverfill(get().entries, url)) {
+        if (wouldOverfill(editable(get()), url)) {
           storeLog.warn('nostr.relays.add_at_capacity', { max: MAX_RELAYS });
           return false;
         }
-        set({ entries: upsert(get().entries, url, marker), source: 'local' });
+        set({ entries: upsert(editable(get()), url, marker), source: 'local' });
         return true;
       },
 
       removeRelay: (url) => {
         const normalized = safeNormalizeRelay(url) ?? url;
-        set({ entries: get().entries.filter((e) => e.url !== normalized), source: 'local' });
+        set({ entries: editable(get()).filter((e) => e.url !== normalized), source: 'local' });
       },
 
       setMarker: (url, marker) => {
-        if (wouldOverfill(get().entries, url)) return;
-        set({ entries: upsert(get().entries, url, marker), source: 'local' });
+        if (wouldOverfill(editable(get()), url)) return;
+        set({ entries: upsert(editable(get()), url, marker), source: 'local' });
       },
 
       restoreDefaults: () => {
@@ -143,8 +153,8 @@ export const useRelayListStore = create<RelayListStore>({
         set({ entries: defaultEntries(), source: 'local' });
       },
 
-      markPublished: (createdAtSec) => {
-        set({ updatedAt: createdAtSec, hasPublished: true, source: 'relay' });
+      markPublished: (createdAtSec, entries) => {
+        set({ entries, updatedAt: createdAtSec, hasPublished: true, source: 'relay' });
       },
 
       markDiscovered: (pubkey) => {

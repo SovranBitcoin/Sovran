@@ -11,11 +11,15 @@ import {
 import type { NostrEventId, NostrPubkeyHex } from '@/shared/lib/protocolIds';
 import { captureActiveProfile } from '@/shared/stores/global/profileStore';
 import {
+  MAX_FUTURE_SEC,
   matchingSigner,
-  nextReplaceableCreatedAt,
+  publishToRelaysRead,
+  readForEdit,
   readNewestOwnEvent,
   signOwnEvent,
+  signReplacement,
   validOwnEvent,
+  type ReadForEdit,
 } from './ownReplaceableEvent';
 import { publishEvent } from './publish';
 import { getOwnWriteRelays } from './outbox/relayListStore';
@@ -25,7 +29,10 @@ const queues = new WeakMap<NDK, Promise<unknown>>();
 
 export async function decodeMuteList(ndk: NDK, event: NDKEvent, pubkey: string): Promise<MuteList> {
   if (!validOwnEvent(event, pubkey, 10000)) throw new Error('Invalid mute list');
-  if (event.content.length > 1_000_000 || event.created_at! > Math.floor(Date.now() / 1000) + 60)
+  if (
+    event.content.length > 1_000_000 ||
+    event.created_at! > Math.floor(Date.now() / 1000) + MAX_FUTURE_SEC
+  )
     throw new Error('Unsupported mute list');
   let privateTags: string[][] = [];
   if (event.content) {
@@ -40,12 +47,17 @@ export async function decodeMuteList(ndk: NDK, event: NDKEvent, pubkey: string):
   return { id: event.id, createdAt: event.created_at!, tags: Tags.parse(event.tags), privateTags };
 }
 
-/** Fetch before editing a replaceable event; never replace unreadable encrypted entries. */
+const WAITING: Record<Extract<ReadForEdit, { status: 'waiting' }>['reason'], string> = {
+  'relay-list-unknown': 'Mute-list relays not known yet',
+  'no-relays': 'No mute-list relays configured',
+  'timed-out': 'Mute-list read timed out',
+  failed: 'Mute-list subscription failed',
+};
+
+/** Restore the list from the write relays held now, waiting for each of them. */
 async function readMuteList(ndk: NDK, pubkey: string): Promise<MuteList | null> {
   const read = await readNewestOwnEvent(ndk, pubkey, 10000);
-  if (read.outcome === 'no-relays') throw new Error('No mute-list relays configured');
-  if (read.outcome === 'timed-out') throw new Error('Mute-list read timed out');
-  if (read.outcome === 'failed') throw new Error('Mute-list subscription failed');
+  if (read.outcome !== 'complete') throw new Error(WAITING[read.outcome]);
   return read.newest ? decodeMuteList(ndk, read.newest, pubkey) : null;
 }
 
@@ -99,7 +111,13 @@ export function setPersonBlocked(
       scope.check();
       const signer = await matchingSigner(ndk, ownPubkey);
       scope.check();
-      const fetched = await readMuteList(ndk, ownPubkey);
+      // The edit waits until this session knows the account's relays and has
+      // read them all, a relay silent read after read left out.
+      const read = await readForEdit(ndk, ownPubkey, 10000);
+      scope.check();
+      if (read.status === 'waiting') throw new Error(WAITING[read.reason]);
+      // Never replace unreadable encrypted entries.
+      const fetched = read.newest ? await decodeMuteList(ndk, read.newest, ownPubkey) : null;
       scope.check();
       const cached = useFeedIgnoreStore.getState().muteList;
       const base = (fetched && isNewerMuteList(fetched, cached) ? fetched : cached) ?? {
@@ -108,7 +126,7 @@ export function setPersonBlocked(
         tags: [],
         privateTags: [],
       };
-      // readMuteList only returns empty after the configured relays answer;
+      // `fetched` is empty only after every relay read answered;
       // a timeout or unreadable list must never create a replacement.
       if (fetched) useFeedIgnoreStore.getState().receiveMuteList(fetched);
       let next = base;
@@ -122,22 +140,17 @@ export function setPersonBlocked(
         'nip44'
       );
       scope.check();
-      const event = await signOwnEvent(ndk, signer, scope, {
+      const event = await signReplacement(ndk, signer, scope, {
         kind: 10000,
         pubkey: ownPubkey,
-        created_at: nextReplaceableCreatedAt(base.createdAt),
+        replaces: base.createdAt,
         tags: next.tags,
         content,
       });
       const latestKnown = useFeedIgnoreStore.getState().muteList;
       if (latestKnown && isNewerMuteList(latestKnown, base))
         throw new Error('Mute list changed; retry sync');
-      const published = await publishEvent({
-        ndk,
-        event,
-        relays: getOwnWriteRelays(),
-        resolveOn: 'all-settled',
-      });
+      const published = await publishToRelaysRead(ndk, event, read.relays);
       scope.check();
       if (published.isErr()) throw new Error('No relay accepted the mute list');
       const accepted = {

@@ -1,6 +1,7 @@
 /**
  * Polished follow-relationship pill for people rows (search results, profile
- * headers). Shows "Following" / "Follows you" / "Mutual".
+ * headers). Shows "Following" / "Follows you" / "Mutual", and "Following ·
+ * syncing" for a follow no published list holds yet.
  *
  * "Following" (viewer→them) is known locally and instant. "Follows you" and
  * "Mutual" require the server (nagg `followStatus`) — pass `relationship` when
@@ -26,7 +27,11 @@ interface FollowBadgeProps {
 
 export function FollowBadge({ pubkey }: FollowBadgeProps) {
   const isFollowingLocal = useNostrSocialStore(selectIsFollowingPubkey(pubkey));
-  const [success, accent] = useThemeColor(['success', 'accent'] as const);
+  // A follow no published list holds yet says it is waiting to sync.
+  const syncing = useNostrSocialStore(
+    (state) => !!state.optimisticFollowsByPubkey[pubkey]?.pending
+  );
+  const [success, accent, muted] = useThemeColor(['success', 'accent', 'muted'] as const);
 
   const resolved: FollowRelationship = isFollowingLocal ? 'following' : 'none';
 
@@ -37,7 +42,9 @@ export function FollowBadge({ pubkey }: FollowBadgeProps) {
     { label: string; color: string; icon: string | null }
   > = {
     mutual: { label: 'Mutual', color: success, icon: 'fluent:checkmark-16-filled' },
-    following: { label: 'Following', color: success, icon: 'fluent:checkmark-16-filled' },
+    following: syncing
+      ? { label: 'Following · syncing', color: muted, icon: 'mdi:clock-outline' }
+      : { label: 'Following', color: success, icon: 'fluent:checkmark-16-filled' },
     follows_you: { label: 'Follows you', color: accent, icon: null },
   };
   const { label, color, icon } = config[resolved];

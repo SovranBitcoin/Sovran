@@ -24,6 +24,10 @@ import {
   useRelayListStore,
 } from '@/shared/lib/nostr/outbox/relayListStore';
 import { DEFAULT_RELAYS } from '@/shared/lib/nostr/outbox/defaults';
+import {
+  SILENT_READS_BEFORE_LEFT_OUT,
+  forgetSilentRelays,
+} from '@/shared/lib/nostr/ownReplaceableEvent';
 
 type FakeEvent = {
   kind: number;
@@ -47,7 +51,11 @@ const mockSeedPool = jest.fn();
 const mockConnectListeners = new Set<(relay: Relay) => void>();
 const mockAppStateListeners = new Set<(state: string) => void>();
 let mockOffline = false;
+/** The active account, whose key the signer holds. */
+let mockActive = 'a1'.repeat(32);
+const mockProfileListeners = new Set<() => void>();
 let mockNdk: {
+  signer: { user: () => Promise<{ pubkey: string }> };
   subscribe: (filter: never, options: never, relaySet: never) => unknown;
   pool: { on: (type: string, l: () => void) => void; off: (type: string, l: () => void) => void };
 } | null;
@@ -104,8 +112,15 @@ jest.mock('@nostr-dev-kit/ndk-mobile', () => ({
   ...jest.requireActual('@nostr-dev-kit/ndk-mobile'),
   NDKEvent: class NDKEvent {
     kind = 0;
+    pubkey = '';
     created_at = 0;
     tags: string[][] = [];
+    content = '';
+    id = '';
+    async sign(signer: { user: () => Promise<{ pubkey: string }> }) {
+      this.pubkey = (await signer.user()).pubkey;
+      this.id = 'e'.repeat(64);
+    }
   },
   NDKRelaySet: {
     fromRelayUrls: (urls: string[]) => ({ relays: new Set(urls.map((url) => ({ url }))) }),
@@ -130,6 +145,18 @@ jest.mock('react-native-web/dist/exports/AppState', () => ({
     },
   },
 }));
+jest.mock('@/shared/stores/global/profileStore', () =>
+  jest
+    .requireActual<typeof import('./helpers/profileStoreMock')>('./helpers/profileStoreMock')
+    .activeAccountReaders(
+      () => ({ getActiveProfile: () => ({ pubkey: mockActive }) }),
+      (listener) => {
+        const notify = () => listener({});
+        mockProfileListeners.add(notify);
+        return () => mockProfileListeners.delete(notify);
+      }
+    )
+);
 jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({
   createProfileScopedStorage: () => ({
     getItem: async () => null,
@@ -206,7 +233,9 @@ beforeEach(() => {
   mockCached = null;
   mockAsked.length = 0;
   mockGate = () => Promise.resolve();
+  mockActive = A;
   mockNdk = {
+    signer: { user: async () => ({ pubkey: mockActive }) },
     subscribe: mockSubscription as never,
     pool: {
       on: (type, listener) => {
@@ -217,6 +246,7 @@ beforeEach(() => {
       },
     },
   };
+  forgetSilentRelays();
   mockPublishEvent.mockReset();
   mockPublishEvent.mockReturnValue(okAsync({ accepted: [] }));
   mockSeedPool.mockReset();
@@ -403,18 +433,45 @@ describe('first-run publish of the default relays', () => {
     expect(mockPublishEvent).toHaveBeenCalledTimes(1);
     const { event, relays, resolveOn } = mockPublishEvent.mock.calls[0][0];
     expect(event.kind).toBe(10002);
-    // Stamped when the 1.5 s delay ends.
+    // Signed by the account, stamped when the 1.5 s delay ends.
+    expect(event.pubkey).toBe(A);
     expect(event.created_at).toBe(NOW_SEC + 1);
     expect(event.tags).toEqual(DEFAULT_RELAYS.map((url) => ['r', url]));
     expect(relays).toEqual([...DEFAULT_RELAYS]);
     expect(resolveOn).toBe('all-settled');
-    // The store records the publish but keeps its (empty) entries.
+    // The saved list is the list published.
     expect(store()).toMatchObject({
-      entries: [],
+      entries: DEFAULT_RELAYS.map((url) => ({ url, read: true, write: true })),
       updatedAt: NOW_SEC + 1,
       hasPublished: true,
       source: 'relay',
     });
+  });
+
+  it('leaves an edit made before the first-run answer to the person to publish', async () => {
+    const read = deferred();
+    mockGate = () => read.promise;
+    renderHook(() => useOwnRelayListSync(A, true));
+    await act(async () => {
+      jest.advanceTimersByTime(1_500);
+    });
+    // The person adds a relay in Network settings while the read is out.
+    store().addRelay('wss://mine.example', { read: true, write: true });
+    await act(async () => read.resolve());
+
+    // Neither replaced by the defaults nor marked published: Network settings
+    // still shows it as unpublished, and its Publish sends it.
+    expect(mockPublishEvent).not.toHaveBeenCalled();
+    expect(store()).toMatchObject({ source: 'local', hasPublished: false });
+    expect(store().entries.map((e) => e.url)).toEqual([...DEFAULT_RELAYS, 'wss://mine.example']);
+    expect(getKnownOwnWriteRelays(A)).toEqual([...DEFAULT_RELAYS, 'wss://mine.example']);
+  });
+
+  it('after the first-run publish, adding one relay keeps the defaults', async () => {
+    await mountAndWait(A);
+    store().addRelay('wss://mine.example', { read: true, write: true });
+
+    expect(store().entries.map((e) => e.url)).toEqual([...DEFAULT_RELAYS, 'wss://mine.example']);
   });
 
   it('does not publish again once a list was published', async () => {
@@ -452,13 +509,16 @@ describe('unmount and account change', () => {
     mockGate = ({ authors }) => (authors[0] === A ? forA.promise : Promise.resolve());
     mockRelays.set(DAMUS, { events: [REMOTE()] });
     const view = await mountAndWait(A);
+    mockActive = B;
+    for (const listener of mockProfileListeners) listener();
     view.rerender({ pubkey: B, enabled: true });
     await act(async () => {
       jest.advanceTimersByTime(1_500);
     });
     await act(async () => forA.resolve());
 
-    expect(store().entries).toEqual([]);
+    // A's list is not taken in: the store holds the defaults B published.
+    expect(store().entries.map((e) => e.url)).toEqual([...DEFAULT_RELAYS]);
     expect(mockSeedPool).not.toHaveBeenCalled();
     // B's read found nothing, so B published the defaults.
     expect(mockPublishEvent).toHaveBeenCalledTimes(1);
@@ -506,17 +566,35 @@ describe('a discovery that did not finish', () => {
     }
   );
 
-  it('treats a read the relays did not finish answering in 12 s as unanswered, not as no list', async () => {
+  it('treats a read the relays did not finish answering in 12 s as unanswered, not as no list, and reads again', async () => {
     mockRelays.set(NOS, 'silent');
     const view = await mountAndWait(A);
     await waitOutRead();
     expect(getKnownOwnWriteRelays(A)).toBeNull();
     expect(mockPublishEvent).not.toHaveBeenCalled();
 
+    // The second read began at once, while NOS was still silent; the third hears it.
     mockRelays.delete(NOS);
-    await act(async () => triggers['returning to the foreground']());
+    await waitOutRead();
     expect(getKnownOwnWriteRelays(A)).toEqual([...DEFAULT_RELAYS]);
     expect(mockPublishEvent).toHaveBeenCalledTimes(1);
+    expect(mockPublishEvent.mock.calls[0][0].relays).toEqual([...DEFAULT_RELAYS]);
+    view.unmount();
+  });
+
+  it('reads without a default relay silent three reads in a row, and publishes the defaults to the others', async () => {
+    mockRelays.set(NOS, 'silent');
+    const view = await mountAndWait(A);
+    for (let read = 1; read < SILENT_READS_BEFORE_LEFT_OUT; read++) await waitOutRead();
+    expect(getKnownOwnWriteRelays(A)).toBeNull();
+
+    await waitOutRead();
+    expect(getKnownOwnWriteRelays(A)).toEqual([...DEFAULT_RELAYS]);
+    expect(mockPublishEvent).toHaveBeenCalledTimes(1);
+    const { event, relays } = mockPublishEvent.mock.calls[0][0];
+    // The list still names every default; only the silent one is not sent it.
+    expect(event.tags).toEqual(DEFAULT_RELAYS.map((url) => ['r', url]));
+    expect(relays).toEqual(DEFAULT_RELAYS.filter((url) => url !== NOS));
     view.unmount();
   });
 
@@ -535,44 +613,51 @@ describe('a discovery that did not finish', () => {
     view.unmount();
   });
 
-  it('asks again every relay an earlier attempt asked, though a partial answer has replaced them', async () => {
+  describe('when the saved write relay that holds the newer list is down', () => {
     // R, the saved write relay, holds the newer list but is down; a default
     // relay answers with an older list that names S instead.
     const R = 'wss://mine.example';
     const S = 'wss://stale.example';
-    useRelayListStore.setState({
-      entries: [{ url: R, read: true, write: true }],
-      source: 'relay',
-      updatedAt: 100,
-      hasPublished: true,
+    beforeEach(() => {
+      useRelayListStore.setState({
+        entries: [{ url: R, read: true, write: true }],
+        source: 'relay',
+        updatedAt: 100,
+        hasPublished: true,
+      });
+      mockRelays.set(R, 'silent');
+      mockRelays.set(DAMUS, { events: [relayList(A, 400, [S])] });
     });
-    mockRelays.set(R, 'silent');
-    mockRelays.set(DAMUS, { events: [relayList(A, 400, [S])] });
-    const view = await mountAndWait(A);
-    await waitOutRead();
-    // The partial answer is shown, but is not known.
-    expect(store().entries.map((e) => e.url)).toEqual([S]);
-    expect(getKnownOwnWriteRelays(A)).toBeNull();
 
-    // Every relay but R answers the retry: still not known.
-    let asked = mockAsked.length;
-    await act(async () => triggers['returning to the foreground']());
-    await waitOutRead();
-    expect(mockAsked.slice(asked).map((a) => a.relays?.[0])).toEqual(
-      expect.arrayContaining([R, S, ...DEFAULT_RELAYS])
-    );
-    expect(getKnownOwnWriteRelays(A)).toBeNull();
+    it('asks again every relay an earlier attempt asked, though a partial answer has replaced them', async () => {
+      const view = await mountAndWait(A);
+      await waitOutRead();
+      // The partial answer is shown, but is not known.
+      expect(store().entries.map((e) => e.url)).toEqual([S]);
+      expect(getKnownOwnWriteRelays(A)).toBeNull();
 
-    // R answers with the newer list: that is the account's list.
-    mockRelays.set(R, { events: [relayList(A, 900, ['wss://new.example'])] });
-    asked = mockAsked.length;
-    await act(async () => triggers['returning to the foreground']());
-    expect(mockAsked.slice(asked).map((a) => a.relays?.[0])).toEqual(
-      expect.arrayContaining([R, S, ...DEFAULT_RELAYS])
-    );
-    expect(getKnownOwnWriteRelays(A)).toEqual(['wss://new.example']);
-    expect(mockPublishEvent).not.toHaveBeenCalled();
-    view.unmount();
+      // The next read began at once; every relay but R answers it: still not known.
+      const asked = mockAsked.length;
+      mockRelays.set(R, { events: [relayList(A, 900, ['wss://new.example'])] });
+      await waitOutRead();
+      expect(mockAsked.slice(asked).map((a) => a.relays?.[0])).toEqual(
+        expect.arrayContaining([R, S, ...DEFAULT_RELAYS])
+      );
+      // R answers the read after with the newer list: that is the account's list.
+      expect(getKnownOwnWriteRelays(A)).toEqual(['wss://new.example']);
+      expect(mockPublishEvent).not.toHaveBeenCalled();
+      view.unmount();
+    });
+
+    it('takes the older list as known once R has been silent three reads in a row', async () => {
+      const view = await mountAndWait(A);
+      for (let read = 0; read < SILENT_READS_BEFORE_LEFT_OUT; read++) await waitOutRead();
+
+      // The risk the owner accepted (F227, F239): the newer list on R is overruled.
+      expect(getKnownOwnWriteRelays(A)).toEqual([S]);
+      expect(mockPublishEvent).not.toHaveBeenCalled();
+      view.unmount();
+    });
   });
 
   it('is not tried again once it has finished', async () => {

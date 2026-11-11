@@ -9,7 +9,10 @@
  * result. A follow list replaces the whole previous one on relays, so it only
  * ever builds on the list a complete read just returned (`planFollowPublish`):
  * anything less and the intents wait, to be tried again after hydration, when
- * a list arrives, on returning to the foreground and on the next tap.
+ * a list arrives, on returning to the foreground and on the next tap. A write
+ * relay that does not answer is read again at once until it has been silent
+ * for a few reads in a row; it is then read and published without
+ * (`readNewestOwnEvent`).
  *
  * Two devices publishing at the same moment can still overwrite each other;
  * that is how the list works on Nostr.
@@ -31,13 +34,13 @@ import {
 } from '@/shared/stores/profile/nostrSocialStore';
 import { captureActiveProfile } from '@/shared/stores/global/profileStore';
 import {
+  MAX_FUTURE_SEC,
   matchingSigner,
-  nextReplaceableCreatedAt,
-  readNewestOwnEvent,
-  signOwnEvent,
-  type OwnEventReadOutcome,
+  publishToRelaysRead,
+  readForEdit,
+  signReplacement,
+  type ReadForEdit,
 } from './ownReplaceableEvent';
-import { publishEvent } from './publish';
 
 type FollowIntents = ReturnType<typeof selectFollowIntents>;
 
@@ -148,16 +151,13 @@ const ContactEvent = z.object({
   created_at: z.number().int().nonnegative(),
 });
 
-/** How far ahead of this device's clock a list may be dated, as for the mute list. */
-const MAX_FUTURE_SEC = 60;
-
 /**
  * Decode the read: a list only from a complete read, and only one that
  * parses and is not dated in the future (building on it would date ours there
  * too, and relays would keep it over every later list).
  */
-function decodeRead(read: { outcome: OwnEventReadOutcome; newest: unknown }): ListRead {
-  if (read.outcome !== 'complete') return { status: 'incomplete' };
+function decodeRead(read: ReadForEdit): ListRead {
+  if (read.status !== 'read') return { status: 'incomplete' };
   if (!read.newest) return { status: 'empty' };
   const parsed = ContactEvent.safeParse(read.newest);
   if (!parsed.success || parsed.data.created_at > Math.floor(Date.now() / 1000) + MAX_FUTURE_SEC)
@@ -282,15 +282,15 @@ async function syncOnce(ndk: NDK, ownPubkey: string): Promise<void> {
 
       const signer = await matchingSigner(ndk, ownPubkey);
       scope.check();
+      const raw = await readForEdit(ndk, ownPubkey, Contacts);
+      scope.check();
       // Until the account's relay list is known its write relays read as the
       // defaults, which may not be where its follow list is.
-      if (!getKnownOwnWriteRelays(ownPubkey)) {
+      if (raw.status === 'waiting' && raw.reason === 'relay-list-unknown') {
         nostrLog.info('nostr.follow.waiting', { reason: 'relay-list-unknown' });
         return;
       }
-      const raw = await readNewestOwnEvent(ndk, ownPubkey, Contacts);
       const read = decodeRead(raw);
-      scope.check();
 
       let intents = selectFollowIntents(social());
       const planOf = (indexed?: IndexedList) => {
@@ -325,6 +325,8 @@ async function syncOnce(ndk: NDK, ownPubkey: string): Promise<void> {
         }
       }
 
+      // Settling or publishing stands only on a complete read.
+      if (raw.status !== 'read') return;
       // The plan stands on this read, so it is kept now, never before the plan:
       // the store takes it unless a list relays keep over it arrived meanwhile.
       if (read.status === 'found')
@@ -343,26 +345,18 @@ async function syncOnce(ndk: NDK, ownPubkey: string): Promise<void> {
       // A signer replaced during the read never signs. Signing can fail but
       // never refuses (the only signer is the account's own key), so a
       // failure keeps the taps for the next pass.
-      if (ndk.signer !== signer) throw new Error('Account signer changed');
-      const event = await signOwnEvent(ndk, signer, scope, {
+      const event = await signReplacement(ndk, signer, scope, {
         kind: Contacts,
         pubkey: ownPubkey,
-        created_at: nextReplaceableCreatedAt(plan.base.createdAt),
+        replaces: plan.base.createdAt,
         tags: plan.tags,
         content: plan.base.content,
       });
       // A list or seed arrived while signing, also one dated the same second,
       // or the write relays changed since the read: read and build again.
-      if (!sameSavedList(atBase, savedList()) || !sameRelays(raw.relays, ownPubkey)) continue;
+      if (!sameSavedList(atBase, savedList()) || !sameRelays(raw.asked, ownPubkey)) continue;
 
-      // Exactly the relays the complete read covered: a relay that was not read
-      // may hold a newer list, and this one would replace it there.
-      const published = await publishEvent({
-        ndk,
-        event,
-        relays: raw.relays,
-        resolveOn: 'all-settled',
-      });
+      const published = await publishToRelaysRead(ndk, event, raw.relays);
       scope.check();
       if (published.isErr()) throw new Error(`Follow list publish failed: ${published.error.type}`);
       // Published, but not recorded for a signer that changed meanwhile: the next pass reads it back.

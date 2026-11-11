@@ -7,7 +7,7 @@
  */
 import { act, renderHook } from '@testing-library/react-native';
 
-import { useFollowToggle } from '@/features/user/screens/UserProfileScreen';
+import { followButtonFace, useFollowToggle } from '@/features/user/screens/UserProfileScreen';
 import {
   selectIsFollowingPubkey,
   useNostrSocialStore,
@@ -135,5 +135,52 @@ describe('the profile Follow button', () => {
     expect(social().optimisticFollowsByPubkey).toEqual({});
     expect(mockPopup).toHaveBeenCalledTimes(1);
     expect(mockPopup).toHaveBeenCalledWith('engagement-update-failed', 'follow');
+  });
+});
+
+describe('what the Follow button shows', () => {
+  it('shows Following once a published list holds the follow, Follow otherwise', () => {
+    expect(followButtonFace(true)).toEqual({
+      label: 'Following',
+      accessibilityLabel: 'Following',
+      icon: 'mdi:check',
+      systemIcon: 'checkmark',
+      isActive: true,
+      filled: false,
+    });
+    expect(followButtonFace(false)).toMatchObject({ label: 'Follow', filled: true });
+  });
+
+  it('says a follow no published list holds yet is waiting to sync', () => {
+    const { result } = renderHook(() => useFollowToggle(Z, OWN));
+    act(() => result.current());
+    const pending = social().optimisticFollowsByPubkey[Z]?.pending ?? false;
+    expect(pending).toBe(true);
+
+    const face = followButtonFace(selectIsFollowingPubkey(Z)(social()), pending);
+    expect(face).toMatchObject({
+      label: 'Following · syncing',
+      accessibilityLabel: 'Following, waiting to sync',
+      icon: 'mdi:clock-outline',
+      isActive: true,
+    });
+    expect(face).not.toEqual(followButtonFace(true));
+  });
+
+  it('says an unfollow no published list holds yet is waiting to sync', () => {
+    social().setContactsFromRelay({
+      tags: [['p', Z]],
+      content: '',
+      createdAtSec: 1,
+      eventId: 'e1',
+    });
+    const { result } = renderHook(() => useFollowToggle(Z, OWN));
+    act(() => result.current());
+
+    expect(followButtonFace(selectIsFollowingPubkey(Z)(social()), true)).toMatchObject({
+      label: 'Unfollowed · syncing',
+      accessibilityLabel: 'Unfollowed, waiting to sync',
+      filled: true,
+    });
   });
 });
