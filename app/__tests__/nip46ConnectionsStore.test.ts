@@ -309,10 +309,12 @@ describe('app lifecycle actions', () => {
     useNip46ConnectionsStore.getState().upsertApp(baseInput(client, { name: 'Coracle' }));
   });
 
-  it('block, mode, encryption, rename', () => {
+  it('block, unblock, mode, encryption, rename', () => {
     const store = useNip46ConnectionsStore.getState();
     store.blockApp(client);
     expect(useNip46ConnectionsStore.getState().apps[client].status).toBe('blocked');
+    store.unblockApp(client);
+    expect(useNip46ConnectionsStore.getState().apps[client].status).toBe('active');
 
     store.setMode(client, 'strict');
     store.setEncryption(client, 'nip04');
