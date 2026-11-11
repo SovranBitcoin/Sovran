@@ -45,6 +45,48 @@ describe('createLegProgressStore', () => {
     expect(store.getState().active).toMatchObject({ state: 'failed', errorMessage: 'nope' });
   });
 
+  it('drops a failed leg’s error once it succeeds on a retry', () => {
+    const store = createLegProgressStore<Record<string, never>>({ name: 't', log: stubLog });
+    store.getState().start({ id: 'x', legs: [{ id: 'a' }], meta: {} });
+    store.getState().setLegFailed('a', 'mint offline');
+    store.getState().setLegDone('a');
+    expect(store.getState().active?.legs[0]).toEqual({ id: 'a', status: 'done' });
+  });
+
+  it('keeps a leg that is done or skipped as it is', () => {
+    const store = createLegProgressStore<Record<string, never>>({ name: 't', log: stubLog });
+    store.getState().start({ id: 'x', legs: [{ id: 'a' }, { id: 'b' }], meta: {} });
+    store.getState().setLegDone('a');
+    store.getState().setLegSkipped('b');
+    store.getState().setLegFailed('a', 'late');
+    store.getState().setActiveLeg('b');
+    expect(store.getState().active?.legs.map((l) => l.status)).toEqual(['done', 'skipped']);
+  });
+
+  it('ends a run once: a final state is not replaced by another', () => {
+    const store = createLegProgressStore<Record<string, never>>({ name: 't', log: stubLog });
+    store.getState().start({ id: 'x', legs: [{ id: 'a' }], meta: {} });
+    store.getState().cancel();
+    store.getState().complete();
+    store.getState().fail('late');
+    expect(store.getState().active).toMatchObject({ state: 'cancelled' });
+    expect(store.getState().active?.errorMessage).toBeUndefined();
+  });
+
+  it('reopens an ended run for a retry, without its old message, and ends it again', () => {
+    const store = createLegProgressStore<Record<string, never>>({ name: 't', log: stubLog });
+    store.getState().start({ id: 'x', legs: [{ id: 'a' }], meta: {} });
+    store.getState().setLegFailed('a', 'mint offline');
+    store.getState().fail('mint offline');
+
+    store.getState().resume();
+    expect(store.getState().active).toMatchObject({ state: 'running', errorMessage: undefined });
+    store.getState().setLegDone('a');
+    store.getState().complete();
+
+    expect(store.getState().active).toMatchObject({ state: 'done', legs: [{ status: 'done' }] });
+  });
+
   it('cancel() sets a terminal cancelled state', () => {
     const store = createLegProgressStore<Record<string, never>>({ name: 't', log: stubLog });
     store.getState().start({ id: 'x', legs: [{ id: 'a' }], meta: {} });

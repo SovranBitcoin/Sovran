@@ -128,3 +128,40 @@ it('presents wrapped mint errors through the shared catalog in the payment toast
       'The mint has already issued ecash for this quote. Check transaction history or use wallet recovery.',
   });
 });
+
+describe('binding a toast to its payment', () => {
+  const processingMelt = {
+    variant: 'melt' as const,
+    id: 'melt-1',
+    owner: { kind: 'pending' as const, key: 'melt-1' },
+    mintUrl: 'https://mint.example',
+    amount: 10,
+    unit: 'sat',
+    state: 'processing' as const,
+  };
+
+  it('binds the toast its starter opened under the key', () => {
+    usePaymentStatusStore.getState().setActive(processingMelt);
+    usePaymentStatusStore.getState().bindOwner('melt-1', { kind: 'melt', quoteId: 'mq-1' });
+    expect(usePaymentStatusStore.getState().active).toMatchObject({
+      id: 'melt-1',
+      owner: { kind: 'melt', quoteId: 'mq-1' },
+      state: 'processing',
+    });
+  });
+
+  it('binds nothing under another key, and never rebinds a bound toast', () => {
+    usePaymentStatusStore.getState().setActive(processingMelt);
+    usePaymentStatusStore.getState().bindOwner('melt-2', { kind: 'melt', quoteId: 'mq-2' });
+    expect(usePaymentStatusStore.getState().active?.id).toBe('melt-1');
+    expect(usePaymentStatusStore.getState().active).toMatchObject({
+      owner: { kind: 'pending', key: 'melt-1' },
+    });
+
+    usePaymentStatusStore.getState().bindOwner('melt-1', { kind: 'melt', quoteId: 'mq-1' });
+    usePaymentStatusStore.getState().bindOwner('melt-1', { kind: 'melt', quoteId: 'mq-other' });
+    expect(usePaymentStatusStore.getState().active).toMatchObject({
+      owner: { kind: 'melt', quoteId: 'mq-1' },
+    });
+  });
+});

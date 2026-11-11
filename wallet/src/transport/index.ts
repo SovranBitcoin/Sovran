@@ -19,10 +19,8 @@ export {
 export {
   classifyMeshRedeemError,
   createMeshRedeemOrchestrator,
-  type MeshRedeemEntry,
   type MeshRedeemErrorKind,
   type MeshRedeemOrchestrator,
   type MeshRedeemOrchestratorConfig,
   type MeshRedeemQueuePort,
-  type MeshRedeemStatus,
 } from './redeemOrchestrator';

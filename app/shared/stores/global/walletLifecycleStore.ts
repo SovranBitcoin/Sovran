@@ -5,8 +5,7 @@ import { persist } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { z } from 'zod';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
-
-type RestoreStatus = 'unknown' | 'not-needed' | 'pending' | 'in-progress' | 'complete' | 'failed';
+import { RESTORE_STATUSES, type RestoreStatus } from './walletRestorePhase';
 
 interface WalletLifecycleState {
   /**
@@ -42,10 +41,7 @@ const PersistedWalletLifecycleStore = z.object({
   // re-resolves it. Without the catch, an unrecognized status fails the
   // whole-blob parse and wipes `seedCreatedAt` too, which is exactly the
   // false-fresh-install state AppGate guards against.
-  restoreStatus: z
-    .enum(['unknown', 'not-needed', 'pending', 'in-progress', 'complete', 'failed'])
-    .default('unknown')
-    .catch('unknown'),
+  restoreStatus: z.enum(RESTORE_STATUSES).default('unknown').catch('unknown'),
   lastRestoreAt: z.number().int().nonnegative().nullable().default(null),
   // An error too long to read is read as none: rejecting it would discard the
   // whole record, `seedCreatedAt` included. New errors are clipped on write.

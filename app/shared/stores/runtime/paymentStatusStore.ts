@@ -5,9 +5,34 @@ import { paymentLog } from '@/shared/lib/logger';
 
 type PaymentStatusState = 'processing' | 'delivered' | 'waiting' | 'confirmed' | 'failed';
 
-interface ActivePaymentStatus {
-  variant: 'receive' | 'send' | 'melt' | 'receive-ecash' | 'payment-request';
-  /** quoteId (receive) or operationId (send) or receiveHistoryEntry.id (receive-ecash) */
+/**
+ * The payment a send, melt or payment-request toast belongs to. A wallet
+ * event changes the toast only when it is for this payment.
+ */
+type PaymentToastOwner =
+  /**
+   * Started before the wallet issued an id for it: a key only its starter
+   * holds, bound to the payment's id when the starter learns it.
+   */
+  | { kind: 'pending'; key: string }
+  /** A melt, by its quote: every event of the melt carries it. */
+  | { kind: 'melt'; quoteId: string }
+  /** A send (plain ecash, or a payment request's), by its operation. */
+  | { kind: 'send'; operationId: string };
+
+type BoundOwner = Exclude<PaymentToastOwner, { kind: 'pending' }>;
+
+function sameOwner(a: BoundOwner, b: BoundOwner): boolean {
+  switch (a.kind) {
+    case 'melt':
+      return b.kind === 'melt' && b.quoteId === a.quoteId;
+    case 'send':
+      return b.kind === 'send' && b.operationId === a.operationId;
+  }
+}
+
+interface PaymentStatusFields {
+  /** The toast's handle (what its popup clears): quoteId, operationId, entry id or the starter's key. */
   id: string;
   mintUrl: string;
   amount: number;
@@ -25,10 +50,90 @@ interface ActivePaymentStatus {
   subtitleOverride?: string;
 }
 
+type ActivePaymentStatus = PaymentStatusFields &
+  (
+    | { variant: 'receive' | 'receive-ecash' }
+    | { variant: 'send' | 'melt' | 'payment-request'; owner: PaymentToastOwner }
+  );
+
+/** The payment a toast belongs to; null for a receive toast, which has none. */
+function ownerOf(active: ActivePaymentStatus | null): PaymentToastOwner | null {
+  if (!active) return null;
+  switch (active.variant) {
+    case 'send':
+    case 'melt':
+    case 'payment-request':
+      return active.owner;
+    case 'receive':
+    case 'receive-ecash':
+      return null;
+  }
+}
+
+/** Whether `active` is the toast of this send (by its operation). */
+export function ownsSend(active: ActivePaymentStatus | null, operationId: string): boolean {
+  const owner = ownerOf(active);
+  return owner?.kind === 'send' && owner.operationId === operationId;
+}
+
+/** Whether `active` is the toast of this melt (by its quote). */
+export function ownsMelt(active: ActivePaymentStatus | null, quoteId: string): boolean {
+  const owner = ownerOf(active);
+  return owner?.kind === 'melt' && owner.quoteId === quoteId;
+}
+
+/**
+ * Whether `active` is the toast of a `variants` payment still in flight. An
+ * event for another payment neither changes nor replaces it: the person is
+ * watching this one, and its own events or its starter end it.
+ */
+export function paymentInFlight(
+  active: ActivePaymentStatus | null,
+  variants: readonly ('send' | 'melt' | 'payment-request')[]
+): boolean {
+  if (active?.state !== 'processing') return false;
+  switch (active.variant) {
+    case 'send':
+    case 'melt':
+    case 'payment-request':
+      return variants.includes(active.variant);
+    case 'receive':
+    case 'receive-ecash':
+      return false;
+  }
+}
+
+/**
+ * A wallet result left to a toast still in flight: a send or melt that
+ * finished while a toast whose payment was not yet known was on screen. It
+ * may be that toast's own, so it is held: the toast catches up with it once
+ * its flow binds it to that payment. Otherwise it is another payment's, and
+ * gets `toast` of its own once the toast on screen ends.
+ */
+interface HeldResult {
+  owner: BoundOwner;
+  /** The melt or send operation, for View. */
+  operationId: string;
+  toast: ActivePaymentStatus;
+}
+
+/** Results held at once; the oldest goes first. */
+const MAX_HELD_RESULTS = 20;
+
 type PaymentStatusStore = {
   active: ActivePaymentStatus | null;
+  held: HeldResult[];
+  /** Hold a finished payment's result for a toast that may yet be bound to it. */
+  holdResult: (result: HeldResult) => void;
+  /** With no toast on screen, show the oldest held result's toast; null when there is none. */
+  takeHeld: () => HeldResult | null;
   setActive: (payment: ActivePaymentStatus | null) => void;
   clearActive: (id?: string) => void;
+  /**
+   * Bind the toast its starter opened under `key` to the payment's id, once
+   * it is known. A result already held for that payment confirms it.
+   */
+  bindOwner: (key: string, owner: BoundOwner) => void;
   setWaiting: (id: string, copy: { title: string; subtitle: string }) => void;
   setDelivered: (id: string) => void;
   setConfirmed: (id: string, extra?: { operationId?: string; receiveEntryId?: string }) => void;
@@ -63,6 +168,31 @@ export const usePaymentStatusStore = create<PaymentStatusStore>({
   scope: 'session',
 })((set) => ({
   active: null,
+  held: [],
+  holdResult: (result) =>
+    set((s) => {
+      paymentLog.info('payment.status.hold_result', {
+        owner: result.owner.kind,
+        held: s.held.length + 1,
+      });
+      const others = s.held.filter((h) => !sameOwner(h.owner, result.owner));
+      return { held: [...others, result].slice(-MAX_HELD_RESULTS) };
+    }),
+  takeHeld: () => {
+    let taken: HeldResult | null = null;
+    set((s) => {
+      const [next, ...rest] = s.held;
+      if (s.active || !next) return s;
+      taken = next;
+      paymentLog.info('payment.status.show_held_result', {
+        variant: next.toast.variant,
+        id: next.toast.id,
+        stillHeld: rest.length,
+      });
+      return { active: next.toast, held: rest };
+    });
+    return taken;
+  },
   setActive: (payment) => {
     set((s) => {
       paymentLog.info(
@@ -98,6 +228,38 @@ export const usePaymentStatusStore = create<PaymentStatusStore>({
         requestedId: id ?? null,
       });
       return { active: null };
+    }),
+  bindOwner: (key, owner) =>
+    set((s) => {
+      const active = s.active;
+      const current = ownerOf(active);
+      if (!active || current?.kind !== 'pending' || current.key !== key) {
+        logSkip('payment.status.bind_owner.skipped', s, key, 'not_pending_for_key');
+        return s;
+      }
+      const result = s.held.find((h) => sameOwner(h.owner, owner));
+      paymentLog.info('payment.status.bind_owner', {
+        id: active.id,
+        variant: active.variant,
+        owner: owner.kind,
+        caughtUp: !!result,
+      });
+      if (!result) return { active: { ...active, owner } };
+      const held = s.held.filter((h) => h !== result);
+      // Its payment finished before the toast knew it: it is confirmed now,
+      // unless it already ended or is waiting on the person.
+      if (active.state !== 'processing' && active.state !== 'delivered') {
+        return { active: { ...active, owner }, held };
+      }
+      return {
+        active: {
+          ...withoutStatusCopy(active),
+          owner,
+          state: 'confirmed' as const,
+          operationId: result.operationId,
+        },
+        held,
+      };
     }),
   setWaiting: (id, copy) =>
     set((s) => {

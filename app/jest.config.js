@@ -25,6 +25,7 @@ module.exports = {
     '^wallet/units$': '<rootDir>/../wallet/src/units/index.ts',
     '^wallet/safeFetch$': '<rootDir>/../wallet/src/safeFetch.ts',
     '^wallet/operations$': '<rootDir>/../wallet/src/operations/index.ts',
+    '^wallet/redeemEntry$': '<rootDir>/../wallet/src/transport/redeemEntry.ts',
     // A hoisted install and an isolated install must use the renderer's React.
     '^react$': require.resolve('react'),
     // bc-ur uses CommonJS while cborg exposes only an import condition.

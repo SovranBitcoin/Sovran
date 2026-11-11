@@ -10,6 +10,7 @@ import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { formatDate } from '@/shared/lib/date';
 import type { SwapGroup } from '@/shared/stores/profile/swapTransactionsStore';
+import { swapGroupOutcome } from '@/shared/lib/cashu/swapGroupPhase';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { log, Log } from '@/shared/lib/logger';
 
@@ -21,17 +22,21 @@ export const SwapTransactionRow = React.memo(({ group }: Props) => {
   const [foreground, danger, success] = useThemeColor(['foreground', 'danger', 'success'] as const);
 
   const aggregate = useMemo(() => {
-    const anyFailed = group.legs.some((l) => l.localStatus === 'failed');
-    if (anyFailed) return { text: 'Failed', color: danger };
-    // A leg whose money has left but has not been seen to arrive keeps the swap pending.
-    const anyUnsettled = group.legs.some(
-      (l) => l.localStatus === 'settling' || l.localStatus === 'paymentPending'
-    );
-    if (group.state === 'running' || anyUnsettled) {
-      return { text: 'Pending', color: withAlpha(foreground, 0.5) };
+    const outcome = swapGroupOutcome(group);
+    switch (outcome) {
+      case 'inProgress':
+        return { text: 'Pending', color: withAlpha(foreground, 0.5) };
+      case 'failed':
+        return { text: 'Failed', color: danger };
+      case 'finished':
+      case 'cancelled':
+        return { text: 'Completed', color: success };
+      default: {
+        const exhaustive: never = outcome;
+        return exhaustive;
+      }
     }
-    return { text: 'Completed', color: success };
-  }, [group.legs, group.state, foreground, danger, success]);
+  }, [group, foreground, danger, success]);
 
   const handlePress = useCallback(() => {
     log.info('transaction.swap.press', {

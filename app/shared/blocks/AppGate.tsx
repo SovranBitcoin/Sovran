@@ -13,6 +13,7 @@ import {
   useWalletLifecycleStore,
   useWalletLifecycleHydrated,
 } from '@/shared/stores/global/walletLifecycleStore';
+import { isRestoreAsked, needsRestoreDecision } from '@/shared/stores/global/walletRestorePhase';
 import { SettingsRecoveryScreen } from '@/features/settings/screens/SettingsRecoveryScreen';
 import { useShownInsteadOfWallet } from '@/shared/lib/qrButtonAnchor';
 
@@ -262,16 +263,12 @@ const RestoreGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     // (restoreStatus='unknown', seedCreatedAt=null) which would falsely
     // trigger a redirect for existing users on every boot.
     if (!hydrated) return;
-    if (restoreStatus === 'complete' || restoreStatus === 'not-needed') {
+    if (!needsRestoreDecision(restoreStatus)) {
+      // Settled, or pending from a previous boot: the screen picks that up.
       setEvaluated(true);
       return;
     }
-    if (restoreStatus === 'pending') {
-      // Already decided in a previous boot — the screen will pick it up.
-      setEvaluated(true);
-      return;
-    }
-    // restoreStatus === 'unknown' | 'failed' | 'in-progress' → resolve now.
+    // Nothing decided, or an older build's 'in-progress' or 'failed': resolve now.
     //
     // 'in-progress' is a stranded value: a build briefly wrote it when a
     // Settings-initiated recovery started and never cleared it, which pinned
@@ -296,7 +293,7 @@ const RestoreGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     return null;
   }
 
-  if (restoreStatus === 'pending' || restoreStatus === 'failed') {
+  if (isRestoreAsked(restoreStatus)) {
     log.debug('gate.restore.blocked', { restoreStatus });
     return (
       <InsteadOfWallet>

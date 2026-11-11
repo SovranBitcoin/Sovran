@@ -262,6 +262,85 @@ describe('rebalance engine — direct transfer', () => {
     expect(wallet.port.executeMelt).toHaveBeenCalledTimes(1);
   });
 
+  describe('a melt whose execute threw is failed only once it is known not to have paid', () => {
+    it.each([
+      ['finds nothing', () => null],
+      [
+        'cannot be read',
+        () => {
+          throw new Error('database is locked');
+        },
+      ],
+    ])(
+      'keeps it pending, its proofs reserved, when the response was lost and its state %s',
+      async (_name, readState) => {
+        const { run, wallet, recorder, findRoutes } = setup();
+        wallet.port.executeMelt.mockRejectedValueOnce(new NetworkError('socket hang up'));
+        wallet.port.getMeltOperation.mockImplementation(async () => readState());
+        wallet.port.refreshMelt.mockRejectedValue(new NetworkError('socket hang up'));
+        await expect(run()).resolves.toEqual({ status: 'pending', operationId: 'melt-1' });
+        expect(recorder.statuses('step-1').at(-1)).toBe('paymentPending');
+        expect(recorder.statuses('step-1')).not.toContain('failed');
+        expect(wallet.port.restoreInflightProofs).not.toHaveBeenCalled();
+        expect(wallet.port.executeMelt).toHaveBeenCalledTimes(1);
+        expect(wallet.port.prepareMelt).toHaveBeenCalledTimes(1);
+        expect(findRoutes).not.toHaveBeenCalled();
+      }
+    );
+
+    it.each([
+      ['reads as no route', new Error('no_route')],
+      ['reads as short inputs', new Error('not enough inputs provided for melt')],
+    ])(
+      'never routes or pays again when an error that is not the mint answering %s',
+      async (_name, error) => {
+        const { run, wallet, findRoutes } = setup();
+        wallet.port.executeMelt.mockRejectedValueOnce(error);
+        wallet.port.refreshMelt.mockRejectedValue(new NetworkError('socket hang up'));
+        await expect(run()).resolves.toEqual({ status: 'pending', operationId: 'melt-1' });
+        expect(wallet.port.executeMelt).toHaveBeenCalledTimes(1);
+        expect(wallet.port.prepareMelt).toHaveBeenCalledTimes(1);
+        expect(findRoutes).not.toHaveBeenCalled();
+        expect(wallet.port.restoreInflightProofs).not.toHaveBeenCalled();
+      }
+    );
+
+    it('settles it from the mint once a read answers, paying nothing twice', async () => {
+      const { run, wallet } = setup();
+      wallet.port.executeMelt.mockRejectedValueOnce(new NetworkError('socket hang up'));
+      wallet.port.refreshMelt.mockImplementationOnce(async (id) => {
+        wallet.payInvoice('invoice-quote-1');
+        return { id, state: 'finalized' };
+      });
+      await expect(run()).resolves.toEqual({ status: 'done' });
+      expect(wallet.port.executeMelt).toHaveBeenCalledTimes(1);
+      expect(wallet.port.restoreInflightProofs).not.toHaveBeenCalled();
+    });
+
+    it.each(['prepared', 'rolled_back', 'failed'])(
+      'fails it and frees its proofs when its state reads %s: nothing was paid',
+      async (state) => {
+        const { run, wallet } = setup();
+        wallet.port.executeMelt.mockRejectedValueOnce(new NetworkError('socket hang up'));
+        wallet.port.getMeltOperation.mockResolvedValueOnce({ state });
+        const outcome = await run();
+        expect(outcome.status).toBe('failed');
+        expect(wallet.port.restoreInflightProofs).toHaveBeenCalledWith(SOURCE);
+        expect(wallet.port.executeMelt).toHaveBeenCalledTimes(1);
+      }
+    );
+
+    it('fails it when the mint itself refused the melt, though its state cannot be read', async () => {
+      const { run, wallet } = setup();
+      wallet.port.executeMelt.mockRejectedValueOnce(
+        new MintOperationError(11001, 'Token already spent')
+      );
+      const outcome = await run();
+      expect(outcome.status).toBe('failed');
+      expect(wallet.port.restoreInflightProofs).toHaveBeenCalledWith(SOURCE);
+    });
+  });
+
   it('keeps a melt that never settles pending, without failing it or freeing its proofs', async () => {
     const { run, wallet, recorder } = setup();
     wallet.port.executeMelt.mockResolvedValue({ id: 'melt-1', state: 'pending' });
@@ -271,6 +350,49 @@ describe('rebalance engine — direct transfer', () => {
     expect(recorder.statuses('step-1')).not.toContain('failed');
     expect(wallet.port.restoreInflightProofs).not.toHaveBeenCalled();
     expect(wallet.port.executeMelt).toHaveBeenCalledTimes(1);
+  });
+
+  describe('a melt status read that fails says nothing about the payment', () => {
+    it('keeps the melt pending, its proofs reserved, when every read fails', async () => {
+      const { run, wallet, recorder, findRoutes } = setup();
+      wallet.port.executeMelt.mockResolvedValue({ id: 'melt-1', state: 'pending' });
+      wallet.port.refreshMelt.mockRejectedValue(new NetworkError('socket hang up'));
+      await expect(run()).resolves.toEqual({ status: 'pending', operationId: 'melt-1' });
+      expect(recorder.statuses('step-1').at(-1)).toBe('paymentPending');
+      expect(recorder.statuses('step-1')).not.toContain('failed');
+      expect(wallet.port.restoreInflightProofs).not.toHaveBeenCalled();
+      expect(wallet.port.executeMelt).toHaveBeenCalledTimes(1);
+      expect(findRoutes).not.toHaveBeenCalled();
+    });
+
+    it('reads again, and settles the melt once a read answers', async () => {
+      const { run, wallet } = setup();
+      wallet.port.executeMelt.mockResolvedValue({ id: 'melt-1', state: 'pending' });
+      wallet.port.refreshMelt
+        .mockRejectedValueOnce(new NetworkError('socket hang up'))
+        .mockImplementationOnce(async (id) => {
+          wallet.payInvoice('invoice-quote-1');
+          return { id, state: 'finalized' };
+        });
+      await expect(run()).resolves.toEqual({ status: 'done' });
+      expect(wallet.port.refreshMelt).toHaveBeenCalledTimes(2);
+      expect(wallet.port.executeMelt).toHaveBeenCalledTimes(1);
+      expect(wallet.port.restoreInflightProofs).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['reads as no route', new Error('no_route')],
+      ['reads as short inputs', new MintOperationError(11005, 'unbalanced')],
+    ])('never routes or pays again when the failed read %s', async (_name, error) => {
+      const { run, wallet, findRoutes } = setup();
+      wallet.port.executeMelt.mockResolvedValue({ id: 'melt-1', state: 'pending' });
+      wallet.port.refreshMelt.mockRejectedValue(error);
+      await expect(run()).resolves.toEqual({ status: 'pending', operationId: 'melt-1' });
+      expect(wallet.port.executeMelt).toHaveBeenCalledTimes(1);
+      expect(wallet.port.prepareMelt).toHaveBeenCalledTimes(1);
+      expect(findRoutes).not.toHaveBeenCalled();
+      expect(wallet.port.restoreInflightProofs).not.toHaveBeenCalled();
+    });
   });
 
   it('fails a rolled-back melt with a typed error and does not pay again', async () => {
@@ -374,6 +496,74 @@ describe('rebalance engine — runs', () => {
     });
     expect(result).toEqual({ status: 'finished', anyFailed: true, anyPending: false });
     expect(settled).toEqual(['a:failed', 'c:done']);
+  });
+
+  describe('a caller that ends the run before a leg opens', () => {
+    /** Ends the run at the next leg once `switched` is set, as an account switch does. */
+    function endsAtNextLeg() {
+      const state = { switched: false, active: true };
+      return {
+        state,
+        isActive: () => state.active,
+        beforeLegOpens: () => {
+          if (state.switched) state.active = false;
+        },
+      };
+    }
+
+    it('lets the transfer in flight finish and starts no other', async () => {
+      const { engine, wallet, recorder } = setup();
+      const control = endsAtNextLeg();
+      wallet.port.executeMelt.mockImplementation(async (id) => {
+        control.state.switched = true;
+        wallet.payInvoice(wallet.invoiceByMelt.get(id) ?? '');
+        return { id, state: 'finalized' };
+      });
+      const settled: string[] = [];
+      const result = await engine.runTransfers(
+        [
+          { ...STEP, id: 'a' },
+          { ...STEP, id: 'b' },
+        ],
+        {
+          isActive: control.isActive,
+          beforeLegOpens: control.beforeLegOpens,
+          isSettled: () => false,
+          sinkFor: () => recorder.sink,
+          onTransferSettled: (step, outcome) => settled.push(`${step.id}:${outcome.status}`),
+        }
+      );
+      expect(result).toEqual({ status: 'aborted' });
+      expect(settled).toEqual(['a:done']);
+      expect(wallet.port.executeMelt).toHaveBeenCalledTimes(1);
+      expect(recorder.statuses('b')).toEqual([]);
+    });
+
+    it('stops a middleman chain before its next hop', async () => {
+      const route: RebalanceRoute = {
+        path: [SOURCE, MIDDLEMAN, DESTINATION],
+        pathNames: ['Source', 'Middleman', 'Destination'],
+        source: 'local_history',
+      };
+      const { engine, wallet, recorder } = setup({
+        balances: { [SOURCE]: 1000, [MIDDLEMAN]: 100, [DESTINATION]: 0 },
+        routes: [route],
+      });
+      const control = endsAtNextLeg();
+      wallet.port.executeMelt
+        .mockRejectedValueOnce(new MintOperationError(20004, 'no_route'))
+        .mockImplementationOnce(async (id) => {
+          control.state.switched = true;
+          wallet.payInvoice(wallet.invoiceByMelt.get(id) ?? '');
+          return { id, state: 'finalized' };
+        });
+      await expect(
+        engine.executeTransfer(STEP, { ...control, sink: recorder.sink })
+      ).resolves.toEqual({ status: 'aborted' });
+      expect(wallet.port.executeMelt).toHaveBeenCalledTimes(2);
+      expect(recorder.statuses('step-1-hop-1-1')).toEqual([]);
+      expect(wallet.port.releaseTrust).toHaveBeenCalledWith([MIDDLEMAN]);
+    });
   });
 
   it('serializes transfers that start concurrently', async () => {

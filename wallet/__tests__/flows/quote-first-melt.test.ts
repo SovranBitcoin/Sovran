@@ -87,6 +87,30 @@ describe('quote-first melt preview (BTC-05)', () => {
     ]);
   });
 
+  it('names the pre-created quote when it says the melt is processing', async () => {
+    const tm = createTestMachine({
+      operations: { quoteMelt: async () => stubQuote() },
+    });
+    await tm.machine.execute(INPUTS.lightningAddress, { reset: true });
+    await tm.machine.enterAmount({ value: 200, unit: 'sat' }, MINT1);
+
+    await tm.machine.confirmMelt();
+
+    const processing = tm.notificationCalls.find((c) => c.key === 'onPaymentProcessing');
+    expect(processing!.data).toMatchObject({ variant: 'melt', quoteId: 'quote-1' });
+  });
+
+  it('names no quote when it says a melt without one is processing', async () => {
+    const tm = createTestMachine();
+    await tm.machine.execute(INPUTS.lightningAddress, { reset: true });
+    await tm.machine.enterAmount({ value: 200, unit: 'sat' }, MINT1);
+
+    await tm.machine.confirmMelt();
+
+    const processing = tm.notificationCalls.find((c) => c.key === 'onPaymentProcessing');
+    expect(processing!.data).not.toHaveProperty('quoteId');
+  });
+
   it('refreshes an expired preview and asks for approval again before paying', async () => {
     let quotes = 0;
     const tm = createTestMachine({

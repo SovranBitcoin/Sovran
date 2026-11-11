@@ -33,6 +33,7 @@ import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useWalletLifecycleStore } from '@/shared/stores/global/walletLifecycleStore';
+import { isSafeToMint } from '@/shared/stores/global/walletRestorePhase';
 import { useNutDropRedeemQueueStore } from '@/shared/stores/profile/nutDropRedeemQueueStore';
 
 import { decryptDmEnvelopes } from '../data/dmDecryptPipeline';
@@ -71,10 +72,8 @@ const BACKDATING_WINDOW_SEC = 2 * 24 * 60 * 60 + 60 * 60;
 
 const queuePort: DmEcashQueuePort = {
   has: (tokenHash) => tokenHash in useNutDropRedeemQueueStore.getState().byTokenHash,
-  enqueue: (tokenHash, entry) => useNutDropRedeemQueueStore.getState().enqueue(tokenHash, entry),
-  markSpent: (tokenHash) => useNutDropRedeemQueueStore.getState().markStatus(tokenHash, 'spent'),
-  park: (tokenHash) =>
-    useNutDropRedeemQueueStore.getState().markStatus(tokenHash, 'untrusted-mint'),
+  enqueue: (tokenHash, entry, status) =>
+    useNutDropRedeemQueueStore.getState().enqueue(tokenHash, entry, status),
 };
 
 /** `null` when the wallet cannot be asked yet. */
@@ -88,8 +87,6 @@ async function probeSpent(token: string): Promise<boolean | null> {
   if (!CocoManager.isInitialized()) return null;
   return isTokenSpent(CocoManager.getInstance(), token);
 }
-
-const restoreSettled = (status: string) => status === 'complete' || status === 'not-needed';
 
 /**
  * True once the queue has been read from storage for the active profile.
@@ -318,7 +315,7 @@ function useDmEcashAutoRedeem(): void {
     // The drainer does nothing while a wallet restore is pending, and this
     // hook mounts before the restore gate. Serve the queue when it settles.
     const unsubscribeRestore = useWalletLifecycleStore.subscribe((state, previous) => {
-      if (restoreSettled(state.restoreStatus) && !restoreSettled(previous.restoreStatus)) {
+      if (isSafeToMint(state.restoreStatus) && !isSafeToMint(previous.restoreStatus)) {
         run('restored', () => drainIfNeeded(false));
       }
     });

@@ -9,6 +9,7 @@ import { legacyClaimPrompt, useLegacyEcashStore } from '@/shared/stores/global/l
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useWalletLifecycleStore } from '@/shared/stores/global/walletLifecycleStore';
+import { isRestoreAsked } from '@/shared/stores/global/walletRestorePhase';
 import { useLatestVersionFetch } from '@/shared/hooks/useLatestVersionFetch';
 import { selectNextCta } from '@/shared/lib/cta/selectNextCta';
 
@@ -49,8 +50,9 @@ export function CtaHost() {
   }, []);
 
   useEffect(() => {
-    if (!hydrated || !navigation?.key || restoreStatus === 'pending' || restoreStatus === 'failed')
-      return;
+    // Held while the restore gate shows recovery; the prompts' own rules hold
+    // them only for a pending restore.
+    if (!hydrated || !navigation?.key || isRestoreAsked(restoreStatus)) return;
     const next =
       previewOverride ??
       selectNextCta({

@@ -109,6 +109,12 @@ import { useTransactionDistributionStore } from '@/shared/stores/profile/transac
 // createSovranNotifications
 // =============================================================================
 
+/** What every payment-flow callback says about its payment. */
+type PaymentNotice = Pick<
+  Parameters<NonNullable<NotificationHandlerMap['onPaymentCancelled']>>[0],
+  'variant' | 'mintUrl' | 'amount' | 'unit'
+>;
+
 interface CreateSovranNotificationsConfig {
   getPubkey?: () => string | undefined;
   getPrivateKey?: () => Uint8Array | undefined;
@@ -120,6 +126,33 @@ export function createSovranNotifications(
   config?: CreateSovranNotificationsConfig
 ): NotificationHandlerMap {
   paymentLog.debug('payment.notifications.created');
+  /**
+   * The processing toast this payment flow opened, under a key only it holds,
+   * and the payment it opened it for. The flow's later callbacks change that
+   * toast only, and only for that payment: another toast on screen, or a late
+   * callback for another payment, is left alone.
+   */
+  let started: {
+    key: string;
+    variant: PaymentNotice['variant'];
+    mintUrl: string;
+    amount: number;
+    unit: string;
+  } | null = null;
+  const startedFor = (data: PaymentNotice) =>
+    started &&
+    started.variant === data.variant &&
+    started.mintUrl === data.mintUrl &&
+    started.amount === data.amount &&
+    started.unit === data.unit
+      ? started
+      : null;
+  /** The toast this flow opened for this payment, while it is the one on screen. */
+  const ownToast = (data: PaymentNotice) => {
+    const own = startedFor(data);
+    const active = usePaymentStatusStore.getState().active;
+    return own && active?.id === own.key ? active : null;
+  };
   return {
     NO_AMOUNT: ({ code: _code, message: _message, data: _data }) => {
       paymentLog.warn('payment.notification.no_amount');
@@ -195,6 +228,7 @@ export function createSovranNotifications(
       // toast; the melt-op:finalized listener's no-active fallback shows the
       // single terminal toast, and onPaymentFailed shows failures.
       if (data.variant === 'melt' && data.method === 'onchain') {
+        started = null;
         paymentLog.info('payment.processing.skipped', {
           variant: data.variant,
           method: data.method,
@@ -204,7 +238,7 @@ export function createSovranNotifications(
       }
       const store = usePaymentStatusStore.getState();
       const variant = data.variant === 'paymentRequest' ? 'payment-request' : data.variant;
-      const id = `${data.variant}-${Date.now()}`;
+      const id = mintLocalId(data.variant);
       paymentLog.info('payment.processing', {
         variant: data.variant,
         statusVariant: variant,
@@ -216,9 +250,23 @@ export function createSovranNotifications(
         activeState: store.active?.state ?? null,
         expectedNext: 'processing_to_terminal_or_delivered',
       });
+      // A melt from a preview already has its quote, which every event of the
+      // melt carries. A payment request's send gets its id while it runs:
+      // until then the toast is held under a key only this flow knows.
+      started = {
+        key: id,
+        variant: data.variant,
+        mintUrl: data.mintUrl,
+        amount: data.amount,
+        unit: data.unit,
+      };
       store.setActive({
         variant,
         id,
+        owner:
+          data.variant === 'melt' && data.quoteId
+            ? { kind: 'melt', quoteId: data.quoteId }
+            : { kind: 'pending', key: id },
         mintUrl: data.mintUrl,
         amount: data.amount,
         unit: data.unit,
@@ -285,10 +333,28 @@ export function createSovranNotifications(
         }
       }
 
-      if (!store.active) {
+      // The payment's ids are in its history entry: bind this flow's toast to
+      // them, so the wallet events of this payment (and no other) reach it.
+      const entryOperationId =
+        typeof confirmedEntry?.operationId === 'string'
+          ? confirmedEntry.operationId
+          : typeof confirmedEntry?.id === 'string' && data.variant === 'melt'
+            ? confirmedEntry.id
+            : undefined;
+      const own = startedFor(data);
+      if (own) {
+        if (data.variant === 'paymentRequest' && entryOperationId) {
+          store.bindOwner(own.key, { kind: 'send', operationId: entryOperationId });
+        } else if (data.variant === 'melt' && typeof confirmedEntry?.quoteId === 'string') {
+          store.bindOwner(own.key, { kind: 'melt', quoteId: confirmedEntry.quoteId });
+        }
+      }
+
+      const active = ownToast(data);
+      if (!active) {
         paymentLog.warn('payment.confirmed.skipped', {
           variant: data.variant,
-          reason: 'no_active_status_toast',
+          reason: store.active ? 'active_status_not_this_payment' : 'no_active_status_toast',
         });
         return;
       }
@@ -297,36 +363,41 @@ export function createSovranNotifications(
         paymentLog.info('payment.confirmed.route', {
           variant: data.variant,
           action: 'set_delivered',
-          activeId: store.active.id,
-          activeState: store.active.state,
+          activeId: active.id,
+          activeState: active.state,
           expectedNext: 'delivered_then_later_confirmed',
         });
-        store.setDelivered(store.active.id);
+        store.setDelivered(active.id);
       } else if (data.variant === 'melt' && data.historyEntry) {
         if (confirmedEntry?.state === 'PENDING') {
           paymentLog.info('payment.confirmed.skipped', {
             variant: data.variant,
             reason: 'melt_history_pending',
-            activeId: store.active.id,
-            activeState: store.active.state,
+            activeId: active.id,
+            activeState: active.state,
           });
           return;
         }
         paymentLog.info('payment.confirmed.route', {
           variant: data.variant,
           action: 'set_confirmed',
-          activeId: store.active.id,
-          activeState: store.active.state,
+          activeId: active.id,
+          activeState: active.state,
         });
-        store.setConfirmed(store.active.id);
+        // The melt for View: its own event may have come while the toast was
+        // still waiting for its quote, and was left to this.
+        store.setConfirmed(
+          active.id,
+          entryOperationId ? { operationId: entryOperationId } : undefined
+        );
       } else {
         paymentLog.info('payment.confirmed.route', {
           variant: data.variant,
           action: 'set_confirmed',
-          activeId: store.active.id,
-          activeState: store.active.state,
+          activeId: active.id,
+          activeState: active.state,
         });
-        store.setConfirmed(store.active.id);
+        store.setConfirmed(active.id);
       }
     },
     onPaymentCancelled: (data) => {
@@ -340,7 +411,8 @@ export function createSovranNotifications(
         unit: data.unit,
         activeId: store.active?.id ?? null,
       });
-      store.clearActive();
+      const own = startedFor(data);
+      if (own) store.clearActive(own.key);
     },
     onPaymentFailed: (data) => {
       const store = usePaymentStatusStore.getState();
@@ -360,29 +432,25 @@ export function createSovranNotifications(
       const reason = describeWalletFailure(data);
       const msg = data.rolledBack ? `${reason}\nYour funds have been returned.` : reason;
       const variant = data.variant === 'paymentRequest' ? 'payment-request' : data.variant;
-      const active = store.active;
-      if (
-        !active ||
-        active.variant !== variant ||
-        active.mintUrl !== data.mintUrl ||
-        active.amount !== data.amount ||
-        active.unit !== data.unit
-      ) {
-        // No matching processing toast to flip (onchain melts suppress it,
-        // and another payment may currently own the surface). A failure must
-        // still surface as its own terminal toast rather than mutating an
-        // unrelated payment.
-        const id = `${data.variant}-${Date.now()}`;
+      const active = ownToast(data);
+      if (!active) {
+        // No processing toast of this flow's to flip (onchain melts suppress
+        // it, and another payment may currently own the surface). A failure
+        // must still surface as its own terminal toast rather than mutating
+        // an unrelated payment.
+        const id = mintLocalId(data.variant);
         paymentLog.info('payment.failed.route', {
           variant: data.variant,
           action: 'new_failed_toast',
           id,
-          reason: active ? 'active_status_mismatch' : 'no_active_status_toast',
+          reason: store.active ? 'active_status_mismatch' : 'no_active_status_toast',
           rolledBack: data.rolledBack,
         });
         store.setActive({
           variant,
           id,
+          // Final when shown: nothing is ever matched to it.
+          owner: { kind: 'pending', key: id },
           mintUrl: data.mintUrl,
           amount: data.amount,
           unit: data.unit,

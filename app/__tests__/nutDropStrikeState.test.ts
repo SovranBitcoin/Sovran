@@ -21,6 +21,8 @@ function entry(
 ): StrikeQueueEntry {
   return {
     status,
+    attempts: 0,
+    nextAttemptAt: 0,
     senderPeerID: senderPeerID ?? undefined,
     receivedAt: T0,
     amount,

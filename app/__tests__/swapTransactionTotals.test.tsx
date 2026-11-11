@@ -86,7 +86,7 @@ jest.mock('expo-haptics', () => ({
 }));
 jest.mock('@/shared/hooks/useThemeColor', () => ({
   useThemeColor: (token: string | readonly string[]) =>
-    typeof token === 'string' ? 'c' : token.map(() => 'c'),
+    typeof token === 'string' ? token : [...token],
 }));
 jest.mock('@/shared/lib/color', () => ({
   ...jest.requireActual('@/shared/lib/color'),
@@ -299,7 +299,8 @@ describe('a swap with a failed leg', () => {
     await render();
 
     // The failed leg never melted: only the 10 the first leg cost is a fee.
-    expect(details()).toMatchObject({ Status: 'Cancelled', Steps: '2', 'Total Fees': '10 sat' });
+    expect(details()).toMatchObject({ Status: 'Failed', Steps: '2', 'Total Fees': '10 sat' });
+    expect(header()).toMatchObject({ color: 'danger' });
     expect(header()).toMatchObject({ amount: 990 });
 
     await expand();
@@ -327,6 +328,68 @@ describe('a swap with a failed leg', () => {
     expect(details()).toMatchObject({ 'Total Fees': '20 sat' });
   });
 
+  it('a finished group with a failed leg reads Failed, as its history row does', async () => {
+    seedGroup({
+      legs: [
+        leg('l1', { amount: 1000, meltQuoteId: 'melt1', mintQuoteId: 'mint1' }),
+        leg('l2', { amount: 500, localStatus: 'failed' }),
+      ],
+    });
+    mockHistory = [historyEntry('melt', 'melt1', -1000), historyEntry('mint', 'mint1', 990)];
+
+    await render();
+
+    expect(details()).toMatchObject({ Status: 'Failed', 'Total Fees': '10 sat' });
+    expect(header()).toMatchObject({ color: 'danger' });
+  });
+
+  it('a failed leg beside one still settling reads Running, as its history row does', async () => {
+    seedGroup({
+      legs: [
+        leg('l1', { amount: 500, localStatus: 'failed' }),
+        leg('l2', { amount: 700, localStatus: 'settling', meltQuoteId: 'melt2' }),
+      ],
+    });
+    mockHistory = [historyEntry('melt', 'melt2', -710)];
+
+    await render();
+
+    expect(details()).toMatchObject({ Status: 'Running' });
+    expect(details()).not.toHaveProperty('Total Fees');
+  });
+
+  it('a group still saved as running reads Running', async () => {
+    seedGroup({ state: 'running', legs: [leg('l1', { amount: 700, localStatus: 'melting' })] });
+
+    await render();
+
+    expect(details()).toMatchObject({ Status: 'Running' });
+  });
+
+  it.each([
+    ['cancelled', 'melting'],
+    ['cancelled', 'verifying'],
+    ['finished', 'melting'],
+    ['finished', 'invoiceReady'],
+  ] as const)(
+    'a %s group with a leg still %s reads Running and shows no fee',
+    async (state, localStatus) => {
+      seedGroup({
+        state,
+        legs: [
+          leg('l1', { amount: 700, localStatus, meltQuoteId: 'melt1', meltOperationId: 'op-1' }),
+        ],
+      });
+      mockHistory = [historyEntry('melt', 'melt1', -710)];
+
+      await render();
+
+      // The melt may still be paid: nothing is lost to fees yet, and nothing is over.
+      expect(details()).toMatchObject({ Status: 'Running' });
+      expect(details()).not.toHaveProperty('Total Fees');
+    }
+  );
+
   it('a cancelled group with no history shows no fee', async () => {
     seedGroup({
       state: 'cancelled',
@@ -336,7 +399,7 @@ describe('a swap with a failed leg', () => {
     await render();
 
     // Nothing was sent, so nothing was lost to fees; the header keeps the amount asked for.
-    expect(details()).toMatchObject({ Status: 'Cancelled' });
+    expect(details()).toMatchObject({ Status: 'Failed' });
     expect(details()).not.toHaveProperty('Total Fees');
     expect(header()).toMatchObject({ amount: 700 });
   });
@@ -376,8 +439,9 @@ describe('a chain that replaces a direct leg', () => {
 
     await render();
 
-    expect(details()).toMatchObject({ Steps: '2', 'Total Fees': '20 sat' });
-    expect(header()).toMatchObject({ amount: 1570 });
+    // The transfer arrived by the chain, so the swap is complete, as its history row says.
+    expect(details()).toMatchObject({ Status: 'Complete', Steps: '2', 'Total Fees': '20 sat' });
+    expect(header()).toMatchObject({ amount: 1570, color: 'success' });
     expect(renderer.root.findAllByType('TransferCard' as never)).toHaveLength(1);
   });
 });

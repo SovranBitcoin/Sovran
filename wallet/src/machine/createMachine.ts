@@ -1292,6 +1292,8 @@ export function createPaymentMachine(
           // The quote method lives on the flow context, not the step data —
           // lets the wallet gate the in-progress indicator per method.
           ...(flowCtx.meltQuoteMethod ? { method: flowCtx.meltQuoteMethod } : {}),
+          // The quote `runConfirmMeltEffect` executes against.
+          ...(data.meltQuote ? { quoteId: data.meltQuote.quoteId } : {}),
         }),
       );
 

@@ -104,12 +104,15 @@ describe('nutDropRedeemQueueStore', () => {
     useNutDropRedeemQueueStore.getState().enqueue(HASH, ENTRY);
     useNutDropRedeemQueueStore.getState().scheduleRetry(HASH, page);
     expect(useNutDropRedeemQueueStore.getState().byTokenHash[HASH]?.lastError).toHaveLength(500);
+    useNutDropRedeemQueueStore.getState().markStatus(HASH, 'redeeming');
     useNutDropRedeemQueueStore.getState().markStatus(HASH, 'failed', page);
     expect(useNutDropRedeemQueueStore.getState().byTokenHash[HASH]?.lastError).toHaveLength(500);
   });
 
   it('marks statuses and records errors', () => {
     useNutDropRedeemQueueStore.getState().enqueue(HASH, ENTRY);
+    // The mint's "spent" answers a receive the drain started.
+    useNutDropRedeemQueueStore.getState().markStatus(HASH, 'redeeming');
     useNutDropRedeemQueueStore.getState().markStatus(HASH, 'spent', 'already spent');
     expect(useNutDropRedeemQueueStore.getState().byTokenHash[HASH]).toMatchObject({
       status: 'spent',

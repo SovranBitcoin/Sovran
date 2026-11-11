@@ -4,6 +4,8 @@
 
 import {
   computeRecoveryCounts,
+  fundsFound,
+  mintRecoveryError,
   countKnownFailures,
   createInitialMintStates,
   currentMint,
@@ -16,22 +18,57 @@ import {
 } from '@/features/settings/lib/recoveryProgress';
 import { mapCheckpointStatusToIndicator } from '@/shared/blocks/status/mapCheckpointStatus';
 
-function state(overrides: Partial<MintRecoveryState> = {}): MintRecoveryState {
-  return {
-    mint: 'https://mint.example',
-    isDiscovered: false,
-    status: 'waiting',
-    keysetsTotal: null,
-    keysetsDone: 0,
-    failedKeysets: 0,
-    alreadyRecoveredKeysets: 0,
-    skippedKeysets: 0,
-    fundsFound: false,
-    startedAtMs: null,
-    durationMs: null,
-    ...overrides,
-  };
-}
+type Where = { mint?: string; isDiscovered?: boolean };
+const at = (where: Where) => ({ mint: 'https://mint.example', isDiscovered: false, ...where });
+const waiting = (where: Where = {}): MintRecoveryState => ({ ...at(where), status: 'waiting' });
+const restoring = (
+  where: Where = {},
+  progress: { keysetsTotal?: number | null; keysetsDone?: number; startedAtMs?: number } = {}
+): MintRecoveryState => ({
+  ...at(where),
+  status: 'restoring',
+  startedAtMs: 0,
+  keysetsTotal: null,
+  keysetsDone: 0,
+  ...progress,
+});
+const done = (where: Where = {}): MintRecoveryState => ({
+  ...at(where),
+  status: 'done',
+  fundsFound: false,
+  durationMs: 1,
+});
+const alreadyRecovered = (where: Where = {}): MintRecoveryState => ({
+  ...at(where),
+  status: 'already-recovered',
+  fundsFound: false,
+  durationMs: 1,
+});
+const failed = (where: Where = {}, error = 'mint offline'): MintRecoveryState => ({
+  ...at(where),
+  status: 'failed',
+  error,
+  fundsFound: false,
+  durationMs: null,
+});
+const timedOut = (where: Where = {}): MintRecoveryState => ({
+  ...at(where),
+  status: 'timed-out',
+  fundsFound: false,
+});
+const cancelled = (where: Where = {}): MintRecoveryState => ({
+  ...at(where),
+  status: 'skipped',
+  reason: 'cancelled',
+  fundsFound: false,
+});
+const notRestorable = (where: Where = {}, funds = false): MintRecoveryState => ({
+  ...at(where),
+  status: 'skipped',
+  reason: 'not-restorable',
+  fundsFound: funds,
+  durationMs: 1,
+});
 
 describe('createInitialMintStates', () => {
   it('marks only the probed URLs as discovered', () => {
@@ -45,11 +82,7 @@ describe('createInitialMintStates', () => {
 
 describe('computeRecoveryCounts', () => {
   it('counts a failed mint as settled — the ring must not stall on it', () => {
-    const counts = computeRecoveryCounts([
-      state({ status: 'done' }),
-      state({ status: 'failed' }),
-      state({ status: 'restoring' }),
-    ]);
+    const counts = computeRecoveryCounts([done(), failed(), restoring()]);
 
     expect(counts).toMatchObject({ settled: 2, succeeded: 1, failed: 1, total: 3 });
     expect(counts.allSettled).toBe(false);
@@ -57,9 +90,7 @@ describe('computeRecoveryCounts', () => {
   });
 
   it('is allSettled only when every mint reached a terminal status', () => {
-    expect(
-      computeRecoveryCounts([state({ status: 'done' }), state({ status: 'failed' })]).allSettled
-    ).toBe(true);
+    expect(computeRecoveryCounts([done(), failed()]).allSettled).toBe(true);
   });
 
   it('does not report an empty run as complete', () => {
@@ -72,10 +103,7 @@ describe('computeRecoveryCounts', () => {
   });
 
   it('clamps progress to 0..1', () => {
-    const allFailed = computeRecoveryCounts([
-      state({ status: 'failed' }),
-      state({ status: 'failed' }),
-    ]);
+    const allFailed = computeRecoveryCounts([failed(), failed()]);
     expect(allFailed.progressPct).toBe(1);
     expect(allFailed.succeeded).toBe(0);
   });
@@ -83,37 +111,37 @@ describe('computeRecoveryCounts', () => {
 
 describe('countKnownFailures', () => {
   it('ignores probed mints, which are expected to miss', () => {
-    const states = [state({ status: 'failed', isDiscovered: true }), state({ status: 'done' })];
+    const states = [failed({ isDiscovered: true }), done()];
     expect(countKnownFailures(states)).toBe(0);
   });
 
   it('counts a failure on a mint the user actually has', () => {
-    expect(countKnownFailures([state({ status: 'failed', isDiscovered: false })])).toBe(1);
+    expect(countKnownFailures([failed({ isDiscovered: false })])).toBe(1);
   });
 });
 
 describe('describeMintProgress', () => {
   it('shows the keyset denominator once it is known', () => {
-    const s = state({ status: 'restoring', keysetsTotal: 8, keysetsDone: 3, startedAtMs: 1_000 });
+    const s = restoring({}, { keysetsTotal: 8, keysetsDone: 3, startedAtMs: 1_000 });
     expect(describeMintProgress(s, 2_000)).toBe('3 of 8 keysets');
   });
 
   it('says it is reading keysets before the denominator arrives', () => {
-    expect(describeMintProgress(state({ status: 'restoring' }), 0)).toBe('Reading keysets');
+    expect(describeMintProgress(restoring(), 0)).toBe('Reading keysets');
   });
 
   it('flags a long-running mint so a slow scan is not read as a hang', () => {
-    const s = state({ status: 'restoring', keysetsTotal: 3, keysetsDone: 1, startedAtMs: 0 });
+    const s = restoring({}, { keysetsTotal: 3, keysetsDone: 1, startedAtMs: 0 });
     expect(describeMintProgress(s, 25_000)).toBe('1 of 3 keysets · still scanning');
   });
 
   it('surfaces the failure reason instead of a count', () => {
-    const s = state({ status: 'failed', error: '2 keyset(s) failed' });
+    const s = failed({}, '2 keyset(s) failed');
     expect(describeMintProgress(s, 0)).toBe('2 keyset(s) failed');
   });
 
   it('falls back to the balance line when the mint is done', () => {
-    expect(describeMintProgress(state({ status: 'done' }), 0)).toBeNull();
+    expect(describeMintProgress(done(), 0)).toBeNull();
   });
 });
 
@@ -123,6 +151,7 @@ describe('isTerminal', () => {
     ['already-recovered', true],
     ['skipped', true],
     ['failed', true],
+    ['timed-out', true],
     ['restoring', false],
     ['waiting', false],
   ] as const)('%s -> %s', (status, expected) => {
@@ -148,16 +177,16 @@ describe('isSuccess', () => {
 describe('currentMint', () => {
   it('names the one mint in flight — only meaningful now mints run serially', () => {
     const states = [
-      state({ mint: 'https://a', status: 'done' }),
-      state({ mint: 'https://b', status: 'restoring' }),
-      state({ mint: 'https://c', status: 'waiting' }),
+      done({ mint: 'https://a' }),
+      restoring({ mint: 'https://b' }),
+      waiting({ mint: 'https://c' }),
     ];
     expect(currentMint(states)?.mint).toBe('https://b');
     expect(currentMintPosition(states)).toBe(2);
   });
 
   it('has no current mint between mints, and reports settled instead', () => {
-    const states = [state({ status: 'done' }), state({ status: 'done' })];
+    const states = [done(), done()];
     expect(currentMint(states)).toBeNull();
     expect(currentMintPosition(states)).toBe(2);
   });
@@ -191,6 +220,7 @@ describe('mintStatusToCheckpoint', () => {
   it.each([
     ['done', { phase: 'done', result: 'success' }],
     ['failed', { phase: 'done', result: 'error' }],
+    ['timed-out', { phase: 'done', result: 'error' }],
     ['skipped', { phase: 'done', result: 'reverted' }],
   ] as const)('%s renders as %o', (status, expected) => {
     expect(mapCheckpointStatusToIndicator(mintStatusToCheckpoint(status))).toEqual(expected);
@@ -199,14 +229,44 @@ describe('mintStatusToCheckpoint', () => {
 
 describe('describeMintProgress for the new statuses', () => {
   it('says a mint was already recovered rather than showing an error', () => {
-    expect(describeMintProgress(state({ status: 'already-recovered' }), 0)).toBe(
-      'Already recovered'
-    );
+    expect(describeMintProgress(alreadyRecovered(), 0)).toBe('Already recovered');
   });
 
   it('reports a skip reason when one was given', () => {
-    expect(describeMintProgress(state({ status: 'skipped', error: 'Cancelled' }), 0)).toBe(
-      'Cancelled'
-    );
+    expect(describeMintProgress(cancelled(), 0)).toBe('Cancelled');
+  });
+});
+
+describe('a mint that timed out', () => {
+  it('counts as a failure, on a known mint, and says it timed out', () => {
+    expect(computeRecoveryCounts([timedOut(), done()])).toMatchObject({ settled: 2, failed: 1 });
+    expect(countKnownFailures([timedOut()])).toBe(1);
+    expect(describeMintProgress(timedOut(), 0)).toBe('Timed out');
+  });
+});
+
+describe("a row's error line and found funds", () => {
+  it.each([
+    ['failed', failed({}, 'mint offline'), 'mint offline'],
+    ['timed out', timedOut(), 'Timed out'],
+    ['cancelled', cancelled(), 'Cancelled'],
+    ['not restorable', notRestorable(), undefined],
+    ['done', done(), undefined],
+    ['waiting', waiting(), undefined],
+  ])('%s', (_name, row, error) => {
+    expect(mintRecoveryError(row)).toBe(error);
+  });
+
+  it('finds funds only where a restore read the balance', () => {
+    const funded: MintRecoveryState = {
+      ...at({}),
+      status: 'done',
+      fundsFound: true,
+      durationMs: 1,
+    };
+    expect(fundsFound(funded)).toBe(true);
+    expect(fundsFound(notRestorable({}, true))).toBe(true);
+    expect(fundsFound(timedOut())).toBe(false);
+    expect(fundsFound(cancelled())).toBe(false);
   });
 });

@@ -1,5 +1,6 @@
 import { oldEcashClaimCopy } from 'copy/prompts';
 import { BACKUP_FLOW_REVISION } from '@/shared/lib/backup/revision';
+import { isRestorePending } from '@/shared/stores/global/walletRestorePhase';
 import type { CtaDefinition, CtaId } from './types';
 import { isNewerVersion } from './version';
 const HOUR_MS = 60 * 60 * 1000;
@@ -36,7 +37,7 @@ export const CTA_DEFINITIONS: readonly CtaDefinition[] = [
     shouldShow: ({ lifecycle, mockMode, balanceTotalSat, nowMs, backupStartedAt }) =>
       (lifecycle.recoveryPhraseVerifiedRevision == null ||
         lifecycle.recoveryPhraseVerifiedRevision < BACKUP_FLOW_REVISION) &&
-      lifecycle.restoreStatus !== 'pending' &&
+      !isRestorePending(lifecycle.restoreStatus) &&
       !mockMode &&
       (backupStartedAt == null || nowMs - backupStartedAt >= ABANDONED_BACKUP_GRACE_MS) &&
       (balanceTotalSat > 0 ||
@@ -58,7 +59,7 @@ export const CTA_DEFINITIONS: readonly CtaDefinition[] = [
     // the person declines for that mint, which the screen records itself.
     dismissPolicy: { snoozeMs: DAY_MS },
     shouldShow: ({ oldEcash, mockMode, lifecycle }) =>
-      oldEcash !== null && !mockMode && lifecycle.restoreStatus !== 'pending',
+      oldEcash !== null && !mockMode && !isRestorePending(lifecycle.restoreStatus),
     content: {
       icon: 'mdi:cash-refund',
       title: oldEcashClaimCopy.title,

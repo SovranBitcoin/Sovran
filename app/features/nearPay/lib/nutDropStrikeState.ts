@@ -15,6 +15,8 @@
  * set) never animate — reopening the screen after a redemption shows nothing.
  */
 
+import { isMeshRedeemDue, meshRedeemPhase, type MeshRedeemEntry } from 'wallet/redeemEntry';
+
 export type StrikeStatus = 'active' | 'success' | 'waiting' | 'fading';
 
 export interface StrikeState {
@@ -40,15 +42,10 @@ export interface StrikeState {
   redeemedHashes?: readonly string[];
 }
 
-export interface StrikeQueueEntry {
-  status: 'pending' | 'redeeming' | 'redeemed' | 'spent' | 'untrusted-mint' | 'failed';
-  senderPeerID?: string;
-  receivedAt: number;
-  amount: number;
-  unit: string;
-  attempts?: number;
-  nextAttemptAt?: number;
-}
+export type StrikeQueueEntry = Pick<
+  MeshRedeemEntry,
+  'status' | 'attempts' | 'nextAttemptAt' | 'senderPeerID' | 'receivedAt' | 'amount' | 'unit'
+>;
 
 /** Minimum visible strike duration — instant redemptions still get a beat. */
 export const STRIKE_MIN_VISIBLE_MS = 1400;
@@ -67,13 +64,31 @@ const LINGER_MS_BY_STATUS = {
   fading: STRIKE_FADE_LINGER_MS,
 } satisfies Record<Exclude<StrikeStatus, 'active'>, number>;
 
-const LIVE_STATUSES = new Set(['pending', 'redeeming']);
-const FAILURE_STATUSES = new Set(['spent', 'untrusted-mint', 'failed']);
-
-function isRetryWaitingEntry(entry: StrikeQueueEntry, now: number): boolean {
-  return (
-    entry.status === 'pending' && (entry.attempts ?? 0) > 0 && (entry.nextAttemptAt ?? 0) > now
-  );
+/**
+ * How an entry counts toward its sender's strike: still being tried, accepted
+ * with a retry not yet due, received, or ended without arriving.
+ */
+function strikeBucket(
+  entry: StrikeQueueEntry,
+  now: number
+): 'live' | 'waiting' | 'redeemed' | 'failed' {
+  const phase = meshRedeemPhase(entry);
+  switch (phase.kind) {
+    case 'waiting':
+      return isMeshRedeemDue(phase, now) ? 'live' : 'waiting';
+    case 'redeeming':
+      return 'live';
+    case 'redeemed':
+      return 'redeemed';
+    case 'spent':
+    case 'untrusted-mint':
+    case 'failed':
+      return 'failed';
+    default: {
+      const exhaustive: never = phase;
+      return exhaustive;
+    }
+  }
 }
 
 export interface DeriveStrikeMapInput {
@@ -123,18 +138,23 @@ export function deriveStrikeMap(input: DeriveStrikeMapInput): DeriveStrikeMapRes
       unit: null,
       redeemedHashes: [],
     };
-    if (isRetryWaitingEntry(entry, now)) {
-      bucket.waiting += 1;
-    } else if (LIVE_STATUSES.has(entry.status)) {
-      bucket.live += 1;
-      if (baselineLiveHashes.has(hash)) bucket.ambient = true;
-    } else if (entry.status === 'redeemed') {
-      bucket.redeemed += 1;
-      bucket.redeemedAmount += entry.amount;
-      bucket.redeemedHashes.push(hash);
-      if (bucket.unit === null) bucket.unit = entry.unit;
-    } else if (FAILURE_STATUSES.has(entry.status)) {
-      bucket.failed += 1;
+    switch (strikeBucket(entry, now)) {
+      case 'waiting':
+        bucket.waiting += 1;
+        break;
+      case 'live':
+        bucket.live += 1;
+        if (baselineLiveHashes.has(hash)) bucket.ambient = true;
+        break;
+      case 'redeemed':
+        bucket.redeemed += 1;
+        bucket.redeemedAmount += entry.amount;
+        bucket.redeemedHashes.push(hash);
+        if (bucket.unit === null) bucket.unit = entry.unit;
+        break;
+      case 'failed':
+        bucket.failed += 1;
+        break;
     }
     byPeer.set(entry.senderPeerID, bucket);
   }

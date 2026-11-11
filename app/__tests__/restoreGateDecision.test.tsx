@@ -199,6 +199,25 @@ describe('restore gate decision table', () => {
     }
   );
 
+  it.each([
+    ['in-progress', 'wallet'],
+    ['failed', 'recovery'],
+  ] as const)(
+    'with no seed yet, leaves a saved %s status alone and shows the %s',
+    async (status, page) => {
+      // QUIRK: the gate re-decides both from the keychain, but with nothing
+      // there it keeps the saved status and judges it by what it shows:
+      // 'failed' holds the app on recovery, 'in-progress' opens it.
+      mockedRetrieveMnemonic.mockResolvedValue(null);
+      seed(status, null);
+
+      await renderGate();
+
+      expect(useWalletLifecycleStore.getState().restoreStatus).toBe(status);
+      expect(shown()).toBe(page);
+    }
+  );
+
   it('opens the app and records the seed once recovery completes', async () => {
     seed('pending', null);
     await renderGate();
