@@ -115,13 +115,17 @@ const DEFAULT_MIDDLEMAN_ROUTING = {
 
 // ⛔ DATA-LOSS FOOTGUN — read before adding or tightening any field below.
 //
-// On rehydrate, `createMergeWithSchema` runs ONE `safeParse` over this whole
-// blob and, if ANY single field fails, throws away the ENTIRE persisted
-// settings object — silently resetting `termsAccepted` (so the terms gate
-// shows on every launch), `hasSeenOnboarding`, and every other setting. A
-// renamed `z.enum` value on a device that persisted the old name is exactly
-// this trap: the Balance-split rename `hero-minimal` → `list` wiped settings
-// this way (symptom in logs: `store.settings.merge_rejected`).
+// On rehydrate, `createMergeWithSchema` parses this whole blob. The store sets
+// `independentFields`, so when that parse fails each field that does not parse
+// on its own is dropped and the blob is parsed again: the dropped fields take
+// their `.default` and the rest keep their saved values (logs:
+// `store.settings.merge_rejected`, then `store.settings.merge_kept_fields`).
+// A failing field with no `.default` fails that second parse too, and then the
+// ENTIRE persisted settings object is thrown away — silently resetting
+// `termsAccepted` (so the terms gate shows on every launch),
+// `hasSeenOnboarding`, and every other setting. A renamed `z.enum` value on a
+// device that persisted the old name is this trap: the Balance-split rename
+// `hero-minimal` → `list` once wiped settings this way.
 //
 // Defence: every constrained field carries `.default(D).catch(D)` —
 // `.default` absorbs a missing field, `.catch` absorbs a present-but-invalid
@@ -138,8 +142,8 @@ const PersistedTermsAccepted = z
   .nullable();
 
 const PersistedMiddlemanRouting = z.looseObject({
-  // `.catch` keeps a stale/out-of-range value from failing the whole-blob parse
-  // (which would discard the entire settings store, incl. terms acceptance).
+  // `.catch` keeps one stale/out-of-range value from resetting the other
+  // routing settings along with it.
   maxHops: z.number().int().min(1).max(8).default(2).catch(2),
   maxFee: z.number().int().nonnegative().default(5).catch(5),
   minSuccessRate: z.number().min(0).max(1).default(0.9).catch(0.9),
@@ -453,12 +457,12 @@ export const useSettingsStore = create<SettingsStore>({ name: 'settings-store', 
         // Every setting stands on its own: one that cannot be read must not
         // cost terms acceptance, onboarding or the rest.
         independentFields: true,
-        // v1 -> v2: force every mock flag off. Mock mode (and its fixture
-        // identities Bob/Alice) must never persist into a shipped/updated
-        // install — it was leaking through after the toggle was disabled. This
-        // guarantees every existing install lands with mock OFF on the next
-        // launch, regardless of how it was turned on; afterHydrate then purges
-        // any fixture metadata that already leaked into the cache.
+        // `migrate` runs once for a blob saved under any older version (it does
+        // not look at which): it turns developer mode, every developer toggle
+        // and every mock flag off, and adds `hasSeenOnboarding` for releases
+        // that predate it. Mock mode (and its fixture identities Bob/Alice)
+        // must never persist into a shipped/updated install; afterHydrate then
+        // purges any fixture metadata that already leaked into the cache.
         version: 4,
         migrate: (state) => {
           const persisted = (state ?? {}) as z.infer<typeof PersistedSettings>;
