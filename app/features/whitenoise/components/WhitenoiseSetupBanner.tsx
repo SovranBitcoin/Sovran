@@ -100,7 +100,11 @@ export function WhitenoiseSetupBanner({
     phase !== 'gone' &&
     (phase === 'running' ||
       phase === 'success' ||
-      (pathname.includes('/contacts') && !!client && !isLoading && !isReady));
+      // A failure stays up whatever the count says: a key package is counted
+      // once stored, before the relays have accepted it.
+      (pathname.includes('/contacts') &&
+        !!client &&
+        (phase === 'failed' || (!isLoading && !isReady))));
 
   useEffect(() => {
     onClearanceChange?.(shouldRenderCard ? cardHeight + FLOAT_GAP + 16 : 0);

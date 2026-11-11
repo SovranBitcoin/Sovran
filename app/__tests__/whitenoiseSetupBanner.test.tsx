@@ -107,6 +107,27 @@ it('a failed setup shows its error, not the success check, and can be tried agai
   expect(mockIndicatorPhases).toContain('done');
 });
 
+it('a setup whose key package was stored but not published still shows its error', async () => {
+  // Marmot stores a new key package and announces it before publishing it, so
+  // the local count can reach the target although the relays refused it.
+  const client = makeClient(async () => undefined);
+  let count = 1;
+  client.keyPackages.count.mockImplementation(async () => count);
+  client.keyPackages.create.mockImplementation(async () => {
+    count += 1;
+    for (const [event, listener] of client.keyPackages.on.mock.calls as [string, () => void][]) {
+      if (event === 'keyPackageAdded') listener();
+    }
+    throw new Error('relay refused the key package');
+  });
+  await openWith(client);
+
+  await pressSetUp();
+
+  expect(mockIndicatorPhases).not.toContain('done');
+  expect(shownText()).toContain('relay refused the key package');
+});
+
 it('a setup that publishes the key packages shows the success check', async () => {
   const client = makeClient(async () => undefined);
   await openWith(client);
