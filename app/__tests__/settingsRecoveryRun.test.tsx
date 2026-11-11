@@ -365,6 +365,30 @@ describe('a search across discovered mints', () => {
     expect(paramPopup).not.toHaveBeenCalled();
     expect(staticPopup).not.toHaveBeenCalled();
   });
+
+  it('keeps trusting a discovered mint whose balance could not be read after its restore', async () => {
+    mockMints = [];
+    const UNREAD = 'https://unread.example';
+    jest.mocked(discoverMints).mockResolvedValue(
+      ok({
+        mints: [
+          { mintUrl: UNREAD, hasAudit: true, state: 'OK', averageScore: null, reviewCount: 0 },
+        ],
+      }) as never
+    );
+    jest.mocked(probeMintForHistory).mockResolvedValue(true);
+    mockBalancesByMint.mockRejectedValue(new Error('database is locked'));
+    const renderer = await mount({ gateMode: true, onComplete: jest.fn() });
+    await act(async () => {
+      byTestId(renderer, 'recovery-search-all-toggle')[0]!.props.onSelectedChange(true);
+    });
+
+    await swipe(renderer);
+
+    // The restore may have saved ecash there: an unread balance is not an empty mint.
+    expect(mockAddMint.mock.calls.map((call) => call[0])).toEqual([UNREAD]);
+    expect(mockUntrustMint).not.toHaveBeenCalled();
+  });
 });
 
 describe('stopping a run', () => {
@@ -731,6 +755,17 @@ describe('a mint that times out while still restoring', () => {
     // What the tidy-up would have done had it known: the run that trusted it untrusts it.
     expect(mockUntrustMint.mock.calls.map((call) => call[0])).toEqual([EMPTY]);
     expect(texts(renderer)).toContain('Timed out');
+  });
+
+  it('keeps trusting a discovered mint it timed out when its late balance cannot be read', async () => {
+    const { finishA } = await discoveredMintTimesOut();
+
+    mockBalancesByMint.mockRejectedValue(new Error('database is locked'));
+    finishA();
+    await advance(0);
+
+    // Its late restore may have saved ecash there: unknown is not empty.
+    expect(mockUntrustMint).not.toHaveBeenCalled();
   });
 
   it('keeps trusting a discovered mint it timed out when another run has started since', async () => {

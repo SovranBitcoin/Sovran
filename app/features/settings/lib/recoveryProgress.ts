@@ -10,6 +10,12 @@
 import type { CheckpointStatus } from '@/shared/blocks/status';
 
 /**
+ * Whether the balance read after a mint's restore found funds there;
+ * `unknown` when that read failed, so the restore may have saved ecash there.
+ */
+export type FundsFound = boolean | 'unknown';
+
+/**
  * Where one mint is in a recovery run, and once it is over, its outcome:
  * restored (`done`, or `already-recovered` when every proof was already in the
  * database, which is what a second run should find), `failed` with its reason,
@@ -33,22 +39,22 @@ type MintRecoveryProgress =
   | {
       status: 'done' | 'already-recovered';
       /** Whether this mint holds a balance after restore. */
-      fundsFound: boolean;
+      fundsFound: FundsFound;
       durationMs: number;
     }
-  | { status: 'failed'; error: string; fundsFound: boolean; durationMs: number | null }
+  | { status: 'failed'; error: string; fundsFound: FundsFound; durationMs: number | null }
   | {
       status: 'timed-out';
       /** A late result of its restore read a balance there. */
-      fundsFound: boolean;
+      fundsFound: FundsFound;
     }
   | {
       status: 'skipped';
       reason: 'cancelled';
       /** A mint the stop cut short may already hold what its first keysets restored. */
-      fundsFound: boolean;
+      fundsFound: FundsFound;
     }
-  | { status: 'skipped'; reason: 'not-restorable'; fundsFound: boolean; durationMs: number };
+  | { status: 'skipped'; reason: 'not-restorable'; fundsFound: FundsFound; durationMs: number };
 
 type MintRecoveryStatus = MintRecoveryProgress['status'];
 
@@ -101,8 +107,8 @@ export function isFailure(status: MintRecoveryStatus): boolean {
   return FAILED.has(status);
 }
 
-/** Whether a mint's funds were found after its restore; false for a mint never restored. */
-export function fundsFound(state: MintRecoveryState): boolean {
+/** What a mint's restore found there; false for a mint never restored. */
+function fundsRead(state: MintRecoveryState): FundsFound {
   switch (state.status) {
     case 'done':
     case 'already-recovered':
@@ -116,12 +122,18 @@ export function fundsFound(state: MintRecoveryState): boolean {
   }
 }
 
+/** Whether a mint's funds were found after its restore. */
+export function fundsFound(state: MintRecoveryState): boolean {
+  return fundsRead(state) === true;
+}
+
 /**
  * Whether the run learned that a mint holds nothing. Not for a mint that
- * timed out: its restore may still find funds there.
+ * timed out, whose restore may still find funds there, nor for one whose
+ * balance could not be read.
  */
 export function knownEmpty(state: MintRecoveryState): boolean {
-  return state.status !== 'timed-out' && !fundsFound(state);
+  return state.status !== 'timed-out' && fundsRead(state) === false;
 }
 
 /** Why a mint did not recover, for a row's error line; undefined when it did or is not over. */

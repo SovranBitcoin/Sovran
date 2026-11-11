@@ -27,6 +27,7 @@ import {
   isSuccess,
   knownEmpty,
   isTerminal,
+  type FundsFound,
   type MintRecoveryState,
 } from '@/features/settings/lib/recoveryProgress';
 
@@ -89,7 +90,7 @@ export function recoveryTransition(run: RecoveryRun, event: RecoveryEvent): Reco
         // A mint's outcome is final. A restore that timed out is not
         // cancelled, and its late result must not rewrite the row; the
         // funds it found are kept on it.
-        if (row.status !== 'timed-out' || row.fundsFound || !fundsFound(event.state)) return run;
+        if (row.status !== 'timed-out' || fundsFound(row) || !fundsFound(event.state)) return run;
         next = { ...row, fundsFound: true };
       }
       const rows = [...run.rows];
@@ -343,8 +344,8 @@ async function recover(
   const update = (index: number, state: MintRecoveryState) =>
     dispatch({ type: 'mintUpdated', index, state });
 
-  /** Restore one mint; resolves whether it holds funds after the restore. */
-  const restoreOneUrl = async (mintUrl: string, i: number): Promise<boolean> => {
+  /** Restore one mint; resolves whether it holds funds after the restore, `unknown` when unread. */
+  const restoreOneUrl = async (mintUrl: string, i: number): Promise<FundsFound> => {
     const isDiscovered = i >= knownMintUrls.length;
     const mintT0 = performance.now();
     cashuLog.info('recovery.mint.start', {
@@ -460,7 +461,9 @@ async function recover(
     const balances = await manager.wallet.balances
       .byMint({ mintUrls: [mintUrl] })
       .catch(() => null);
-    const found = amountToNumber(balances?.[mintUrl]?.total) > 0;
+    // A read that failed says nothing: the restore may have saved ecash there.
+    const found: FundsFound =
+      balances === null ? 'unknown' : amountToNumber(balances[mintUrl]?.total) > 0;
     const durationMs = Math.round((performance.now() - mintT0) * 100) / 100;
 
     // Report what actually happened. This used to be an unconditional
@@ -519,16 +522,17 @@ async function recover(
   // A discovered mint that timed out is left trusted by the tidy-up below:
   // its restore goes on behind the run and may yet find funds. Its late
   // result decides it as the tidy-up would have, however late it comes:
-  // untrusted when it found nothing, kept when it found funds. One whose
-  // result never comes stays trusted, and so does one a later run has taken
-  // up: that run lists it as trusted and restores it as its own.
+  // untrusted when it found nothing, kept when it found funds or its balance
+  // could not be read. One whose result never comes stays trusted, and so
+  // does one a later run has taken up: that run lists it as trusted and
+  // restores it as its own.
   const awaitingLateResult = new Set<string>();
-  const decideWhenRestored = (mintUrl: string, restore: Promise<boolean>) => {
+  const decideWhenRestored = (mintUrl: string, restore: Promise<FundsFound>) => {
     awaitingLateResult.add(mintUrl);
     void restore.then(
       async (found) => {
         awaitingLateResult.delete(mintUrl);
-        if (found || !isLatestRun()) {
+        if (found !== false || !isLatestRun()) {
           cashuLog.info('recovery.cleanup.timed_out_mint_kept', {
             ...mintUrlLogFields(mintUrl),
             fundsFound: found,
@@ -602,7 +606,8 @@ async function recover(
   dispatch({ type: 'finalizing' });
 
   // Untrust discovered mints that returned no funds; one that timed out
-  // may yet, and is left trusted until its late result decides it. `wallet.restore`
+  // may yet, and is left trusted until its late result decides it, and one
+  // whose balance could not be read may hold funds and is left trusted. `wallet.restore`
   // calls `mintService.addMintByUrl(url, { trusted: true })` for every
   // probed URL (see ../coco/packages/core/api/WalletApi.ts), which would
   // otherwise leave attacker-supplied URLs from the audit API permanently
