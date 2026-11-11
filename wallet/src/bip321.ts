@@ -6,13 +6,13 @@ import { logger } from "./logger";
 
 const SATS_PER_BTC = 100_000_000;
 
-export interface BuildBip321OnchainUriOptions {
+interface BuildBip321OnchainUriOptions {
   amountSats?: number | null;
   label?: string | null;
   message?: string | null;
 }
 
-export function formatSatsAsBtcAmount(amountSats: number): string | null {
+function formatSatsAsBtcAmount(amountSats: number): string | null {
   if (!Number.isSafeInteger(amountSats) || amountSats <= 0) {
     logger.warn("bip321.amount.invalid", {
       amountSats,
@@ -83,7 +83,7 @@ export function buildBip321OnchainUri(
   return uri;
 }
 
-export interface BuildUnifiedBip321UriInput {
+interface BuildUnifiedBip321UriInput {
   /** Onchain address — the URI body (BIP-321 allows an empty body). */
   address?: string | null;
   /** BOLT11 invoice — the `lightning` key. NOTE: only invoices have a

@@ -41,18 +41,6 @@ export function getScanSource(
   return getAnnotation(entry).scan ?? null;
 }
 
-export function getDistribution(
-  entry: EntryWithMetadata,
-): TransactionAnnotation["distribution"] | null {
-  return getAnnotation(entry).distribution ?? null;
-}
-
-export function getLocation(
-  entry: EntryWithMetadata,
-): TransactionAnnotation["location"] | null {
-  return getAnnotation(entry).location ?? null;
-}
-
 export function getSwap(
   entry: EntryWithMetadata,
 ): TransactionAnnotation["swap"] | null {

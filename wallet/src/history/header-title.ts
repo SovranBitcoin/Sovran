@@ -27,7 +27,7 @@ import { isTerminalFailureState } from "./states";
 import { DEFAULT_PAYMENT_COPY } from "./timeline/context";
 
 /** Which rail carried the money, at the granularity the title names. */
-export type TransactionHeaderRail =
+type TransactionHeaderRail =
   | "lightningSend"
   | "onchainSend"
   | "ecashSend"
@@ -40,7 +40,7 @@ export type TransactionHeaderRail =
  * Where the transaction is, in the only terms a title needs: what the user is
  * about to do, is watching happen, or is reading about afterwards.
  */
-export type TransactionHeaderPhase =
+type TransactionHeaderPhase =
   | "ready"
   | "inFlight"
   | "settled"

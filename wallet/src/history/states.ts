@@ -18,7 +18,7 @@
 
 import { logger } from "../logger";
 
-export type TimelineFlow = "mint" | "melt" | "send" | "receive";
+type TimelineFlow = "mint" | "melt" | "send" | "receive";
 
 const TERMINAL_FAILURE_STATES = new Set([
   "rolledBack",

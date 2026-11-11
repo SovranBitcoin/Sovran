@@ -143,10 +143,3 @@ export class UnitRateUnavailableError extends Error {
     this.unit = unit;
   }
 }
-
-export function isUnitRateUnavailableError(err: unknown): boolean {
-  return (
-    err instanceof UnitRateUnavailableError ||
-    (err instanceof Error && err.name === "UnitRateUnavailableError")
-  );
-}

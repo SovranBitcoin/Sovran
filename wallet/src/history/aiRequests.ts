@@ -51,7 +51,7 @@ export interface AiRequestGroup {
 }
 
 /** The AI annotation on a merged entry, or null. */
-export function getAiPayment(entry: {
+function getAiPayment(entry: {
   metadata?: Record<string, string> | undefined;
 }): NonNullable<ReturnType<typeof getAnnotation>["ai"]> | null {
   return getAnnotation(entry).ai ?? null;

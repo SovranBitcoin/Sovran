@@ -32,7 +32,7 @@ import {
  * Persistence port over the wallet's redeem-queue store. Keys are the
  * token dedupe hash (`meshTokenDedupeKey`).
  */
-export interface MeshRedeemQueuePort {
+interface MeshRedeemQueuePort {
   /** Drop expired entries (the store owns its TTL policy). */
   prune(): void;
   entries(): Record<string, MeshRedeemEntry>;
@@ -55,7 +55,7 @@ export interface MeshRedeemQueuePort {
   ): Extract<MeshRedeemStatus, "pending" | "failed"> | null;
 }
 
-export type MeshRedeemErrorKind = "spent" | "network" | "retryable" | "fatal";
+type MeshRedeemErrorKind = "spent" | "network" | "retryable" | "fatal";
 
 /**
  * What the queue recorded for a failed attempt: back in line for another try,
@@ -77,7 +77,7 @@ export function classifyMeshRedeemError(err: unknown): MeshRedeemErrorKind {
   return "fatal";
 }
 
-export interface MeshRedeemOrchestratorConfig {
+interface MeshRedeemOrchestratorConfig {
   getManager: () => Manager | null;
   queue: MeshRedeemQueuePort;
   /**

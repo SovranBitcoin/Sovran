@@ -4,7 +4,7 @@
 
 import { logger } from '../logger';
 
-export type TruncateMode = 'start' | 'middle' | 'end' | 'beforeAt';
+type TruncateMode = 'start' | 'middle' | 'end' | 'beforeAt';
 
 const RTL_LANGS = new Set(['ar', 'he', 'fa', 'ur', 'ps', 'sd', 'yi']);
 

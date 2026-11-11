@@ -479,7 +479,7 @@ export function summarizeMempoolAddress(
   };
 }
 
-export interface MempoolSpaceChainAdapterOptions {
+interface MempoolSpaceChainAdapterOptions {
   network?: ChainAdapter["network"];
 }
 

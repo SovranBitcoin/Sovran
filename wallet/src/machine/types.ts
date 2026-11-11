@@ -519,12 +519,6 @@ export interface FlowContext {
 // Machine Snapshot — full state at a point in time
 // ---------------------------------------------------------------------------
 
-export interface MachineSnapshot<S extends FlowStep = FlowStep> {
-  step: S;
-  context: FlowContext;
-  data: S extends keyof StepDataMap ? StepDataMap[S] : never;
-}
-
 // ---------------------------------------------------------------------------
 // Execution State — derived from snapshot for UI consumption
 // ---------------------------------------------------------------------------

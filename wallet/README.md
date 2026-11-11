@@ -5,7 +5,10 @@ sequencing, payment-state copy, screen-action availability, subscription events,
 chain helpers, and adapter-shaped side effects. Wallet apps own presentation,
 routing, storage, native modules, and product-specific enrichment.
 
-The package (`wallet` in this workspace) has two main entry points:
+The package is private to this workspace and has one consumer, the app. Its
+entry files export only what the app or the package's own tests import, and
+`bun run knip` fails on an entry export nothing imports. It has two main entry
+points:
 
 - `wallet` for framework-agnostic machine, adapters, copy, history, chain,
   subscription, screen-action session, and capability helpers.
@@ -234,8 +237,8 @@ distinct operation or flow meaning.
 Emoji token copy is a `sendToken.copy` variant with `variantId: 'emoji'`.
 There is no sibling emoji-copy runtime action.
 
-Frameworks that are not React should use `createScreenActionSession()`. A
-session owns entry parsing, subscription-driven entry updates, merge/decorate
+Under the hook is a framework-agnostic session (`createScreenActionSession`,
+internal to the package). A session owns entry parsing, subscription-driven entry updates, merge/decorate
 rules, source refreshes, action inspection, action execution, and disposal. It
 exposes `inspect()`, `subscribe()`, `execute(action, params?)`, `setEntry()`,
 `setEntrySeed()`, and `dispose()`. React's `useScreenActions()` is only an
@@ -248,8 +251,8 @@ React.
 
 ## Copy And Localization
 
-Use `createPaymentCopyResolver` (with per-key `overrides`), `resolvePaymentCopy`
-and `getPaymentCopy` for payment-state text.
+Use `createPaymentCopyResolver` (with per-key `overrides`) and
+`createPaymentCopyGroups` for payment-state text.
 
 Apps may override individual copy keys, but default payment copy belongs in
 Colada. New payment states should declare copy keys beside the state/action
@@ -257,7 +260,7 @@ logic instead of adding app-screen strings.
 
 ## Subscription Bus
 
-`createSubscriptionBus()` exposes:
+The provider makes one bus (`createSubscriptionBus`, internal), which exposes:
 
 - `subscribe(filter, listener)`
 - `subscribeAll(listener)`
@@ -281,7 +284,6 @@ Framework-agnostic helpers include:
 - `fetchMempoolAddressStats`
 - `summarizeMempoolAddress`
 - `getOnchainConfirmationProgress`
-- `getOnchainConfirmationInfo`
 - `MempoolAddressStatsSchema`
 
 The `ChainAdapter` contract covers fees, address transactions, address summary,
@@ -294,7 +296,6 @@ the same adapter shape.
 Mint payment-method support is explicit. Colada derives support from NUT-04
 and NUT-05 method-unit metadata via:
 
-- `deriveMintMethodSupportFromInfo`
 - `deriveMintMethodCapabilityMapFromTrustedMints`
 - `getMintMethodCapability`
 - `evaluateMintMethodAmountAvailability`

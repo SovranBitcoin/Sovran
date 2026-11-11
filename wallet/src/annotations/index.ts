@@ -2,17 +2,12 @@
 // colada/annotations — public surface
 // ---------------------------------------------------------------------------
 
-export { ANNOTATION_KEYS, encodeAnnotation, decodeAnnotation } from "./model";
+export { encodeAnnotation, decodeAnnotation } from "./model";
 export type {
   AnnotationRecord,
   TransactionAnnotation,
-  CounterpartyDirection,
   ScanMethod,
-  LockDirection,
   DistributionSource,
-  SwapRole,
-  PaymentRequestRole,
-  PaymentRequestAnnotationTransport,
   ZapReceiptKind,
 } from "./model";
 
@@ -33,14 +28,10 @@ export {
 export type { AnnotationStoreAdapter } from "./store";
 
 export {
-  getAnnotation,
   getCounterparty,
   getScanSource,
-  getDistribution,
-  getLocation,
   getSwap,
   getPaymentRequest,
-  getOnchainMelt,
   getZap,
   describeSendLock,
   isP2PKLocked,

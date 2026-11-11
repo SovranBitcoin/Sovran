@@ -5,22 +5,16 @@
 // Provider & flow hooks
 export {
   ColadaProvider,
-  useAnnotationStore,
   useColadaContext,
   useColadaManager,
   useColadaTrustedMintUrls,
   usePaymentFlowMachine,
   type DeepLinkConfig,
   type ColadaProviderProps,
-  type PaymentFlowRefs,
-  type ScreenActionsBridge,
 } from "./ColadaProvider";
 
 // Transaction list read model
-export {
-  useColadaTransactions,
-  type UseColadaTransactionsResult,
-} from "./useColadaTransactions";
+export { useColadaTransactions } from "./useColadaTransactions";
 
 // Single-entry annotation read model
 export { useColadaTransactionAnnotation } from "./useColadaTransactionAnnotation";
@@ -28,49 +22,11 @@ export { useColadaTransactionAnnotation } from "./useColadaTransactionAnnotation
 // Balance breakdown read model
 export { useColadaBalance } from "./useColadaBalance";
 
-export {
-  useReusableMintQuote,
-  type UseReusableMintQuoteResult,
-} from "./useReusableMintQuote";
+export { useReusableMintQuote } from "./useReusableMintQuote";
 export {
   useStandingPaymentRequest,
   type UseStandingPaymentRequestResult,
 } from "./useStandingPaymentRequest";
-
-export type {
-  ChainAdapter,
-  ClipboardAdapter,
-  ColadaAdapters,
-  ImagePickerAdapter,
-  NfcAdapter,
-  NostrAdapter,
-  QrDecoderAdapter,
-  ShareAdapter,
-} from "../adapters";
-
-export type {
-  ColadaSubscriptionBus,
-  ColadaSubscriptionEvent,
-  HistoryEntryType,
-  SubscriptionEventType,
-  SubscriptionFilter,
-  SubscriptionListener,
-} from "../subscriptions";
-
-export type {
-  PaymentCopyKey,
-  PaymentCopyResolver,
-  PaymentCopyVariables,
-} from "../copy";
-
-// Scan types (machine.scan uses these)
-export type {
-  URDecoderLike,
-  ScanOptions,
-  ProcessResult,
-  ScanSourceResult,
-  ScanSources,
-} from "../machine/types";
 
 // Post-terminal screen actions
 export {
@@ -80,10 +36,7 @@ export {
 } from "./useScreenActions";
 
 // Re-export suggestion types for convenience
-export type {
-  QuickSendSuggestion,
-  QuickSendConfig,
-} from "../amount-actions/types";
+export type { QuickSendSuggestion } from "../amount-actions/types";
 
 // Execution state subscription
 export { useExecutionState } from "./useExecutionState";

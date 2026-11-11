@@ -43,7 +43,7 @@ export function rankMintCandidates(
   );
 }
 
-export interface MintSelectionConfig {
+interface MintSelectionConfig {
   /** Mints allowed by the payment request. Empty/undefined = any trusted mint. */
   allowedMints?: string[];
   preferredMints?: string[];

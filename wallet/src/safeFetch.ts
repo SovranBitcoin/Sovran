@@ -21,7 +21,7 @@ import { errField, logger } from "./logger";
  * Nostr-relay round-trip on cellular; configurable per-call via
  * `RequestControls.timeoutMs`.
  */
-export const DEFAULT_TIMEOUT_MS = 15_000;
+const DEFAULT_TIMEOUT_MS = 15_000;
 
 export interface RequestControls {
   signal?: AbortSignal;

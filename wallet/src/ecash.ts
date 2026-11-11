@@ -13,7 +13,7 @@ import { amountToNumberOrUndefined } from "./amount";
 import { logger } from "./logger";
 import { extractP2PKPubkey } from "./p2pk";
 
-export interface EcashTokenMetadata {
+interface EcashTokenMetadata {
   /** Total token amount in `unit`'s base unit (sats for `'sat'`). */
   amount: number;
   mint: string;

@@ -326,13 +326,6 @@ function extractOptions(
 // BIP-321 container parser
 // ---------------------------------------------------------------------------
 
-/**
- * Returns true if the input is a BIP321 bitcoin: URI.
- */
-export function isBip321(input: string): boolean {
-  return sanitizeInput(input).toLowerCase().startsWith("bitcoin:");
-}
-
 function parseBip321Container(input: string): Bip321Container | null {
   const trimmed = sanitizeInput(input);
   if (!trimmed.toLowerCase().startsWith("bitcoin:")) return null;

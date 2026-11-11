@@ -3,13 +3,7 @@
 // ---------------------------------------------------------------------------
 
 // Core factory (framework-agnostic entry point)
-export {
-  createColada,
-  createWalletContextTracker,
-  type ColadaConfig,
-  type ColadaInstance,
-  type WalletContextTracker,
-} from "./core";
+export { createColada } from "./core";
 
 // Re-export Manager type so consumers don't need to import coco-cashu-core
 export type { Manager } from "@cashu/coco-core";
@@ -17,38 +11,20 @@ export type { Manager } from "@cashu/coco-core";
 // P2PK locks — the terms a send applies, and what a token's conditions say.
 export {
   describeSpendingConditions,
-  isLockedSend,
   LOCK_CLOCK_SKEW_MS,
-  normalizeP2pkLock,
   P2PK_RECLAIM_ENABLED,
 } from "./p2pk";
 export type { P2pkLockSpec, SpendingConditions } from "./p2pk";
 
 // Wallet seed helpers
 export {
-  CashuSeedError,
   createCashuSeedGetter,
   deriveStandardCashuSeed,
-  normalizeCashuMnemonic,
-  tryDeriveStandardCashuSeed,
-} from "./wallet-seed";
-export type {
-  CashuSeedCache,
-  CashuSeedCacheContext,
-  CashuSeedErrorCode,
-  CashuSeedResult,
-  CreateCashuSeedGetterConfig,
-  DeriveStandardCashuSeedOptions,
 } from "./wallet-seed";
 
-// Logger seam — consumers inject a structured logger via the `logger` option
-// on `createColada`; tests and standalone consumers get a no-op default.
-export { setLogger, type CocoLogger } from "./logger";
-
-// Copy / i18n
+// Onchain confirmations, explorer links and fee acceleration
 export {
   DEFAULT_ONCHAIN_REQUIRED_CONFIRMATIONS,
-  addressExplorerUrl,
   buildOnchainConfirmationProgressFromTx,
   accelerationTotalSats,
   createAccelerationInvoice,
@@ -60,12 +36,10 @@ export {
   fetchAddressOutpointCandidates,
   fetchAverageBlockTimeMinutes,
   fetchMempoolAddressStats,
-  getOnchainConfirmationInfo,
   getOnchainConfirmationProgress,
   isAcknowledgedAccelerationStatus,
   matchUniqueSendOutpoint,
   MempoolAddressStatsSchema,
-  MempoolHttpError,
   parseOutpoint,
   shouldStopTxConfirmationPolling,
   summarizeMempoolAddress,
@@ -73,38 +47,17 @@ export {
 } from "./chain";
 export type {
   AccelerationEstimate,
-  AccelerationInvoice,
-  AccelerationStatus,
-  AddressOutpointCandidateTx,
   MempoolAddressSummary,
   MempoolAddressStats,
-  MempoolSpaceChainAdapterOptions,
   OnchainConfirmationProgress as ChainOnchainConfirmationProgress,
-  OutpointMatchCriteria,
 } from "./chain";
 
+// Copy / i18n
 export {
   createPaymentCopyGroups,
   createPaymentCopyResolver,
-  getPaymentCopy,
-  MELT_COPY,
-  MINT_COPY,
-  PAYMENT_REQUEST_COPY,
-  paymentCopyDefaults,
-  RECEIVE_COPY,
-  resolvePaymentCopy,
-  SEND_COPY,
-  TOAST_COPY,
 } from "./copy";
-export type {
-  PaymentCopyCatalog,
-  PaymentCopyError,
-  PaymentCopyKey,
-  PaymentCopyOptions,
-  PaymentCopyResolver,
-  PaymentCopyResult,
-  PaymentCopyVariables,
-} from "./copy";
+export type { PaymentCopyResolver } from "./copy";
 
 // History / payment-state timeline
 export {
@@ -114,42 +67,24 @@ export {
   getCardLabel,
   getHistoryEntryRefreshLabel,
   getSendTokenReachabilityWarning,
-  getHistoryEntryOnchainMeltAddress,
-  getHistoryEntryOnchainMintAddress,
   getStatusColorType,
   getStatusHeader,
-  getAiPayment,
   groupAiRequests,
   isAiRequestLeg,
   isSettledStepType,
-  inFlightReceiveToHistoryEntry,
   isPendingPaymentRequestEntry,
-  listInFlightReceiveEntries,
-  listPendingPaymentRequestEntries,
-  PENDING_PAYMENT_REQUEST_MAX_AGE_MS,
-  mergeTransactionSources,
-  pendingPaymentRequestToHistoryEntry,
-  sameTransactionList,
   normalizeHistoryEntry,
-  serializeHistoryEntry,
   entryStateRank,
   isTerminalFailureState,
-  isTimelineFlow,
   normalizeContractState,
   normalizeTimelineMeltState,
   normalizeTimelineMintState,
-  resolveEntryState,
   isCancellablePendingEcash,
-  isReservedPendingEcash,
   railHeaderTitle,
-  transactionHeaderPhase,
-  transactionHeaderRail,
   transactionHeaderTitle,
   isMeltQuotePaid,
   isMeltQuoteReadyToPay,
-  isMintExpired,
   isMintQuotePaymentObserved,
-  isOnchainHistoryEntry,
   isPendingTransaction,
   isReceiveTokenPending,
   isReceiveTokenRedeemed,
@@ -157,30 +92,16 @@ export {
   isSendTokenComplete,
   isSettledReceiveHistoryEntry,
   isSettledSpendHistoryEntry,
-  matchesTransactionDirection,
   matchesTransactionFilters,
   matchesTransactionPaymentType,
   shouldShowMintOfflineWarning,
 } from "./history";
 export type {
-  TransactionHeaderPhase,
-  TransactionHeaderRail,
   AiRequestGroup,
   AiRequestState,
-  BuildTimelineInput,
-  OnchainConfirmationProgress,
-  SendTokenReachabilityStatus,
-  SendTokenReachabilityWarningOptions,
-  SendTokenWarningCopy,
-  TimelineFlow,
   TimelineFlowVariant,
-  TimelineItem,
-  TimelineModel,
-  TimelineOutcome,
-  TimelineOutcomeKind,
   TimelineStep,
   TimelineStepType,
-  TransactionBucket,
   TransactionDirection,
   TransactionPaymentType,
 } from "./history";
@@ -191,143 +112,59 @@ export { meltMethodForTarget } from "./melt-target";
 // source, P2PK lock, distribution, location, swap grouping). colada owns the
 // model + keying + selectors; the consuming wallet supplies persistence.
 export {
-  ANNOTATION_KEYS,
   annotationKey,
   candidateKeys,
-  createInMemoryAnnotationStore,
   decodeAnnotation,
   encodeAnnotation,
-  getAnnotation,
   getCounterparty,
-  getDistribution,
-  getLocation,
-  getOnchainMelt,
-  getPaymentRequest,
   getScanSource,
   getSwap,
   getZap,
   describeSendLock,
   isP2PKLocked,
   mergeAnnotationRecords,
-  mergeAnnotationsIntoEntry,
-  normaliseAnnotationRaw,
   rawAnnotationKey,
 } from "./annotations";
 export type {
-  AnnotationEntryLike,
   AnnotationRecord,
   AnnotationStoreAdapter,
-  CounterpartyDirection,
   DistributionSource,
-  LockDirection,
-  PaymentRequestAnnotationTransport,
-  PaymentRequestRole,
   ScanMethod,
-  SwapRole,
   TransactionAnnotation,
   ZapReceiptKind,
 } from "./annotations";
 
-// Balance breakdown read model (framework-agnostic)
-export {
-  amountToNumber,
-  amountToNumberOrUndefined,
-  requireAmount,
-} from "./amount";
-export type { AmountValue } from "./amount";
-export { emptyBalanceBreakdown, sumAmounts, sumReservedSends } from "./balance";
-export type { WalletBalanceBreakdown } from "./balance";
-
 // Adapter contracts
 export type {
-  ChainAddressCounter,
-  ChainAddressFundingTx,
-  ChainAddressStats,
-  ChainAddressSummary,
-  ChainAdapter,
-  ChainFeeEstimate,
-  ChainNetwork,
   ChainTransactionStatus,
-  ClipboardAdapter,
-  ColadaAdapters,
-  ImagePickerAdapter,
-  JsonPrimitive,
   JsonRecord,
-  JsonValue,
-  LoggerAdapter,
-  NfcAdapter,
-  NostrAdapter,
-  QrDecoderAdapter,
-  ShareAdapter,
 } from "./adapters";
 
 // Subscription bus
-export {
-  createSubscriptionBus,
-  matchesSubscriptionFilter,
-} from "./subscriptions";
 export type {
   ColadaSubscriptionBus,
   ColadaSubscriptionEvent,
-  HistoryEntryType,
-  HistoryUpdatedEvent,
-  MeltUpdatedEvent,
-  MintInfoEnrichmentChangedEvent,
-  MintInfoFetchedEvent,
-  MintSelectorItemAddedEvent,
-  MintUpdatedEvent,
-  ReceiveNpcMintChangedEvent,
-  ReceiveP2pkKeyChangedEvent,
-  ScreenActionsChangedEvent,
-  ScreenActionsChangedReason,
-  SubscriptionEventForFilter,
-  SubscriptionEventForType,
-  SubscriptionEventType,
-  SubscriptionFilter,
-  SubscriptionListener,
 } from "./subscriptions";
-
-// Errors
-export {
-  AuthoredError,
-  failureText,
-  type FailureText,
-  isMeltUserCancelledError,
-  MeltUserCancelledError,
-  isUnitRateUnavailableError,
-  UnitRateUnavailableError,
-} from "./errors";
 
 // Mint rebalance engine (melt/mint hops between mints, bounded
 // re-preparation, reconciliation, error classification)
 export {
-  classifyRebalanceError,
   createChainSteps,
   createRebalanceEngine,
   createRebalanceLock,
   insertStepsAfter,
   meltNeverSent,
   meltSettledUnpaid,
-  RebalanceMeltRolledBackError,
-  RebalanceRoutesExhaustedError,
 } from "./rebalance";
 export type {
   RebalanceEngine,
-  RebalanceErrorKind,
   RebalanceEventSink,
-  RebalanceLegDescriptor,
   RebalanceLegStatus,
   RebalanceLegUpdate,
-  RebalanceLock,
-  RebalanceMintReceipt,
-  RebalancePreparedMelt,
   RebalanceRoute,
-  RebalanceRouteAttempt,
   RebalanceRoutingInfo,
-  RebalanceTransfer,
   RebalanceTransferOutcome,
   RebalanceWalletPort,
-  StrandedMintBalance,
 } from "./rebalance";
 
 // Reusable mint-quote singleton (standing bolt12 offer / onchain address)
@@ -339,86 +176,48 @@ export {
   rotateStandingPaymentRequest,
   standingPaymentRequestKey,
   type SingleUseReencodeOptions,
-  type StandingPaymentRequest,
-  type StandingPaymentRequestInput,
 } from "./payment-request-receive";
 export {
-  ensureReusableMintQuote,
   rotateReusableMintQuote,
   reusableQuoteKey,
-  type EnsureReusableMintQuoteInput,
   type ReusableQuoteIdentityStore,
 } from "./quotes/reusable";
 
 // Machine (state machine core)
 export { createPaymentMachine } from "./machine/createMachine";
-export { resolveNext } from "./machine/resolveNext";
 
 // Pipeline utilities (usable standalone)
-export { parsePaymentInput, isBip321, looksLikeBitcoinAddress } from "./parse";
+export { parsePaymentInput, looksLikeBitcoinAddress } from "./parse";
 export {
   buildBip321OnchainUri,
   buildUnifiedBip321Uri,
-  formatSatsAsBtcAmount,
-  type BuildBip321OnchainUriOptions,
-  type BuildUnifiedBip321UriInput,
 } from "./bip321";
-export { resolveIntent } from "./intent";
-export {
-  describeDestination,
-  type DescribeDestinationOptions,
-} from "./destination-descriptor";
+export { describeDestination } from "./destination-descriptor";
 export {
   decodeEcashTokenMetadata,
   isValidEcashToken,
   isWellFormedEcashToken,
-  type EcashTokenMetadata,
 } from "./ecash";
 export {
   decodePaymentRequestInfo,
   lockableMintsFromRequest,
 } from "./payment-request";
-export { decodeBolt11Invoice, type Bolt11Info } from "./bolt11";
+export { decodeBolt11Invoice } from "./bolt11";
 export { defaultDetectors } from "./detectors";
-export { annotateOptions } from "./annotate";
 export {
-  selectMint,
-  rankMintCandidates,
-  type MintSelectionConfig,
-} from "./mint-selection";
-export {
-  accountMintCandidates,
   accountMintUrls,
-  buildMethodAwareMintCandidates,
-  createAmountEntryMethodContext,
   deriveMintMethodCapabilityMapFromTrustedMints,
-  deriveMintMethodSupportFromInfo,
   deriveSupportedUnitsFromInfo,
-  evaluateMintMethodAmountAvailability,
-  getCapabilityUnavailableReason,
-  getUnitAmountEnvelope,
-  type AmountEntryEnvelope,
   getMintMethodCapability,
-  hasCompatibleMintForMethod,
   hasMintSupportingMethod,
   configureEnabledPaymentMethods,
-  isMethodImplemented,
-  isMintMethodCompatible,
-  methodContextHasCompatibleMint,
-  methodContextHasSupportingMint,
   pickHighestBalanceUnit,
   pickMintForUnit,
   resolveReceiveMethodMint,
-  type MintMethodAmountAvailability,
-  type ReceiveMethodMintResolution,
 } from "./mint-capabilities";
 export {
   FIAT_UNITS,
-  isSwitchableUnit,
   SWITCHABLE_UNITS,
-  unitDefinition,
-  type FiatUnit,
-  type SwitchableUnit,
 } from "./units/registry";
 export {
   ACCOUNT_UNITS,
@@ -428,124 +227,46 @@ export {
   isTestnutUnit,
   toAccountUnit,
   toRealUnit,
-  type AccountUnit,
-  type TestnutUnit,
 } from "./units/accounts";
-export {
-  validateIntent,
-  isValidSatAmount,
-  MAX_SAT_AMOUNT,
-} from "./guards";
-// Normalization
-export {
-  sanitizeInput,
-  safeDecodeURIComponent,
-  stripPrefixes,
-  stripGenericPrefixes,
-  stripLightningPrefixes,
-  stripCashuPrefixes,
-  inputVariants,
-} from "./normalize";
-
 // Proof composition primitives
-export {
-  buildExactOfflineAmountIndex,
-  composeSatoshis,
-  composeFiat,
-} from "./offline";
+export { composeSatoshis } from "./offline";
 
 // Machine types
 export type {
-  FlowStep,
-  FlowContext,
-  FlowEvent,
-  Destination,
   StepDataMap,
   StepHandlerMap,
-  CreateMachineConfig,
   MachineOperations,
   PaymentMachine,
-  ExecutionState,
-  ErrorCode,
-  ReceiveExecuteFinalizedResult,
-  ReceiveExecutePendingReason,
-  ReceiveExecutePendingResult,
-  ReceiveExecuteResult,
-  MachineSnapshot,
-  MeltQuoteMethod,
-  MintQuoteMethod,
   NotificationHandlerMap,
-  PaymentQuoteMethod,
-  ScanSourceResult,
   ScanSources,
   NfcIOAdapter,
   RecipientProfile,
-  SendEntrySource,
-  SendFallbackAlternative,
-  SendFallbackId,
 } from "./machine/types";
-
-export type { MintAvailability } from "./machine/selectMintContext";
-
-// Amount actions (amount screen action system)
-export {
-  createAmountActionManager,
-  resolveAmount,
-  resolutionEqual,
-  computeQuickSendSuggestions,
-} from "./amount-actions";
-export type {
-  AmountInputMode,
-  CoreAmountResolution,
-  AmountResolution,
-  CreateAmountActionManagerConfig,
-  AmountActionManager,
-  QuickSendSuggestion,
-  QuickSendConfig,
-} from "./amount-actions";
 
 // Screen actions (post-terminal screen action system)
 export {
-  createScreenActionSession,
-  createScreenActionManager,
-  getAvailableActions,
   decodePaymentRequestEntryPhase,
   shouldApplyEntryUpdate,
   mergeEntryUpdate,
-  decorateEntry,
   meltOperationToScreenActionEntry,
-  createDefaultScreenActionHandlers,
   startNewEcashSendIfFinished,
 } from "./screen-actions";
 export type {
-  ActionAvailability,
-  ActionHandler,
-  ActionState,
   ActionVariant,
-  CreateScreenActionSessionConfig,
   DecoratedEntryFields,
-  DefaultScreenActionHandlersConfig,
   MeltOperationLike,
   NavigationCallbacks,
-  ScreenActionEntrySeed,
-  ScreenActionEntryUpdateSubscriber,
   ScreenActionContext,
   ScreenActionHandlerMap,
-  ScreenActionManager,
   ScreenActionName,
   ScreenActionsBridge,
-  ScreenActionSession,
-  ScreenActionSessionSnapshot,
   ScreenType,
 } from "./screen-actions";
 
 // Formatting utilities
-export { FormattedTimestamp } from "./formatting";
-export { FormattedString, type TruncateMode } from "./formatting";
-export { localizeReason, type LocalizedReason } from "./formatting";
+export { FormattedString } from "./formatting";
 export {
   isFiatUnit,
-  majorToMinor,
   minorToRawInput,
   unitMinorDecimals,
   unitSymbol,
@@ -554,15 +275,9 @@ export {
 // LNURL resolution (lightning address & lnurlp → bolt11)
 export {
   requestInvoiceFromLnurl,
-  getLnurlPayParams,
   parseLightningAddress,
-  parseLnurlp,
   decodeUrlOrAddress,
   isLightningInvoiceBolt11,
-  LnurlError,
-  type LnurlErrorCode,
-  type LnurlPayExtrasContext,
-  type LnurlPayExtrasProvider,
 } from "./lnurl";
 
 // Recipient identity resolution (Lightning Address → Nostr hex pubkey)
@@ -572,7 +287,7 @@ export {
   verifyNip05,
   type Nip05Verification,
 } from "./nip05";
-export { normalizeNostrPubkey, resolveRecipientPubkey } from "./recipient";
+export { normalizeNostrPubkey } from "./recipient";
 
 // Cancellable-fetch primitives (timeout + AbortSignal). Hermes lacks
 // `DOMException`, so callers must duck-type aborts via `isAbortError`
@@ -581,63 +296,29 @@ export { normalizeNostrPubkey, resolveRecipientPubkey } from "./recipient";
 export {
   combineSignals,
   isAbortError,
-  safeFetch,
   timeoutSignal,
   withTimeout,
-  DEFAULT_TIMEOUT_MS,
   type RequestControls,
 } from "./safeFetch";
 
 export { createNostrMintEnrichment } from "./nostr-mint-enrichment";
-export type {
-  NostrMintEnrichment,
-  NostrMintEnrichmentConfig,
-} from "./nostr-mint-enrichment";
 
 // Domain types
 export type {
   Detectors,
-  PaymentRequestInfo,
-  PaymentRequestTransport,
   WalletContext,
-  AmountEntryMethodContext,
   MintMethodCapabilityMap,
-  MintMethodRequirement,
-  MintMethodSupport,
   MintMethodUnitCapability,
   MintPaymentMethod,
-  MintPaymentOperation,
-  PaymentOptionKind,
-  PaymentOption,
-  Bip321Container,
-  ParsedInputType,
-  ParsedPaymentInput,
-  OptionStatus,
   AnnotatedOption,
-  RecommendationRule,
-  ResolvedIntent,
-  DestinationKind,
   DestinationIcon,
-  DestinationAction,
-  DestinationAmount,
-  DestinationRecipientRef,
-  DestinationRecipient,
   DestinationDescriptor,
-  AmountEntryConstraints,
   MintListItem,
   MintCatalogEntry,
-  MintContactProfile,
-  MintContactProfileResolver,
-  MintSelectionResult,
   MintCandidate,
   MintReviewInfo,
   MintReviewRecommendation,
-  MintReviewsFetcher,
   MintReviewsSummary,
-  GuardResult,
-  ExactOfflineAmountIndex,
-  CompositionResult,
-  FiatCompositionResult,
 } from "./types";
 
 // Mesh transport (Nut Drop): token classification on receive and the

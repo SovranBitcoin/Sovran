@@ -56,7 +56,7 @@ const parseInvoiceCallback = parseWith(
  * Distinct LNURL failure codes so the caller (machine + UI) can route
  * each case — generic "fetch failed" hides amount-mismatch attacks.
  */
-export type LnurlErrorCode =
+type LnurlErrorCode =
   | 'LNURL_INVALID_TARGET'
   | 'LNURL_PARAMS_FETCH_FAILED'
   | 'LNURL_INVALID_PARAMS'
@@ -150,7 +150,7 @@ export function parseLightningAddress(
   return result ? { username: result[1], domain: result[2] } : null;
 }
 
-export function parseLnurlp(url: string): string | null {
+function parseLnurlp(url: string): string | null {
   if (!url) return null;
   if (!LNURLP_REGEX.test(url.toLowerCase())) return null;
   const withoutProtocol = url.replace(/^lnurlp:\/\//i, '');
@@ -213,7 +213,7 @@ function assertSecureCallback(callback: string): URL {
   return url;
 }
 
-export async function getLnurlPayParams(
+async function getLnurlPayParams(
   meltTarget: string,
   controls: RequestControls = {},
 ): Promise<LnurlPayParams | null> {

@@ -13,7 +13,7 @@ import type {
   MintReviewsSummary,
 } from './types';
 
-export interface NostrMintEnrichmentConfig {
+interface NostrMintEnrichmentConfig {
   /** REST app-view base URL, e.g. `https://nagg.up.railway.app`. */
   appViewBaseUrl: string;
   /** Route version prefix: `''` → `/nostr/*`, `'v1'` → `/v1/nostr/*`. Default `'v1'`. */
@@ -22,7 +22,7 @@ export interface NostrMintEnrichmentConfig {
   timeoutMs?: number;
 }
 
-export interface NostrMintEnrichment {
+interface NostrMintEnrichment {
   resolveMintContactProfile: (
     pubkey: string,
     mintUrl: string,

@@ -11,7 +11,7 @@ export type TransactionPaymentType = "all" | "lightning" | "ecash" | "onchain";
 export type TransactionDirection = "all" | "incoming" | "outgoing";
 
 /** Which list section a history entry belongs to. */
-export type TransactionBucket = "pending" | "confirmed" | "expired";
+type TransactionBucket = "pending" | "confirmed" | "expired";
 
 // These predicates run per-entry per-filter-evaluation on the history list —
 // tens of thousands of calls per session. Keep them log-free; log at the call
@@ -154,7 +154,7 @@ export function matchesTransactionPaymentType(
   return historyEntry.type === "send" || historyEntry.type === "receive";
 }
 
-export function matchesTransactionDirection(
+function matchesTransactionDirection(
   historyEntry: HistoryEntry,
   direction: TransactionDirection,
 ): boolean {

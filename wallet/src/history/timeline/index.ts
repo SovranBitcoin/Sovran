@@ -17,12 +17,8 @@ export {
 } from "./context";
 export type {
   BuildTimelineInput,
-  OnchainConfirmationProgress,
   TimelineFlowVariant,
-  TimelineItem,
   TimelineModel,
-  TimelineOutcome,
-  TimelineOutcomeKind,
   TimelineStep,
   TimelineStepType,
 } from "./types";

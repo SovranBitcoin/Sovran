@@ -4,7 +4,6 @@
 // formatter can use it without loading the payment machine behind `wallet`.
 export {
   FIAT_UNITS,
-  isSwitchableUnit,
   SWITCHABLE_UNITS,
   unitDefinition,
   type FiatUnit,
@@ -13,18 +12,12 @@ export {
 export {
   ACCOUNT_UNITS,
   accountUnitLabel,
-  accountUnitName,
-  isAccountUnit,
   isTestnutUnit,
-  toAccountUnit,
   toRealUnit,
   type AccountUnit,
-  type TestnutUnit,
 } from "./accounts";
 export {
   isFiatUnit,
-  majorToMinor,
-  minorToRawInput,
   unitMinorDecimals,
   unitSymbol,
 } from "../formatting/units";

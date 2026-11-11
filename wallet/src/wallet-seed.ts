@@ -7,7 +7,7 @@ import { err, ok, type Result } from 'neverthrow';
 
 import { errField, logger } from './logger';
 
-export type CashuSeedErrorCode =
+type CashuSeedErrorCode =
   | 'MISSING_MNEMONIC'
   | 'INVALID_MNEMONIC'
   | 'INVALID_SEED';
@@ -24,14 +24,14 @@ export class CashuSeedError extends Error {
 
 type MaybePromise<T> = T | Promise<T>;
 
-export type CashuSeedResult = Result<Uint8Array, CashuSeedError>;
+type CashuSeedResult = Result<Uint8Array, CashuSeedError>;
 
-export interface CashuSeedCacheContext {
+interface CashuSeedCacheContext {
   /** Normalized BIP-39 mnemonic. Treat as secret material. */
   mnemonic: string;
 }
 
-export interface CashuSeedCache {
+interface CashuSeedCache {
   load?: (
     context: CashuSeedCacheContext,
   ) => MaybePromise<Uint8Array | null | undefined>;
@@ -41,13 +41,13 @@ export interface CashuSeedCache {
   ) => MaybePromise<void>;
 }
 
-export interface CreateCashuSeedGetterConfig {
+interface CreateCashuSeedGetterConfig {
   getMnemonic: () => MaybePromise<string | null | undefined>;
   deriveSeed?: (mnemonic: string) => MaybePromise<Uint8Array>;
   cache?: CashuSeedCache;
 }
 
-export interface DeriveStandardCashuSeedOptions {
+interface DeriveStandardCashuSeedOptions {
   passphrase?: string;
 }
 

@@ -13,7 +13,7 @@ import {
   ProofValidationError,
 } from '@cashu/coco-core';
 
-export type RebalanceErrorKind =
+type RebalanceErrorKind =
   /** Local proof selection could not cover amount + fees. Nothing was sent to the mint. */
   | 'insufficient_proofs'
   /** The mint rejected the melt inputs as too small for amount + fee reserve. Nothing was spent. */

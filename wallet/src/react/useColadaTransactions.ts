@@ -19,7 +19,7 @@ import type { AnnotationStoreAdapter } from "../annotations";
 import { useAnnotationStore, useColadaManager } from "./ColadaProvider";
 import { createSharedReadStore, type SharedReadStore } from "./sharedReadStore";
 
-export interface UseColadaTransactionsResult {
+interface UseColadaTransactionsResult {
   /** Merged, deduped, newest-first transaction history. */
   history: HistoryEntry[];
   /** Load the next page of coco history (infinite scroll). */

@@ -18,7 +18,7 @@ type ReusableMintQuote = Awaited<
   ReturnType<Manager["quotes"]["mint"]["create"]>
 >;
 
-export interface UseReusableMintQuoteResult {
+interface UseReusableMintQuoteResult {
   /** The standing quote (offer/address in `quote.request`), null while loading. */
   quote: ReusableMintQuote | null;
   isLoading: boolean;
