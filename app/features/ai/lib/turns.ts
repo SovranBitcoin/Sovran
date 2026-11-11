@@ -50,14 +50,14 @@ export type Turn =
   | { phase: 'failed'; error: TurnError }
   | { phase: 'interrupted'; text: string };
 
-export type TurnEvent =
+type TurnEvent =
   | { type: 'asked'; startedAtMs: number }
   | { type: 'streamed'; text: string; reasoning: string }
   | { type: 'answered'; truncation: { budgetTokens: number } | null }
   | { type: 'failed'; error: TurnError }
   | { type: 'interrupted' };
 
-export function isTurnLive(turn: Turn | undefined): boolean {
+function isTurnLive(turn: Turn | undefined): boolean {
   return turn?.phase === 'asking' || turn?.phase === 'streaming';
 }
 
