@@ -72,6 +72,7 @@ function build(
     /** Applied as given, past the recording wrapper (which makes every call async). */
     direct?: Partial<MachineOperations>;
     nfcAdapter?: NfcIOAdapter;
+    notifications?: Record<string, (data: unknown) => unknown>;
     wallet?: Partial<WalletContext>;
   } = {},
 ) {
@@ -91,6 +92,7 @@ function build(
     {
       get: (_target, key: string) => (data: unknown) => {
         notificationCalls.push({ key, data });
+        return config.notifications?.[key]?.(data);
       },
     },
   );
@@ -592,11 +594,9 @@ describe("Pay on a melt preview", () => {
     expect(await isFree(tm.machine)).toBe(true);
   });
 
-  // QUIRK: between the melt's result and the handler dispatch nothing frees
-  // the machine on a throw. A transaction link (or a notification) that
-  // throws after a paid melt rejects Pay and leaves the machine held, still
-  // saying it executes, until a reset.
-  it("stays held when linking the paid melt throws", async () => {
+  // The melt was paid: a link or notification that throws afterwards is
+  // logged, and neither keeps the machine held nor lets Pay pay again.
+  it("finishes and keeps the melt paid when linking it throws", async () => {
     const tm = build({
       direct: {
         linkTransaction: () => {
@@ -606,13 +606,31 @@ describe("Pay on a melt preview", () => {
     });
     await toMeltPreview(tm.machine);
 
-    await expect(tm.machine.confirmMelt()).rejects.toThrow("history store closed");
+    await expect(tm.machine.confirmMelt()).resolves.toBeUndefined();
 
-    expect(isExecuting(tm.machine)).toBe(true);
-    expect(await isFree(tm.machine)).toBe(false);
-    tm.machine.reset();
+    expect(tm.notificationCalls.some((c) => c.key === "onPaymentConfirmed")).toBe(true);
     expect(isExecuting(tm.machine)).toBe(false);
     expect(await isFree(tm.machine)).toBe(true);
+    await tm.machine.confirmMelt();
+    expect(tm.calls("executeMelt")).toBe(1);
+  });
+
+  it("finishes and keeps the melt paid when a notification throws", async () => {
+    const tm = build({
+      notifications: {
+        onPaymentConfirmed: () => {
+          throw new Error("toast failed");
+        },
+      },
+    });
+    await toMeltPreview(tm.machine);
+
+    await expect(tm.machine.confirmMelt()).resolves.toBeUndefined();
+
+    expect(isExecuting(tm.machine)).toBe(false);
+    expect(await isFree(tm.machine)).toBe(true);
+    await tm.machine.confirmMelt();
+    expect(tm.calls("executeMelt")).toBe(1);
   });
 
   it("drops a melt that lands after a reset and leaves the newer turn's lock alone", async () => {
@@ -735,10 +753,9 @@ describe("Pay on a payment request", () => {
     expect(await isFree(tm.machine)).toBe(true);
   });
 
-  // QUIRK: as for a melt, a throw between the delivered result and the handler
-  // dispatch leaves the machine held and executing; the caller sees the throw
-  // although the payment was delivered.
-  it("stays held when linking the delivered payment throws", async () => {
+  // As for a melt, a link that throws after delivery is logged: the caller
+  // still learns the payment was delivered, and Pay does not send again.
+  it("resolves delivered and is free when linking the delivered payment throws", async () => {
     const tm = build({
       direct: {
         linkTransaction: () => {
@@ -748,13 +765,29 @@ describe("Pay on a payment request", () => {
     });
     await toPaymentRequest(tm.machine);
 
-    await expect(tm.machine.confirmPaymentRequest()).rejects.toThrow(
-      "history store closed",
-    );
+    expect((await tm.machine.confirmPaymentRequest()).kind).toBe("delivered");
 
+    expect(isExecuting(tm.machine)).toBe(false);
+    expect(await isFree(tm.machine)).toBe(true);
+    expect(await tm.machine.confirmPaymentRequest()).toEqual({ kind: "ignored" });
     expect(tm.calls("executePaymentRequest")).toBe(1);
-    expect(isExecuting(tm.machine)).toBe(true);
-    expect(await isFree(tm.machine)).toBe(false);
+  });
+
+  // A listener is the subscriber's code: its throw reaches the caller, but
+  // only after the step records the delivery and the turn finishes.
+  it("is free and keeps the delivery when a listener throws after it", async () => {
+    const tm = build();
+    await toPaymentRequest(tm.machine);
+    tm.machine.subscribe(() => {
+      if (tm.calls("executePaymentRequest") > 0) throw new Error("render failed");
+    });
+
+    await expect(tm.machine.confirmPaymentRequest()).rejects.toThrow("render failed");
+
+    expect(isExecuting(tm.machine)).toBe(false);
+    expect(await isFree(tm.machine)).toBe(true);
+    expect(await tm.machine.confirmPaymentRequest()).toEqual({ kind: "ignored" });
+    expect(tm.calls("executePaymentRequest")).toBe(1);
   });
 });
 

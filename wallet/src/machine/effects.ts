@@ -32,7 +32,7 @@ type NfcWriteFailedNotificationData = Parameters<
   NonNullable<NotificationHandlerMap['onNfcWriteFailed']>
 >[0];
 
-type MachineEffectNotification =
+export type MachineEffectNotification =
   | {
       type: 'onPaymentConfirmed';
       data: PaymentConfirmedNotificationData;
@@ -50,7 +50,7 @@ type MachineEffectNotification =
       data: NfcWriteFailedNotificationData;
     };
 
-type MachineEffectLink = {
+export type MachineEffectLink = {
   type: 'linkTransaction';
   input: string;
   transactionId: string;

@@ -30,6 +30,7 @@ import {
   runRecipientPubkeyEffect,
   runTrustMintEffect,
 } from "./effects";
+import type { MachineEffectLink, MachineEffectNotification } from "./effects";
 import { transition } from "./transitions";
 import { meltMethodForTarget } from "../melt-target";
 import { meltQuotePreviewMatches } from "./meltQuotePreview";
@@ -489,14 +490,63 @@ export function createPaymentMachine(
         ? ["executeMelt", "confirmMelt"]
         : ["executePaymentRequest", "confirmPaymentRequest"];
     if (isStaleGeneration(generation, `${operation}.finalize`)) return;
-    setExecuting(false);
     try {
+      setExecuting(false);
       if (step !== fromStep) {
         await dispatchHandler(step, stepData);
         notify();
       }
     } finally {
       finishTurn(generation, `${confirm}.unlock`, QUIET_EXIT);
+    }
+  }
+
+  /**
+   * Links a settled payment to its scan and tells the wallet about it. The
+   * payment happened and its step already says so: a link or notification
+   * that throws is logged, and neither undoes the payment nor keeps the turn
+   * from finishing.
+   */
+  function announcePayment(news: {
+    links: MachineEffectLink[];
+    notifications: MachineEffectNotification[];
+  }): void {
+    const announce = (run: () => void) => {
+      try {
+        run();
+      } catch (err) {
+        logger.warn("machine.payment.announce.failed", { error: errField(err) });
+      }
+    };
+    for (const link of news.links) {
+      announce(() =>
+        operations?.linkTransaction?.({
+          scannedInput: link.input,
+          transactionId: link.transactionId,
+        }),
+      );
+    }
+    for (const notification of news.notifications) {
+      announce(() => {
+        switch (notification.type) {
+          case "onPaymentConfirmed":
+            void notifications?.onPaymentConfirmed?.(notification.data);
+            return;
+          case "onTransactionCreated":
+            void notifications?.onTransactionCreated?.(notification.data);
+            return;
+          case "onMeltQuoteCreated":
+            void notifications?.onMeltQuoteCreated?.(notification.data);
+            return;
+          case "onNfcWriteFailed":
+            void notifications?.onNfcWriteFailed?.(notification.data);
+            return;
+          default: {
+            const unreachable: never = notification;
+            return unreachable;
+          }
+        }
+      });
     }
   }
 
@@ -1138,32 +1188,11 @@ export function createPaymentMachine(
         endCommit(sendGeneration);
       }
 
-      // QUIRK: nothing frees the machine if a link, a notification or a
-      // listener throws from here to `finishPayment` (turn-exits test).
       if (effect.isOk()) {
         if (effect.value.kind === "stale") return;
         logger.info("machine.melt.success", { ...mintUrlFields(data.mintUrl) });
-
-        for (const link of effect.value.links) {
-          if (link.type === "linkTransaction") {
-            operations.linkTransaction?.({
-              scannedInput: link.input,
-              transactionId: link.transactionId,
-            });
-          }
-        }
-
-        for (const notification of effect.value.notifications) {
-          if (notification.type === "onPaymentConfirmed") {
-            void notifications?.onPaymentConfirmed?.(notification.data);
-          } else if (notification.type === "onTransactionCreated") {
-            void notifications?.onTransactionCreated?.(notification.data);
-          } else if (notification.type === "onMeltQuoteCreated") {
-            void notifications?.onMeltQuoteCreated?.(notification.data);
-          }
-        }
-
         setStep(effect.value.step, effect.value.data);
+        announcePayment(effect.value);
       } else {
         logger.warn("machine.melt.failed", {
           error: errField(effect.error.cause),
@@ -1216,8 +1245,6 @@ export function createPaymentMachine(
         endCommit(sendGeneration);
       }
 
-      // QUIRK: as for a melt, nothing frees the machine if something throws
-      // from here to `finishPayment`.
       if (effect.isOk()) {
         if (effect.value.kind === "stale") return;
 
@@ -1242,25 +1269,8 @@ export function createPaymentMachine(
             ...mintUrlFields(data.mintUrl),
           });
           settleConfirm({ kind: "delivered" });
-
-          for (const link of effect.value.links) {
-            if (link.type === "linkTransaction") {
-              operations.linkTransaction?.({
-              scannedInput: link.input,
-              transactionId: link.transactionId,
-            });
-            }
-          }
-
-          for (const notification of effect.value.notifications) {
-            if (notification.type === "onPaymentConfirmed") {
-              void notifications?.onPaymentConfirmed?.(notification.data);
-            } else if (notification.type === "onTransactionCreated") {
-              void notifications?.onTransactionCreated?.(notification.data);
-            }
-          }
-
           setStep(effect.value.step, effect.value.data);
+          announcePayment(effect.value);
         }
       } else {
         logger.warn("machine.paymentRequest.failed", {
