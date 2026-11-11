@@ -346,6 +346,9 @@ export function useCachedRead<TData>(
       return () => {
         abortRef.current?.abort();
         abortRef.current = null;
+        // The aborted run's `finally` skips clearing its flight, and a refocus
+        // on a still-fresh entry serves it without starting a new one.
+        setFlight(null);
       };
     }, [enabled, key, focusRevalidate, abortOnBlur, start])
   );
