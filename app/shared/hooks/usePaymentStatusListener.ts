@@ -25,12 +25,7 @@ import {
 } from 'wallet';
 import { paymentStatusPopup } from '@/shared/lib/popup';
 import { describeError } from '@/shared/lib/errors';
-import {
-  ownsMelt,
-  ownsSend,
-  paymentInFlight,
-  usePaymentStatusStore,
-} from '@/shared/stores/runtime/paymentStatusStore';
+import { ownsMelt, usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
 import { isSwapStatusActive } from '@/shared/stores/runtime/swapStatusStore';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { setTransactionAnnotation } from '@/shared/stores/profile/transactionAnnotationStore';
@@ -730,61 +725,56 @@ export function usePaymentStatusListener(): void {
         });
         return;
       }
-      const store = usePaymentStatusStore.getState();
-      const active = store.active;
-      if (active && ownsSend(active, operationId)) {
-        paymentLog.info('hook.payment_status.send_confirm_same_toast', {
-          operationId,
-          activeId: active.id,
-          activeVariant: active.variant,
-          activeState: active.state,
-        });
-        store.setConfirmed(active.id, { operationId });
-        return;
-      }
-      if (paymentInFlight(active, ['send', 'payment-request'])) {
-        // Another payment is still being sent and this may not be its send:
-        // it keeps the surface, and its own events or its flow end it. The
-        // result is held, for that toast once its flow binds it to this send.
-        paymentLog.info('hook.payment_status.send_left_to_payment_in_flight', {
-          operationId,
-          activeId: active?.id ?? null,
-          activeVariant: active?.variant ?? null,
-        });
-        store.holdResult({
-          owner: { kind: 'send', operationId },
-          operationId,
-          toast: {
-            variant: 'send',
-            id: operationId,
-            owner: { kind: 'send', operationId },
-            mintUrl,
-            amount,
-            unit,
-            state: 'confirmed',
-          },
-        });
-        return;
-      }
-
-      paymentLog.info('hook.payment_status.send_new_success_toast', {
-        operationId,
-        ...mintUrlLogFields(mintUrl),
-        amount,
-        unit,
-        reason: 'no_matching_active_toast',
-      });
-      store.setActive({
-        variant: 'send',
+      const owner = { kind: 'send' as const, operationId };
+      const toast = {
+        variant: 'send' as const,
         id: operationId,
-        owner: { kind: 'send', operationId },
+        owner,
         mintUrl,
         amount,
         unit,
-        state: 'confirmed',
-      });
-
-      paymentStatusPopup({ variant: 'send', id: operationId, mintUrl, amount, unit });
+        state: 'confirmed' as const,
+      };
+      const active = usePaymentStatusStore.getState().active;
+      // A send still being paid keeps the surface, and this may be its own
+      // send: the result is held, for that toast once its flow binds it.
+      const delivery = usePaymentStatusStore
+        .getState()
+        .deliverResult({ owner, operationId, toast }, ['send', 'payment-request']);
+      switch (delivery) {
+        case 'confirmed':
+          paymentLog.info('hook.payment_status.send_confirm_same_toast', {
+            operationId,
+            activeId: active?.id ?? null,
+            activeVariant: active?.variant ?? null,
+            activeState: active?.state ?? null,
+          });
+          return;
+        case 'held':
+          paymentLog.info('hook.payment_status.send_left_to_payment_in_flight', {
+            operationId,
+            activeId: active?.id ?? null,
+            activeVariant: active?.variant ?? null,
+          });
+          return;
+        case 'alreadyShown':
+          paymentLog.info('hook.payment_status.send_already_shown', { operationId });
+          return;
+        case 'shown':
+          paymentLog.info('hook.payment_status.send_new_success_toast', {
+            operationId,
+            ...mintUrlLogFields(mintUrl),
+            amount,
+            unit,
+            reason: 'no_matching_active_toast',
+          });
+          paymentStatusPopup({ variant: 'send', id: operationId, mintUrl, amount, unit });
+          return;
+        default: {
+          const exhaustive: never = delivery;
+          return exhaustive;
+        }
+      }
     });
 
     const offMeltRolledBack = manager.on('melt-op:rolled-back', ({ mintUrl, operation }) => {
@@ -891,70 +881,71 @@ export function usePaymentStatusListener(): void {
           });
           return;
         }
-        const store = usePaymentStatusStore.getState();
-        const active = store.active;
-        if (active && ownsMelt(active, operation.quoteId)) {
-          // Still processing → confirm. Already confirmed → just merge operationId for View button.
-          paymentLog.info('hook.payment_status.melt_confirm_same_toast', {
-            operationId,
-            quoteId: operation.quoteId,
-            activeId: active.id,
-            activeState: active.state,
-          });
-          store.setConfirmed(active.id, { operationId });
-        } else if (paymentInFlight(active, ['melt'])) {
-          // Another melt is still in flight and this may be its own, before its
-          // flow has reported its quote: it keeps the surface, and its flow
-          // confirms it with its melt for View.
-          paymentLog.info('hook.payment_status.melt_left_to_payment_in_flight', {
-            operationId,
-            quoteId: operation.quoteId,
-            activeId: active?.id ?? null,
-          });
-          const owner = { kind: 'melt' as const, quoteId: operation.quoteId };
-          store.holdResult({
-            owner,
-            operationId,
-            toast: {
+        const amount = amountToNumber(operation.amount);
+        const unit = operation.unit;
+        const owner = { kind: 'melt' as const, quoteId: operation.quoteId };
+        const toast = {
+          variant: 'melt' as const,
+          id: operation.quoteId,
+          owner,
+          mintUrl,
+          amount,
+          unit,
+          state: 'confirmed' as const,
+        };
+        const active = usePaymentStatusStore.getState().active;
+        // Another melt still in flight keeps the surface, and this may be its
+        // own before its flow has reported its quote: the result is held, and
+        // that flow confirms it with its melt for View.
+        const delivery = usePaymentStatusStore
+          .getState()
+          .deliverResult({ owner, operationId, toast }, ['melt']);
+        switch (delivery) {
+          case 'confirmed':
+            // Still processing → confirm. Already confirmed → just merge operationId for View button.
+            paymentLog.info('hook.payment_status.melt_confirm_same_toast', {
+              operationId,
+              quoteId: operation.quoteId,
+              activeId: active?.id ?? null,
+              activeState: active?.state ?? null,
+            });
+            return;
+          case 'held':
+            paymentLog.info('hook.payment_status.melt_left_to_payment_in_flight', {
+              operationId,
+              quoteId: operation.quoteId,
+              activeId: active?.id ?? null,
+            });
+            return;
+          case 'alreadyShown':
+            paymentLog.info('hook.payment_status.melt_already_shown', {
+              operationId,
+              quoteId: operation.quoteId,
+            });
+            return;
+          case 'shown':
+            // Background melt (no toast of its own on screen): a new confirmed toast.
+            paymentLog.info('hook.payment_status.melt_new_success_toast', {
+              operationId,
+              quoteId: operation.quoteId,
+              ...mintUrlLogFields(mintUrl),
+              amount,
+              unit,
+              reason: 'no_matching_active_toast',
+            });
+            paymentStatusPopup({
               variant: 'melt',
               id: operation.quoteId,
-              owner,
               mintUrl,
-              amount: amountToNumber(operation.amount),
-              unit: operation.unit,
-              state: 'confirmed',
-            },
-          });
-        } else {
-          // Background melt (no active toast) — show new confirmed toast
-          const amount = amountToNumber(operation.amount);
-          const unit = operation.unit;
-          paymentLog.info('hook.payment_status.melt_new_success_toast', {
-            operationId,
-            quoteId: operation.quoteId,
-            ...mintUrlLogFields(mintUrl),
-            amount,
-            unit,
-            reason: 'no_matching_active_toast',
-          });
-          store.setActive({
-            variant: 'melt',
-            id: operation.quoteId,
-            owner: { kind: 'melt', quoteId: operation.quoteId },
-            mintUrl,
-            amount,
-            unit,
-            state: 'confirmed',
-          });
-
-          paymentStatusPopup({
-            variant: 'melt',
-            id: operation.quoteId,
-            mintUrl,
-            amount,
-            unit,
-            operationId,
-          });
+              amount,
+              unit,
+              operationId,
+            });
+            return;
+          default: {
+            const exhaustive: never = delivery;
+            return exhaustive;
+          }
         }
       }
     );

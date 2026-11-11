@@ -101,7 +101,7 @@ beforeEach(() => {
   jest.spyOn(console, 'info').mockImplementation(() => undefined);
   jest.spyOn(console, 'warn').mockImplementation(() => undefined);
   jest.spyOn(console, 'error').mockImplementation(() => undefined);
-  usePaymentStatusStore.setState({ active: null });
+  usePaymentStatusStore.setState(usePaymentStatusStore.getInitialState());
   useSwapStatusStore.setState({ active: null });
   useMintStore.setState({ standingQuotes: {} });
   useTransactionAnnotationStore.setState({ annotations: {} });
@@ -711,6 +711,62 @@ describe('usePaymentStatusListener', () => {
     expect(active()).toBeNull();
     expect(mockedPopup).toHaveBeenCalledTimes(1);
     unmount();
+  });
+
+  describe('a held success whose event comes again', () => {
+    const meltB = {
+      mintUrl: MINT,
+      operationId: 'mo-b',
+      operation: { quoteId: 'mq-b', amount: 200, unit: 'sat', method: 'bolt11' },
+    };
+    function holdBBesideMeltA() {
+      usePaymentStatusStore.getState().setActive({
+        variant: 'melt',
+        id: 'melt-a',
+        owner: { kind: 'melt', quoteId: 'mq-a' },
+        mintUrl: MINT,
+        amount: 300,
+        unit: 'sat',
+        state: 'processing',
+      });
+      act(() => fake.emit('melt-op:finalized', meltB));
+      act(() =>
+        fake.emit('melt-op:finalized', {
+          mintUrl: MINT,
+          operationId: 'mo-a',
+          operation: { quoteId: 'mq-a', amount: 300, unit: 'sat', method: 'bolt11' },
+        })
+      );
+      expect(active()).toMatchObject({ id: 'melt-a', state: 'confirmed' });
+    }
+    const popupsOfB = () => mockedPopup.mock.calls.filter(([popup]) => popup.id === 'mq-b').length;
+
+    it('is shown once when it comes again after the toast in flight confirmed', () => {
+      const { unmount } = mount();
+      holdBBesideMeltA();
+
+      act(() => fake.emit('melt-op:finalized', meltB));
+      expect(active()).toMatchObject({ id: 'mq-b', state: 'confirmed' });
+      act(() => usePaymentStatusStore.getState().clearActive('mq-b'));
+
+      expect(active()).toBeNull();
+      expect(popupsOfB()).toBe(1);
+      unmount();
+    });
+
+    it('is not shown again when it comes again after it was shown from the hold', () => {
+      const { unmount } = mount();
+      holdBBesideMeltA();
+      act(() => usePaymentStatusStore.getState().clearActive('melt-a'));
+      expect(active()).toMatchObject({ id: 'mq-b', state: 'confirmed' });
+      act(() => usePaymentStatusStore.getState().clearActive('mq-b'));
+
+      act(() => fake.emit('melt-op:finalized', meltB));
+
+      expect(active()).toBeNull();
+      expect(popupsOfB()).toBe(1);
+      unmount();
+    });
   });
 
   it('shows another send’s success, left to a payment request in flight, once that toast ends', () => {

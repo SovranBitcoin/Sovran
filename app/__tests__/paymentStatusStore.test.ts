@@ -13,7 +13,7 @@ jest.mock('@/shared/lib/logger', () => ({
 describe('paymentStatusStore', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    usePaymentStatusStore.getState().setActive(null);
+    usePaymentStatusStore.setState(usePaymentStatusStore.getInitialState());
   });
 
   it('marks recoverable receive failures as waiting with custom copy', () => {
@@ -163,5 +163,70 @@ describe('binding a toast to its payment', () => {
     expect(usePaymentStatusStore.getState().active).toMatchObject({
       owner: { kind: 'melt', quoteId: 'mq-1' },
     });
+  });
+});
+
+describe('results held for a toast still waiting to be bound', () => {
+  const MINT = 'https://mint.example';
+  beforeEach(() => usePaymentStatusStore.setState(usePaymentStatusStore.getInitialState()));
+
+  const meltResult = (quoteId: string) => {
+    const owner = { kind: 'melt' as const, quoteId };
+    return {
+      owner,
+      operationId: `op-${quoteId}`,
+      toast: {
+        variant: 'melt' as const,
+        id: quoteId,
+        owner,
+        mintUrl: MINT,
+        amount: 10,
+        unit: 'sat',
+        state: 'confirmed' as const,
+      },
+    };
+  };
+  const waitingMelt = (key: string) =>
+    usePaymentStatusStore.getState().setActive({
+      variant: 'melt',
+      id: key,
+      owner: { kind: 'pending', key },
+      mintUrl: MINT,
+      amount: 10,
+      unit: 'sat',
+      state: 'processing',
+    });
+
+  it('keeps the waiting toast’s own result however many others are held after it', () => {
+    waitingMelt('toast');
+    const store = usePaymentStatusStore.getState();
+    store.deliverResult(meltResult('own'), ['melt']);
+    for (let i = 0; i < 25; i += 1) store.deliverResult(meltResult(`other-${i}`), ['melt']);
+
+    usePaymentStatusStore.getState().bindOwner('toast', { kind: 'melt', quoteId: 'own' });
+
+    expect(usePaymentStatusStore.getState().active).toMatchObject({
+      id: 'toast',
+      state: 'confirmed',
+      operationId: 'op-own',
+    });
+  });
+
+  it('still drops the oldest results once no toast is waiting for them', () => {
+    usePaymentStatusStore.getState().setActive({
+      variant: 'melt',
+      id: 'bound',
+      owner: { kind: 'melt', quoteId: 'bound' },
+      mintUrl: MINT,
+      amount: 10,
+      unit: 'sat',
+      state: 'processing',
+    });
+    const store = usePaymentStatusStore.getState();
+    for (let i = 0; i < 25; i += 1) store.deliverResult(meltResult(`other-${i}`), ['melt']);
+
+    const held = usePaymentStatusStore.getState().held;
+    expect(held).toHaveLength(20);
+    expect(held[0]?.owner).toEqual({ kind: 'melt', quoteId: 'other-5' });
   });
 });
