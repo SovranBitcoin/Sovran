@@ -243,7 +243,11 @@ type NfcWriteBackEffectSuccess =
     }
   | {
       kind: 'stale';
-      /** Whether the token reached the tag before the turn went stale. */
+      /**
+       * Whether the write succeeded before the turn went stale. A write that
+       * began and failed is not delivered here, but its token is not taken
+       * back either: the terminal may hold it.
+       */
       delivered: boolean;
     };
 
@@ -1792,6 +1796,8 @@ export function runNfcWriteBackEffect({
   return ResultAsync.fromPromise(
     (async () => {
       let nfcSendResult: NfcSendOperationResult | null = null;
+      // From here the terminal may hold the token, whatever the write reports.
+      let writeStarted = false;
 
       try {
         logger.info('effects.nfcWriteBack.progress', { phase: 'creating' });
@@ -1816,13 +1822,24 @@ export function runNfcWriteBackEffect({
 
         logger.info('effects.nfcWriteBack.progress', { phase: 'writing' });
         onProgress?.({ phase: 'writing' });
+        writeStarted = true;
         await nfcAdapter.writeToken(nfcSendResult.token);
       } catch (cause) {
         if (isStale('executeNfcSend.catch')) {
           logger.info('effects.nfcWriteBack.stale', {
             op: 'executeNfcSend.catch',
+            writeStarted,
           });
-          if (nfcSendResult) await rollBack(nfcSendResult.operationId, true);
+          // A write that began and then failed may still have reached the
+          // terminal (its last acknowledgement can be lost): the outcome is
+          // unknown, and taking the token back could undo a payment made.
+          // The reset that overtook the tap already left nothing that could
+          // rebuild it.
+          if (nfcSendResult && !writeStarted) {
+            await rollBack(nfcSendResult.operationId, true);
+          } else if (writeStarted) {
+            logger.warn('effects.nfcWriteBack.outcomeUnknown', { stale: true });
+          }
           await releaseSession(true);
           return { kind: 'stale', delivered: false } as const;
         }

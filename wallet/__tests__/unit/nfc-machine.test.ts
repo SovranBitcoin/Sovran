@@ -644,6 +644,28 @@ describe("what an NFC tap leaves behind when it ends", () => {
       expect(unitSwitches(tap.switchUnit)).toEqual(["usd"]);
     });
 
+    // Once the write began the terminal may hold the token, even when the
+    // write then reports failure (its last acknowledgement can be lost).
+    it("does not take the token back when the write it overtook then fails", async () => {
+      const tap = setup({ unit: "usd" });
+      let failWrite!: (error: Error) => void;
+      tap.adapter.writeToken.mockImplementationOnce(
+        () =>
+          new Promise<void>((_resolve, reject) => {
+            failWrite = reject;
+          }),
+      );
+      const written: Deferred = {
+        promise: Promise.resolve(),
+        resolve: () => failWrite(new Error("tag lost")),
+      };
+      await overtake(tap, written, () => expect(tap.adapter.writeToken).toHaveBeenCalledTimes(1));
+      expect(tap.tm.operationCalls.filter((call) => call.name === "rollbackSend")).toEqual([]);
+      expect(tap.adapter.releaseSession).toHaveBeenCalledTimes(1);
+      // The reset left nothing that could rebuild the payment.
+      expect(Object.keys(tap.tm.machine.getContext())).toEqual(["unit"]);
+    });
+
     // The session and the unit hold one tap at a time. A newer tap's read
     // took the session over; a newer tap the machine runs owns the unit.
     describe("when a newer tap began after the reset", () => {

@@ -883,7 +883,9 @@ describe('runNfcWriteBackEffect', () => {
     expect(releaseSession).toHaveBeenCalledTimes(1);
   });
 
-  it('takes back a token whose write failed after reset', async () => {
+  // The write began: the terminal may hold the token although the write
+  // reports failure, so its outcome is unknown and it is not taken back.
+  it('does not take back a token whose write failed after reset', async () => {
     const releaseSession = vi.fn(async () => {});
     const rollbackSend = vi.fn(async () => {});
 
@@ -908,7 +910,7 @@ describe('runNfcWriteBackEffect', () => {
     expect(result.isOk()).toBe(true);
     if (result.isErr()) return;
     expect(result.value).toEqual({ kind: 'stale', delivered: false });
-    expect(rollbackSend).toHaveBeenCalledExactlyOnceWith('operation-1');
+    expect(rollbackSend).not.toHaveBeenCalled();
     expect(releaseSession).toHaveBeenCalledTimes(1);
   });
 
