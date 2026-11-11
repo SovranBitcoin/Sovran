@@ -357,6 +357,25 @@ describe('conversation list seeding', () => {
       'a'.repeat(64),
     ]);
   });
+
+  it('fills a seeded row from a live message with the same time', async () => {
+    const peer = 'a'.repeat(64);
+    useDmLastMessageStore.getState().recordLastMessage(peer, {
+      protocol: 'nip17',
+      atSeconds: 500,
+      isOwn: false,
+    });
+    mockInbox.mockImplementation(() => new Promise<DmEnvelopePage>(() => {}));
+    const { result } = renderHook(() => useDmConversations('viewer', key, { live: true }));
+    await waitFor(() => expect(mockLive).toHaveBeenCalledTimes(1));
+    const onLive = mockLive.mock.calls[0][1] as (p: DmEnvelopePage) => void;
+
+    act(() => onLive(page(peer, 1, 500)));
+
+    const row = result.current.conversations.find((c) => c.counterparty === peer);
+    expect(row?.previewPending).toBeFalsy();
+    expect(row?.newestMessageId).toBeTruthy();
+  });
 });
 
 describe.each([

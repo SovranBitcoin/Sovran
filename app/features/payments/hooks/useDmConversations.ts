@@ -135,7 +135,11 @@ export function useDmConversations(
         };
         for (const target of meta.mode === 'live' ? [bucket, liveRef.current] : [bucket]) {
           const existing = target.get(dm.counterparty);
-          if (!existing || dm.createdAtSec > existing.lastMessageAtSec) {
+          // A seeded row has the time but not the text: the message itself, at
+          // that same time, fills it.
+          const fillsSeed =
+            existing?.previewPending && dm.createdAtSec === existing.lastMessageAtSec;
+          if (!existing || dm.createdAtSec > existing.lastMessageAtSec || fillsSeed) {
             target.set(dm.counterparty, row);
           }
         }
