@@ -17,7 +17,7 @@ jest.mock('@/shared/lib/logger', () => ({
 
 const mint = { mint: 'https://a.example', isDiscovered: false };
 const waiting: MintRecoveryState = { ...mint, status: 'waiting' };
-const timedOut: MintRecoveryState = { ...mint, status: 'timed-out' };
+const timedOut: MintRecoveryState = { ...mint, status: 'timed-out', fundsFound: false };
 const done: MintRecoveryState = { ...mint, status: 'done', fundsFound: true, durationMs: 5 };
 
 const restoring = (rows: MintRecoveryState[]): RecoveryRun => ({
@@ -56,10 +56,29 @@ it('keeps a stop asked for during the search through the restore step', () => {
 });
 
 it('never changes a mint that has its outcome, during the run or after it', () => {
-  const during = restoring([timedOut]);
-  expect(recoveryTransition(during, { type: 'mintUpdated', index: 0, state: done })).toBe(during);
+  const during = restoring([done]);
+  expect(recoveryTransition(during, { type: 'mintUpdated', index: 0, state: timedOut })).toBe(
+    during
+  );
+  // A late result that found nothing leaves a timed-out mint as it was.
+  const empty: MintRecoveryState = { ...mint, status: 'done', fundsFound: false, durationMs: 5 };
+  const late = restoring([timedOut]);
+  expect(recoveryTransition(late, { type: 'mintUpdated', index: 0, state: empty })).toBe(late);
   const after: RecoveryRun = { phase: 'finished', rows: [timedOut], end: { kind: 'incomplete' } };
-  expect(recoveryTransition(after, { type: 'mintUpdated', index: 0, state: done })).toBe(after);
+  expect(recoveryTransition(after, { type: 'mintUpdated', index: 0, state: empty })).toBe(after);
+});
+
+it('records the funds a timed-out mint’s late restore found, and keeps it timed out', () => {
+  const withFunds: MintRecoveryState = { ...timedOut, fundsFound: true };
+  const during = restoring([timedOut]);
+  expect(recoveryTransition(during, { type: 'mintUpdated', index: 0, state: done })).toEqual(
+    restoring([withFunds])
+  );
+  const after: RecoveryRun = { phase: 'finished', rows: [timedOut], end: { kind: 'incomplete' } };
+  expect(recoveryTransition(after, { type: 'mintUpdated', index: 0, state: done })).toEqual({
+    ...after,
+    rows: [withFunds],
+  });
 });
 
 it('ends with the rows it has, or none when it never got to a step', () => {

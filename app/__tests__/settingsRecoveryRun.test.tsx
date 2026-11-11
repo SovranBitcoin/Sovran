@@ -617,23 +617,30 @@ describe('a mint that times out while still restoring', () => {
   }
 
   /**
-   * Mint A's first keyset never answers until `finishA`; the run times the
-   * mint out after 120 s and ends, while that restore goes on behind it.
+   * The first keyset of `mint` (mint A unless named) never answers until
+   * `finishA`; the run times the mint out after 120 s and ends, while that
+   * restore goes on behind it.
    */
   async function runPastTimeout(
-    options: { stop?: boolean; gateMode?: boolean } = {}
+    options: { stop?: boolean; gateMode?: boolean; mint?: string; searchAll?: boolean } = {}
   ): Promise<{ renderer: Renderer; finishA: () => void }> {
     jest.useFakeTimers();
+    const held = options.mint ?? MINT_A;
     let finishA = () => {};
     mockRestoreKeyset.mockImplementation(
       (_m: unknown, { mintUrl, keysetId }: { mintUrl: string; keysetId: string }) =>
-        mintUrl === MINT_A && keysetId === KEYSET_1
+        mintUrl === held && keysetId === KEYSET_1
           ? new Promise<void>((resolve) => {
               finishA = resolve;
             })
           : Promise.resolve()
     );
     const renderer = await mount(options.gateMode ? { gateMode: true, onComplete: jest.fn() } : {});
+    if (options.searchAll) {
+      await act(async () => {
+        byTestId(renderer, 'recovery-search-all-toggle')[0]!.props.onSelectedChange(true);
+      });
+    }
     let ended = false;
     await act(async () => {
       void byTestId(renderer, 'recovery-swipe')[0]!
@@ -664,6 +671,32 @@ describe('a mint that times out while still restoring', () => {
 
     // The stop belongs to the run that was stopped, however late its work.
     expect(mockRestoreKeyset).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps trusting a discovered mint it timed out, and records the funds its late restore found', async () => {
+    mockMints = [];
+    const FOUND = 'https://found.example';
+    jest.mocked(discoverMints).mockResolvedValue(
+      ok({
+        mints: [
+          { mintUrl: FOUND, hasAudit: true, state: 'OK', averageScore: null, reviewCount: 0 },
+        ],
+      }) as never
+    );
+    jest.mocked(probeMintForHistory).mockResolvedValue(true);
+    const { renderer, finishA } = await runPastTimeout({ mint: FOUND, searchAll: true });
+    expect(texts(renderer)).toContain('Timed out');
+
+    // Its outcome is unknown when the run tidies up: it is left trusted.
+    expect(mockUntrustMint).not.toHaveBeenCalled();
+
+    mockBalancesByMint.mockResolvedValue({ [FOUND]: { total: 21 } });
+    finishA();
+    await advance(0);
+
+    // The late restore found funds there; the row still says it timed out.
+    expect(mockUntrustMint).not.toHaveBeenCalled();
+    expect(texts(renderer)).toContain('Timed out');
   });
 });
 

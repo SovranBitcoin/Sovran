@@ -51,7 +51,11 @@ const failed = (where: Where = {}, error = 'mint offline'): MintRecoveryState =>
   fundsFound: false,
   durationMs: null,
 });
-const timedOut = (where: Where = {}): MintRecoveryState => ({ ...at(where), status: 'timed-out' });
+const timedOut = (where: Where = {}): MintRecoveryState => ({
+  ...at(where),
+  status: 'timed-out',
+  fundsFound: false,
+});
 const cancelled = (where: Where = {}): MintRecoveryState => ({
   ...at(where),
   status: 'skipped',

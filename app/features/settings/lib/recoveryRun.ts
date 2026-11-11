@@ -25,6 +25,7 @@ import {
   createInitialMintStates,
   fundsFound,
   isSuccess,
+  knownEmpty,
   isTerminal,
   type MintRecoveryState,
 } from '@/features/settings/lib/recoveryProgress';
@@ -81,11 +82,18 @@ export function recoveryTransition(run: RecoveryRun, event: RecoveryEvent): Reco
       if (run.phase !== 'running' && run.phase !== 'cancelling') return run;
       return { ...run, label: event.label };
     case 'mintUpdated': {
-      // A mint's outcome is final. A restore that timed out is not
-      // cancelled, and its late result must not rewrite the row.
-      if (run.phase === 'idle' || isTerminal(run.rows[event.index]!.status)) return run;
+      if (run.phase === 'idle') return run;
+      const row = run.rows[event.index]!;
+      let next: MintRecoveryState = event.state;
+      if (isTerminal(row.status)) {
+        // A mint's outcome is final. A restore that timed out is not
+        // cancelled, and its late result must not rewrite the row; the
+        // funds it found are kept on it.
+        if (row.status !== 'timed-out' || row.fundsFound || !fundsFound(event.state)) return run;
+        next = { ...row, fundsFound: true };
+      }
       const rows = [...run.rows];
-      rows[event.index] = event.state;
+      rows[event.index] = next;
       return { ...run, rows };
     }
     case 'cancelRequested':
@@ -510,7 +518,7 @@ async function recover(
       update(
         i,
         timedOut
-          ? { ...base, status: 'timed-out' }
+          ? { ...base, status: 'timed-out', fundsFound: false }
           : {
               ...base,
               status: 'failed',
@@ -529,7 +537,8 @@ async function recover(
 
   dispatch({ type: 'finalizing' });
 
-  // Untrust discovered mints that returned no funds. `wallet.restore`
+  // Untrust discovered mints that returned no funds; one that timed out
+  // may yet, and is left trusted. `wallet.restore`
   // calls `mintService.addMintByUrl(url, { trusted: true })` for every
   // probed URL (see ../coco/packages/core/api/WalletApi.ts), which would
   // otherwise leave attacker-supplied URLs from the audit API permanently
@@ -537,7 +546,7 @@ async function recover(
   const untrustUrls = [
     ...new Set([
       ...rows()
-        .filter((r) => r.isDiscovered && !fundsFound(r))
+        .filter((r) => r.isDiscovered && knownEmpty(r))
         .map((r) => r.mint),
       ...probeMissUrls,
     ]),

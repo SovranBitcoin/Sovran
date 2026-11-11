@@ -17,7 +17,9 @@ import type { CheckpointStatus } from '@/shared/blocks/status';
  * (`cancelled`, including a mint stopped before its last keyset) or because
  * none of its keysets has an id that can be restored (`not-restorable`).
  *
- * An outcome is final: nothing moves a mint out of it.
+ * An outcome is final: nothing moves a mint out of it. A mint that timed out
+ * is still restoring behind the run; what its late result found is recorded
+ * on it, and it stays timed out.
  */
 type MintRecoveryProgress =
   | { status: 'waiting' }
@@ -35,7 +37,11 @@ type MintRecoveryProgress =
       durationMs: number;
     }
   | { status: 'failed'; error: string; fundsFound: boolean; durationMs: number | null }
-  | { status: 'timed-out' }
+  | {
+      status: 'timed-out';
+      /** A late result of its restore read a balance there. */
+      fundsFound: boolean;
+    }
   | {
       status: 'skipped';
       reason: 'cancelled';
@@ -102,12 +108,20 @@ export function fundsFound(state: MintRecoveryState): boolean {
     case 'already-recovered':
     case 'failed':
     case 'skipped':
+    case 'timed-out':
       return state.fundsFound;
     case 'waiting':
     case 'restoring':
-    case 'timed-out':
       return false;
   }
+}
+
+/**
+ * Whether the run learned that a mint holds nothing. Not for a mint that
+ * timed out: its restore may still find funds there.
+ */
+export function knownEmpty(state: MintRecoveryState): boolean {
+  return state.status !== 'timed-out' && !fundsFound(state);
 }
 
 /** Why a mint did not recover, for a row's error line; undefined when it did or is not over. */
