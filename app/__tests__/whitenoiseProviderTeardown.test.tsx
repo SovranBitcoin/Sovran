@@ -101,13 +101,13 @@ it('a plain unmount unregisters, drops the listeners and zeroes the signer at on
   ]);
 });
 
-it('a plain unmount whose listener removal throws still finishes, leaving the signer as it was', () => {
+it('a plain unmount whose listener removal throws still finishes and still zeroes the signer', () => {
   mockClient.removeAllListeners.mockImplementation(() => {
     throw new Error('emitter broken');
   });
 
   expect(() => mount().unmount()).not.toThrow();
-  expect(mockSteps).toEqual(['unregister service', 'unregister holder']);
+  expect(mockSteps).toEqual(['unregister service', 'unregister holder', 'dispose signer']);
   expect(mockLog.warn).toHaveBeenCalledWith('whitenoise.client.dispose_failed', {
     error: 'emitter broken',
   });
