@@ -45,7 +45,8 @@ type DeliveryEvent =
 
 /**
  * Which events move each state; any other is refused. Reports only move
- * forward (sending → sent → delivered → read).
+ * forward (sending → sent → delivered → read), and a delivered or read report
+ * wins over every failure.
  */
 const MOVES: Record<BleDmDelivery['state'], readonly DeliveryEvent['type'][]> = {
   sending: ['sent', 'delivered', 'read', 'failed', 'timed-out', 'relaunched'],
@@ -56,8 +57,9 @@ const MOVES: Record<BleDmDelivery['state'], readonly DeliveryEvent['type'][]> = 
   // The 15 s mark and a restart mean "not confirmed yet": a later report
   // wins (owner's ruling, F212). Until one comes it offers a retry.
   unconfirmed: ['sent', 'delivered', 'read', 'failed'],
-  // A new reason replaces the old one.
-  failed: ['failed'],
+  // A new reason replaces the old one. A delivered or read report is proof
+  // the peer has it, so it wins over a failure, whichever came first (owner's ruling).
+  failed: ['failed', 'delivered', 'read'],
 };
 
 function stateAfter(event: DeliveryEvent): BleDmDelivery {

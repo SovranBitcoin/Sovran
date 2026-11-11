@@ -166,35 +166,45 @@ describe('delivery status', () => {
     expect(thread()[0].deliveryStatus).toBe('read');
   });
 
-  it('an unconfirmed message refuses a late sending and takes a native failure as final', () => {
+  it('an unconfirmed message refuses a late sending and takes a native failure, then a delivery', () => {
     store().appendOutgoing(outgoing('o1', 1), PEER_A);
     expect(store().markTimedOut('o1')).toBe(true);
     status('o1', 'sending');
     expect(thread()[0]).toMatchObject({ deliveryStatus: 'failed', failureReason: 'timeout' });
 
     status('o1', 'failed', 'peer_unreachable');
-    status('o1', 'delivered');
     expect(thread()[0]).toMatchObject({
       deliveryStatus: 'failed',
       failureReason: 'peer_unreachable',
     });
+    status('o1', 'delivered');
+    expect(thread()[0]).toMatchObject({ deliveryStatus: 'delivered', isPending: false });
+    expect(thread()[0].failureReason).toBeUndefined();
   });
 
-  it('a failure keeps its reason and a later delivery does not move it', () => {
-    store().appendOutgoing(outgoing('o1', 1), PEER_A);
-    status('o1', 'failed', 'peer_unreachable');
-    expect(thread()[0]).toMatchObject({
-      deliveryStatus: 'failed',
-      failureReason: 'peer_unreachable',
-    });
+  it.each(['delivered', 'read'] as const)(
+    'a failure keeps its reason, and a later %s report wins over it (the report is proof)',
+    (report) => {
+      store().appendOutgoing(outgoing('o1', 1), PEER_A);
+      status('o1', 'failed', 'peer_unreachable');
+      expect(thread()[0]).toMatchObject({
+        deliveryStatus: 'failed',
+        failureReason: 'peer_unreachable',
+      });
+      status('o1', 'failed', 'other_reason');
+      expect(thread()[0].failureReason).toBe('other_reason');
 
-    // 'failed' ranks highest, so nothing after it moves the message.
-    status('o1', 'delivered');
-    expect(thread()[0]).toMatchObject({
-      deliveryStatus: 'failed',
-      failureReason: 'peer_unreachable',
-    });
-  });
+      status('o1', report);
+      expect(thread()[0]).toMatchObject({ deliveryStatus: report, isPending: false });
+      expect(thread()[0].failureReason).toBeUndefined();
+
+      // A failure, a sent or a sending after it moves it no more.
+      status('o1', 'failed', 'peer_unreachable');
+      status('o1', 'sent');
+      status('o1', 'sending');
+      expect(thread()[0].deliveryStatus).toBe(report);
+    }
+  );
 
   it('a late failure leaves a message the peer acknowledged delivered or read', () => {
     store().appendOutgoing(outgoing('o1', 1), PEER_A);
@@ -314,8 +324,8 @@ describe('after a restart', () => {
     expect(rows(thread())).toEqual(expected);
     expect(rows(JSON.parse(mockAsync.get(key)!).state.byPeer[PEER_A])).toEqual(expected);
 
-    // A saved timeout or restart reads as unconfirmed, so a late delivery
-    // wins; any other saved failure is final (F212).
+    // A late delivery wins over every saved failure, an unconfirmed one (a
+    // saved timeout or restart) and a native one alike: the report is proof.
     for (const m of thread()) status(m.id, 'delivered');
     expect(thread().map((m) => m.deliveryStatus)).toEqual([
       'delivered',
@@ -324,8 +334,8 @@ describe('after a restart', () => {
       'read',
       'delivered',
       'delivered',
-      'failed',
-      'failed',
+      'delivered',
+      'delivered',
     ]);
   });
 
