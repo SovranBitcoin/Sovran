@@ -28,6 +28,7 @@ jest.mock('@/shared/lib/getDiscoveredMintMetadata', () => ({
   getDiscoveredMintMetadata: jest.fn(),
 }));
 jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({
+  getActiveProfilePubkey: () => 'account-a',
   createProfileScopedStorage: () => ({
     getItem: async () => null,
     setItem: async () => {},

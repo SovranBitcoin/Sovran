@@ -15,6 +15,7 @@ import { mintLocalId } from '@/shared/lib/id';
 import { cashuLog } from '@/shared/lib/logger';
 import { swapStatusPopup } from '@/shared/lib/popup';
 import { useSwapTransactionsStore } from '@/shared/stores/profile/swapTransactionsStore';
+import { getActiveProfilePubkey } from '@/shared/lib/cashu/profileScopedStorage';
 import { useSwapStatusStore } from '@/shared/stores/runtime/swapStatusStore';
 import { anySwapGroupHeld, holdSwapGroup } from '@/shared/lib/cashu/swapGroupPhase';
 import type { MiddlemanRoutingSettings } from '@/shared/stores/global/settingsStore';
@@ -79,7 +80,26 @@ type StartRun = (
  */
 interface OwnedRun {
   groupId: string | null;
+  /** The account the group was started for. */
+  account: string | undefined;
   release: () => void;
+}
+
+/** A swap history group, with the account it was started for. */
+interface StartedGroup {
+  id: string;
+  account: string | undefined;
+}
+
+/**
+ * The swap history store, while it still holds `account`'s groups. After an
+ * account switch it holds another account's, and a late write from a run
+ * started for the old one must not land there.
+ */
+function swapHistoryOf(account: string | undefined) {
+  if (getActiveProfilePubkey() === account) return useSwapTransactionsStore.getState();
+  cashuLog.info('mint.rebalance.group_write_skipped_other_account');
+  return null;
 }
 
 /** The Swap status toast, when it belongs to this group. */
@@ -169,7 +189,7 @@ export function useMintRebalanceOrchestrator({
   const [lock] = useState(createRebalanceLock);
 
   const runRef = useRef<OwnedRun | null>(null);
-  const swapGroupIdRef = useRef<string | null>(null);
+  const swapGroupRef = useRef<StartedGroup | null>(null);
   /** What the group's toast was started with, to show it again for a retry. */
   const toastStartRef = useRef<ToastStart | null>(null);
   const swapLegIdByStepIdRef = useRef<Record<string, string>>({});
@@ -197,12 +217,13 @@ export function useMintRebalanceOrchestrator({
    * they show.
    */
   const claimRun = useCallback((): OwnedRun => {
-    const groupId = swapGroupIdRef.current;
-    if (groupId) useSwapTransactionsStore.getState().reopenGroup(groupId);
+    const groupId = swapGroupRef.current?.id ?? null;
+    const account = swapGroupRef.current?.account;
+    if (groupId) swapHistoryOf(account)?.reopenGroup(groupId);
     const toast = toastFor(groupId);
     if (toast) toast.resume();
     else if (toastStartRef.current) showToast(toastStartRef.current, stepStatesRef.current);
-    const run = { groupId, release: groupId ? holdSwapGroup(groupId) : () => {} };
+    const run = { groupId, account, release: groupId ? holdSwapGroup(groupId) : () => {} };
     runRef.current = run;
     return run;
   }, []);
@@ -216,9 +237,9 @@ export function useMintRebalanceOrchestrator({
   }, []);
 
   /** End the swap group and the screen for a run that did not get through its steps. */
-  const closeCancelled = useCallback((groupId: string | null) => {
+  const closeCancelled = useCallback((groupId: string | null, account: string | undefined) => {
     setRunStatus('cancelled');
-    if (groupId) useSwapTransactionsStore.getState().finalizeGroup(groupId, 'cancelled');
+    if (groupId) swapHistoryOf(account)?.finalizeGroup(groupId, 'cancelled');
   }, []);
 
   const plan = useMemo(() => runPlan ?? computedPlan, [runPlan, computedPlan]);
@@ -290,7 +311,7 @@ export function useMintRebalanceOrchestrator({
     (step: TransferStep) =>
       createRebalanceStepSink({
         step,
-        groupId: swapGroupIdRef.current,
+        groupId: swapGroupRef.current?.id ?? null,
         swapLegIds: swapLegIdByStepIdRef.current,
         updateStepState,
         insertChainRows,
@@ -319,14 +340,12 @@ export function useMintRebalanceOrchestrator({
         const toast = toastFor(run.groupId);
         if (result.status === 'aborted') {
           // The wallet changed under the run (an account switch).
-          closeCancelled(run.groupId);
+          closeCancelled(run.groupId, run.account);
           toast?.cancel();
           return;
         }
         setRunStatus('finished');
-        if (run.groupId) {
-          useSwapTransactionsStore.getState().finalizeGroup(run.groupId, 'finished');
-        }
+        if (run.groupId) swapHistoryOf(run.account)?.finalizeGroup(run.groupId, 'finished');
         if (result.anyFailed) toast?.fail();
         else if (result.anyPending) toast?.settleUnknown(PAYMENT_PENDING_DETAIL);
         else toast?.complete();
@@ -355,7 +374,7 @@ export function useMintRebalanceOrchestrator({
       } catch (err) {
         const run = currentRun();
         if (giveUpRun(run)) {
-          closeCancelled(run.groupId);
+          closeCancelled(run.groupId, run.account);
           toastFor(run.groupId)?.fail(describeError(err, 'cashu').text);
         }
         throw err;
@@ -376,7 +395,7 @@ export function useMintRebalanceOrchestrator({
     // Start a swap group for this run (used for Transactions grouping)
     swapLegIdByStepIdRef.current = {};
     const groupId = useSwapTransactionsStore.getState().startGroup({ unit, title: 'Swap' });
-    swapGroupIdRef.current = groupId;
+    swapGroupRef.current = { id: groupId, account: getActiveProfilePubkey() };
     const initialStates = createInitialStepStates(snapshot.steps);
     stepStatesRef.current = initialStates;
     setStepStates(initialStates);
@@ -505,8 +524,8 @@ export function useMintRebalanceOrchestrator({
     // and coco settles it.
     const run = runRef.current;
     if (run) giveUpRun(run);
-    const groupId = run?.groupId ?? swapGroupIdRef.current;
-    closeCancelled(groupId);
+    const groupId = run?.groupId ?? swapGroupRef.current?.id ?? null;
+    closeCancelled(groupId, run ? run.account : swapGroupRef.current?.account);
     // Flip the SwapStatusToast to its terminal 'cancelled' state; the runner
     // returns early on abort, so its complete()/fail() never fires.
     toastFor(groupId)?.cancel();
@@ -517,7 +536,7 @@ export function useMintRebalanceOrchestrator({
     runPlan,
     stepStates,
     runStatus,
-    swapGroupId: swapGroupIdRef.current,
+    swapGroupId: swapGroupRef.current?.id ?? null,
     handleStart,
     handleRetry,
     handleSkip,
