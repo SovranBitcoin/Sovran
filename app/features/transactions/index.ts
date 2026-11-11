@@ -24,7 +24,9 @@ export {
   entryDetailItems,
 } from './components/detail/transactionDetailRows';
 export {
+  filtersFromTransactionsParams,
   TransactionsFilterProvider,
+  TransactionsRouteParamsSchema,
   useTransactionsFilter,
 } from './components/TransactionsFilterContext';
 export { useIsTransactionHistoryView } from './lib/transactionHistoryView';

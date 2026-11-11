@@ -127,48 +127,25 @@ it('opens the sheet with every filter under its own name, at its default', () =>
   open({});
   expect(sheetParams()).toEqual({ pathname: '/filters', params: DEFAULT_SHEET_PARAMS });
   expect(header().badge).toBe(0);
-  expect(mockScreenProps).toMatchObject({
-    initialTab: 'All',
-    filterCurrency: 'sat',
-    filterPaymentType: 'all',
-    filterDirection: 'all',
-    filterMintUrl: 'all',
-    filterSource: 'all',
-    filterLock: 'all',
-    filterCounterparty: 'all',
-    filterZap: 'all',
-    filterMonth: null,
-  });
+  expect(mockScreenProps).toMatchObject({ filters: DEFAULT_SHEET_PARAMS, filterMonth: null });
 });
 
 it('takes every filter param, shows it on the list and the badge, and hands it back to the sheet', () => {
   open(EVERY_FILTER);
-  expect(mockScreenProps).toMatchObject({
-    initialTab: 'Pending',
-    filterCurrency: 'usd',
-    filterPaymentType: 'ecash',
-    filterDirection: 'outgoing',
-    filterMintUrl: 'https://mint.example',
-    filterSource: 'nfc',
-    filterLock: 'locked',
-    filterCounterparty: 'with',
-    filterZap: 'zaps',
-  });
+  const every = {
+    currency: 'usd',
+    paymentType: 'ecash',
+    direction: 'outgoing',
+    status: 'Pending',
+    mintUrl: 'https://mint.example',
+    source: 'nfc',
+    lock: 'locked',
+    counterparty: 'with',
+    zap: 'zaps',
+  };
+  expect(mockScreenProps).toMatchObject({ filters: every });
   expect(header().badge).toBe(9);
-  expect(sheetParams()).toEqual({
-    pathname: '/filters',
-    params: {
-      currency: 'usd',
-      paymentType: 'ecash',
-      direction: 'outgoing',
-      status: 'Pending',
-      mintUrl: 'https://mint.example',
-      source: 'nfc',
-      lock: 'locked',
-      counterparty: 'with',
-      zap: 'zaps',
-    },
-  });
+  expect(sheetParams()).toEqual({ pathname: '/filters', params: every });
 });
 
 it('changes only the filters a later visit names, and ignores empty ones', () => {
