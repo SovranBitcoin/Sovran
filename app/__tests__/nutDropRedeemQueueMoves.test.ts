@@ -85,19 +85,35 @@ describe('moves the queue accepts', () => {
   });
 
   it.each([
+    ['message intake: probe says spent', 'spent'],
+    ['message intake: mint not trusted', 'untrusted-mint'],
+  ] as const)('%s: queues a new token as %s, never tried', (_writer, status) => {
+    expect(
+      store().enqueue(
+        HASH,
+        { token: 't', mintUrl: MINT, amount: 1, unit: 'sat', source: 'nostr' },
+        status
+      )
+    ).toBe(true);
+    expect(current()).toMatchObject({ status, attempts: 0, nextAttemptAt: 0, receivedAt: NOW });
+    expect(current()).not.toHaveProperty('lastError');
+  });
+
+  it('leaves a token another path already queued as it is', () => {
+    at('redeeming', { source: undefined });
+    const before = current();
+    expect(
+      store().enqueue(
+        HASH,
+        { token: 't', mintUrl: MINT, amount: 1, unit: 'sat', source: 'nostr' },
+        'untrusted-mint'
+      )
+    ).toBe(false);
+    expect(current()).toEqual(before);
+  });
+
+  it.each([
     // [writer, from, call, expected status]
-    [
-      'message intake: probe says spent',
-      'pending',
-      () => store().markStatus(HASH, 'spent'),
-      'spent',
-    ],
-    [
-      'message intake: mint not trusted',
-      'pending',
-      () => store().markStatus(HASH, 'untrusted-mint'),
-      'untrusted-mint',
-    ],
     [
       'drain: starts a receive',
       'pending',
@@ -237,7 +253,7 @@ describe('moves the queue refuses', () => {
   const ALLOWED: Record<keyof typeof MOVES, readonly Entry['status'][]> = {
     redeeming: ['pending', 'redeeming'],
     redeemed: ['redeeming', 'spent'],
-    spent: ['pending', 'redeeming', 'untrusted-mint', 'failed'],
+    spent: ['redeeming', 'untrusted-mint', 'failed'],
     'untrusted-mint': ['pending', 'redeeming'],
     failed: ['redeeming'],
     retry: ['pending', 'redeeming'],

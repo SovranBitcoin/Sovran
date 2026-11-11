@@ -71,10 +71,8 @@ const BACKDATING_WINDOW_SEC = 2 * 24 * 60 * 60 + 60 * 60;
 
 const queuePort: DmEcashQueuePort = {
   has: (tokenHash) => tokenHash in useNutDropRedeemQueueStore.getState().byTokenHash,
-  enqueue: (tokenHash, entry) => useNutDropRedeemQueueStore.getState().enqueue(tokenHash, entry),
-  markSpent: (tokenHash) => useNutDropRedeemQueueStore.getState().markStatus(tokenHash, 'spent'),
-  park: (tokenHash) =>
-    useNutDropRedeemQueueStore.getState().markStatus(tokenHash, 'untrusted-mint'),
+  enqueue: (tokenHash, entry, status) =>
+    useNutDropRedeemQueueStore.getState().enqueue(tokenHash, entry, status),
 };
 
 /** `null` when the wallet cannot be asked yet. */

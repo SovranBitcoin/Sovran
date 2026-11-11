@@ -47,11 +47,21 @@ export interface MeshRedeemEntry {
 }
 
 /**
- * What can happen to an entry, by the status it ends in, plus the two moves
- * back into line: `retry` (an attempt failed and may be tried again, or the
- * attempts ran out) and `requeue` (the person, or a newly trusted mint, puts
- * a held entry back). A new entry starts `pending` and no move leads there
- * otherwise.
+ * What a new entry is queued as: in line, or, when the message intake already
+ * asked before queueing, held for review or spent. Only a new entry is given
+ * one; a writer whose token was queued first by another path leaves that
+ * entry as it is.
+ */
+export type MeshRedeemArrival = Extract<
+  MeshRedeemStatus,
+  "pending" | "untrusted-mint" | "spent"
+>;
+
+/**
+ * What can happen to an entry already queued, by the status it ends in, plus
+ * the two moves back into line: `retry` (an attempt failed and may be tried
+ * again, or the attempts ran out) and `requeue` (the person, or a newly
+ * trusted mint, puts a held entry back). No move leads to `pending` otherwise.
  */
 export type MeshRedeemMove =
   Exclude<MeshRedeemStatus, "pending"> | "retry" | "requeue";
@@ -68,10 +78,9 @@ const MESH_REDEEM_MOVES: Record<MeshRedeemMove, readonly MeshRedeemStatus[]> = {
   // Only the drain, after the receive succeeded. From `spent` too: a probe
   // that ran while this wallet's own receive was finishing saw it spent.
   redeemed: ["redeeming", "spent"],
-  // The message intake's probe, the drain's receive, or the reconcile of a
-  // held entry redeemed by hand.
-  spent: ["pending", "redeeming", "untrusted-mint", "failed"],
-  // The message intake, or the drain's trust check.
+  // The drain's receive, or the reconcile of a held entry redeemed by hand.
+  spent: ["redeeming", "untrusted-mint", "failed"],
+  // Only the drain's trust check, before it starts or resumes a receive.
   "untrusted-mint": ["pending", "redeeming"],
   // The mint refused the drain's receive.
   failed: ["redeeming"],

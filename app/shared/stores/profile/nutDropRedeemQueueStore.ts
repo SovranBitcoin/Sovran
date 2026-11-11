@@ -6,6 +6,7 @@ import {
   MESH_REDEEM_MAX_ATTEMPTS,
   MESH_REDEEM_STATUSES,
   meshRedeemPhase,
+  type MeshRedeemArrival,
   type MeshRedeemEntry,
   type MeshRedeemMove,
   type MeshRedeemStatus,
@@ -55,7 +56,12 @@ interface NutDropRedeemQueueState {
 }
 
 interface NutDropRedeemQueueActions {
-  /** Idempotent on token hash — mesh re-delivery never duplicates an entry. */
+  /**
+   * Adds a new entry, as `status` (in line unless the caller already knows
+   * better). Idempotent on token hash: re-delivery never duplicates an entry,
+   * and a token already queued keeps its entry, status and all. True only
+   * when this call created the entry.
+   */
   enqueue: (
     tokenHash: string,
     entry: Pick<
@@ -68,7 +74,8 @@ interface NutDropRedeemQueueActions {
       | 'paymentId'
       | 'source'
       | 'senderPubkey'
-    >
+    >,
+    status?: MeshRedeemArrival
   ) => boolean;
   /** Refused, and logged, when the entry's status is not one the move may start from. */
   markStatus: (
@@ -201,7 +208,7 @@ export const useNutDropRedeemQueueStore = create<NutDropRedeemQueueStore>({
       byTokenHash: {},
       recoveredCopy: null,
 
-      enqueue: (tokenHash, entry) => {
+      enqueue: (tokenHash, entry, status = 'pending') => {
         if (get().byTokenHash[tokenHash]) return false;
         if (!fitsNutDropQueue(tokenHash, entry)) {
           storeLog.warn('store.nut_drop_queue.enqueue_refused', {
@@ -214,13 +221,14 @@ export const useNutDropRedeemQueueStore = create<NutDropRedeemQueueStore>({
           tokenHash: tokenHash.slice(0, 12),
           mintUrl: entry.mintUrl,
           amount: entry.amount,
+          status,
         });
         set((state) => ({
           byTokenHash: {
             ...state.byTokenHash,
             [tokenHash]: {
               ...entry,
-              status: 'pending',
+              status,
               attempts: 0,
               nextAttemptAt: 0,
               receivedAt: Date.now(),

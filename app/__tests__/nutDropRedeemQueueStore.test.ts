@@ -111,6 +111,8 @@ describe('nutDropRedeemQueueStore', () => {
 
   it('marks statuses and records errors', () => {
     useNutDropRedeemQueueStore.getState().enqueue(HASH, ENTRY);
+    // The mint's "spent" answers a receive the drain started.
+    useNutDropRedeemQueueStore.getState().markStatus(HASH, 'redeeming');
     useNutDropRedeemQueueStore.getState().markStatus(HASH, 'spent', 'already spent');
     expect(useNutDropRedeemQueueStore.getState().byTokenHash[HASH]).toMatchObject({
       status: 'spent',
