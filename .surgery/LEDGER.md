@@ -576,3 +576,25 @@ have been taken on that list yet.
 Not verified: nothing was run on iOS or Android; no real upgrade was run (no saved shape changed); the surveys did
 not read every file (each lists what it skipped, among them most of `shared/ui`, the large stores and much of the
 feed UI); the unmeasured speed-ups are listed, not made.
+
+## Decisions (owner, 2026-11-12, after sweep 1)
+
+None of these is built yet. Each names the follow-up it settles.
+
+| Decision                                                                                                                                                         | Settles                       |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- |
+| Run the released app and the new one on simulators, upgrade one to the other and try the payment screens. Use Claude Fable 5.2 or Codex GPT-6.1 Sol for it.      | F228 in part, the upgrade run |
+| Follow: show that a follow is waiting to sync; after a relay has failed several reads in a row, read and publish without it.                                     | F227, F239 (1)                |
+| Pay again after a failed Lightning payment: show the new fee first; a second tap pays.                                                                           | F243 (wallet B3)              |
+| Offline check: use the phone's own connection signal if it can be made right on both iOS and Android; otherwise use whether Nostr relays answer. Not one server. | F243 (stores B2)              |
+| AI Regenerate and Retry follow the same confirm-spend rule as a normal send.                                                                                     | F243 (messaging I2)           |
+| The backup reminder counts every currency.                                                                                                                       | F243 (stores B5)              |
+| White Noise invitations: look back three days.                                                                                                                   | F243 (messaging B1)           |
+| The four unused actions (un-hide a post, unblock a signer app, the NFC armed flag, composer content warning and mention): delete all four.                       | F241, pass 3 C3               |
+| Unreachable feed and wallet code that only tests exercise: delete it and its tests.                                                                              | F245 (unreachable)            |
+| The wallet package is only for this app: remove the entry-file exports nothing imports.                                                                          | pass 3 C1                     |
+| Profile, relay list, mute list and follows share one rule: read the latest copy, change it, publish to the relays read, wait when that cannot be done.           | F240, pass 3 C5               |
+| Merging: the owner merges the stacked pull requests, oldest first; they are kept up to date and reported when ready.                                             | all open pull requests        |
+
+Still without a ruling: the rest of F243 and F244, the saved-but-unread fields and the unmeasured speed-ups in F245,
+pass 3 C2 (two facade reads with no caller) and C4 (one writer for the saved profile list).
