@@ -93,8 +93,6 @@ async function publishPoll(ndk: NDK, state: ComposerSnapshot): Promise<PublishOu
 interface ComposedDraft {
   blocks: readonly ComposerBlock[];
   target: ComposerTarget;
-  mentionPubkeys?: readonly string[];
-  contentWarning?: string;
 }
 
 /**
@@ -109,8 +107,6 @@ export async function publishComposed(ndk: NDK, draft: ComposedDraft): Promise<P
   const note = buildNoteEvent({
     blocks: draft.blocks,
     target: draft.target,
-    mentionPubkeys: draft.mentionPubkeys,
-    contentWarning: draft.contentWarning,
   });
   if (note.content.trim().length === 0 && !note.tags.some((t) => t[0] === 'imeta')) {
     return 'empty';
@@ -209,8 +205,6 @@ export function usePublishNote(): () => Promise<PublishOutcome> {
     const outcome = await publishComposed(ndk, {
       blocks: state.blocks,
       target: state.target ?? { mode: 'new' },
-      mentionPubkeys: state.mentionPubkeys,
-      contentWarning: state.contentWarning,
     });
     if (outcome === 'ok') useComposerStore.getState().close();
     return outcome;

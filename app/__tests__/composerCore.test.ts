@@ -127,31 +127,11 @@ describe('buildNoteEvent', () => {
     expect(note.tags).toContainEqual(['p', 'qpub']);
   });
 
-  it('adds explicit and sensitive-media content warnings', () => {
-    const explicit = buildNoteEvent({
-      blocks: [text('1', 'x')],
-      target: { mode: 'new' },
-      contentWarning: 'nsfw',
-    });
-    expect(explicit.tags).toContainEqual(['content-warning', 'nsfw']);
-
+  it('adds a content warning for sensitive media', () => {
     const sensitive = buildNoteEvent({
       blocks: [{ ...image('2', 'https://cdn/y.jpg'), sensitive: true }],
       target: { mode: 'new' },
     });
     expect(sensitive.tags).toContainEqual(['content-warning']);
-  });
-
-  it('dedupes mention p tags', () => {
-    const note = buildNoteEvent({
-      blocks: [text('1', 'hey')],
-      target: { mode: 'new' },
-      mentionPubkeys: ['a', 'a', 'b'],
-    });
-    const pTags = note.tags.filter((t) => t[0] === 'p');
-    expect(pTags).toEqual([
-      ['p', 'a'],
-      ['p', 'b'],
-    ]);
   });
 });

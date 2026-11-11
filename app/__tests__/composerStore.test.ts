@@ -32,8 +32,6 @@ describe('opening and closing the draft', () => {
     state().setBlockText(firstTextId(), 'left over');
     state().addMediaBlock({ kind: 'media', mediaKind: 'image', localUri: 'file://x' });
     state().setPoll({ options: [], type: 'singlechoice' });
-    state().setContentWarning('spoilers');
-    state().addMention('someone');
 
     state().open(
       { mode: 'reply', parentId: PARENT.id, parentPubkey: 'author' },
@@ -42,9 +40,7 @@ describe('opening and closing the draft', () => {
 
     expect(state()).toMatchObject({
       target: { mode: 'reply', parentId: PARENT.id },
-      contentWarning: undefined,
       poll: undefined,
-      mentionPubkeys: [],
       parentEvent: PARENT,
       parentProfile: { name: 'Author' },
     });
@@ -103,24 +99,11 @@ describe('editing the draft', () => {
     expect(state().blocks.map((b) => b.id)).toEqual([firstTextId(), two]);
   });
 
-  it('records each mentioned pubkey once', () => {
-    state().addMention('x');
-    state().addMention('y');
-    state().addMention('x');
-    expect(state().mentionPubkeys).toEqual(['x', 'y']);
-  });
-
-  it('sets and clears the poll and the content warning', () => {
+  it('sets and clears the poll', () => {
     state().setPoll({ options: [], type: 'multiplechoice', endsAt: 5 });
-    state().setContentWarning('nsfw');
-    expect(state()).toMatchObject({
-      poll: { type: 'multiplechoice', endsAt: 5 },
-      contentWarning: 'nsfw',
-    });
+    expect(state()).toMatchObject({ poll: { type: 'multiplechoice', endsAt: 5 } });
 
     state().setPoll(undefined);
-    state().setContentWarning(undefined);
     expect(state().poll).toBeUndefined();
-    expect(state().contentWarning).toBeUndefined();
   });
 });
