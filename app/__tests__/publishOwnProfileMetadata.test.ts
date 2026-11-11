@@ -472,3 +472,41 @@ it('allows removing an identity without network verification', async () => {
   expect(verifyNip05).not.toHaveBeenCalled();
   expect(useOwnProfileMetadataStore.getState().latest?.content).not.toHaveProperty('nip05');
 });
+
+describe('the profile a save builds on, and where it is sent', () => {
+  it('builds on an older profile one relay sent while another has not answered in three seconds', async () => {
+    jest.useFakeTimers();
+    const ndk = makeNdk();
+    ndk.subscription.start.mockImplementation(async () => {
+      // Relay two holds the newer profile, with an about and a lud16, and never answers.
+      ndk.subscription.relayFilters.set('wss://two.example/', []);
+      ndk.subscription.emit('event', {
+        pubkey,
+        kind: 0,
+        id: 'c'.repeat(64),
+        created_at: 20,
+        content: JSON.stringify({ name: 'Old' }),
+      });
+      ndk.eose();
+    });
+    const pending = publish(ndk);
+    await jest.advanceTimersByTimeAsync(3000);
+    const result = await pending;
+    jest.useRealTimers();
+
+    // QUIRK (F240 D5): the save is built on the partial read and published.
+    expect(result.isOk()).toBe(true);
+    expect(JSON.parse(jest.mocked(publishEvent).mock.calls[0][0].event.content)).toEqual({
+      name: 'Old',
+      display_name: 'New',
+    });
+  });
+
+  it('sends a save to the write relays held, or the defaults, whichever relays were read', async () => {
+    await publish();
+    // QUIRK (F240): with no write relays held, the defaults, none of which was asked by name.
+    expect(jest.mocked(publishEvent).mock.calls[0][0].relays).toEqual(
+      jest.requireActual('@/shared/lib/nostr/outbox/defaults').DEFAULT_RELAYS
+    );
+  });
+});
