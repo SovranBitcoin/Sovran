@@ -61,7 +61,13 @@ export function useMintContacts(
 
   // Load mint info and filter for those with nostr contacts
   useEffect(() => {
-    if (mints.length === 0) return;
+    if (mints.length === 0) {
+      // No run follows to replace the rows or end the loading of the run this
+      // one cancelled.
+      setMintsWithInfo([]);
+      setMintInfoLoading(false);
+      return;
+    }
     let cancelled = false;
     if (loadedRef.current?.getMintInfo !== getMintInfo) {
       loadedRef.current = { getMintInfo, byUrl: new Map() };

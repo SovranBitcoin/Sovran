@@ -119,3 +119,33 @@ it('loads every mint again when the wallet hands over a new getMintInfo', async 
   await waitFor(() => expect(result.current.displayMints[0].mintInfo.name).toBe('other wallet'));
   expect(after).toHaveBeenCalledTimes(2);
 });
+
+it('clears the contacts when the last mint is removed', async () => {
+  const getMintInfo = jest.fn(async (url: string) => infoFor(url));
+  const { result, rerender } = render({ mints: [mint('a')], getMintInfo });
+  await waitFor(() => expect(result.current.displayMints).toHaveLength(1));
+
+  rerender({ mints: [], getMintInfo });
+
+  await waitFor(() => expect(result.current.displayMints).toEqual([]));
+  expect(result.current.mintPubkeys).toEqual([]);
+  expect(result.current.mintInfoLoading).toBe(false);
+});
+
+it('stops loading when the last mint is removed while its info is still being read', async () => {
+  let release!: (info: GetInfoResponse) => void;
+  const getMintInfo = jest.fn(
+    () =>
+      new Promise<GetInfoResponse>((resolve) => {
+        release = resolve;
+      })
+  );
+  const { result, rerender } = render({ mints: [mint('a')], getMintInfo });
+  await waitFor(() => expect(result.current.mintInfoLoading).toBe(true));
+
+  rerender({ mints: [], getMintInfo });
+  await act(async () => release(infoFor('https://a.example')));
+
+  expect(result.current.mintInfoLoading).toBe(false);
+  expect(result.current.displayMints).toEqual([]);
+});
