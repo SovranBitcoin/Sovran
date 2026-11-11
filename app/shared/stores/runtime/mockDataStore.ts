@@ -485,15 +485,7 @@ export function purgeLegacyMockData() {
       const entries = state.entries.filter(
         (entry) => !MOCK.scanEntries.some((fixture) => fixture.id === entry.id)
       );
-      if (entries.length === state.entries.length) return state;
-      return {
-        entries,
-        entriesByTransactionId: Object.fromEntries(
-          entries
-            .filter((entry) => entry.transactionId)
-            .map((entry) => [entry.transactionId!, entry])
-        ),
-      };
+      return entries.length === state.entries.length ? state : { entries };
     });
   });
   afterHydrationOnce(useSwapTransactionsStore, () => {

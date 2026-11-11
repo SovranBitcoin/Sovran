@@ -725,8 +725,7 @@ describe('wallpaper-store: a catalog with more albums or wallpapers than the lim
  * no error (`app/shared/blocks/AppGate.tsx:220,223`), so no released path is
  * known to write a long one: this pins the store boundary only. 0.1.3 read
  * limit :41, which rejected the whole record. Repaired: an over-long error is
- * read as none, and `setRestoreStatus` clips a new one
- * (`walletLifecycleTransitions.test.ts`).
+ * read as none, and this build writes no error at all.
  */
 describe('wallet-lifecycle: a restore error longer than 500', () => {
   const KEY = 'wallet-lifecycle';

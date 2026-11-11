@@ -119,7 +119,7 @@ function stubFetch402(body: unknown) {
 
 describe('402 → balance truth-sync', () => {
   beforeEach(() => {
-    useRoutstrStore.getState().setApiKey('sk-test');
+    useRoutstrStore.setState({ apiKey: 'sk-test' });
     // A provider is a precondition now: nothing is sent until one is picked.
     setRoutstrNodeBaseUrl('https://node.example');
   });

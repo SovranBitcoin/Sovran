@@ -21,7 +21,6 @@ type NotificationPolicyState = {
 type NotificationPolicyActions = {
   setPolicy: (policy: FeedNotificationPolicy) => void;
   setReplyScope: (replyScope: FeedNotificationReplyScope) => void;
-  resetNotificationPolicy: () => void;
 };
 
 type NotificationPolicyStore = NotificationPolicyState & NotificationPolicyActions;
@@ -59,12 +58,6 @@ export const useNotificationPolicyStore = create<NotificationPolicyStore>({
         storeLog.info('feed.notification_reply_scope.set', { replyScope });
         set({ replyScope });
       },
-
-      resetNotificationPolicy: () =>
-        set({
-          policy: DEFAULT_NOTIFICATION_POLICY,
-          replyScope: DEFAULT_NOTIFICATION_REPLY_SCOPE,
-        }),
     }),
     persistConfig({
       name: 'notification-policy-store',

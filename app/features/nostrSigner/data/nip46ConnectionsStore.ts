@@ -225,13 +225,6 @@ export interface UpsertAppInput {
   grants?: Partial<Record<GrantKey, Nip46Grant>>;
 }
 
-interface UpdateMetadataInput {
-  name?: string;
-  url?: string;
-  image?: string;
-  relays?: string[];
-}
-
 export type UpsertAppError = 'invalid_pubkey' | 'invalid_relays' | 'app_limit_reached';
 type SetGrantError = 'unknown_app' | 'invalid_grant_key' | 'critical_always_forbidden';
 type SetPeerDecryptGrantError =
@@ -302,8 +295,6 @@ interface Nip46ConnectionsActions {
   /** Deletes EVERY record — the hub's Reset Remote Login. */
   clearAll: () => void;
   renameApp: (clientPubkey: string, name: string) => void;
-  /** Re-pair metadata refresh — only call after user approval (blocks rename-phishing). */
-  updateMetadataAfterApproval: (clientPubkey: string, meta: UpdateMetadataInput) => void;
 }
 
 type Nip46ConnectionsStore = Nip46ConnectionsState & Nip46ConnectionsActions;
@@ -663,17 +654,6 @@ export const useNip46ConnectionsStore = create<Nip46ConnectionsStore>({
               return rest;
             }
             return { ...app, name: sanitized };
-          });
-        },
-
-        updateMetadataAfterApproval: (clientPubkey, meta) => {
-          patchApp(clientPubkey, (app) => {
-            const relays = meta.relays ? sanitizeRelays(meta.relays) : null;
-            return {
-              ...app,
-              ...sanitizedAppMetadata(meta),
-              ...(relays !== null && { relays }),
-            };
           });
         },
       };

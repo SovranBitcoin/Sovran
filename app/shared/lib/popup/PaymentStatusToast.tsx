@@ -33,7 +33,7 @@ const SEGMENT_FONT_SIZE = 13;
  * react to confirmation/failure).
  */
 function ToastAmountText({ amount, unit, color }: { amount: number; unit: string; color: string }) {
-  const displayBtc = useSettingsStore((s) => s.getDisplayBtc());
+  const displayBtc = useSettingsStore((s) => s.displayBtc);
   const formatted = formatAmount({ amount, unit }, { useUserPreference: true });
   // Mirrors `decorate` in AmountFormatter.tsx — only sat amounts get a
   // ₿ prefix or ⚡︎ suffix, depending on the user's display preference.

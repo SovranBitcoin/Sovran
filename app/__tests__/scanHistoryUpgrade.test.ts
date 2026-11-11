@@ -67,14 +67,16 @@ describe('scan history upgrade past the limits', () => {
     );
 
     const store = await loadStore();
-    const { entries, entriesByTransactionId } = store.getState();
+    const { entries } = store.getState();
+    const linked = (transactionId: string) =>
+      entries.find((e) => e.transactionId === transactionId);
 
     // The oldest scan holds the only link to its transaction, and the
     // annotation import reads these after loading.
     expect(entries).toHaveLength(501);
-    expect(entriesByTransactionId['tx-0'].raw).toBe('lnbc1scan0');
-    expect(entriesByTransactionId['tx-1'].raw).toBe('lnbc1scan1');
-    expect(entriesByTransactionId['tx-500'].raw).toBe('lnbc1scan500');
+    expect(linked('tx-0')?.raw).toBe('lnbc1scan0');
+    expect(linked('tx-1')?.raw).toBe('lnbc1scan1');
+    expect(linked('tx-500')?.raw).toBe('lnbc1scan500');
   });
 
   it('keeps a scan whose string is longer than a new scan may be', async () => {
@@ -85,10 +87,9 @@ describe('scan history upgrade past the limits', () => {
     ]);
 
     const store = await loadStore();
-    const { entries, entriesByTransactionId } = store.getState();
+    const { entries } = store.getState();
 
     expect(entries.map((e) => e.transactionId)).toEqual(['tx-0', 'tx-1', 'tx-2']);
-    expect(Object.keys(entriesByTransactionId).sort()).toEqual(['tx-0', 'tx-1', 'tx-2']);
   });
 
   it('comes back under the limit the next time a scan is added', async () => {
@@ -134,7 +135,6 @@ describe('scan history upgrade past the limits', () => {
     const store = await loadStore();
 
     expect(store.getState().entries).toEqual(entries);
-    expect(store.getState().entriesByTransactionId['tx-b'].raw).toBe(entries[0].raw);
     expect(mockMemory[STORAGE_KEY]).toBe(before);
   });
 

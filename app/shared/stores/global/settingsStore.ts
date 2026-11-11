@@ -268,9 +268,7 @@ interface SettingsActions {
   setLastKnownAppVersion: (version: NonNullable<SettingsState['lastKnownAppVersion']>) => void;
   // Display settings
   setDisplayBtc: (display: number) => void;
-  getDisplayBtc: () => number;
   setDisplayCurrency: (currency: DisplayCurrency) => void;
-  getDisplayCurrency: () => DisplayCurrency;
 
   // Experimental features
   setExperimental: (experimental: boolean) => void;
@@ -340,12 +338,10 @@ export const useSettingsStore = create<SettingsStore>({ name: 'settings-store', 
           storeLog.info('store.settings.set_display_btc', { display });
           set({ displayBtc: display });
         },
-        getDisplayBtc: () => get().displayBtc,
         setDisplayCurrency: (currency: DisplayCurrency) => {
           storeLog.info('store.settings.set_display_currency', { currency });
           set({ displayCurrency: currency });
         },
-        getDisplayCurrency: () => get().displayCurrency,
 
         // Experimental
         setExperimental: (experimental: boolean) => {

@@ -26,7 +26,7 @@ interface WalletLifecycleState {
   lastRestoreError: string | null;
 
   markSeedCreatedNow: () => void;
-  setRestoreStatus: (status: RestoreStatus, error?: string | null) => void;
+  setRestoreStatus: (status: RestoreStatus) => void;
   markRestoreComplete: () => void;
 }
 
@@ -44,7 +44,7 @@ const PersistedWalletLifecycleStore = z.object({
   restoreStatus: z.enum(RESTORE_STATUSES).default('unknown').catch('unknown'),
   lastRestoreAt: z.number().int().nonnegative().nullable().default(null),
   // An error too long to read is read as none: rejecting it would discard the
-  // whole record, `seedCreatedAt` included. New errors are clipped on write.
+  // whole record, `seedCreatedAt` included.
   lastRestoreError: z.string().max(MAX_RESTORE_ERROR).nullable().default(null).catch(null),
 });
 
@@ -69,11 +69,7 @@ export const useWalletLifecycleStore = create<WalletLifecycleState>({
       markSeedCreatedNow: () =>
         set((s) => (s.seedCreatedAt == null ? { seedCreatedAt: Date.now() } : s)),
 
-      setRestoreStatus: (status, error = null) =>
-        set({
-          restoreStatus: status,
-          lastRestoreError: error?.slice(0, MAX_RESTORE_ERROR) ?? null,
-        }),
+      setRestoreStatus: (status) => set({ restoreStatus: status, lastRestoreError: null }),
 
       markRestoreComplete: () =>
         set({ restoreStatus: 'complete', lastRestoreAt: Date.now(), lastRestoreError: null }),

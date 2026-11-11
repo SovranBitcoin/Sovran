@@ -45,7 +45,6 @@ interface ComposerState {
   addMediaBlock: (block: Omit<MediaBlock, 'id'>) => string;
   updateBlock: (id: string, patch: Partial<MediaBlock>) => void;
   removeBlock: (id: string) => void;
-  moveBlock: (from: number, to: number) => void;
   setContentWarning: (cw: string | undefined) => void;
   setPoll: (poll: PollDraft | undefined) => void;
   addMention: (pubkey: string) => void;
@@ -98,14 +97,6 @@ export const useComposerStore = create<ComposerState>({
     }),
 
   removeBlock: (id) => set({ blocks: get().blocks.filter((b) => b.id !== id) }),
-
-  moveBlock: (from, to) => {
-    const blocks = [...get().blocks];
-    if (from < 0 || from >= blocks.length || to < 0 || to >= blocks.length) return;
-    const [moved] = blocks.splice(from, 1);
-    blocks.splice(to, 0, moved);
-    set({ blocks });
-  },
 
   setContentWarning: (cw) => set({ contentWarning: cw }),
   setPoll: (poll) => set({ poll }),

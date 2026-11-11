@@ -48,9 +48,5 @@ describe('feed preference stores', () => {
     useNotificationPolicyStore.getState().setReplyScope('THREAD');
     expect(useNotificationPolicyStore.getState().policy).toBe('MODERATE');
     expect(useNotificationPolicyStore.getState().replyScope).toBe('THREAD');
-
-    useNotificationPolicyStore.getState().resetNotificationPolicy();
-    expect(useNotificationPolicyStore.getState().policy).toBe('RELAXED');
-    expect(useNotificationPolicyStore.getState().replyScope).toBe('DIRECT');
   });
 });

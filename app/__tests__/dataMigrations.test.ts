@@ -43,7 +43,7 @@ describe('v0.1.0 transaction side-data migration', () => {
     await Promise.all(stores.map((store) => store.persist.rehydrate()));
     useDataMigrationStore.setState({ level: 0 });
     useTransactionAnnotationStore.setState({ annotations: {} });
-    useScanHistoryStore.setState({ entries: [], entriesByTransactionId: {} });
+    useScanHistoryStore.setState({ entries: [] });
     useTransactionDistributionStore.setState({ distributions: {} });
     useTransactionLocationStore.setState({ locations: {} });
     useSwapTransactionsStore.setState({ groups: {}, quoteIdToGroup: {} });

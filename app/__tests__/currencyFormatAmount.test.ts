@@ -14,7 +14,7 @@ jest.mock('@/shared/stores/global/pricelistStore', () => ({
 
 jest.mock('@/shared/stores/global/settingsStore', () => ({
   useSettingsStore: {
-    getState: () => ({ getDisplayBtc: () => mockDisplayBtc }),
+    getState: () => ({ displayBtc: mockDisplayBtc }),
   },
 }));
 

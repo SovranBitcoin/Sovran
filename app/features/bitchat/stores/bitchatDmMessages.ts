@@ -153,10 +153,6 @@ interface BitchatDmMessagesStore {
   applyDeliveryStatus(event: BLEDeliveryStatusEvent): void;
   /** The 15 s watchdog fired for `messageID`; true when that moved the message. */
   markTimedOut(messageID: string): boolean;
-  /** Get the current thread for a peer (stable reference until next change). */
-  getForPeer(peerID: string): BleDmMessage[];
-  /** Reset a thread (e.g. when the user clears the conversation). */
-  clearForPeer(peerID: string): void;
 }
 
 function reportedEvent(event: BLEDeliveryStatusEvent): DeliveryEvent {
@@ -360,20 +356,6 @@ export const useBitchatDmMessagesStore = create<BitchatDmMessagesStore>({
         if (byPeer) set({ byPeer });
         return !!byPeer;
       },
-      getForPeer: (peerID) => get().byPeer[peerID] ?? [],
-      clearForPeer: (peerID) =>
-        set((state) => {
-          if (!state.byPeer[peerID]) {
-            bitchatLog.debug('bitchat.dm.thread.clear.skipped_missing', { peerID });
-            return state;
-          }
-          const { [peerID]: _removed, ...rest } = state.byPeer;
-          bitchatLog.info('bitchat.dm.thread.clear', {
-            peerID,
-            removedCount: state.byPeer[peerID]?.length ?? 0,
-          });
-          return { byPeer: rest };
-        }),
     }),
     persistConfig<BitchatDmMessagesStore, PersistedSlice>({
       name: 'bitchat-dm-messages-store',

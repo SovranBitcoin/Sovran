@@ -102,7 +102,7 @@ describe('Routstr response credentials', () => {
     async (_, run) => {
       const fetchMock = jest.spyOn(globalThis, 'fetch');
       for (const status of [200, 402, 500]) {
-        useRoutstrStore.getState().setApiKey('cashuA-test-original');
+        useRoutstrStore.setState({ apiKey: 'cashuA-test-original' });
         fetchMock.mockResolvedValueOnce(response(status));
         await run('cashuA-test-original').catch(() => undefined);
         expect(useRoutstrStore.getState().apiKey).toBe('cashuB-test-change');
@@ -130,7 +130,7 @@ describe('Routstr response credentials', () => {
   });
 
   it.each(operations)('%s never overwrites an sk key', async (_, run) => {
-    useRoutstrStore.getState().setApiKey('sk-test');
+    useRoutstrStore.setState({ apiKey: 'sk-test' });
     jest.spyOn(globalThis, 'fetch').mockResolvedValueOnce(response());
     await run('sk-test');
     expect(useRoutstrStore.getState().apiKey).toBe('sk-test');
@@ -141,7 +141,7 @@ describe('Routstr response credentials', () => {
     async (change) => {
       jest.spyOn(globalThis, 'fetch').mockImplementationOnce(async () => {
         if (change === 'profile') mockProfile = 1;
-        if (change === 'key') useRoutstrStore.getState().setApiKey('cashuB-newer');
+        if (change === 'key') useRoutstrStore.setState({ apiKey: 'cashuB-newer' });
         if (change === 'node') setRoutstrNodeBaseUrl('https://other-node.example');
         return response(401, 'Expired key');
       });
