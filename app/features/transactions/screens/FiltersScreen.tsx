@@ -38,6 +38,8 @@ import {
   SWITCHABLE_UNITS,
 } from 'wallet';
 import { useActiveUnit } from '@/features/wallet/hooks/useActiveUnit';
+import { belongsToAccount } from '@/shared/lib/cashu/accountScope';
+import { useIsTestnutMint } from '@/shared/stores/global/mintTestnutStore';
 
 type Status = 'All' | 'Confirmed' | 'Pending' | 'Expired';
 type SourceFilter = 'all' | ScanMethod;
@@ -106,6 +108,7 @@ export function FiltersScreen() {
   useLifecycleLogger('FiltersScreen');
   const { trustedMints } = useMints();
   const { history } = useHistoryWithMelts();
+  const isTestnutMint = useIsTestnutMint();
   // Every real account, plus the testnut accounts this wallet actually has.
   const { availableUnits } = useActiveUnit();
   const currencyTabs = [
@@ -202,7 +205,8 @@ export function FiltersScreen() {
     const normalizedCurrency = currency.toLowerCase();
 
     const filteredTransactions = history.filter((historyEntry: HistoryEntry) => {
-      if (normalizedCurrency !== 'all' && historyEntry.unit !== normalizedCurrency) return false;
+      // The list's account scope, so a test account counts what it then shows.
+      if (!belongsToAccount(normalizedCurrency, historyEntry, isTestnutMint)) return false;
       if (mintUrl !== 'all' && historyEntry.mintUrl !== mintUrl) return false;
 
       // Swap legs are surfaced as a single grouped row (annotation-driven).
@@ -230,7 +234,19 @@ export function FiltersScreen() {
     });
 
     return filteredTransactions.length;
-  }, [currency, direction, history, mintUrl, paymentType, source, lock, counterparty, zap, status]);
+  }, [
+    currency,
+    direction,
+    history,
+    isTestnutMint,
+    mintUrl,
+    paymentType,
+    source,
+    lock,
+    counterparty,
+    zap,
+    status,
+  ]);
 
   return (
     <ScreenWrapper
