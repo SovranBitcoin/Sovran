@@ -248,6 +248,64 @@ describe('after a restart', () => {
     expect(thread(PEER_B)[0].deliveryStatus).toBe('read');
   });
 
+  it('reads back every saved status and reason, and writes back only the restart demotion', async () => {
+    store().appendIncoming(incoming('seed', 0));
+    await settle();
+    const key = [...mockAsync.keys()].find((k) => k.startsWith('bitchat-dm-messages-store'))!;
+    const saved = JSON.parse(mockAsync.get(key)!);
+    const own = (id: string, deliveryStatus: string, failureReason?: string) => ({
+      ...outgoing(id, 1),
+      isPending: deliveryStatus === 'sending',
+      deliveryStatus,
+      ...(failureReason ? { failureReason } : {}),
+    });
+    saved.state.byPeer = {
+      [PEER_A]: [
+        own('sending', 'sending'),
+        own('sent', 'sent'),
+        own('delivered', 'delivered'),
+        own('read', 'read'),
+        own('timeout', 'failed', 'timeout'),
+        own('restart', 'failed', 'app_restart'),
+        own('native', 'failed', 'handshake-timeout'),
+        own('bare', 'failed'),
+      ],
+    };
+    useBitchatDmMessagesStore.setState({ byPeer: {} });
+    await settle();
+    mockAsync.set(key, JSON.stringify(saved));
+    await useBitchatDmMessagesStore.persist.rehydrate();
+    await settle();
+
+    const rows = (list: BleDmMessage[]) =>
+      list.map((m) => [m.id, m.deliveryStatus, m.failureReason, m.isPending]);
+    const expected = [
+      ['sending', 'failed', 'app_restart', false],
+      ['sent', 'failed', 'app_restart', false],
+      ['delivered', 'delivered', undefined, false],
+      ['read', 'read', undefined, false],
+      ['timeout', 'failed', 'timeout', false],
+      ['restart', 'failed', 'app_restart', false],
+      ['native', 'failed', 'handshake-timeout', false],
+      ['bare', 'failed', undefined, false],
+    ];
+    expect(rows(thread())).toEqual(expected);
+    expect(rows(JSON.parse(mockAsync.get(key)!).state.byPeer[PEER_A])).toEqual(expected);
+
+    for (const m of thread()) status(m.id, 'delivered');
+    // QUIRK (F212, D1): a saved failure is final whatever its reason.
+    expect(thread().map((m) => m.deliveryStatus)).toEqual([
+      'failed',
+      'failed',
+      'delivered',
+      'read',
+      'failed',
+      'failed',
+      'failed',
+      'failed',
+    ]);
+  });
+
   it('loads a saved status this release does not know as failed', async () => {
     store().appendOutgoing({ ...outgoing('o1', 1), deliveryStatus: 'delivered' }, PEER_A);
     await settle();

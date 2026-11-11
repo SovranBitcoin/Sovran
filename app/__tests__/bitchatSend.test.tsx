@@ -440,6 +440,26 @@ describe('Bluetooth direct message (ble-dm)', () => {
     expect(thread()[0]).toMatchObject({ deliveryStatus: 'sent', isPending: false });
   });
 
+  it('a late sent or delivered after the 15 s watchdog leaves the row failed', async () => {
+    const { result } = await mount(undefined, 'ble-dm', { dm: { peerID: BLE_PEER } });
+    await act(async () => {
+      await result.current.sendMessage('hello peer');
+    });
+    act(() => {
+      jest.advanceTimersByTime(15_000);
+    });
+    const messageID = thread()[0]!.id;
+
+    act(() => {
+      useBitchatDmMessagesStore.getState().applyDeliveryStatus({ messageID, status: 'sent' });
+      useBitchatDmMessagesStore.getState().applyDeliveryStatus({ messageID, status: 'delivered' });
+    });
+
+    // QUIRK (F212, D1): the watchdog's guess is final, so a message the peer
+    // received still offers a retry.
+    expect(thread()[0]).toMatchObject({ deliveryStatus: 'failed', failureReason: 'timeout' });
+  });
+
   it('the watchdog fires after the chat is closed', async () => {
     const { result, unmount } = await mount(undefined, 'ble-dm', { dm: { peerID: BLE_PEER } });
     await act(async () => {
