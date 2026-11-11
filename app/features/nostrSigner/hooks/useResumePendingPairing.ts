@@ -24,6 +24,7 @@
 
 import { useEffect, useRef } from 'react';
 
+import { useNip46ConnectionsStore } from '@/features/nostrSigner/data/nip46ConnectionsStore';
 import { useNip46RequestsStore } from '@/features/nostrSigner/data/nip46RequestsStore';
 import { nip46Engine } from '@/features/nostrSigner/lib/nip46Engine';
 import { parseNostrconnectUri } from '@/features/nostrSigner/lib/nip46Uri';
@@ -32,9 +33,8 @@ import {
   type TakePairingIntentOutcome,
 } from '@/features/nostrSigner/lib/pairingIntentStorage';
 import { nostrLog } from '@/shared/lib/logger';
+import { useStoreLoadLatched } from '@/shared/lib/persist/hydrationOutcome';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
-
-import { useNip46ConnectionsHydrated } from './useNostrSignerService';
 
 function handleOutcome(outcome: TakePairingIntentOutcome): void {
   const requests = useNip46RequestsStore.getState();
@@ -73,7 +73,7 @@ function handleOutcome(outcome: TakePairingIntentOutcome): void {
 
 export function useResumePendingPairing(): void {
   const { keys } = useNostrKeysContext();
-  const connectionsHydrated = useNip46ConnectionsHydrated();
+  const connectionsHydrated = useStoreLoadLatched(useNip46ConnectionsStore.persist);
   const attemptedRef = useRef(false);
 
   useEffect(() => {

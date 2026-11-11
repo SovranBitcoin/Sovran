@@ -18,13 +18,14 @@
  * home for the person to review (`ParkedMessageEcash`).
  */
 
-import { useEffect, useRef, useSyncExternalStore } from 'react';
+import { useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
 
 import { drainNutDropRedeemQueue } from '@/features/nearPay/lib/nutDropAutoRedeem';
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { getActiveProfilePubkey } from '@/shared/lib/cashu/profileScopedStorage';
 import { paymentLog, redactError } from '@/shared/lib/logger';
+import { useStoreLoad } from '@/shared/lib/persist/hydrationOutcome';
 import { giftWrapCache } from '@/shared/lib/nostr/giftWrapCache';
 import { nip04Cache } from '@/shared/lib/nostr/nip04Cache';
 import { cashuP2pkPubkeyFromNostrHex } from '@/shared/lib/protocolIds';
@@ -86,26 +87,6 @@ async function probeSpent(token: string): Promise<boolean | null> {
   return isTokenSpent(CocoManager.getInstance(), token);
 }
 
-/**
- * True once the queue has been read from storage for the active profile.
- * Until then the store holds an empty default: a token queued into it would
- * be written over what is on disk, then dropped when the stored map loads.
- */
-function useQueueHydrated(): boolean {
-  return useSyncExternalStore(
-    (onChange) => {
-      const offStart = useNutDropRedeemQueueStore.persist.onHydrate(onChange);
-      const offEnd = useNutDropRedeemQueueStore.persist.onFinishHydration(onChange);
-      return () => {
-        offStart();
-        offEnd();
-      };
-    },
-    () => useNutDropRedeemQueueStore.persist.hasHydrated(),
-    () => false
-  );
-}
-
 const queueEntries = () => useNutDropRedeemQueueStore.getState().byTokenHash;
 
 function useDmEcashAutoRedeem(): void {
@@ -119,7 +100,9 @@ function useDmEcashAutoRedeem(): void {
   );
   const pubkey = keys?.pubkey;
   const privateKey = keys?.privateKey;
-  const queueReady = useQueueHydrated();
+  // Until the queue is read for this profile it holds an empty default: a token
+  // queued into it would be written over what is on disk.
+  const queueReady = useStoreLoad(useNutDropRedeemQueueStore.persist) === 'loaded';
   const { isOffline } = useOfflineStatus();
   const wasOffline = useRef(isOffline);
 

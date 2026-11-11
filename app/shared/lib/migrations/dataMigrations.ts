@@ -25,6 +25,7 @@ import { useTransactionLocationStore } from '@/shared/stores/profile/transaction
 import { useSwapTransactionsStore } from '@/shared/stores/profile/swapTransactionsStore';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { storeLog } from '@/shared/lib/logger';
+import { whenLoaded } from '@/shared/lib/persist/hydrationOutcome';
 
 interface DataMigrationStep {
   /** Stable, human-readable name (logging only; ordering is by array index). */
@@ -57,7 +58,7 @@ export async function runDataMigrations(): Promise<void> {
       throw new Error('Active profile changed during data migration');
     }
   };
-  await whenHydrated(useDataMigrationStore);
+  await whenLoaded(useDataMigrationStore);
   const start = useDataMigrationStore.getState().level;
   for (let i = start; i < DATA_MIGRATIONS.length; i++) {
     const step = DATA_MIGRATIONS[i];
@@ -78,26 +79,14 @@ export async function runDataMigrations(): Promise<void> {
   }
 }
 
-async function whenHydrated(store: {
-  persist: { hasHydrated: () => boolean; onFinishHydration: (cb: () => void) => () => void };
-}): Promise<void> {
-  if (store.persist.hasHydrated()) return;
-  await new Promise<void>((resolve) => {
-    const unsub = store.persist.onFinishHydration(() => {
-      unsub();
-      resolve();
-    });
-  });
-}
-
 // v0.1.0 stored these fields separately. Fill gaps; current annotations win.
 async function importLegacyTransactionSideData(assertActiveProfile: () => void): Promise<void> {
   await Promise.all([
-    whenHydrated(useTransactionAnnotationStore),
-    whenHydrated(useScanHistoryStore),
-    whenHydrated(useTransactionDistributionStore),
-    whenHydrated(useTransactionLocationStore),
-    whenHydrated(useSwapTransactionsStore),
+    whenLoaded(useTransactionAnnotationStore),
+    whenLoaded(useScanHistoryStore),
+    whenLoaded(useTransactionDistributionStore),
+    whenLoaded(useTransactionLocationStore),
+    whenLoaded(useSwapTransactionsStore),
   ]);
 
   assertActiveProfile();

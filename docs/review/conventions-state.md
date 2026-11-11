@@ -8,9 +8,9 @@ Scope: `**/*.tsx`, `**/hooks/**/*.ts`, `**/use*.ts`
 
 Persisted stores hydrate asynchronously here (AsyncStorage behind the migration gate), so until `persist.hasHydrated()` is true every read returns the in-code default, not the user's data.
 
-Does `hunk` take an irreversible or user-visible decision — a redirect or `router.*` call, showing a terms, onboarding, backup or CTA prompt, starting a network request, or publishing — from the value of a persisted Zustand store inside an effect or at mount, with no check of that store's `persist.hasHydrated()` / `onFinishHydration`, a `_hasHydrated` field, or an ancestor gate that the hunk shows?
+Does `hunk` take an irreversible or user-visible decision — a redirect or `router.*` call, showing a terms, onboarding, backup or CTA prompt, starting a network request, or publishing — from the value of a persisted Zustand store inside an effect or at mount, with no check of that store's load (`useStoreLoad`, `useStoreLoadLatched`, `onceLoaded` / `whenLoaded` from `shared/lib/persist/hydrationOutcome.ts`, `persist.hasHydrated()`), a `_hasHydrated` field, or an ancestor gate that the hunk shows?
 
-Allowed cases: The component renders below a gate that already waits for that store (`AppGate` for `settingsStore`, `ThemeProvider` for wallpaper/theme, `CtaHost`, `useWalletLifecycleHydrated`); the hook follows the house pattern `useState(() => store.persist.hasHydrated())` + `onFinishHydration` + re-check; purely presentational reads where showing the default for a frame is harmless (theme, sort order, toggles); non-persisted runtime stores; `createQueryCacheStore` reads, whose `hydrate(key)` is awaited explicitly.
+Allowed cases: The component renders below a gate that already waits for that store (`AppGate` for `settingsStore`, `ThemeProvider` for wallpaper/theme, `CtaHost`, `RestoreGate`); the hook gates on `useStoreLoad` or `useStoreLoadLatched`; purely presentational reads where showing the default for a frame is harmless (theme, sort order, toggles); non-persisted runtime stores; `createQueryCacheStore` reads, whose `hydrate(key)` is awaited explicitly.
 
 ## persist/early-write
 
@@ -20,7 +20,7 @@ A write to a persisted store before hydration finishes is overwritten in memory 
 
 Does `hunk` call an action or `setState` of a persisted Zustand store from module scope, a store initialiser, app bootstrap, a migration or a mount effect, where nothing in the hunk shows that hydration has finished (`persist.hasHydrated()`, `onFinishHydration`, `afterHydrate`, an awaited hydration helper)?
 
-Allowed cases: Writes made in response to a user action on a screen rendered below the hydration gate; writes inside `afterHydrate` / `onFinishHydration` callbacks; writes wrapped in `withSkippedPersistWrites`; stores without `persist`; helpers that await hydration first (`whenHydrated` in `shared/lib/migrations/dataMigrations.ts`, `refreshVertex`).
+Allowed cases: Writes made in response to a user action on a screen rendered below the hydration gate; writes inside `afterHydrate` / `onFinishHydration` callbacks; writes wrapped in `withSkippedPersistWrites`; stores without `persist`; helpers that wait for the load first (`onceLoaded` / `whenLoaded`, as `runDataMigrations` and `refreshVertex` do).
 
 ## persist/after-hydrate
 

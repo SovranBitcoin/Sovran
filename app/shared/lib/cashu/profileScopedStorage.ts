@@ -17,6 +17,7 @@ import {
   profilePersistWritesBlocked,
   trackProfilePersistWrite,
 } from '@/shared/lib/persist/profileWriteBarrier';
+import { whenLoaded } from '@/shared/lib/persist/hydrationOutcome';
 import { persistRegistry } from '@/shared/lib/persist/persistConfig';
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -56,17 +57,6 @@ export function signalMigrationsComplete(): void {
   _migrationGateResolve = null;
 }
 
-/** Wait for profileStore hydration to complete before reading profiles. */
-async function ensureProfileStoreHydrated(): Promise<void> {
-  if (useProfileStore.persist.hasHydrated()) return;
-  await new Promise<void>((resolve) => {
-    const unsub = useProfileStore.persist.onFinishHydration(() => {
-      unsub();
-      resolve();
-    });
-  });
-}
-
 /** The profile whose key the scoped stores are reading and writing under now. */
 export function getActiveProfilePubkey(): string | undefined {
   const state = useProfileStore.getState();
@@ -87,7 +77,7 @@ export class NoProfileYetError extends Error {
 /** Capture after migrations/hydration, before starting an owner-bound service. */
 export async function captureProfileStorageOwner(): Promise<string> {
   await _migrationGate;
-  await ensureProfileStoreHydrated();
+  await whenLoaded(useProfileStore);
   const pubkey = getActiveProfilePubkey();
   if (!pubkey) throw new NoProfileYetError();
   return pubkey;
@@ -155,7 +145,7 @@ export function createProfileScopedStorage(
     return trackProfilePersistWrite(
       (async () => {
         await _migrationGate;
-        await ensureProfileStoreHydrated();
+        await whenLoaded(useProfileStore);
         // No profile existed when this was called (first launch): use whichever
         // exists now, or the bare key if there is still none.
         await mutate(keyFor(name, pubkey ?? getActiveProfilePubkey()));
@@ -167,7 +157,7 @@ export function createProfileScopedStorage(
     profileStorageOwner: ownerPubkey,
     getItem: async (name: string) => {
       await _migrationGate;
-      await ensureProfileStoreHydrated();
+      await whenLoaded(useProfileStore);
       const pubkey = ownerPubkey ?? getActiveProfilePubkey();
       const value = await AsyncStorage.getItem(keyFor(name, pubkey));
       // Recorded only once the read has succeeded, and only for a store that

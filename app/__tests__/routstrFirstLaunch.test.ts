@@ -90,14 +90,14 @@ async function coldStart() {
     require('@/shared/lib/migrations/globalMigrations') as typeof import('@/shared/lib/migrations/globalMigrations');
   const { signalMigrationsComplete } =
     require('@/shared/lib/cashu/profileScopedStorage') as typeof import('@/shared/lib/cashu/profileScopedStorage');
-  const { hydrationSettled } =
+  const { whenLoaded } =
     require('@/shared/lib/persist/hydrationOutcome') as typeof import('@/shared/lib/persist/hydrationOutcome');
   const { useProfileStore } =
     require('@/shared/stores/global/profileStore') as typeof import('@/shared/stores/global/profileStore');
 
   await runGlobalMigrations();
   signalMigrationsComplete();
-  const loaded = await hydrationSettled(useRoutstrStore);
+  const loaded = await whenLoaded(useRoutstrStore, { orFailed: true });
   await settle();
   return {
     store: useRoutstrStore,

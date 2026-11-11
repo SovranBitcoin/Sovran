@@ -67,7 +67,7 @@ jest.mock('@/shared/stores/profile/nutDropRedeemQueueStore', () => ({
     getState: () => ({ byTokenHash: {} }),
     persist: {
       hasHydrated: () => mockHydrated,
-      onHydrate: () => () => undefined,
+      getOptions: () => ({ name: 'nut-drop-redeem-queue' }),
       onFinishHydration: (listener: () => void) => {
         mockHydrationListeners.add(listener);
         return () => mockHydrationListeners.delete(listener);

@@ -305,14 +305,6 @@ export const storeRegistryManifest = [
     profileStorage: false,
   },
   {
-    file: 'shared/stores/global/settingsStore.ts',
-    name: 'useSettingsHydration',
-    scope: 'global',
-    persisted: false,
-    queryCache: false,
-    profileStorage: false,
-  },
-  {
     file: 'shared/stores/global/walletLifecycleStore.ts',
     name: 'wallet-lifecycle',
     scope: 'global',

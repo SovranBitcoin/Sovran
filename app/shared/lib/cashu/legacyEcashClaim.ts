@@ -20,7 +20,7 @@ import {
 import { legacyEcashMint } from '@/shared/lib/cashu/legacyEcashMint';
 import { getStoredProofsBySecrets } from '@/shared/lib/cashu/managerInternals';
 import { cashuLog } from '@/shared/lib/logger';
-import { hydrationSettled } from '@/shared/lib/persist/hydrationOutcome';
+import { whenLoaded } from '@/shared/lib/persist/hydrationOutcome';
 import { REDUX_ERA_ROW } from '@/shared/lib/nostr/reduxEraRoot';
 import { retrieveMnemonic } from '@/shared/lib/nostr/secureStorage';
 import {
@@ -240,8 +240,8 @@ async function claimOnce(manager: Manager, isLive: () => boolean): Promise<void>
   // Without the records there is no telling what was already tried, and
   // without the profiles no telling whose ecash this is.
   const loaded = await Promise.all([
-    hydrationSettled(useLegacyEcashStore),
-    hydrationSettled(useProfileStore),
+    whenLoaded(useLegacyEcashStore, { orFailed: true }),
+    whenLoaded(useProfileStore, { orFailed: true }),
   ]);
   if (loaded.includes(false) || !isLive()) return;
 

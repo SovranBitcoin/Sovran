@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
@@ -6,6 +6,7 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { getAiProviders } from '@/shared/lib/apiClient';
 import { aiLog, SHOW_LOGS } from '@/shared/lib/logger';
 import { buildProviderInfoHref } from '@/shared/lib/nav/providerInfoRoutes';
+import { useStoreLoad } from '@/shared/lib/persist/hydrationOutcome';
 import { paramPopup } from '@/shared/lib/popup';
 import { discoverProviders } from '@/shared/lib/routstr/discovery';
 import {
@@ -79,11 +80,6 @@ const keyExtractor = (row: ProviderRow) => row.baseUrl;
 
 /** A tap is a person waiting, not a background sweep. Short enough that a dead
  *  provider does not hold the choice hostage, long enough for a slow radio. */
-/** The persisted directory's hydration, as an external store for the gate above the list. */
-const subscribeDirectoryHydration = (onChange: () => void) =>
-  useAiProviderDirectoryStore.persist.onFinishHydration(onChange);
-const readDirectoryHydrated = () => useAiProviderDirectoryStore.persist.hasHydrated();
-
 const TAP_PROBE_TIMEOUT_MS = 6_000;
 
 /** How long probe results pool before the list is told. Short enough to read
@@ -227,11 +223,7 @@ export function ProviderListScreen() {
   // The saved directory decides the order, and it is read from storage
   // asynchronously; until it has, the list shows nothing rather than a local
   // ranking that jumps into nagg's order a moment later.
-  const directoryHydrated = useSyncExternalStore(
-    subscribeDirectoryHydration,
-    readDirectoryHydrated,
-    readDirectoryHydrated
-  );
+  const directoryHydrated = useStoreLoad(useAiProviderDirectoryStore.persist) === 'loaded';
   const rows = useProviderRows(probed, directory, directoryHydrated);
 
   // Every input this render read, by reference. `cause` in the log is the set

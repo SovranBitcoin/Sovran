@@ -27,7 +27,6 @@ jest.mock('@/shared/lib/nostr/secureStorage', () => ({
 }));
 
 jest.mock('@/shared/stores/global/settingsStore', () => ({
-  useSettingsHydration: () => 'ready',
   useSettingsStore: Object.assign(
     (selector: (s: unknown) => unknown) => selector({ hasSeenOnboarding: false }),
     {
@@ -43,9 +42,11 @@ jest.mock('@/shared/stores/global/settingsStore', () => ({
 jest.mock('@/shared/stores/global/walletLifecycleStore', () => ({
   useWalletLifecycleStore: Object.assign(
     (selector: (s: unknown) => unknown) => selector({ seedCreatedAt: mockLifecycle.seedCreatedAt }),
-    { getState: () => ({ seedCreatedAt: mockLifecycle.seedCreatedAt }) }
+    {
+      getState: () => ({ seedCreatedAt: mockLifecycle.seedCreatedAt }),
+      persist: { hasHydrated: () => true, onFinishHydration: () => () => {} },
+    }
   ),
-  useWalletLifecycleHydrated: () => true,
 }));
 
 jest.mock('@/shared/providers/NostrKeysProvider', () => ({
