@@ -24,6 +24,10 @@ import {
   useRelayListStore,
 } from '@/shared/lib/nostr/outbox/relayListStore';
 import { DEFAULT_RELAYS } from '@/shared/lib/nostr/outbox/defaults';
+import {
+  SILENT_READS_BEFORE_LEFT_OUT,
+  forgetSilentRelays,
+} from '@/shared/lib/nostr/ownReplaceableEvent';
 
 type FakeEvent = {
   kind: number;
@@ -217,6 +221,7 @@ beforeEach(() => {
       },
     },
   };
+  forgetSilentRelays();
   mockPublishEvent.mockReset();
   mockPublishEvent.mockReturnValue(okAsync({ accepted: [] }));
   mockSeedPool.mockReset();
@@ -506,33 +511,35 @@ describe('a discovery that did not finish', () => {
     }
   );
 
-  it('treats a read the relays did not finish answering in 12 s as unanswered, not as no list', async () => {
+  it('treats a read the relays did not finish answering in 12 s as unanswered, not as no list, and reads again', async () => {
     mockRelays.set(NOS, 'silent');
     const view = await mountAndWait(A);
     await waitOutRead();
     expect(getKnownOwnWriteRelays(A)).toBeNull();
     expect(mockPublishEvent).not.toHaveBeenCalled();
 
+    // The second read began at once, while NOS was still silent; the third hears it.
     mockRelays.delete(NOS);
-    await act(async () => triggers['returning to the foreground']());
+    await waitOutRead();
     expect(getKnownOwnWriteRelays(A)).toEqual([...DEFAULT_RELAYS]);
     expect(mockPublishEvent).toHaveBeenCalledTimes(1);
+    expect(mockPublishEvent.mock.calls[0][0].relays).toEqual([...DEFAULT_RELAYS]);
     view.unmount();
   });
 
-  it('stays unanswered, attempt after attempt, while one default relay never answers', async () => {
+  it('reads without a default relay silent three reads in a row, and publishes the defaults to the others', async () => {
     mockRelays.set(NOS, 'silent');
     const view = await mountAndWait(A);
-    await waitOutRead();
-    for (let attempt = 0; attempt < 4; attempt++) {
-      await act(async () => triggers['returning to the foreground']());
-      await waitOutRead();
-    }
-
-    // QUIRK (F239): one silent default keeps a new account's list unpublished
-    // and every follow waiting for the session.
+    for (let read = 1; read < SILENT_READS_BEFORE_LEFT_OUT; read++) await waitOutRead();
     expect(getKnownOwnWriteRelays(A)).toBeNull();
-    expect(mockPublishEvent).not.toHaveBeenCalled();
+
+    await waitOutRead();
+    expect(getKnownOwnWriteRelays(A)).toEqual([...DEFAULT_RELAYS]);
+    expect(mockPublishEvent).toHaveBeenCalledTimes(1);
+    const { event, relays } = mockPublishEvent.mock.calls[0][0];
+    // The list still names every default; only the silent one is not sent it.
+    expect(event.tags).toEqual(DEFAULT_RELAYS.map((url) => ['r', url]));
+    expect(relays).toEqual(DEFAULT_RELAYS.filter((url) => url !== NOS));
     view.unmount();
   });
 
@@ -551,44 +558,51 @@ describe('a discovery that did not finish', () => {
     view.unmount();
   });
 
-  it('asks again every relay an earlier attempt asked, though a partial answer has replaced them', async () => {
+  describe('when the saved write relay that holds the newer list is down', () => {
     // R, the saved write relay, holds the newer list but is down; a default
     // relay answers with an older list that names S instead.
     const R = 'wss://mine.example';
     const S = 'wss://stale.example';
-    useRelayListStore.setState({
-      entries: [{ url: R, read: true, write: true }],
-      source: 'relay',
-      updatedAt: 100,
-      hasPublished: true,
+    beforeEach(() => {
+      useRelayListStore.setState({
+        entries: [{ url: R, read: true, write: true }],
+        source: 'relay',
+        updatedAt: 100,
+        hasPublished: true,
+      });
+      mockRelays.set(R, 'silent');
+      mockRelays.set(DAMUS, { events: [relayList(A, 400, [S])] });
     });
-    mockRelays.set(R, 'silent');
-    mockRelays.set(DAMUS, { events: [relayList(A, 400, [S])] });
-    const view = await mountAndWait(A);
-    await waitOutRead();
-    // The partial answer is shown, but is not known.
-    expect(store().entries.map((e) => e.url)).toEqual([S]);
-    expect(getKnownOwnWriteRelays(A)).toBeNull();
 
-    // Every relay but R answers the retry: still not known.
-    let asked = mockAsked.length;
-    await act(async () => triggers['returning to the foreground']());
-    await waitOutRead();
-    expect(mockAsked.slice(asked).map((a) => a.relays?.[0])).toEqual(
-      expect.arrayContaining([R, S, ...DEFAULT_RELAYS])
-    );
-    expect(getKnownOwnWriteRelays(A)).toBeNull();
+    it('asks again every relay an earlier attempt asked, though a partial answer has replaced them', async () => {
+      const view = await mountAndWait(A);
+      await waitOutRead();
+      // The partial answer is shown, but is not known.
+      expect(store().entries.map((e) => e.url)).toEqual([S]);
+      expect(getKnownOwnWriteRelays(A)).toBeNull();
 
-    // R answers with the newer list: that is the account's list.
-    mockRelays.set(R, { events: [relayList(A, 900, ['wss://new.example'])] });
-    asked = mockAsked.length;
-    await act(async () => triggers['returning to the foreground']());
-    expect(mockAsked.slice(asked).map((a) => a.relays?.[0])).toEqual(
-      expect.arrayContaining([R, S, ...DEFAULT_RELAYS])
-    );
-    expect(getKnownOwnWriteRelays(A)).toEqual(['wss://new.example']);
-    expect(mockPublishEvent).not.toHaveBeenCalled();
-    view.unmount();
+      // The next read began at once; every relay but R answers it: still not known.
+      const asked = mockAsked.length;
+      mockRelays.set(R, { events: [relayList(A, 900, ['wss://new.example'])] });
+      await waitOutRead();
+      expect(mockAsked.slice(asked).map((a) => a.relays?.[0])).toEqual(
+        expect.arrayContaining([R, S, ...DEFAULT_RELAYS])
+      );
+      // R answers the read after with the newer list: that is the account's list.
+      expect(getKnownOwnWriteRelays(A)).toEqual(['wss://new.example']);
+      expect(mockPublishEvent).not.toHaveBeenCalled();
+      view.unmount();
+    });
+
+    it('takes the older list as known once R has been silent three reads in a row', async () => {
+      const view = await mountAndWait(A);
+      for (let read = 0; read < SILENT_READS_BEFORE_LEFT_OUT; read++) await waitOutRead();
+
+      // The risk the owner accepted (F227, F239): the newer list on R is overruled.
+      expect(getKnownOwnWriteRelays(A)).toEqual([S]);
+      expect(mockPublishEvent).not.toHaveBeenCalled();
+      view.unmount();
+    });
   });
 
   it('is not tried again once it has finished', async () => {

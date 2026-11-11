@@ -23,6 +23,10 @@ import {
   requestFollowSync,
 } from '@/shared/lib/nostr/followSync';
 import { DEFAULT_RELAYS } from '@/shared/lib/nostr/outbox/defaults';
+import {
+  SILENT_READS_BEFORE_LEFT_OUT,
+  forgetSilentRelays,
+} from '@/shared/lib/nostr/ownReplaceableEvent';
 import { useRelayListStore } from '@/shared/lib/nostr/outbox/relayListStore';
 import { useFollowSync } from '@/shared/lib/nostr/ownsync/useFollowSync';
 import {
@@ -272,6 +276,11 @@ function publishedTags(call = 0): string[][] {
   return mockPublish.mock.calls[call][0].event.tags;
 }
 
+/** Let `reads` reads end, each by its relays' silence (12 s). */
+async function readsTimeOut(reads: number) {
+  for (let read = 0; read < reads; read++) await jest.advanceTimersByTimeAsync(12_001);
+}
+
 function switchAccount() {
   mockProfile.activeAccountIndex = 1;
   for (const listener of mockProfileListeners) listener(mockProfile);
@@ -292,6 +301,7 @@ beforeEach(async () => {
   mockHookNdk = null;
   mockOffline = false;
   mockDisk.clear();
+  forgetSilentRelays();
   useNostrSocialStore.setState(useNostrSocialStore.getInitialState(), true);
   await useNostrSocialStore.persist.rehydrate();
   useRelayListStore.setState(useRelayListStore.getInitialState(), true);
@@ -600,34 +610,79 @@ describe('following someone', () => {
     expect(social().optimisticFollowsByPubkey).toEqual({});
   });
 
-  it('keeps the follow when a write relay does not answer and no list is saved', async () => {
+  it('keeps the follow while a write relay has not answered and no list is saved', async () => {
     jest.useFakeTimers();
     mockStored.set(mockRelays[0].url, []);
     const { ndk } = setup();
 
     tap(Z);
     const run = requestFollowSync(ndk, OWN);
-    await jest.advanceTimersByTimeAsync(12_001);
-    await run;
+    await readsTimeOut(SILENT_READS_BEFORE_LEFT_OUT - 1);
 
     expect(mockPublish).not.toHaveBeenCalled();
     expect(social().optimisticFollowsByPubkey[Z]?.pending).toBe(true);
+
+    // Silent three reads in a row: relay two is left out, never relay one,
+    // whose "I hold nothing" is an answer, and is the whole answer now.
+    await readsTimeOut(1);
+    await run;
+    expect(mockPublish).toHaveBeenCalledTimes(1);
+    expect(mockPublish.mock.calls[0][0].relays).toEqual([mockRelays[0].url]);
+    expect(publishedTags()).toEqual([['p', Z]]);
   });
 
-  it('keeps waiting, read after read, while one write relay never answers', async () => {
+  it('reads and publishes without a write relay that did not answer three reads in a row', async () => {
     jest.useFakeTimers();
     // Relay two never answers; relay one holds the list.
     mockStored.set(mockRelays[0].url, [contacts(T, [['p', X]])]);
     const { ndk } = setup();
 
     tap(Z);
-    for (let read = 0; read < 5; read++) {
-      const run = requestFollowSync(ndk, OWN);
-      await jest.advanceTimersByTimeAsync(12_001);
-      await run;
-    }
+    const run = requestFollowSync(ndk, OWN);
+    // Each silent read is followed by another at once, without waiting for a trigger.
+    await readsTimeOut(SILENT_READS_BEFORE_LEFT_OUT);
+    await run;
 
-    // QUIRK (F227): a dead write relay holds every follow back for the session.
+    expect(mockPublish).toHaveBeenCalledTimes(1);
+    expect(mockPublish.mock.calls[0][0].relays).toEqual([mockRelays[0].url]);
+    expect(publishedTags()).toEqual([
+      ['p', X],
+      ['p', Z],
+    ]);
+    expect(social().optimisticFollowsByPubkey).toEqual({});
+  });
+
+  it('asks a left-out relay again, and reads and publishes with it once it answers', async () => {
+    jest.useFakeTimers();
+    mockStored.set(mockRelays[0].url, [contacts(T, [['p', X]])]);
+    const { ndk } = setup();
+    tap(Z);
+    const first = requestFollowSync(ndk, OWN);
+    await readsTimeOut(SILENT_READS_BEFORE_LEFT_OUT);
+    await first;
+    expect(mockPublish.mock.calls[0][0].relays).toEqual([mockRelays[0].url]);
+
+    // Relay two answers the probe the next read sends it, after that read is over.
+    mockStored.set(mockRelays[1].url, []);
+    tap(Y);
+    await requestFollowSync(ndk, OWN);
+    expect(mockPublish.mock.calls[1][0].relays).toEqual([mockRelays[0].url]);
+
+    tap(W);
+    await requestFollowSync(ndk, OWN);
+    expect(mockPublish.mock.calls[2][0].relays).toEqual(mockRelays.map((relay) => relay.url));
+  });
+
+  it('waits on every relay when all of them are silent, and stops reading again', async () => {
+    jest.useFakeTimers();
+    const { ndk } = setup();
+
+    tap(Z);
+    const run = requestFollowSync(ndk, OWN);
+    await readsTimeOut(SILENT_READS_BEFORE_LEFT_OUT + 1);
+    await run;
+
+    expect(mockFilters).toHaveLength(2 * (SILENT_READS_BEFORE_LEFT_OUT + 1));
     expect(mockPublish).not.toHaveBeenCalled();
     expect(social().optimisticFollowsByPubkey[Z]?.pending).toBe(true);
   });
@@ -640,14 +695,15 @@ describe('following someone', () => {
 
     tap(Z);
     const run = requestFollowSync(ndk, OWN);
-    await jest.advanceTimersByTimeAsync(12_001);
+    await readsTimeOut(SILENT_READS_BEFORE_LEFT_OUT);
     await run;
 
+    // Without relay two the read is complete, and the saved list is newer than it.
     expect(mockPublish).not.toHaveBeenCalled();
     expect(social().optimisticFollowsByPubkey[Z]?.pending).toBe(true);
   });
 
-  it('waits when an older list answers and the relay holding the newer one times out', async () => {
+  it('waits while the relay holding the newer list times out, then overrules it once left out', async () => {
     jest.useFakeTimers();
     // Relay two holds [X, Y] and never answers; relay one has only the older [X].
     mockStored.set(mockRelays[0].url, [contacts(T, [['p', X]])]);
@@ -655,14 +711,23 @@ describe('following someone', () => {
 
     tap(Z);
     const run = requestFollowSync(ndk, OWN);
-    await jest.advanceTimersByTimeAsync(12_001);
-    await run;
+    await readsTimeOut(SILENT_READS_BEFORE_LEFT_OUT - 1);
 
     expect(mockPublish).not.toHaveBeenCalled();
     expect(social().optimisticFollowsByPubkey[Z]?.pending).toBe(true);
     // The partial answer is not kept as the list a later follow builds on.
     expect(social().contactsUpdatedAt).toBe(0);
     expect(social().contactsTags).toEqual([]);
+
+    await readsTimeOut(1);
+    await run;
+    // The risk the owner accepted (F227): Y, only on the silent relay, is not
+    // in the list relay one now holds.
+    expect(publishedTags()).toEqual([
+      ['p', X],
+      ['p', Z],
+    ]);
+    expect(mockPublish.mock.calls[0][0].relays).toEqual([mockRelays[0].url]);
   });
 
   it('does not settle a tap against a read that did not finish', async () => {
@@ -677,10 +742,14 @@ describe('following someone', () => {
 
     social().setFollowIntent(Z, true);
     const run = requestFollowSync(ndk, OWN);
-    await jest.advanceTimersByTimeAsync(12_001);
-    await run;
-
+    await readsTimeOut(SILENT_READS_BEFORE_LEFT_OUT - 1);
     expect(social().optimisticFollowsByPubkey[Z]?.pending).toBe(true);
+
+    // Complete without the silent relay: the list there holds the follow.
+    await readsTimeOut(1);
+    await run;
+    expect(mockPublish).not.toHaveBeenCalled();
+    expect(social().optimisticFollowsByPubkey).toEqual({});
   });
 
   it('waits when the relays hold no list though one was saved before', async () => {
@@ -1388,19 +1457,20 @@ describe('what wakes a waiting follow', () => {
 
   it('a write relay connecting after it did not answer', async () => {
     jest.useFakeTimers();
-    mockStored.set(mockRelays[0].url, [contacts(T, [['p', X]])]);
+    // Neither relay answers, so the worker reads until each is silent four
+    // times over and stops.
     const { ndk, pool } = setup();
     mockHookNdk = ndk;
     const view = renderHook(() => useFollowSync());
 
     act(() => tap(Z));
     await act(async () => {
-      await jest.advanceTimersByTimeAsync(12_001);
+      await readsTimeOut(SILENT_READS_BEFORE_LEFT_OUT + 1);
     });
     expect(mockPublish).not.toHaveBeenCalled();
 
-    // Relay two is back and answers now.
-    mockStored.set(mockRelays[1].url, [contacts(T, [['p', X]])]);
+    // Both relays are back and answer now.
+    relaysHold(contacts(T, [['p', X]]));
     await act(async () => pool.connect({ url: 'wss://elsewhere.example' }));
     expect(mockPublish).not.toHaveBeenCalled();
     await act(async () => pool.connect(mockRelays[1]));

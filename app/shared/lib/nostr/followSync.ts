@@ -9,7 +9,10 @@
  * result. A follow list replaces the whole previous one on relays, so it only
  * ever builds on the list a complete read just returned (`planFollowPublish`):
  * anything less and the intents wait, to be tried again after hydration, when
- * a list arrives, on returning to the foreground and on the next tap.
+ * a list arrives, on returning to the foreground and on the next tap. A write
+ * relay that does not answer is read again at once until it has been silent
+ * for a few reads in a row; it is then read and published without
+ * (`readNewestOwnEvent`).
  *
  * Two devices publishing at the same moment can still overwrite each other;
  * that is how the list works on Nostr.
@@ -35,6 +38,7 @@ import {
   nextReplaceableCreatedAt,
   readNewestOwnEvent,
   signOwnEvent,
+  worthReadingAgain,
   type OwnEventReadOutcome,
 } from './ownReplaceableEvent';
 import { publishEvent } from './publish';
@@ -288,9 +292,11 @@ async function syncOnce(ndk: NDK, ownPubkey: string): Promise<void> {
         nostrLog.info('nostr.follow.waiting', { reason: 'relay-list-unknown' });
         return;
       }
-      const raw = await readNewestOwnEvent(ndk, ownPubkey, Contacts);
-      const read = decodeRead(raw);
+      const raw = await readNewestOwnEvent(ndk, ownPubkey, Contacts, { leaveOutSilent: true });
       scope.check();
+      // A write relay that stays silent is read without after a few reads in a row.
+      if (worthReadingAgain(raw)) continue;
+      const read = decodeRead(raw);
 
       let intents = selectFollowIntents(social());
       const planOf = (indexed?: IndexedList) => {
@@ -353,10 +359,11 @@ async function syncOnce(ndk: NDK, ownPubkey: string): Promise<void> {
       });
       // A list or seed arrived while signing, also one dated the same second,
       // or the write relays changed since the read: read and build again.
-      if (!sameSavedList(atBase, savedList()) || !sameRelays(raw.relays, ownPubkey)) continue;
+      if (!sameSavedList(atBase, savedList()) || !sameRelays(raw.asked, ownPubkey)) continue;
 
-      // Exactly the relays the complete read covered: a relay that was not read
-      // may hold a newer list, and this one would replace it there.
+      // Exactly the relays the complete read covered: a relay that was not read,
+      // also one left out as silent, may hold a newer list, and this one would
+      // replace it there.
       const published = await publishEvent({
         ndk,
         event,

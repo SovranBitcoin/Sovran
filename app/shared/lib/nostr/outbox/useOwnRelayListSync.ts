@@ -10,10 +10,13 @@
  *
  * Only an answer from every asked relay marks the account's list as discovered
  * for this session, which is what lets the follow worker read and publish
- * (`getKnownOwnWriteRelays`). The device cache is never asked. A read that
- * failed, or that a relay did not finish answering, marks nothing and is tried
- * again on returning to the foreground, when the network comes back and when a
- * relay connects. A retry asks every relay an earlier attempt asked as well as
+ * (`getKnownOwnWriteRelays`). The device cache is never asked. A relay that
+ * does not answer is read again straight away until it has been silent for
+ * `SILENT_READS_BEFORE_LEFT_OUT` reads in a row; the next read goes without it
+ * (`readNewestOwnEvent`), so one dead default relay cannot hold a new account
+ * back. A read that failed, or that still did not finish, marks nothing and is
+ * tried again on returning to the foreground, when the network comes back and
+ * when a relay connects. A retry asks every relay an earlier attempt asked as well as
  * the saved ones now: a partial answer is taken into the store, and may have
  * replaced the saved relay that holds the newer list.
  *
@@ -30,7 +33,7 @@ import type NDK from '@nostr-dev-kit/ndk-mobile';
 
 import { nostrLog } from '@/shared/lib/logger';
 import { publishEvent } from '@/shared/lib/nostr/publish';
-import { readNewestOwnEvent } from '@/shared/lib/nostr/ownReplaceableEvent';
+import { readNewestOwnEvent, worthReadingAgain } from '@/shared/lib/nostr/ownReplaceableEvent';
 import { DEFAULT_RELAYS, normalizeRelayList } from '@/shared/lib/nostr/outbox/defaults';
 import {
   RELAY_LIST_KIND,
@@ -65,24 +68,31 @@ async function syncOwnRelayList(
   isCancelled: () => boolean
 ): Promise<'discovered' | 'unanswered'> {
   try {
-    const current = discoveryRelays();
-    if (!current) return 'unanswered';
-    for (const url of current) asked.add(url);
-    const relays = [...asked];
-    const read = await readNewestOwnEvent(ndk, pubkey, RELAY_LIST_KIND, relays);
-    if (isCancelled()) return 'unanswered';
+    let read: Awaited<ReturnType<typeof readNewestOwnEvent>>;
+    do {
+      const current = discoveryRelays();
+      if (!current) return 'unanswered';
+      for (const url of current) asked.add(url);
+      read = await readNewestOwnEvent(ndk, pubkey, RELAY_LIST_KIND, {
+        relays: [...asked],
+        leaveOutSilent: true,
+      });
+      if (isCancelled()) return 'unanswered';
 
+      if (read.newest) {
+        // A list any relay returned is taken in, even before the others answered.
+        const entries = parseRelayList({ tags: read.newest.tags });
+        useRelayListStore.getState().setFromRelay(entries, read.newest.created_at ?? 0);
+        seedPool(
+          ndk,
+          entries.map((e) => e.url)
+        );
+      }
+      // A relay that stays silent is read without after a few reads in a row.
+    } while (worthReadingAgain(read));
     const { newest } = read;
-    if (newest) {
-      // A list any relay returned is taken in, even before the others answered.
-      const entries = parseRelayList({ tags: newest.tags });
-      useRelayListStore.getState().setFromRelay(entries, newest.created_at ?? 0);
-      seedPool(
-        ndk,
-        entries.map((e) => e.url)
-      );
-    }
-    // Only every asked relay's answer makes the list known, or says there is none.
+    // Only every relay's answer, but those left out as silent, makes the list
+    // known, or says there is none.
     if (read.outcome !== 'complete') {
       nostrLog.warn('nostr.relays.sync_unanswered', { outcome: read.outcome });
       return 'unanswered';
@@ -93,6 +103,9 @@ async function syncOwnRelayList(
     // The relays hold no list: the defaults are the account's list.
     // First-run-publish them (never clobbers).
     if (useRelayListStore.getState().hasPublished) return 'discovered';
+    // Never a relay left out of the read: it may hold a list this one would replace.
+    const targets = DEFAULT_RELAYS.filter((url) => read.relays.includes(url));
+    if (targets.length === 0) return 'discovered';
     const created = Math.floor(Date.now() / 1000);
     const list = new NDKEvent(ndk);
     list.kind = RELAY_LIST_KIND;
@@ -101,7 +114,7 @@ async function syncOwnRelayList(
     const result = await publishEvent({
       ndk,
       event: list,
-      relays: [...DEFAULT_RELAYS],
+      relays: targets,
       resolveOn: 'all-settled',
     });
     if (!isCancelled() && result.isOk()) {
