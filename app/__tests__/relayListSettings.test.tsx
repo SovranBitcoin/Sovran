@@ -233,7 +233,7 @@ jest.mock('@/shared/ui/primitives/Switch', () => ({
     return <Switch value={isSelected} onValueChange={onSelectedChange} {...props} />;
   },
 }));
-jest.mock('@/shared/ui/primitives/Badge', () => ({ Badge: () => null }));
+jest.mock('@/shared/ui/primitives/Badge', () => ({ Badge: jest.requireMock('react-native').Text }));
 jest.mock('heroui-native', () => {
   const { View, Text, TextInput } = jest.requireMock('react-native');
   const ListGroup = Object.assign(
@@ -252,6 +252,28 @@ jest.mock('heroui-native', () => {
 function mount() {
   return render(<RelayListSettings ndk={relayFake()} pubkey={OWN} />);
 }
+
+it.each([undefined, 'connecting'] as const)(
+  'does not label an unchecked or connecting relay offline (%s)',
+  (health) => {
+    render(
+      <RelayListSettings ndk={relayFake()} pubkey={OWN} health={health ? { [MINE]: health } : {}} />
+    );
+    expect(screen.getByText(MINE)).toBeOnTheScreen();
+    expect(screen.queryByText('Offline')).not.toBeOnTheScreen();
+    expect(screen.queryByText('Online')).not.toBeOnTheScreen();
+  }
+);
+
+it('shows the known connection state for relays with an answer', () => {
+  const { rerender } = render(
+    <RelayListSettings ndk={relayFake()} pubkey={OWN} health={{ [MINE]: 'connected' }} />
+  );
+  expect(screen.getByText('Online')).toBeOnTheScreen();
+  rerender(<RelayListSettings ndk={relayFake()} pubkey={OWN} health={{ [MINE]: 'failed' }} />);
+  expect(screen.getByText('Offline')).toBeOnTheScreen();
+  expect(screen.queryByText('Online')).not.toBeOnTheScreen();
+});
 async function start() {
   fireEvent.press(screen.getByRole('button', { name: 'Edit relays' }));
   expect(await screen.findByRole('button', { name: 'Review changes' })).toBeOnTheScreen();

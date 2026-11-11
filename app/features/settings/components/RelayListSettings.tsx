@@ -176,7 +176,7 @@ export function RelayListSettings({
                   <ListGroup.Item>
                     <ListGroup.ItemContent>
                       <ListGroup.ItemTitle>{entry.url}</ListGroup.ItemTitle>
-                      {health ? (
+                      {health?.[entry.url] && health[entry.url] !== 'connecting' ? (
                         <Badge
                           variant={health[entry.url] === 'connected' ? 'success' : 'error'}
                           size={11}>
