@@ -1,0 +1,220 @@
+/**
+ * settled-preview-final.test.ts — a settled preview stays settled
+ *
+ * Once a melt preview is paid, or a payment request preview delivered or left
+ * undelivered (its ecash left and was not taken back), that flow is over: a
+ * second Pay would pay twice. Every event type is listed below against those
+ * three previews. An event either starts another flow (the step leaves the
+ * preview) or changes nothing, and in neither case does a Pay on the old
+ * preview send again. `Record<FlowEvent["type"], …>` makes a new event type
+ * fail to compile here until it is placed in the table.
+ */
+
+import { describe, expect, it } from "vitest";
+
+import { createPaymentMachine } from "../../src/machine/createMachine";
+import { defaultDetectors } from "../../src/detectors";
+import { PaymentRequestUndeliveredError } from "../../src/errors";
+import type {
+  FlowEvent,
+  MachineOperations,
+  StepHandlerMap,
+} from "../../src/machine/types";
+import { createMockOperations, resetTxCounter } from "../_harness/mockOperations";
+import { INPUTS, MINT1, MINT2, WALLETS } from "../_harness/fixtures";
+import type { OperationCall } from "../_harness/types";
+
+function build(operations?: Partial<MachineOperations>) {
+  resetTxCounter();
+  const operationCalls: OperationCall[] = [];
+  const handlerCalls: string[] = [];
+  const handlers = new Proxy({} as StepHandlerMap, {
+    get: (_target, step: string) => () => {
+      handlerCalls.push(step);
+    },
+  });
+  const machine = createPaymentMachine({
+    handlers,
+    detectors: defaultDetectors,
+    getContext: () => WALLETS.default,
+    getUnit: () => "sat",
+    operations: createMockOperations(operations, operationCalls),
+    scanSources: {},
+  });
+  const calls = (name: string) =>
+    operationCalls.filter((call) => call.name === name).length;
+  return { machine, handlerCalls, calls };
+}
+
+type Built = ReturnType<typeof build>;
+
+/** A settled preview, how to reach it, and how to press Pay on it again. */
+type Settled = {
+  name: string;
+  step: "navigateToMeltPreview" | "navigateToPaymentRequest";
+  input: string;
+  optionKind: "lightningAddress" | "paymentRequest";
+  amount: number;
+  /** A mint the flow could be moved to. */
+  otherMint: string;
+  operation: "executeMelt" | "executePaymentRequest";
+  operations?: Partial<MachineOperations>;
+  reach: (tm: Built) => Promise<void>;
+  pay: (tm: Built) => Promise<unknown>;
+};
+
+const SETTLED: Settled[] = [
+  {
+    name: "a paid melt preview",
+    step: "navigateToMeltPreview",
+    input: INPUTS.lightningAddress,
+    optionKind: "lightningAddress",
+    amount: 200,
+    otherMint: MINT2,
+    operation: "executeMelt",
+    reach: async ({ machine }) => {
+      await machine.execute(INPUTS.lightningAddress, { reset: true });
+      await machine.enterAmount({ value: 200, unit: "sat" }, MINT1);
+      await machine.confirmMelt();
+    },
+    pay: ({ machine }) => machine.confirmMelt(),
+  },
+  {
+    name: "a delivered payment request",
+    step: "navigateToPaymentRequest",
+    input: INPUTS.paymentRequestBasic,
+    optionKind: "paymentRequest",
+    amount: 100,
+    // The request names MINT1 alone, so the only mint to move to is MINT1.
+    otherMint: MINT1,
+    operation: "executePaymentRequest",
+    reach: async ({ machine }) => {
+      await machine.execute(INPUTS.paymentRequestBasic, { reset: true });
+      expect((await machine.confirmPaymentRequest()).kind).toBe("delivered");
+    },
+    pay: ({ machine }) => machine.confirmPaymentRequest(),
+  },
+  {
+    name: "an undelivered payment request",
+    step: "navigateToPaymentRequest",
+    input: INPUTS.paymentRequestBasic,
+    optionKind: "paymentRequest",
+    amount: 100,
+    otherMint: MINT1,
+    operation: "executePaymentRequest",
+    operations: {
+      executePaymentRequest: async () => {
+        throw new PaymentRequestUndeliveredError("op-9", new Error("relay down"));
+      },
+    },
+    reach: async ({ machine }) => {
+      await machine.execute(INPUTS.paymentRequestBasic, { reset: true });
+      expect((await machine.confirmPaymentRequest()).kind).toBe("undelivered");
+    },
+    pay: ({ machine }) => machine.confirmPaymentRequest(),
+  },
+];
+
+/** What each event does to a settled preview. */
+const EXPECTED: Record<FlowEvent["type"], "newFlow" | "unchanged"> = {
+  EXECUTE: "newFlow",
+  RESET: "newFlow",
+  START_SEND: "newFlow",
+  START_SEND_ECASH: "newFlow",
+  START_RECEIVE_LIGHTNING: "newFlow",
+  START_RECEIVE: "newFlow",
+  SHOW_RECEIVE_QR: "newFlow",
+  REVIEW_MINT: "newFlow",
+  OPTION_CHOSEN: "unchanged",
+  AMOUNT_ENTERED: "unchanged",
+  MINT_SELECTED: "unchanged",
+  PROOFS_CHOSEN: "unchanged",
+  SEND_MEMO_SUBMITTED: "unchanged",
+  REQUEST_MINT_SELECTOR: "unchanged",
+  MINT_TRUSTED: "unchanged",
+  CONFIRM_MELT: "unchanged",
+  CONFIRM_PAYMENT_REQUEST: "unchanged",
+};
+
+/** One or more events of each type, aimed at the settled flow itself. */
+function eventsOf(type: FlowEvent["type"], s: Settled): FlowEvent[] {
+  switch (type) {
+    case "EXECUTE":
+      return [{ type, input: INPUTS.cashuTokenV3 }];
+    case "RESET":
+    case "START_SEND":
+    case "START_RECEIVE_LIGHTNING":
+    case "START_RECEIVE":
+    case "SHOW_RECEIVE_QR":
+    case "MINT_TRUSTED":
+    case "CONFIRM_MELT":
+    case "CONFIRM_PAYMENT_REQUEST":
+    case "START_SEND_ECASH":
+    case "REQUEST_MINT_SELECTOR":
+      return [{ type }];
+    case "REVIEW_MINT":
+      return [{ type, mintUrl: MINT2, token: INPUTS.cashuTokenV3 }];
+    case "OPTION_CHOSEN":
+      return [
+        { type, option: { kind: s.optionKind, value: s.input, source: "standalone" } },
+      ];
+    case "AMOUNT_ENTERED":
+      return [
+        { type, amount: s.amount, unit: "sat", mintUrl: MINT1 },
+        { type, amount: s.amount, unit: "sat", mintUrl: s.otherMint },
+      ];
+    case "MINT_SELECTED":
+      return [
+        { type, mintUrl: MINT1 },
+        { type, mintUrl: s.otherMint },
+      ];
+    case "PROOFS_CHOSEN":
+      return [{ type, amount: s.amount }];
+    case "SEND_MEMO_SUBMITTED":
+      return [{ type, memo: "again" }];
+    default: {
+      const unreachable: never = type;
+      return unreachable;
+    }
+  }
+}
+
+const TYPES = Object.keys(EXPECTED) as FlowEvent["type"][];
+
+describe.each(SETTLED)("$name", (s) => {
+  it.each(TYPES.filter((type) => EXPECTED[type] === "unchanged"))(
+    "%s changes nothing, and Pay does not send again",
+    async (type) => {
+      for (const event of eventsOf(type, s)) {
+        const tm = build(s.operations);
+        await s.reach(tm);
+        expect(tm.calls(s.operation)).toBe(1);
+        const context = tm.machine.getContext();
+        const handled = tm.handlerCalls.length;
+
+        await tm.machine.send(event);
+        await s.pay(tm);
+
+        expect(tm.calls(s.operation)).toBe(1);
+        expect(tm.machine.getStep()).toBe(s.step);
+        expect(tm.machine.getContext()).toBe(context);
+        expect(tm.handlerCalls).toHaveLength(handled);
+      }
+    },
+  );
+
+  it.each(TYPES.filter((type) => EXPECTED[type] === "newFlow"))(
+    "%s leaves the settled preview for another flow",
+    async (type) => {
+      for (const event of eventsOf(type, s)) {
+        const tm = build(s.operations);
+        await s.reach(tm);
+
+        await tm.machine.send(event);
+
+        expect(tm.machine.getStep()).not.toBe(s.step);
+        expect(tm.calls(s.operation)).toBe(1);
+      }
+    },
+  );
+});

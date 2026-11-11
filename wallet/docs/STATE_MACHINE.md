@@ -485,6 +485,13 @@ MUST NOT:
   second Pay is ignored (for a Lightning address it would fetch a fresh
   invoice and pay twice). A failed attempt leaves the phase `preview`, so Pay
   after a failure still retries.
+- A settled preview (melt `settled`, payment request `settled` or
+  `undelivered`) is final for its flow. Only an event that starts another flow
+  (`EXECUTE`, `RESET`, a `START_*`, `SHOW_RECEIVE_QR`, `REVIEW_MINT`) leaves
+  it; every other event changes nothing, since re-resolving the amount, mint
+  or option would rebuild a preview that Pay sends again
+  (`LEAVES_SETTLED_PREVIEW`, `createMachine.ts`;
+  `__tests__/flows/settled-preview-final.test.ts`).
 - Do not invent a `rolling_back` machine state. `MELT_FAILED` is a defined
   `ErrorCode` but the confirm-melt path never sets `error` with it for
   single-option flows.
@@ -618,7 +625,7 @@ EXECUTE(paymentRequest) / OPTION_CHOSEN(paymentRequest)
         rolledBack -> outcome rolledBack; routeOperationFailure(..,{rolledBack:true})
         thrown     -> outcome undelivered (PaymentRequestUndeliveredError) or failed;
                       undelivered also sets phase undelivered {operationId}, and a
-                      further confirm or mint list request is ignored
+                      further event of the same flow is ignored
                       routeOperationFailure(..)
         stale / locked out -> outcome ignored
    NFC: source==='nfc' on navigateToPaymentRequest -> runNfcWriteBackEffect -> sendComplete
@@ -644,7 +651,8 @@ MUST:
 - `CONFIRM_PAYMENT_REQUEST` is gated on `step === 'navigateToPaymentRequest'` AND
   `operations.executePaymentRequest`. `createMachine.ts:661`. Once the step's
   phase is `settled` or `undelivered`, a further confirm is ignored (outcome
-  `ignored`) instead of sending again.
+  `ignored`) instead of sending again, and the preview is final as for a melt
+  (Section 5.2).
 - On delivery failure the operation must attempt rollback (cancel if `prepared`,
   reclaim if executing/pending) and only return `rolledBack` when that
   cancel-or-reclaim succeeds; otherwise throw `PaymentRequestUndeliveredError`

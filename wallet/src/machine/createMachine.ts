@@ -249,6 +249,35 @@ const INTENT_EVENTS = new Set<FlowEvent["type"]>([
   "RESET",
 ]);
 
+/**
+ * Whether an event may leave a settled preview (paid, delivered, or sent and
+ * not taken back). Those that start another flow may. Any other event would
+ * carry on the settled flow: re-resolve its amount or mint, re-choose its
+ * option, reopen its mint list or Pay again, each rebuilding a preview that
+ * Pay sends a second time. On a settled preview they change nothing.
+ */
+const LEAVES_SETTLED_PREVIEW: Record<FlowEvent["type"], boolean> = {
+  EXECUTE: true,
+  RESET: true,
+  START_SEND: true,
+  START_SEND_ECASH: true,
+  START_RECEIVE_LIGHTNING: true,
+  START_RECEIVE: true,
+  SHOW_RECEIVE_QR: true,
+  // Redeeming a token from an untrusted mint, from a chat or the history,
+  // while the machine still sits on the last payment.
+  REVIEW_MINT: true,
+  OPTION_CHOSEN: false,
+  AMOUNT_ENTERED: false,
+  MINT_SELECTED: false,
+  PROOFS_CHOSEN: false,
+  SEND_MEMO_SUBMITTED: false,
+  REQUEST_MINT_SELECTOR: false,
+  MINT_TRUSTED: false,
+  CONFIRM_MELT: false,
+  CONFIRM_PAYMENT_REQUEST: false,
+};
+
 // ---------------------------------------------------------------------------
 // createPaymentMachine
 // ---------------------------------------------------------------------------
@@ -948,17 +977,19 @@ export function createPaymentMachine(
       unit: flowCtx.unit,
     });
 
-    // A settled preview has no mint left to choose. Opening the selector from
-    // it would replace the step data that says it settled, and the restore
-    // below would then rebuild an unpaid preview that Pay runs a second time.
+    // A settled preview is final for its flow: only another flow leaves it.
     if (
-      event.type === "REQUEST_MINT_SELECTOR" &&
       (step === "navigateToMeltPreview" ||
         step === "navigateToPaymentRequest") &&
-      !awaitsPay((stepData as StepDataMap[typeof step]).phase)
+      !awaitsPay((stepData as StepDataMap[typeof step]).phase) &&
+      !LEAVES_SETTLED_PREVIEW[event.type]
     ) {
-      logger.warn("machine.mintSelector.alreadySettled", { currentStep: step });
-      finishTurn(sendGeneration, "mintSelector.alreadySettled", QUIET_EXIT);
+      logger.info("machine.event.unhandled", {
+        type: event.type,
+        currentStep: step,
+        reason: "previewSettled",
+      });
+      finishTurn(sendGeneration, "previewSettled", QUIET_EXIT);
       return;
     }
 
@@ -1036,15 +1067,10 @@ export function createPaymentMachine(
       operations?.executeMelt
     ) {
       const originalStep = step;
+      // A paid preview never reaches here (see the settled guard above): a
+      // second executeMelt would pay twice. A failed attempt leaves the
+      // phase `preview`, so Pay after a failure still retries.
       const data = stepData as StepDataMap["navigateToMeltPreview"];
-      if (!awaitsPay(data.phase)) {
-        // Already paid. Running executeMelt again would pay twice (for a
-        // Lightning address it fetches a fresh invoice). A failed attempt
-        // leaves the preview, so Pay after a failure still retries.
-        logger.warn("machine.confirm.alreadySettled", { type: event.type });
-        finishTurn(sendGeneration, "confirmMelt.alreadySettled", QUIET_EXIT);
-        return;
-      }
       if (
         data.meltQuote?.expiresAt != null &&
         data.meltQuote.expiresAt <= Date.now() / 1000 &&
@@ -1158,14 +1184,9 @@ export function createPaymentMachine(
       operations?.executePaymentRequest
     ) {
       const originalStep = step;
+      // A delivered or undelivered preview never reaches here (see the
+      // settled guard above), so its caller's outcome stays `ignored`.
       const data = stepData as StepDataMap["navigateToPaymentRequest"];
-      if (!awaitsPay(data.phase)) {
-        // Already delivered, or sent and not taken back: sending again would
-        // pay twice. The caller's outcome stays `ignored`.
-        logger.warn("machine.confirm.alreadySettled", { type: event.type });
-        finishTurn(sendGeneration, "confirmPaymentRequest.alreadySettled", QUIET_EXIT);
-        return;
-      }
       // Callers that arrive during the await below are dropped by the lock
       // and keep their own holder, which this turn never took.
       const settle = takeConfirms();
