@@ -27,11 +27,14 @@ export function useMintInfo(mintUrl: string | string | undefined | null): GetInf
     return hit;
   }, [normalizedUrl, mints]);
 
-  const [fetchedInfo, setFetchedInfo] = useState<GetInfoResponse | null>(null);
+  // Keyed by the URL it was fetched for, so another mint's info never stands in.
+  const [fetched, setFetched] = useState<{ url: string; info: GetInfoResponse | null } | null>(
+    null
+  );
 
   useEffect(() => {
     if (!normalizedUrl || cachedInfo) {
-      setFetchedInfo(null);
+      setFetched(null);
       return;
     }
     let mounted = true;
@@ -43,17 +46,17 @@ export function useMintInfo(mintUrl: string | string | undefined | null): GetInf
             ...mintUrlLogFields(normalizedUrl),
             hasInfo: !!info,
           });
-          setFetchedInfo(info);
+          setFetched({ url: normalizedUrl, info });
         }
       })
       .catch((err) => {
         cashuLog.warn('mintInfo.fetch.fail', { ...mintUrlLogFields(normalizedUrl), error: err });
-        if (mounted) setFetchedInfo(null);
+        if (mounted) setFetched(null);
       });
     return () => {
       mounted = false;
     };
   }, [normalizedUrl, cachedInfo, getMintInfo]);
 
-  return cachedInfo ?? fetchedInfo;
+  return cachedInfo ?? (fetched?.url === normalizedUrl ? fetched.info : null);
 }
