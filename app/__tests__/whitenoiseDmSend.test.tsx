@@ -15,7 +15,7 @@
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { act, renderHook } from '@testing-library/react-native';
-import type { ReactNode } from 'react';
+import { useLayoutEffect, type ReactNode } from 'react';
 
 import { WhitenoiseContext } from '@/features/whitenoise/WhitenoiseContext';
 import { useWhitenoiseDM } from '@/features/whitenoise/hooks/useWhitenoiseDM';
@@ -489,6 +489,51 @@ describe('a send before the conversation has loaded', () => {
 
     expect(fake.client.createGroup).toHaveBeenCalledTimes(1);
     expect(await AsyncStorage.getItem(INDEX_KEY)).toBe('{"v":1,"d":"c0de"}');
+  });
+});
+
+describe('a send in the moment the client arrives', () => {
+  // The screen can be open before the White Noise client exists. In the commit
+  // that first carries the client, the saved conversation has not been read
+  // yet and `isLoading` still says false from the client-less state.
+  it('is refused: nothing is created and the saved conversation is kept', async () => {
+    const group = makeGroup([0x01, 0x02]);
+    fake.groups.set('0102', group);
+    await seedIndex('0102');
+    contextClient = null;
+    let armed = false;
+    let early: Promise<void> | undefined;
+    const view = renderHook(
+      () => {
+        const dm = useWhitenoiseDM(PEER);
+        useLayoutEffect(() => {
+          if (!armed) return;
+          armed = false;
+          early = dm.send('in the gap');
+        });
+        return dm;
+      },
+      { wrapper }
+    );
+    await act(async () => undefined);
+    expect(view.result.current.isLoading).toBe(false);
+
+    contextClient = fake.client;
+    armed = true;
+    await act(async () => {
+      view.rerender({});
+      await early;
+    });
+
+    expect(early).toBeDefined();
+    expect(fake.client.createGroup).not.toHaveBeenCalled();
+    expect(await AsyncStorage.getItem(INDEX_KEY)).toBe('{"v":1,"d":"0102"}');
+
+    await act(async () => {
+      await view.result.current.send('on time');
+    });
+    expect(fake.client.createGroup).not.toHaveBeenCalled();
+    expect(group.sendChatMessage).toHaveBeenCalledWith('on time');
   });
 });
 

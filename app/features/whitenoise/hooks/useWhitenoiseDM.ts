@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import { bytesToHex } from '@noble/hashes/utils.js';
 import {
@@ -68,9 +68,11 @@ export function useWhitenoiseDM(counterpartyPubkey: string): UseWhitenoiseDMStat
   // sendDmImpl also writes it directly to bridge the gap between createGroup
   // and the commit of setGroup(created).
   const groupRef = useLatestRef<WnGroup | null>(group);
-  // Until loading settles, `groupRef` cannot tell "no conversation yet" from
-  // "not read yet", so a send then would create a second group.
-  const isLoadingRef = useLatestRef(isLoading);
+  // What the last finished read was for. Until a read has finished for this
+  // client and peer, `groupRef` cannot tell "no conversation yet" from "not
+  // read yet", so a send then would create a second group. `isLoading` cannot
+  // say this: it is still false in the commit that first carries the client.
+  const loadedForRef = useRef<LoadedFor | null>(null);
 
   // Resolve existing group by counterparty pubkey, hydrate persisted history.
   // The impls construct their own WhitenoiseDmIndex from accountIndex at call
@@ -78,6 +80,7 @@ export function useWhitenoiseDM(counterpartyPubkey: string): UseWhitenoiseDMStat
   // fresh index instead of reusing the previous account's (audit 33.json
   // F-008; same shape as useWhitenoiseRequests' acceptRequestImpl).
   useEffect(() => {
+    loadedForRef.current = null;
     if (!client || !counterpartyPubkey) {
       setIsLoading(false);
       return;
@@ -88,6 +91,10 @@ export function useWhitenoiseDM(counterpartyPubkey: string): UseWhitenoiseDMStat
       setMessages,
       setIsLoading,
       setError,
+    }).then(() => {
+      if (!cancelled) {
+        loadedForRef.current = { client, counterpartyPubkey, selfPubkey, accountIndex };
+      }
     });
     return () => {
       cancelled = true;
@@ -156,7 +163,7 @@ export function useWhitenoiseDM(counterpartyPubkey: string): UseWhitenoiseDMStat
         counterpartyPubkey,
         accountIndex,
         groupRef,
-        isLoadingRef,
+        loadedForRef,
         setError,
         setIsCreatingGroup,
         setGroup,
@@ -260,6 +267,13 @@ async function loadDmGroupImpl(
   }
 }
 
+interface LoadedFor {
+  client: NonNullable<WhitenoiseClient>;
+  counterpartyPubkey: string;
+  selfPubkey: string;
+  accountIndex: WhitenoiseAccountIndex;
+}
+
 interface SendDmCtx {
   client: WhitenoiseClient;
   selfPubkey: string;
@@ -267,7 +281,7 @@ interface SendDmCtx {
   counterpartyPubkey: string;
   accountIndex: WhitenoiseAccountIndex;
   groupRef: { current: WnGroup | null };
-  isLoadingRef: { current: boolean };
+  loadedForRef: { current: LoadedFor | null };
   setError: (value: string | null) => void;
   setIsCreatingGroup: (value: boolean) => void;
   setGroup: (value: WnGroup | null) => void;
@@ -282,19 +296,25 @@ async function sendDmImpl(ctx: SendDmCtx, text: string): Promise<void> {
     counterpartyPubkey,
     accountIndex,
     groupRef,
-    isLoadingRef,
+    loadedForRef,
     setError,
     setIsCreatingGroup,
     setGroup,
     setMessages,
   } = ctx;
   if (!text.trim()) return;
-  if (isLoadingRef.current) {
-    wnLog.warn('whitenoise.dm.send_refused_while_loading');
-    return;
-  }
   if (!client) {
     setError('White Noise client not ready');
+    return;
+  }
+  const loadedFor = loadedForRef.current;
+  if (
+    loadedFor?.client !== client ||
+    loadedFor.counterpartyPubkey !== counterpartyPubkey ||
+    loadedFor.selfPubkey !== selfPubkey ||
+    loadedFor.accountIndex !== accountIndex
+  ) {
+    wnLog.warn('whitenoise.dm.send_refused_while_loading');
     return;
   }
   if (!selfPubkey) {
