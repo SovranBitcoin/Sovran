@@ -27,8 +27,6 @@ function pageOldestWrapSec(page: DmEnvelopePage): number | undefined {
  * slack to a per-page minimum by mistake.
  */
 export interface DmEnvelopeCursor {
-  /** Forget every tracked envelope — for a fresh first page. */
-  reset(): void;
   /** Record a page; returns how many of its envelopes were previously unseen. */
   track(page: DmEnvelopePage): number;
   /** `until` for the next (older) page, or undefined while nothing is tracked. */
@@ -36,14 +34,10 @@ export interface DmEnvelopeCursor {
 }
 
 export function createDmEnvelopeCursor(): DmEnvelopeCursor {
-  let seenWrapIds = new Set<string>();
+  const seenWrapIds = new Set<string>();
   let oldestWrapSec: number | undefined;
 
   return {
-    reset() {
-      seenWrapIds = new Set();
-      oldestWrapSec = undefined;
-    },
     track(page) {
       let fresh = 0;
       for (const envelope of page.envelopes) {

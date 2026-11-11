@@ -64,12 +64,4 @@ describe('DM envelope cursor', () => {
     // ISO strings still read as before.
     expect(at('2023-11-14T22:13:20.000Z')).toBe(1_700_000_000 + 1);
   });
-
-  it('forgets everything on reset', () => {
-    const cursor = createDmEnvelopeCursor();
-    cursor.track(page({ id: 'a', createdAt: 700 }));
-    cursor.reset();
-    expect(cursor.nextUntil()).toBeUndefined();
-    expect(cursor.track(page({ id: 'a', createdAt: 700 }))).toBe(1);
-  });
 });
