@@ -434,3 +434,50 @@ it('runs one pass at a time, and one more for requests that land during it', asy
   // Two passes over one unsettled leg, not forty.
   expect(coco.ops.mint.get).toHaveBeenCalledTimes(2);
 });
+
+describe('a pass whose write was refused because the leg changed while it was read', () => {
+  const settle = async () => {
+    for (let i = 0; i < 20; i++) await new Promise((resolve) => setImmediate(resolve));
+  };
+
+  it('is followed by one more pass, which reads the leg as it is now', async () => {
+    // A retry prepared a new melt while the first one was being read.
+    const leg = savedLeg('invoiceReady', { mint: 'mint-1', melt: 'melt-1' });
+    useSwapTransactionsStore.getState().finalizeGroup(leg.groupId, 'cancelled');
+    const coco = manager({ mint: { state: 'finalized' } });
+    coco.ops.melt.get.mockImplementation(async (...[id]: unknown[]) => {
+      if (id === 'melt-2') return { state: 'finalized' };
+      useSwapTransactionsStore
+        .getState()
+        .tagMelt(leg.groupId, leg.legId, { quoteId: 'q-melt-2', operationId: 'melt-2' });
+      return { state: 'rolled_back' };
+    });
+
+    createSwapLegReconciler(coco).run();
+    await settle();
+
+    expect(coco.ops.melt.get.mock.calls.map(([id]) => id)).toEqual(['melt-1', 'melt-2']);
+    expect(leg()).toMatchObject({ localStatus: 'done', meltOperationId: 'melt-2' });
+  });
+
+  it('is followed by one more pass only, though the leg changes during that one too', async () => {
+    const leg = savedLeg('invoiceReady', { mint: 'mint-1', melt: 'melt-1' });
+    useSwapTransactionsStore.getState().finalizeGroup(leg.groupId, 'cancelled');
+    let next = 1;
+    const coco = manager({});
+    coco.ops.melt.get.mockImplementation(async () => {
+      next += 1;
+      useSwapTransactionsStore.getState().tagMelt(leg.groupId, leg.legId, {
+        quoteId: `q-melt-${next}`,
+        operationId: `melt-${next}`,
+      });
+      return { state: 'rolled_back' };
+    });
+
+    createSwapLegReconciler(coco).run();
+    await settle();
+
+    expect(coco.ops.melt.get).toHaveBeenCalledTimes(2);
+    expect(leg().localStatus).toBe('invoiceReady');
+  });
+});

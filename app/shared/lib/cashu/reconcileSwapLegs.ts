@@ -41,11 +41,15 @@ const MELT_ROLLED_BACK = 'The payment did not go through. The funds are back in 
  * `cancelled` when one stopped before it sent anything.
  *
  * Nothing is written once `isCurrent` says this pass has been replaced.
+ * Resolves true when a write was refused because its leg changed while its
+ * operation was read: what was read no longer applies, and the leg as it is
+ * now has not been looked at.
  */
 export async function reconcileSwapLegs(
   manager: SwapLegOperations,
   isCurrent: () => boolean = () => true
-): Promise<void> {
+): Promise<boolean> {
+  let legChangedWhileRead = false;
   const unsettled: { groupId: string; leg: SwapLeg }[] = [];
   const interrupted: string[] = [];
   for (const group of Object.values(useSwapTransactionsStore.getState().groups)) {
@@ -79,6 +83,7 @@ export async function reconcileSwapLegs(
           current.meltOperationId !== leg.meltOperationId ||
           current.mintOperationId !== leg.mintOperationId
         ) {
+          legChangedWhileRead = true;
           return false;
         }
         store.setLegStatus(groupId, leg.id, update);
@@ -106,8 +111,9 @@ export async function reconcileSwapLegs(
     }
   }
 
-  if (!isCurrent()) return;
+  if (!isCurrent()) return legChangedWhileRead;
   for (const groupId of interrupted) endInterruptedGroup(groupId);
+  return legChangedWhileRead;
 }
 
 /** End an interrupted group once no leg's money may still move, as its legs prove it went. */
@@ -127,7 +133,9 @@ function endInterruptedGroup(groupId: string): void {
 /**
  * Runs `reconcileSwapLegs` one pass at a time. A request that lands during a
  * pass asks for one more instead of starting its own, so a burst of operation
- * events costs two passes, not one each. Once stopped it writes nothing,
+ * events costs two passes, not one each. A pass that read a leg which then
+ * changed asks for one more as well, once, so the leg as it is now is read
+ * without waiting for the next event. Once stopped it writes nothing,
  * including from a pass that was reading when it stopped.
  */
 export function createSwapLegReconciler(manager: SwapLegOperations) {
@@ -136,10 +144,15 @@ export function createSwapLegReconciler(manager: SwapLegOperations) {
   let again = false;
   const pass = async () => {
     running = true;
+    let rereadChangedLeg = true;
     try {
       do {
         again = false;
-        await reconcileSwapLegs(manager, () => active);
+        const legChanged = await reconcileSwapLegs(manager, () => active);
+        if (legChanged && rereadChangedLeg) {
+          rereadChangedLeg = false;
+          again = true;
+        }
       } while (again && active);
     } catch (error) {
       cashuLog.warn('swap.reconcile.failed', { error: redactError(error) });
