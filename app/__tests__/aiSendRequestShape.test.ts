@@ -51,7 +51,10 @@ jest.mock('@/shared/lib/routstr/api', () => ({
 }));
 jest.mock('@/shared/lib/routstr/refreshLineup', () => ({ refreshRoutstrLineup: jest.fn() }));
 jest.mock('@/shared/stores/global/profileStore', () => ({
-  useProfileStore: { getState: () => ({ activeAccountIndex: 0 }) },
+  useProfileStore: {
+    getState: () => ({ activeAccountIndex: 0 }),
+    subscribe: () => () => undefined,
+  },
 }));
 jest.mock('@/shared/lib/routstr/securePersistence', () => ({
   createRoutstrPersistence: () =>

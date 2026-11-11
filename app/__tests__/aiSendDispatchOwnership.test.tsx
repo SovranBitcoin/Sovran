@@ -74,7 +74,10 @@ jest.mock('@/shared/lib/routstr/refreshLineup', () => ({
   refreshRoutstrLineup: jest.fn(async () => false),
 }));
 jest.mock('@/shared/stores/global/profileStore', () => ({
-  useProfileStore: { getState: () => ({ activeAccountIndex: 0 }) },
+  useProfileStore: {
+    getState: () => ({ activeAccountIndex: 0 }),
+    subscribe: () => () => undefined,
+  },
 }));
 jest.mock('@/shared/lib/routstr/securePersistence', () => ({
   createRoutstrPersistence: () =>
@@ -269,6 +272,26 @@ describe('a request whose conversation is switched away after it was handed over
     expect(mockRoute).not.toHaveBeenCalled();
     expect(messagesOf('s2')).toEqual(other);
   });
+
+  it.each(['send', 'retry'] as const)(
+    'a %s is not paid for when the conversation is switched away and back while its payment client is built',
+    async (action) => {
+      const client = hold();
+      mockClientGate = client.held;
+      const { settle } = start(action);
+      await tick();
+      await switchAway();
+      await act(async () => {
+        useRoutstrStore.getState().switchSession('s1');
+      });
+      await client.release();
+      await settle();
+
+      // Once it lost its conversation the request is over, though it is open again.
+      expect(mockRoute).not.toHaveBeenCalled();
+      expect(messagesOf('s2')).toEqual(other);
+    }
+  );
 
   it('a refused candidate does not lead to a paid request for the next one after a switch', async () => {
     mockRoute.mockImplementationOnce(async () => {

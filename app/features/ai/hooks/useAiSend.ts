@@ -115,17 +115,20 @@ const r2 = (n: number) => Math.round(n * 100) / 100;
 
 /**
  * Run a send or regenerate with its request's controller, held in `preparing`
- * (what closing the screen aborts) until the stream takes it or the run ends.
+ * (what closing the screen aborts) until the stream takes it or the run ends,
+ * and with a watch on the account and conversation it was started in.
  */
 async function withRequestController(
   preparing: Set<AbortController>,
-  run: (controller: AbortController) => Promise<void>
+  run: (controller: AbortController, watch: OwnerWatch) => Promise<void>
 ): Promise<void> {
   const controller = new AbortController();
   preparing.add(controller);
+  const watch = watchOwner(currentOwner());
   try {
-    await run(controller);
+    await run(controller, watch);
   } finally {
+    watch.stop();
     preparing.delete(controller);
   }
 }
@@ -142,13 +145,38 @@ function currentOwner(): Owner {
   };
 }
 
+type OwnerChange = 'none' | 'account' | 'conversation';
+
 /** What moved since `owner` was taken: a request then would be sent for the wrong one. */
-function ownerChange(owner: Owner): 'none' | 'account' | 'conversation' {
+function ownerChange(owner: Owner): OwnerChange {
   const now = currentOwner();
   if (now.account !== owner.account) return 'account';
   if (now.anonymous !== owner.anonymous || now.conversationId !== owner.conversationId)
     return 'conversation';
   return 'none';
+}
+
+/** An owner watched from when it was taken until `stop`. */
+type OwnerWatch = { owner: Owner; change: () => OwnerChange; stop: () => void };
+
+/**
+ * Watch `owner` for every change to the account or conversation, not only at
+ * the moments it is asked. A move is kept once seen, even when it is undone:
+ * a request whose conversation was left and opened again, or whose account was
+ * switched and back, is over for good. `change` says `account` while another
+ * account is active (its store holds that account's conversations), and
+ * `conversation` for any other move seen since `owner` was taken.
+ */
+function watchOwner(owner: Owner): OwnerWatch {
+  let moved = false;
+  const change = (): OwnerChange => {
+    const now = ownerChange(owner);
+    if (now !== 'none') moved = true;
+    if (now === 'account') return 'account';
+    return moved ? 'conversation' : 'none';
+  };
+  const offs = [useRoutstrStore.subscribe(change), useProfileStore.subscribe(change)];
+  return { owner, change, stop: () => offs.forEach((off) => off()) };
 }
 
 /**
@@ -335,19 +363,10 @@ export function useAiSend() {
           imageCount = 0;
         }
       }
-      // Whether the answer still belongs to the account and conversation it
-      // was asked in, on a screen still open. Asked before each request is
-      // paid for, up to the moment its token is handed over, but not once it
-      // is: a switch then leaves the answer streaming into its own
-      // conversation. Losing it aborts the request, so the abort paths stop it.
       const owner: Owner = {
         account: profile,
         anonymous: storeState.isAnonymousMode,
         conversationId,
-      };
-      const stillOwned = () => {
-        if (ownerChange(owner) !== 'none') controller.abort();
-        return !controller.signal.aborted;
       };
       const primaryModel = primaryEntry.modelId;
       // What the user approved, or — on a retry, which shows no sheet — what
@@ -395,6 +414,17 @@ export function useAiSend() {
       // answer reads from its saved message), so a failure after that, in the
       // title or the cost log, must not give it a new, failed one.
       let settled = false;
+      // Whether the answer still belongs to the account and conversation it
+      // was asked in, on a screen still open, and has all along. Asked before
+      // each request is paid for, up to the moment its token is handed over,
+      // but not once it is: a switch then leaves the answer streaming into its
+      // own conversation. Losing it aborts the request, so the abort paths
+      // stop it, and the abort is what keeps it lost.
+      const ownerWatch = watchOwner(owner);
+      const stillOwned = () => {
+        if (ownerWatch.change() !== 'none') controller.abort();
+        return !controller.signal.aborted;
+      };
       try {
         // Text chars + image-part count — never serialises base64 payloads
         // into a log line.
@@ -1002,6 +1032,7 @@ export function useAiSend() {
           errorId: presentation.id,
         });
       } finally {
+        ownerWatch.stop();
         // Left without settling (the account changed under it): it ended
         // without an answer. Only this turn: a newer stream owns its own.
         dispatchTurn(assistantMessageId, { type: 'interrupted' });
@@ -1011,7 +1042,12 @@ export function useAiSend() {
   );
 
   const prepareSend = useCallback(
-    async (controller: AbortController, userMessage: string, attachments?: ChatAttachment[]) => {
+    async (
+      controller: AbortController,
+      watch: OwnerWatch,
+      userMessage: string,
+      attachments?: ChatAttachment[]
+    ) => {
       // Every precondition in one place, decided before the optimistic bubbles
       // go in: declining after them would leave a user message with no answer
       // and nothing to retry. The gate is pure and exhaustive, so each way a
@@ -1019,7 +1055,7 @@ export function useAiSend() {
       // provider, a mint the provider refuses and a declined confirmation used
       // to be indistinguishable from outside.
       const trimmed = userMessage.trim();
-      const owner = currentOwner();
+      const { owner } = watch;
       const storeNow = useRoutstrStore.getState();
       const quotedFunds = latestFunds.current;
       const activeProvider = storeNow.userNodeBaseUrl;
@@ -1076,7 +1112,7 @@ export function useAiSend() {
       // show it to. Nothing is sent; a question asked in a saved conversation
       // is left there, unanswered, to be asked again.
       const whyNotSend = () => {
-        const change = ownerChange(owner);
+        const change = watch.change();
         return change === 'none' && controller.signal.aborted ? 'closed' : change;
       };
       const leaveQuestion = (reason: 'conversation' | 'closed') => {
@@ -1247,8 +1283,8 @@ export function useAiSend() {
   // drops the duplicate at the ref level.
   const sendInner = useCallback(
     (userMessage: string, attachments?: ChatAttachment[]) =>
-      withRequestController(preparingRef.current, (controller) =>
-        prepareSend(controller, userMessage, attachments)
+      withRequestController(preparingRef.current, (controller, watch) =>
+        prepareSend(controller, watch, userMessage, attachments)
       ),
     [prepareSend]
   );
@@ -1262,8 +1298,8 @@ export function useAiSend() {
    * brought back via the bubble's chevron nav.
    */
   const prepareRetry = useCallback(
-    async (controller: AbortController, messageId: string) => {
-      const owner = currentOwner();
+    async (controller: AbortController, watch: OwnerWatch, messageId: string) => {
+      const { owner } = watch;
       const stateNow = useRoutstrStore.getState();
       const original = stateNow.conversationHistory.find((m) => m.id === messageId);
       if (!original || original.role !== 'assistant') {
@@ -1286,7 +1322,7 @@ export function useAiSend() {
       }
       // The answer stays in its own conversation, to be asked again from
       // there, when the account or conversation moved or the screen closed.
-      const change = ownerChange(owner);
+      const change = watch.change();
       if (change !== 'none' || controller.signal.aborted) {
         aiLog.info('ai.retry.not_sent', {
           messageId,
@@ -1334,8 +1370,8 @@ export function useAiSend() {
   // regenerate chevron would spawn two sibling assistants and bill twice.
   const retryInner = useCallback(
     (messageId: string) =>
-      withRequestController(preparingRef.current, (controller) =>
-        prepareRetry(controller, messageId)
+      withRequestController(preparingRef.current, (controller, watch) =>
+        prepareRetry(controller, watch, messageId)
       ),
     [prepareRetry]
   );
