@@ -349,8 +349,8 @@ export function createPaymentMachine(
   let stepData: StepDataMap[FlowStep] = idleData;
   // Whether the open mint list was opened over a preview, which then still
   // awaited Pay (a settled preview is final). Pay with the list dismissed
-  // restores that preview, and only that one. Cleared whenever the step
-  // leaves selectMint.
+  // restores that preview, and only that one. Opening the list again while
+  // it is open keeps it. Cleared whenever the step leaves selectMint.
   let mintListOverPreview = false;
   // The turn: one `send()` call holds the machine from `beginTurn` to
   // `finishTurn`. Only the functions under "Turn" below write these five.
@@ -1559,7 +1559,9 @@ export function createPaymentMachine(
       }
       flowCtx = result.context;
       setStep(result.step, result.data);
-      if (event.type === "REQUEST_MINT_SELECTOR") {
+      // A list opened while the list is already open keeps what it was
+      // opened over.
+      if (event.type === "REQUEST_MINT_SELECTOR" && prevStep !== "selectMint") {
         mintListOverPreview =
           prevStep === "navigateToMeltPreview" ||
           prevStep === "navigateToPaymentRequest";

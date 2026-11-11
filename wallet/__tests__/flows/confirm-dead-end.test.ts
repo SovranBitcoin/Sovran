@@ -72,6 +72,45 @@ describe('CONFIRM_MELT on a mint-less selectMint step (BTC-09)', () => {
       tm.notificationCalls.find((c) => c.key === 'onMissingMintForAmount')
     ).toBeUndefined();
   });
+
+  // The preview's mint pill opens the list again while it is already open:
+  // the list stays opened over the preview, so Pay still restores it.
+  it('restores and pays a melt preview after the list was opened and dismissed twice', async () => {
+    const tm = createTestMachine();
+    await tm.machine.execute(INPUTS.lightningAddress, { reset: true });
+    await tm.machine.enterAmount({ value: 200, unit: 'sat' }, MINT1);
+    tm.assertStep('navigateToMeltPreview');
+
+    await tm.machine.requestMintSelector();
+    await tm.machine.requestMintSelector();
+    tm.assertStep('selectMint');
+
+    await tm.machine.confirmMelt();
+
+    expect(tm.operationCalls.filter((c) => c.name === 'executeMelt')).toHaveLength(1);
+    expect(
+      tm.notificationCalls.find((c) => c.key === 'onMissingMintForAmount')
+    ).toBeUndefined();
+  });
+
+  it('restores and pays a payment request preview after the list was opened and dismissed twice', async () => {
+    const tm = createTestMachine();
+    await tm.machine.execute(INPUTS.paymentRequestBasic, { reset: true });
+    tm.assertStep('navigateToPaymentRequest');
+
+    await tm.machine.requestMintSelector();
+    await tm.machine.requestMintSelector();
+    tm.assertStep('selectMint');
+
+    expect((await tm.machine.confirmPaymentRequest()).kind).toBe('delivered');
+
+    expect(
+      tm.operationCalls.filter((c) => c.name === 'executePaymentRequest')
+    ).toHaveLength(1);
+    expect(
+      tm.notificationCalls.find((c) => c.key === 'onMissingMintForAmount')
+    ).toBeUndefined();
+  });
 });
 
 describe('Pay on a still-mounted preview after the machine moved to error', () => {

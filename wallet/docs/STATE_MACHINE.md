@@ -512,7 +512,8 @@ the preview, `CONFIRM_MELT` restores `navigateToMeltPreview` from ctx -- but ONL
 when the list was opened over a preview awaiting Pay (`mintListOverPreview`)
 and both `flowCtx.mintUrl` and `flowCtx.amount` are truthy. A list opened
 anywhere else (the screen after an NFC tap paid, say) restores nothing, so a
-paid payment's context never comes back as a preview. When the guard fails the
+paid payment's context never comes back as a preview. Opening the list again
+while it is open keeps what it was first opened over. When the guard fails the
 machine fires `onMissingMintForAmount` and re-dispatches the `selectMint`
 handler — the confirm tap is never silently dropped.
 
