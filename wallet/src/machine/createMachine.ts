@@ -534,6 +534,22 @@ export function createPaymentMachine(
    * that throws is logged, and neither undoes the payment nor keeps the turn
    * from finishing.
    */
+  /**
+   * Calls one of the host's notifications around a payment. They are fire and
+   * forget: a throw, at once or from the promise it returns, is logged and
+   * changes nothing about the payment, the turn or the caller's outcome.
+   */
+  function tell(name: string, call: () => unknown): void {
+    const failed = (err: unknown) => {
+      logger.warn("machine.notification.failed", { name, error: errField(err) });
+    };
+    try {
+      Promise.resolve(call()).catch(failed);
+    } catch (err) {
+      failed(err);
+    }
+  }
+
   function announcePayment(news: {
     links: MachineEffectLink[];
     notifications: MachineEffectNotification[];
@@ -869,12 +885,14 @@ export function createPaymentMachine(
     // user stays on the preview step to retry or back out.
     if (isMeltUserCancelledError(err)) {
       logger.info("machine.operationFailure.userCancelled", { variant });
-      void notifications?.onPaymentCancelled?.({
-        variant,
-        mintUrl: data.mintUrl,
-        amount: data.amount,
-        unit: data.unit,
-      });
+      tell("onPaymentCancelled", () =>
+        notifications?.onPaymentCancelled?.({
+          variant,
+          mintUrl: data.mintUrl,
+          amount: data.amount,
+          unit: data.unit,
+        }),
+      );
       return;
     }
 
@@ -886,15 +904,17 @@ export function createPaymentMachine(
         );
 
     // Always notify failure so the processing notification is dismissed.
-    void notifications?.onPaymentFailed?.({
-      variant,
-      mintUrl: data.mintUrl,
-      amount: data.amount,
-      unit: data.unit,
-      message,
-      authored,
-      rolledBack: opts?.rolledBack,
-    });
+    tell("onPaymentFailed", () =>
+      notifications?.onPaymentFailed?.({
+        variant,
+        mintUrl: data.mintUrl,
+        amount: data.amount,
+        unit: data.unit,
+        message,
+        authored,
+        rolledBack: opts?.rolledBack,
+      }),
+    );
 
     // The ecash left the wallet and could not be taken back, so the recipient
     // may already hold it. Offering another option could pay them twice.
@@ -1223,15 +1243,17 @@ export function createPaymentMachine(
       });
       announcePaymentStart(sendGeneration, "confirmMelt.start");
 
-      void notifications?.onPaymentProcessing?.({
-        variant: "melt",
-        mintUrl: data.mintUrl,
-        amount: data.amount,
-        unit: data.unit,
-        // The quote method lives on the flow context, not the step data —
-        // lets the wallet gate the in-progress indicator per method.
-        ...(flowCtx.meltQuoteMethod ? { method: flowCtx.meltQuoteMethod } : {}),
-      });
+      tell("onPaymentProcessing", () =>
+        notifications?.onPaymentProcessing?.({
+          variant: "melt",
+          mintUrl: data.mintUrl,
+          amount: data.amount,
+          unit: data.unit,
+          // The quote method lives on the flow context, not the step data —
+          // lets the wallet gate the in-progress indicator per method.
+          ...(flowCtx.meltQuoteMethod ? { method: flowCtx.meltQuoteMethod } : {}),
+        }),
+      );
 
       beginCommit(sendGeneration);
       let effect: Awaited<ReturnType<typeof runConfirmMeltEffect>>;
@@ -1286,12 +1308,14 @@ export function createPaymentMachine(
       });
       announcePaymentStart(sendGeneration, "confirmPaymentRequest.start");
 
-      void notifications?.onPaymentProcessing?.({
-        variant: "paymentRequest",
-        mintUrl: data.mintUrl,
-        amount: data.amount,
-        unit: data.unit,
-      });
+      tell("onPaymentProcessing", () =>
+        notifications?.onPaymentProcessing?.({
+          variant: "paymentRequest",
+          mintUrl: data.mintUrl,
+          amount: data.amount,
+          unit: data.unit,
+        }),
+      );
 
       beginCommit(sendGeneration);
       let effect: Awaited<ReturnType<typeof runConfirmPaymentRequestEffect>>;

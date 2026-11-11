@@ -856,6 +856,107 @@ describe("Pay on a payment request", () => {
 // Main path
 // ---------------------------------------------------------------------------
 
+// A notification is the host's fire and forget: what it throws, at once or
+// later, is logged, and the payment, the turn and the caller's outcome carry
+// on as if it had returned.
+describe("a notification that throws", () => {
+  const throwing = () => {
+    throw new Error("toast failed");
+  };
+  const rejecting = () => Promise.reject(new Error("toast failed"));
+
+  let unhandled: unknown[] = [];
+  const onUnhandled = (reason: unknown) => {
+    unhandled.push(reason);
+  };
+  beforeEach(() => {
+    unhandled = [];
+    process.on("unhandledRejection", onUnhandled);
+  });
+  afterEach(() => {
+    process.off("unhandledRejection", onUnhandled);
+  });
+
+  it.each([
+    ["throws", throwing],
+    ["rejects", rejecting],
+  ])("as a melt starts (%s): pays once, and the machine is free", async (_how, notify) => {
+    const tm = build({ notifications: { onPaymentProcessing: notify } });
+    await toMeltPreview(tm.machine);
+
+    await expect(tm.machine.confirmMelt()).resolves.toBeUndefined();
+    await tm.machine.confirmMelt();
+    await settle();
+
+    expect(tm.calls("executeMelt")).toBe(1);
+    expect(isExecuting(tm.machine)).toBe(false);
+    expect(await isFree(tm.machine)).toBe(true);
+    expect(unhandled).toEqual([]);
+  });
+
+  it.each([
+    ["throws", throwing],
+    ["rejects", rejecting],
+  ])("as a payment request starts (%s): resolves delivered, and the machine is free", async (_how, notify) => {
+    const tm = build({ notifications: { onPaymentProcessing: notify } });
+    await toPaymentRequest(tm.machine);
+
+    expect((await tm.machine.confirmPaymentRequest()).kind).toBe("delivered");
+    await settle();
+
+    expect(isExecuting(tm.machine)).toBe(false);
+    expect(await isFree(tm.machine)).toBe(true);
+    expect(unhandled).toEqual([]);
+  });
+
+  it.each([
+    ["throws", throwing],
+    ["rejects", rejecting],
+  ])("on an undelivered request (%s): resolves undelivered and keeps it so", async (_how, notify) => {
+    const tm = build({
+      operations: {
+        executePaymentRequest: async () => {
+          throw new PaymentRequestUndeliveredError("op-9", new Error("relay down"));
+        },
+      },
+      notifications: { onPaymentFailed: notify },
+    });
+    await toPaymentRequest(tm.machine);
+
+    expect((await tm.machine.confirmPaymentRequest()).kind).toBe("undelivered");
+    expect((await tm.machine.confirmPaymentRequest()).kind).toBe("ignored");
+    await settle();
+
+    expect(tm.calls("executePaymentRequest")).toBe(1);
+    expect(await isFree(tm.machine)).toBe(true);
+    expect(unhandled).toEqual([]);
+  });
+
+  it.each([
+    ["throws", throwing],
+    ["rejects", rejecting],
+  ])("on a failed melt (%s): stays on the preview, and Pay retries", async (_how, notify) => {
+    const tm = build({
+      operations: {
+        executeMelt: async () => {
+          throw new Error("mint said no");
+        },
+      },
+      notifications: { onPaymentFailed: notify },
+    });
+    await toMeltPreview(tm.machine);
+
+    await expect(tm.machine.confirmMelt()).resolves.toBeUndefined();
+    expect(tm.machine.getStep()).toBe("navigateToMeltPreview");
+    expect(await isFree(tm.machine)).toBe(true);
+    await tm.machine.confirmMelt();
+    await settle();
+
+    expect(tm.calls("executeMelt")).toBe(2);
+    expect(unhandled).toEqual([]);
+  });
+});
+
 describe("the main path", () => {
   it("is free and not executing after a resolve and its handler", async () => {
     const tm = build();

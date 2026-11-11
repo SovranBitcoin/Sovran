@@ -292,7 +292,9 @@ state (generation, lock, `isExecuting`, the commit generation and the
 payment-request confirm holders) is written only by the functions in that
 section. `__tests__/flows/turn-exits.test.ts` pins every exit. Once a payment
 settles its step records it first; a link or notification that throws
-afterwards is logged (`announcePayment`), and a listener or handler that
+afterwards is logged (`announcePayment`), as is a notification that throws or
+rejects as a payment starts, fails or is cancelled (`tell`): the payment, the
+turn and the caller's outcome carry on. A listener or handler that
 throws reaches the caller only after the turn finished. An NFC tap's tag
 session and unit switch are one `NfcTap`, opened as its EXECUTE turn starts and
 ended in one place after the auto-resolve loop: every way out, a throw
