@@ -7,7 +7,7 @@ type NearPaySessionPhase = 'picking' | 'transitioning' | 'amount';
 /** Every new nearby payment is locked to the authenticated recipient. */
 export type NearPayDelivery = { locked: true };
 
-interface NearPayRecipient {
+export interface NearPayRecipient {
   peerID: string;
   nickname: string;
   hasDirectLink: boolean;

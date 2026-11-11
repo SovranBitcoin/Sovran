@@ -36,6 +36,7 @@ import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useAmountDraftStore } from '@/shared/stores/runtime/amountDraftStore';
 import { useContactSendStore } from '@/shared/stores/runtime/contactSendStore';
+import { sendRouteOf } from '@/shared/stores/runtime/sendRoute';
 import { useNotePickerStore } from '@/shared/stores/runtime/notePickerStore';
 import { zIndex } from '@/shared/styles/tokens';
 import { E2EActionMenuProbe } from '@/shared/lib/popup/E2EActionMenuProbe';
@@ -324,14 +325,25 @@ export function AmountFlowContent({ amountEntry, headerMode = 'native' }: Amount
   // How the ecash gets there is the flow's, decided before any amount: a
   // request names its transport, a Nut Drop goes over the mesh, a contact is
   // sent a Nostr message, and anything else is shown for the other phone.
-  const contactSendActive = useContactSendStore((state) => state.active !== null);
+  const contactTarget = useContactSendStore((state) => state.active);
   const carrier = useMemo(() => {
     if (entryPaymentRequest) {
       return requestCarrierOf(decodePaymentRequestInfo(entryPaymentRequest)?.transports);
     }
-    if (nearPayRecipient) return 'bluetooth' as const;
-    return contactSendActive ? ('nostr' as const) : ('scan' as const);
-  }, [contactSendActive, entryPaymentRequest, nearPayRecipient]);
+    const route = sendRouteOf({ nearby: nearPayRecipient, contact: contactTarget });
+    switch (route.kind) {
+      case 'nearby':
+        return 'bluetooth' as const;
+      case 'contact':
+        return 'nostr' as const;
+      case 'handOff':
+        return 'scan' as const;
+      default: {
+        const unreachable: never = route;
+        return unreachable;
+      }
+    }
+  }, [contactTarget, entryPaymentRequest, nearPayRecipient]);
   const delivery = useMemo(
     () =>
       describeSendDelivery({

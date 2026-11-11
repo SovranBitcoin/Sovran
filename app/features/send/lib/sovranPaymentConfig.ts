@@ -85,7 +85,11 @@ import { chooseProofs } from './proofSelectorPicker';
 import { chooseSendFallback } from './sendFallbackPicker';
 import { captureAndStoreLocation } from '@/shared/hooks/useTransactionLocation';
 import { useNearPaySessionStore } from '@/shared/stores/runtime/nearPayStore';
-import { useContactSendStore } from '@/shared/stores/runtime/contactSendStore';
+import {
+  useContactSendStore,
+  type ContactSendTarget,
+} from '@/shared/stores/runtime/contactSendStore';
+import { sendRouteOf } from '@/shared/stores/runtime/sendRoute';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { useNpcMintStore } from '@/shared/stores/profile/npcMintStore';
 import { getNpcAddress } from '@/shared/lib/cashu/npc';
@@ -873,8 +877,8 @@ function getEncodedEcashTokenFromSendHistoryEntry(historyEntry: string): string 
 }
 
 /**
- * Deliver a just-created bearer ecash token to a remote Nostr contact when a
- * destination-first Send was addressed to one (`contactSendStore`). The token
+ * Deliver a just-created bearer ecash token to the remote Nostr contact a
+ * destination-first Send was addressed to (`contactSendStore`). The token
  * rides an encrypted NIP-17 gift-wrapped DM to the contact's npub — bearer is
  * safe here because only that npub can decrypt it (unlike the public mesh).
  *
@@ -883,12 +887,11 @@ function getEncodedEcashTokenFromSendHistoryEntry(historyEntry: string): string 
  * bearer hand-off screen and the funds stay recoverable. Always clears the
  * target on success so a later ordinary send never re-DMs to a stale contact.
  */
-async function deliverContactDmIfActive(
+async function deliverContactDm(
+  target: ContactSendTarget,
   historyEntry: string,
   deliverContactEcashDm?: CreateSovranHandlersConfig['deliverContactEcashDm']
 ): Promise<boolean> {
-  const target = useContactSendStore.getState().active;
-  if (!target) return false;
   if (!deliverContactEcashDm) {
     paymentLog.warn('contact_send.delivery.no_adapter');
     return false;
@@ -1063,36 +1066,50 @@ export function createSovranHandlers({
       // may be P2PK-locked to them; the DM is the envelope, the lock is what
       // is inside it.
       //
-      // Nearby delivery is bound to its operation before execution and never
-      // populates the contact-send session.
-      const contactTarget = useContactSendStore.getState().active;
-      if (contactTarget) {
-        const recipientPubkey = contactTarget.pubkey;
-        const delivered = await deliverContactDmIfActive(
-          enrichedHistoryEntry,
-          deliverContactEcashDm
-        );
-        if (delivered) {
-          if (hasFeature('directMessages')) {
-            router.dismissAll();
-            // Let the modal dismissal settle before pushing the DM thread —
-            // navigating mid-dismissal triggers react-native-screens' modal
-            // header-visibility remount loop (blank DM thread).
-            runAfterInteractions(() => {
-              router.navigate({ pathname: '/userMessages', params: { pubkey: recipientPubkey } });
-            });
-          } else {
-            // Without DM pages the send ends on the wallet: the token is
-            // already with the contact, so there is no hand-off to show.
-            // `dismissAll` alone only pops this flow's stack to its first
-            // screen, the send chooser.
-            router.dismissTo('/');
+      // Nearby delivery is bound to its operation before execution, so a
+      // nearby send ends on the hand-off screen like an ordinary one.
+      const route = sendRouteOf({
+        nearby: useNearPaySessionStore.getState().active?.recipient ?? null,
+        contact: useContactSendStore.getState().active,
+      });
+      switch (route.kind) {
+        case 'contact': {
+          const recipientPubkey = route.target.pubkey;
+          const delivered = await deliverContactDm(
+            route.target,
+            enrichedHistoryEntry,
+            deliverContactEcashDm
+          );
+          if (delivered) {
+            if (hasFeature('directMessages')) {
+              router.dismissAll();
+              // Let the modal dismissal settle before pushing the DM thread —
+              // navigating mid-dismissal triggers react-native-screens' modal
+              // header-visibility remount loop (blank DM thread).
+              runAfterInteractions(() => {
+                router.navigate({ pathname: '/userMessages', params: { pubkey: recipientPubkey } });
+              });
+            } else {
+              // Without DM pages the send ends on the wallet: the token is
+              // already with the contact, so there is no hand-off to show.
+              // `dismissAll` alone only pops this flow's stack to its first
+              // screen, the send chooser.
+              router.dismissTo('/');
+            }
+            return;
           }
-          return;
+          // Delivery failed — fall through to the bearer hand-off screen so the
+          // user can still copy/share the token (funds are not lost).
+          paymentLog.warn('contact_send.delivery.fallback_to_hand_off');
+          break;
         }
-        // Delivery failed — fall through to the bearer hand-off screen so the
-        // user can still copy/share the token (funds are not lost).
-        paymentLog.warn('contact_send.delivery.fallback_to_hand_off');
+        case 'nearby':
+        case 'handOff':
+          break;
+        default: {
+          const unreachable: never = route;
+          return unreachable;
+        }
       }
 
       leaveMintPicker('(send-flow)', () =>
