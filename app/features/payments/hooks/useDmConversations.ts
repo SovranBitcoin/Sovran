@@ -13,7 +13,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { giftWrapCache } from '@/shared/lib/nostr/giftWrapCache';
 import { nip04Cache } from '@/shared/lib/nostr/nip04Cache';
-import { fetchDmEnvelopes, subscribeDmEnvelopesLive } from '../data/dmEnvelopeClient';
+import { subscribeDmEnvelopesLive } from '../data/dmEnvelopeClient';
 import { decryptDmEnvelopes } from '../data/dmDecryptPipeline';
 import type { DmEnvelopePage, DmProtocol } from '../data/dmEnvelopeTypes';
 import { dmConversationsCache, dmConversationsKey } from '../data/dmSnapshotCaches';
@@ -36,8 +36,6 @@ export interface DmConversation {
   /** Seeded from last-message metadata: the preview text has not been decrypted yet. */
   previewPending?: boolean;
 }
-
-const PAGE_LIMIT = 100;
 
 /** Rows from the persisted last-message metadata: who, when, which protocol — never text. */
 function seedFromLastMessages(): DmConversation[] {
@@ -144,23 +142,12 @@ export function useDmConversations(
     ]);
   }, [viewerPubkey]);
 
-  const fetchPage = useCallback(
-    (args: { until?: number; refresh: boolean; signal?: AbortSignal }) =>
-      fetchDmEnvelopes({
-        viewer: viewerPubkey ?? '',
-        limit: PAGE_LIMIT,
-        ...args,
-      }),
-    [viewerPubkey]
-  );
-
   const pages = useDmEnvelopePages({
     surface: 'dmConversations',
+    viewer: viewerPubkey,
     hasSnapshot: initial.key === cacheKey && initial.snapshot,
     feedKey: viewerPubkey && viewerPrivateKey ? viewerPubkey : null,
-    pageLimit: PAGE_LIMIT,
     hydrate,
-    fetchPage,
     onPage,
     onReset,
     failureEvent: 'payment.dm.conversations.failed',

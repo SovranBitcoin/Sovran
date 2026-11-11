@@ -12,6 +12,10 @@ import { act, renderHook, waitFor } from '@testing-library/react-native';
 import { useDmEnvelopePages } from '@/features/payments/hooks/useDmEnvelopePages';
 import type { DmEnvelopePage } from '@/features/payments/data/dmEnvelopeTypes';
 
+const mockFetch = jest.fn();
+jest.mock('@/features/payments/data/dmEnvelopeClient', () => ({
+  fetchDmEnvelopes: (...args: unknown[]) => mockFetch(...args),
+}));
 jest.mock('@/shared/lib/logger', () => {
   const sink = { info: jest.fn(), warn: jest.fn(), debug: jest.fn(), error: jest.fn() };
   return {
@@ -21,9 +25,10 @@ jest.mock('@/shared/lib/logger', () => {
   };
 });
 
-const PAGE_LIMIT = 3;
+/** The conversation list's page size: a page this long is full. */
+const FULL = 100;
 
-/** A page of `count` envelopes whose wrap times descend from `newestTs`. */
+/** A page of envelopes, one per id, whose wrap times descend from `newestTs`. */
 function page(ids: string[], newestTs = 1_000): DmEnvelopePage {
   return {
     envelopes: ids.map((id, index) => ({
@@ -34,16 +39,28 @@ function page(ids: string[], newestTs = 1_000): DmEnvelopePage {
   };
 }
 
-function setup(overrides: Partial<Parameters<typeof useDmEnvelopePages>[0]> = {}) {
-  const fetchPage = jest.fn(async () => page(['a', 'b', 'c']));
+/** A full page whose ids start with `prefix`. */
+function full(prefix: string, newestTs = 1_000): DmEnvelopePage {
+  return page(
+    Array.from({ length: FULL }, (_, i) => `${prefix}${i}`),
+    newestTs
+  );
+}
+
+function setup({
+  fetchPage = jest.fn(async () => full('a')),
+  ...overrides
+}: Partial<Parameters<typeof useDmEnvelopePages>[0]> & {
+  fetchPage?: (args: { until?: number; refresh: boolean }) => Promise<DmEnvelopePage>;
+} = {}) {
+  mockFetch.mockReset().mockImplementation(fetchPage);
   const onPage = jest.fn();
   const onReset = jest.fn();
   const options = {
     surface: 'dmConversations' as const,
+    viewer: 'viewer',
     feedKey: 'viewer',
-    pageLimit: PAGE_LIMIT,
     hydrate: jest.fn(async () => {}),
-    fetchPage,
     onPage,
     onReset,
     failureEvent: 'test.dm.failed',
@@ -55,6 +72,14 @@ function setup(overrides: Partial<Parameters<typeof useDmEnvelopePages>[0]> = {}
   return { ...view, options, fetchPage, onPage, onReset };
 }
 
+it('asks the shared inbox for a full page for the viewer', async () => {
+  const { result } = setup();
+  await waitFor(() => expect(result.current.hasLoadedOnce).toBe(true));
+  expect(mockFetch).toHaveBeenCalledWith(
+    expect.objectContaining({ viewer: 'viewer', limit: FULL, refresh: false })
+  );
+});
+
 describe('useDmEnvelopePages', () => {
   it('hydrates, loads the first page, and reports more when the page is full', async () => {
     const { result, options, onPage, onReset } = setup();
@@ -62,7 +87,7 @@ describe('useDmEnvelopePages', () => {
     await waitFor(() => expect(result.current.hasLoadedOnce).toBe(true));
     expect(options.hydrate).toHaveBeenCalledTimes(1);
     expect(onReset).toHaveBeenCalledTimes(1);
-    expect(onPage).toHaveBeenCalledWith(page(['a', 'b', 'c']), { first: true, mode: 'initial' });
+    expect(onPage).toHaveBeenCalledWith(full('a'), { first: true, mode: 'initial' });
     expect(result.current.hasMore).toBe(true);
     expect(result.current.loading).toBe(false);
     expect(result.current.status).toBe('ready');
@@ -70,7 +95,7 @@ describe('useDmEnvelopePages', () => {
   });
 
   it('keeps paging when a full page lost a wrap that did not parse', async () => {
-    const short = { ...page(['a', 'b']), received: PAGE_LIMIT };
+    const short = { ...page(['a', 'b']), received: FULL };
     const { result } = setup({ fetchPage: jest.fn(async () => short) });
     await waitFor(() => expect(result.current.hasLoadedOnce).toBe(true));
     expect(result.current.hasMore).toBe(true);
@@ -102,7 +127,7 @@ describe('useDmEnvelopePages', () => {
   it('pages after the first carry the loadMore mode and never the first flag', async () => {
     const fetchPage = jest
       .fn<Promise<DmEnvelopePage>, [{ until?: number; refresh: boolean }]>()
-      .mockResolvedValueOnce(page(['a', 'b', 'c'], 1_000))
+      .mockResolvedValueOnce(full('a', 1_000))
       .mockResolvedValueOnce(page(['d'], 900));
     const { result, onPage } = setup({ fetchPage });
     await waitFor(() => expect(result.current.hasMore).toBe(true));
@@ -115,8 +140,8 @@ describe('useDmEnvelopePages', () => {
   it('pages older envelopes with an `until` cursor behind the oldest wrap time', async () => {
     const fetchPage = jest
       .fn<Promise<DmEnvelopePage>, [{ until?: number; refresh: boolean }]>()
-      .mockResolvedValueOnce(page(['a', 'b', 'c'], 1_000))
-      .mockResolvedValueOnce(page(['d', 'e', 'f'], 900));
+      .mockResolvedValueOnce(full('a', 1_000))
+      .mockResolvedValueOnce(full('d', 900));
     const { result } = setup({ fetchPage });
 
     await waitFor(() => expect(result.current.hasMore).toBe(true));
@@ -126,8 +151,8 @@ describe('useDmEnvelopePages', () => {
       await result.current.loadMore();
     });
 
-    // Oldest wrap time of page 1 is 998; the cursor over-fetches by its slack.
-    expect(fetchPage.mock.calls[1][0].until).toBeGreaterThan(998);
+    // Oldest wrap time of page 1 is 901; the cursor over-fetches by its slack.
+    expect(fetchPage.mock.calls[1][0].until).toBeGreaterThan(1_000 - FULL + 1);
     expect(fetchPage).toHaveBeenCalledTimes(2);
     expect(result.current.hasMore).toBe(true);
   });
@@ -135,7 +160,7 @@ describe('useDmEnvelopePages', () => {
   it('stops paging on a short page', async () => {
     const fetchPage = jest
       .fn<Promise<DmEnvelopePage>, [{ until?: number; refresh: boolean }]>()
-      .mockResolvedValueOnce(page(['a', 'b', 'c'], 1_000))
+      .mockResolvedValueOnce(full('a', 1_000))
       .mockResolvedValueOnce(page(['d'], 900));
     const { result } = setup({ fetchPage });
 
@@ -149,7 +174,7 @@ describe('useDmEnvelopePages', () => {
 
   it('stops paging on a full page the server has already served', async () => {
     // The spinner-forever case: the server ignored `until` and replayed page 1.
-    const fetchPage = jest.fn(async () => page(['a', 'b', 'c'], 1_000));
+    const fetchPage = jest.fn(async () => full('a', 1_000));
     const { result } = setup({ fetchPage });
 
     await waitFor(() => expect(result.current.hasMore).toBe(true));
@@ -162,7 +187,7 @@ describe('useDmEnvelopePages', () => {
   });
 
   it('clears accumulated results and reloads when the feed identity changes', async () => {
-    const fetchPage = jest.fn(async () => page(['a', 'b', 'c']));
+    const fetchPage = jest.fn(async () => full('a'));
     const { result, rerender, options, onReset } = setup({ fetchPage });
 
     await waitFor(() => expect(result.current.hasLoadedOnce).toBe(true));
@@ -212,7 +237,7 @@ describe('useDmEnvelopePages', () => {
   it('re-fetches the first page with `refresh` set once refresh() is called', async () => {
     const fetchPage = jest
       .fn<Promise<DmEnvelopePage>, [{ until?: number; refresh: boolean }]>()
-      .mockResolvedValue(page(['a', 'b', 'c']));
+      .mockResolvedValue(full('a'));
     const { result } = setup({ fetchPage });
 
     await waitFor(() => expect(result.current.hasLoadedOnce).toBe(true));
@@ -230,7 +255,7 @@ describe('useDmEnvelopePages', () => {
     let finish!: (p: DmEnvelopePage) => void;
     const fetchPage = jest
       .fn<Promise<DmEnvelopePage>, [{ until?: number; refresh: boolean }]>()
-      .mockResolvedValueOnce(page(['a', 'b', 'c']))
+      .mockResolvedValueOnce(full('a'))
       .mockImplementationOnce(() => new Promise<DmEnvelopePage>((r) => (finish = r)));
     const { result, onPage, onReset } = setup({ fetchPage });
 
@@ -254,7 +279,7 @@ describe('useDmEnvelopePages', () => {
   it('retains the loaded state when a refresh fails', async () => {
     const fetchPage = jest
       .fn<Promise<DmEnvelopePage>, [{ until?: number; refresh: boolean }]>()
-      .mockResolvedValueOnce(page(['a', 'b', 'c']))
+      .mockResolvedValueOnce(full('a'))
       .mockRejectedValueOnce(new Error('nagg unavailable'));
     const { result, onReset } = setup({ fetchPage });
     await waitFor(() => expect(result.current.status).toBe('ready'));
