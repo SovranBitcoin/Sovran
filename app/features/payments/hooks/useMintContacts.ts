@@ -25,6 +25,14 @@ export interface MintContact {
   timestamp: number;
 }
 
+/** The npub a mint lists as its Nostr contact: the first Nostr contact that is one. */
+function nostrContactNpub(mintInfo: GetInfoResponse): string | undefined {
+  if (!Array.isArray(mintInfo.contact)) return undefined;
+  return mintInfo.contact.find(
+    (c) => c.method === 'nostr' && typeof c.info === 'string' && c.info.startsWith('npub1')
+  )?.info;
+}
+
 /** Mint info requests in flight at once; a miss is an HTTP round trip to the mint. */
 const MINT_INFO_CONCURRENCY = 4;
 
@@ -104,13 +112,7 @@ export function useMintContacts(
         if (cancelled) return;
 
         const withNostr: MintWithInfo[] = results.filter(
-          (r): r is MintWithInfo =>
-            r.mintInfo !== null &&
-            Array.isArray(r.mintInfo.contact) &&
-            r.mintInfo.contact.some(
-              (c) =>
-                c.method === 'nostr' && typeof c.info === 'string' && c.info.startsWith('npub1')
-            )
+          (r): r is MintWithInfo => r.mintInfo !== null && !!nostrContactNpub(r.mintInfo)
         );
         paymentLog.info('payment.mint.contacts.loaded', {
           totalMints: mints.length,
@@ -149,10 +151,10 @@ export function useMintContacts(
 
     return mintsWithInfo.map(({ mint, mintInfo }) => {
       let mintPubkey: string | null = null;
-      const nostrContact = mintInfo.contact?.find((c) => c.method === 'nostr');
-      if (nostrContact?.info) {
+      const npub = nostrContactNpub(mintInfo);
+      if (npub) {
         try {
-          mintPubkey = npubToPubkey(nostrContact.info);
+          mintPubkey = npubToPubkey(npub);
         } catch (err) {
           paymentLog.warn('payment.mint.contacts.npub_decode_failed', {
             ...mintUrlLogFields(mint.mintUrl),

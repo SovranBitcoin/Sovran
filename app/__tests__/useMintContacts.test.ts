@@ -2,6 +2,7 @@ import { act, renderHook, waitFor } from '@testing-library/react-native';
 import type { GetInfoResponse } from '@cashu/cashu-ts';
 import type { Mint } from '@cashu/coco-core';
 import { useMintContacts } from '@/features/payments/hooks/useMintContacts';
+import type { DmConversation } from '@/features/payments/hooks/useDmConversations';
 
 jest.mock('@/shared/lib/imageCache', () => ({ prefetchImages: jest.fn(async () => {}) }));
 jest.mock('@/shared/lib/nostr/client', () => ({
@@ -148,4 +149,36 @@ it('stops loading when the last mint is removed while its info is still being re
 
   expect(result.current.mintInfoLoading).toBe(false);
   expect(result.current.displayMints).toEqual([]);
+});
+
+it('uses the npub contact that admitted the mint, not the first nostr contact', async () => {
+  const mints = [mint('a')];
+  const fields: Partial<GetInfoResponse> = {
+    name: 'a',
+    contact: [
+      { method: 'nostr', info: 'https://a.example/nostr' },
+      { method: 'nostr', info: 'npub1valid' },
+    ],
+  };
+  const info = fields as GetInfoResponse;
+  const getMintInfo = async () => info;
+  const conversations: DmConversation[] = [
+    {
+      counterparty: 'hex:npub1valid',
+      lastMessagePreview: 'hello from the mint',
+      lastMessageIsOwn: false,
+      lastMessageAtSec: 1700000000,
+      protocol: 'nip17',
+      newestMessageId: 'event-1',
+    },
+  ];
+  const { result } = renderHook(() => useMintContacts(null, mints, getMintInfo, conversations));
+  await waitFor(() => expect(result.current.displayMints).toHaveLength(1));
+
+  expect(result.current.mintPubkeys).toEqual(['hex:npub1valid']);
+  expect(result.current.displayMints[0]).toMatchObject({
+    pubkey: 'hex:npub1valid',
+    dmEvent: { content: 'hello from the mint', isOwn: false },
+    timestamp: 1700000000,
+  });
 });
