@@ -309,12 +309,10 @@ describe('app lifecycle actions', () => {
     useNip46ConnectionsStore.getState().upsertApp(baseInput(client, { name: 'Coracle' }));
   });
 
-  it('block, unblock, mode, encryption, rename', () => {
+  it('block, mode, encryption, rename', () => {
     const store = useNip46ConnectionsStore.getState();
     store.blockApp(client);
     expect(useNip46ConnectionsStore.getState().apps[client].status).toBe('blocked');
-    store.unblockApp(client);
-    expect(useNip46ConnectionsStore.getState().apps[client].status).toBe('active');
 
     store.setMode(client, 'strict');
     store.setEncryption(client, 'nip04');
@@ -347,40 +345,33 @@ describe('app lifecycle actions', () => {
     expect(useNip46ConnectionsStore.getState().apps[client]).toBeUndefined();
   });
 
-  it('updateMetadataAfterApproval applies sanitized metadata only', () => {
-    useNip46ConnectionsStore.getState().updateMetadataAfterApproval(client, {
-      name: 'Primal',
-      url: 'https://primal.net',
-      relays: ['wss://relay.primal.net', 'http://insecure.example'],
-    });
-    const app = useNip46ConnectionsStore.getState().apps[client];
-    expect(app.name).toBe('Primal');
-    expect(app.url).toBe('https://primal.net');
-    expect(app.relays).toEqual(['wss://relay.primal.net']);
-  });
-
   // Pins the omit-means-keep half of `sanitizedAppMetadata`: the three display
   // fields are spread only when a sanitized value survived. Without that guard
-  // a later refresh that carries no name writes `name: undefined` straight
-  // through persist, and the app's label disappears from the signer list for
-  // good. An over-long URL must be dropped the same way, not truncated.
-  it('updateMetadataAfterApproval keeps stored metadata a later refresh omits', () => {
+  // a re-pair that carries no name writes `name: undefined` straight through
+  // persist, and the app's label disappears from the signer list for good. An
+  // over-long URL must be dropped the same way, not truncated.
+  it('a re-pair keeps stored metadata it omits and keeps only wss relays', () => {
     const store = useNip46ConnectionsStore.getState();
-    store.updateMetadataAfterApproval(client, {
-      name: 'Primal',
-      url: 'https://primal.net',
-      image: 'https://primal.net/icon.png',
-    });
+    store.upsertApp(
+      baseInput(client, {
+        name: 'Primal',
+        url: 'https://primal.net',
+        image: 'https://primal.net/icon.png',
+      })
+    );
 
-    store.updateMetadataAfterApproval(client, {
-      url: `https://primal.net/${'x'.repeat(600)}`,
-      relays: ['wss://relay.primal.net'],
-    });
+    store.upsertApp(
+      baseInput(client, {
+        url: `https://primal.net/${'x'.repeat(600)}`,
+        relays: ['wss://relay.primal.net', 'http://insecure.example'],
+      })
+    );
 
     const app = useNip46ConnectionsStore.getState().apps[client];
     expect(app.name).toBe('Primal');
     expect(app.url).toBe('https://primal.net');
     expect(app.image).toBe('https://primal.net/icon.png');
+    expect(app.relays).toEqual(['wss://relay.primal.net']);
   });
 });
 
