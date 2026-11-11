@@ -9,7 +9,7 @@ type PaymentStatusState = 'processing' | 'delivered' | 'waiting' | 'confirmed' |
  * The payment a send, melt or payment-request toast belongs to. A wallet
  * event changes the toast only when it is for this payment.
  */
-export type PaymentToastOwner =
+type PaymentToastOwner =
   /**
    * Started before the wallet issued an id for it: a key only its starter
    * holds, bound to the payment's id when the starter learns it.

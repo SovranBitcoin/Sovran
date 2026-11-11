@@ -4,11 +4,7 @@
  * A saved swap group's phase is its saved state plus whether a run in this
  * process holds it: `running` with no holder reads as interrupted.
  */
-import {
-  holdSwapGroup,
-  swapGroupOutcome,
-  swapGroupPhase,
-} from '@/shared/lib/cashu/swapGroupPhase';
+import { holdSwapGroup, swapGroupOutcome, swapGroupPhase } from '@/shared/lib/cashu/swapGroupPhase';
 import type { SwapGroup, SwapLeg } from '@/shared/stores/profile/swapTransactionsStore';
 
 it('reads a running group as running only while a run holds it', () => {

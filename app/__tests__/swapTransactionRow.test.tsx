@@ -121,7 +121,6 @@ describe('a leg whose melt or mint can still complete keeps the swap pending, ho
     }
   });
 
-
   it.each([
     ['melting', leg('melting', { meltOperationId: 'melt-op' })],
     ['verifying', leg('verifying', { meltOperationId: 'melt-op' })],

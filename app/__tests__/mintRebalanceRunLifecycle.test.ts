@@ -466,7 +466,12 @@ describe('a reroute cancelled while its intermediary is being trusted', () => {
     mockManager.ops.melt.execute.mockRejectedValueOnce(new Error('no_route'));
     mockManager.quotes.mint.create.mockImplementation(async (input) => {
       if (input.mintUrl === via) throw new Error('middleman offline');
-      return { quoteId: 'mint-quote-1', mintUrl: DESTINATION, unit: 'sat', request: 'lnbc-fixture' };
+      return {
+        quoteId: 'mint-quote-1',
+        mintUrl: DESTINATION,
+        unit: 'sat',
+        request: 'lnbc-fixture',
+      };
     });
     // The row shows the route found before its hop rows are inserted.
     let trustedForAutoRoute!: () => void;
