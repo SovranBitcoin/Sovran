@@ -153,8 +153,6 @@ interface NostrSocialActions {
    * contact list wins.
    */
   seedFollowsFromFacade: (params: { follows: string[]; createdAtSec: number }) => void;
-  setFollowOptimistic: (pubkey: string, value: boolean, pending: boolean) => void;
-  clearFollowOptimistic: (pubkey: string) => void;
   /** Record the person's tap; `followSync` publishes it. */
   setFollowIntent: (pubkey: string, value: boolean) => void;
   /** Drop the given intents, each only if no newer tap replaced it. */
@@ -499,23 +497,6 @@ export const useNostrSocialStore = create<NostrSocialStore>({
       },
 
       // ---- follow optimistic ----
-
-      setFollowOptimistic: (pubkey, value, pending) => {
-        storeLog.debug('social.follow.optimistic', { pubkey: pubkey.slice(0, 8), value, pending });
-        set((state) => ({
-          optimisticFollowsByPubkey: withOptimisticEntry(state.optimisticFollowsByPubkey, pubkey, {
-            value,
-            pending,
-          }),
-        }));
-      },
-
-      clearFollowOptimistic: (pubkey) => {
-        storeLog.debug('social.follow.optimistic.clear', { pubkey: pubkey.slice(0, 8) });
-        set((state) => ({
-          optimisticFollowsByPubkey: omitKey(state.optimisticFollowsByPubkey, pubkey),
-        }));
-      },
 
       setFollowIntent: (pubkey, value) => {
         storeLog.debug('social.follow.intent', { pubkey: pubkey.slice(0, 8), value });

@@ -59,7 +59,7 @@ export async function matchingSigner(ndk: NDK, pubkey: string) {
  */
 export type OwnEventReadOutcome = 'complete' | 'timed-out' | 'failed' | 'no-relays';
 
-export type OwnEventRead = {
+type OwnEventRead = {
   outcome: OwnEventReadOutcome;
   /** The newest valid event any relay returned, also when the read did not complete. */
   newest: NDKEvent | undefined;

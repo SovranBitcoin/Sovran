@@ -5,7 +5,8 @@
  * person's own Nostr events. Batches of events are fed through a fake relay
  * subscription into the real partition and the real profile, social, own
  * content and own-profile stores. Only the NDK subscription, the keys
- * provider, the mute-list fetch, the Nostr cache layer and storage are replaced.
+ * provider, the mute-list fetch, the follow worker, the Nostr cache layer and
+ * storage are replaced.
  */
 
 import { act, renderHook } from '@testing-library/react-native';
@@ -58,6 +59,9 @@ jest.mock('@/shared/providers/NostrKeysProvider', () => ({
 }));
 jest.mock('@/shared/lib/nostr/ownsync/useMuteListSync', () => ({
   useMuteListSync: () => undefined,
+}));
+jest.mock('@/shared/lib/nostr/ownsync/useFollowSync', () => ({
+  useFollowSync: () => undefined,
 }));
 jest.mock('@/shared/lib/nostr/buildNostrDataLayer', () => ({ buildNostrDataLayer: () => null }));
 jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({

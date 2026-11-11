@@ -20,6 +20,7 @@ import {
   parseOwnProfileSnapshot,
 } from '@/shared/lib/nostr/profile/publishOwnProfileMetadata';
 import { useEffect, useMemo, useRef } from 'react';
+import { useFollowSync } from './useFollowSync';
 import { useMuteListSync } from './useMuteListSync';
 
 import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
@@ -86,6 +87,7 @@ function applyProfile(event: OwnSyncEvent, accountIndex: number): void {
 
 export function useOwnEventsSync(): void {
   useMuteListSync();
+  useFollowSync();
   const { keys } = useNostrKeysContext();
   const pubkey = keys?.pubkey;
   const activeAccountIndex = useProfileStore((s) => s.activeAccountIndex);
