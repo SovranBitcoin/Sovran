@@ -198,7 +198,7 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
     const start = clock.now();
     while (clock.now() - start < maxWaitMs) {
       if (!isActive()) return 'aborted';
-      let state: string | null = null;
+      let state: string | undefined;
       try {
         state = (await wallet.refreshMelt(operationId)).state;
       } catch (error) {

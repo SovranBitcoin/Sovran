@@ -456,7 +456,10 @@ describe('a pass whose write was refused because the leg changed while it was re
     createSwapLegReconciler(coco).run();
     await settle();
 
-    expect(coco.ops.melt.get.mock.calls.map(([id]) => id)).toEqual(['melt-1', 'melt-2']);
+    expect(coco.ops.melt.get.mock.calls.map((call: unknown[]) => call[0])).toEqual([
+      'melt-1',
+      'melt-2',
+    ]);
     expect(leg()).toMatchObject({ localStatus: 'done', meltOperationId: 'melt-2' });
   });
 
