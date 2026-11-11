@@ -110,6 +110,22 @@ describe('the profile Follow button', () => {
     expect(selectIsFollowingPubkey(Z)(social())).toBe(true);
   });
 
+  it('writes a tap into the account whose stores are loaded when it is made', () => {
+    const { result } = renderHook(() => useFollowToggle(Z, OWN));
+    // The stores are reset and loaded for another account, as an in-process
+    // switch does, while this handler still names the first one.
+    useNostrSocialStore.setState(useNostrSocialStore.getInitialState(), true);
+
+    act(() => result.current());
+
+    // QUIRK: the handler does not check that `ownPubkey` is the account the
+    // stores hold, so this tap lands in the other account's store. No screen
+    // can make it: both switch flows unmount the account's screens before its
+    // stores change (an in-process switch suspends the providers first; the
+    // default switch never changes the stores in memory and restarts).
+    expect(social().optimisticFollowsByPubkey[Z]).toMatchObject({ value: true, pending: true });
+  });
+
   it('records nothing for the own profile, and shows the error without an account', () => {
     const own = renderHook(() => useFollowToggle(OWN, OWN));
     act(() => own.result.current());

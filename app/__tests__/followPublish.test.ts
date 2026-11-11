@@ -542,6 +542,31 @@ describe('following someone', () => {
     expect(mockPopup).not.toHaveBeenCalled();
   });
 
+  it('settles a follow one write relay took, and the next one brings the other relay up to it', async () => {
+    relaysHold(contacts(T, [['p', X]]));
+    mockRefusing.add(mockRelays[1].url);
+    const { ndk } = setup();
+
+    tap(Z);
+    await requestFollowSync(ndk, OWN);
+
+    expect(social().optimisticFollowsByPubkey).toEqual({});
+    expect(heldBy(mockRelays[1].url)).toHaveLength(1);
+
+    mockRefusing.clear();
+    tap(Y);
+    await requestFollowSync(ndk, OWN);
+
+    // Built on the list relay one took, though relay two still answers with the older one.
+    expect(publishedTags(1)).toEqual([
+      ['p', X],
+      ['p', Z],
+      ['p', Y],
+    ]);
+    for (const relay of mockRelays)
+      expect(heldBy(relay.url).at(-1)?.tags).toEqual(publishedTags(1));
+  });
+
   it('tries again for a tap made while a publish was failing', async () => {
     relaysHold(contacts(T, [['p', X]]));
     mockPublish.mockImplementationOnce(async () => {
