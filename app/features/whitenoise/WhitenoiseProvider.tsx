@@ -32,7 +32,7 @@ type WhitenoiseHandle = {
 /** The handle when there is no key or NDK yet, or the client failed to build. */
 function inertHandle(accountIndex: number): WhitenoiseHandle {
   return {
-    value: { client: null, inviteReader: null, relays: defaultRelays, accountIndex },
+    value: { client: null, inviteReader: null, accountIndex },
     stop: async () => undefined,
     close: async () => undefined,
   };
@@ -75,7 +75,7 @@ function createWhitenoiseHandle({
       await shutdown();
     };
     return {
-      value: { client, inviteReader: reader.value, relays: defaultRelays, accountIndex },
+      value: { client, inviteReader: reader.value, accountIndex },
       stop,
       close: async (mode) => {
         if (mode === 'switch') {

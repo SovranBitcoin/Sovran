@@ -117,7 +117,6 @@ function wrapper({ children }: { children: ReactNode }) {
       value={{
         client: client as never,
         inviteReader: reader as never,
-        relays: PROVIDER_RELAYS,
         accountIndex: 2,
       }}>
       {children}

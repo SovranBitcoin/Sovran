@@ -15,6 +15,7 @@ import { WhitenoiseDmIndex } from '../storage/dmIndex';
 import { WhitenoiseGroupHistory } from '../storage/groupHistory';
 import { mintLocalId } from '@/shared/lib/id';
 import { wnLog } from '@/shared/lib/logger';
+import { relays as appRelays } from '@/shared/ndk';
 
 const KEY_PACKAGE_KIND = 443;
 const GROUP_EVENT_KIND = 445;
@@ -217,7 +218,7 @@ function errorOf(state: Conversation): string | null {
 }
 
 export function useWhitenoiseDM(counterpartyPubkey: string): UseWhitenoiseDMState {
-  const { client, relays, accountIndex } = useWhitenoise();
+  const { client, accountIndex } = useWhitenoise();
   const { keys } = useNostrKeysContext();
   const selfPubkey = keys?.pubkey ?? '';
 
@@ -276,7 +277,7 @@ export function useWhitenoiseDM(counterpartyPubkey: string): UseWhitenoiseDMStat
   // Nostr-tag value marmot writes when publishing kind-445 group events.
   useEffect(() => {
     if (!client || !group || !openedFor) return;
-    const groupRelays = group.relays && group.relays.length > 0 ? group.relays : [...relays];
+    const groupRelays = group.relays && group.relays.length > 0 ? group.relays : [...appRelays];
     const nostrGroupIdHex = getNostrGroupIdHex(group.state);
 
     const onAppMessage = (bytes: Uint8Array) => {
@@ -317,7 +318,7 @@ export function useWhitenoiseDM(counterpartyPubkey: string): UseWhitenoiseDMStat
       group.off('applicationMessage', onAppMessage);
       handle.unsubscribe();
     };
-  }, [client, group, openedFor, relays, selfPubkey, updateMessages]);
+  }, [client, group, openedFor, selfPubkey, updateMessages]);
 
   // The lazy group-creation path is the high-cost double-tap target: a
   // second concurrent call would see no group yet, call `client.createGroup`
@@ -326,13 +327,12 @@ export function useWhitenoiseDM(counterpartyPubkey: string): UseWhitenoiseDMStat
   // the guard lives on useSingleFlight's ref, which holds regardless of
   // callback identity. A send decides from the client, peer and conversation
   // as they are when it is called, never as a kept callback saw them.
-  const inputs = useLatestRef({ client, relays, counterpartyPubkey, selfPubkey, accountIndex });
+  const inputs = useLatestRef({ client, counterpartyPubkey, selfPubkey, accountIndex });
   const send = useSingleFlight((text: string) => {
     const now = inputs.current;
     return sendDmImpl(
       {
         client: now.client,
-        relays: now.relays,
         opened: openedForNow(machine.current, now),
         current: () => machine.current,
         dispatch,
@@ -434,7 +434,6 @@ async function loadDmGroupImpl(
 
 interface SendDmCtx {
   client: WhitenoiseClient;
-  relays: ReturnType<typeof useWhitenoise>['relays'];
   /** The conversation, when it was opened for the current client, account and peer. */
   opened: OpenedConversation | null;
   /** The conversation as it is now, after a wait. */
@@ -544,11 +543,11 @@ function keepUninvitedGroup(target: OpenedFor, group: WnGroup | null): void {
  * earlier), invite the peer and save the index; null when that failed.
  */
 async function createDmGroup(ctx: SendDmCtx, target: OpenedFor): Promise<WnGroup | null> {
-  const { relays, dispatch } = ctx;
+  const { dispatch } = ctx;
   const { client, counterpartyPubkey, accountIndex } = target;
   dispatch({ type: 'create-started', for: target });
   try {
-    const fallbackRelays = relays.length > 0 ? [...relays] : [];
+    const fallbackRelays = [...appRelays];
     const lookupRelays = await resolveInboxRelays(
       client.network,
       counterpartyPubkey,

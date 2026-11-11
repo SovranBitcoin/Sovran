@@ -66,7 +66,6 @@ async function openWith(client: ReturnType<typeof makeClient>) {
       value={{
         client: client as never,
         inviteReader: null,
-        relays,
         accountIndex: 0,
       }}>
       <WhitenoiseSetupBanner />
