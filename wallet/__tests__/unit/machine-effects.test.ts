@@ -10,7 +10,6 @@ import {
   runNfcWriteBackEffect,
   runRecipientProfileEffect,
   runRecipientPubkeyEffect,
-  runTrustMintEffect,
 } from '../../src/machine/effects';
 import type { StepDataMap } from '../../src/machine/types';
 
@@ -347,55 +346,6 @@ describe('runMintReviewInfoEffect', () => {
       operation: async () => mintReviewInfo,
       getLocale: () => 'en',
       isStale: (op) => op === 'buildMintReviewInfo',
-    });
-
-    expect(result.isOk()).toBe(true);
-    if (result.isErr()) return;
-    expect(result.value).toEqual({ kind: 'stale' });
-  });
-});
-
-describe('runTrustMintEffect', () => {
-  it('trusts the reviewed mint', async () => {
-    const trustMint = vi.fn(async () => {});
-
-    const result = await runTrustMintEffect({
-      data: reviewMintData,
-      operation: trustMint,
-      getLocale: () => 'en',
-      isStale: () => false,
-    });
-
-    expect(result.isOk()).toBe(true);
-    expect(trustMint).toHaveBeenCalledWith('https://mint.example');
-    if (result.isErr()) return;
-    expect(result.value).toEqual({ kind: 'completed' });
-  });
-
-  it('maps trust failures to UNSUPPORTED_INPUT', async () => {
-    const result = await runTrustMintEffect({
-      data: reviewMintData,
-      operation: async () => {
-        throw new Error('Trust failed');
-      },
-      getLocale: () => 'en',
-      isStale: () => false,
-    });
-
-    expect(result.isErr()).toBe(true);
-    if (result.isOk()) return;
-    expect(result.error.data).toMatchObject({
-      code: 'UNSUPPORTED_INPUT',
-      message: 'Failed to trust mint',
-    });
-  });
-
-  it('returns stale when trust resolves after reset', async () => {
-    const result = await runTrustMintEffect({
-      data: reviewMintData,
-      operation: async () => {},
-      getLocale: () => 'en',
-      isStale: (op) => op === 'trustMint',
     });
 
     expect(result.isOk()).toBe(true);

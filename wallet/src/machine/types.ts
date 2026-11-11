@@ -498,8 +498,6 @@ export interface FlowContext {
    * the swap server-side.
    */
   offline?: boolean;
-  /** Token held during mint trust review. Set on REVIEW_MINT, consumed on MINT_TRUSTED. */
-  reviewToken?: string;
   /** Original raw input string from scan/execute. Available after EXECUTE. */
   rawInput?: string;
   /** Scan source hint. Persisted for the flow's lifetime (cleared on RESET). */
@@ -629,7 +627,6 @@ export type FlowEvent =
   | { type: "START_RECEIVE" }
   | { type: "SHOW_RECEIVE_QR" }
   | { type: "REVIEW_MINT"; mintUrl: string; token: string }
-  | { type: "MINT_TRUSTED" }
   | { type: "CONFIRM_MELT" }
   | { type: "CONFIRM_PAYMENT_REQUEST" }
   | { type: "RESET" };
@@ -1036,11 +1033,7 @@ export interface MachineOperations {
   buildMintListItems: (
     data: StepDataMap["selectMint"],
   ) => Promise<MintListItem[]>;
-  /**
-   * Trust a mint. Called internally by `mintTrusted()` when the machine is
-   * in the `reviewMint` step. The machine transitions to `receiveToken`
-   * on success or `error` on failure.
-   */
+  /** Trust a mint. Run by the `mintInfo` screen's `trust` action. */
   trustMint?: (mintUrl: string) => Promise<void>;
   /**
    * Load detailed mint info for the trust review screen.
@@ -1466,13 +1459,6 @@ export interface PaymentMachine {
    * The `reviewMint` handler is dispatched so the wallet controls the navigation.
    */
   reviewMint: (mintUrl: string, token: string) => Promise<void>;
-  /**
-   * Trust the mint currently being reviewed.
-   * Calls `operations.trustMint(mintUrl)` internally, then transitions
-   * from `reviewMint` back to `receiveToken` so the user can retry the
-   * redeem. On failure, transitions to `error`.
-   */
-  mintTrusted: () => Promise<void>;
   /**
    * Confirm and execute a melt from the preview screen.
    * Requires `operations.executeMelt` to be provided. On success, dispatches

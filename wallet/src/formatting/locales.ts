@@ -56,7 +56,6 @@ const en: TranslationMap = {
   MELT_FAILED: 'Lightning payment failed',
   PAYMENT_REQUEST_FAILED: 'Payment request failed',
   LOAD_MINTS_FAILED: 'Failed to load mints',
-  TRUST_MINT_FAILED: 'Failed to trust mint',
 
   // Mint selection errors
   NO_ALLOWED_MINT_TRUSTED: 'No allowed mint is trusted',
@@ -91,7 +90,6 @@ const ar: TranslationMap = {
   MELT_FAILED: 'فشل الدفع عبر البرق',
   PAYMENT_REQUEST_FAILED: 'فشل طلب الدفع',
   LOAD_MINTS_FAILED: 'فشل تحميل المنتات',
-  TRUST_MINT_FAILED: 'فشل الوثوق بالمنت',
 
   NO_ALLOWED_MINT_TRUSTED: 'لا يوجد منت مسموح به موثوق',
   INSUFFICIENT_BALANCE_ALLOWED: 'رصيد غير كافٍ في المنتات المسموحة',
@@ -125,7 +123,6 @@ const de: TranslationMap = {
   MELT_FAILED: 'Lightning-Zahlung fehlgeschlagen',
   PAYMENT_REQUEST_FAILED: 'Zahlungsanfrage fehlgeschlagen',
   LOAD_MINTS_FAILED: 'Mints konnten nicht geladen werden',
-  TRUST_MINT_FAILED: 'Mint konnte nicht vertraut werden',
 
   NO_ALLOWED_MINT_TRUSTED: 'Kein erlaubter Mint ist vertraut',
   INSUFFICIENT_BALANCE_ALLOWED: 'Unzureichendes Guthaben bei erlaubten Mints',

@@ -28,7 +28,6 @@ import {
   runNfcWriteBackEffect,
   runRecipientProfileEffect,
   runRecipientPubkeyEffect,
-  runTrustMintEffect,
 } from "./effects";
 import type { MachineEffectLink, MachineEffectNotification } from "./effects";
 import { transition } from "./transitions";
@@ -133,7 +132,6 @@ const INTENT_EVENTS = new Set<FlowEvent["type"]>([
   "START_RECEIVE",
   "SHOW_RECEIVE_QR",
   "REVIEW_MINT",
-  "MINT_TRUSTED",
   "RESET",
 ]);
 
@@ -163,7 +161,6 @@ const LEAVES_SETTLED_PAYMENT: Record<FlowEvent["type"], boolean> = {
   PROOFS_CHOSEN: false,
   SEND_MEMO_SUBMITTED: false,
   REQUEST_MINT_SELECTOR: false,
-  MINT_TRUSTED: false,
   CONFIRM_MELT: false,
   CONFIRM_PAYMENT_REQUEST: false,
 };
@@ -1501,11 +1498,6 @@ export function createPaymentMachine(
             }
           : event;
 
-      const reviewMintData =
-        event.type === "MINT_TRUSTED" && step === "reviewMint"
-          ? (stepData as StepDataMap["reviewMint"])
-          : null;
-
       // Capture original options before transition overwrites stepData.
       const preTransitionOptions =
         event.type === "OPTION_CHOSEN" &&
@@ -2186,26 +2178,6 @@ export function createPaymentMachine(
         setExecuting(false);
       }
 
-      // Trust mint operation: when MINT_TRUSTED transitions to receiveToken,
-      // call operations.trustMint first. On failure, redirect to error.
-      if (reviewMintData && operations?.trustMint && step === "receiveToken") {
-        setExecuting(true);
-
-        const effect = await runTrustMintEffect({
-          data: reviewMintData,
-          operation: operations.trustMint,
-          getLocale: () => getLocale?.() ?? "en",
-          isStale: (op) => isStaleGeneration(sendGeneration, op),
-        });
-
-        if (effect.isOk()) {
-          if (effect.value.kind === "stale") return;
-        } else {
-          setStep("error", effect.error.data);
-        }
-        setExecuting(false);
-      }
-
       // Quote-first melt preview (BTC-05): create the melt quote BEFORE the
       // preview screen renders so the confirm sheet can show the mint's real
       // fee_reserve and the amount+fee total. Pay executes against THIS
@@ -2550,8 +2522,6 @@ export function createPaymentMachine(
   const reviewMint = (mintUrl: string, token: string) =>
     send({ type: "REVIEW_MINT", mintUrl, token });
 
-  const mintTrusted = () => send({ type: "MINT_TRUSTED" });
-
   const confirmMelt = () => send({ type: "CONFIRM_MELT" });
   const confirmPaymentRequest = async (): Promise<PaymentRequestConfirmOutcome> => {
     const holder = registerConfirm();
@@ -2585,7 +2555,6 @@ export function createPaymentMachine(
     startReceive,
     showReceiveQr,
     reviewMint,
-    mintTrusted,
     confirmMelt,
     confirmPaymentRequest,
     reset,

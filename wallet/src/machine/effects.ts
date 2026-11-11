@@ -205,20 +205,6 @@ type MintReviewInfoEffectError = {
   data: StepDataMap['error'];
 };
 
-type TrustMintEffectSuccess =
-  | {
-      kind: 'completed';
-    }
-  | {
-      kind: 'stale';
-    };
-
-type TrustMintEffectError = {
-  kind: 'failed';
-  cause: unknown;
-  data: StepDataMap['error'];
-};
-
 type MintListEnrichmentEffectSuccess =
   | {
       kind: 'completed';
@@ -359,13 +345,6 @@ interface RunMintReviewInfoEffectConfig {
   isStale: (op: string) => boolean;
 }
 
-interface RunTrustMintEffectConfig {
-  data: StepDataMap['reviewMint'];
-  operation: NonNullable<MachineOperations['trustMint']>;
-  getLocale: () => string;
-  isStale: (op: string) => boolean;
-}
-
 interface RunMintListEnrichmentEffectConfig {
   data: StepDataMap['selectMint'];
   operation: MachineOperations['buildMintListItems'];
@@ -498,23 +477,6 @@ function toMintReviewInfoEffectError(
       code: 'UNSUPPORTED_INPUT',
       // Shown as is by the app; the cause is in the log line above.
       message: t('LOAD_MINTS_FAILED', locale),
-    },
-  };
-}
-
-function toTrustMintEffectError(
-  cause: unknown,
-  locale: string,
-): TrustMintEffectError {
-  logger.warn('effects.trustMint.error', {
-    error: errField(cause),
-  });
-  return {
-    kind: 'failed',
-    cause,
-    data: {
-      code: 'UNSUPPORTED_INPUT',
-      message: t('TRUST_MINT_FAILED', locale),
     },
   };
 }
@@ -1627,46 +1589,6 @@ export function runMintReviewInfoEffect({
       logger.warn('effects.mintReviewInfo.failed', {
         step,
         ...mintUrlFields(mintUrl),
-        error: errField(failure.cause),
-      });
-      return errAsync(failure);
-    });
-}
-
-export function runTrustMintEffect({
-  data,
-  operation,
-  getLocale,
-  isStale,
-}: RunTrustMintEffectConfig): ResultAsync<
-  TrustMintEffectSuccess,
-  TrustMintEffectError
-> {
-  const locale = getLocale();
-
-  logger.info('effects.trustMint.start', {
-    ...mintUrlFields(data.mintUrl),
-  });
-
-  return ResultAsync.fromThrowable(
-    () => operation(data.mintUrl),
-    (cause) => toTrustMintEffectError(cause, locale),
-  )()
-    .andThen(() => {
-      if (isStale('trustMint')) {
-        logger.info('effects.trustMint.stale', { op: 'trustMint' });
-        return okAsync({ kind: 'stale' } as const);
-      }
-      logger.info('effects.trustMint.completed', { ...mintUrlFields(data.mintUrl) });
-      return okAsync({ kind: 'completed' } as const);
-    })
-    .orElse((failure) => {
-      if (isStale('trustMint.catch')) {
-        logger.info('effects.trustMint.stale', { op: 'trustMint.catch' });
-        return okAsync({ kind: 'stale' } as const);
-      }
-      logger.warn('effects.trustMint.failed', {
-        ...mintUrlFields(data.mintUrl),
         error: errField(failure.cause),
       });
       return errAsync(failure);

@@ -795,23 +795,9 @@ export function transition(
       // payment's preview for Pay to send again.
       return stamp({
         step: "reviewMint",
-        context: {
-          ...(currentStep === "receiveToken" ? currentCtx : { unit }),
-          reviewToken: event.token,
-        },
+        context: currentStep === "receiveToken" ? { ...currentCtx } : { unit },
         data: { mintUrl: event.mintUrl, token: event.token },
       });
-    case "MINT_TRUSTED": {
-      const token = currentCtx.reviewToken;
-      if (token) {
-        return stamp({
-          step: "receiveToken",
-          context: { ...currentCtx, reviewToken: undefined },
-          data: { token },
-        });
-      }
-      return UNCHANGED;
-    }
   }
 
   // State-specific events

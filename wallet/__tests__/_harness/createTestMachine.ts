@@ -344,9 +344,6 @@ async function executeAction(machine: PaymentMachine, action: FlowAction): Promi
     case 'reviewMint':
       await machine.reviewMint(action.mintUrl, action.token);
       break;
-    case 'mintTrusted':
-      await machine.mintTrusted();
-      break;
     case 'reset':
       machine.reset();
       break;

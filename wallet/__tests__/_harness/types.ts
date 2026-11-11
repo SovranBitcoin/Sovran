@@ -177,8 +177,6 @@ export type FlowAction =
   | { type: 'confirmPaymentRequest' }
   /** App initiates mint trust review (untrusted mint detected). */
   | { type: 'reviewMint'; mintUrl: string; token: string }
-  /** User trusts the mint after reviewing. */
-  | { type: 'mintTrusted' }
   /** User taps Cancel / Back — reset to idle. */
   | { type: 'reset' };
 

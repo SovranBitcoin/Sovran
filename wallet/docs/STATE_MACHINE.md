@@ -114,7 +114,7 @@ step, `isExecuting`, and the step's data as `details` on an input step and on
 | `mintQuoteCreated` | Terminal success of mint-quote creation. | no | yes |
 | `navigateToMeltPreview` | Lightning melt preview/confirm; `CONFIRM_MELT` executes in place. Carries `phase`: `preview` or `settled {historyEntry}`. | no | yes |
 | `navigateToPaymentRequest` | Payment-request preview/confirm; `CONFIRM_PAYMENT_REQUEST` executes in place. Carries `phase`: `preview`, `settled {historyEntry}` or `undelivered {operationId}`. NFC auto-execute target. | no | yes |
-| `receiveToken` | Token redeem step. Reached from intent and from `MINT_TRUSTED`. | no | yes |
+| `receiveToken` | Token redeem step. Reached from intent. | no | yes |
 | `reviewMint` | Mint trust-review before redeeming from an untrusted mint. | no | yes |
 | `openMint` | Open a mint info screen (non-trust-review). | no | yes |
 | `openProfile` | Open a Nostr profile screen. | no | yes |
@@ -169,7 +169,6 @@ one turn at a time (see "How a turn flows").
 | `startReceiveLightning({reset?})` | `START_RECEIVE_LIGHTNING` | |
 | `startReceive({reset?})` | `START_RECEIVE` | |
 | `reviewMint(mintUrl, token)` | `REVIEW_MINT` | |
-| `mintTrusted()` | `MINT_TRUSTED` | then runs `operations.trustMint` |
 | `confirmMelt()` | `CONFIRM_MELT` | runs `operations.executeMelt` in place |
 | `confirmPaymentRequest()` | `CONFIRM_PAYMENT_REQUEST` | returns `PaymentRequestConfirmOutcome`: `delivered`, `rolledBack`, `failed`, `undelivered {operationId}` or `ignored` |
 | `reset()` | `resetInternal` + notify | |
@@ -231,17 +230,17 @@ signal that the flow has given up -- a `chooseFallbackOption` step may follow.
 
 ### 3.6 Events
 
-All 15 `FlowEvent` types are dispatched via `send()`
+All 14 `FlowEvent` types are dispatched via `send()`
 (`src/machine/types.ts:355-412`):
 
 `EXECUTE`, `OPTION_CHOSEN`, `AMOUNT_ENTERED`, `MINT_SELECTED`, `PROOFS_CHOSEN`,
 `SEND_MEMO_SUBMITTED`, `REQUEST_MINT_SELECTOR`, `START_SEND_ECASH`,
-`START_RECEIVE_LIGHTNING`, `START_RECEIVE`, `REVIEW_MINT`, `MINT_TRUSTED`,
+`START_RECEIVE_LIGHTNING`, `START_RECEIVE`, `REVIEW_MINT`,
 `CONFIRM_MELT`, `CONFIRM_PAYMENT_REQUEST`, `RESET`.
 
 Global events (handled from any state, `transitions.ts:390-441`): `EXECUTE`,
 `RESET`, `REQUEST_MINT_SELECTOR`, `SEND_MEMO_SUBMITTED`, `START_SEND_ECASH`,
-`START_RECEIVE_LIGHTNING`, `START_RECEIVE`, `REVIEW_MINT`, `MINT_TRUSTED`.
+`START_RECEIVE_LIGHTNING`, `START_RECEIVE`, `REVIEW_MINT`.
 State-specific events (`transitions.ts:444-453`): `OPTION_CHOSEN`,
 `AMOUNT_ENTERED`, `MINT_SELECTED`, `PROOFS_CHOSEN`. These four are not actually
 state-gated inside `transition()`; the second switch only lists events not
@@ -273,8 +272,8 @@ send(event)
         -> stamp offline onto every result.context
         -> {step, context, data}
         -> or {kind:'unchanged'} when the step does not handle the event
-           (a stray PROOFS_CHOSEN / SEND_MEMO_SUBMITTED, MINT_TRUSTED with no
-           review token, a CONFIRM_* off its step): step, data and context
+           (a stray PROOFS_CHOSEN / SEND_MEMO_SUBMITTED, a CONFIRM_* off
+           its step): step, data and context
            stay, nothing is dispatched, the turn finishes
   -> setStep(step, data); flowCtx = merged context
   -> if step is confirmSend/createMintQuote AND operations present:
@@ -584,8 +583,8 @@ MUST NOT:
 Intent: redeem an incoming ecash token. The token resolves to `receiveToken` with
 NO machine-level trust check; the app's `receiveToken.redeem` screen action runs
 `operations.isMintTrusted` and either calls `operations.executeReceive` (trusted)
-or routes through `reviewMint` -> `MINT_TRUSTED` -> `trustMint` ->
-`receiveToken` (untrusted). This is distinct from `startReceive` /
+or routes to `reviewMint` (untrusted), whose handler opens the mint page; its
+`mintInfo.trust` screen action runs `operations.trustMint`. This is distinct from `startReceive` /
 `startReceiveLightning`, which GENERATE a receive address / quote and never touch
 `executeReceive`.
 
@@ -595,7 +594,7 @@ EXECUTE(ecashToken) -> receiveToken                       (no trust gate here)
         unit !== 'sat' -> onUnsupportedTokenUnit; return
         isMintTrusted? false -> machine.reviewMint(mintUrl, token); return
         true -> onReceiveProcessing -> executeReceive -> onReceiveConfirmed
-   reviewMint -> MINT_TRUSTED -> trustMint (same dispatch) -> receiveToken
+   reviewMint -> mint page -> mintInfo.trust -> trustMint
         user presses Redeem AGAIN (isMintTrusted now true) -> executeReceive
 ```
 
@@ -603,7 +602,7 @@ EXECUTE(ecashToken) -> receiveToken                       (no trust gate here)
 | --- | --- | --- |
 | `operations.isMintTrusted` | redeem trust gate | never (local) |
 | `operations.buildMintReviewInfo` | entering `reviewMint` | conditional |
-| `operations.trustMint` | `MINT_TRUSTED` | conditional |
+| `operations.trustMint` | `mintInfo.trust` screen action | conditional |
 | `operations.executeReceive` | redeem trusted path | always |
 | `operations.linkTransaction` | redeem success | never (app-provided; default omits it) |
 
@@ -619,10 +618,8 @@ MUST:
   `defaultHandlers.ts:224-232`.
 - Redeem must reject non-sat tokens via `onUnsupportedTokenUnit`.
   `defaultHandlers.ts:212-217`.
-- `MINT_TRUSTED` transitions to `receiveToken` only when `ctx.reviewToken` is
-  present; otherwise it is a no-op. `transitions.ts:430-439`.
-- `trustMint` runs in the SAME dispatch as `MINT_TRUSTED`; trust-then-redeem is a
-  two-press loop and `MINT_TRUSTED` does NOT auto-redeem. `createMachine.ts:1151-1171`.
+- Trust-then-redeem is a two-press loop: trusting on the mint page does NOT
+  auto-redeem.
 - The synthetic receive fallback must not echo the encoded token into
   `onTransactionCreated`. `defaultOperations.ts:714-727`.
 - `linkTransaction` must prefer `flowCtx.rawInput` over the re-encoded token so
@@ -991,8 +988,7 @@ The en copy for `MINT_UNREACHABLE` is "Mint unreachable" (`locales.ts:29`); for
 `destination`, `mintQuoteMethod`, `meltQuoteMethod`, `unit` (required),
 `paymentRequest`, `meltTarget`, `recipientPubkey`, `recipientProfile`,
 `amountEntryDisplay`, `localProofSend`, `memo`, `sendMemoHandled`,
-`mintUnreachableConfirmed`, `supportedMintUrls`, `offline`, `reviewToken`,
-`rawInput`, `source`, `originalOptions`, `failedOptionValues`
+`mintUnreachableConfirmed`, `supportedMintUrls`, `offline`, `rawInput`, `source`, `originalOptions`, `failedOptionValues`
 (`types.ts:215-287`).
 
 ### Root-entry context clearing
@@ -1075,7 +1071,6 @@ during verification and the invariant rests on source review.
       (`defaultHandlers.ts:224-232`).
 - [ ] Non-sat token rejected via `onUnsupportedTokenUnit`
       (`defaultHandlers.ts:212-217`).
-- [ ] `MINT_TRUSTED` no-op without `reviewToken` (`transitions.ts:430-439`).
 - [ ] Synthetic receive entry omits the encoded token
       (`defaultOperations.ts:714-727`).
 - [ ] `linkTransaction` prefers `flowCtx.rawInput` (`defaultHandlers.ts:261-269`).
@@ -1151,7 +1146,7 @@ during verification and the invariant rests on source review.
 | `src/machine/transitions.ts` | `transition()`, handlers (`handleExecute`/`handleAmountEntered`/`handleMintSelected`/`handleProofsChosen`/`handleSendMemoSubmitted`/`handleOptionChosen`), offline stamping, context reset/merge |
 | `src/machine/resolveNext.ts` | intent-driven routing, `getDestination`, gather order, `checkProofComposition`, `terminalStep`, mint gather, method requirements |
 | `src/machine/contextResolution.ts` | `resolveFromContext` (intent-less continuation), `revalidateMintForAmount`, `requestMintSelector` |
-| `src/machine/effects.ts` | `runConfirmSendEffect`, `runConfirmMeltEffect`, `runConfirmPaymentRequestEffect`, `runMintQuoteEffect`, `runNfcWriteBackEffect`, `runMintReviewInfoEffect`, `runTrustMintEffect`, `handleConfirmSendFailure`, offline error builders |
+| `src/machine/effects.ts` | `runConfirmSendEffect`, `runConfirmMeltEffect`, `runConfirmPaymentRequestEffect`, `runMintQuoteEffect`, `runNfcWriteBackEffect`, `runMintReviewInfoEffect`, `handleConfirmSendFailure`, offline error builders |
 | `src/machine/amountFallback.ts` | `buildProofSuggestions`, `buildChooseProofsData`, `buildChooseAmountFallback`, `buildBalanceSuggestions` |
 | `src/machine/flows/send.ts` | `startSendEcashFlow`, mint pre-resolution |
 | `src/machine/flows/receive.ts` | `startReceiveFlow`, `startReceiveLightningFlow` |
@@ -1463,9 +1458,9 @@ Shipped NFC behavior is Section 5.6. The following are intended, not shipped:
 ### 11.15 Review mint: trust / don't-trust with auto-melt -- gap
 
 - Current: the `reviewMint` step is entered only by `REVIEW_MINT`
-  (`transitions.ts:424-429`) and has exactly two exits: `MINT_TRUSTED` ->
-  `trustMint` -> `receiveToken` (`transitions.ts:430-440`,
-  `createMachine.ts:1153-1171`), or the app `back`. The `mintInfo` action surface
+  (`transitions.ts:424-429`); the machine has no exit from it of its own. The
+  app's `reviewMint` handler opens the mint page, where `trust` runs
+  `operations.trustMint`, or the app `back`. The `mintInfo` action surface
   is `trust | copy | share | back` (`src/screen-actions/types.ts:54`); there is
   NO don't-trust / reject action and NO `MINT_DISTRUSTED` event.
 - Current: the redeem trust gate runs BEFORE `executeReceive`

@@ -78,8 +78,6 @@ function summarizeContext(ctx: FlowContext): Record<string, unknown> {
     offline: !!ctx.offline,
     supportedMintCount: ctx.supportedMintUrls?.length ?? 0,
     failedOptionCount: ctx.failedOptionValues?.length ?? 0,
-    hasReviewToken: !!ctx.reviewToken,
-    reviewTokenLength: ctx.reviewToken?.length ?? 0,
     hasRawInput: !!ctx.rawInput,
     rawInputLength: ctx.rawInput?.length ?? 0,
     hasSource: !!ctx.source,

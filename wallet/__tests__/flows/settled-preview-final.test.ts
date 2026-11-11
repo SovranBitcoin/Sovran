@@ -154,7 +154,6 @@ const EXPECTED: Record<FlowEvent["type"], "newFlow" | "unchanged"> = {
   PROOFS_CHOSEN: "unchanged",
   SEND_MEMO_SUBMITTED: "unchanged",
   REQUEST_MINT_SELECTOR: "unchanged",
-  MINT_TRUSTED: "unchanged",
   CONFIRM_MELT: "unchanged",
   CONFIRM_PAYMENT_REQUEST: "unchanged",
 };
@@ -169,7 +168,6 @@ function eventsOf(type: FlowEvent["type"], s: Settled): FlowEvent[] {
     case "START_RECEIVE_LIGHTNING":
     case "START_RECEIVE":
     case "SHOW_RECEIVE_QR":
-    case "MINT_TRUSTED":
     case "CONFIRM_MELT":
     case "CONFIRM_PAYMENT_REQUEST":
     case "START_SEND_ECASH":
@@ -229,14 +227,6 @@ const FOLLOW_THROUGH: { name: string; run: (tm: Built, s: Settled) => Promise<un
     name: "an amount, then Pay",
     run: async (tm, s) => {
       await tm.machine.enterAmount({ value: s.amount, unit: "sat" }, MINT1);
-      return s.pay(tm);
-    },
-  },
-  {
-    name: "trusting the mint, the mint list, then Pay",
-    run: async (tm, s) => {
-      await tm.machine.mintTrusted();
-      await tm.machine.requestMintSelector();
       return s.pay(tm);
     },
   },

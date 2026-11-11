@@ -19,15 +19,16 @@
  * There's nothing for the user to decide — just "accept" or "reject".
  *
  * The one complication is TRUST: if the token came from a mint the user
- * hasn't trusted yet, the machine detours through the reviewMint flow:
- *   execute(token) → reviewMint → [user trusts mint] → receiveToken
+ * hasn't trusted yet, the app opens the reviewMint step. Trusting happens on
+ * the mint page (the `mintInfo.trust` screen action); the token's receive
+ * screen underneath redeems it when Redeem is pressed again.
  *
  * This file tests:
  *   - Direct receive: execute(token) → receiveToken
  *   - Prefix variations: cashu:, cashu:// → same result
  *   - Wallet independence: works with any wallet state
  *   - Handler verification: receiveToken handler is called with token data
- *   - Trust review flow: reviewMint → mintTrusted → receiveToken
+ *   - Trust review: reviewMint opens the review with the token
  *   - Table-driven scenarios: declarative format for the above flows
  */
 
@@ -104,35 +105,23 @@ describe('receive token — prefix variations', () => {
 
 /**
  * When the token's mint isn't trusted by the user, the app shows a
- * review screen before accepting the token. The flow becomes:
- *   reviewMint(untrustedMint, token) → [user reviews] → mintTrusted() → receiveToken
- *
- * The token is stored as `reviewToken` in context during the review.
- * After the user trusts the mint, the machine continues to receiveToken
- * with the original token.
+ * review screen before accepting the token:
+ *   reviewMint(untrustedMint, token) → reviewMint step
  *
  * Note: the trust check itself happens in the app layer (not in the
- * machine) — the app calls reviewMint() when it detects an untrusted mint.
+ * machine) — the app calls reviewMint() when it detects an untrusted mint,
+ * and trusting is the mint page's `trust` screen action.
  */
 describe('receive token — trust review flow', () => {
-  it('reviewMint → mintTrusted → receiveToken', async () => {
+  it('reviewMint opens the review with the mint and the token', async () => {
     const tm = createTestMachine();
     // App detects untrusted mint and initiates review
     await tm.machine.reviewMint('https://new.mint.example.com', INPUTS.cashuTokenV3);
     tm.assertStep('reviewMint');
-
-    // User reviews mint info and taps "Trust"
-    await tm.machine.mintTrusted();
-    // Machine continues to receiveToken with the original token
-    tm.assertStep('receiveToken');
-  });
-
-  it('reviewMint stores reviewToken in context', async () => {
-    // The token must be stored so we can resume after trusting.
-    // Without it, mintTrusted wouldn't know what token to receive.
-    const tm = createTestMachine();
-    await tm.machine.reviewMint('https://new.mint.example.com', INPUTS.cashuTokenV3);
-    tm.assertContext({ reviewToken: INPUTS.cashuTokenV3 });
+    expect(tm.handlerCalls.at(-1)).toMatchObject({
+      step: 'reviewMint',
+      data: { mintUrl: 'https://new.mint.example.com', token: INPUTS.cashuTokenV3 },
+    });
   });
 
   it('keeps the scanned input of the token receive it interrupts', async () => {
@@ -141,8 +130,7 @@ describe('receive token — trust review flow', () => {
     await tm.machine.execute(INPUTS.cashuTokenV3);
     tm.assertStep('receiveToken');
     await tm.machine.reviewMint('https://new.mint.example.com', INPUTS.cashuTokenV3);
-    await tm.machine.mintTrusted();
-    tm.assertStep('receiveToken');
+    tm.assertStep('reviewMint');
     tm.assertContext({ rawInput: INPUTS.cashuTokenV3 });
   });
 });
@@ -162,18 +150,12 @@ const RECEIVE_SCENARIOS: FlowScenario[] = [
     expect: { step: 'receiveToken' },
   },
   {
-    name: 'receive via trust review: reviewMint → mintTrusted → receiveToken',
+    name: 'review an untrusted mint: reviewMint → reviewMint',
     steps: [
       // App initiates review for untrusted mint
       { type: 'reviewMint', mintUrl: 'https://new.example.com', token: INPUTS.cashuTokenV3 },
-      // User trusts the mint
-      { type: 'mintTrusted' },
     ],
-    waypoints: [
-      // After step 0, we should be at reviewMint waiting for user decision
-      { afterStep: 0, step: 'reviewMint' },
-    ],
-    expect: { step: 'receiveToken' },
+    expect: { step: 'reviewMint' },
   },
 ];
 
@@ -215,9 +197,6 @@ describe('receive token — no machine notifications during routing', () => {
     const tm = createTestMachine();
     await tm.machine.reviewMint('https://new.mint.example.com', INPUTS.cashuTokenV3);
     tm.assertStep('reviewMint');
-
-    await tm.machine.mintTrusted();
-    tm.assertStep('receiveToken');
 
     expect(tm.notificationCalls).toHaveLength(0);
   });

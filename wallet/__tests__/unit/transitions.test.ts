@@ -32,7 +32,6 @@
  *     START_RECEIVE    → receiveHub
  *     REQUEST_MINT_SELECTOR → selectMint
  *     REVIEW_MINT      → reviewMint
- *     MINT_TRUSTED     → receiveToken (when reviewToken exists)
  *
  *   STATE-SPECIFIC EVENTS (only handled in their respective step):
  *     AMOUNT_ENTERED   → advances past enterAmount
@@ -907,10 +906,8 @@ describe('transition — REQUEST_MINT_SELECTOR', () => {
 /**
  * REVIEW_MINT is triggered when the user receives a cashu token from an
  * untrusted mint. Before redeeming, the user must review and trust the
- * mint. The machine parks at reviewMint until the user decides.
- *
- * The reviewToken is stored in context so that after trusting, the machine
- * can continue to receiveToken with the original token.
+ * mint (on the mint page). The machine parks at reviewMint with the mint and
+ * the token as step data.
  */
 describe('transition — REVIEW_MINT', () => {
   it('routes to reviewMint step', () => {
@@ -920,35 +917,7 @@ describe('transition — REVIEW_MINT', () => {
       token: 'cashuAtest',
     });
     expect(result.step).toBe('reviewMint');
-    // The token is saved so we can resume after trusting
-    expect(result.context.reviewToken).toBe('cashuAtest');
-  });
-});
-
-// ---------------------------------------------------------------------------
-// MINT_TRUSTED — global event
-// ---------------------------------------------------------------------------
-
-/**
- * MINT_TRUSTED fires after the user approves the untrusted mint in the
- * review screen. If a reviewToken exists in context, the machine continues
- * to receiveToken to redeem it. If no reviewToken (shouldn't happen in
- * normal flow), the machine stays on reviewMint.
- */
-describe('transition — MINT_TRUSTED', () => {
-  it('routes to receiveToken when reviewToken exists', () => {
-    const ctx: FlowContext = { ...idle, reviewToken: 'cashuAtest' };
-    const result = tx('reviewMint', ctx, { type: 'MINT_TRUSTED' });
-    expect(result.step).toBe('receiveToken');
-    // reviewToken is consumed — cleared from context
-    expect(result.context.reviewToken).toBeUndefined();
-  });
-
-  it('stays on current step when no reviewToken', () => {
-    // Edge case: MINT_TRUSTED without a reviewToken. The machine has
-    // nothing to continue with, so it stays on reviewMint.
-    const result = txOutcome('reviewMint', idle, { type: 'MINT_TRUSTED' });
-    expect(result).toEqual({ kind: 'unchanged' });
+    expect(result.data).toEqual({ mintUrl: MINT1, token: 'cashuAtest' });
   });
 });
 
