@@ -1,4 +1,4 @@
-import { useFeedIgnoreStore } from '@/features/feed/stores/ignoreStore';
+import { useBlockedConversation } from '@/features/feed/hooks/useBlockedConversation';
 import { avatarStateFor } from '@/shared/lib/imageLoadState';
 import { ModeratedDmBubble } from '../components/ModeratedDmBubble';
 /**
@@ -94,9 +94,7 @@ export function UserMessagesScreen({
   onBack,
 }: UserMessagesScreenProps) {
   useLifecycleLogger('UserMessagesScreen');
-  const blocked = useFeedIgnoreStore((s) => s.ignoredPubkeys.includes(pubkey));
-  const filterEnabled = useFeedIgnoreStore((s) => s.dmFilterEnabled);
-  const filterWords = useFeedIgnoreStore((s) => s.dmFilterWords);
+  const { blocked, banner, guardSend, wordFilter } = useBlockedConversation(pubkey);
 
   const [shade400, background] = useThemeColor(['shade-400', 'background'] as const);
   const { keys: nostrKeys } = useNostrKeysContext();
@@ -274,7 +272,7 @@ export function UserMessagesScreen({
       bubbleMessages,
       counterpartyMetadata,
       counterpartyResolving,
-      filterWords,
+      filterWords: wordFilter.words,
       blocked,
       machine,
     },
@@ -333,7 +331,6 @@ export function UserMessagesScreen({
 
   const handleNostrDMSend = useCallback(
     async (text: string) => {
-      if (useFeedIgnoreStore.getState().ignoredPubkeys.includes(pubkey)) return;
       // Mock thread: append locally and stop. Publishing here would broadcast
       // demo messages outside the isolated conversation.
       if (isMockThread) {
@@ -548,20 +545,15 @@ export function UserMessagesScreen({
         log={chatLog}
         messages={blocked ? [] : bubbleMessages}
         composerDisabled={blocked}
-        banner={
-          blocked ? (
-            <Text>This person is blocked. Open “Block or report” to unblock them.</Text>
-          ) : undefined
-        }
+        banner={banner}
         renderBubble={(args) => (
           <ModeratedDmBubble
             {...args}
             scope={`${nostrKeys?.pubkey}:${pubkey}:${protocol}`}
-            enabled={filterEnabled}
-            words={filterWords}
+            {...wordFilter}
           />
         )}
-        onSend={handleNostrDMSend}
+        onSend={guardSend(handleNostrDMSend)}
         onStartReached={hasMore ? loadMore : undefined}
         onStartReachedThreshold={0.3}
         composerPlaceholder="Write here"

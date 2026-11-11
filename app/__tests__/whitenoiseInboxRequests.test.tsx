@@ -19,6 +19,7 @@ import type { ReactNode } from 'react';
 
 import { wnLog } from '@/shared/lib/logger';
 import { WhitenoiseContext } from '@/features/whitenoise/WhitenoiseContext';
+import { relays } from '@/shared/ndk';
 import { useWhitenoiseInbox } from '@/features/whitenoise/hooks/useWhitenoiseInbox';
 import {
   useWhitenoiseRequests,
@@ -45,7 +46,8 @@ jest.mock('@/shared/lib/logger', () => {
 const SELF = 'a'.repeat(64);
 const INVITER = 'c'.repeat(64);
 const OTHER = 'd'.repeat(64);
-const PROVIDER_RELAYS = ['wss://app.example'];
+/** The app's relays, which the provider hands White Noise. */
+const PROVIDER_RELAYS = relays;
 const CURSOR_KEY = 'whitenoise:2:inbox-cursor:last-seen-at';
 
 function deferred<T = void>() {
@@ -115,7 +117,6 @@ function wrapper({ children }: { children: ReactNode }) {
       value={{
         client: client as never,
         inviteReader: reader as never,
-        relays: PROVIDER_RELAYS,
         accountIndex: 2,
       }}>
       {children}

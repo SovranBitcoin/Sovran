@@ -9,6 +9,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import type { ReactNode } from 'react';
 
 import { WhitenoiseContext } from '@/features/whitenoise/WhitenoiseContext';
+import { relays } from '@/shared/ndk';
 import { WhitenoiseSetupBanner } from '@/features/whitenoise/components/WhitenoiseSetupBanner';
 
 const mockIndicatorPhases: string[] = [];
@@ -65,7 +66,6 @@ async function openWith(client: ReturnType<typeof makeClient>) {
       value={{
         client: client as never,
         inviteReader: null,
-        relays: ['wss://relay.example'],
         accountIndex: 0,
       }}>
       <WhitenoiseSetupBanner />
@@ -135,5 +135,7 @@ it('a setup that publishes the key packages shows the success check', async () =
   await pressSetUp();
 
   expect(client.keyPackages.create).toHaveBeenCalledTimes(2);
+  // Each key package names the app's relays, the ones it is published to.
+  expect(client.keyPackages.create).toHaveBeenCalledWith({ relays, isLastResort: true });
   expect(mockIndicatorPhases).toContain('done');
 });

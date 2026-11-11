@@ -229,7 +229,7 @@ _Reference — every capability Sovran ships today, organized by concern. Each i
 
 ### Discovery
 
-<!-- code: features/map/screens/MapScreen.tsx; features/map/screens/MerchantDetailScreen.tsx; features/map/hooks/useMapMarkers.ts; features/map/hooks/useMapCamera.ts; shared/lib/map/mapClustering.ts; shared/lib/map/btcMapClusterCache.ts; shared/stores/global/btcMapStore.ts; features/mint/hooks/useAuditedMints.ts; features/mint/hooks/useNostrDiscoveredMints.ts -->
+<!-- code: features/map/screens/MapScreen.tsx; features/map/screens/MerchantDetailScreen.tsx; features/map/hooks/useMerchantMap.ts; features/map/hooks/useMapCamera.ts; shared/lib/map/mapClustering.ts; shared/lib/map/btcMapClusterCache.ts; shared/stores/global/btcMapStore.ts; features/mint/hooks/useAuditedMints.ts; features/mint/hooks/useNostrDiscoveredMints.ts -->
 
 - [x] **btcmaps.org merchants** — Bitcoin-accepting merchants on an interactive map
 - [x] **Map clustering** — `supercluster`-backed zoom-aware merchant clustering

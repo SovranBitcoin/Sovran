@@ -1,4 +1,4 @@
-import { useFeedIgnoreStore } from '@/features/feed/stores/ignoreStore';
+import { useBlockedConversation } from '@/features/feed/hooks/useBlockedConversation';
 import { ModeratedDmBubble } from '@/features/user/components/ModeratedDmBubble';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 /**
@@ -10,7 +10,7 @@ import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
  * DM modes mount the shared `<DmChatHeader>`.
  */
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { Stack } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 
@@ -31,15 +31,8 @@ import { useBluetoothState } from '../hooks/useBluetoothState';
 import { BluetoothInlineNotice, ChatStatusStrip } from '../components/BluetoothNotice';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { withGlassHeaderItems } from '@/navigation/headerItems';
-import {
-  ChatMessageBubble,
-  ChatScreen,
-  DmChatHeader,
-  extractCashuToken,
-  type ChatBubbleMessage,
-} from '@/shared/ui/composed/chat';
+import { ChatMessageBubble, ChatScreen, DmChatHeader } from '@/shared/ui/composed/chat';
 import { Screen } from '@/shared/ui/composed/Screen';
-import type { ChatMessage } from 'bitchat-module';
 
 interface GeohashChatScreenProps {
   /**
@@ -61,16 +54,7 @@ interface GeohashChatScreenProps {
   dmPeerID?: string;
   /** Display name for the DM peer. Used in the header title. */
   dmNickname?: string;
-  onBack?: () => void;
 }
-
-/**
- * Failed Bluetooth DMs already retried in this app session, by message id. A
- * retry sends the text again as a new message with its own status and its own
- * retry, so the failed one is retried once. Module scope, so leaving and
- * reopening the chat does not offer it again.
- */
-const retriedBleDmIds = new Set<string>();
 
 export function GeohashChatScreen({
   geohash,
@@ -78,7 +62,6 @@ export function GeohashChatScreen({
   transport = 'nostr',
   dmPeerID,
   dmNickname,
-  onBack,
 }: GeohashChatScreenProps) {
   useLifecycleLogger('GeohashChatScreen');
 
@@ -90,11 +73,11 @@ export function GeohashChatScreen({
     'accent-foreground',
   ] as const);
 
-  const { messages, isConnected, sendMessage } = useBitChat(
-    geohash,
+  const { messages, isConnected, sendMessage, retryFor } = useBitChat({
     transport,
-    dmPeerID ? { dm: { peerID: dmPeerID, nickname: dmNickname } } : undefined
-  );
+    geohash,
+    peerID: dmPeerID,
+  });
   // Always call; the hook is safe when BLE isn't running. We use the peer
   // list for two things: the peer-count badge on the mesh tier header, and
   // the reachability banner above the BLE-DM composer.
@@ -130,41 +113,12 @@ export function GeohashChatScreen({
   // identity). For ble-dm it's a 16-hex BitChat peer ID — no Nostr identity,
   // so DmChatHeader falls back to nickname-only and hides the npub/QR.
   const isNostrPubkey = !!dmPeerID && Hex64.safeParse(dmPeerID).success;
-  const blocked = useFeedIgnoreStore(
-    (s) => transport === 'nostr-dm' && !!dmPeerID && s.ignoredPubkeys.includes(dmPeerID)
+  const { blocked, banner, guardSend, wordFilter } = useBlockedConversation(
+    transport === 'nostr-dm' ? dmPeerID : undefined
   );
-  const filterEnabled = useFeedIgnoreStore((s) => s.dmFilterEnabled);
-  const filterWords = useFeedIgnoreStore((s) => s.dmFilterWords);
   const ownPubkey = useNostrKeysContext().keys?.pubkey;
 
-  const handleBack = onBack ?? (() => router.back());
-  const [retriedIds, setRetriedIds] = useState<ReadonlySet<string>>(() => new Set(retriedBleDmIds));
-
-  const bubbleMessages = useMemo<ChatBubbleMessage[]>(
-    () =>
-      messages.map((m: ChatMessage) => {
-        // `ble-dm` messages carry a richer `deliveryStatus` from the global
-        // store; all other transports just have `isPending`. Cast to read
-        // the optional field without forcing every ChatMessage shape to
-        // declare it.
-        const richStatus = (m as { deliveryStatus?: ChatBubbleMessage['deliveryStatus'] })
-          .deliveryStatus;
-        const deliveryStatus: ChatBubbleMessage['deliveryStatus'] | undefined = m.isOwn
-          ? (richStatus ?? (m.isPending ? 'sending' : 'sent'))
-          : undefined;
-        return {
-          id: m.id,
-          content: m.content,
-          senderId: m.senderId,
-          sender: m.sender,
-          timestamp: m.timestamp,
-          isOwn: m.isOwn,
-          deliveryStatus,
-          cashuToken: extractCashuToken(m.content) ?? undefined,
-        };
-      }),
-    [messages]
-  );
+  const handleBack = () => router.back();
 
   const header = isDM ? (
     <DmChatHeader
@@ -299,59 +253,27 @@ export function GeohashChatScreen({
       <ChatScreen
         surface={surface}
         log={bitchatLog}
-        messages={blocked ? [] : bubbleMessages}
+        messages={blocked ? [] : messages}
         composerDisabled={blocked}
-        banner={
-          blocked ? (
-            <Text>This person is blocked. Open “Block or report” to unblock them.</Text>
-          ) : undefined
-        }
-        onSend={(text) => {
-          if (
-            transport !== 'nostr-dm' ||
-            !useFeedIgnoreStore.getState().ignoredPubkeys.includes(dmPeerID ?? '')
-          )
-            return sendMessage(text);
-        }}
+        banner={banner}
+        onSend={guardSend(sendMessage)}
         composerPlaceholder="Write here"
         renderBubble={
           transport === 'ble-dm'
-            ? ({ message: m, isFirstInGroup, isLastInGroup }) => {
-                // Look up the original content from `messages` so retry
-                // re-dispatches the exact text the user typed (the bubble's
-                // `content` may have been stripped of an embedded cashu
-                // token in `bubbleMessages`).
-                const original = messages.find((src) => src.id === m.id);
-                const handleRetry =
-                  m.deliveryStatus === 'failed' && original && !retriedIds.has(m.id)
-                    ? () => {
-                        // A second tap can land before the bubble re-renders
-                        // without its retry.
-                        if (retriedBleDmIds.has(m.id)) return;
-                        retriedBleDmIds.add(m.id);
-                        setRetriedIds(new Set(retriedBleDmIds));
-                        bitchatLog.info('bitchat.screen.ble_dm_retry', {
-                          messageID: m.id,
-                        });
-                        void sendMessage(original.content);
-                      }
-                    : undefined;
-                return (
-                  <ChatMessageBubble
-                    message={m}
-                    isFirstInGroup={isFirstInGroup}
-                    isLastInGroup={isLastInGroup}
-                    onRetry={handleRetry}
-                  />
-                );
-              }
+            ? ({ message, isFirstInGroup, isLastInGroup }) => (
+                <ChatMessageBubble
+                  message={message}
+                  isFirstInGroup={isFirstInGroup}
+                  isLastInGroup={isLastInGroup}
+                  onRetry={retryFor(message)}
+                />
+              )
             : transport === 'nostr-dm'
               ? (args) => (
                   <ModeratedDmBubble
                     {...args}
                     scope={`${ownPubkey}:${dmPeerID}:${geohash}`}
-                    enabled={filterEnabled}
-                    words={filterWords}
+                    {...wordFilter}
                   />
                 )
               : undefined

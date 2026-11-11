@@ -6,6 +6,7 @@ import { resolveInboxRelays } from '../client/network';
 import { AsyncStorageKVBackend } from '../storage/asyncStorageBackend';
 import { WhitenoiseNamespace, whitenoisePrefix } from '../storage/namespaces';
 import { wnLog } from '@/shared/lib/logger';
+import { relays as appRelays } from '@/shared/ndk';
 
 type GiftWrapEvent = Parameters<InviteReader['ingestEvent']>[0];
 
@@ -32,7 +33,7 @@ const CURSOR_SLACK_SECONDS = 60;
  * account scope.
  */
 export function useWhitenoiseInbox() {
-  const { client, inviteReader, relays, accountIndex } = useWhitenoise();
+  const { client, inviteReader, accountIndex } = useWhitenoise();
   const { keys } = useNostrKeysContext();
   const selfPubkey = keys?.pubkey;
 
@@ -63,7 +64,7 @@ export function useWhitenoiseInbox() {
     const start = async () => {
       // Prefer the user's published kind-10051 inbox relays if any; fall
       // back to the default app relay set.
-      const inboxRelays = await resolveInboxRelays(client.network, selfPubkey, relays);
+      const inboxRelays = await resolveInboxRelays(client.network, selfPubkey, appRelays);
       if (cancelled) return;
 
       // No cursor on first cold start: full backfill once so users with
@@ -170,5 +171,5 @@ export function useWhitenoiseInbox() {
       cancelled = true;
       unsubscribe?.();
     };
-  }, [client, inviteReader, selfPubkey, relays, cursorStore]);
+  }, [client, inviteReader, selfPubkey, cursorStore]);
 }

@@ -13,14 +13,14 @@
  */
 import { useCallback, type ReactNode } from 'react';
 import { Platform } from 'react-native';
-import { useBluetoothState, type UseBluetoothStateResult } from '../hooks/useBluetoothState';
+import type { UseBluetoothStateResult } from '../hooks/useBluetoothState';
 import { Button } from '@/shared/ui/primitives/Button';
 import { EmptyState } from '@/shared/ui/composed/EmptyState';
 import { Notice } from '@/shared/ui/composed/Notice';
 
 interface BluetoothNoticeProps {
-  /** Pass the surrounding screen's hook result to share one subscription. */
-  bluetooth?: UseBluetoothStateResult;
+  /** The surrounding screen's `useBluetoothState()` result. */
+  bluetooth: UseBluetoothStateResult;
 }
 
 function noticeAction(
@@ -77,9 +77,7 @@ const COPY: Record<UseBluetoothStateResult['status'], NoticeCopy | null> = {
   },
 };
 
-export function BluetoothNotice({ bluetooth: bluetoothProp }: BluetoothNoticeProps) {
-  const ownBluetooth = useBluetoothState();
-  const bluetooth = bluetoothProp ?? ownBluetooth;
+export function BluetoothNotice({ bluetooth }: BluetoothNoticeProps) {
   const copy = COPY[bluetooth.status];
   const action = noticeAction(bluetooth);
   const handlePress = useCallback(() => action?.onPress(), [action]);
@@ -111,9 +109,7 @@ export function BluetoothNotice({ bluetooth: bluetoothProp }: BluetoothNoticePro
  * Bluetooth is unavailable (e.g. a BLE DM thread with history). Shares
  * `ChatStatusStrip` with GeohashChatScreen's peer-reachability banners.
  */
-export function BluetoothInlineNotice({ bluetooth: bluetoothProp }: BluetoothNoticeProps) {
-  const ownBluetooth = useBluetoothState();
-  const bluetooth = bluetoothProp ?? ownBluetooth;
+export function BluetoothInlineNotice({ bluetooth }: BluetoothNoticeProps) {
   const copy = COPY[bluetooth.status];
   const action = noticeAction(bluetooth);
   const handlePress = useCallback(() => action?.onPress(), [action]);

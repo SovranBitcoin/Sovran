@@ -3,6 +3,7 @@ import type { MarmotClient } from '@internet-privacy/marmot-ts';
 import { useWhitenoise } from '../WhitenoiseContext';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { wnLog } from '@/shared/lib/logger';
+import { relays as appRelays } from '@/shared/ndk';
 
 const TARGET_KEY_PACKAGE_COUNT = 2;
 
@@ -27,7 +28,6 @@ async function readCount(client: MarmotClient): Promise<number> {
 // Bodies live at module scope: they need nothing from render scope beyond the
 // setters, and keeping them out of the hook keeps its compiled output lean.
 type WhitenoiseClient = ReturnType<typeof useWhitenoise>['client'];
-type WhitenoiseRelays = ReturnType<typeof useWhitenoise>['relays'];
 
 async function refreshImpl(
   client: WhitenoiseClient,
@@ -58,7 +58,6 @@ async function refreshImpl(
 
 async function bootstrapImpl(
   client: WhitenoiseClient,
-  relays: WhitenoiseRelays,
   io: {
     setKeyPackageCount: (value: number) => void;
     setIsBootstrapping: (value: boolean) => void;
@@ -69,13 +68,9 @@ async function bootstrapImpl(
     io.setError('White Noise client not ready');
     return false;
   }
-  if (relays.length === 0) {
-    io.setError('No relays configured');
-    return false;
-  }
   io.setIsBootstrapping(true);
   io.setError(null);
-  const targetRelays = [...relays];
+  const targetRelays = [...appRelays];
   try {
     const startCount = await readCount(client);
     const need = Math.max(0, TARGET_KEY_PACKAGE_COUNT - startCount);
@@ -102,7 +97,7 @@ async function bootstrapImpl(
 }
 
 export function useWhitenoiseSetup(): WhitenoiseSetupState {
-  const { client, relays } = useWhitenoise();
+  const { client } = useWhitenoise();
   const [keyPackageCount, setKeyPackageCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isBootstrapping, setIsBootstrapping] = useState(false);
@@ -138,7 +133,7 @@ export function useWhitenoiseSetup(): WhitenoiseSetupState {
   // guard lives on useSingleFlight's ref, so it holds regardless of this
   // callback's identity.
   const bootstrap = useSingleFlight(() =>
-    bootstrapImpl(client, relays, { setKeyPackageCount, setIsBootstrapping, setError })
+    bootstrapImpl(client, { setKeyPackageCount, setIsBootstrapping, setError })
   );
 
   return {

@@ -1,13 +1,14 @@
 /**
  * The White Noise conversation screen's send box: it opens only once the
  * conversation has loaded, so nothing typed can reach a send that would not
- * yet know whether a group already exists.
+ * yet know whether a group already exists; and a blocked person's
+ * conversation shows nothing, says how to unblock and sends nothing.
  *
  * The conversation hook is replaced at the screen's boundary
  * (`useWhitenoiseDM`), and the chat surface records the props it is given.
  */
 import { render } from '@testing-library/react-native';
-import type { ReactNode } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 
 import { WhitenoiseDMScreen } from '@/features/whitenoise/screens/WhitenoiseDMScreen';
 
@@ -22,13 +23,22 @@ let mockDm = {
   messages: [],
   send: jest.fn(async (_text: string) => undefined),
 };
-let mockChatProps: { composerDisabled?: boolean } = {};
+type ChatProps = {
+  composerDisabled?: boolean;
+  composerPlaceholder?: string;
+  emptyContent?: ReactNode;
+  messages?: unknown[];
+  banner?: ReactNode;
+  onSend?: (text: string) => unknown;
+};
+let mockChatProps: ChatProps = {};
+let mockIgnored: string[] = [];
 
 jest.mock('@/features/whitenoise/hooks/useWhitenoiseDM', () => ({
   useWhitenoiseDM: () => mockDm,
 }));
 jest.mock('@/shared/ui/composed/chat', () => ({
-  ChatScreen: (props: { composerDisabled?: boolean }) => {
+  ChatScreen: (props: ChatProps) => {
     mockChatProps = props;
     return null;
   },
@@ -42,9 +52,10 @@ jest.mock('@/features/user/components/ModeratedDmBubble', () => ({
   ModeratedDmBubble: () => null,
 }));
 jest.mock('@/features/feed/stores/ignoreStore', () => {
-  const state = { ignoredPubkeys: [], dmFilterEnabled: false, dmFilterWords: [] };
-  const useFeedIgnoreStore = (selector: (s: typeof state) => unknown) => selector(state);
-  useFeedIgnoreStore.getState = () => state;
+  const state = () => ({ ignoredPubkeys: mockIgnored, dmFilterEnabled: false, dmFilterWords: [] });
+  const useFeedIgnoreStore = (selector: (s: ReturnType<typeof state>) => unknown) =>
+    selector(state());
+  useFeedIgnoreStore.getState = state;
   return { useFeedIgnoreStore };
 });
 jest.mock('@/shared/providers/NostrKeysProvider', () => ({
@@ -82,4 +93,97 @@ it('keeps the send box closed while the conversation is loading', () => {
 it('opens the send box once loading has settled, with or without a group', () => {
   expect(openWith({ isLoading: false, hasGroup: true })).toBe(false);
   expect(openWith({ isLoading: false, hasGroup: false })).toBe(false);
+});
+
+it('a blocked person’s conversation shows nothing, says how to unblock and sends nothing', async () => {
+  mockIgnored = [PEER];
+  openWith({
+    isLoading: false,
+    hasGroup: true,
+    messages: [
+      { id: 'm1', content: 'hi', authorPubkey: PEER, createdAtSec: 1, isSelf: false },
+    ] as never,
+  });
+
+  expect(mockChatProps.messages).toEqual([]);
+  expect(mockChatProps.composerDisabled).toBe(true);
+  await mockChatProps.onSend?.('hi');
+  expect(mockDm.send).not.toHaveBeenCalled();
+  expect((mockChatProps.banner as ReactElement<{ children: string }>).props.children).toBe(
+    'This person is blocked. Open “Block or report” to unblock them.'
+  );
+  mockIgnored = [];
+});
+
+/** Every string in a React element tree, in order. */
+function textsOf(node: ReactNode): string[] {
+  if (typeof node === 'string') return [node];
+  if (Array.isArray(node)) return node.flatMap(textsOf);
+  if (node && typeof node === 'object' && 'props' in node) {
+    return textsOf((node as ReactElement<{ children?: ReactNode }>).props.children);
+  }
+  return [];
+}
+
+it.each([
+  [
+    'no client',
+    { isClientReady: false, isLoading: false, isCreatingGroup: false, hasGroup: false },
+    true,
+    'Write here',
+    'White Noise is not available yet.',
+  ],
+  [
+    'loading',
+    { isClientReady: true, isLoading: true, isCreatingGroup: false, hasGroup: false },
+    true,
+    'Write here',
+    'Loading…',
+  ],
+  [
+    'reading a saved group’s history',
+    { isClientReady: true, isLoading: true, isCreatingGroup: false, hasGroup: true },
+    true,
+    'Write here',
+    'Loading…',
+  ],
+  [
+    'creating the group',
+    { isClientReady: true, isLoading: false, isCreatingGroup: true, hasGroup: false },
+    true,
+    'Creating encrypted group…',
+    'Start an MLS-encrypted chat with ',
+  ],
+  [
+    'no group yet',
+    { isClientReady: true, isLoading: false, isCreatingGroup: false, hasGroup: false },
+    false,
+    'Write here',
+    'Start an MLS-encrypted chat with ',
+  ],
+  [
+    'a group',
+    { isClientReady: true, isLoading: false, isCreatingGroup: false, hasGroup: true },
+    false,
+    'Write here',
+    'No messages yet. Say hi to ',
+  ],
+])('%s: the send box and the empty thread say so', (_name, dm, disabled, placeholder, empty) => {
+  openWith({ ...dm, error: null, messages: [] });
+  expect(mockChatProps.composerDisabled).toBe(disabled);
+  expect(mockChatProps.composerPlaceholder).toBe(placeholder);
+  expect(textsOf(mockChatProps.emptyContent)[0]).toMatch(new RegExp(`^${empty}`));
+});
+
+it('shows a failed read or send as the banner, the send box staying open', () => {
+  openWith({
+    isClientReady: true,
+    isLoading: false,
+    isCreatingGroup: false,
+    hasGroup: true,
+    error: 'no relay accepted',
+    messages: [],
+  });
+  expect(mockChatProps.composerDisabled).toBe(false);
+  expect(textsOf(mockChatProps.banner)).toEqual(['no relay accepted']);
 });

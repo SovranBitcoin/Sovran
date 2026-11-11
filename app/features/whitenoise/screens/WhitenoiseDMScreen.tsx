@@ -1,4 +1,4 @@
-import { useFeedIgnoreStore } from '@/features/feed/stores/ignoreStore';
+import { useBlockedConversation } from '@/features/feed/hooks/useBlockedConversation';
 import { ModeratedDmBubble } from '@/features/user/components/ModeratedDmBubble';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useMemo } from 'react';
@@ -28,9 +28,7 @@ const SURFACE = 'whitenoise' as const;
  */
 export function WhitenoiseDMScreen({ pubkey }: { pubkey: string }) {
   useLifecycleLogger('WhitenoiseDMScreen');
-  const blocked = useFeedIgnoreStore((s) => s.ignoredPubkeys.includes(pubkey));
-  const filterEnabled = useFeedIgnoreStore((s) => s.dmFilterEnabled);
-  const filterWords = useFeedIgnoreStore((s) => s.dmFilterWords);
+  const { blocked, banner, guardSend, wordFilter } = useBlockedConversation(pubkey);
   const ownPubkey = useNostrKeysContext().keys?.pubkey;
 
   const { metadata } = useNostrProfileMetadata(pubkey);
@@ -82,24 +80,20 @@ export function WhitenoiseDMScreen({ pubkey }: { pubkey: string }) {
           <ModeratedDmBubble
             {...args}
             scope={`${ownPubkey}:${pubkey}:whitenoise`}
-            enabled={filterEnabled}
-            words={filterWords}
+            {...wordFilter}
           />
         )}
-        onSend={(text) => {
-          if (!useFeedIgnoreStore.getState().ignoredPubkeys.includes(pubkey)) return send(text);
-        }}
+        onSend={guardSend(send)}
         composerDisabled={blocked || !isClientReady || isLoading || isCreatingGroup}
         composerPlaceholder={isCreatingGroup ? 'Creating encrypted group…' : 'Write here'}
         composerTestID="whitenoise-dm-input"
         banner={
-          blocked ? (
-            <Text>This person is blocked. Open “Block or report” to unblock them.</Text>
-          ) : error ? (
+          banner ??
+          (error ? (
             <Text size={13} style={{ color: danger, padding: 12 }}>
               {error}
             </Text>
-          ) : null
+          ) : null)
         }
         isLoading={false}
         historyExtras={(last) => ({

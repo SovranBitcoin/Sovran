@@ -42,7 +42,7 @@ beforeEach(() => {
 });
 
 test('BLE chat handles native iOS and Android peer list events without requiring a peerID', async () => {
-  const view = renderHook(() => useBitChat(undefined, 'ble'));
+  const view = renderHook(() => useBitChat({ transport: 'ble' }));
   await act(async () => {});
   // Exact payload emitted by both native bridges' didUpdatePeerList callback.
   expect(() => {
@@ -60,7 +60,7 @@ test('BLE chat handles native iOS and Android peer list events without requiring
 test.each(['connected', 'disconnected'] as const)(
   'BLE chat logs an iOS %s peer event without exposing the full identifier',
   async (type) => {
-    const view = renderHook(() => useBitChat(undefined, 'ble'));
+    const view = renderHook(() => useBitChat({ transport: 'ble' }));
     await act(async () => {});
     act(() => mockPeerListener({ type, peerID: '0123456789abcdef' }));
     expect(bitchatLog.debug).toHaveBeenLastCalledWith('bitchat.hook.ble_peer', {

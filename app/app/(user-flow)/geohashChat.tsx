@@ -9,7 +9,6 @@
  * alphabet so a malformed link cannot reach the native bitchat module.
  */
 
-import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { z } from 'zod';
 
 import { GeohashChatScreen } from '@/features/bitchat/screens/GeohashChatScreen';
@@ -31,7 +30,6 @@ function GeohashChatRoute() {
       geohash={params.geohash}
       tierLabel={params.tierLabel}
       transport={params.transport ?? 'nostr'}
-      onBack={() => router.back()}
     />
   );
 }

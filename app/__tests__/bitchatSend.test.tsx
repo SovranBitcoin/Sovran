@@ -85,7 +85,7 @@ jest.mock('@/features/bitchat/lib/profileScope', () => ({
 }));
 jest.mock('@/shared/lib/logger', () => {
   const log = { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() };
-  return { bitchatLog: log, log, storeLog: log, redactError: (e: unknown) => e };
+  return { bitchatLog: log, cashuLog: log, log, storeLog: log, redactError: (e: unknown) => e };
 });
 
 const GEOHASH = 'u4pruy';
@@ -126,7 +126,7 @@ async function leaveBeforeBLEStarts(...args: Parameters<typeof useBitChat>) {
   });
   await act(async () => undefined);
   expect(view.result.current.isConnected).toBe(false);
-  view.rerender([undefined, 'nostr']);
+  view.rerender([{ transport: 'nostr' }]);
   await act(async () => {
     starting.resolve(undefined);
     await starting.promise;
@@ -148,7 +148,7 @@ afterEach(() => {
 
 describe('public geohash chat (nostr)', () => {
   it('starts Nostr for the profile, joins the geohash and reports connected', async () => {
-    const { result } = await mount(GEOHASH, 'nostr');
+    const { result } = await mount({ transport: 'nostr', geohash: GEOHASH });
 
     expect(mockNative.startNostr).toHaveBeenCalledWith('profile-1');
     expect(mockNative.joinGeohash).toHaveBeenCalledWith(GEOHASH);
@@ -158,7 +158,7 @@ describe('public geohash chat (nostr)', () => {
   it('a send goes to sendGeohashMessage with the nickname and shows a pending, then sent, own row', async () => {
     const sending = deferred<undefined>();
     mockNative.sendGeohashMessage.mockReturnValueOnce(sending.promise);
-    const { result } = await mount(GEOHASH, 'nostr');
+    const { result } = await mount({ transport: 'nostr', geohash: GEOHASH });
 
     let done!: Promise<void>;
     act(() => {
@@ -171,9 +171,8 @@ describe('public geohash chat (nostr)', () => {
         sender: 'Tester',
         senderId: '',
         timestamp: NOW,
-        isPrivate: false,
         isOwn: true,
-        isPending: true,
+        deliveryStatus: 'sending',
       }),
     ]);
 
@@ -182,12 +181,12 @@ describe('public geohash chat (nostr)', () => {
       await done;
     });
     expect(result.current.messages).toEqual([
-      expect.objectContaining({ content: 'gm', isPending: false }),
+      expect.objectContaining({ content: 'gm', deliveryStatus: 'sent' }),
     ]);
   });
 
   it('collapses the relay echo of an own message and drops messages for another geohash', async () => {
-    const { result } = await mount(GEOHASH, 'nostr');
+    const { result } = await mount({ transport: 'nostr', geohash: GEOHASH });
     await act(async () => {
       await result.current.sendMessage('gm');
     });
@@ -224,12 +223,12 @@ describe('public geohash chat (nostr)', () => {
       ['gm', true],
       ['hello back', false],
     ]);
-    expect(result.current.messages[1]).toMatchObject({ senderId: NOSTR_PEER, isPrivate: false });
+    expect(result.current.messages[1]).toMatchObject({ senderId: NOSTR_PEER });
   });
 
   it('a rejected native send removes the row and resolves without an error (F183)', async () => {
     mockNative.sendGeohashMessage.mockRejectedValueOnce(new Error('relay down'));
-    const { result } = await mount(GEOHASH, 'nostr');
+    const { result } = await mount({ transport: 'nostr', geohash: GEOHASH });
 
     let outcome!: Promise<void>;
     await act(async () => {
@@ -244,7 +243,7 @@ describe('public geohash chat (nostr)', () => {
   });
 
   it('does not connect without a geohash', async () => {
-    const { result } = await mount(undefined, 'nostr');
+    const { result } = await mount({ transport: 'nostr' });
 
     expect(mockNative.startNostr).not.toHaveBeenCalled();
     expect(result.current.isConnected).toBe(false);
@@ -252,7 +251,7 @@ describe('public geohash chat (nostr)', () => {
 
   it('stays disconnected when joining the geohash fails', async () => {
     mockNative.joinGeohash.mockRejectedValueOnce(new Error('no relays'));
-    const { result } = await mount(GEOHASH, 'nostr');
+    const { result } = await mount({ transport: 'nostr', geohash: GEOHASH });
 
     expect(result.current.isConnected).toBe(false);
   });
@@ -260,7 +259,7 @@ describe('public geohash chat (nostr)', () => {
 
 describe('public Bluetooth chat (ble)', () => {
   it('takes a public mesh lease, starts BLE with the profile identity and releases the lease on unmount', async () => {
-    const { result, unmount } = await mount(undefined, 'ble');
+    const { result, unmount } = await mount({ transport: 'ble' });
 
     expect(mockNative.acquirePublicBLEMesh).toHaveBeenCalledTimes(1);
     expect(mockNative.startBLE).toHaveBeenCalledWith({
@@ -275,12 +274,12 @@ describe('public Bluetooth chat (ble)', () => {
   });
 
   it('a BLE start that resolves after leaving the chat leaves it disconnected', async () => {
-    const { result } = await leaveBeforeBLEStarts(undefined, 'ble');
+    const { result } = await leaveBeforeBLEStarts({ transport: 'ble' });
     expect(result.current.isConnected).toBe(false);
   });
 
   it('a send goes to sendBLEMessage and a mesh message arrives as a peer row', async () => {
-    const { result } = await mount(undefined, 'ble');
+    const { result } = await mount({ transport: 'ble' });
 
     await act(async () => {
       await result.current.sendMessage('hi mesh');
@@ -303,7 +302,7 @@ describe('public Bluetooth chat (ble)', () => {
 
   it('a rejected native send removes the row and resolves (F183)', async () => {
     mockNative.sendBLEMessage.mockRejectedValueOnce(new Error('mesh not started'));
-    const { result } = await mount(undefined, 'ble');
+    const { result } = await mount({ transport: 'ble' });
 
     await act(async () => {
       await expect(result.current.sendMessage('lost')).resolves.toBeUndefined();
@@ -315,7 +314,7 @@ describe('public Bluetooth chat (ble)', () => {
 
 describe('Nostr direct message (nostr-dm)', () => {
   it('sends a gift-wrapped DM to the peer and keeps only that peer’s incoming messages', async () => {
-    const { result } = await mount(GEOHASH, 'nostr-dm', { dm: { peerID: NOSTR_PEER } });
+    const { result } = await mount({ transport: 'nostr-dm', geohash: GEOHASH, peerID: NOSTR_PEER });
     expect(mockNative.joinGeohash).toHaveBeenCalledWith(GEOHASH);
 
     await act(async () => {
@@ -341,14 +340,14 @@ describe('Nostr direct message (nostr-dm)', () => {
     });
 
     expect(mockNative.sendGeohashPrivateMessage).toHaveBeenCalledWith(NOSTR_PEER, 'psst');
-    expect(result.current.messages.map((m) => [m.content, m.isOwn, m.isPrivate])).toEqual([
-      ['psst', true, true],
-      ['from peer', false, true],
+    expect(result.current.messages.map((m) => [m.content, m.isOwn])).toEqual([
+      ['psst', true],
+      ['from peer', false],
     ]);
   });
 
   it('a peer id that is not a Nostr pubkey never reaches native and the row is dropped', async () => {
-    const { result } = await mount(GEOHASH, 'nostr-dm', { dm: { peerID: BLE_PEER } });
+    const { result } = await mount({ transport: 'nostr-dm', geohash: GEOHASH, peerID: BLE_PEER });
 
     await act(async () => {
       await result.current.sendMessage('psst');
@@ -360,7 +359,7 @@ describe('Nostr direct message (nostr-dm)', () => {
 
   it('a rejected native send removes the row and resolves (F183)', async () => {
     mockNative.sendGeohashPrivateMessage.mockRejectedValueOnce(new Error('relay down'));
-    const { result } = await mount(GEOHASH, 'nostr-dm', { dm: { peerID: NOSTR_PEER } });
+    const { result } = await mount({ transport: 'nostr-dm', geohash: GEOHASH, peerID: NOSTR_PEER });
 
     await act(async () => {
       await expect(result.current.sendMessage('lost')).resolves.toBeUndefined();
@@ -374,21 +373,19 @@ describe('Bluetooth direct message (ble-dm)', () => {
   const thread = () => useBitchatDmMessagesStore.getState().byPeer[BLE_PEER] ?? [];
 
   it('starts BLE and the Noise handshake with the peer on open', async () => {
-    await mount(undefined, 'ble-dm', { dm: { peerID: BLE_PEER } });
+    await mount({ transport: 'ble-dm', peerID: BLE_PEER });
 
     expect(mockNative.startBLE).toHaveBeenCalledTimes(1);
     expect(mockNative.startBLEPrivateChat).toHaveBeenCalledWith(BLE_PEER);
   });
 
   it('a BLE start that resolves after leaving the thread leaves it disconnected', async () => {
-    const { result } = await leaveBeforeBLEStarts(undefined, 'ble-dm', {
-      dm: { peerID: BLE_PEER },
-    });
+    const { result } = await leaveBeforeBLEStarts({ transport: 'ble-dm', peerID: BLE_PEER });
     expect(result.current.isConnected).toBe(false);
   });
 
   it('a send saves a sending row in the DM store, then hands native the same message id', async () => {
-    const { result } = await mount(undefined, 'ble-dm', { dm: { peerID: BLE_PEER } });
+    const { result } = await mount({ transport: 'ble-dm', peerID: BLE_PEER });
 
     await act(async () => {
       await result.current.sendMessage('hello peer');
@@ -414,12 +411,14 @@ describe('Bluetooth direct message (ble-dm)', () => {
       nickname: 'Tester',
       messageID: id,
     });
-    expect(result.current.messages).toBe(thread());
+    expect(result.current.messages).toEqual([
+      expect.objectContaining({ id, content: 'hello peer', deliveryStatus: 'sending' }),
+    ]);
   });
 
   it('a native rejection marks the saved row failed with the reason and cancels the watchdog', async () => {
     mockNative.sendBLEPrivateMessage.mockRejectedValueOnce(new Error('peer unknown'));
-    const { result } = await mount(undefined, 'ble-dm', { dm: { peerID: BLE_PEER } });
+    const { result } = await mount({ transport: 'ble-dm', peerID: BLE_PEER });
 
     await act(async () => {
       await result.current.sendMessage('hello peer');
@@ -440,7 +439,7 @@ describe('Bluetooth direct message (ble-dm)', () => {
   });
 
   it('a row still sending after 15 s is marked failed with reason timeout', async () => {
-    const { result } = await mount(undefined, 'ble-dm', { dm: { peerID: BLE_PEER } });
+    const { result } = await mount({ transport: 'ble-dm', peerID: BLE_PEER });
     await act(async () => {
       await result.current.sendMessage('hello peer');
     });
@@ -456,7 +455,7 @@ describe('Bluetooth direct message (ble-dm)', () => {
   });
 
   it('a row that reached sent before 15 s is left alone by the watchdog', async () => {
-    const { result } = await mount(undefined, 'ble-dm', { dm: { peerID: BLE_PEER } });
+    const { result } = await mount({ transport: 'ble-dm', peerID: BLE_PEER });
     await act(async () => {
       await result.current.sendMessage('hello peer');
     });
@@ -474,7 +473,7 @@ describe('Bluetooth direct message (ble-dm)', () => {
   });
 
   it('a late sent, then delivered, after the 15 s watchdog wins: the row shows delivered', async () => {
-    const { result } = await mount(undefined, 'ble-dm', { dm: { peerID: BLE_PEER } });
+    const { result } = await mount({ transport: 'ble-dm', peerID: BLE_PEER });
     await act(async () => {
       await result.current.sendMessage('hello peer');
     });
@@ -498,7 +497,7 @@ describe('Bluetooth direct message (ble-dm)', () => {
   });
 
   it('a retry of an unconfirmed message that is then reported delivered leaves two delivered copies', async () => {
-    const { result } = await mount(undefined, 'ble-dm', { dm: { peerID: BLE_PEER } });
+    const { result } = await mount({ transport: 'ble-dm', peerID: BLE_PEER });
     await act(async () => {
       await result.current.sendMessage('hello peer');
     });
@@ -526,7 +525,7 @@ describe('Bluetooth direct message (ble-dm)', () => {
   });
 
   it('the watchdog fires after the chat is closed', async () => {
-    const { result, unmount } = await mount(undefined, 'ble-dm', { dm: { peerID: BLE_PEER } });
+    const { result, unmount } = await mount({ transport: 'ble-dm', peerID: BLE_PEER });
     await act(async () => {
       await result.current.sendMessage('hello peer');
     });

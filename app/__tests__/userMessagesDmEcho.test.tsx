@@ -8,11 +8,14 @@ import { Amount, getEncodedToken } from '@cashu/cashu-ts';
 
 import { UserMessagesScreen } from '@/features/user/screens/UserMessagesScreen';
 import { useDmEchoStore } from '@/shared/stores/runtime/dmEchoStore';
+import { useFeedIgnoreStore } from '@/features/feed/stores/ignoreStore';
+import { log } from '@/shared/lib/logger';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const PEER_PUBKEY = '22'.repeat(32);
 let mockDemoEnabled = false;
+let mockFictionalContact = true;
 const mockOwnPubkey = '11'.repeat(32);
 let mockActiveOwnPubkey = mockOwnPubkey;
 const SELF_WRAP_ID = 'self-wrap-1';
@@ -123,7 +126,7 @@ jest.mock('@/shared/hooks/useGuardedRouter', () => ({
 
 jest.mock('@/shared/lib/cashu/npc', () => ({ getNpcAddress: () => undefined }));
 jest.mock('@/shared/stores/runtime/mockDataStore', () => ({
-  isMockContactPubkey: () => true,
+  isMockContactPubkey: () => mockFictionalContact,
   getMockDmThread: () => [
     {
       id: 'demo-dm-fixture',
@@ -222,15 +225,28 @@ jest.mock('@/shared/ui/composed/chat', () => {
       isLoading,
       loadingContent,
       emptyContent,
+      composerDisabled,
+      banner,
+      onSend,
     }: {
       messages: { id: string; cashuToken?: string; isOwn: boolean }[];
       isLoading?: boolean;
       loadingContent?: React.ReactNode;
       emptyContent?: React.ReactNode;
+      composerDisabled?: boolean;
+      banner?: React.ReactNode;
+      onSend: (text: string) => unknown;
     }) =>
       ReactActual.createElement(
         'chat-screen',
-        { testID: 'chat-screen', isLoading, messageCount: messages.length },
+        {
+          testID: 'chat-screen',
+          isLoading,
+          messageCount: messages.length,
+          composerDisabled,
+          banner,
+          onSend,
+        },
         isLoading
           ? loadingContent
           : messages.length === 0
@@ -382,5 +398,38 @@ it('removes demo messages when Mock Mode is disabled on the mounted conversation
     renderer!.update(<UserMessagesScreen pubkey={PEER_PUBKEY} protocol="nip17" />);
   });
   expect(renderer!.root.findByProps({ testID: 'chat-screen' }).props.messageCount).toBe(0);
+  await act(async () => renderer!.unmount());
+});
+
+it('a blocked person’s conversation shows nothing, says how to unblock and sends nothing', async () => {
+  mockDemoEnabled = false;
+  mockThreadState = threadState({
+    hasLoadedOnce: true,
+    messages: [
+      { id: 'm1', content: 'hi', senderPubkey: PEER_PUBKEY, createdAtSec: 1, isOwn: false },
+    ],
+  });
+  mockUseDmThread.mockImplementation(() => mockThreadState);
+  useFeedIgnoreStore.setState({ ignoredPubkeys: [PEER_PUBKEY] });
+  // A real contact, so a send that got past the block would start publishing.
+  mockFictionalContact = false;
+  let renderer: TestRenderer.ReactTestRenderer;
+  await act(async () => {
+    renderer = TestRenderer.create(<UserMessagesScreen pubkey={PEER_PUBKEY} protocol="nip17" />);
+  });
+  const chat = renderer!.root.findByProps({ testID: 'chat-screen' });
+
+  expect(chat.props.messageCount).toBe(0);
+  expect(chat.props.composerDisabled).toBe(true);
+  expect(chat.props.banner.props.children).toBe(
+    'This person is blocked. Open “Block or report” to unblock them.'
+  );
+  jest.mocked(log.info).mockClear();
+  await act(async () => {
+    await Promise.resolve(chat.props.onSend('hi')).catch(() => undefined);
+  });
+  expect(log.info).not.toHaveBeenCalledWith('dm.send.start', expect.anything());
+  useFeedIgnoreStore.setState({ ignoredPubkeys: [] });
+  mockFictionalContact = true;
   await act(async () => renderer!.unmount());
 });
