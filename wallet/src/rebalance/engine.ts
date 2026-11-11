@@ -184,7 +184,11 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
 
   // ── Reconciliation ────────────────────────────────────────────────────
 
-  /** Poll a sent melt until coco reports it settled, it rolls back, or time runs out. */
+  /**
+   * Poll a sent melt until coco reports it settled, it rolls back, or time
+   * runs out. Only a rollback the mint reports throws: a read that fails says
+   * nothing about the payment, and the next poll reads again.
+   */
   async function awaitMeltSettlement(
     operationId: string,
     maxWaitMs: number,
@@ -194,9 +198,14 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
     const start = clock.now();
     while (clock.now() - start < maxWaitMs) {
       if (!isActive()) return 'aborted';
-      const refreshed = await wallet.refreshMelt(operationId);
-      if (refreshed.state === 'finalized') return 'finalized';
-      if (refreshed.state === 'rolled_back') {
+      let state: string | null = null;
+      try {
+        state = (await wallet.refreshMelt(operationId)).state;
+      } catch (error) {
+        log.warn('mint.rebalance.melt_refresh_failed', { operationId, error });
+      }
+      if (state === 'finalized') return 'finalized';
+      if (state === 'rolled_back') {
         throw new RebalanceMeltRolledBackError(operationId, rolledBackMessage);
       }
       await clock.sleep(SETTLE_POLL_MS);
@@ -239,7 +248,8 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
         );
       } catch (error) {
         // Rolled back: the mint released the inputs, so the mint is settled.
-        run.unsettledMints.delete(mintUrl);
+        // Anything else leaves the melt as unsettled as it was.
+        if (error instanceof RebalanceMeltRolledBackError) run.unsettledMints.delete(mintUrl);
         throw error;
       }
       if (settlement === 'finalized') run.unsettledMints.delete(mintUrl);
