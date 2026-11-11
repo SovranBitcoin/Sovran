@@ -330,15 +330,79 @@ describe('rebalance engine — direct transfer', () => {
       }
     );
 
-    it('fails it when the mint itself refused the melt, though its state cannot be read', async () => {
+    it.each([
+      [10001, 'Proof verification failed'],
+      [20004, 'Lightning payment failed'],
+    ])(
+      'fails it when the mint refused it before paying (%s), though its state cannot be read',
+      async (code, detail) => {
+        const { run, wallet } = setup();
+        wallet.port.executeMelt.mockRejectedValueOnce(new MintOperationError(code, detail));
+        wallet.port.getMeltOperation.mockRejectedValue(new Error('database is locked'));
+        const outcome = await run();
+        expect(outcome.status).toBe('failed');
+        expect(wallet.port.restoreInflightProofs).toHaveBeenCalledWith(SOURCE);
+      }
+    );
+
+    // Proofs already spent, or the invoice already paid, may be this very melt having paid.
+    it.each([
+      [11001, 'Token already spent'],
+      [20006, 'Invoice already paid'],
+      [11003, 'Outputs already signed'],
+      [12002, 'Keyset is inactive'],
+    ])(
+      'keeps it pending, its proofs reserved, when the mint answered %s and its state cannot be read',
+      async (code, detail) => {
+        const { run, wallet, findRoutes } = setup();
+        wallet.port.executeMelt.mockRejectedValueOnce(new MintOperationError(code, detail));
+        wallet.port.getMeltOperation.mockRejectedValue(new Error('database is locked'));
+        wallet.port.refreshMelt.mockRejectedValue(new NetworkError('socket hang up'));
+        await expect(run()).resolves.toEqual({ status: 'pending', operationId: 'melt-1' });
+        expect(wallet.port.restoreInflightProofs).not.toHaveBeenCalled();
+        expect(wallet.port.executeMelt).toHaveBeenCalledTimes(1);
+        expect(wallet.port.prepareMelt).toHaveBeenCalledTimes(1);
+        expect(findRoutes).not.toHaveBeenCalled();
+      }
+    );
+
+    it.each(['prepared', 'failed', 'rolled_back'])(
+      'fails it and frees its proofs once a later read shows it %s, after the first read failed',
+      async (state) => {
+        const { run, wallet } = setup();
+        const lost = new NetworkError('socket hang up');
+        wallet.port.executeMelt.mockRejectedValueOnce(lost);
+        wallet.port.getMeltOperation.mockRejectedValue(new Error('database is locked'));
+        wallet.port.refreshMelt
+          .mockRejectedValueOnce(new NetworkError('socket hang up'))
+          .mockResolvedValue({ id: 'melt-1', state });
+        const outcome = await run();
+        expect(outcome.status).toBe('failed');
+        expect(wallet.port.restoreInflightProofs).toHaveBeenCalledWith(SOURCE);
+        expect(wallet.port.executeMelt).toHaveBeenCalledTimes(1);
+      }
+    );
+
+    it('keeps a melt another call is executing pending though a read shows it prepared', async () => {
       const { run, wallet } = setup();
-      wallet.port.executeMelt.mockRejectedValueOnce(
-        new MintOperationError(11001, 'Token already spent')
-      );
-      const outcome = await run();
-      expect(outcome.status).toBe('failed');
-      expect(wallet.port.restoreInflightProofs).toHaveBeenCalledWith(SOURCE);
+      wallet.port.executeMelt.mockRejectedValueOnce(new OperationInProgressError('melt-1'));
+      wallet.port.refreshMelt.mockResolvedValue({ id: 'melt-1', state: 'prepared' });
+      await expect(run()).resolves.toEqual({ status: 'pending', operationId: 'melt-1' });
+      expect(wallet.port.restoreInflightProofs).not.toHaveBeenCalled();
+      expect(wallet.port.executeMelt).toHaveBeenCalledTimes(1);
     });
+  });
+
+  it('fails a pending melt that coco then settles as failed, and frees its proofs', async () => {
+    const { run, wallet } = setup();
+    wallet.port.executeMelt.mockResolvedValue({ id: 'melt-1', state: 'pending' });
+    wallet.port.refreshMelt.mockResolvedValue({ id: 'melt-1', state: 'failed' });
+    const outcome = await run();
+    expect(outcome.status === 'failed' && outcome.error).toBeInstanceOf(
+      RebalanceMeltRolledBackError
+    );
+    expect(wallet.port.restoreInflightProofs).toHaveBeenCalledWith(SOURCE);
+    expect(wallet.port.executeMelt).toHaveBeenCalledTimes(1);
   });
 
   it('keeps a melt that never settles pending, without failing it or freeing its proofs', async () => {
@@ -448,6 +512,8 @@ describe('rebalance engine — middleman routing', () => {
   it('skips unstarted hops and tries the next route when a hop fails', async () => {
     const second: RebalanceRoute = { ...route, source: 'graph' };
     const { run, wallet, recorder } = setup({ balances, routes: [route, second] });
+    // Coco rolled the refused melts back: they did not pay.
+    wallet.port.getMeltOperation.mockResolvedValue({ state: 'rolled_back' });
     wallet.port.executeMelt
       .mockRejectedValueOnce(new MintOperationError(20004, 'no_route'))
       .mockRejectedValueOnce(new MintOperationError(11001, 'Token already spent'));
@@ -459,6 +525,7 @@ describe('rebalance engine — middleman routing', () => {
 
   it('fails with the exhausted-routes error, keeping the last route error as its cause', async () => {
     const { run, wallet } = setup({ balances, routes: [route, { ...route, source: 'graph' }] });
+    wallet.port.getMeltOperation.mockResolvedValue({ state: 'rolled_back' });
     const lastError = new MintOperationError(11001, 'Token already spent');
     wallet.port.executeMelt
       .mockRejectedValueOnce(new MintOperationError(20004, 'no_route'))
@@ -811,6 +878,7 @@ describe('rebalance engine — money still on its way', () => {
   it('tries no other route once a hop has paid: the amount has already left the source', async () => {
     const second: RebalanceRoute = { ...route, source: 'graph' };
     const { run, wallet, recorder } = setup({ balances, routes: [route, second] });
+    wallet.port.getMeltOperation.mockResolvedValue({ state: 'rolled_back' });
     const refused = new MintOperationError(11001, 'Token already spent');
     wallet.port.executeMelt
       .mockRejectedValueOnce(new MintOperationError(20004, 'no_route'))

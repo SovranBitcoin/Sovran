@@ -99,12 +99,35 @@ it('marks a pending payment failed when the melt was rolled back', async () => {
   expect(leg()).toMatchObject({ localStatus: 'failed', errorMessage: expect.any(String) });
 });
 
-it('leaves a pending payment alone while the melt is unresolved', async () => {
+it.each(['pending', 'executing', 'rolling_back'])(
+  'leaves a pending payment alone while the melt is %s',
+  async (state) => {
+    const leg = savedLeg('paymentPending');
+
+    await reconcileSwapLegs(manager({ melt: { state } }));
+
+    expect(leg().localStatus).toBe('paymentPending');
+  }
+);
+
+it.each([
+  ['only prepared: the engine gave up on it before it was ever sent', 'prepared'],
+  ['failed, its inputs given back', 'failed'],
+])('marks a pending payment failed when its melt reads %s', async (_name, state) => {
   const leg = savedLeg('paymentPending');
 
-  await reconcileSwapLegs(manager({ melt: { state: 'pending' } }));
+  await reconcileSwapLegs(manager({ melt: { state } }));
 
-  expect(leg().localStatus).toBe('paymentPending');
+  expect(leg()).toMatchObject({ localStatus: 'failed', errorMessage: expect.any(String) });
+});
+
+it('marks a leg a finished run left at melting failed when its melt failed', async () => {
+  const leg = savedLeg('melting');
+
+  await reconcileSwapLegs(manager({ melt: { state: 'failed' } }));
+
+  expect(leg().localStatus).toBe('failed');
+  expect(groupState(leg.groupId)).toBe('finished');
 });
 
 it('marks a settling leg failed when its melt turns out to have been rolled back', async () => {

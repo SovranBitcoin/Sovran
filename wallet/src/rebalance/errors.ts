@@ -53,12 +53,34 @@ function mintErrorCode(err: unknown): number | undefined {
 }
 
 /**
- * Whether the mint itself answered the request with an error (a NUT error
- * code). A lost response, a timeout or a local failure is not: it says
- * nothing about whether the mint went on to process the request.
+ * NUT codes that prove the mint refused this very melt before paying
+ * anything. A mint checks a melt's inputs and outputs before it pays, and a
+ * repeat of a melt that paid is answered otherwise (its proofs spent, its
+ * invoice paid), so these cannot come from a melt that went through. 20004 is
+ * sent only once the mint's backend reported the payment failed and its
+ * inputs were released (nutshell and cdk both). Every other code may be this
+ * melt having paid: "proofs already spent" (11001), "outputs already signed"
+ * (11003) and "invoice already paid" (20006) among them, and a code whose
+ * meaning is in doubt stays off this list.
  */
-export function isMintRejection(err: unknown): boolean {
-  return mintErrorCode(err) !== undefined;
+const MELT_REFUSED_CODES: ReadonlySet<number> = new Set([
+  10001, // proof verification failed
+  NUT_TRANSACTION_UNBALANCED,
+  11007, // duplicate inputs
+  11008, // duplicate outputs
+  11009, // inputs or outputs of more than one unit
+  11010, // inputs and outputs of different units
+  20004, // Lightning payment failed
+]);
+
+/**
+ * Whether the mint itself refused the melt before paying. A lost response, a
+ * timeout, a local failure or any other answer is not: it says nothing about
+ * whether the melt paid.
+ */
+export function meltRefusedBeforePaying(err: unknown): boolean {
+  const code = mintErrorCode(err);
+  return code !== undefined && MELT_REFUSED_CODES.has(code);
 }
 
 export function classifyRebalanceError(err: unknown): RebalanceErrorKind {

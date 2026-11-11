@@ -1,5 +1,10 @@
 export { createChainSteps, insertStepsAfter } from './chain';
-export { createRebalanceEngine, type RebalanceEngine } from './engine';
+export {
+  createRebalanceEngine,
+  meltNeverSent,
+  meltSettledUnpaid,
+  type RebalanceEngine,
+} from './engine';
 export { createRebalanceLock } from './lock';
 export {
   classifyRebalanceError,

@@ -27,7 +27,7 @@ import {
 } from './amounts';
 import {
   classifyRebalanceError,
-  isMintRejection,
+  meltRefusedBeforePaying,
   RebalanceMeltRolledBackError,
   RebalanceRoutesExhaustedError,
 } from './errors';
@@ -65,11 +65,27 @@ const NEXT_TRANSFER_PAUSE_MS = 500;
 const ARRIVING_MAX_MS = 60 * 60 * 1000;
 
 /**
- * Melt states that prove the payment did not leave the mint: coco never sent
- * it (`init`, `prepared`), or settled it as unpaid and gave its inputs back.
- * Every other state, and a state that cannot be read, may still pay.
+ * Whether coco settled a melt as unpaid and gave its inputs back (`failed`,
+ * `rolled_back`). That proves it did not pay whoever else holds it.
  */
-const MELT_NOT_PAID_STATES = new Set(['init', 'prepared', 'failed', 'rolled_back']);
+export function meltSettledUnpaid(state: string): boolean {
+  return state === 'failed' || state === 'rolled_back';
+}
+
+/**
+ * Whether coco has not sent a melt yet (`init`, `prepared`). That proves it
+ * did not pay only once no call can still send it: the one execute that could
+ * has returned. Every other state (`executing`, `pending`, `rolling_back`),
+ * and a state that cannot be read, may still pay.
+ */
+export function meltNeverSent(state: string): boolean {
+  return state === 'init' || state === 'prepared';
+}
+
+/** For a melt whose own execute has returned: whether its state proves it did not pay. */
+function meltDidNotPay(state: string): boolean {
+  return meltSettledUnpaid(state) || meltNeverSent(state);
+}
 
 type Settlement = 'finalized' | 'pending' | 'aborted';
 
@@ -196,16 +212,16 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
   // ── Reconciliation ────────────────────────────────────────────────────
 
   /**
-   * Poll a sent melt until coco reports it settled, it rolls back, or time
-   * runs out. Only a rollback the mint reports throws: a read that fails says
-   * nothing about the payment, and the next poll reads again.
+   * Poll a sent melt until coco reports it settled, a state it reads proves
+   * it did not pay, or time runs out. A read that fails says nothing about
+   * the payment, and the next poll reads again.
    */
   async function awaitMeltSettlement(
     operationId: string,
     maxWaitMs: number,
     isActive: () => boolean,
-    rolledBackMessage?: string
-  ): Promise<Settlement> {
+    provesNotPaid: (state: string) => boolean
+  ): Promise<Settlement | { notPaid: string }> {
     const start = clock.now();
     while (clock.now() - start < maxWaitMs) {
       if (!isActive()) return 'aborted';
@@ -216,9 +232,7 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
         log.warn('mint.rebalance.melt_refresh_failed', { operationId, error });
       }
       if (state === 'finalized') return 'finalized';
-      if (state === 'rolled_back') {
-        throw new RebalanceMeltRolledBackError(operationId, rolledBackMessage);
-      }
+      if (state !== undefined && provesNotPaid(state)) return { notPaid: state };
       await clock.sleep(SETTLE_POLL_MS);
     }
     return 'pending';
@@ -238,9 +252,10 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
    * Execute a prepared melt once and report how it settled. When `execute`
    * throws, the error is believed (the melt failed, its proofs freed or
    * another payment prepared) only once the melt is known not to have paid:
-   * its state says so or, when its state cannot be read, the mint itself
-   * refused the request. Any other melt is awaited as in flight, never
-   * repeated, and stays pending when it does not settle.
+   * its state says so or, when its state cannot be read, the mint refused it
+   * before paying. Any other melt is awaited as in flight, never repeated,
+   * and stays pending when it does not settle; a later read that proves it
+   * did not pay releases it then.
    */
   async function executeMeltOnce(
     run: TransferRun,
@@ -249,24 +264,27 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
     settleWaitMs: number,
     rolledBackMessage?: string
   ): Promise<Settlement> {
-    const settle = async (operationId: string): Promise<Settlement> => {
+    const rolledBack = (operationId: string) =>
+      new RebalanceMeltRolledBackError(operationId, rolledBackMessage);
+    /** Wait for the melt; once a read proves it did not pay, its mint holds nothing of it. */
+    const settle = async (
+      operationId: string,
+      provesNotPaid: (state: string) => boolean,
+      unpaid: (state: string) => unknown
+    ): Promise<Settlement> => {
       run.unsettledMints.add(mintUrl);
-      let settlement: Settlement;
-      try {
-        settlement = await awaitMeltSettlement(
-          operationId,
-          settleWaitMs,
-          run.isActive,
-          rolledBackMessage
-        );
-      } catch (error) {
-        // Rolled back: the mint released the inputs, so the mint is settled.
-        // Anything else leaves the melt as unsettled as it was.
-        if (error instanceof RebalanceMeltRolledBackError) run.unsettledMints.delete(mintUrl);
-        throw error;
+      const settled = await awaitMeltSettlement(
+        operationId,
+        settleWaitMs,
+        run.isActive,
+        provesNotPaid
+      );
+      if (typeof settled === 'object') {
+        run.unsettledMints.delete(mintUrl);
+        throw unpaid(settled.notPaid);
       }
-      if (settlement === 'finalized') run.unsettledMints.delete(mintUrl);
-      return settlement;
+      if (settled === 'finalized') run.unsettledMints.delete(mintUrl);
+      return settled;
     };
 
     let result: Awaited<ReturnType<typeof wallet.executeMelt>>;
@@ -276,16 +294,24 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
       if (!run.isActive()) return 'aborted';
       if (classifyRebalanceError(error) === 'operation_in_progress') {
         debug({ event: 'melt_in_progress_reconcile', stepId: run.step.id, operationId: melt.id });
-        return settle(melt.id);
+        // Another call holds the melt and may yet send it: only a settled
+        // state proves anything.
+        return settle(melt.id, meltSettledUnpaid, () => rolledBack(melt.id));
       }
       const state = await readMeltState(melt.id);
-      const notPaid = state === null ? isMintRejection(error) : MELT_NOT_PAID_STATES.has(state);
+      const notPaid = state === null ? meltRefusedBeforePaying(error) : meltDidNotPay(state);
       if (notPaid) throw error;
       debug({ event: 'melt_error_in_flight', stepId: run.step.id, operationId: melt.id, state });
-      return settle(melt.id);
+      // This execute was the only call that could send it, and it has returned.
+      return settle(melt.id, meltDidNotPay, (unpaidState) =>
+        meltSettledUnpaid(unpaidState) ? rolledBack(melt.id) : error
+      );
     }
     if (!run.isActive()) return 'aborted';
-    if (result?.state === 'pending') return settle(result.id ?? melt.id);
+    if (result?.state === 'pending') {
+      const operationId = result.id ?? melt.id;
+      return settle(operationId, meltSettledUnpaid, () => rolledBack(operationId));
+    }
     return 'finalized';
   }
 
