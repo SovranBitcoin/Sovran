@@ -583,7 +583,7 @@ describe('ecash send — executeSend operation', () => {
     await tm.machine.startSendEcash();
     await tm.machine.enterAmount({ value: 100, unit: 'sat' }, MINT1);
     tm.assertStep('error');
-    tm.assertExecution({ code: 'SEND_FAILED' });
+    tm.assertError({ code: 'SEND_FAILED' });
   });
 });
 

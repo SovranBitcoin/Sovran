@@ -186,7 +186,7 @@ describe('mint quote — executeMintQuote operation', () => {
     await tm.machine.enterAmount({ value: 1000, unit: 'sat' }, MINT1);
 
     tm.assertStep('error');
-    tm.assertExecution({ code: 'MINT_QUOTE_FAILED' });
+    tm.assertError({ code: 'MINT_QUOTE_FAILED' });
     expect(tm.operationCalls.find((c) => c.name === 'executeMintQuote')).toBeUndefined();
   });
 });
@@ -296,7 +296,7 @@ describe('mint quote — executeMintQuote error handling', () => {
     await tm.machine.startReceiveLightning();
     await tm.machine.enterAmount({ value: 1000, unit: 'sat' }, MINT1);
     tm.assertStep('error');
-    tm.assertExecution({ code: 'MINT_QUOTE_FAILED' });
+    tm.assertError({ code: 'MINT_QUOTE_FAILED' });
   });
 
   it('error message contains the operation error text', async () => {
@@ -309,9 +309,7 @@ describe('mint quote — executeMintQuote error handling', () => {
     });
     await tm.machine.startReceiveLightning();
     await tm.machine.enterAmount({ value: 1000, unit: 'sat' }, MINT1);
-    tm.assertStep('error');
-    const execution = tm.machine.inspect();
-    expect(execution.message).toContain('Connection refused');
+    tm.assertError({ message: expect.stringContaining('Connection refused') });
   });
 });
 

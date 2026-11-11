@@ -94,19 +94,20 @@ fall back to an unlocked token. Lightning/onchain choices discard an editable
 ecash lock. Protocol-seeded locks remain authoritative when the amount screen
 does not own the choice.
 
-`FlowStep` (`src/machine/types.ts:19-38`). Terminal here means
-`deriveExecutionState` settles it to `ready`/`READY` or `blocked` and no further
-machine transition is expected from the step itself.
+`FlowStep` (`src/machine/types.ts:19-38`). Terminal here means no further
+machine transition is expected from the step itself. `inspect()` reports the
+step, `isExecuting`, and the step's data as `details` on an input step and on
+`error`.
 
 | Step | Purpose | Input step | Terminal |
 | --- | --- | --- | --- |
-| `idle` | Reset resting state; `ready`/`READY`, `isExecutable:true`. No handler. | no | no |
-| `chooseOption` | BIP321 multi-option selection. `needsInput`/`OPTION_SELECTION_REQUIRED`. | yes | no |
-| `chooseFallbackOption` | BIP321 fallback after an option failed. `FALLBACK_OPTION_REQUIRED`. | yes | no |
-| `enterAmount` | Amount entry. `needsInput`/`NO_AMOUNT`. | yes | no |
-| `selectMint` | Mint selection. `MINT_SELECTION_REQUIRED`. Seeds fallback rows, runs `operations.buildMintListItems`. | yes | no |
-| `chooseProofs` | Offline proof round-up/round-down. `PROOF_SELECTION_REQUIRED`. | yes | no |
-| `enterSendMemo` | Optional ecash token memo (only when `enableEcashSendMemo`). `SEND_MEMO_REQUIRED`. | yes | no |
+| `idle` | Reset resting state. No handler. | no | no |
+| `chooseOption` | BIP321 multi-option selection. | yes | no |
+| `chooseFallbackOption` | BIP321 fallback after an option failed. | yes | no |
+| `enterAmount` | Amount entry. | yes | no |
+| `selectMint` | Mint selection. Seeds fallback rows, runs `operations.buildMintListItems`. | yes | no |
+| `chooseProofs` | Offline proof round-up/round-down. | yes | no |
+| `enterSendMemo` | Optional ecash token memo (only when `enableEcashSendMemo`). | yes | no |
 | `confirmSend` | Action step for ecash send. Intercepted -> `runConfirmSendEffect`. | no | no (internal) |
 | `sendComplete` | Terminal success of ecash send. Carries `historyEntry`, `createdOffline?`, `mintWasOffline?`. | no | yes |
 | `createMintQuote` | Action step for Lightning receive. Intercepted -> `runMintQuoteEffect`. | no | no (internal) |
@@ -119,12 +120,12 @@ machine transition is expected from the step itself.
 | `openProfile` | Open a Nostr profile screen. | no | yes |
 | `navigateToReceive` | Open the receive hub (`START_RECEIVE`). | no | yes |
 | `dismiss` | Persist-only / dismiss terminal (`MINT_SELECTED` with no destination). | no | yes |
-| `error` | Error terminal. `deriveExecutionState` -> `blocked`. Dispatches `notifications[code]`. | no | yes |
+| `error` | Error terminal; its data (`code`, `message`, `data`) is `inspect().details`. Dispatches `notifications[code]`. | no | yes |
 
-`confirmSend` and `createMintQuote` have no `deriveExecutionState` case; when
-`operations` are present the machine intercepts and re-targets them to a result
-or error step before settling, so they read as `ready`/`READY` only transiently.
-Without `operations`, the step is dispatched to the app step handler instead.
+`confirmSend` and `createMintQuote` are action steps: when `operations` are
+present the machine intercepts and re-targets them to a result or error step
+before settling, so `inspect()` reports them only transiently. Without
+`operations`, the step is dispatched to the app step handler instead.
 
 ### 3.2 Destinations
 
@@ -172,7 +173,7 @@ one turn at a time (see "How a turn flows").
 | `confirmMelt()` | `CONFIRM_MELT` | runs `operations.executeMelt` in place |
 | `confirmPaymentRequest()` | `CONFIRM_PAYMENT_REQUEST` | returns `PaymentRequestConfirmOutcome`: `delivered`, `rolledBack`, `failed`, `undelivered {operationId}` or `ignored` |
 | `reset()` | `resetInternal` + notify | |
-| `inspect()` | cached `ExecutionState` | the snapshot accessor is `inspect`, not `getSnapshot` |
+| `inspect()` | cached `ExecutionState` (`step`, `isExecuting`, `details`) | the snapshot accessor is `inspect`, not `getSnapshot` |
 | `getContext()` | current `FlowContext` | |
 | `getStep()` | current `FlowStep` | |
 | `subscribe(listener)` | state-change bus | returns unsubscribe |
@@ -253,9 +254,8 @@ caught by the first. `CONFIRM_MELT` and `CONFIRM_PAYMENT_REQUEST` bypass
 `INSUFFICIENT_BALANCE`, `NO_BALANCE`, `UNSUPPORTED_INPUT`,
 `UNSUPPORTED_PAYMENT_METHOD`, `ALL_OPTIONS_DISABLED`, `MISSING_MELT_TARGET`,
 `SEND_FAILED`, `MINT_QUOTE_FAILED`, `MELT_FAILED`, `PAYMENT_REQUEST_FAILED`,
-`NFC_WRITE_FAILED`, `NFC_SESSION_LOST`, `NFC_READ_FAILED`. `deriveExecutionState`
-maps the `error` step to `status:'blocked'`; codes outside the allowlist fall
-back to `UNSUPPORTED_INPUT` (`createMachine.ts:119-134`).
+`NFC_WRITE_FAILED`, `NFC_SESSION_LOST`, `NFC_READ_FAILED`. The `error` step's
+data carries the code as set; `inspect().details` reports it unchanged.
 
 ## 4. Machine lifecycle
 
@@ -1147,7 +1147,7 @@ during verification and the invariant rests on source review.
 
 | File | Responsibility |
 | --- | --- |
-| `src/machine/createMachine.ts` | `send()` dispatcher, `deriveExecutionState`, step interception (`confirmSend`/`createMintQuote`/`reviewMint`/`openMint`), NFC auto-execute, `routeOperationFailure`, generation guards, bound methods, notify bus |
+| `src/machine/createMachine.ts` | `send()` dispatcher, `inspect()` projection, step interception (`confirmSend`/`createMintQuote`/`reviewMint`/`openMint`), NFC auto-execute, `routeOperationFailure`, generation guards, bound methods, notify bus |
 | `src/machine/transitions.ts` | `transition()`, handlers (`handleExecute`/`handleAmountEntered`/`handleMintSelected`/`handleProofsChosen`/`handleSendMemoSubmitted`/`handleOptionChosen`), offline stamping, context reset/merge |
 | `src/machine/resolveNext.ts` | intent-driven routing, `getDestination`, gather order, `checkProofComposition`, `terminalStep`, mint gather, method requirements |
 | `src/machine/contextResolution.ts` | `resolveFromContext` (intent-less continuation), `revalidateMintForAmount`, `requestMintSelector` |

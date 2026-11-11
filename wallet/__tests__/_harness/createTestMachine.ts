@@ -45,6 +45,7 @@ import type {
   FlowStep,
   ExecutionState,
   PaymentMachine,
+  StepDataMap,
   StepHandlerMap,
   NotificationHandlerMap,
 } from '../../src/machine/types';
@@ -237,6 +238,15 @@ export function createTestMachine(config?: TestMachineConfig): TestMachine {
      */
     assertExecution(matcher: Partial<ExecutionState>) {
       expect(machine.inspect()).toMatchObject(matcher);
+    },
+
+    /**
+     * Assert the machine is at `error` and its step data (code, message,
+     * data) matches the expected fields.
+     */
+    assertError(matcher: Partial<StepDataMap['error']>) {
+      expect(machine.getStep()).toBe('error');
+      expect(machine.inspect().details).toMatchObject(matcher);
     },
 
     /**

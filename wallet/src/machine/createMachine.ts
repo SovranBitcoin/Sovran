@@ -60,133 +60,6 @@ import type {
   StepDataMap,
 } from "./types";
 
-// ---------------------------------------------------------------------------
-// Derive ExecutionState from step
-// ---------------------------------------------------------------------------
-
-function deriveExecutionState(
-  step: FlowStep,
-  data: StepDataMap[FlowStep],
-  locale: string = "en",
-): ExecutionState {
-  switch (step) {
-    case "idle":
-      return {
-        status: "ready",
-        code: "READY",
-        message: null,
-        isExecutable: true,
-        isExecuting: false,
-        step,
-      };
-
-    case "chooseOption":
-      return {
-        status: "needsInput",
-        code: "OPTION_SELECTION_REQUIRED",
-        message: t("OPTION_SELECTION_REQUIRED", locale),
-        isExecutable: false,
-        isExecuting: false,
-        step,
-        details: data as Record<string, unknown>,
-      };
-
-    case "chooseFallbackOption":
-    case "chooseSendFallback":
-      return {
-        status: "needsInput",
-        code: "FALLBACK_OPTION_REQUIRED",
-        message: t("FALLBACK_OPTION_REQUIRED", locale),
-        isExecutable: false,
-        isExecuting: false,
-        step,
-        details: data as Record<string, unknown>,
-      };
-
-    case "enterAmount":
-      return {
-        status: "needsInput",
-        code: "NO_AMOUNT",
-        message: t("NO_AMOUNT", locale),
-        isExecutable: false,
-        isExecuting: false,
-        step,
-        details: data as Record<string, unknown>,
-      };
-
-    case "selectMint":
-      return {
-        status: "needsInput",
-        code: "MINT_SELECTION_REQUIRED",
-        message: t("MINT_SELECTION_REQUIRED", locale),
-        isExecutable: false,
-        isExecuting: false,
-        step,
-        details: data as Record<string, unknown>,
-      };
-
-    case "chooseProofs":
-    case "enterSendMemo":
-      return {
-        status: "needsInput",
-        code:
-          step === "chooseProofs"
-            ? "PROOF_SELECTION_REQUIRED"
-            : "SEND_MEMO_REQUIRED",
-        message:
-          step === "chooseProofs"
-            ? t("PROOF_SELECTION_REQUIRED", locale)
-            : t("SEND_MEMO_REQUIRED", locale),
-        isExecutable: false,
-        isExecuting: false,
-        step,
-        details: data as Record<string, unknown>,
-      };
-
-    case "error": {
-      const errorData = data as StepDataMap["error"];
-      const code = errorData.code;
-      const blockedCode =
-        code === "NO_VALID_MINT" ||
-        code === "INSUFFICIENT_BALANCE" ||
-        code === "NO_BALANCE" ||
-        code === "ALL_OPTIONS_DISABLED" ||
-        code === "UNSUPPORTED_INPUT" ||
-        code === "UNSUPPORTED_PAYMENT_METHOD" ||
-        code === "SEND_FAILED" ||
-        code === "MINT_QUOTE_FAILED" ||
-        code === "MELT_FAILED" ||
-        code === "PAYMENT_REQUEST_FAILED" ||
-        code === "NFC_WRITE_FAILED" ||
-        code === "NFC_SESSION_LOST" ||
-        code === "NFC_READ_FAILED" ||
-        code === "UNIT_NOT_FUNDED"
-          ? code
-          : ("UNSUPPORTED_INPUT" as const);
-      return {
-        status: "blocked",
-        code: blockedCode,
-        message: errorData.message,
-        isExecutable: false,
-        isExecuting: false,
-        step,
-        details: errorData.data,
-      };
-    }
-
-    // Terminal navigate steps
-    default:
-      return {
-        status: "ready",
-        code: "READY",
-        message: null,
-        isExecutable: true,
-        isExecuting: false,
-        step,
-      };
-  }
-}
-
 /**
  * Whether a payment preview still waits for Pay. Once it settled, or its
  * ecash left without being taken back, paying again (or choosing another
@@ -219,6 +92,19 @@ const INPUT_STEPS = new Set<FlowStep>([
   "chooseProofs",
   "enterSendMemo",
 ]);
+
+/**
+ * What `inspect()` reports for a step: the step, and its data when the step
+ * waits for input or is `error` (then `StepDataMap["error"]`).
+ */
+function deriveExecutionState(
+  step: FlowStep,
+  data: StepDataMap[FlowStep],
+): ExecutionState {
+  return INPUT_STEPS.has(step) || step === "error"
+    ? { step, isExecuting: false, details: data as Record<string, unknown> }
+    : { step, isExecuting: false };
+}
 
 /**
  * Events that carry fresh user intent. The router never tells the machine
@@ -444,9 +330,8 @@ export function createPaymentMachine(
   }
 
   const notify = () => {
-    const locale = getLocale?.() ?? "en";
     cachedSnapshot = {
-      ...deriveExecutionState(step, stepData, locale),
+      ...deriveExecutionState(step, stepData),
       isExecuting: handlerExecuting,
     };
     listeners.forEach((fn) => fn());
@@ -2464,21 +2349,10 @@ export function createPaymentMachine(
 
     processedScanInput = data;
     await runTurn({ type: "EXECUTE", input: data }, origin);
-    const state = cachedSnapshot;
+    const lockedPending = cachedSnapshot.step === "chooseOption";
+    if (!lockedPending) processedScanInput = null;
 
-    if (
-      state.status !== "needsInput" ||
-      state.code !== "OPTION_SELECTION_REQUIRED"
-    ) {
-      processedScanInput = null;
-    }
-
-    return {
-      urInProgress: false,
-      lockedPending:
-        state.status === "needsInput" &&
-        state.code === "OPTION_SELECTION_REQUIRED",
-    };
+    return { urInProgress: false, lockedPending };
   }
 
   const scan =

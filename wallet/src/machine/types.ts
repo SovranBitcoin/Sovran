@@ -524,54 +524,16 @@ export interface MachineSnapshot<S extends FlowStep = FlowStep> {
 // Execution State — derived from snapshot for UI consumption
 // ---------------------------------------------------------------------------
 
-export type ExecutionState =
-  | {
-      status: "ready";
-      code: "READY";
-      message: null;
-      isExecutable: true;
-      isExecuting: boolean;
-      step: FlowStep;
-      details?: Record<string, unknown>;
-    }
-  | {
-      status: "needsInput";
-      code:
-        | "NO_AMOUNT"
-        | "MINT_SELECTION_REQUIRED"
-        | "OPTION_SELECTION_REQUIRED"
-        | "FALLBACK_OPTION_REQUIRED"
-        | "PROOF_SELECTION_REQUIRED"
-        | "SEND_MEMO_REQUIRED";
-      message: string;
-      isExecutable: false;
-      isExecuting: boolean;
-      step: FlowStep;
-      details?: Record<string, unknown>;
-    }
-  | {
-      status: "blocked";
-      code:
-        | "UNSUPPORTED_INPUT"
-        | "NO_VALID_MINT"
-        | "INSUFFICIENT_BALANCE"
-        | "NO_BALANCE"
-        | "ALL_OPTIONS_DISABLED"
-        | "UNSUPPORTED_PAYMENT_METHOD"
-        | "SEND_FAILED"
-        | "MINT_QUOTE_FAILED"
-        | "MELT_FAILED"
-        | "PAYMENT_REQUEST_FAILED"
-        | "NFC_WRITE_FAILED"
-        | "NFC_SESSION_LOST"
-        | "NFC_READ_FAILED"
-        | "UNIT_NOT_FUNDED";
-      message: string;
-      isExecutable: false;
-      isExecuting: boolean;
-      step: FlowStep;
-      details?: Record<string, unknown>;
-    };
+export interface ExecutionState {
+  step: FlowStep;
+  /** A step handler is running (the screen shows its spinner). */
+  isExecuting: boolean;
+  /**
+   * The step's data while it waits for input, and on `error` (then
+   * `StepDataMap["error"]`: its `code`, `message` and `data`).
+   */
+  details?: Record<string, unknown>;
+}
 
 // ---------------------------------------------------------------------------
 // Flow Events — user actions that drive the machine

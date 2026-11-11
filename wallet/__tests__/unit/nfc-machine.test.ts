@@ -85,7 +85,7 @@ describe("NFC terminal unit and mints", () => {
       hasSpendingCondition: true,
     });
     await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
-    tm.assertExecution({ code: "UNSUPPORTED_PAYMENT_METHOD" });
+    tm.assertError({ code: "UNSUPPORTED_PAYMENT_METHOD" });
     expect(switchUnit).not.toHaveBeenCalled();
     expect(sentMint(tm)).toBeUndefined();
     expect(adapter.writeToken).not.toHaveBeenCalled();
@@ -180,7 +180,7 @@ describe("NFC terminal unit and mints", () => {
     async (balances) => {
       const { tm, switchUnit, adapter } = setup({ unit: "usd", balances });
       await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
-      tm.assertExecution({
+      tm.assertError({
         code: "UNIT_NOT_FUNDED",
         message:
           "This terminal wants USD. You have no USD ecash at an accepted mint.",
@@ -204,20 +204,20 @@ describe("NFC terminal unit and mints", () => {
   it("retains the existing hard-stop without a host switch operation", async () => {
     const { tm } = setup({ unit: "usd", switchEnabled: false });
     await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
-    tm.assertExecution({ code: "UNSUPPORTED_PAYMENT_METHOD" });
+    tm.assertError({ code: "UNSUPPORTED_PAYMENT_METHOD" });
     expect(sentMint(tm)).toBeUndefined();
   });
   it("keeps non-NFC unit mismatch interactive", async () => {
     const { tm, switchUnit } = setup({ unit: "usd" });
     await tm.machine.execute(INPUTS.paymentRequestBasic, { reset: true });
-    tm.assertExecution({ code: "UNSUPPORTED_PAYMENT_METHOD" });
+    tm.assertError({ code: "UNSUPPORTED_PAYMENT_METHOD" });
     expect(switchUnit).not.toHaveBeenCalled();
   });
   it("releases the session without sending when the host switch rejects", async () => {
     const { tm, switchUnit, adapter } = setup({ unit: "usd" });
     switchUnit.mockRejectedValueOnce(new Error("host switch failed"));
     await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
-    tm.assertExecution({ code: "NFC_READ_FAILED" });
+    tm.assertError({ code: "NFC_READ_FAILED" });
     expect(sentMint(tm)).toBeUndefined();
     expect(adapter.releaseSession).toHaveBeenCalled();
   });
@@ -268,7 +268,7 @@ describe("NFC terminal unit and mints", () => {
   it("rejects amountless requests before switching units", async () => {
     const { tm, switchUnit } = setup({ unit: "usd", amount: null });
     await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
-    tm.assertExecution({ code: "NFC_READ_FAILED" });
+    tm.assertError({ code: "NFC_READ_FAILED" });
     expect(sentMint(tm)).toBeUndefined();
     expect(switchUnit).not.toHaveBeenCalled();
   });
@@ -375,7 +375,7 @@ describe("NFC mint choice honours the payment-request gate", () => {
       operations: { paymentRequestPayabilityFrom: refuseFees(reason) },
     });
     await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
-    tm.assertExecution({ code: "PAYMENT_REQUEST_FAILED", message: reason });
+    tm.assertError({ code: "PAYMENT_REQUEST_FAILED", message: reason });
     expect(sentMint(tm)).toBeUndefined();
     expect(adapter.writeToken).not.toHaveBeenCalled();
     expect(adapter.releaseSession).toHaveBeenCalled();
@@ -390,7 +390,7 @@ describe("NFC mint choice honours the payment-request gate", () => {
       },
     });
     await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
-    tm.assertExecution({ code: "NFC_WRITE_FAILED" });
+    tm.assertError({ code: "NFC_WRITE_FAILED" });
     expect(adapter.writeToken).not.toHaveBeenCalled();
     expect(tm.notificationCalls).toContainEqual({
       key: "onNfcWriteFailed",
@@ -423,7 +423,7 @@ describe("what an NFC tap leaves behind when it ends", () => {
     const { tm, adapter, switchUnit } = setup({ unit: "usd" });
     adapter.writeToken.mockRejectedValueOnce(new Error("tag lost"));
     await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
-    tm.assertExecution({ code: "NFC_WRITE_FAILED" });
+    tm.assertError({ code: "NFC_WRITE_FAILED" });
     expect(adapter.releaseSession).toHaveBeenCalledTimes(1);
     expect(unitSwitches(switchUnit)).toEqual(["usd", "sat"]);
   });
@@ -438,7 +438,7 @@ describe("what an NFC tap leaves behind when it ends", () => {
       },
     });
     await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
-    tm.assertExecution({ code: "NFC_WRITE_FAILED" });
+    tm.assertError({ code: "NFC_WRITE_FAILED" });
     expect(adapter.releaseSession).toHaveBeenCalledTimes(1);
     expect(unitSwitches(switchUnit)).toEqual(["usd", "sat"]);
   });
@@ -449,7 +449,7 @@ describe("what an NFC tap leaves behind when it ends", () => {
       operations: { paymentRequestPayabilityFrom: refuseFees("fees") },
     });
     await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
-    tm.assertExecution({ code: "PAYMENT_REQUEST_FAILED", message: "fees" });
+    tm.assertError({ code: "PAYMENT_REQUEST_FAILED", message: "fees" });
     expect(adapter.releaseSession).toHaveBeenCalledTimes(1);
     expect(unitSwitches(switchUnit)).toEqual(["usd", "sat"]);
   });
@@ -465,7 +465,7 @@ describe("what an NFC tap leaves behind when it ends", () => {
   it("releases once and switches nothing when the unit is not funded", async () => {
     const { tm, adapter, switchUnit } = setup({ unit: "usd", balances: {} });
     await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
-    tm.assertExecution({ code: "UNIT_NOT_FUNDED" });
+    tm.assertError({ code: "UNIT_NOT_FUNDED" });
     expect(adapter.releaseSession).toHaveBeenCalledTimes(1);
     expect(unitSwitches(switchUnit)).toEqual([]);
   });
@@ -474,7 +474,7 @@ describe("what an NFC tap leaves behind when it ends", () => {
     const { tm, adapter, switchUnit } = setup({ unit: "usd" });
     switchUnit.mockRejectedValueOnce(new Error("host switch failed"));
     await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
-    tm.assertExecution({ code: "NFC_READ_FAILED" });
+    tm.assertError({ code: "NFC_READ_FAILED" });
     expect(adapter.releaseSession).toHaveBeenCalledTimes(1);
     expect(unitSwitches(switchUnit)).toEqual(["usd"]);
   });
@@ -519,7 +519,7 @@ describe("what an NFC tap leaves behind when it ends", () => {
       `bitcoin:?creq=${INPUTS.paymentRequestBasic}&lightning=${NFC_TAG_INVOICE}`,
       { source: "nfc" },
     );
-    tm.assertExecution({ code: "NFC_READ_FAILED" });
+    tm.assertError({ code: "NFC_READ_FAILED" });
     expect(adapter.releaseSession).toHaveBeenCalledTimes(1);
     expect(unitSwitches(switchUnit)).toEqual(["usd", "sat"]);
   });
@@ -527,7 +527,7 @@ describe("what an NFC tap leaves behind when it ends", () => {
   it("releases once when a tag without an amount asks for one", async () => {
     const { tm, adapter, switchUnit } = setup();
     await tm.machine.scan!(INPUTS.lightningAddress, { source: "nfc" });
-    tm.assertExecution({ code: "NFC_READ_FAILED" });
+    tm.assertError({ code: "NFC_READ_FAILED" });
     expect(adapter.releaseSession).toHaveBeenCalledTimes(1);
     expect(unitSwitches(switchUnit)).toEqual([]);
   });
@@ -796,7 +796,7 @@ describe("an NFC tap whose token could not be taken back", () => {
     });
     tap.adapter.writeToken.mockRejectedValueOnce(new Error("tag lost"));
     await tap.tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
-    expect(tap.tm.machine.inspect()).toMatchObject({
+    tap.tm.assertError({
       code: "NFC_WRITE_FAILED",
       message: expect.stringMatching(/may have reached the terminal/),
     });
@@ -808,8 +808,7 @@ describe("an NFC tap whose token could not be taken back", () => {
   it("says the first token may have gone out", async () => {
     const { tm } = failedTap();
     await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
-    tm.assertStep("error");
-    expect(tm.machine.inspect()).toMatchObject({
+    tm.assertError({
       code: "NFC_WRITE_FAILED",
       message: expect.stringMatching(/may have reached the terminal/),
     });

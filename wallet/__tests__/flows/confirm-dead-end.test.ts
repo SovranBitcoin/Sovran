@@ -149,8 +149,7 @@ describe('Pay on a still-mounted preview after the machine moved to error', () =
     expect(attempts).toBe(1);
     tm.assertStep('error');
     expect(tm.handlerCalls).toHaveLength(handlerCalls);
-    expect(tm.machine.inspect()).toMatchObject({
-      status: 'blocked',
+    tm.assertError({
       code: 'MELT_FAILED',
       message: 'LNURL invoice fetch failed',
     });
