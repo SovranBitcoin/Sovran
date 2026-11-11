@@ -153,9 +153,8 @@ export {
   createRebalanceEngine,
   createRebalanceLock,
   insertStepsAfter,
-  meltNeverSent,
-  meltSettledUnpaid,
 } from "./rebalance";
+export { meltNeverSent, meltSettledUnpaid } from "./melt-outcome";
 export type {
   RebalanceEngine,
   RebalanceEventSink,

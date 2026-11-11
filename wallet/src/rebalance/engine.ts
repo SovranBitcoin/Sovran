@@ -18,6 +18,7 @@
 
 import { amountToNumber } from '../amount';
 import { logger as packageLogger, mintUrlFields, errField } from '../logger';
+import { meltDidNotPay, meltSettledUnpaid, outcomeOfFailedMeltExecute } from '../melt-outcome';
 import {
   computeInitialTransferAmount,
   feeHeadroomFor,
@@ -27,7 +28,6 @@ import {
 } from './amounts';
 import {
   classifyRebalanceError,
-  meltRefusedBeforePaying,
   RebalanceMeltRolledBackError,
   RebalanceRoutesExhaustedError,
 } from './errors';
@@ -63,29 +63,6 @@ const NEXT_ROUTE_PAUSE_MS = 1_500;
 const NEXT_TRANSFER_PAUSE_MS = 500;
 /** How long a settled melt's receipt is waited for before it is given up on. An invoice lives less. */
 const ARRIVING_MAX_MS = 60 * 60 * 1000;
-
-/**
- * Whether coco settled a melt as unpaid and gave its inputs back (`failed`,
- * `rolled_back`). That proves it did not pay whoever else holds it.
- */
-export function meltSettledUnpaid(state: string): boolean {
-  return state === 'failed' || state === 'rolled_back';
-}
-
-/**
- * Whether coco has not sent a melt yet (`init`, `prepared`). That proves it
- * did not pay only once no call can still send it: the one execute that could
- * has returned. Every other state (`executing`, `pending`, `rolling_back`),
- * and a state that cannot be read, may still pay.
- */
-export function meltNeverSent(state: string): boolean {
-  return state === 'init' || state === 'prepared';
-}
-
-/** For a melt whose own execute has returned: whether its state proves it did not pay. */
-function meltDidNotPay(state: string): boolean {
-  return meltSettledUnpaid(state) || meltNeverSent(state);
-}
 
 type Settlement = 'finalized' | 'pending' | 'aborted';
 
@@ -299,8 +276,7 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
         return settle(melt.id, meltSettledUnpaid, () => rolledBack(melt.id));
       }
       const state = await readMeltState(melt.id);
-      const notPaid = state === null ? meltRefusedBeforePaying(error) : meltDidNotPay(state);
-      if (notPaid) throw error;
+      if (outcomeOfFailedMeltExecute(error, state) === 'notPaid') throw error;
       debug({ event: 'melt_error_in_flight', stepId: run.step.id, operationId: melt.id, state });
       // This execute was the only call that could send it, and it has returned.
       return settle(melt.id, meltDidNotPay, (unpaidState) =>
