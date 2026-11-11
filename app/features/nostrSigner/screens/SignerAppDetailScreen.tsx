@@ -355,7 +355,7 @@ export function SignerAppDetailScreen(): React.ReactElement {
               close();
               for (const peer of peers) {
                 revokePeerDecryptGrant(clientPubkey, peer);
-                revokeSessionGrant(clientPubkey, undefined, peer);
+                revokeSessionGrant(clientPubkey, peer);
               }
             },
           },

@@ -150,14 +150,10 @@ interface Nip46RequestsActions {
   }) => Result<void, SessionGrantError>;
   hasSessionGrant: (clientPubkey: string, grantKey: GrantKey, peerPubkey: string) => boolean;
   /**
-   * Revoke session grants for an app — all of them, one method's, or (via
-   * `peerPubkey`) one conversation partner's across both methods.
+   * Revoke session grants for an app — all of them, or (via `peerPubkey`) one
+   * conversation partner's across both methods.
    */
-  revokeSessionGrant: (
-    clientPubkey: string,
-    grantKey?: SessionGrantKey,
-    peerPubkey?: string
-  ) => void;
+  revokeSessionGrant: (clientPubkey: string, peerPubkey?: string) => void;
   /**
    * Session-scoped allow for a non-decrypt grant key (wallet sign kinds
    * included — runtime-only by design). Idempotent: consolidated approval
@@ -271,14 +267,11 @@ export const useNip46RequestsStore = create<Nip46RequestsStore>({
     );
   },
 
-  revokeSessionGrant: (clientPubkey, grantKey, peerPubkey) => {
+  revokeSessionGrant: (clientPubkey, peerPubkey) => {
     const peer = peerPubkey?.toLowerCase();
     set((state) => ({
       sessionGrants: state.sessionGrants.filter(
-        (g) =>
-          g.clientPubkey !== clientPubkey ||
-          (grantKey !== undefined && g.grantKey !== grantKey) ||
-          (peer !== undefined && g.peerPubkey !== peer)
+        (g) => g.clientPubkey !== clientPubkey || (peer !== undefined && g.peerPubkey !== peer)
       ),
     }));
   },

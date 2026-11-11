@@ -230,15 +230,11 @@ describe('session grants', () => {
     expect(useNip46RequestsStore.getState().sessionGrants).toHaveLength(2);
   });
 
-  it('revokes one key or all keys for an app', () => {
+  it('revokes every key for an app', () => {
     const store = useNip46RequestsStore.getState();
     grant(APP_A, 'nip44_decrypt', PEER_X);
     grant(APP_A, 'nip04_decrypt', PEER_X);
     grant(APP_B, 'nip44_decrypt', PEER_X);
-
-    store.revokeSessionGrant(APP_A, 'nip44_decrypt');
-    expect(store.hasSessionGrant(APP_A, 'nip44_decrypt', PEER_X)).toBe(false);
-    expect(store.hasSessionGrant(APP_A, 'nip04_decrypt', PEER_X)).toBe(true);
 
     store.revokeSessionGrant(APP_A);
     expect(useNip46RequestsStore.getState().sessionGrants).toEqual([
@@ -349,7 +345,7 @@ describe('revoke by peer', () => {
       peerIsSelf: false,
     });
 
-    store.revokeSessionGrant(APP_A, undefined, PEER_X.toUpperCase());
+    store.revokeSessionGrant(APP_A, PEER_X.toUpperCase());
 
     const grants = useNip46RequestsStore.getState().sessionGrants;
     expect(grants).toHaveLength(2);
