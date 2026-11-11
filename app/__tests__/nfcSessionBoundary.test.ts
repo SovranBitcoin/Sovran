@@ -254,7 +254,9 @@ describe('a payment machine tap over the adapter', () => {
     'creqApGF0gaNhdGRwb3N0YWF4GWh0dHBzOi8vbWludDEuZXhhbXBsZS5jb21hZ/dhYRhkYXVjc2F0YW2BeBlodHRwczovL21pbnQxLmV4YW1wbGUuY29t';
   const MINT = 'https://mint1.example.com';
 
-  function tapMachine(executeNfcSend: () => Promise<{ token: string; historyEntry: string; operationId: string }>) {
+  function tapMachine(
+    executeNfcSend: () => Promise<{ token: string; historyEntry: string; operationId: string }>
+  ) {
     const adapter = createNfcAdapter();
     const machine = createPaymentMachine({
       handlers: {},
