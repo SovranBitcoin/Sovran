@@ -1,9 +1,12 @@
 /**
- * A swap run aborted by an account switch: the run started for account A,
- * the swap history store is reset and loaded again for account B, and only
- * then does the run see the wallet change and end. Its late cancellation
- * must not land in B's history; A's saved group is left running, and the
- * next time A is open the reconciler settles it from its own operations.
+ * A swap run that outlives an account switch. The run started for account A;
+ * the switch unmounts the account's tree (`AccountScopedProviders` is keyed by
+ * account), so the screen's hook is gone, but its run is a closure that keeps
+ * the manager it started with and never sees B's. The swap history store is
+ * reset and loaded again for B while that run goes on: its late writes (the
+ * next leg, its quote tags and annotations, the run's end) must not land in
+ * B's history. A's saved group is left running, and the next time A is open
+ * the reconciler settles it from its own operations.
  *
  * The real swap history store runs over the real profile-scoped storage
  * (backed by the AsyncStorage mock) and the real profile store; the real
@@ -25,6 +28,7 @@ import {
   unblockProfilePersistWrites,
 } from '@/shared/lib/cashu/profileScopedStorage';
 import { reconcileSwapLegs } from '@/shared/lib/cashu/reconcileSwapLegs';
+import { setTransactionAnnotation } from '@/shared/stores/profile/transactionAnnotationStore';
 
 jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock')
@@ -72,6 +76,9 @@ const STORE = 'swap-transactions-store';
 const SOURCE = 'https://source.example';
 const DESTINATION = 'https://destination.example';
 
+/** Whether account A's recipient has issued. */
+let recipientState = 'pending';
+
 function createManager() {
   const operation = () => ({
     id: 'mint-op-1',
@@ -81,8 +88,7 @@ function createManager() {
     request: 'lnbc-fixture',
     amount: Amount.from(100),
     unit: 'sat',
-    // The recipient has not issued while the run goes on.
-    state: 'pending',
+    state: recipientState,
     createdAt: 1000,
     updatedAt: 1000,
   });
@@ -130,8 +136,11 @@ function createManager() {
 let mockManager = createManager();
 
 const plan: RebalancePlan = {
-  steps: [{ id: 'step-1', fromMintUrl: SOURCE, toMintUrl: DESTINATION, amount: 100 }],
-  totalAmount: 100,
+  steps: [
+    { id: 'step-1', fromMintUrl: SOURCE, toMintUrl: DESTINATION, amount: 100 },
+    { id: 'step-2', fromMintUrl: SOURCE, toMintUrl: DESTINATION, amount: 100 },
+  ],
+  totalAmount: 200,
   currentBalances: { [SOURCE]: 1000, [DESTINATION]: 0 },
   targetBalances: { [SOURCE]: 900, [DESTINATION]: 100 },
 };
@@ -162,6 +171,9 @@ async function switchTo(accountIndex: number) {
 
 beforeEach(async () => {
   jest.useFakeTimers();
+  recipientState = 'pending';
+  mockManager = createManager();
+  jest.mocked(setTransactionAnnotation).mockClear();
   await AsyncStorage.clear();
   await useProfileStore.persist.rehydrate();
   useProfileStore.setState({
@@ -179,8 +191,8 @@ afterEach(() => {
   jest.useRealTimers();
 });
 
-it('a run aborted by an account switch writes nothing into the next account, and its own group settles when that account opens again', async () => {
-  const { result, rerender } = renderHook(() =>
+it('a run that outlives an account switch writes nothing into the next account, and its own group settles when that account opens again', async () => {
+  const { result, unmount } = renderHook(() =>
     useMintRebalanceOrchestrator({
       unit: 'sat',
       computedPlan: plan,
@@ -197,7 +209,7 @@ it('a run aborted by an account switch writes nothing into the next account, and
     })
   );
 
-  // Account A: the melt is paid, the destination has not issued yet.
+  // Account A: the first melt is paid, the destination has not issued yet.
   await act(async () => result.current.handleStart());
   await flush(100);
   const groupId = result.current.swapGroupId!;
@@ -205,6 +217,7 @@ it('a run aborted by an account switch writes nothing into the next account, and
     state: 'running',
     legs: [{ localStatus: 'verifying', meltOperationId: 'melt-op-1' }],
   });
+  const annotationsBeforeSwitch = jest.mocked(setTransactionAnnotation).mock.calls.length;
 
   // Account B holds a running group under the same id, so a write that
   // reaches B's history is seen. (Group ids are random; this makes the
@@ -216,19 +229,25 @@ it('a run aborted by an account switch writes nothing into the next account, and
     JSON.stringify({ state: { groups: { [groupId]: bGroup }, quoteIdToGroup: {} }, version })
   );
 
-  // The switch completes before the run sees the wallet change.
+  // The switch unmounts A's tree; the run goes on with A's manager.
+  const managerA = mockManager;
+  unmount();
   await switchTo(1);
   expect(useSwapTransactionsStore.getState().groups[groupId]?.title).toBe('B');
-  mockManager = createManager();
-  rerender({});
+
+  // A's first transfer arrives and its run moves on to the second: a new leg,
+  // its quote and melt tags and their annotations, then the run's end.
+  recipientState = 'finalized';
   await flush(16000);
+  await flush(16000);
+  expect(managerA.ops.melt.execute).toHaveBeenCalledTimes(2);
 
-  // The run ended for the screen; B's history is untouched, in memory and saved.
-  expect(result.current.runStatus).toBe('cancelled');
-  expect(useSwapTransactionsStore.getState().groups[groupId]).toMatchObject(bGroup);
-  expect((await saved(ACCOUNT_B)).groups[groupId]).toMatchObject(bGroup);
+  // B's history is untouched, in memory and saved, and no annotation was written for it.
+  expect(useSwapTransactionsStore.getState().groups[groupId]).toEqual(bGroup);
+  expect((await saved(ACCOUNT_B)).groups[groupId]).toEqual(bGroup);
+  expect(setTransactionAnnotation).toHaveBeenCalledTimes(annotationsBeforeSwitch);
 
-  // A's saved group is left as the run last wrote it: running, its leg verifying.
+  // A's saved group is left as the run last wrote it before the switch.
   expect((await saved(ACCOUNT_A)).groups[groupId]).toMatchObject({
     state: 'running',
     legs: [{ localStatus: 'verifying' }],

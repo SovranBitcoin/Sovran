@@ -35,6 +35,8 @@ import { findRebalanceRouteCandidates } from '@/features/mint/lib/rebalanceRoute
 import {
   createRebalanceStepSink,
   PAYMENT_PENDING_DETAIL,
+  swapHistoryOf,
+  type StartedGroup,
 } from '@/features/mint/lib/rebalanceStepSink';
 import { createRebalanceWalletPort } from '@/features/mint/lib/rebalanceWalletPort';
 
@@ -83,23 +85,6 @@ interface OwnedRun {
   /** The account the group was started for. */
   account: string | undefined;
   release: () => void;
-}
-
-/** A swap history group, with the account it was started for. */
-interface StartedGroup {
-  id: string;
-  account: string | undefined;
-}
-
-/**
- * The swap history store, while it still holds `account`'s groups. After an
- * account switch it holds another account's, and a late write from a run
- * started for the old one must not land there.
- */
-function swapHistoryOf(account: string | undefined) {
-  if (getActiveProfilePubkey() === account) return useSwapTransactionsStore.getState();
-  cashuLog.info('mint.rebalance.group_write_skipped_other_account');
-  return null;
 }
 
 /** The Swap status toast, when it belongs to this group. */
@@ -310,7 +295,7 @@ export function useMintRebalanceOrchestrator({
     (step: TransferStep) =>
       createRebalanceStepSink({
         step,
-        groupId: swapGroupRef.current?.id ?? null,
+        group: swapGroupRef.current,
         swapLegIds: swapLegIdByStepIdRef.current,
         updateStepState,
         insertChainRows,
