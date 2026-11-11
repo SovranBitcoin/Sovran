@@ -662,6 +662,90 @@ describe('usePaymentStatusListener', () => {
     unmount();
   });
 
+  it('shows another melt’s success, left to a melt in flight, once that toast ends', () => {
+    const { unmount } = mount();
+    usePaymentStatusStore.getState().setActive({
+      variant: 'melt',
+      id: 'melt-a',
+      owner: { kind: 'melt', quoteId: 'mq-a' },
+      mintUrl: MINT,
+      amount: 300,
+      unit: 'sat',
+      state: 'processing',
+    });
+    act(() =>
+      fake.emit('melt-op:finalized', {
+        mintUrl: MINT,
+        operationId: 'mo-b',
+        operation: { quoteId: 'mq-b', amount: 200, unit: 'sat', method: 'bolt11' },
+      })
+    );
+    act(() =>
+      fake.emit('melt-op:finalized', {
+        mintUrl: MINT,
+        operationId: 'mo-a',
+        operation: { quoteId: 'mq-a', amount: 300, unit: 'sat', method: 'bolt11' },
+      })
+    );
+    expect(active()).toMatchObject({ id: 'melt-a', state: 'confirmed' });
+    expect(mockedPopup).not.toHaveBeenCalled();
+
+    // Melt A's toast is dismissed: melt B's success is shown, once.
+    act(() => usePaymentStatusStore.getState().clearActive('melt-a'));
+    expect(active()).toMatchObject({
+      variant: 'melt',
+      id: 'mq-b',
+      owner: { kind: 'melt', quoteId: 'mq-b' },
+      amount: 200,
+      state: 'confirmed',
+    });
+    expect(mockedPopup).toHaveBeenCalledWith({
+      variant: 'melt',
+      id: 'mq-b',
+      mintUrl: MINT,
+      amount: 200,
+      unit: 'sat',
+      operationId: 'mo-b',
+    });
+    act(() => usePaymentStatusStore.getState().clearActive('mq-b'));
+    expect(active()).toBeNull();
+    expect(mockedPopup).toHaveBeenCalledTimes(1);
+    unmount();
+  });
+
+  it('shows another send’s success, left to a payment request in flight, once that toast ends', () => {
+    const { unmount } = mount();
+    usePaymentStatusStore.getState().setActive({
+      variant: 'payment-request',
+      id: 'pr-toast',
+      owner: { kind: 'pending', key: 'pr-toast' },
+      mintUrl: MINT,
+      amount: 5,
+      unit: 'sat',
+      state: 'processing',
+    });
+    act(() =>
+      fake.emit('send:finalized', {
+        mintUrl: MINT,
+        operationId: 'send-c',
+        operation: { amount: 7, unit: 'sat' },
+      })
+    );
+    expect(mockedPopup).not.toHaveBeenCalled();
+
+    // The payment request's flow ends its toast without this send: it was another's.
+    act(() => usePaymentStatusStore.getState().clearActive('pr-toast'));
+    expect(active()).toMatchObject({ variant: 'send', id: 'send-c', state: 'confirmed' });
+    expect(mockedPopup).toHaveBeenCalledWith({
+      variant: 'send',
+      id: 'send-c',
+      mintUrl: MINT,
+      amount: 7,
+      unit: 'sat',
+    });
+    unmount();
+  });
+
   it('does not fail a melt in flight for another melt’s rollback of the same amount', () => {
     const { unmount } = mount();
     usePaymentStatusStore.getState().setActive({

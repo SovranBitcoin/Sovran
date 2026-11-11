@@ -751,7 +751,19 @@ export function usePaymentStatusListener(): void {
           activeId: active?.id ?? null,
           activeVariant: active?.variant ?? null,
         });
-        store.holdResult({ owner: { kind: 'send', operationId }, operationId });
+        store.holdResult({
+          owner: { kind: 'send', operationId },
+          operationId,
+          toast: {
+            variant: 'send',
+            id: operationId,
+            owner: { kind: 'send', operationId },
+            mintUrl,
+            amount,
+            unit,
+            state: 'confirmed',
+          },
+        });
         return;
       }
 
@@ -899,7 +911,20 @@ export function usePaymentStatusListener(): void {
             quoteId: operation.quoteId,
             activeId: active?.id ?? null,
           });
-          store.holdResult({ owner: { kind: 'melt', quoteId: operation.quoteId }, operationId });
+          const owner = { kind: 'melt' as const, quoteId: operation.quoteId };
+          store.holdResult({
+            owner,
+            operationId,
+            toast: {
+              variant: 'melt',
+              id: operation.quoteId,
+              owner,
+              mintUrl,
+              amount: amountToNumber(operation.amount),
+              unit: operation.unit,
+              state: 'confirmed',
+            },
+          });
         } else {
           // Background melt (no active toast) — show new confirmed toast
           const amount = amountToNumber(operation.amount);
@@ -934,9 +959,27 @@ export function usePaymentStatusListener(): void {
       }
     );
 
+    // A result held for a toast in flight that was not that toast's own is
+    // shown once the toast on screen ends, oldest first.
+    const offHeld = usePaymentStatusStore.subscribe((state) => {
+      if (state.active || state.held.length === 0) return;
+      const held = state.takeHeld();
+      if (!held) return;
+      const { toast } = held;
+      paymentStatusPopup({
+        variant: toast.variant,
+        id: toast.id,
+        mintUrl: toast.mintUrl,
+        amount: toast.amount,
+        unit: toast.unit,
+        ...(toast.variant === 'melt' ? { operationId: held.operationId } : {}),
+      });
+    });
+
     return () => {
       disposed = true;
       paymentLog.debug('hook.payment_status.unsubscribing');
+      offHeld();
       offStateChanged();
       offAdded();
       offRedeemed();

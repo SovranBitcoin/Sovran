@@ -107,12 +107,14 @@ export function paymentInFlight(
  * A wallet result left to a toast still in flight: a send or melt that
  * finished while a toast whose payment was not yet known was on screen. It
  * may be that toast's own, so it is held: the toast catches up with it once
- * its flow binds it to that payment.
+ * its flow binds it to that payment. Otherwise it is another payment's, and
+ * gets `toast` of its own once the toast on screen ends.
  */
 interface HeldResult {
   owner: BoundOwner;
   /** The melt or send operation, for View. */
   operationId: string;
+  toast: ActivePaymentStatus;
 }
 
 /** Results held at once; the oldest goes first. */
@@ -123,6 +125,8 @@ type PaymentStatusStore = {
   held: HeldResult[];
   /** Hold a finished payment's result for a toast that may yet be bound to it. */
   holdResult: (result: HeldResult) => void;
+  /** With no toast on screen, show the oldest held result's toast; null when there is none. */
+  takeHeld: () => HeldResult | null;
   setActive: (payment: ActivePaymentStatus | null) => void;
   clearActive: (id?: string) => void;
   /**
@@ -174,6 +178,21 @@ export const usePaymentStatusStore = create<PaymentStatusStore>({
       const others = s.held.filter((h) => !sameOwner(h.owner, result.owner));
       return { held: [...others, result].slice(-MAX_HELD_RESULTS) };
     }),
+  takeHeld: () => {
+    let taken: HeldResult | null = null;
+    set((s) => {
+      const [next, ...rest] = s.held;
+      if (s.active || !next) return s;
+      taken = next;
+      paymentLog.info('payment.status.show_held_result', {
+        variant: next.toast.variant,
+        id: next.toast.id,
+        stillHeld: rest.length,
+      });
+      return { active: next.toast, held: rest };
+    });
+    return taken;
+  },
   setActive: (payment) => {
     set((s) => {
       paymentLog.info(
