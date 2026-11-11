@@ -7,9 +7,13 @@ import {
   publishOwnProfileMetadata,
   ingestOwnProfileMetadata,
   loadOwnProfileMetadata,
-  PROFILE_CREATED_AT_MAX_SKEW_SECONDS,
   type OwnProfileLoadResult,
 } from '@/shared/lib/nostr/profile/publishOwnProfileMetadata';
+import {
+  MAX_FUTURE_SEC,
+  SILENT_READS_BEFORE_LEFT_OUT,
+  forgetSilentRelays,
+} from '@/shared/lib/nostr/ownReplaceableEvent';
 import { useOwnProfileMetadataStore } from '@/shared/stores/profile/ownProfileMetadataStore';
 import { publishEvent } from '@/shared/lib/nostr/publish/publishEvent';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
@@ -53,12 +57,26 @@ jest.mock('@/shared/lib/nostr/buildNostrDataLayer', () => ({
 const mockIngest = jest.fn();
 const mockDelete = jest.fn();
 jest.mock('@/shared/lib/nostr/publish/publishEvent', () => ({ publishEvent: jest.fn() }));
-jest.mock('@/shared/lib/nostr/outbox/relayListStore', () => ({ getOwnWriteRelays: () => [] }));
+/** The account's write relays this session's relay-list sync found, or null before it has. */
+let mockKnown: string[] | null;
+/** One relay object per url, as NDK's pool keeps them. */
+const mockRelayObjects = new Map<string, { url: string }>();
+const mockRelay = (url: string) => {
+  if (!mockRelayObjects.has(url)) mockRelayObjects.set(url, { url });
+  return mockRelayObjects.get(url)!;
+};
+jest.mock('@/shared/lib/nostr/outbox/relayListStore', () => ({
+  getOwnWriteRelays: () => [],
+  getKnownOwnWriteRelays: () => mockKnown,
+}));
 jest.mock('@nostr-dev-kit/ndk-mobile', () => ({
   __esModule: true,
   default: jest.fn(),
   normalizeRelayUrl: (url: string) => url,
   NDKSubscriptionCacheUsage: { ONLY_RELAY: 'ONLY_RELAY' },
+  NDKRelaySet: {
+    fromRelayUrls: (urls: string[]) => ({ relays: new Set(urls.map(mockRelay)) }),
+  },
   NDKEvent: class {
     id = 'e'.repeat(64);
     sign = jest.fn(async () => {});
@@ -66,6 +84,17 @@ jest.mock('@nostr-dev-kit/ndk-mobile', () => ({
 }));
 
 const pubkey = 'a'.repeat(64);
+const RELAY = 'wss://relay.example/';
+/** A signed kind 0 as a relay sends it. */
+const kind0 = (id: string, created_at: number, content: unknown) => ({
+  pubkey,
+  kind: 0,
+  id,
+  created_at,
+  content: typeof content === 'string' ? content : JSON.stringify(content),
+  getEventHash: () => id,
+  verifySignature: () => true,
+});
 const accepted = {
   eventId: 'e'.repeat(64),
   anyAccepted: true,
@@ -74,7 +103,7 @@ const accepted = {
   relayResults: [],
 };
 const makeNdk = () => {
-  const relay = { url: 'wss://relay.example/' };
+  const relay = mockRelay(RELAY);
   const subscription = Object.assign(new EventEmitter(), {
     relayFilters: new Map([[relay.url, []]]),
     eosesSeen: new Set<{ url: string }>(),
@@ -102,8 +131,15 @@ const publish = (ndk: NDK = makeNdk(), initialLoad: OwnProfileLoadResult = { sta
     patch: { name: 'New', picture: null },
     initialLoad,
   });
+/** Let `reads` reads end, each by a relay's silence (12 s). */
+async function readsTimeOut(reads: number) {
+  for (let read = 0; read < reads; read++) await jest.advanceTimersByTimeAsync(12_001);
+}
+
 beforeEach(() => {
   jest.clearAllMocks();
+  forgetSilentRelays();
+  mockKnown = [RELAY];
   useOwnProfileMetadataStore.setState({ latest: null, optimistic: null });
   jest.mocked(publishEvent).mockReturnValue(okAsync(accepted));
 });
@@ -124,6 +160,7 @@ it('acceptance updates profile and cache, removes the old avatar, and clears the
     name: 'New',
   });
   expect(jest.mocked(publishEvent).mock.calls[0][0].resolveOn).toBe('optimistic');
+  expect(jest.mocked(publishEvent).mock.calls[0][0].relays).toEqual([RELAY]);
 });
 it('all-failed rolls back the overlay without a profile or cache write', async () => {
   jest.mocked(publishEvent).mockImplementation(() => {
@@ -219,18 +256,15 @@ it('preserves the freshest fetched base, including fields unseen by the editor',
     .setLatest({ content: { about: 'Old' }, createdAt: 10, eventId: 'b'.repeat(64) });
   const ndk = makeNdk();
   ndk.subscription.start.mockImplementation(async () => {
-    ndk.subscription.emit('event', {
-      pubkey,
-      kind: 0,
-      id: 'c'.repeat(64),
-      created_at: 20,
-      content: JSON.stringify({
+    ndk.subscription.emit(
+      'event',
+      kind0('c'.repeat(64), 20, {
         about: 'New',
         name: 'handle',
         display_name: 'Old',
         extension: { keep: true },
-      }),
-    });
+      })
+    );
     ndk.eose();
   });
   await publish(ndk);
@@ -295,7 +329,8 @@ it('refuses a timed-out base lookup when a cached name proves a profile exists',
   const ndk = makeNdk();
   ndk.subscription.start.mockImplementation(() => new Promise(() => {}));
   const pending = publish(ndk);
-  await jest.advanceTimersByTimeAsync(3000);
+  // The only relay is read again until it counts as silent, and once more.
+  await readsTimeOut(SILENT_READS_BEFORE_LEFT_OUT + 1);
   const result = await pending;
   spy.mockRestore();
   jest.useRealTimers();
@@ -310,10 +345,19 @@ it('publishes an empty base only after mount and save both receive empty relay E
   expect(initialLoad).toEqual({ status: 'absent' });
   expect((await publish(ndk, initialLoad)).isOk()).toBe(true);
   expect(ndk.subscribe).toHaveBeenCalledTimes(2);
-  expect(ndk.subscribe).toHaveBeenCalledWith(
+  // The editor's fields come from the pool; the save reads each write relay.
+  expect(ndk.subscribe).toHaveBeenNthCalledWith(
+    1,
     { kinds: [0], authors: [pubkey] },
     { cacheUsage: 'ONLY_RELAY', closeOnEose: false },
     undefined,
+    false
+  );
+  expect(ndk.subscribe).toHaveBeenNthCalledWith(
+    2,
+    { kinds: [0], authors: [pubkey] },
+    { cacheUsage: 'ONLY_RELAY', closeOnEose: false },
+    { relays: new Set([mockRelay(RELAY)]) },
     false
   );
   expect(JSON.parse(jest.mocked(publishEvent).mock.calls[0][0].event.content)).toEqual({
@@ -340,7 +384,7 @@ it.each(['cachedDisplayName', 'cachedPicture'] as const)(
     expect(publishEvent).not.toHaveBeenCalled();
   }
 );
-it.each(['timeout', 'error', 'invalid', 'synthetic-eose', 'partial-eose'])(
+it.each(['timeout', 'error', 'invalid', 'synthetic-eose'])(
   'does not classify %s as no kind-0',
   async (failure) => {
     jest.useFakeTimers();
@@ -348,24 +392,28 @@ it.each(['timeout', 'error', 'invalid', 'synthetic-eose', 'partial-eose'])(
     ndk.subscription.start.mockImplementation(async () => {
       if (failure === 'error') throw new Error('offline');
       if (failure === 'invalid') {
-        ndk.subscription.emit('event', { pubkey, kind: 0, content: 'not json' });
+        ndk.subscription.emit('event', kind0('c'.repeat(64), 20, 'not json'));
         ndk.eose();
       }
       if (failure === 'synthetic-eose') ndk.subscription.emit('eose');
-      if (failure === 'partial-eose') {
-        ndk.subscription.relayFilters.set('wss://other.example/', []);
-        ndk.eose();
-      }
     });
     const pending = publish(ndk);
-    await jest.advanceTimersByTimeAsync(3000);
+    await readsTimeOut(SILENT_READS_BEFORE_LEFT_OUT + 1);
     const result = await pending;
     jest.useRealTimers();
     expect(result._unsafeUnwrapErr().type).toBe('base-unavailable');
-    expect(ndk.subscription.stop).toHaveBeenCalledTimes(1);
+    expect(ndk.subscription.stop).toHaveBeenCalled();
     expect(publishEvent).not.toHaveBeenCalled();
   }
 );
+
+it('waits for the relay list before reading or saving', async () => {
+  mockKnown = null;
+  const ndk = makeNdk();
+  expect((await publish(ndk))._unsafeUnwrapErr().type).toBe('base-unavailable');
+  expect(ndk.subscribe).not.toHaveBeenCalled();
+  expect(publishEvent).not.toHaveBeenCalled();
+});
 it('clamps a future base and logs only its delta once per publish', async () => {
   jest.useFakeTimers().setSystemTime(1000000);
   const createdAtSec = 100000;
@@ -376,7 +424,7 @@ it('clamps a future base and logs only its delta once per publish', async () => 
   });
   await publish();
   const event = jest.mocked(publishEvent).mock.calls[0][0].event;
-  expect(event.created_at).toBeGreaterThan(1000 + PROFILE_CREATED_AT_MAX_SKEW_SECONDS);
+  expect(event.created_at).toBeGreaterThan(1000 + MAX_FUTURE_SEC);
   expect(JSON.parse(event.content)).toMatchObject({
     lud16: 'keep',
     nip05: 'keep',
@@ -474,39 +522,42 @@ it('allows removing an identity without network verification', async () => {
 });
 
 describe('the profile a save builds on, and where it is sent', () => {
-  it('builds on an older profile one relay sent while another has not answered in three seconds', async () => {
+  it('does not build on an older profile one relay sent while another has not answered', async () => {
     jest.useFakeTimers();
+    const TWO = 'wss://two.example/';
+    mockKnown = [RELAY, TWO];
     const ndk = makeNdk();
     ndk.subscription.start.mockImplementation(async () => {
-      // Relay two holds the newer profile, with an about and a lud16, and never answers.
-      ndk.subscription.relayFilters.set('wss://two.example/', []);
-      ndk.subscription.emit('event', {
-        pubkey,
-        kind: 0,
-        id: 'c'.repeat(64),
-        created_at: 20,
-        content: JSON.stringify({ name: 'Old' }),
-      });
+      // Relay two holds the newer profile and never answers.
+      ndk.subscription.emit('event', kind0('c'.repeat(64), 20, { name: 'Old' }));
       ndk.eose();
     });
     const pending = publish(ndk);
-    await jest.advanceTimersByTimeAsync(3000);
+    await readsTimeOut(SILENT_READS_BEFORE_LEFT_OUT - 1);
+    expect(publishEvent).not.toHaveBeenCalled();
+
+    // Silent three reads in a row: the save goes on without relay two, and is
+    // not sent to it. A newer profile only relay two holds is overruled, the
+    // risk the owner accepted (F227).
+    await readsTimeOut(1);
     const result = await pending;
     jest.useRealTimers();
-
-    // QUIRK (F240 D5): the save is built on the partial read and published.
     expect(result.isOk()).toBe(true);
-    expect(JSON.parse(jest.mocked(publishEvent).mock.calls[0][0].event.content)).toEqual({
-      name: 'Old',
-      display_name: 'New',
-    });
+    const { event, relays } = jest.mocked(publishEvent).mock.calls[0][0];
+    expect(JSON.parse(event.content)).toEqual({ name: 'Old', display_name: 'New' });
+    expect(relays).toEqual([RELAY]);
   });
 
-  it('sends a save to the write relays held, or the defaults, whichever relays were read', async () => {
-    await publish();
-    // QUIRK (F240): with no write relays held, the defaults, none of which was asked by name.
-    expect(jest.mocked(publishEvent).mock.calls[0][0].relays).toEqual(
-      jest.requireActual('@/shared/lib/nostr/outbox/defaults').DEFAULT_RELAYS
-    );
+  it('builds on the profile the editor opened on when it is newer than what the relays read hold', async () => {
+    const opened = { content: { about: 'opened' }, createdAt: 30, eventId: 'd'.repeat(64) };
+    const ndk = makeNdk();
+    ndk.subscription.start.mockImplementation(async () => {
+      ndk.subscription.emit('event', kind0('c'.repeat(64), 20, { about: 'older' }));
+      ndk.eose();
+    });
+    await publish(ndk, { status: 'found', snapshot: opened });
+    const { event } = jest.mocked(publishEvent).mock.calls[0][0];
+    expect(JSON.parse(event.content)).toMatchObject({ about: 'opened' });
+    expect(event.created_at).toBeGreaterThan(30);
   });
 });
