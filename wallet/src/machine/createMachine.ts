@@ -973,7 +973,6 @@ export function createPaymentMachine(
       }
     })();
 
-    void task;
     return task;
   }
 

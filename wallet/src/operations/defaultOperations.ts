@@ -1059,7 +1059,6 @@ export function createDefaultOperations(
       // because picking there moves the wallet to that mint's account.
       const crossesAccounts = (mintUrl: string) =>
         isTestnut(mintUrl) !== testnutAccount;
-      const listedMints = allTrustedMints;
       const rowVerdict = createMintRowRules({
         data,
         capabilityCtx: {
@@ -1081,7 +1080,7 @@ export function createDefaultOperations(
           (mintInfoMap.get(mintUrl)?.nuts?.["17"]?.supported?.length ?? 0) > 0,
       });
 
-      const items = listedMints.map((mint: Mint): MintListItem => {
+      const items = allTrustedMints.map((mint: Mint): MintListItem => {
         const mintUrl = mint.mintUrl;
         const info = mintInfoMap.get(mintUrl);
         const balance = balances[mintUrl] ?? 0;
@@ -1138,7 +1137,6 @@ export function createDefaultOperations(
           : null,
         testnutAccount,
         trustedCount: allTrustedMints.length,
-        listedCount: listedMints.length,
         // Listed under their own unit tab; pickable only when scope is "selected".
         otherAccount: Object.fromEntries(
           allTrustedMints
@@ -2032,7 +2030,7 @@ export function createDefaultOperations(
         });
         // HTTP / transport-less payment request: use the paymentRequests API
         let requestForCoco = paymentRequest;
-        if (info?.mintsPreferred) {
+        if (info.mintsPreferred) {
           // Coco 2.0.0 treats every m list as strict. Remove only the advisory
           // list in its input copy; the original request remains the flow identity.
           const sdkRequest = decodePaymentRequest(paymentRequest);

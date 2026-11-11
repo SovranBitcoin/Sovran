@@ -273,7 +273,7 @@ function handleOptionChosen(
       // Same cross-unit hard-stop as the EXECUTE arm (BTC-04) — a BIP-321
       // creq option carries its unit just like a standalone scan.
       const requestUnit = (intent.info.unit ?? "sat").trim().toLowerCase();
-      const activeUnit = (currentCtx.unit ?? "sat").trim().toLowerCase();
+      const activeUnit = currentCtx.unit.trim().toLowerCase();
       if (requestUnit !== activeUnit) {
         logger.warn("transitions.optionChosen.paymentRequestUnitMismatch", {
           requestUnit,

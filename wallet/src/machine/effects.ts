@@ -1065,7 +1065,6 @@ function handleConfirmSendFailure(args: {
               contextPatch,
               createdOffline: true,
               mintWasOffline:
-                contextPatch?.mintUnreachableConfirmed === true ||
                 effectiveContext.mintUnreachableConfirmed === true,
             }),
           );
