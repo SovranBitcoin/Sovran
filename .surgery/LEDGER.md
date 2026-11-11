@@ -7,7 +7,7 @@ State, not history. Passes run in order; one call runs one pass.
 | 0 Pin behaviour           | **Done** (2026-11-11). Every boundary the surveys listed has a pin; the gates are closed. Branch `surgery/pass-0-gates`.                                             |
 | 1 Persisted state         | **Done** (2026-11-11), proven on every release fixture; no real upgrade was run. Cuts on `surgery/pass-1-cuts` and `surgery/pass-1-queue`, not merged. See "Pass 1". |
 | 2 Implicit state machines | **Done** (2026-11-11). All sixteen approved conversions built on `surgery/pass-2` (one partly: the machine turn); not merged, nothing run on a device. See "Pass 2". |
-| 3 Deepen modules          | **Awaiting approval** (2026-11-12). Surveyed; twelve defects fixed on `surgery/pass-3`; proposals below, none made. See "Pass 3".                                    |
+| 3 Deepen modules          | **Cutting** (groups A and B approved 2026-11-12; group C not approved). See "Pass 3".                                                                                |
 
 Pass 0 is on branch `surgery/pass-0`; pass 1's evidence is on `surgery/pass-1` and its cuts on `surgery/pass-1-cuts`, each stacked on the one before (worktree `../sovran-surgery`,
 based on `main` at `e5d70b590`). Neither is pushed. Until they merge, this file and the survey folders also sit
@@ -436,7 +436,12 @@ unused store actions (they are members, not exports), or code only tests import;
 callers. `createMachine.ts` should lose its pure NFC rules to their own module and gain one `advance(event)` helper;
 its turn functions and settled-step table should stay where they are.
 
-### Proposed cuts (none made; each needs the owner's approval)
+### Decisions (owner, 2026-11-12)
+
+Groups A and B are approved. Group C is not: each row there needs a ruling first. The builders' brief is
+`pass-3/CUT-BRIEF.md`.
+
+### Cuts
 
 Line counts are the surveyors' estimates of product lines removed, net. Group A deletes code nothing reaches. Group
 B gives a duplicated rule one owner. Group C needs a ruling first.
