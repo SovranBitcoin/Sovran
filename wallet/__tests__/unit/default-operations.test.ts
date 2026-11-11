@@ -415,6 +415,56 @@ describe("executePaymentRequest — Nostr transport", () => {
     expect(failure).toMatchObject({ operationId: "op-1", message: "relay down" });
   });
 
+  it("cancels the prepared send and sends nothing when the token cannot be made", async () => {
+    const mockManager = createMockManager();
+    mockManager.ops.send.execute = vi
+      .fn()
+      .mockRejectedValue(new Error("network drop mid-flight"));
+    mockGetPRInfo.mockReturnValue({
+      mints: [MINT1],
+      amount: 100,
+      unit: "sat",
+      transports: [{ type: "nostr", target: "nprofile1abc" }],
+    });
+    const sendNostrDM = vi.fn().mockResolvedValue(undefined);
+    const ops = createDefaultOperations({
+      getManager: () => mockManager as unknown as Manager,
+      sendNostrDM,
+    });
+
+    await expect(
+      ops.executePaymentRequest!({ mintUrl: MINT1, paymentRequest: "creqABC", amount: 100, unit: "sat" }),
+    ).rejects.toThrow("network drop mid-flight");
+
+    expect(mockManager.ops.send.cancel).toHaveBeenCalledWith("prepared-send-1");
+    expect(mockManager.ops.send.reclaim).not.toHaveBeenCalled();
+    expect(sendNostrDM).not.toHaveBeenCalled();
+  });
+
+  it("keeps the execute error when the cancel after it fails", async () => {
+    const mockManager = createMockManager();
+    mockManager.ops.send.execute = vi
+      .fn()
+      .mockRejectedValue(new Error("network drop mid-flight"));
+    mockManager.ops.send.cancel = vi
+      .fn()
+      .mockRejectedValue(new Error("Cannot cancel operation in state 'executing'"));
+    mockGetPRInfo.mockReturnValue({
+      mints: [MINT1],
+      amount: 100,
+      unit: "sat",
+      transports: [{ type: "nostr", target: "nprofile1abc" }],
+    });
+    const ops = createDefaultOperations({
+      getManager: () => mockManager as unknown as Manager,
+      sendNostrDM: vi.fn(),
+    });
+
+    await expect(
+      ops.executePaymentRequest!({ mintUrl: MINT1, paymentRequest: "creqABC", amount: 100, unit: "sat" }),
+    ).rejects.toThrow("network drop mid-flight");
+  });
+
   it("reports a delivered send as delivered when its history row cannot be read", async () => {
     const mockManager = createMockManager();
     mockManager.history.getHistoryEntryById = vi.fn().mockRejectedValue(new Error("database is locked"));

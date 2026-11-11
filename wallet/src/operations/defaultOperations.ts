@@ -212,7 +212,11 @@ async function executeSendWithRescue(
   mgr: Manager,
   operation: { id: string },
   input: {
-    logPrefix: "executeSend" | "executeOfflineSend" | "executeNfcSend";
+    logPrefix:
+      | "executeSend"
+      | "executeOfflineSend"
+      | "executeNfcSend"
+      | "executePaymentRequest.nostr";
     /** Passed through to ops.send.execute verbatim (undefined = no options). */
     executeOptions?: { memo?: string };
     /** Dev mock-fail gate — inside the try so the rescue path is exercised. */
@@ -1956,7 +1960,12 @@ export function createDefaultOperations(
           amount,
           needsSwap: !!prepared.needsSwap,
         });
-        const { operation, token } = await mgr.ops.send.execute(prepared.id);
+        // Nothing has been delivered yet, so a send that cannot be executed
+        // is cancelled like every other send; delivery has its own rollback
+        // below.
+        const { operation, token } = await executeSendWithRescue(mgr, prepared, {
+          logPrefix: "executePaymentRequest.nostr",
+        });
         operationId = operation.id;
         logger.info("operations.executePaymentRequest.nostr.tokenCreated", {
           operationId,

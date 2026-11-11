@@ -8,6 +8,8 @@
  */
 import {
   Amount,
+  PaymentRequest,
+  PaymentRequestTransportType,
   createBlindSignature,
   deriveKeysetId,
   getEncodedToken,
@@ -20,6 +22,7 @@ import {
   type CoreProof,
   type Manager,
 } from "@cashu/coco-core";
+import { nip19 } from "nostr-tools";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createDefaultOperations } from "../../src/operations/defaultOperations";
@@ -413,6 +416,59 @@ describe("send: executeSend against a real Coco Manager", () => {
       expect(mint.calls).toEqual(["swap", "checkstate"]);
     },
   );
+});
+
+describe("payment request over Nostr: executePaymentRequest against a real Coco Manager", () => {
+  function nostrRequest(): string {
+    return new PaymentRequest(
+      [
+        {
+          type: PaymentRequestTransportType.NOSTR,
+          target: nip19.nprofileEncode({ pubkey: "ee".repeat(32) }),
+          tags: [["n", "17"]],
+        },
+      ],
+      "request-1",
+      10,
+      "sat",
+      [MINT_URL],
+    ).toEncodedRequest();
+  }
+
+  it("gives the reserved proofs back when the send fails before Coco starts it", async () => {
+    const { manager, repos, mint } = await harness();
+    const sendNostrDM = vi.fn().mockResolvedValue(undefined);
+    const ops = createDefaultOperations({
+      getManager: () => manager,
+      sendNostrDM,
+    });
+    // Coco's first write of an execute marks the send "executing". When that
+    // write fails nothing has started: the send is still "prepared", with its
+    // proofs reserved, and Coco's own recovery has nothing to undo.
+    const update = repos.sendOperationRepository.update.bind(
+      repos.sendOperationRepository,
+    );
+    vi.spyOn(repos.sendOperationRepository, "update").mockImplementation(
+      async (operation) => {
+        if (operation.state === "executing") throw new Error("database is locked");
+        return update(operation);
+      },
+    );
+
+    await expect(
+      ops.executePaymentRequest!({
+        mintUrl: MINT_URL,
+        paymentRequest: nostrRequest(),
+        amount: 10,
+        unit: "sat",
+      }),
+    ).rejects.toThrow("database is locked");
+
+    expect(sendNostrDM).not.toHaveBeenCalled();
+    expect(mint.calls).toEqual([]);
+    expect(await historyRows(manager)).toEqual([["send", "rolled_back"]]);
+    expect(await balance(manager)).toEqual({ spendable: 100, reserved: 0 });
+  });
 });
 
 describe("receive: the app's createExecuteReceive against a real Coco Manager", () => {

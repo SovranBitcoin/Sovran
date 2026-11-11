@@ -410,12 +410,13 @@ MUST:
 - `executeSend`/`executeOfflineSend` never return a tokenless entry; the history
   entry is enriched or synthesized to carry the token.
   `defaultOperations.ts:373-379,399-405`.
-- `executeSend`/`executeOfflineSend`/`executeNfcSend` route execute through
-  `executeSendWithRescue`: when `ops.send.execute` throws after prepare, the
-  prepared operation is cancelled (best-effort, original error rethrown) so
-  proofs never stay reserved and no phantom pending row lingers. The dev
+- `executeSend`/`executeOfflineSend`/`executeNfcSend` and the Nostr branch of
+  `executePaymentRequest` route execute through `executeSendWithRescue`: when
+  `ops.send.execute` throws after prepare, the prepared operation is cancelled
+  (best-effort, original error rethrown), so a send Coco could not start does
+  not keep its proofs reserved under a prepared row. Coco cancels only a
+  prepared send: one cut off mid-swap stays `executing` until recovery. The dev
   mock-fail gate sits inside the rescue so QA exercises it.
-  `defaultOperations.ts:191-238`.
 - `PROOFS_CHOSEN` / `SEND_MEMO_SUBMITTED` are handled only from their owning
   steps (`chooseProofs` / `enterSendMemo`) and are not in `INTENT_EVENTS` — a
   stray event must not supersede in-flight resolve work.
