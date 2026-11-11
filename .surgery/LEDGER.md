@@ -564,6 +564,11 @@ Also: unreachable code and exports removed, identical copies merged (tier rank t
 payment announcements, the timeout helper), three tests that could not fail rewritten so they can, and stale
 comments and documentation corrected against the code.
 
+Reviewed commit by commit by Codex GPT-6.1 Sol (wallet and payments) and Codex GPT-6 Astra (the rest): two defects,
+both repaired with a failing test first by Claude Fable 5.2 and not re-reviewed: a live DM could not fill a seeded
+row with the same time (`90c97c1cb`), and note stats were ranked per answer, not per note (the commit after it).
+The review also noted that the tier-rank fix can change which follow set is saved as the seed.
+
 Listed for the owner, not fixed: F243 (money and saved data), F244 (behaviour needing a decision), F245
 (unreachable code that carries tests, repeated work not yet measured, leftovers from passes 2 and 3). No decisions
 have been taken on that list yet.
