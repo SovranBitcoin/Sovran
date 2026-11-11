@@ -8,7 +8,7 @@
  * feed client, the list, the cards, the pull-to-refresh control and screen
  * furniture are replaced (the same stand-ins as engagementRowRenders.test.tsx).
  *
- * Pins F185's refresh latch as a QUIRK.
+ * Pins F185's refresh latch and F221's cancelled enrichment as QUIRKs.
  */
 import type { ReactNode } from 'react';
 import { act, render, screen } from '@testing-library/react-native';
@@ -21,7 +21,14 @@ import {
 import type { FeedEvent, FeedItem } from '../components/nostr/feedTypes';
 import { feedPageCache } from '../data/feedCache';
 
-type GetFeedRequest = { spec: string; refresh?: boolean; loadMore?: boolean; cursor?: unknown };
+type GetFeedRequest = {
+  spec: string;
+  refresh?: boolean;
+  loadMore?: boolean;
+  cursor?: unknown;
+  userPubkey?: string;
+  signal?: AbortSignal;
+};
 type ListProps = {
   data: unknown[];
   keyExtractor: (item: unknown, index: number) => string;
@@ -37,6 +44,12 @@ type Pending = {
 };
 
 const mockRequests: Pending[] = [];
+const mockEnrich: {
+  held: boolean;
+  calls: { signal?: AbortSignal; resolve: (u: unknown) => void }[];
+} = { held: false, calls: [] };
+const mockKeys: { pubkey: string | undefined } = { pubkey: 'viewer' };
+const mockIgnore = { ignoredPubkeys: [] as string[], ignoredEventIds: [] as string[] };
 const mockList: { props: ListProps | null } = { props: null };
 const mockPull: { refreshing: boolean; onRefresh: () => void } = {
   refreshing: false,
@@ -47,7 +60,11 @@ jest.mock('../data/useFeedClient', () => ({
   getFeedClient: () => ({
     getFeed: (request: GetFeedRequest) =>
       new Promise((resolve, reject) => mockRequests.push({ request, resolve, reject })),
-    enrich: async () => ({}),
+    enrich: (request: { signal?: AbortSignal }) =>
+      new Promise((resolve) => {
+        mockEnrich.calls.push({ signal: request.signal, resolve });
+        if (!mockEnrich.held) resolve({});
+      }),
   }),
 }));
 jest.mock('@/shared/ui/composed/List', () => {
@@ -99,7 +116,7 @@ jest.mock('@nostr-dev-kit/ndk-mobile', () => ({ useNDK: () => ({ ndk: {} }), NDK
 jest.mock('@/shared/lib/nostr/publish', () => ({ publishEvent: jest.fn() }));
 jest.mock('@/shared/lib/popup', () => ({ paramPopup: jest.fn(), actionMenuPopup: jest.fn() }));
 jest.mock('@/shared/providers/NostrKeysProvider', () => ({
-  useNostrKeysContext: () => ({ keys: { pubkey: 'viewer' } }),
+  useNostrKeysContext: () => ({ keys: mockKeys.pubkey ? { pubkey: mockKeys.pubkey } : null }),
 }));
 jest.mock('@/shared/lib/nostr/useEntityCache', () => ({
   readNoteMetrics: () => undefined,
@@ -191,10 +208,9 @@ jest.mock('../components/thread-embed', () => ({
 jest.mock('../hooks/usePostActions', () => ({ usePostActions: () => jest.fn() }));
 jest.mock('../hooks/useZap', () => ({ useZap: () => ({ openZapMenu: jest.fn() }) }));
 jest.mock('../lib/useQuotePost', () => ({ useQuotePost: () => jest.fn() }));
-jest.mock('../stores/ignoreStore', () => {
-  const state = { ignoredPubkeys: [], ignoredEventIds: [] };
-  return { useFeedIgnoreStore: (select: (value: typeof state) => unknown) => select(state) };
-});
+jest.mock('../stores/ignoreStore', () => ({
+  useFeedIgnoreStore: (select: (value: typeof mockIgnore) => unknown) => select(mockIgnore),
+}));
 
 const note = (content: string): FeedEvent => ({
   id: content.padEnd(64, '0'),
@@ -238,6 +254,11 @@ async function answer(index: number, page: unknown) {
 
 beforeEach(() => {
   mockRequests.length = 0;
+  mockEnrich.held = false;
+  mockEnrich.calls.length = 0;
+  mockKeys.pubkey = 'viewer';
+  mockIgnore.ignoredPubkeys = [];
+  mockIgnore.ignoredEventIds = [];
   mockList.props = null;
   feedPageCache.clear();
   jest.spyOn(global, 'requestAnimationFrame').mockImplementation(() => 0);
@@ -380,5 +401,131 @@ describe('refresh and load more', () => {
     await act(async () => mockPull.onRefresh());
     await act(async () => mockList.props!.onEndReached());
     expect(mockRequests).toHaveLength(before);
+  });
+});
+
+describe('viewer, preferences and remount', () => {
+  it("loads the viewer's own feed once their keys arrive, from skeletons", async () => {
+    mockKeys.pubkey = undefined;
+    const view = render(<HomeFeed />);
+    await settle();
+    expect(mockRequests[0]!.request.userPubkey).toBeUndefined();
+    await answer(0, feedPage(['host']));
+    expect(cards()).toEqual(['host']);
+
+    mockKeys.pubkey = 'viewer';
+    view.rerender(<HomeFeed />);
+    await settle();
+    expect(skeletons()).toBe(5);
+    expect(cards()).toEqual([]);
+    expect(mockRequests[1]!.request).toMatchObject({ userPubkey: 'viewer', refresh: false });
+    await answer(1, feedPage(['mine']));
+    expect(cards()).toEqual(['mine']);
+  });
+
+  it('paints a fresh cached page on remount without asking again', async () => {
+    const first = render(<HomeFeed />);
+    await settle();
+    await answer(0, feedPage(['one']));
+    first.unmount();
+
+    render(<HomeFeed />);
+    expect(cards()).toEqual(['one']);
+    expect(skeletons()).toBe(0);
+    await settle();
+    expect(mockRequests).toHaveLength(1);
+  });
+
+  it('a block while the page is fresh repaints page one from the cache without asking', async () => {
+    const view = render(<HomeFeed />);
+    await settle();
+    await answer(0, feedPage(['one', 'two']));
+    await act(async () => mockList.props!.onEndReached());
+    await answer(1, feedPage(['three'], false));
+    expect(cards()).toEqual(['one', 'two', 'three']);
+
+    mockIgnore.ignoredEventIds = [note('two').id];
+    view.rerender(<HomeFeed />);
+    await settle();
+    // The loaded-more page goes too: page one is applied again.
+    expect(cards()).toEqual(['one']);
+    expect(mockRequests).toHaveLength(2);
+  });
+
+  it('a block while the page is stale asks again without skeletons', async () => {
+    const now = Date.now();
+    const clock = jest.spyOn(Date, 'now').mockReturnValue(now);
+    const view = render(<HomeFeed />);
+    await settle();
+    await answer(0, feedPage(['one', 'two']));
+
+    clock.mockReturnValue(now + 3 * 60 * 1000);
+    mockIgnore.ignoredEventIds = [note('two').id];
+    view.rerender(<HomeFeed />);
+    await settle();
+    expect(cards()).toEqual(['one']);
+    expect(skeletons()).toBe(0);
+    expect(mockRequests).toHaveLength(2);
+    expect(mockRequests[1]!.request).toMatchObject({ refresh: false });
+  });
+});
+
+describe('refresh and load more meeting page one', () => {
+  it('keeps the cards when a refresh fails, then pages from the top', async () => {
+    render(<HomeFeed />);
+    await settle();
+    await answer(0, feedPage(['one', 'two']));
+
+    await act(async () => mockPull.onRefresh());
+    await act(async () => mockRequests[1]!.reject(new Error('offline')));
+    expect(cards()).toEqual(['one', 'two']);
+    expect(mockPull.refreshing).toBe(false);
+    expect(emptyTitle()).toBeNull();
+
+    // QUIRK: the refresh dropped the cursor before it failed, so the next page
+    // is asked for from the top.
+    await act(async () => mockList.props!.onEndReached());
+    expect(mockRequests[2]!.request).toMatchObject({ loadMore: true, cursor: null });
+  });
+
+  it("cancels page one's enrichment when the next page is asked for", async () => {
+    mockEnrich.held = true;
+    render(<HomeFeed />);
+    await settle();
+    await answer(0, feedPage(['one']));
+    expect(mockEnrich.calls).toHaveLength(1);
+
+    await act(async () => mockList.props!.onEndReached());
+    expect(mockRequests[1]!.request).toMatchObject({ loadMore: true });
+    // QUIRK (F221): page one and the next page share one load, so asking for
+    // the next page aborts page one's enrichment.
+    expect(mockEnrich.calls[0]!.signal?.aborted).toBe(true);
+  });
+
+  it("cancels a stale page's revalidation when the next page is asked for", async () => {
+    const now = Date.now();
+    const clock = jest.spyOn(Date, 'now').mockReturnValue(now);
+    const view = render(<HomeFeed activeFilter={FEED_FILTER_FOR_YOU} />);
+    await settle();
+    await answer(0, feedPage(['old']));
+    view.rerender(<HomeFeed activeFilter={FEED_FILTER_FOLLOWING_POPULAR} />);
+    await settle();
+    await answer(1, feedPage(['popular']));
+
+    clock.mockReturnValue(now + 3 * 60 * 1000);
+    view.rerender(<HomeFeed activeFilter={FEED_FILTER_FOR_YOU} />);
+    await settle();
+    expect(specOf(mockRequests[2]!)).toBe('for-you');
+
+    await act(async () => mockList.props!.onEndReached());
+    expect(mockRequests[3]!.request).toMatchObject({
+      loadMore: true,
+      cursor: { createdAt: 1, id: 'cursor' },
+    });
+    expect(mockRequests[2]!.request.signal?.aborted).toBe(true);
+    await answer(3, feedPage(['older'], false));
+    expect(cards()).toEqual(['old', 'older']);
+    await answer(2, feedPage(['new']));
+    expect(cards()).toEqual(['old', 'older']);
   });
 });

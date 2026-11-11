@@ -41,8 +41,8 @@ const mockRoutstr = {
   selectedProvider: 'openai',
   // Nothing writes this any more: null on a new install.
   balance: null as number | null,
-  lineup,
-  lastKnownLineup: null,
+  lineup: lineup as typeof lineup | null,
+  lastKnownLineup: null as { derivedAt: number; lineup: typeof lineup } | null,
   conversationHistory: [],
   activeChildren: {},
   currentSessionId: 'session-1',
@@ -52,6 +52,8 @@ const mockRoutstr = {
 let mockFunds: { balanceSats: number } | null = { balanceSats: 1_000 };
 
 jest.mock('@/shared/stores/profile/routstrStore', () => ({
+  // The real lineup rule, over this file's stand-in state.
+  selectLineup: jest.requireActual('@/shared/stores/profile/routstrStore').selectLineup,
   useRoutstrStore: Object.assign(
     (select: (state: typeof mockRoutstr) => unknown) => select(mockRoutstr),
     { getState: () => mockRoutstr }
@@ -61,14 +63,13 @@ jest.mock('@/features/ai/hooks/useRoutstrFunds', () => ({ useRoutstrFunds: () =>
 jest.mock('@/features/ai/hooks/useAiSend', () => ({
   useAiSend: () => ({ send: jest.fn(), retry: jest.fn(), isSending: false }),
 }));
-jest.mock('@/shared/stores/global/settingsStore', () => {
-  const state = { mockMode: false };
-  return {
-    useSettingsStore: Object.assign((select: (s: typeof state) => unknown) => select(state), {
-      getState: () => state,
-    }),
-  };
-});
+const mockSettings = { mockMode: false };
+jest.mock('@/shared/stores/global/settingsStore', () => ({
+  useSettingsStore: Object.assign(
+    (select: (s: typeof mockSettings) => unknown) => select(mockSettings),
+    { getState: () => mockSettings }
+  ),
+}));
 jest.mock('@/shared/stores/runtime/mockPresentationData', () => ({ DEMO_AI_MESSAGES: [] }));
 jest.mock('@/shared/stores/profile/aiProviderDirectoryStore', () => ({
   useAiProviderDirectoryStore: { persist: { hasHydrated: () => true } },
@@ -120,6 +121,9 @@ jest.mock('@/features/ai/lib/attachments', () => ({ pickChatImage: jest.fn() }))
 let renderer: TestRenderer.ReactTestRenderer;
 afterEach(() => {
   act(() => renderer?.unmount());
+  mockRoutstr.lineup = lineup;
+  mockRoutstr.lastKnownLineup = null;
+  mockSettings.mockMode = false;
 });
 
 function plusDisabled(): boolean {
@@ -138,4 +142,24 @@ it('turns the image button off when the wallet can only pay for a text-only mode
 it('offers the image button when the wallet can pay for the vision model', () => {
   mockFunds = { balanceSats: 10_000 };
   expect(plusDisabled()).toBe(false);
+});
+
+it('reads the saved lineup while this session has none', () => {
+  mockFunds = { balanceSats: 10_000 };
+  mockRoutstr.lineup = null;
+  mockRoutstr.lastKnownLineup = { derivedAt: 1, lineup };
+  expect(plusDisabled()).toBe(false);
+});
+
+it('keeps an empty session lineup over the saved one', () => {
+  mockFunds = { balanceSats: 10_000 };
+  mockRoutstr.lineup = emptyLineup();
+  mockRoutstr.lastKnownLineup = { derivedAt: 1, lineup };
+  expect(plusDisabled()).toBe(true);
+});
+
+it('offers no images in mock mode', () => {
+  mockFunds = { balanceSats: 10_000 };
+  mockSettings.mockMode = true;
+  expect(plusDisabled()).toBe(true);
 });

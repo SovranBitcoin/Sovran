@@ -1,4 +1,4 @@
-import NDK, { NDKEvent } from '@nostr-dev-kit/ndk-mobile';
+import NDK, { type NDKEvent } from '@nostr-dev-kit/ndk-mobile';
 import { z } from 'zod';
 import { useFeedIgnoreStore, normalizeIgnoreHex } from '@/features/feed/stores/ignoreStore';
 import {
@@ -12,7 +12,9 @@ import type { NostrEventId, NostrPubkeyHex } from '@/shared/lib/protocolIds';
 import {
   captureProfile,
   matchingSigner,
+  nextReplaceableCreatedAt,
   readNewestOwnEvent,
+  signOwnEvent,
   validOwnEvent,
 } from './ownReplaceableEvent';
 import { publishEvent } from './publish';
@@ -120,16 +122,13 @@ export function setPersonBlocked(
         'nip44'
       );
       scope.check();
-      const event = new NDKEvent(ndk);
-      event.kind = 10000;
-      event.pubkey = ownPubkey;
-      event.created_at = Math.max(Math.floor(Date.now() / 1000), base.createdAt + 1);
-      event.tags = next.tags;
-      event.content = content;
-      await event.sign(signer);
-      scope.check();
-      if (event.pubkey !== ownPubkey || ndk.signer !== signer)
-        throw new Error('Account signer changed');
+      const event = await signOwnEvent(ndk, signer, scope, {
+        kind: 10000,
+        pubkey: ownPubkey,
+        created_at: nextReplaceableCreatedAt(base.createdAt),
+        tags: next.tags,
+        content,
+      });
       const latestKnown = useFeedIgnoreStore.getState().muteList;
       if (latestKnown && isNewerMuteList(latestKnown, base))
         throw new Error('Mute list changed; retry sync');
@@ -170,17 +169,15 @@ export async function publishReport(
   const scope = captureProfile(ownPubkey);
   try {
     scope.check();
-    const event = new NDKEvent(ndk);
-    event.kind = 1984;
-    event.pubkey = ownPubkey;
-    event.tags = reportTags(target, reason, publicEventId);
-    event.content = '';
+    const tags = reportTags(target, reason, publicEventId);
     const signer = await matchingSigner(ndk, ownPubkey);
     scope.check();
-    await event.sign(signer);
-    scope.check();
-    if (event.pubkey !== ownPubkey || ndk.signer !== signer)
-      throw new Error('Account signer changed');
+    const event = await signOwnEvent(ndk, signer, scope, {
+      kind: 1984,
+      pubkey: ownPubkey,
+      tags,
+      content: '',
+    });
     const result = await publishEvent({
       ndk,
       event,

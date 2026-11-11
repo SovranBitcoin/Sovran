@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import {
   selectConversationId,
+  selectLineup,
   useRoutstrStore,
   type ChatAttachment,
 } from '@/shared/stores/profile/routstrStore';
@@ -109,6 +110,15 @@ function availableChain(
     });
   }
   return ordered;
+}
+
+/** The selected (provider, tier), the lineup it resolves against and the chain a send walks. */
+function selectedChain(state: ReturnType<typeof useRoutstrStore.getState>) {
+  const provider = getProviderById(state.selectedProvider);
+  const tier = getTierById(state.selectedTier);
+  const lineup = selectLineup(state);
+  const chain = availableChain(provider.id, tier.id, lineup, state.nodeBaseUrl);
+  return { provider, tier, lineup, chain };
 }
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
@@ -274,22 +284,17 @@ export function useAiSend() {
       const profile = useProfileStore.getState().activeAccountIndex;
       const storeState = useRoutstrStore.getState();
       const balanceSats = walletSats;
-      const tier = getTierById(storeState.selectedTier);
-      const provider = getProviderById(storeState.selectedProvider);
       const cachedModels = storeState.modelsCache?.data ?? [];
-      // Resolve the (provider, tier) pair against the dynamic lineup —
-      // live-derived when a catalog fetch has landed this session, else
-      // the persisted last-known snapshot. `null` only on a true
+      // Resolved against `selectLineup`, which is `null` only on a true
       // first-run-offline (no catalog AND no snapshot): there is
       // deliberately no hardcoded id to guess at anymore, so surface it
       // instead of burning a round-trip on a dead model.
-      const lineup = storeState.lineup ?? storeState.lastKnownLineup?.lineup ?? null;
-      const displayedModel = resolveSelectedEntry(provider.id, tier.id, balanceSats, lineup);
       // ONE chain, built once and never widened. Its `sealed` tag carries the
       // user's encryption choice through every later narrowing below — the
       // vision filter and the post-repoint recovery both derive from it, and
       // neither can reach a vendor the chain did not already contain.
-      const chain = availableChain(provider.id, tier.id, lineup, storeState.nodeBaseUrl);
+      const { provider, tier, lineup, chain } = selectedChain(storeState);
+      const displayedModel = resolveSelectedEntry(provider.id, tier.id, balanceSats, lineup);
       const primaryEntry = selectFromChain(chain, balanceSats);
       if (!primaryEntry) {
         // Two different absences wearing one shape. An empty plaintext chain
@@ -578,11 +583,7 @@ export function useAiSend() {
               current.selectedProvider === provider.id &&
               current.selectedTier === tier.id
             ) {
-              const slot = slotForModel(
-                current.lineup ?? current.lastKnownLineup?.lineup ?? null,
-                candidate,
-                tier.id
-              );
+              const slot = slotForModel(selectLineup(current), candidate, tier.id);
               if (slot) current.setSelectedSlot(slot);
             }
             if (i > 0) {
@@ -1061,15 +1062,7 @@ export function useAiSend() {
       const activeProvider = storeNow.userNodeBaseUrl;
       // Quoted from the same chain the send will walk, refused models last, so
       // the sheet names the model — and the figure — that actually goes first.
-      const plannedEntry = selectFromChain(
-        availableChain(
-          getProviderById(storeNow.selectedProvider).id,
-          getTierById(storeNow.selectedTier).id,
-          storeNow.lineup ?? storeNow.lastKnownLineup?.lineup ?? null,
-          storeNow.nodeBaseUrl
-        ),
-        walletSats
-      );
+      const plannedEntry = selectFromChain(selectedChain(storeNow).chain, walletSats);
       const timestamp = Date.now();
       const userMessageId = `msg-${timestamp}-u`;
       const assistantMessageId = `msg-${timestamp + 1}-a`;
@@ -1377,6 +1370,5 @@ export function useAiSend() {
   );
   const retry = useSingleFlight(retryInner);
 
-  const balance = useRoutstrStore((s) => s.balance);
-  return { send, retry, isSending, balance };
+  return { send, retry, isSending };
 }

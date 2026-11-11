@@ -5,6 +5,8 @@
  * signer fixed across each wait so a switch never writes to the wrong account.
  */
 import NDK, { NDKEvent, NDKRelaySet, NDKSubscriptionCacheUsage } from '@nostr-dev-kit/ndk-mobile';
+import type { NDKSigner } from '@nostr-dev-kit/ndk-mobile';
+import { supersedes } from 'nostr';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { getOwnWriteRelays } from './outbox/relayListStore';
 
@@ -51,6 +53,26 @@ export async function matchingSigner(ndk: NDK, pubkey: string) {
   if (!signer || (await signer.user()).pubkey !== pubkey || ndk.signer !== signer)
     throw new Error('Account signer is not ready');
   return signer;
+}
+
+/** Now, or one second past a later-dated base: relays keep the newer replaceable event. */
+export const nextReplaceableCreatedAt = (base = 0, now = Math.floor(Date.now() / 1000)) =>
+  Math.max(now, base + 1);
+
+/** Sign an own event with its pinned signer; refuse it if the account or signer changed meanwhile. */
+export async function signOwnEvent(
+  ndk: NDK,
+  signer: NDKSigner,
+  scope: { check: () => void },
+  fields: { kind: number; pubkey: string; created_at?: number; tags: string[][]; content: string }
+) {
+  const event = Object.assign(new NDKEvent(ndk), fields);
+  await event.sign(signer);
+  scope.check();
+  if (event.pubkey !== fields.pubkey || ndk.signer !== signer)
+    throw new Error('Account signer changed');
+  // Signing dates an event that was not dated.
+  return event as NDKEvent & { created_at: number };
 }
 
 /**
@@ -107,12 +129,8 @@ export async function readNewestOwnEvent(
         subscriptions.push(subscription);
         subscription.on('event', (event: NDKEvent) => {
           if (settled || !validOwnEvent(event, pubkey, kind)) return;
-          if (
-            !newest ||
-            event.created_at! > newest.created_at! ||
-            (event.created_at === newest.created_at && event.id < newest.id)
-          )
-            newest = event;
+          type Dated = { created_at: number; id: string }; // checked by `validOwnEvent`
+          if (!newest || supersedes(event as Dated, newest as Dated)) newest = event;
         });
         subscription.on('eose', () => {
           if (![...relays.relays].every((relay) => subscription.eosesSeen.has(relay))) return;

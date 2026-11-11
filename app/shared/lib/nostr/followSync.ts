@@ -15,7 +15,6 @@
  * that is how the list works on Nostr.
  */
 import type NDK from '@nostr-dev-kit/ndk-mobile';
-import { NDKEvent } from '@nostr-dev-kit/ndk-mobile';
 import { Contacts } from 'nostr-tools/kinds';
 import { supersedes, tiers, type facade } from 'nostr';
 import { z } from 'zod';
@@ -32,7 +31,9 @@ import {
 import {
   captureProfile,
   matchingSigner,
+  nextReplaceableCreatedAt,
   readNewestOwnEvent,
+  signOwnEvent,
   type OwnEventReadOutcome,
 } from './ownReplaceableEvent';
 import { publishEvent } from './publish';
@@ -353,20 +354,17 @@ async function syncOnce(ndk: NDK, ownPubkey: string): Promise<void> {
       }
       const atBase = savedList();
 
-      const event = new NDKEvent(ndk);
-      event.kind = Contacts;
-      event.pubkey = ownPubkey;
-      event.created_at = Math.max(Math.floor(Date.now() / 1000), plan.base.createdAt + 1);
-      event.tags = plan.tags;
-      event.content = plan.base.content;
       // A signer replaced during the read never signs. Signing can fail but
       // never refuses (the only signer is the account's own key), so a
       // failure keeps the taps for the next pass.
       if (ndk.signer !== signer) throw new Error('Account signer changed');
-      await event.sign(signer);
-      scope.check();
-      if (event.pubkey !== ownPubkey || ndk.signer !== signer)
-        throw new Error('Account signer changed');
+      const event = await signOwnEvent(ndk, signer, scope, {
+        kind: Contacts,
+        pubkey: ownPubkey,
+        created_at: nextReplaceableCreatedAt(plan.base.createdAt),
+        tags: plan.tags,
+        content: plan.base.content,
+      });
       // A list or seed arrived while signing, also one dated the same second,
       // or the write relays changed since the read: read and build again.
       if (!sameSavedList(atBase, savedList()) || !sameRelays(raw.relays, ownPubkey)) continue;
