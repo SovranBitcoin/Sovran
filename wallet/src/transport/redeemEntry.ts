@@ -172,10 +172,15 @@ function unknownStatus(_status: never, nextAttemptAt: number): MeshRedeemPhase {
   return waiting(nextAttemptAt);
 }
 
-/** True for an entry in line whose time to be tried has come. */
+/**
+ * True for an entry the drain takes now: in line, or a receive cut short,
+ * whose time to be tried has come. A receive still running is taken too; the
+ * drain runs one at a time, so it can only be one a drain was cut short in.
+ */
 export function isMeshRedeemDue(phase: MeshRedeemPhase, now: number): boolean {
   return (
-    phase.kind === "waiting" && (phase.retryAt === null || phase.retryAt <= now)
+    isMeshRedeemInPlay(phase) &&
+    (phase.retryAt === null || phase.retryAt <= now)
   );
 }
 

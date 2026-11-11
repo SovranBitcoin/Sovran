@@ -132,21 +132,22 @@ export function hasDrainableMessageEcash(entries: QueueEntries): boolean {
 
 /**
  * When the next backed-off retry of a message token falls due, or `null` when
- * none is waiting on a timer. The orchestrator records the time but does not
- * wake itself for it.
+ * none is waiting on a timer. A receive cut short waits for its retry time as
+ * a waiting token does. The orchestrator records the time but does not wake
+ * itself for it.
  */
 export function nextMessageEcashRetryAt(entries: QueueEntries): number | null {
   let soonest: number | null = null;
   for (const entry of Object.values(entries)) {
     if (entry.source !== 'nostr') continue;
     const phase = meshRedeemPhase(entry);
-    if (phase.kind !== 'waiting' || phase.retryAt === null) continue;
+    if (!isMeshRedeemInPlay(phase) || phase.retryAt === null) continue;
     if (soonest === null || phase.retryAt < soonest) soonest = phase.retryAt;
   }
   return soonest;
 }
 
-/** True when a message token is waiting and its time to be tried has come. */
+/** True when a message token's time to be tried has come (see `isMeshRedeemDue`). */
 export function hasDueMessageEcash(entries: QueueEntries, now: number): boolean {
   return Object.values(entries).some(
     (entry) => entry.source === 'nostr' && isMeshRedeemDue(meshRedeemPhase(entry), now)

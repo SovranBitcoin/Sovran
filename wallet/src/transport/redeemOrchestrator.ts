@@ -22,7 +22,7 @@ import type { Manager } from "@cashu/coco-core";
 import { NetworkError, HttpResponseError } from "@cashu/coco-core";
 import { logger, mintUrlFields } from "../logger";
 import {
-  isMeshRedeemInPlay,
+  isMeshRedeemDue,
   meshRedeemPhase,
   type MeshRedeemEntry,
   type MeshRedeemStatus,
@@ -165,13 +165,9 @@ export function createMeshRedeemOrchestrator(
     // background budget. Retrying is safe — a receive that actually
     // completed re-classifies as `spent`. Like a waiting entry, one whose
     // retry time is still to come waits for it.
-    const due = Object.entries(config.queue.entries()).filter(([, entry]) => {
-      const phase = meshRedeemPhase(entry);
-      return (
-        isMeshRedeemInPlay(phase) &&
-        (phase.retryAt === null || phase.retryAt <= cutoff)
-      );
-    });
+    const due = Object.entries(config.queue.entries()).filter(([, entry]) =>
+      isMeshRedeemDue(meshRedeemPhase(entry), cutoff),
+    );
     if (due.length === 0) return;
 
     logger.info("transport.redeem.drainStart", { dueCount: due.length });

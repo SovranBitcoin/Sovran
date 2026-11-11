@@ -313,6 +313,9 @@ describe('what each reader makes of an entry', () => {
     ['backing off', 'pending', { attempts: 1, nextAttemptAt: NOW + 30_000 }],
     ['retry time passed', 'pending', { attempts: 1, nextAttemptAt: NOW - 1 }],
     ['redeeming', 'redeeming', {}],
+    // A receive cut short is tried again like a waiting entry with the same time.
+    ['cut short, backing off', 'redeeming', { attempts: 1, nextAttemptAt: NOW + 30_000 }],
+    ['cut short, retry time passed', 'redeeming', { attempts: 1, nextAttemptAt: NOW - 1 }],
     ['redeemed', 'redeemed', { attempts: 1 }],
     ['spent', 'spent', {}],
     ['untrusted mint', 'untrusted-mint', { attempts: 1 }],
@@ -346,7 +349,15 @@ describe('what each reader makes of an entry', () => {
     ],
     [
       'redeeming',
-      { parked: [], unclaimed: ['receiving'], drainable: true, due: false, retryAt: null },
+      { parked: [], unclaimed: ['receiving'], drainable: true, due: true, retryAt: null },
+    ],
+    [
+      'cut short, backing off',
+      { parked: [], unclaimed: ['receiving'], drainable: true, due: false, retryAt: NOW + 30_000 },
+    ],
+    [
+      'cut short, retry time passed',
+      { parked: [], unclaimed: ['receiving'], drainable: true, due: true, retryAt: NOW - 1 },
     ],
     ['redeemed', { parked: [], unclaimed: [], drainable: false, due: false, retryAt: null }],
     ['spent', { parked: [], unclaimed: [], drainable: false, due: false, retryAt: null }],
