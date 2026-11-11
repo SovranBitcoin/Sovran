@@ -401,7 +401,7 @@ describe('usePaymentStatusListener', () => {
         operation: { amount: 99, unit: 'sat' },
       })
     );
-    // The delivered payment request is not confirmed by another send (F219): that send
+    // The delivered payment request is not confirmed by another send: that send
     // gets a toast of its own.
     expect(active()).toMatchObject({
       variant: 'send',
@@ -596,7 +596,7 @@ describe('usePaymentStatusListener', () => {
         operation: { quoteId: 'mq-x', amount: 900, unit: 'sat', method: 'bolt11' },
       })
     );
-    // The confirmed toast of another melt keeps its own View target (F219); this melt gets
+    // The confirmed toast of another melt keeps its own View target; this melt gets
     // a toast of its own.
     expect(active()).toMatchObject({
       id: 'mq-x',

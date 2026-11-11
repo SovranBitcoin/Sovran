@@ -191,7 +191,7 @@ describe('closing', () => {
   });
 });
 
-// F217: the wallet is ready once its plugins have started, and a start that
+// The wallet is ready once its plugins have started, and a start that
 // failed is not handed to anyone.
 describe('starting the plugins', () => {
   it('is not ready, and hands nobody the wallet, until its plugins have started', async () => {
@@ -231,7 +231,7 @@ describe('starting the plugins', () => {
   });
 });
 
-// F217: whatever an open acquired is closed when the open fails, so no
+// Whatever an open acquired is closed when the open fails, so no
 // database handle is left outside the manager's reach.
 describe('an open that fails after the database opened', () => {
   it('closes the database, and the next open opens it again', async () => {

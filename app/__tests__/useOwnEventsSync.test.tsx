@@ -247,7 +247,7 @@ describe('useOwnEventsSync', () => {
     deliver(rerender, [profileEvent(id('b'), T, 'B-id')]);
     deliver(rerender, [profileEvent(id('b'), T, 'B-id'), profileEvent(id('a'), T, 'A-id')]);
 
-    // The same profile wins however the events are split into batches (F182).
+    // The same profile wins however the events are split into batches.
     expect(latestProfileId()).toBe(id('a'));
     expect(cachedName(0)).toBe('A-id');
     unmount();

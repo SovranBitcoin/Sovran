@@ -7,7 +7,7 @@
  * the own-profile stats cache and the shared entity cache. The endpoint and
  * the entity-cache ingest are replaced.
  *
- * Unlike the relay-fed own-profile path (F182, pinned in
+ * Unlike the relay-fed own-profile path (pinned in
  * useOwnEventsSync.test.tsx), this path carries no event timestamp at all, so
  * there is no equal-timestamp case: every answer is written as it comes.
  */

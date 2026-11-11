@@ -11,7 +11,7 @@ Method: started from pass 0's `feed-social.md` and `nostr.md` candidate lists, r
 `nostr/src/facade/session/notifications-session.ts` with a fake source; no file written); everything else is
 "traced" (read end to end), not run. No test suite was run.
 
-Already filed and not repeated here (cited where they touch a candidate): F122, F125, F153, F182, F185, F190, F203,
+Already filed and not repeated here (cited where they touch a candidate): F122, F125, F153, F185, F190, F203,
 F204, F02, F47.
 
 Shapes the repo already uses that a conversion should reuse, not reinvent:
@@ -196,7 +196,7 @@ caller).
 
 **Meaningless combinations.** `processedRef` reset for account B while `events` still holds account A's batch
 (the subscription is swapped by `useSubscribe` after the same commit). Newness kept as a timestamp only while the
-partition orders by timestamp then id (F182).
+partition orders by timestamp then id (the own-profile tie-break item, since fixed).
 
 **Reachable today.** Pinned as a QUIRK in `app/__tests__/useOwnEventsSync.test.tsx:244-258`: after an account change a
 batch still holding the previous account's like is ingested into the new account's profile-scoped
@@ -213,7 +213,7 @@ holds nothing.
 `nostrSocialStoreOwnSync.test.ts`.
 
 **Recommendation: convert.** One `useReducer`-free module object keyed by owner: `{ owner, seen, profileNewest: {at,
-id} }`, created per pubkey, and a filter `event.pubkey === owner` before partitioning. Fixes F182 and D7 together; the
+id} }`, created per pubkey, and a filter `event.pubkey === owner` before partitioning. Fixes the own-profile tie-break item and D7 together; the
 two QUIRK assertions change on purpose. Size S.
 
 ## 5. Notifications session: per-source state

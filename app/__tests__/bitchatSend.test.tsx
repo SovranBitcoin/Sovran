@@ -452,7 +452,7 @@ describe('Bluetooth direct message (ble-dm)', () => {
 
     expect(thread()[0]).toMatchObject({ deliveryStatus: 'failed', failureReason: 'timeout' });
 
-    // The 15 s mark means "not confirmed yet": a later report wins (F212).
+    // The 15 s mark means "not confirmed yet": a later report wins.
     act(() => {
       useBitchatDmMessagesStore.getState().applyDeliveryStatus({ messageID, status: 'sent' });
     });

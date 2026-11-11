@@ -51,11 +51,11 @@ type DeliveryEvent =
 const MOVES: Record<BleDmDelivery['state'], readonly DeliveryEvent['type'][]> = {
   sending: ['sent', 'delivered', 'read', 'failed', 'timed-out', 'relaunched'],
   sent: ['delivered', 'read', 'failed', 'relaunched'],
-  // The peer acknowledged it: final, a late failure included (owner's ruling, F212).
+  // The peer acknowledged it: final, a late failure included (owner's ruling, 2026-11-11).
   delivered: ['read'],
   read: [],
   // The 15 s mark and a restart mean "not confirmed yet": a later report
-  // wins (owner's ruling, F212). Until one comes it offers a retry.
+  // wins (owner's ruling, 2026-11-11). Until one comes it offers a retry.
   unconfirmed: ['sent', 'delivered', 'read', 'failed'],
   // A new reason replaces the old one. A delivered or read report is proof
   // the peer has it, so it wins over a failure, whichever came first (owner's ruling).
