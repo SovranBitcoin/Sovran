@@ -524,13 +524,16 @@ describe('AI send lineup recovery', () => {
     expect(chatErrorActions('routstr.not_found')).toContain('retry');
   });
 
-  it('keeps an aborted turn out of the conversation — it did not fail', async () => {
+  it('keeps an aborted turn as one to ask again — it did not fail', async () => {
     const abort = Object.assign(new Error('Aborted'), { name: 'AbortError' });
     sendMock.mockRejectedValueOnce(abort);
     await send();
-    expect(useRoutstrStore.getState().conversationHistory).toEqual([
+    const history = useRoutstrStore.getState().conversationHistory;
+    expect(history).toEqual([
       expect.objectContaining({ role: 'user', pending: false }),
+      expect.objectContaining({ role: 'assistant', content: '' }),
     ]);
+    expect(getTurn(history[1].id)).toEqual({ phase: 'interrupted', text: '' });
   });
 
   it('carries the exact shortfall on a wallet 402 rather than a bare top-up prompt', async () => {

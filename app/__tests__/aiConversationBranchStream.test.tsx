@@ -429,8 +429,8 @@ describe('streaming an answer', () => {
     ]);
   });
 
-  it('an abort mid-stream (the screen unmounting) removes the answer placeholder and its partial text', async () => {
-    const { hook, bubble, assistantId, sending } = await startSend();
+  it('leaving the screen mid-answer keeps the answer so far, as one that can be asked again', async () => {
+    const { hook, assistantId, sending } = await startSend();
     await act(async () => live.push(content('half an ans')));
 
     hook.unmount();
@@ -438,10 +438,58 @@ describe('streaming an answer', () => {
       await sending();
     });
 
-    expect(history().map((m) => m.role)).toEqual(['user']);
-    expect(history().some((m) => m.id === assistantId)).toBe(false);
-    expect(getTurnError(assistantId)).toBeNull();
-    expect(bubble.result.current).toEqual({ text: null, thinking: null });
+    expect(history().map((m) => [m.role, m.content, m.pending ?? null])).toEqual([
+      ['user', 'hello', false],
+      ['assistant', '', null],
+    ]);
+    expect(getTurn(assistantId)).toEqual({ phase: 'interrupted', text: 'half an ans' });
+
+    // Back on the screen, the answer can be asked again.
+    arrangeStream();
+    const again = renderHook(useAiSend);
+    let retrying!: Promise<unknown>;
+    act(() => {
+      retrying = again.result.current.retry(assistantId);
+    });
+    await tick();
+    await act(async () => {
+      live.push(content('a whole answer'));
+      live.end();
+      await retrying;
+    });
+    expect(history().at(-1)).toMatchObject({
+      parentId: history()[0]!.id,
+      content: 'a whole answer',
+    });
+  });
+
+  it('a stream stopped by a newer one keeps the answer it had so far', async () => {
+    useRoutstrStore.setState({
+      conversationHistory: [
+        msg('u1', 'user', null, 1, 'first question'),
+        msg('a1', 'assistant', 'u1', 2, 'first answer'),
+      ],
+    });
+    arrangeStream();
+    const hook = renderHook(useAiSend);
+    let retrying!: Promise<unknown>;
+    act(() => {
+      retrying = hook.result.current.retry('a1');
+    });
+    await tick();
+    const older = history().at(-1)!.id;
+    await act(async () => live.push(content('regenerat')));
+
+    arrangeStream();
+    act(() => {
+      void hook.result.current.send('second question');
+    });
+    await act(async () => {
+      await retrying;
+    });
+
+    expect(history().some((m) => m.id === older)).toBe(true);
+    expect(getTurn(older)).toEqual({ phase: 'interrupted', text: 'regenerat' });
   });
 
   it('a failure mid-stream keeps the placeholder empty with an error pill; the streamed text is lost', async () => {

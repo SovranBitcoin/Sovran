@@ -39,32 +39,31 @@ export interface TurnError {
  * - `done`: the answer is in the saved message. `truncation` says when the
  *   completion budget ran out before the model finished.
  * - `failed`: the request failed, and why.
- * - `interrupted`: it ended without an answer (no chunks came, or it was left
- *   behind), and can be asked again.
+ * - `interrupted`: it stopped before the answer finished (the screen closed, a
+ *   newer stream stopped it, no chunks came) and can be asked again; `text`
+ *   is what had arrived, kept in memory only (`''` for none).
  */
 export type Turn =
   | { phase: 'asking'; startedAtMs: number }
   | { phase: 'streaming'; startedAtMs: number; text: string; reasoning: string }
   | { phase: 'done'; truncation: { budgetTokens: number } | null }
   | { phase: 'failed'; error: TurnError }
-  | { phase: 'interrupted' };
+  | { phase: 'interrupted'; text: string };
 
 export type TurnEvent =
   | { type: 'asked'; startedAtMs: number }
   | { type: 'streamed'; text: string; reasoning: string }
   | { type: 'answered'; truncation: { budgetTokens: number } | null }
   | { type: 'failed'; error: TurnError }
-  | { type: 'interrupted' }
-  /** Stopped (a newer stream, or the screen closing): the answer is removed. */
-  | { type: 'stopped' };
+  | { type: 'interrupted' };
 
 export function isTurnLive(turn: Turn | undefined): boolean {
   return turn?.phase === 'asking' || turn?.phase === 'streaming';
 }
 
 /**
- * Pure: the turn after `event`, or `undefined` once it is removed. A settled
- * turn ignores everything but a new `asked`, so a late event from a stream
+ * Pure: the turn after `event` (still `undefined` for one never asked that an
+ * event needs to have been). A settled turn ignores everything but a new `asked`, so a late event from a stream
  * cannot change an answer that already settled. A request can fail before it
  * is asked (no model to ask).
  */
@@ -87,9 +86,8 @@ export function nextTurn(turn: Turn | undefined, event: TurnEvent): Turn | undef
     case 'failed':
       return live || turn === undefined ? { phase: 'failed', error: event.error } : turn;
     case 'interrupted':
-      return live ? { phase: 'interrupted' } : turn;
-    case 'stopped':
-      return live ? undefined : turn;
+      if (turn?.phase === 'streaming') return { phase: 'interrupted', text: turn.text };
+      return live ? { phase: 'interrupted', text: '' } : turn;
     default: {
       const unreachable: never = event;
       return unreachable;
@@ -108,9 +106,8 @@ function notify(): void {
 export function dispatchTurn(messageId: string, event: TurnEvent): void {
   const current = turns.get(messageId);
   const next = nextTurn(current, event);
-  if (next === current) return;
-  if (next) turns.set(messageId, next);
-  else turns.delete(messageId);
+  if (next === current || !next) return;
+  turns.set(messageId, next);
   notify();
 }
 
@@ -159,7 +156,7 @@ export function readAnswer(message: RoutstrMessage, turn: Turn | undefined): Tur
   if (turn) return turn;
   return message.content || message.reasoningContent
     ? { phase: 'done', truncation: null }
-    : { phase: 'interrupted' };
+    : { phase: 'interrupted', text: '' };
 }
 
 registerAccountScoped(

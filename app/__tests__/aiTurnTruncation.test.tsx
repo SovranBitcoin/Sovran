@@ -155,3 +155,21 @@ describe('the bubble for a truncated answer', () => {
     expect(r.root.findAllByProps({ testID: `ai-message-continue-${MESSAGE_ID}` })).toHaveLength(0);
   });
 });
+
+describe('the bubble for an answer that stopped partway', () => {
+  it('shows what had arrived, says it stopped, and offers to ask again', () => {
+    dispatchTurn(MESSAGE_ID, { type: 'asked', startedAtMs: 1 });
+    dispatchTurn(MESSAGE_ID, { type: 'streamed', text: 'Half an answer', reasoning: '' });
+    dispatchTurn(MESSAGE_ID, { type: 'interrupted' });
+    const onRetry = jest.fn();
+    const r = render(<AiMessageBubble message={{ ...answer, content: '' }} onRetry={onRetry} />);
+
+    expect(texts(r).some((t) => t.includes('Half an answer'))).toBe(true);
+    expect(texts(r)).toContain('Stopped before the answer finished.');
+    act(() => {
+      r.root.findByProps({ testID: `ai-message-retry-${MESSAGE_ID}` }).props.onPress();
+    });
+    expect(onRetry).toHaveBeenCalledWith(MESSAGE_ID);
+    act(() => r.unmount());
+  });
+});

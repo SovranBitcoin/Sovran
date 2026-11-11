@@ -350,7 +350,15 @@ function AssistantBubble({ message, onRetry, onContinue, branchNav }: AiMessageB
   // stream the turn's text and reasoning render as they arrive instead of
   // appearing all at once on completion.
   const displayedContent =
-    answer.phase === 'streaming' ? answer.text : isLive ? '' : message.content;
+    answer.phase === 'streaming'
+      ? answer.text
+      : answer.phase === 'interrupted'
+        ? answer.text || message.content
+        : isLive
+          ? ''
+          : message.content;
+  // What had arrived of an answer that stopped before it finished.
+  const stoppedPartway = answer.phase === 'interrupted' && answer.text.length > 0;
   const displayedReasoning =
     answer.phase === 'streaming'
       ? answer.reasoning
@@ -472,6 +480,18 @@ function AssistantBubble({ message, onRetry, onContinue, branchNav }: AiMessageB
             trade for holding less of their money if the case where it bites
             is visible; silently truncating a paid answer would be worse than
             over-reserving. */}
+        {stoppedPartway ? (
+          <HStack className="mt-0.5 shrink items-center gap-1.5">
+            <Icon name="mdi:alert-circle-outline" size={14} color={shade400} />
+            <Text
+              size={12}
+              className="text-foreground/60 shrink"
+              testID={`ai-message-stopped-${message.id}`}>
+              Stopped before the answer finished.
+            </Text>
+          </HStack>
+        ) : null}
+
         {truncation ? (
           <HStack className="mt-0.5 shrink items-center gap-1.5">
             <Icon name="mdi:alert-circle-outline" size={14} color={shade400} />

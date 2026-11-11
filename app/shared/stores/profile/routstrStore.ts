@@ -598,8 +598,6 @@ interface RoutstrActions {
       modelSwitch?: RoutstrMessage['modelSwitch'];
     }
   ) => void;
-  /** Remove messages from the conversation they were written in. */
-  removeMessages: (conversationId: string | null, ids: Set<string>) => void;
   /** Pick which sibling is shown at a branch point. Writes through to
    *  the current session's `activeChildren` so the choice survives across
    *  app restarts. */
@@ -1264,15 +1262,6 @@ export const useRoutstrStore = create<RoutstrStore>({ name: 'routstr-store', sco
       addMessage: (message: RoutstrMessage) => {
         storeLog.debug('store.routstr.add_message', { role: message.role });
         set((state) => withSessionMirror(state, [...state.conversationHistory, message]));
-      },
-
-      removeMessages: (conversationId, ids) => {
-        storeLog.debug('store.routstr.remove_messages', { count: ids.size });
-        set((state) =>
-          mapConversationMessages(state, conversationId, (messages) =>
-            messages.filter((msg) => !ids.has(msg.id))
-          )
-        );
       },
 
       setMessagePending: (conversationId, id, pending) => {

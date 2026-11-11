@@ -150,7 +150,6 @@ export function useAiSend() {
   const createSession = useRoutstrStore((s) => s.createSession);
   const addMessage = useRoutstrStore((s) => s.addMessage);
   const setMessagePending = useRoutstrStore((s) => s.setMessagePending);
-  const removeMessages = useRoutstrStore((s) => s.removeMessages);
   const finalizeAssistantMessage = useRoutstrStore((s) => s.finalizeAssistantMessage);
   const setActiveBranch = useRoutstrStore((s) => s.setActiveBranch);
   const updateSessionTitle = useRoutstrStore((s) => s.updateSessionTitle);
@@ -871,8 +870,9 @@ export function useAiSend() {
         if (useProfileStore.getState().activeAccountIndex !== profile) return;
         if (isAbortError(err) || controller.signal.aborted) {
           aiLog.info('ai.send.aborted', { flowId });
-          removeMessages(conversationId, new Set([assistantMessageId]));
-          dispatchTurn(assistantMessageId, { type: 'stopped' });
+          // The answer stays, with what had arrived, and can be asked again:
+          // a question must never be left with no answer and nothing to press.
+          dispatchTurn(assistantMessageId, { type: 'interrupted' });
           span.end({ outcome: 'aborted' });
           return;
         }
@@ -938,7 +938,7 @@ export function useAiSend() {
         dispatchTurn(assistantMessageId, { type: 'interrupted' });
       }
     },
-    [removeMessages, finalizeAssistantMessage, updateSessionTitle, walletSats]
+    [finalizeAssistantMessage, updateSessionTitle, walletSats]
   );
 
   const sendInner = useCallback(

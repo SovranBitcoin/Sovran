@@ -20,12 +20,15 @@ describe('an answer moving through its turn', () => {
     });
   });
 
-  it('settles as failed, interrupted, or removed when stopped, only while live', () => {
+  it('settles as failed or interrupted, keeping the text that had arrived', () => {
     for (const live of [asking, streaming]) {
       expect(nextTurn(live, { type: 'failed', error })).toEqual({ phase: 'failed', error });
-      expect(nextTurn(live, { type: 'interrupted' })).toEqual({ phase: 'interrupted' });
-      expect(nextTurn(live, { type: 'stopped' })).toBeUndefined();
     }
+    expect(nextTurn(asking, { type: 'interrupted' })).toEqual({ phase: 'interrupted', text: '' });
+    expect(nextTurn(streaming, { type: 'interrupted' })).toEqual({
+      phase: 'interrupted',
+      text: 'hi',
+    });
   });
 
   it('can fail before it is asked (no model to ask)', () => {
@@ -36,14 +39,13 @@ describe('an answer moving through its turn', () => {
     const settled: Turn[] = [
       { phase: 'done', truncation: null },
       { phase: 'failed', error },
-      { phase: 'interrupted' },
+      { phase: 'interrupted', text: 'so far' },
     ];
     for (const turn of settled) {
       expect(nextTurn(turn, { type: 'streamed', text: 'late', reasoning: '' })).toBe(turn);
       expect(nextTurn(turn, { type: 'answered', truncation: null })).toBe(turn);
       expect(nextTurn(turn, { type: 'failed', error })).toBe(turn);
       expect(nextTurn(turn, { type: 'interrupted' })).toBe(turn);
-      expect(nextTurn(turn, { type: 'stopped' })).toBe(turn);
       expect(nextTurn(turn, { type: 'asked', startedAtMs: 7 })).toEqual({
         phase: 'asking',
         startedAtMs: 7,
@@ -69,7 +71,10 @@ describe('a saved answer with no turn', () => {
   });
 
   it('reads as interrupted when it is empty (closed mid-answer, or by an older build)', () => {
-    expect(readAnswer({ ...message, content: '' }, undefined)).toEqual({ phase: 'interrupted' });
+    expect(readAnswer({ ...message, content: '' }, undefined)).toEqual({
+      phase: 'interrupted',
+      text: '',
+    });
   });
 
   it('reads as its turn while there is one', () => {
