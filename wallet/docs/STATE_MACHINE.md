@@ -111,8 +111,8 @@ machine transition is expected from the step itself.
 | `sendComplete` | Terminal success of ecash send. Carries `historyEntry`, `createdOffline?`, `mintWasOffline?`. | no | yes |
 | `createMintQuote` | Action step for Lightning receive. Intercepted -> `runMintQuoteEffect`. | no | no (internal) |
 | `mintQuoteCreated` | Terminal success of mint-quote creation. | no | yes |
-| `navigateToMeltPreview` | Lightning melt preview/confirm; `CONFIRM_MELT` executes in place. | no | yes |
-| `navigateToPaymentRequest` | Payment-request preview/confirm; `CONFIRM_PAYMENT_REQUEST` executes in place. NFC auto-execute target. | no | yes |
+| `navigateToMeltPreview` | Lightning melt preview/confirm; `CONFIRM_MELT` executes in place. Carries `phase`: `preview` or `settled {historyEntry}`. | no | yes |
+| `navigateToPaymentRequest` | Payment-request preview/confirm; `CONFIRM_PAYMENT_REQUEST` executes in place. Carries `phase`: `preview`, `settled {historyEntry}` or `undelivered {operationId}`. NFC auto-execute target. | no | yes |
 | `receiveToken` | Token redeem step. Reached from intent and from `MINT_TRUSTED`. | no | yes |
 | `reviewMint` | Mint trust-review before redeeming from an untrusted mint. | no | yes |
 | `openMint` | Open a mint info screen (non-trust-review). | no | yes |
@@ -409,7 +409,7 @@ EXECUTE (melt* intent) / AMOUNT_ENTERED(destination=meltQuote)
         [quote-first: operations.quoteMelt creates the melt quote BEFORE the
          preview dispatches; its fee_reserve + quoted amount ride the step data]
    -> CONFIRM_MELT -- in place --> operations.executeMelt({ …, quoteId })
-        success: setStep('navigateToMeltPreview', {...data, historyEntry})  (step STAYS)
+        success: setStep('navigateToMeltPreview', {...data, phase: settled {historyEntry}})  (step STAYS)
         failure: routeOperationFailure -> chooseFallbackOption | ALL_OPTIONS_DISABLED | stay
 ```
 
@@ -446,8 +446,8 @@ MUST:
   `LNURL_INVOICE_AMOUNT_MISMATCH` is thrown before any mint melt. `lnurl.ts:268-279`.
 - The LNURL callback must be https (or http only for `.onion`); `.onion` hosts
   throw `LNURL_TOR_REQUIRED` up front. `lnurl.ts:115-130,172-177`.
-- On `CONFIRM_MELT` success the step stays `navigateToMeltPreview` with
-  `historyEntry` merged. `createMachine.ts:634`; `effects.ts:504-510`.
+- On `CONFIRM_MELT` success the step stays `navigateToMeltPreview` with its
+  phase `settled { historyEntry }`. `createMachine.ts:634`; `effects.ts:504-510`.
 - `FlowContext.amount` is ALWAYS denominated in `ctx.unit`. Scanned fixed
   amounts (BIP-321 `amount=`, fixed bolt11/bolt12) are sat-denominated, so on a
   fiat-unit account the seeding arms re-denominate ONCE via the live pricelist
@@ -469,10 +469,10 @@ MUST NOT:
 - `CONFIRM_MELT` must not execute unless `step === 'navigateToMeltPreview'` and
   `operations.executeMelt` is provided; otherwise it falls through `transition()`
   unchanged. `createMachine.ts:589`.
-- `CONFIRM_MELT` must not execute again once the step data carries the settled
-  `historyEntry`: a second Pay is ignored (for a Lightning address it would
-  fetch a fresh invoice and pay twice). A failed attempt sets no
-  `historyEntry`, so Pay after a failure still retries.
+- `CONFIRM_MELT` must not execute again once the step's phase is `settled`: a
+  second Pay is ignored (for a Lightning address it would fetch a fresh
+  invoice and pay twice). A failed attempt leaves the phase `preview`, so Pay
+  after a failure still retries.
 - Do not invent a `rolling_back` machine state. `MELT_FAILED` is a defined
   `ErrorCode` but the confirm-melt path never sets `error` with it for
   single-option flows.
@@ -602,10 +602,10 @@ intentionally skipped.
 EXECUTE(paymentRequest) / OPTION_CHOSEN(paymentRequest)
    -> enterAmount? -> selectMint? (supportedMintUrls-constrained) -> navigateToPaymentRequest
    -> CONFIRM_PAYMENT_REQUEST -- in place --> executePaymentRequest
-        completed  -> step STAYS navigateToPaymentRequest, +historyEntry; outcome delivered
+        completed  -> step STAYS navigateToPaymentRequest, phase settled {historyEntry}; outcome delivered
         rolledBack -> outcome rolledBack; routeOperationFailure(..,{rolledBack:true})
         thrown     -> outcome undelivered (PaymentRequestUndeliveredError) or failed;
-                      undelivered also sets `undeliveredOperationId` on the step, and a
+                      undelivered also sets phase undelivered {operationId}, and a
                       further confirm or mint list request is ignored
                       routeOperationFailure(..)
         stale / locked out -> outcome ignored
@@ -630,9 +630,9 @@ MUST:
 - `checkProofComposition` returns null for `paymentRequest`; the proof picker
   must not be shown from the normal gate. `resolveNext.ts:158-161`.
 - `CONFIRM_PAYMENT_REQUEST` is gated on `step === 'navigateToPaymentRequest'` AND
-  `operations.executePaymentRequest`. `createMachine.ts:661`. Once the step
-  data carries the delivered `historyEntry`, a further confirm is ignored
-  (outcome `ignored`) instead of sending again.
+  `operations.executePaymentRequest`. `createMachine.ts:661`. Once the step's
+  phase is `settled` or `undelivered`, a further confirm is ignored (outcome
+  `ignored`) instead of sending again.
 - On delivery failure the operation must attempt rollback (cancel if `prepared`,
   reclaim if executing/pending) and only return `rolledBack` when that
   cancel-or-reclaim succeeds; otherwise throw `PaymentRequestUndeliveredError`

@@ -877,6 +877,7 @@ export function resolveFromContext(
         amount,
         recipientPubkey: ctx.recipientPubkey,
         recipientProfile: ctx.recipientProfile,
+        phase: { kind: "preview" },
       },
     });
   }
@@ -951,6 +952,7 @@ export function resolveFromContext(
         amount,
         recipientPubkey: ctx.recipientPubkey,
         recipientProfile: ctx.recipientProfile,
+        phase: { kind: "preview" },
       },
     });
   }

@@ -48,6 +48,7 @@ import type {
   MintSelectorScope,
   PaymentMachine,
   PaymentRequestConfirmOutcome,
+  PaymentRequestPreviewPhase,
   ProcessResult,
   RecipientProfile,
   ScanOptions,
@@ -180,6 +181,25 @@ function deriveExecutionState(
         isExecuting: false,
         step,
       };
+  }
+}
+
+/**
+ * Whether a payment preview still waits for Pay. Once it settled, or its
+ * ecash left without being taken back, paying again (or choosing another
+ * mint to pay from) could pay twice.
+ */
+function awaitsPay(phase: PaymentRequestPreviewPhase): boolean {
+  switch (phase.kind) {
+    case "preview":
+      return true;
+    case "settled":
+    case "undelivered":
+      return false;
+    default: {
+      const unreachable: never = phase;
+      return unreachable;
+    }
   }
 }
 
@@ -833,9 +853,7 @@ export function createPaymentMachine(
       event.type === "REQUEST_MINT_SELECTOR" &&
       (step === "navigateToMeltPreview" ||
         step === "navigateToPaymentRequest") &&
-      ((stepData as StepDataMap["navigateToMeltPreview"]).historyEntry ||
-        (stepData as StepDataMap["navigateToPaymentRequest"])
-          .undeliveredOperationId)
+      !awaitsPay((stepData as StepDataMap[typeof step]).phase)
     ) {
       logger.warn("machine.mintSelector.alreadySettled", { currentStep: step });
       sendLocked = false;
@@ -843,8 +861,8 @@ export function createPaymentMachine(
     }
 
     // Handle CONFIRM_MELT/CONFIRM_PAYMENT_REQUEST directly — these bypass transition().
-    // On success: stepData is updated with historyEntry but step stays unchanged
-    //   (the user is already on the screen — no re-navigation needed).
+    // On success: the step data's phase becomes `settled` but the step stays
+    //   unchanged (the user is already on the screen — no re-navigation needed).
     // On failure: step changes to chooseFallbackOption or error, and the handler is dispatched.
 
     // If the user opened the mint selector from a terminal step and dismissed
@@ -858,12 +876,15 @@ export function createPaymentMachine(
       flowCtx.mintUrl &&
       flowCtx.amount
     ) {
+      // The selector only opens from a preview that still awaits Pay (see
+      // above), so the restored preview awaits Pay too.
       if (flowCtx.meltTarget) {
         setStep("navigateToMeltPreview", {
           mintUrl: flowCtx.mintUrl,
           meltTarget: flowCtx.meltTarget,
           amount: flowCtx.amount,
           unit: flowCtx.unit,
+          phase: { kind: "preview" },
           // Carry the pre-created quote (BTC-05) so Pay still executes
           // against the quote whose fee the user saw.
           ...(meltQuotePreviewMatches(flowCtx.meltQuotePreview, {
@@ -881,6 +902,7 @@ export function createPaymentMachine(
           paymentRequest: flowCtx.paymentRequest,
           amount: flowCtx.amount,
           unit: flowCtx.unit,
+          phase: { kind: "preview" },
         });
       }
       notify();
@@ -913,10 +935,10 @@ export function createPaymentMachine(
     ) {
       const originalStep = step;
       const data = stepData as StepDataMap["navigateToMeltPreview"];
-      if (data.historyEntry) {
+      if (!awaitsPay(data.phase)) {
         // Already paid. Running executeMelt again would pay twice (for a
         // Lightning address it fetches a fresh invoice). A failed attempt
-        // leaves no historyEntry, so Pay after a failure still retries.
+        // leaves the preview, so Pay after a failure still retries.
         logger.warn("machine.confirm.alreadySettled", { type: event.type });
         sendLocked = false;
         return;
@@ -1056,7 +1078,7 @@ export function createPaymentMachine(
     ) {
       const originalStep = step;
       const data = stepData as StepDataMap["navigateToPaymentRequest"];
-      if (data.historyEntry || data.undeliveredOperationId) {
+      if (!awaitsPay(data.phase)) {
         // Already delivered, or sent and not taken back: sending again would
         // pay twice. The caller's outcome stays `ignored`.
         logger.warn("machine.confirm.alreadySettled", { type: event.type });
@@ -1159,7 +1181,7 @@ export function createPaymentMachine(
         if (undelivered) {
           setStep("navigateToPaymentRequest", {
             ...data,
-            undeliveredOperationId: cause.operationId,
+            phase: { kind: "undelivered", operationId: cause.operationId },
           });
         }
         routeOperationFailure(cause, "paymentRequest", data.paymentRequest, data, {

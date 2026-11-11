@@ -153,6 +153,25 @@ export interface AmountEntryDisplayMetadata {
 // Step Data — typed payload delivered to each handler
 // ---------------------------------------------------------------------------
 
+/**
+ * Where a melt preview is. A successful melt keeps the step (the person is
+ * already on the screen) and moves it to `settled`, which no Pay or mint
+ * change can leave: paying again would pay twice.
+ */
+export type MeltPreviewPhase =
+  | { kind: "preview" }
+  | { kind: "settled"; historyEntry: string };
+
+/**
+ * Where a payment request preview is. Besides `preview` and `settled`
+ * (delivered), `undelivered` means its ecash left the wallet, was not
+ * confirmed delivered and could not be taken back: the recipient may hold
+ * it, so this preview must not send again.
+ */
+export type PaymentRequestPreviewPhase =
+  | MeltPreviewPhase
+  | { kind: "undelivered"; operationId: string };
+
 export interface StepDataMap {
   idle: Record<string, never>;
   /**
@@ -276,8 +295,7 @@ export interface StepDataMap {
      * quote failure (Pay falls back to creating a fresh quote at execution).
      */
     meltQuote?: MeltQuotePreview;
-    /** Populated after a successful melt so the screen can link to the new transaction. */
-    historyEntry?: string;
+    phase: MeltPreviewPhase;
   };
   navigateToPaymentRequest: {
     mintUrl: string;
@@ -286,14 +304,7 @@ export interface StepDataMap {
     unit: string;
     recipientPubkey?: string;
     recipientProfile?: RecipientProfile;
-    /** Populated after a successful payment request send. */
-    historyEntry?: string;
-    /**
-     * Set when ecash for this request left the wallet, was not confirmed
-     * delivered and could not be taken back. The recipient may hold it, so
-     * this preview must not send again.
-     */
-    undeliveredOperationId?: string;
+    phase: PaymentRequestPreviewPhase;
   };
   createMintQuote: {
     mintUrl: string;

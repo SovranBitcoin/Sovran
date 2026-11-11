@@ -435,6 +435,7 @@ function terminalStep(
           amount: amount!,
           recipientPubkey,
           recipientProfile,
+          phase: { kind: "preview" },
         },
       };
     case "paymentRequest":
@@ -447,6 +448,7 @@ function terminalStep(
           unit,
           recipientPubkey,
           recipientProfile,
+          phase: { kind: "preview" },
         },
       };
     case "sendEcash":

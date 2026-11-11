@@ -655,7 +655,10 @@ function buildConfirmMeltResult(
   return {
     kind: 'completed',
     step: 'navigateToMeltPreview',
-    data: { ...data, historyEntry: result.historyEntry },
+    data: {
+      ...data,
+      phase: { kind: 'settled', historyEntry: result.historyEntry },
+    },
     links,
     notifications,
   };
@@ -718,7 +721,10 @@ function buildConfirmPaymentRequestResult(
   return {
     kind: 'completed',
     step: 'navigateToPaymentRequest',
-    data: { ...data, historyEntry: result.historyEntry },
+    data: {
+      ...data,
+      phase: { kind: 'settled', historyEntry: result.historyEntry },
+    },
     links,
     notifications,
   };

@@ -630,6 +630,7 @@ function handleProofsChosen(
         amount: event.amount,
         recipientPubkey: ctx.recipientPubkey,
         recipientProfile: ctx.recipientProfile,
+        phase: { kind: "preview" },
       },
     };
   }
@@ -645,6 +646,7 @@ function handleProofsChosen(
         amount: event.amount,
         recipientPubkey: ctx.recipientPubkey,
         recipientProfile: ctx.recipientProfile,
+        phase: { kind: "preview" },
       },
     };
   }

@@ -30,6 +30,7 @@ const confirmMeltData: StepDataMap['navigateToMeltPreview'] = {
   meltTarget: 'lnurl1target',
   amount: 250,
   unit: 'sat',
+  phase: { kind: 'preview' },
 };
 
 const confirmPaymentRequestData: StepDataMap['navigateToPaymentRequest'] = {
@@ -37,6 +38,7 @@ const confirmPaymentRequestData: StepDataMap['navigateToPaymentRequest'] = {
   paymentRequest: 'creq1request',
   amount: 250,
   unit: 'sat',
+  phase: { kind: 'preview' },
 };
 
 const reviewMintData: StepDataMap['reviewMint'] = {
@@ -488,7 +490,7 @@ describe('runConfirmMeltEffect', () => {
       kind: 'completed',
       step: 'navigateToMeltPreview',
       data: {
-        historyEntry: expect.any(String),
+        phase: { kind: 'settled', historyEntry: expect.any(String) },
       },
       links: [
         {
@@ -589,7 +591,7 @@ describe('runConfirmPaymentRequestEffect', () => {
       kind: 'completed',
       step: 'navigateToPaymentRequest',
       data: {
-        historyEntry: expect.any(String),
+        phase: { kind: 'settled', historyEntry: expect.any(String) },
       },
       links: [
         {
