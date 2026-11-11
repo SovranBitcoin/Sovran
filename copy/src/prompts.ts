@@ -15,3 +15,47 @@ export const oldEcashClaimCopy = {
   later: "Not now",
   decline: "Don't claim",
 } as const;
+
+/** Network settings: relay edits stay on this screen until reviewed and accepted. */
+export const relayEditCopy = {
+  title: "Your relays",
+  online: "Online",
+  offline: "Offline",
+  edit: "Edit relays",
+  reload: "Read latest list",
+  loading: "Reading your latest relay list…",
+  waiting:
+    "Your latest list could not be read. Connect and try again before editing.",
+  pending:
+    "A saved proposal is waiting. Review it against your latest list before publishing.",
+  applySaved: "Use saved proposal",
+  draft:
+    "Changes stay on this screen until you publish. Leaving discards this draft.",
+  review: "Review changes",
+  reviewTitle: "Review relay changes",
+  changed:
+    "Your list changed elsewhere. Review the updated changes before publishing.",
+  unchanged: "No changes.",
+  add: "Add relay",
+  url: "Relay URL",
+  invalidUrl: "Enter a valid relay URL (wss://…).",
+  limit: (max: number) =>
+    `You can keep up to ${max} relays. Remove one to add another.`,
+  defaults: "Restore defaults",
+  cancel: "Cancel",
+  back: "Keep editing",
+  publish: "Publish relay list",
+  publishing: "Publishing…",
+  failed: "Could not publish. Read your latest list and review again.",
+  noWrite: "Add a relay to write to, or restore defaults.",
+  success: (count: number) => `Published to ${count} relays.`,
+  read: "Read",
+  write: "Write",
+  neither: "Off",
+  added: "Add",
+  removed: "Remove",
+  permissions: "Change permissions",
+  remove: (url: string) => `Remove ${url}`,
+  readFrom: (url: string) => `Read from ${url}`,
+  writeTo: (url: string) => `Write to ${url}`,
+} as const;

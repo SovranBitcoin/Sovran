@@ -19,9 +19,14 @@ import { DEFAULT_RELAYS, normalizeRelayList } from '@/shared/lib/nostr/outbox/de
 import {
   RELAY_LIST_KIND,
   serializeRelayList,
+  parseRelayList,
   type RelayListEntry,
 } from '@/shared/lib/nostr/outbox/nip65';
-import { getOwnWriteRelays, useRelayListStore } from '@/shared/lib/nostr/outbox/relayListStore';
+import {
+  defaultEntries,
+  getOwnWriteRelays,
+  useRelayListStore,
+} from '@/shared/lib/nostr/outbox/relayListStore';
 import {
   matchingSigner,
   publishToRelaysRead,
@@ -69,97 +74,246 @@ export function relayListRelays(pubkey: string): string[] | null {
   ]);
 }
 
+type CompleteRead = Extract<ReadForEdit, { status: 'read' }>;
 type RelayListPublishError =
-  /** Not a list to publish: it has no relay to write to. */
   | { type: 'no-write-relay' }
-  /** The relays could not all be read; nothing was sent. */
   | { type: 'waiting' }
+  | { type: 'changed' }
   | { type: 'failed'; cause?: unknown };
+type PublishResult = Result<{ accepted: number }, RelayListPublishError>;
 
-/**
- * Publish `entries` as the account's relay list. Recorded as the saved list
- * (`markPublished`) only once a relay accepted it, and only while the list
- * held is still the one this started from: an edit made meanwhile stays
- * unpublished. A list with no relay to write to is refused: others would
- * read that the account has none, while this app writes to the defaults.
- *
- * `read` is a complete read just made (the first-run publish passes
- * discovery's); otherwise the relays are read here first.
- */
-export async function publishOwnRelayList(
+export type RelayListReview = {
+  readonly base: readonly RelayListEntry[];
+  readonly entries: readonly RelayListEntry[];
+  publish: () => Promise<PublishResult>;
+};
+export type RelayListEditor = {
+  readonly base: readonly RelayListEntry[];
+  readonly savedProposal: readonly RelayListEntry[] | null;
+  review: (entries: readonly RelayListEntry[]) => RelayListReview;
+  dispose: () => void;
+};
+
+const snapshot = (entries: readonly RelayListEntry[]) =>
+  Object.freeze(entries.map((entry) => Object.freeze({ ...entry })));
+const entriesFrom = (read: CompleteRead) =>
+  read.newest ? parseRelayList(read.newest) : defaultEntries();
+const sameBase = (a: CompleteRead, b: CompleteRead) =>
+  a.newest?.id === b.newest?.id &&
+  JSON.stringify([...a.relays].sort()) === JSON.stringify([...b.relays].sort()) &&
+  JSON.stringify([...a.asked].sort()) === JSON.stringify([...b.asked].sort());
+
+// Read newly learned destinations too, before offering a base for review.
+async function readRelayBase(
   ndk: NDK,
   pubkey: string,
-  entries: readonly RelayListEntry[],
-  options: { read?: Extract<ReadForEdit, { status: 'read' }>; stillWanted?: () => boolean } = {}
-): Promise<Result<{ accepted: number }, RelayListPublishError>> {
-  if (!entries.some((entry) => entry.write)) return err({ type: 'no-write-relay' });
-  const scope = captureActiveProfile(pubkey);
-  const held = useRelayListStore.getState().entries;
-  const updatedAt = useRelayListStore.getState().updatedAt;
-  // Capture old and proposed destinations before signer lookup can yield to an edit.
-  const destinations = relayListRelays(pubkey);
-  const wanted = () =>
-    (options.read !== undefined || entries === held) &&
-    useRelayListStore.getState().entries === held &&
-    useRelayListStore.getState().updatedAt === updatedAt &&
-    (options.stillWanted?.() ?? true);
+  proposed: readonly RelayListEntry[] = [],
+  previous: readonly string[] = []
+) {
+  const known = relayListRelays(pubkey);
+  if (!known) return { status: 'waiting', reason: 'relay-list-unknown' } satisfies ReadForEdit;
+  let relays = normalizeRelayList([
+    ...known,
+    ...previous,
+    ...proposed.filter((e) => e.write).map((e) => e.url),
+  ]);
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const read = await readForEdit(ndk, pubkey, RELAY_LIST_KIND, relays);
+    if (read.status === 'waiting') return read;
+    const learned = entriesFrom(read)
+      .filter((e) => e.write)
+      .map((e) => e.url);
+    const expanded = normalizeRelayList([...relays, ...learned]);
+    if (expanded.length === relays.length) return read;
+    relays = expanded;
+  }
+  return { status: 'waiting', reason: 'relay-list-unknown' } satisfies ReadForEdit;
+}
+
+const publishing = new WeakMap<NDK, Set<string>>();
+async function exclusively(
+  ndk: NDK,
+  pubkey: string,
+  run: () => Promise<PublishResult>
+): Promise<PublishResult> {
+  const active = publishing.get(ndk) ?? new Set<string>();
+  if (active.has(pubkey)) return err({ type: 'waiting' });
+  publishing.set(ndk, active);
+  active.add(pubkey);
   try {
-    const signer = await matchingSigner(ndk, pubkey);
-    scope.check();
-    if (!wanted()) return err({ type: 'waiting' });
-    const read = options.read ?? (await readForEdit(ndk, pubkey, RELAY_LIST_KIND, destinations));
-    scope.check();
-    if (!wanted() || ndk.signer !== signer) return err({ type: 'waiting' });
-    if (read.status === 'waiting') {
-      nostrLog.info('nostr.relays.publish_waiting', { reason: read.reason });
-      return err({ type: 'waiting' });
-    }
-    const event = await signReplacement(ndk, signer, scope, {
-      kind: RELAY_LIST_KIND,
-      pubkey,
-      // After the newest list the relays hold and the one saved here.
-      replaces: Math.max(updatedAt, read.newest?.created_at ?? 0),
-      tags: serializeRelayList(entries),
-      content: '',
-    });
-    scope.check();
-    if (!wanted() || ndk.signer !== signer) return err({ type: 'waiting' });
-    const published = await publishToRelaysRead(ndk, event, read.relays);
-    scope.check();
-    if (ndk.signer !== signer) return err({ type: 'failed' });
-    if (published.isErr()) return err({ type: 'failed', cause: published.error });
-    const accepted = published.value.accepted.length;
-    nostrLog.info('nostr.relays.published', { accepted, relays: read.relays.length });
-    if (wanted()) useRelayListStore.getState().markPublished(event.created_at, [...entries]);
-    return ok({ accepted });
-  } catch (cause) {
-    nostrLog.warn('nostr.relays.publish_failed', {
-      error: cause instanceof Error ? cause.message : String(cause),
-    });
-    return err({ type: 'failed', cause });
+    return await run();
   } finally {
-    scope.dispose();
+    active.delete(pubkey);
   }
 }
 
-/** Network settings' "Publish relay list", with what the screen shows while and after. */
-export async function publishRelayList(ctx: {
-  ndk: NDK;
-  pubkey: string;
-  entries: readonly RelayListEntry[];
-  setPublishing: (publishing: boolean) => void;
-  setPublishMsg: (msg: string | null) => void;
-}): Promise<void> {
-  const { ndk, pubkey, entries, setPublishing, setPublishMsg } = ctx;
-  setPublishing(true);
-  setPublishMsg(null);
+/** A complete read starts an ephemeral edit. No toggle writes the saved store. */
+export async function beginRelayListEdit(
+  ndk: NDK,
+  pubkey: string
+): Promise<Result<RelayListEditor, RelayListPublishError>> {
+  const scope = captureActiveProfile(pubkey);
+  const held = useRelayListStore.getState().entries;
+  const updatedAt = useRelayListStore.getState().updatedAt;
+  const destinations = relayListRelays(pubkey);
+  const savedProposal = useRelayListStore.getState().source === 'local' ? snapshot(held) : null;
+  let disposed = false;
+  const dispose = () => {
+    disposed = true;
+    scope.dispose();
+  };
+  const wanted = () =>
+    !disposed &&
+    useRelayListStore.getState().entries === held &&
+    useRelayListStore.getState().updatedAt === updatedAt;
   try {
-    const result = await publishOwnRelayList(ndk, pubkey, entries);
-    if (result.isOk()) setPublishMsg(`Published to ${result.value.accepted} relays.`);
-    else if (result.error.type === 'no-write-relay')
-      setPublishMsg('Add a relay to write to, or restore defaults.');
-    else setPublishMsg('Could not publish. Check your connection and try again.');
-  } finally {
-    setPublishing(false);
+    const signer = await matchingSigner(ndk, pubkey);
+    scope.check();
+    if (!destinations || !wanted()) {
+      dispose();
+      return err({ type: 'waiting' });
+    }
+    const base = await readRelayBase(ndk, pubkey, [], destinations);
+    scope.check();
+    if (base.status === 'waiting' || !wanted() || ndk.signer !== signer) {
+      dispose();
+      return err({ type: 'waiting' });
+    }
+    // Keep only complete reads in the session. Each review owns immutable copies.
+    let current: CompleteRead = base;
+    let revision = 0;
+    const editor: RelayListEditor = {
+      get base() {
+        return snapshot(entriesFrom(current));
+      },
+      savedProposal,
+      dispose,
+      review(entries) {
+        const reviewed = current;
+        const approvedRevision = ++revision;
+        const proposal = snapshot(entries.filter((e) => e.read || e.write));
+        let consumed = false;
+        return {
+          base: snapshot(entriesFrom(reviewed)),
+          entries: proposal,
+          publish: () =>
+            exclusively(ndk, pubkey, async () => {
+              if (consumed) return err({ type: 'waiting' });
+              consumed = true;
+              const valid = () =>
+                wanted() && approvedRevision === revision && ndk.signer === signer;
+              try {
+                scope.check();
+                if (!valid()) return err({ type: 'waiting' });
+                if (!proposal.some((e) => e.write)) return err({ type: 'no-write-relay' });
+                const fresh = await readRelayBase(ndk, pubkey, proposal, reviewed.asked);
+                scope.check();
+                if (fresh.status === 'waiting' || !valid()) return err({ type: 'waiting' });
+                // New proposed destinations must also have answered before signing;
+                // their absence from the original read alone does not change its base.
+                if (
+                  fresh.newest?.id !== reviewed.newest?.id ||
+                  reviewed.asked.some((url) => !fresh.asked.includes(url)) ||
+                  reviewed.relays.some((url) => !fresh.relays.includes(url))
+                ) {
+                  current = fresh;
+                  return err({ type: 'changed' });
+                }
+                const event = await signReplacement(ndk, signer, scope, {
+                  kind: RELAY_LIST_KIND,
+                  pubkey,
+                  replaces: Math.max(updatedAt, fresh.newest?.created_at ?? 0),
+                  tags: serializeRelayList(proposal),
+                  content: '',
+                });
+                scope.check();
+                if (!valid()) return err({ type: 'waiting' });
+                const afterSign = await readRelayBase(ndk, pubkey, proposal, fresh.asked);
+                scope.check();
+                if (afterSign.status === 'waiting' || !valid()) return err({ type: 'waiting' });
+                if (!sameBase(fresh, afterSign)) {
+                  current = afterSign;
+                  return err({ type: 'changed' });
+                }
+                const published = await publishToRelaysRead(ndk, event, afterSign.relays);
+                scope.check();
+                if (!valid()) return err({ type: 'failed' });
+                if (published.isErr()) return err({ type: 'failed', cause: published.error });
+                useRelayListStore.getState().markPublished(event.created_at, [...proposal]);
+                scope.check();
+                if (ndk.signer !== signer) return err({ type: 'failed' });
+                useRelayListStore.getState().markDiscovered(pubkey);
+                return ok({ accepted: published.value.accepted.length });
+              } catch (cause) {
+                return err({ type: 'failed', cause });
+              }
+            }),
+        };
+      },
+    };
+    return ok(editor);
+  } catch (cause) {
+    dispose();
+    return err({ type: 'failed', cause });
   }
+}
+
+/** First run can only publish defaults, after discovery proved no list exists. */
+export async function publishDefaultRelayList(
+  ndk: NDK,
+  pubkey: string,
+  read: CompleteRead,
+  stillWanted: () => boolean
+): Promise<PublishResult> {
+  return exclusively(ndk, pubkey, async () => {
+    const scope = captureActiveProfile(pubkey);
+    const held = useRelayListStore.getState().entries;
+    const wanted = () => {
+      const state = useRelayListStore.getState();
+      return (
+        stillWanted() && state.entries === held && !state.hasPublished && state.source !== 'local'
+      );
+    };
+    try {
+      if (read.newest || !wanted()) return err({ type: 'waiting' });
+      const signer = await matchingSigner(ndk, pubkey);
+      scope.check();
+      if (!wanted()) return err({ type: 'waiting' });
+      const fresh = await readRelayBase(ndk, pubkey, [], read.asked);
+      scope.check();
+      if (fresh.status === 'waiting' || fresh.newest || !wanted() || ndk.signer !== signer)
+        return err({ type: 'waiting' });
+      const entries = defaultEntries();
+      const event = await signReplacement(ndk, signer, scope, {
+        kind: RELAY_LIST_KIND,
+        pubkey,
+        tags: serializeRelayList(entries),
+        content: '',
+      });
+      scope.check();
+      if (!wanted() || ndk.signer !== signer) return err({ type: 'waiting' });
+      const afterSign = await readRelayBase(ndk, pubkey, [], fresh.asked);
+      scope.check();
+      if (
+        afterSign.status === 'waiting' ||
+        !sameBase(fresh, afterSign) ||
+        !wanted() ||
+        ndk.signer !== signer
+      )
+        return err({ type: 'waiting' });
+      const published = await publishToRelaysRead(ndk, event, afterSign.relays);
+      scope.check();
+      if (ndk.signer !== signer || !wanted()) return err({ type: 'failed' });
+      if (published.isErr()) return err({ type: 'failed', cause: published.error });
+      useRelayListStore.getState().markPublished(event.created_at, entries);
+      return ok({ accepted: published.value.accepted.length });
+    } catch (cause) {
+      nostrLog.warn('nostr.relays.publish_failed', {
+        error: cause instanceof Error ? cause.message : String(cause),
+      });
+      return err({ type: 'failed', cause });
+    } finally {
+      scope.dispose();
+    }
+  });
 }

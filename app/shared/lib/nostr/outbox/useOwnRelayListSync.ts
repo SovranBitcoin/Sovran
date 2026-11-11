@@ -6,7 +6,7 @@
  * relay-list store, and seeds the pool with those relays. If every one of them
  * answers that no list exists yet, it first-run-publishes the default
  * bootstrap set as the user's `kind:10002` so followers/outbox-aware clients
- * can discover them (`publishOwnRelayList`), unless the person has an edit of
+ * can discover them (`publishDefaultRelayList`), unless the person has an edit of
  * their own waiting to be published.
  *
  * Only an answer from every asked relay marks the account's list as discovered
@@ -36,11 +36,11 @@ import { nostrLog } from '@/shared/lib/logger';
 import { readNewestOwnEvent, worthReadingAgain } from '@/shared/lib/nostr/ownReplaceableEvent';
 import { RELAY_LIST_KIND, parseRelayList } from '@/shared/lib/nostr/outbox/nip65';
 import {
-  publishOwnRelayList,
+  publishDefaultRelayList,
   relayListRelays,
   trackRelaysAsked,
 } from '@/shared/lib/nostr/outbox/publishOwnRelayList';
-import { defaultEntries, useRelayListStore } from '@/shared/lib/nostr/outbox/relayListStore';
+import { useRelayListStore } from '@/shared/lib/nostr/outbox/relayListStore';
 import { seedPool } from '@/shared/lib/nostr/outbox/seedPool';
 import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
 
@@ -76,7 +76,10 @@ async function syncOwnRelayList(
         // A list any relay returned is taken in, even before the others answered.
         const entries = parseRelayList({ tags: read.newest.tags });
         for (const entry of entries) if (entry.write) learned.add(entry.url);
-        useRelayListStore.getState().setFromRelay(entries, read.newest.created_at ?? 0);
+        // Older releases saved whole local proposals without a baseline. Keep
+        // them until the person reviews them against a fresh complete read.
+        if (useRelayListStore.getState().source !== 'local')
+          useRelayListStore.getState().setFromRelay(entries, read.newest.created_at ?? 0);
         seedPool(
           ndk,
           entries.map((e) => e.url)
@@ -91,6 +94,9 @@ async function syncOwnRelayList(
       nostrLog.warn('nostr.relays.sync_unanswered', { outcome: read.outcome });
       return 'unanswered';
     }
+    // A saved proposal is not the discovered remote configuration. Own-list
+    // writers wait until it is explicitly reviewed and published.
+    if (useRelayListStore.getState().source === 'local') return 'unanswered';
     useRelayListStore.getState().markDiscovered(pubkey);
     if (newest) return 'discovered';
 
@@ -98,12 +104,14 @@ async function syncOwnRelayList(
     // First-run-publish them (never clobbers), to the relays just read. An
     // edit the person made before this answer is theirs to publish: it is
     // neither replaced by the defaults nor marked published unsent.
-    const { hasPublished, source } = useRelayListStore.getState();
-    if (hasPublished || source === 'local') return 'discovered';
-    const published = await publishOwnRelayList(ndk, pubkey, defaultEntries(), {
-      read: { status: 'read', newest: undefined, relays: read.relays, asked: read.asked },
-      stillWanted: () => !isCancelled(),
-    });
+    const { hasPublished } = useRelayListStore.getState();
+    if (hasPublished) return 'discovered';
+    const published = await publishDefaultRelayList(
+      ndk,
+      pubkey,
+      { status: 'read', newest: undefined, relays: read.relays, asked: read.asked },
+      () => !isCancelled()
+    );
     if (published.isOk()) nostrLog.info('nostr.relays.first_run_published');
     return 'discovered';
   } catch (error) {

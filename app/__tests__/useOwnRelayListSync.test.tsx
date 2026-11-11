@@ -18,7 +18,7 @@
 import { act, renderHook } from '@testing-library/react-native';
 import { ResultAsync, errAsync, okAsync } from 'neverthrow';
 
-import { publishOwnRelayList } from '@/shared/lib/nostr/outbox/publishOwnRelayList';
+import { beginRelayListEdit } from '@/shared/lib/nostr/outbox/publishOwnRelayList';
 import type NDK from '@nostr-dev-kit/ndk-mobile';
 import { useOwnRelayListSync } from '@/shared/lib/nostr/outbox/useOwnRelayListSync';
 import {
@@ -351,7 +351,7 @@ describe('reading the own relay list', () => {
     ]);
   });
 
-  it('replaces local edits with any fetched list, even an older one', async () => {
+  it('preserves an ambiguous saved local proposal while learning the remote destinations', async () => {
     useRelayListStore.setState({
       entries: [{ url: 'wss://local-edit.example', read: true, write: true }],
       updatedAt: 900,
@@ -359,14 +359,10 @@ describe('reading the own relay list', () => {
     });
     mockRelays.set('wss://local-edit.example', { events: [REMOTE()] });
     await mountAndWait(A);
-
-    // QUIRK: the last-writer guard applies only to a relay-sourced list, so an
-    // older network list (500) overwrites newer local edits (900).
-    expect(store()).toMatchObject({ updatedAt: 500, source: 'relay' });
-    expect(store().entries.map((e) => e.url)).toEqual([
-      'wss://both.example',
-      'wss://write.example',
-    ]);
+    expect(store()).toMatchObject({ updatedAt: 900, source: 'local' });
+    expect(store().entries).toEqual([{ url: 'wss://local-edit.example', read: true, write: true }]);
+    expect(mockPublishEvent).not.toHaveBeenCalled();
+    expect(getKnownOwnWriteRelays(A)).toBeNull();
   });
 
   it('writes nothing when the read fails', async () => {
@@ -462,11 +458,11 @@ describe('first-run publish of the default relays', () => {
     await act(async () => read.resolve());
 
     // Neither replaced by the defaults nor marked published: Network settings
-    // still shows it as unpublished, and its Publish sends it.
+    // still offers it as a saved proposal for an explicit review.
     expect(mockPublishEvent).not.toHaveBeenCalled();
     expect(store()).toMatchObject({ source: 'local', hasPublished: false });
     expect(store().entries.map((e) => e.url)).toEqual([...DEFAULT_RELAYS, 'wss://mine.example']);
-    expect(getKnownOwnWriteRelays(A)).toEqual([...DEFAULT_RELAYS, 'wss://mine.example']);
+    expect(getKnownOwnWriteRelays(A)).toBeNull();
   });
 
   it('after the first-run publish, adding one relay keeps the defaults', async () => {
@@ -699,7 +695,13 @@ it('reads and publishes to a learned old write relay removed before its first qu
   store().removeRelay(old);
   store().addRelay(next, { read: true, write: true });
   await act(async () => {
-    await publishOwnRelayList(mockNdk as unknown as NDK, A, store().entries);
+    const result = await beginRelayListEdit(mockNdk as unknown as NDK, A);
+    if (result.isErr()) throw new Error(result.error.type);
+    try {
+      await result.value.review(store().entries).publish();
+    } finally {
+      result.value.dispose();
+    }
   });
   expect(mockAsked.flatMap((read) => read.relays ?? [])).toContain(old);
   expect(mockPublishEvent.mock.calls.at(-1)![0].relays).toEqual(

@@ -1,20 +1,17 @@
 /**
  * @jest-environment node
  *
- * Network settings' "Publish relay list" (`publishRelayList` over
- * `publishOwnRelayList`) against the real relay-list store: what it reads
- * first, what it sends, to which relays, how it is dated, what it records and
- * what the screen is told. Replaced: the relays (a fake subscription per
- * relay), the publish seam, the signer, the active account, storage and the
- * logger.
+ * Relay edit sessions against the real relay-list store and reader. Network,
+ * signing, active account, storage and logging are deterministic boundaries.
  */
 import type NDK from '@nostr-dev-kit/ndk-mobile';
 import { errAsync, okAsync } from 'neverthrow';
 
 import { DEFAULT_RELAYS } from '@/shared/lib/nostr/outbox/defaults';
 import {
-  publishOwnRelayList,
-  publishRelayList,
+  beginRelayListEdit,
+  publishDefaultRelayList,
+  type RelayListEditor,
   trackRelaysAsked,
 } from '@/shared/lib/nostr/outbox/publishOwnRelayList';
 import { useRelayListStore } from '@/shared/lib/nostr/outbox/relayListStore';
@@ -129,17 +126,21 @@ function relayFake() {
   } as unknown as NDK;
 }
 
-function publish(entries = store().entries) {
-  const messages: (string | null)[] = [];
-  const publishing: boolean[] = [];
-  return publishRelayList({
-    ndk: relayFake(),
-    pubkey: OWN,
-    entries,
-    setPublishing: (value) => publishing.push(value),
-    setPublishMsg: (message) => messages.push(message),
-  }).then(() => ({ messages, publishing }));
+const editors: RelayListEditor[] = [];
+async function edit(ndk = relayFake()) {
+  const result = await beginRelayListEdit(ndk, OWN);
+  if (result.isErr()) throw new Error(result.error.type);
+  editors.push(result.value);
+  return result.value;
 }
+const remote = (tags: string[][], id = 'b', created_at = 200): RelayEvent => ({
+  kind: 10002,
+  pubkey: OWN,
+  created_at,
+  id: id.repeat(64),
+  tags,
+});
+const mine = { url: MINE, read: true, write: true };
 
 const sent = () => mockPublish.mock.calls[0][0];
 
@@ -164,109 +165,301 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  editors.splice(0).forEach((editor) => editor.dispose());
   expect(mockProfileListeners.size).toBe(0);
   jest.useRealTimers();
 });
 
-describe('publishing the relay list from Network settings', () => {
-  it('reads every relay first, sends the signed list to all of them, and records it as the saved list', async () => {
-    const { messages, publishing } = await publish();
+it('refuses an unreviewed saved proposal that would overwrite remote additions and permissions', async () => {
+  mockHeld.set(MINE, [
+    remote([
+      ['r', MINE, 'read'],
+      ['r', 'wss://remote-only.example'],
+    ]),
+  ]);
+  store().addRelay('wss://local-addition.example', { read: true, write: true });
+  const editor = await edit();
+  expect(editor.base).toEqual([
+    { url: MINE, read: true, write: false },
+    { url: 'wss://remote-only.example', read: true, write: true },
+  ]);
+  expect(editor.savedProposal).toEqual([
+    mine,
+    { url: 'wss://local-addition.example', read: true, write: true },
+  ]);
+  expect(mockPublish).not.toHaveBeenCalled();
+  expect(store().source).toBe('local');
+});
 
-    expect(mockAsked).toEqual([MINE, ...DEFAULT_RELAYS]);
-    expect(sent().event).toMatchObject({ kind: 10002, pubkey: OWN, tags: [['r', MINE]] });
-    expect(sent().relays).toEqual([MINE, ...DEFAULT_RELAYS]);
-    expect(sent().resolveOn).toBe('all-settled');
-    expect(store()).toMatchObject({
-      entries: [{ url: MINE, read: true, write: true }],
-      source: 'relay',
-      hasPublished: true,
-      updatedAt: sent().event.created_at,
-    });
-    expect(messages).toEqual([null, `Published to ${DEFAULT_RELAYS.length + 1} relays.`]);
-    expect(publishing).toEqual([true, false]);
-  });
+it('adds to the latest list, retaining external additions and permissions', async () => {
+  mockHeld.set(MINE, [
+    remote([
+      ['r', MINE, 'read'],
+      ['r', 'wss://remote-only.example'],
+    ]),
+  ]);
+  const editor = await edit();
+  const review = editor.review([
+    ...editor.base,
+    { url: 'wss://new.example', read: true, write: true },
+  ]);
+  const result = await review.publish();
+  expect(result.isOk()).toBe(true);
+  expect(sent().event.tags).toEqual([
+    ['r', MINE, 'read'],
+    ['r', 'wss://remote-only.example'],
+    ['r', 'wss://new.example'],
+  ]);
+  expect(sent().relays).toEqual(
+    expect.arrayContaining([MINE, 'wss://remote-only.example', 'wss://new.example'])
+  );
+  expect(store().source).toBe('relay');
+  expect(store().discoveredFor).toBe(OWN);
+  expect(store().entries).toEqual(review.entries);
+});
 
-  it('sends a changed list to the old write relays as well as the new ones', async () => {
-    // This session's discovery asked the old write relay; the person replaced it.
-    const untrack = trackRelaysAsked(OWN, new Set([OLD]));
-    await publish();
-    untrack();
+it('retains an intentional removal and sends to the old destination too', async () => {
+  mockHeld.set(MINE, [
+    remote([
+      ['r', MINE],
+      ['r', OLD],
+    ]),
+  ]);
+  const editor = await edit();
+  expect((await editor.review([mine]).publish()).isOk()).toBe(true);
+  expect(sent().event.tags).toEqual([['r', MINE]]);
+  expect(sent().relays).toContain(OLD);
+});
 
-    expect(sent().relays).toEqual(expect.arrayContaining([OLD, MINE]));
-  });
+it('requires a new review when another client changes permissions during review', async () => {
+  mockHeld.set(MINE, [
+    remote([
+      ['r', MINE],
+      ['r', OLD],
+    ]),
+  ]);
+  const editor = await edit();
+  const review = editor.review([mine]);
+  mockHeld.set(MINE, [
+    remote(
+      [
+        ['r', MINE, 'read'],
+        ['r', OLD],
+      ],
+      'c',
+      201
+    ),
+  ]);
+  const result = await review.publish();
+  expect(result.isErr() && result.error.type).toBe('changed');
+  expect(mockPublish).not.toHaveBeenCalled();
+  const again = editor.review(review.entries);
+  expect(again.base[0]).toEqual({ url: MINE, read: true, write: false });
+  expect((await again.publish()).isOk()).toBe(true);
+  expect(sent().event.tags).toEqual([['r', MINE]]);
+});
 
-  it('keeps the edit unpublished and says so when no relay accepts it', async () => {
-    mockPublish.mockReturnValue(errAsync({ type: 'all-failed', relayResults: [] }));
-    const { messages } = await publish();
-
-    expect(store()).toMatchObject({ source: 'local', updatedAt: 100 });
-    expect(messages).toEqual([null, 'Could not publish. Check your connection and try again.']);
-  });
-
-  it('sends nothing, and says so, when a relay could not be read', async () => {
-    mockHeld.set(DEFAULT_RELAYS[0], 'fail');
-    const { messages } = await publish();
-
-    expect(mockPublish).not.toHaveBeenCalled();
-    expect(store().source).toBe('local');
-    expect(messages).toEqual([null, 'Could not publish. Check your connection and try again.']);
-  });
-
-  it('dates the list after the one it replaces, saved here or held by the relays', async () => {
-    useRelayListStore.setState({ updatedAt: NOW_SEC + 600 });
-    await publish();
-    expect(sent().event.created_at).toBe(NOW_SEC + 601);
-
-    mockPublish.mockClear();
+it('detects a remote change made while signing before posting', async () => {
+  mockHeld.set(MINE, [remote([['r', MINE]])]);
+  const editor = await edit();
+  mockAfterSign.mockImplementation(() =>
     mockHeld.set(MINE, [
-      { kind: 10002, pubkey: OWN, created_at: NOW_SEC + 900, id: 'b'.repeat(64), tags: [] },
-    ]);
-    store().addRelay('wss://another.example', { read: true, write: true });
-    await publish();
-    expect(sent().event.created_at).toBe(NOW_SEC + 901);
-  });
-
-  it('refuses a list with no relay to write to, and sends nothing', async () => {
-    store().removeRelay(MINE);
-    const empty = await publish();
-    store().addRelay(MINE, { read: true, write: false });
-    const readOnly = await publish();
-
-    expect(mockPublish).not.toHaveBeenCalled();
-    expect(store().source).toBe('local');
-    for (const { messages } of [empty, readOnly])
-      expect(messages).toEqual([null, 'Add a relay to write to, or restore defaults.']);
-  });
-
-  it('keeps an edit made while publishing unpublished', async () => {
-    mockPublish.mockImplementation(({ relays }: { relays: string[] }) => {
-      store().addRelay('wss://during.example', { read: true, write: true });
-      return okAsync({ accepted: relays.map((url) => ({ url, ok: true })) });
-    });
-    await publish();
-
-    expect(store().source).toBe('local');
-    expect(store().entries.map((entry) => entry.url)).toEqual([MINE, 'wss://during.example']);
-  });
+      remote(
+        [
+          ['r', MINE],
+          ['r', OLD],
+        ],
+        'c',
+        201
+      ),
+    ])
+  );
+  const result = await editor.review([mine]).publish();
+  expect(result.isErr() && result.error.type).toBe('changed');
+  expect(mockPublish).not.toHaveBeenCalled();
 });
 
-describe('editing a list that is empty because nothing was ever chosen', () => {
-  it('adds a relay to the defaults, which are what this app writes to', () => {
-    useRelayListStore.setState({ entries: [], source: 'relay' });
-    store().addRelay(MINE, { read: true, write: true });
-    expect(store().entries.map((entry) => entry.url)).toEqual([...DEFAULT_RELAYS, MINE]);
-  });
-
-  it('keeps an empty list the person emptied themselves', () => {
-    useRelayListStore.setState({ entries: [], source: 'local' });
-    store().addRelay(MINE, { read: true, write: true });
-    expect(store().entries.map((entry) => entry.url)).toEqual([MINE]);
-  });
+it('keeps a deliberately empty remote list empty, with no defaults added', async () => {
+  mockHeld.set(MINE, [remote([])]);
+  const editor = await edit();
+  expect(editor.base).toEqual([]);
+  expect((await editor.review([mine]).publish()).isOk()).toBe(true);
+  expect(sent().event.tags).toEqual([['r', MINE]]);
 });
 
-it('keeps a later edit pending when signer lookup was started for the earlier list', async () => {
+it('offers defaults only when no published list exists', async () => {
+  const editor = await edit();
+  expect(editor.base.map((entry) => entry.url)).toEqual(DEFAULT_RELAYS);
+  expect(mockPublish).not.toHaveBeenCalled();
+});
+
+it('waits without editing or publishing after an incomplete read', async () => {
+  mockHeld.set(DEFAULT_RELAYS[0], 'fail');
+  const result = await beginRelayListEdit(relayFake(), OWN);
+  expect(result.isErr() && result.error.type).toBe('waiting');
+  expect(store().entries).toEqual([mine]);
+  expect(mockPublish).not.toHaveBeenCalled();
+});
+
+it('waits without publishing if the fresh read fails', async () => {
+  const editor = await edit();
+  mockHeld.set(DEFAULT_RELAYS[0], 'fail');
+  const result = await editor.review([mine]).publish();
+  expect(result.isErr() && result.error.type).toBe('waiting');
+  expect(mockPublish).not.toHaveBeenCalled();
+});
+
+it('rejects lists with no write relay', async () => {
+  const editor = await edit();
+  for (const proposal of [[], [{ ...mine, write: false }]]) {
+    const result = await editor.review(proposal).publish();
+    expect(result.isErr() && result.error.type).toBe('no-write-relay');
+  }
+  expect(mockPublish).not.toHaveBeenCalled();
+});
+
+it('does not report success or save the proposal when publication fails', async () => {
+  const editor = await edit();
+  mockPublish.mockReturnValue(errAsync({ type: 'all-failed', relayResults: [] }));
+  const result = await editor.review([mine]).publish();
+  expect(result.isErr() && result.error.type).toBe('failed');
+  expect(store()).toMatchObject({ source: 'local', updatedAt: 100 });
+});
+
+it('owns immutable proposals and ignores repeat taps and overlapping reviews', async () => {
+  const editor = await edit();
+  const proposal = [{ ...mine }];
+  const review = editor.review(proposal);
+  proposal[0].write = false;
+  const outcomes = await Promise.all([review.publish(), review.publish()]);
+  expect(outcomes.filter((result) => result.isOk())).toHaveLength(1);
+  expect(mockPublish).toHaveBeenCalledTimes(1);
+  expect(sent().event.tags).toEqual([['r', MINE]]);
+});
+
+it('invalidates a previous review when returning to edit', async () => {
+  const editor = await edit();
+  const old = editor.review([mine]);
+  editor.review([{ ...mine, read: false }]);
+  expect((await old.publish()).isErr()).toBe(true);
+  expect(mockPublish).not.toHaveBeenCalled();
+});
+
+it('cancels an edit and reads again on re-entry without saving its changes', async () => {
+  const editor = await edit();
+  const review = editor.review([{ ...mine, read: false }]);
+  editor.dispose();
+  expect((await review.publish()).isErr()).toBe(true);
+  mockHeld.set(MINE, [remote([['r', OLD]])]);
+  const next = await edit();
+  expect(next.base).toEqual([{ url: OLD, read: true, write: true }]);
+  expect(store().entries).toEqual([mine]);
+  expect(mockPublish).not.toHaveBeenCalled();
+});
+
+it.each(['read', 'sign', 'post-sign', 'publish'] as const)(
+  'guards a signer replacement during %s',
+  async (phase) => {
+    const ndk = relayFake();
+    const editor = await edit(ndk);
+    const replace = () => Object.assign(ndk, { signer: { user: async () => ({ pubkey: OWN }) } });
+    if (phase === 'read') replace();
+    if (phase === 'sign') mockAfterSign.mockImplementation(replace);
+    if (phase === 'post-sign')
+      mockAfterSign.mockImplementation(() => {
+        void Promise.resolve().then(() => Promise.resolve().then(replace));
+      });
+    if (phase === 'publish')
+      mockPublish.mockImplementation(({ relays }: { relays: string[] }) => {
+        replace();
+        return okAsync({ accepted: relays.map((url) => ({ url })) });
+      });
+    const result = await editor.review([mine]).publish();
+    expect(result.isErr()).toBe(true);
+    expect(mockPublish).toHaveBeenCalledTimes(phase === 'publish' ? 1 : 0);
+    expect(store()).toMatchObject({ source: 'local', updatedAt: 100 });
+  }
+);
+
+it.each(['read', 'sign', 'post-sign', 'publish'] as const)(
+  'guards an account switch during %s',
+  async (phase) => {
+    const editor = await edit();
+    const switchAccount = () => {
+      mockProfile.activeAccountIndex = 1;
+      for (const listener of mockProfileListeners) listener(mockProfile);
+    };
+    if (phase === 'read') switchAccount();
+    if (phase === 'sign') mockAfterSign.mockImplementation(switchAccount);
+    if (phase === 'post-sign')
+      mockAfterSign.mockImplementation(() => {
+        void Promise.resolve().then(() => Promise.resolve().then(switchAccount));
+      });
+    if (phase === 'publish')
+      mockPublish.mockImplementation(({ relays }: { relays: string[] }) => {
+        switchAccount();
+        return okAsync({ accepted: relays.map((url) => ({ url })) });
+      });
+    expect((await editor.review([mine]).publish()).isErr()).toBe(true);
+    expect(mockPublish).toHaveBeenCalledTimes(phase === 'publish' ? 1 : 0);
+    expect(store()).toMatchObject({ source: 'local', updatedAt: 100 });
+  }
+);
+
+it('rejects saved changes during signing and keeps them pending', async () => {
+  const editor = await edit();
+  mockAfterSign.mockImplementation(() => store().addRelay(OLD, { read: true, write: true }));
+  expect((await editor.review([mine]).publish()).isErr()).toBe(true);
+  expect(mockPublish).not.toHaveBeenCalled();
+  expect(store().entries.map((entry) => entry.url)).toEqual([MINE, OLD]);
+});
+
+it('includes learned old write destinations', async () => {
+  const untrack = trackRelaysAsked(OWN, new Set(), new Set([OLD]));
+  try {
+    const editor = await edit();
+    await editor.review([mine]).publish();
+    expect(sent().relays).toContain(OLD);
+  } finally {
+    untrack();
+  }
+});
+
+it('cancels first-run defaults and refuses defaults over any existing list or saved proposal', async () => {
+  const read = {
+    status: 'read' as const,
+    newest: undefined,
+    relays: [...DEFAULT_RELAYS],
+    asked: [...DEFAULT_RELAYS],
+  };
   const ndk = relayFake();
-  let release!: () => void;
+  expect((await publishDefaultRelayList(ndk, OWN, read, () => true)).isErr()).toBe(true);
+  useRelayListStore.setState({ hasPublished: false, source: 'default' });
+  expect((await publishDefaultRelayList(ndk, OWN, read, () => false)).isErr()).toBe(true);
+  mockHeld.set(MINE, [remote([])]);
+  expect((await publishDefaultRelayList(ndk, OWN, read, () => true)).isErr()).toBe(true);
+  expect(mockPublish).not.toHaveBeenCalled();
+});
+
+it('keeps old learned destinations after an external removal requires a new review', async () => {
+  mockHeld.set(MINE, [
+    remote([
+      ['r', MINE],
+      ['r', OLD],
+    ]),
+  ]);
+  const editor = await edit();
+  const review = editor.review([mine]);
+  mockHeld.set(MINE, [remote([['r', MINE]], 'c', 201)]);
+  const result = await review.publish();
+  expect(result.isErr() && result.error.type).toBe('changed');
+  expect((await editor.review(review.entries).publish()).isOk()).toBe(true);
+  expect(sent().relays).toContain(OLD);
+});
+
+it('invalidates an invocation when saved entries change during signer lookup', async () => {
+  const ndk = relayFake();
+  let release: (() => void) | undefined;
   const gate = new Promise<void>((resolve) => {
     release = resolve;
   });
@@ -278,110 +471,88 @@ it('keeps a later edit pending when signer lookup was started for the earlier li
       },
     },
   });
-  const pending = publishOwnRelayList(ndk, OWN, store().entries);
-  store().addRelay('wss://during.example', { read: true, write: true });
-  release();
-  await pending;
+  const pending = beginRelayListEdit(ndk, OWN);
+  store().addRelay(OLD, { read: true, write: true });
+  release?.();
+  expect((await pending).isErr()).toBe(true);
   expect(mockPublish).not.toHaveBeenCalled();
-  expect(store().source).toBe('local');
-  expect(store().entries.map((entry) => entry.url)).toEqual([MINE, 'wss://during.example']);
+  expect(store().entries.map((entry) => entry.url)).toEqual([MINE, OLD]);
 });
 
-it('does not send when signing yields to a later edit', async () => {
+it('serializes separate sessions for the same account', async () => {
   const ndk = relayFake();
-  let calls = 0;
+  const first = await edit(ndk);
+  const second = await edit(ndk);
+  const outcomes = await Promise.all([
+    first.review([mine]).publish(),
+    second.review([mine]).publish(),
+  ]);
+  expect(outcomes.filter((result) => result.isOk())).toHaveLength(1);
+  expect(mockPublish).toHaveBeenCalledTimes(1);
+});
+
+it('keeps a later saved proposal pending even if the earlier event was accepted', async () => {
+  const editor = await edit();
+  mockPublish.mockImplementation(({ relays }: { relays: string[] }) => {
+    store().addRelay(OLD, { read: true, write: true });
+    return okAsync({ accepted: relays.map((url) => ({ url })) });
+  });
+  expect((await editor.review([mine]).publish()).isErr()).toBe(true);
+  expect(store()).toMatchObject({ source: 'local', updatedAt: 100 });
+  expect(store().entries.map((entry) => entry.url)).toEqual([MINE, OLD]);
+});
+
+it('does not publish first-run defaults if another list appears during signing', async () => {
+  useRelayListStore.setState({ hasPublished: false, source: 'default' });
+  mockAfterSign.mockImplementation(() => mockHeld.set(MINE, [remote([])]));
+  const result = await publishDefaultRelayList(
+    relayFake(),
+    OWN,
+    { status: 'read', newest: undefined, relays: [...DEFAULT_RELAYS], asked: [...DEFAULT_RELAYS] },
+    () => true
+  );
+  expect(result.isErr()).toBe(true);
+  expect(mockPublish).not.toHaveBeenCalled();
+  expect(store().hasPublished).toBe(false);
+});
+
+it('retains destinations known when opening even if discovery changes during signer lookup', async () => {
+  const ndk = relayFake();
+  let release: (() => void) | undefined;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
   Object.assign(ndk, {
     signer: {
       user: async () => {
-        if (++calls === 2) store().addRelay('wss://during.example', { read: true, write: true });
+        await gate;
         return { pubkey: OWN };
       },
     },
   });
-  await publishOwnRelayList(ndk, OWN, store().entries);
-  expect(mockPublish).not.toHaveBeenCalled();
-  expect(store().source).toBe('local');
+  const untrack = trackRelaysAsked(OWN, new Set(), new Set([OLD]));
+  const pending = beginRelayListEdit(ndk, OWN);
+  untrack();
+  release?.();
+  const result = await pending;
+  if (result.isErr()) throw new Error(result.error.type);
+  editors.push(result.value);
+  await result.value.review([mine]).publish();
+  expect(sent().relays).toContain(OLD);
 });
 
-it('does not mark accepted relay publication saved after its signer is replaced', async () => {
-  const ndk = relayFake();
-  mockPublish.mockImplementation(({ relays }: { relays: string[] }) => {
-    Object.assign(ndk, { signer: { user: async () => ({ pubkey: OWN }) } });
-    return okAsync({ accepted: relays.map((url) => ({ url, ok: true })) });
+it('does not mark discovery for an account switched by a saved-list subscriber', async () => {
+  const editor = await edit();
+  const unsubscribe = useRelayListStore.subscribe((state) => {
+    if (state.source !== 'relay') return;
+    mockProfile.activeAccountIndex = 1;
+    for (const listener of mockProfileListeners) listener(mockProfile);
   });
-  await publishOwnRelayList(ndk, OWN, store().entries);
-  expect(mockPublish).toHaveBeenCalledTimes(1);
-  expect(store()).toMatchObject({ source: 'local', updatedAt: 100 });
-});
-
-it('honors cancellation before sending first-run defaults', async () => {
-  const ndk = relayFake();
-  await publishOwnRelayList(ndk, OWN, store().entries, { stillWanted: () => false });
-  expect(mockPublish).not.toHaveBeenCalled();
-  expect(store().source).toBe('local');
-});
-
-it('does not send an older rendered list after the current entries changed', async () => {
-  const rendered = store().entries;
-  store().addRelay('wss://during.example', { read: true, write: true });
-  await publishOwnRelayList(relayFake(), OWN, rendered);
-  expect(mockPublish).not.toHaveBeenCalled();
-  expect(store().entries.map((entry) => entry.url)).toContain('wss://during.example');
-});
-
-// Known quirk, NOT the approved edit semantics. No pre-edit baseline survives in
-// the relay store: [MINE,C] can mean "add C to old [MINE]" or "remove B and
-// change MINE's permission in [MINE,B]". A union would erase intentional removal.
-// The desired assertion retaining B and MINE's remote read marker failed here.
-// Left for the owner: a durable intent/baseline or a new explicit edit/review flow.
-it('known quirk: a local relay snapshot overwrites remote additions and permission changes', async () => {
-  const remoteOnly = 'wss://remote-only.example';
-  mockHeld.set(MINE, [
-    {
-      kind: 10002,
-      pubkey: OWN,
-      created_at: 200,
-      id: 'b'.repeat(64),
-      tags: [
-        ['r', MINE, 'read'],
-        ['r', remoteOnly],
-      ],
-    },
-  ]);
-  store().addRelay('wss://local-addition.example', { read: true, write: true });
-  await publish();
-  expect(sent().event.tags).toEqual([
-    ['r', MINE],
-    ['r', 'wss://local-addition.example'],
-  ]);
-});
-
-it('does not send if the signer changes after the signing helper checked it', async () => {
-  const ndk = relayFake();
-  mockAfterSign.mockImplementation(() => {
-    // The helper checks its signer before returning. Replace it in the gap
-    // between that continuation and the publisher resuming from its await.
-    void Promise.resolve().then(() =>
-      Promise.resolve().then(() => {
-        Object.assign(ndk, { signer: { user: async () => ({ pubkey: OWN }) } });
-      })
-    );
-  });
-  await publishOwnRelayList(ndk, OWN, store().entries);
-  expect(mockPublish).not.toHaveBeenCalled();
-  expect(store().source).toBe('local');
-});
-
-it('does not send if the account changes after the signing helper checked it', async () => {
-  mockAfterSign.mockImplementation(() => {
-    void Promise.resolve().then(() =>
-      Promise.resolve().then(() => {
-        mockProfile.activeAccountIndex = 1;
-        for (const listener of mockProfileListeners) listener(mockProfile);
-      })
-    );
-  });
-  await publishOwnRelayList(relayFake(), OWN, store().entries);
-  expect(mockPublish).not.toHaveBeenCalled();
-  expect(store().source).toBe('local');
+  try {
+    const result = await editor.review([mine]).publish();
+    expect(result.isErr()).toBe(true);
+    expect(store().discoveredFor).toBeNull();
+  } finally {
+    unsubscribe();
+  }
 });
