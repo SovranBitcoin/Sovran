@@ -480,6 +480,9 @@ export function createSovranNotifications(
       else if (source === 'gallery') staticPopup('no-qr-code-found');
     },
     onScanError: (source, err) => {
+      // An ambient cycle re-arms on its own and stays quiet, as its scan
+      // source keeps its failed reads quiet.
+      if (source === 'nfc' && nfcReader().holder === 'ambient') return;
       if (source === 'gallery') staticPopup('qr-scan-failed');
       else staticPopup('general-error', { failure: { service: 'app', error: err } });
     },

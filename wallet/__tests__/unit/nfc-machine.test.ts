@@ -901,3 +901,74 @@ describe("an NFC read that finishes late", () => {
     tm.assertStep("navigateToPaymentRequest");
   });
 });
+
+// A read that succeeds while a payment is being made is not taken: nothing
+// pays from it, its session is let go (unless a newer read took it over),
+// and the host hears that the scan did not go through.
+describe("an NFC read the machine is too busy to take", () => {
+  function busyTap() {
+    let finishSend: (() => void) | undefined;
+    const tap = setup({
+      operations: {
+        executeSend: vi.fn(async () => {
+          await new Promise<void>((resolve) => {
+            finishSend = resolve;
+          });
+          return { historyEntry: JSON.stringify({ id: "tx-send", type: "send" }) };
+        }),
+        executeOfflineSend: undefined,
+      },
+    });
+    const start = async () => {
+      await tap.tm.machine.startSendEcash({ reset: true });
+      const sending = tap.tm.machine.enterAmount({ value: 10, unit: "sat" }, accepted, {
+        destination: "sendEcash",
+      });
+      await vi.waitFor(() => expect(finishSend).toBeTypeOf("function"));
+      return async () => {
+        finishSend!();
+        await sending;
+      };
+    };
+    return { ...tap, start };
+  }
+
+  it("lets the session go and says the scan did not go through", async () => {
+    const tap = busyTap();
+    const done = await tap.start();
+
+    await tap.tm.machine.scan!(undefined, { source: "nfc" });
+
+    expect(sentMint(tap.tm)).toBeUndefined();
+    expect(tap.adapter.releaseSession).toHaveBeenCalledTimes(1);
+    expect(tap.tm.notificationCalls.filter((call) => call.key === "onScanError")).toEqual([
+      { key: "onScanError", data: ["nfc", expect.any(Error)] },
+    ]);
+    await done();
+    tap.tm.assertStep("sendComplete");
+  });
+
+  it("leaves the session to a read that began after it", async () => {
+    const tap = busyTap();
+    const done = await tap.start();
+    let finishRead!: (data: typeof INPUTS.paymentRequestBasic) => void;
+    tap.adapter.readPaymentRequest
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            finishRead = resolve;
+          }),
+      )
+      .mockImplementationOnce(() => new Promise(() => {}));
+    const readA = tap.tm.machine.scan!(undefined, { source: "nfc" });
+    await vi.waitFor(() => expect(finishRead).toBeTypeOf("function"));
+    void tap.tm.machine.scan!(undefined, { source: "nfc" });
+    await vi.waitFor(() => expect(tap.adapter.readPaymentRequest).toHaveBeenCalledTimes(2));
+
+    finishRead(INPUTS.paymentRequestBasic);
+    await readA;
+
+    expect(tap.adapter.releaseSession).not.toHaveBeenCalled();
+    await done();
+  });
+});

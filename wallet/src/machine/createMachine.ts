@@ -310,7 +310,18 @@ interface NfcTap {
  */
 interface ScanOrigin {
   source: string | undefined;
-  nfcRead: number | null;
+  nfc: NfcReadHandover | null;
+}
+
+/**
+ * An NFC read handed to the machine with its tag session. A tap that takes
+ * it ends the session (`endNfcTap`); a read no tap took (its turn was
+ * dropped while money moved, or the input was not run) is let go by the scan
+ * that read it.
+ */
+interface NfcReadHandover {
+  read: number;
+  taken: "no" | "tap" | "dropped";
 }
 
 /**
@@ -1101,11 +1112,39 @@ export function createPaymentMachine(
   async function releaseNfcSession(tap: NfcTap): Promise<void> {
     if (tap.session === "released") return;
     tap.session = "released";
-    if (tap.read !== nfcRead) {
+    await releaseNfcRead(tap.adapter, tap.read);
+  }
+
+  /** Lets go of a read's tag session unless a newer read took it over. */
+  async function releaseNfcRead(
+    adapter: NfcIOAdapter,
+    read: number,
+  ): Promise<void> {
+    if (read !== nfcRead) {
       logger.info("machine.nfc.release.skipped", { reason: "newerRead" });
       return;
     }
-    await tap.adapter.releaseSession();
+    await adapter.releaseSession();
+  }
+
+  /**
+   * After a scan: an NFC read no tap took still holds its tag session, so it
+   * lets go of it here. One the machine dropped because a payment was being
+   * made tells the host the scan did not go through.
+   */
+  async function endUntakenNfcRead(origin: ScanOrigin): Promise<void> {
+    const handover = origin.nfc;
+    if (!handover || handover.taken === "tap" || !nfcAdapter) return;
+    logger.info("machine.nfc.read.notTaken", { reason: handover.taken });
+    await releaseNfcRead(nfcAdapter, handover.read).catch((error: unknown) => {
+      logger.warn("machine.nfc.release.failed", { error: errField(error) });
+    });
+    if (handover.taken === "dropped") {
+      void notifications?.onScanError?.(
+        "nfc",
+        new Error("NFC read not taken: a payment is in progress"),
+      );
+    }
   }
 
   /**
@@ -1137,7 +1176,10 @@ export function createPaymentMachine(
     origin: ScanOrigin | null,
   ): Promise<void> => {
     const sendGeneration = beginTurn(event.type);
-    if (sendGeneration === null) return;
+    if (sendGeneration === null) {
+      if (origin?.nfc) origin.nfc.taken = "dropped";
+      return;
+    }
     // This caller's result holder, taken before anything awaits: only this
     // turn's own send settles it, so a tap that sends nothing stays
     // `ignored` whatever a later turn delivers.
@@ -1467,16 +1509,19 @@ export function createPaymentMachine(
       let unit = getUnit?.() ?? configUnit;
       let nfcError: StepDataMap["error"] | undefined;
       const nfcTap: NfcTap | null =
-        event.type === "EXECUTE" && origin?.nfcRead != null && nfcAdapter
+        event.type === "EXECUTE" && origin?.nfc && nfcAdapter
           ? {
               input: event.input,
               adapter: nfcAdapter,
-              read: origin.nfcRead,
+              read: origin.nfc.read,
               session: "held",
               unitSwitch: null,
             }
           : null;
-      if (nfcTap) latestNfcTap = nfcTap;
+      if (nfcTap && origin?.nfc) {
+        origin.nfc.taken = "tap";
+        latestNfcTap = nfcTap;
+      }
       // Every read of the wallet context below goes through `readContext`,
       // which keeps the balances in the unit the tap switched the host to.
       const readContext = (): ReturnType<typeof getContext> => {
@@ -2447,11 +2492,15 @@ export function createPaymentMachine(
           // An NFC read takes the tag session over from any read before it.
           const origin: ScanOrigin = {
             source: scanSource,
-            nfcRead: scanSource === "nfc" ? ++nfcRead : null,
+            nfc: scanSource === "nfc" ? { read: ++nfcRead, taken: "no" } : null,
           };
 
           if (hasData) {
-            return processScanData(data, origin);
+            try {
+              return await processScanData(data, origin);
+            } finally {
+              await endUntakenNfcRead(origin);
+            }
           }
 
           const source = options?.source ?? "clipboard";
@@ -2491,7 +2540,11 @@ export function createPaymentMachine(
             return { urInProgress: false };
           }
           if ("data" in result && result.data) {
-            return processScanData(result.data, origin);
+            try {
+              return await processScanData(result.data, origin);
+            } finally {
+              await endUntakenNfcRead(origin);
+            }
           }
 
           return { urInProgress: false };

@@ -12,6 +12,7 @@
 
 import { Platform } from 'react-native';
 import NfcManager from 'react-native-nfc-manager';
+import { createPaymentMachine } from 'wallet';
 
 import { runTapToPayScan } from '@/features/send/lib/runTapToPayScan';
 import {
@@ -20,7 +21,7 @@ import {
 } from '@/features/send/lib/sovranPaymentConfig';
 import { NfcError, holdNfcReader, nfcReader } from '@/shared/lib/nfc';
 import { acquireSession } from '@/shared/lib/nfc/session';
-import { paramPopup } from '@/shared/lib/popup';
+import { paramPopup, staticPopup } from '@/shared/lib/popup';
 import { usePopupStore } from '@/shared/stores/runtime/popupStore';
 import { useNfcTapStore } from '@/shared/stores/runtime/nfcTapStore';
 
@@ -270,5 +271,81 @@ describe('an explicit Tap to pay press', () => {
     expect(native.cancelTechnologyRequest).toHaveBeenCalledTimes(cancels + 1);
     answer();
     await run;
+  });
+});
+
+// A read that succeeds while a payment is being made is not taken by the
+// payment machine: its session is let go at once, and an explicit press is
+// told to try again, while an ambient cycle stays quiet.
+describe('a read the payment machine is too busy to take', () => {
+  const REQUEST =
+    'creqApGF0gaNhdGRwb3N0YWF4GWh0dHBzOi8vbWludDEuZXhhbXBsZS5jb21hZ/dhYRhkYXVjc2F0YW2BeBlodHRwczovL21pbnQxLmV4YW1wbGUuY29t';
+  const MINT = 'https://mint1.example.com';
+
+  async function busyMachine() {
+    const adapter = {
+      readPaymentRequest: jest.fn(async () => {
+        await acquireSession();
+        return REQUEST;
+      }),
+      writeToken: jest.fn(async () => undefined),
+      releaseSession: jest.fn(async () => undefined),
+      isAvailable: jest.fn(async () => true),
+    };
+    let finishSend!: () => void;
+    const machine = createPaymentMachine({
+      handlers: {},
+      getContext: () => ({
+        trustedMintUrls: [MINT],
+        mintBalances: { [MINT]: 1000 },
+        proofAmounts: {},
+      }),
+      getUnit: () => 'sat',
+      nfcAdapter: adapter,
+      notifications: createSovranNotifications(),
+      scanSources: createSovranScanSources(adapter),
+      operations: {
+        executeSend: jest.fn(
+          () =>
+            new Promise<{ historyEntry: string }>((resolve) => {
+              finishSend = () => resolve({ historyEntry: '{"id":"tx-1","type":"send"}' });
+            })
+        ),
+        executeMintQuote: jest.fn(),
+        buildMintListItems: jest.fn(async () => []),
+        executeNfcSend: jest.fn(),
+      },
+    });
+    await machine.startSendEcash({ reset: true });
+    const sending = machine.enterAmount({ value: 10, unit: 'sat' }, MINT, {
+      destination: 'sendEcash',
+    });
+    for (let i = 0; i < 50 && finishSend === undefined; i += 1) await settle();
+    return { machine, adapter, done: () => (finishSend(), sending) };
+  }
+
+  it('lets the session go and asks an explicit press to try again', async () => {
+    const { machine, adapter, done } = await busyMachine();
+    const releasePress = holdNfcReader('explicit');
+
+    await machine.scan!(undefined, { source: 'nfc' });
+
+    expect(adapter.releaseSession).toHaveBeenCalledTimes(1);
+    expect(staticPopup).toHaveBeenCalledWith('general-error', expect.anything());
+    expect(adapter.writeToken).not.toHaveBeenCalled();
+    releasePress();
+    await done();
+  });
+
+  it('lets the session go quietly during an ambient cycle', async () => {
+    const { machine, adapter, done } = await busyMachine();
+    const releaseAmbient = holdNfcReader('ambient');
+
+    await machine.scan!(undefined, { source: 'nfc' });
+
+    expect(adapter.releaseSession).toHaveBeenCalledTimes(1);
+    expect(staticPopup).not.toHaveBeenCalled();
+    releaseAmbient();
+    await done();
   });
 });

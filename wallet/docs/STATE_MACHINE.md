@@ -309,7 +309,10 @@ begins and travels with the scanned input (`ScanOrigin`), so a read that
 finishes after a newer one began keeps its own identity, and a read the
 machine did not take never turns a later input into a tap. The host's adapter
 releases a session only for a read that failed; after a read, releasing is
-the tap's alone, a failed write included. A `confirmPaymentRequest()` call's result is settled only by its own
+the tap's alone, a failed write included. A read no tap took (its EXECUTE was
+dropped while money moved, or its input was not run) is let go by the scan
+that read it, under the same newer-read rule, and one dropped while money
+moved fires `onScanError('nfc')` (`endUntakenNfcRead`). A `confirmPaymentRequest()` call's result is settled only by its own
 turn, so a tap that sent nothing resolves `ignored`.
 
 Gather order is fixed: amount -> mint -> proofs -> terminal
