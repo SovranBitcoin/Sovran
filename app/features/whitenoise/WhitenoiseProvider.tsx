@@ -15,10 +15,28 @@ import { WhitenoiseContext, type WhitenoiseContextValue } from './WhitenoiseCont
 
 type WhitenoiseHandle = {
   value: WhitenoiseContextValue;
-  disposeSigner: (() => void) | null;
-  shutdown: (() => Promise<void>) | null;
-  release: (() => void) | null;
+  /** Stop invitation admission and drain the client, keeping it held (the switch service). */
+  stop: () => Promise<void>;
+  /**
+   * Let the client go. `switch` (an in-process profile switch): stop, then
+   * release. `unmount`: drop the listeners — defense-in-depth against a
+   * detached subtree emitting into the dead client — and zero the signer's
+   * owned copy of the nsec at once, since Hermes does not zero freed memory
+   * on GC (audit 33.json F-004). One shared `try` means a throwing
+   * `removeAllListeners` skips the disposal below it — long-standing
+   * behaviour, preserved here — but nothing escapes the unmount.
+   */
+  close: (mode: 'switch' | 'unmount') => Promise<void>;
 };
+
+/** The handle when there is no key or NDK yet, or the client failed to build. */
+function inertHandle(accountIndex: number): WhitenoiseHandle {
+  return {
+    value: { client: null, inviteReader: null, relays: defaultRelays, accountIndex },
+    stop: async () => undefined,
+    close: async () => undefined,
+  };
+}
 
 /**
  * Build the Whitenoise client + invite reader for one account, or an inert
@@ -36,14 +54,7 @@ function createWhitenoiseHandle({
   privateKey: Uint8Array | undefined;
   ndk: ReturnType<typeof useNDK>['ndk'];
 }): WhitenoiseHandle {
-  if (!privateKey || !ndk) {
-    return {
-      value: { client: null, inviteReader: null, relays: defaultRelays, accountIndex },
-      disposeSigner: null,
-      shutdown: null,
-      release: null,
-    };
-  }
+  if (!privateKey || !ndk) return inertHandle(accountIndex);
   try {
     const { client, disposeSigner, shutdown, release } = createWhitenoiseClient({
       accountIndex,
@@ -57,61 +68,39 @@ function createWhitenoiseHandle({
     });
     const reader = profileSwitchResource(inviteReader);
     wnLog.info('whitenoise.client.created', { accountIndex });
+    const stop = async () => {
+      // Stop invitation admission, then drain its decrypt/storage work before zeroing keys.
+      await reader.stop();
+      inviteReader.removeAllListeners();
+      await shutdown();
+    };
     return {
       value: { client, inviteReader: reader.value, relays: defaultRelays, accountIndex },
-      disposeSigner,
-      shutdown: async () => {
-        // Stop invitation admission, then drain its decrypt/storage work before zeroing keys.
-        await reader.stop();
-        inviteReader.removeAllListeners();
-        await shutdown();
-      },
-      release: () => {
-        reader.release();
-        release();
+      stop,
+      close: async (mode) => {
+        if (mode === 'switch') {
+          await stop();
+          reader.release();
+          release();
+          return;
+        }
+        try {
+          client.removeAllListeners();
+          reader.value.removeAllListeners();
+          disposeSigner();
+          wnLog.info('whitenoise.client.disposed', { accountIndex });
+        } catch (err) {
+          wnLog.warn('whitenoise.client.dispose_failed', {
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
       },
     };
   } catch (err) {
     wnLog.error('whitenoise.client.create_failed', {
       error: err instanceof Error ? err.message : String(err),
     });
-    return {
-      value: { client: null, inviteReader: null, relays: defaultRelays, accountIndex },
-      disposeSigner: null,
-      shutdown: null,
-      release: null,
-    };
-  }
-}
-
-/**
- * Drop the client's listeners and zero the signer's owned copy of the nsec.
- *
- * At module scope: the body's optional calls and ternary sit inside a
- * try/catch, which React Compiler cannot lower. One shared `try` means a
- * throwing `removeAllListeners` skips the disposal below it — long-standing
- * behaviour, preserved here — but nothing escapes the unmount.
- */
-function disposeWhitenoiseHandle({
-  client,
-  inviteReader,
-  disposeSigner,
-  accountIndex,
-}: {
-  client: WhitenoiseContextValue['client'];
-  inviteReader: WhitenoiseContextValue['inviteReader'];
-  disposeSigner: (() => void) | null;
-  accountIndex: number;
-}): void {
-  try {
-    client?.removeAllListeners();
-    inviteReader?.removeAllListeners();
-    disposeSigner?.();
-    wnLog.info('whitenoise.client.disposed', { accountIndex });
-  } catch (err) {
-    wnLog.warn('whitenoise.client.dispose_failed', {
-      error: err instanceof Error ? err.message : String(err),
-    });
+    return inertHandle(accountIndex);
   }
 }
 
@@ -135,46 +124,25 @@ export function WhitenoiseProvider({
   );
 
   const value = handle.value;
+  // A provider re-keyed or replaced (privateKey or ndk change) lets its
+  // client go: drained and released on an in-process profile switch, after
+  // descendants have removed their listeners; zeroed at once otherwise.
   useEffect(() => {
     let released = false;
-    const stop = async () => {
-      await handle.shutdown?.();
-    };
     const dispose = async () => {
-      await stop();
-      handle.release?.();
+      await handle.close('switch');
       released = true;
       unregisterHolder();
     };
     const unregisterHolder = registerAccountScoped('whitenoise.client', dispose, () => released);
-    const unregisterService = registerProfileSwitchService('whitenoise', stop);
+    const unregisterService = registerProfileSwitchService('whitenoise', handle.stop);
     return () => {
       unregisterService();
       if (useSettingsStore.getState().inProcessProfileSwitch) {
-        // Async release runs after descendants have removed their listeners.
         void dispose().catch(() => wnLog.warn('whitenoise.shutdown.failed'));
       } else {
         unregisterHolder();
-      }
-    };
-  }, [handle]);
-
-  // When the memoized client/inviteReader is replaced (privateKey or ndk
-  // change) or the provider unmounts (profile-switch React-key remount):
-  // (1) drop EventEmitter listeners — defense-in-depth against a detached
-  // subtree emitting into the dead client; (2) zero the signer's owned copy
-  // of the user's nsec — Hermes does not zero freed memory on GC, so the
-  // raw key bytes would otherwise sit in process memory until the slab is
-  // reused. Audit 33.json F-004.
-  useEffect(() => {
-    const { client, inviteReader, accountIndex: idx } = handle.value;
-    const { disposeSigner } = handle;
-    if (!client && !inviteReader && !disposeSigner) return;
-    return () => {
-      if (useSettingsStore.getState().inProcessProfileSwitch) {
-        return;
-      } else {
-        disposeWhitenoiseHandle({ client, inviteReader, disposeSigner, accountIndex: idx });
+        void handle.close('unmount');
       }
     };
   }, [handle]);
