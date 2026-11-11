@@ -14,7 +14,6 @@
  * cipher path.
  */
 
-import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { z } from 'zod';
 
 import { GeohashChatScreen } from '@/features/bitchat/screens/GeohashChatScreen';
@@ -53,7 +52,6 @@ function BitchatDMRoute() {
       transport={params.transport}
       dmPeerID={params.peerID}
       dmNickname={params.nickname}
-      onBack={() => router.back()}
     />
   );
 }
