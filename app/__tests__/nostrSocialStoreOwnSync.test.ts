@@ -1,9 +1,13 @@
 /**
  * Unit tests for nostrSocialStore's own-events ingest path (used by
  * useOwnEventsSync): global upsert of likes/reposts/replies, kind:5 deletions,
- * and the replied index.
+ * the replied index, and the follow list's states decoded from the saved fields.
  */
-import { useNostrSocialStore } from '@/shared/stores/profile/nostrSocialStore';
+import {
+  selectContactList,
+  selectFollowIntents,
+  useNostrSocialStore,
+} from '@/shared/stores/profile/nostrSocialStore';
 
 jest.mock('@/shared/lib/logger', () => ({
   storeLog: { info: jest.fn(), debug: jest.fn(), warn: jest.fn(), error: jest.fn() },
@@ -71,5 +75,77 @@ describe('nostrSocialStore own-events ingest', () => {
     expect(next.engagementByEventId.t1.liked).toBeUndefined(); // like deleted → un-highlight
     expect(next.engagementByEventId.t1.reposted?.ownEventId).toBe('repost-keep'); // sibling kept
     expect(next.engagementByEventId.t3).toBeUndefined(); // last action gone → record dropped
+  });
+});
+
+describe('nostrSocialStore follow list', () => {
+  const X = 'b1'.repeat(32);
+  const T = 1_700_000_000;
+
+  beforeEach(() => {
+    useNostrSocialStore.setState(useNostrSocialStore.getInitialState(), true);
+  });
+
+  it('decodes the saved fields', () => {
+    expect(selectContactList(useNostrSocialStore.getState())).toEqual({ status: 'unknown' });
+    useNostrSocialStore.getState().seedFollowsFromFacade({ follows: [X], createdAtSec: T });
+    expect(selectContactList(useNostrSocialStore.getState())).toEqual({
+      status: 'seeded',
+      updatedAt: T,
+    });
+    useNostrSocialStore.getState().setContactsFromRelay({
+      tags: [
+        ['p', X],
+        ['t', 'a'],
+      ],
+      content: 'c',
+      createdAtSec: T,
+    });
+    expect(selectContactList(useNostrSocialStore.getState())).toEqual({
+      status: 'authoritative',
+      tags: [
+        ['p', X],
+        ['t', 'a'],
+      ],
+      content: 'c',
+      updatedAt: T,
+    });
+    // A newer seed with fewer follows: the saved tags are no longer the list.
+    useNostrSocialStore.getState().seedFollowsFromFacade({ follows: [], createdAtSec: T + 1 });
+    expect(selectContactList(useNostrSocialStore.getState())).toEqual({
+      status: 'seeded',
+      updatedAt: T + 1,
+    });
+  });
+
+  it('reads a pending entry, also one saved before a restart, as an outstanding intent', () => {
+    useNostrSocialStore.setState({
+      optimisticFollowsByPubkey: {
+        [X]: { value: false, pending: true, updatedAt: 3 },
+        settled: { value: true, pending: false, updatedAt: 4 },
+      },
+    });
+    expect(selectFollowIntents(useNostrSocialStore.getState())).toEqual({
+      [X]: { value: false, pending: true, updatedAt: 3 },
+    });
+  });
+
+  it('settles an intent only if no newer tap replaced it', () => {
+    const s = useNostrSocialStore.getState();
+    s.setFollowIntent(X, true);
+    const applied = selectFollowIntents(useNostrSocialStore.getState());
+    s.setFollowIntent('other', true);
+    s.settleFollowIntents(applied);
+    expect(Object.keys(useNostrSocialStore.getState().optimisticFollowsByPubkey)).toEqual([
+      'other',
+    ]);
+
+    const stale = { [X]: { value: false, pending: true, updatedAt: 1 } };
+    s.setFollowIntent(X, true);
+    s.settleFollowIntents(stale);
+    expect(useNostrSocialStore.getState().optimisticFollowsByPubkey[X]).toMatchObject({
+      value: true,
+      pending: true,
+    });
   });
 });

@@ -38,11 +38,36 @@ type EngagementRecord = {
  */
 const MAX_ENGAGEMENT_ENTRIES = 5000;
 
+/**
+ * One person's follow as the person last asked for it. `pending: true` is an
+ * intent not yet published in a follow list: a desired state, also after a
+ * restart, never proof that a publish is running (that lives in memory, in
+ * `followSync`). `pending: false` is only in data older releases wrote; it is
+ * shown until the follow list agrees with it.
+ */
 type FollowOptimisticState = {
   value: boolean;
   pending: boolean;
   updatedAt: number;
 };
+
+/**
+ * The account's own follow list as the saved fields can vouch for it.
+ *
+ * - `unknown`: nothing loaded from anywhere.
+ * - `seeded`: the follow set came from nagg or Primal (pubkeys only) and the
+ *   saved raw list does not match it, so the raw list is missing or older.
+ * - `authoritative`: the saved raw list is the one the follow set was read
+ *   from, at `updatedAt`; a follow can be built on it.
+ *
+ * Decoded from the saved fields, which stay as they are. The stamp is shared:
+ * a seed with exactly the saved list's follows reads as `authoritative` at the
+ * seed's time while its tags are the older list's.
+ */
+export type ContactList =
+  | { status: 'unknown' }
+  | { status: 'seeded'; updatedAt: number }
+  | { status: 'authoritative'; tags: string[][]; content: string; updatedAt: number };
 
 type EngagementOptimisticState = {
   value: boolean;
@@ -121,15 +146,19 @@ interface NostrSocialActions {
   /**
    * Seed the read-side follow set from the tiered facade's social-graph bundle
    * (nagg → Primal → relay). Read-only accelerator: it sets `followingPubkeys`
-   * and bumps the LWW gate but NEVER writes `contactsTags`/`content` — the raw
-   * kind-3 from `useOwnEventsSync`'s relay sub stays the write-authoritative
-   * source for follow/unfollow re-publish (it preserves relay hints + petnames
-   * the facade's parsed `follows` drop). LWW-gated by the kind-3 `created_at` so
-   * a facade seed and a relay delta can't fight — the newer contact list wins.
+   * and bumps the LWW gate but NEVER writes `contactsTags`/`content` — the
+   * facade's parsed `follows` drop the relay hints and petnames, so only a raw
+   * kind-3 can be built on (see `selectContactList`). LWW-gated by the kind-3
+   * `created_at` so a facade seed and a relay delta can't fight — the newer
+   * contact list wins.
    */
   seedFollowsFromFacade: (params: { follows: string[]; createdAtSec: number }) => void;
   setFollowOptimistic: (pubkey: string, value: boolean, pending: boolean) => void;
   clearFollowOptimistic: (pubkey: string) => void;
+  /** Record the person's tap; `followSync` publishes it. */
+  setFollowIntent: (pubkey: string, value: boolean) => void;
+  /** Drop the given intents, each only if no newer tap replaced it. */
+  settleFollowIntents: (intents: Record<string, FollowOptimisticState>) => void;
   clearSettledFollowOptimistic: () => void;
 
   markRepostDeleted: (originalEventId: string) => void;
@@ -488,6 +517,32 @@ export const useNostrSocialStore = create<NostrSocialStore>({
         }));
       },
 
+      setFollowIntent: (pubkey, value) => {
+        storeLog.debug('social.follow.intent', { pubkey: pubkey.slice(0, 8), value });
+        set((state) => ({
+          optimisticFollowsByPubkey: withOptimisticEntry(state.optimisticFollowsByPubkey, pubkey, {
+            value,
+            pending: true,
+          }),
+        }));
+      },
+
+      settleFollowIntents: (intents) => {
+        set((state) => {
+          let next = state.optimisticFollowsByPubkey;
+          for (const [pubkey, intent] of Object.entries(intents)) {
+            const current = next[pubkey];
+            if (current?.value === intent.value && current.updatedAt === intent.updatedAt)
+              next = omitKey(next, pubkey);
+          }
+          if (next === state.optimisticFollowsByPubkey) return state;
+          storeLog.debug('social.follow.intent.settled', {
+            settled: Object.keys(state.optimisticFollowsByPubkey).length - Object.keys(next).length,
+          });
+          return { optimisticFollowsByPubkey: next };
+        });
+      },
+
       clearSettledFollowOptimistic: () => {
         set((state) => {
           const next: Record<string, FollowOptimisticState> = {};
@@ -735,6 +790,32 @@ export const useNostrSocialStore = create<NostrSocialStore>({
 // ---------------------------------------------------------------------------
 // Selectors
 // ---------------------------------------------------------------------------
+
+export function selectContactList(state: NostrSocialState): ContactList {
+  const listed = extractFollowingFromTags(state.contactsTags);
+  const shown = Object.keys(state.followingPubkeys);
+  const agree =
+    shown.length === Object.keys(listed).length && shown.every((pubkey) => listed[pubkey]);
+  if (!agree) return { status: 'seeded', updatedAt: state.contactsUpdatedAt };
+  if (state.contactsUpdatedAt === 0 && state.contactsTags.length === 0 && !state.contactsContent)
+    return { status: 'unknown' };
+  return {
+    status: 'authoritative',
+    tags: state.contactsTags,
+    content: state.contactsContent,
+    updatedAt: state.contactsUpdatedAt,
+  };
+}
+
+/** Follows and unfollows the person asked for that no published list holds yet. */
+export function selectFollowIntents(
+  state: NostrSocialState
+): Record<string, FollowOptimisticState> {
+  const intents: Record<string, FollowOptimisticState> = {};
+  for (const [pubkey, entry] of Object.entries(state.optimisticFollowsByPubkey))
+    if (entry.pending) intents[pubkey] = entry;
+  return intents;
+}
 
 export const selectIsFollowingPubkey = (pubkey: string) => (state: NostrSocialStore) => {
   const optimistic = state.optimisticFollowsByPubkey[pubkey];
