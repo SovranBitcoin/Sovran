@@ -1,7 +1,5 @@
-import {
-  computeRebalancePlan,
-  MIN_FEE_RESERVE,
-} from '@/features/mint/components/rebalance/rebalancePlanner';
+import { computeRebalancePlan } from '@/features/mint/components/rebalance/rebalancePlanner';
+import { MIN_FEE_RESERVE } from '@/features/mint/components/rebalance/transferFee';
 
 jest.mock('@/shared/stores/profile/mintDistributionStore', () => ({
   TOTAL_BASIS_POINTS: 10_000,
