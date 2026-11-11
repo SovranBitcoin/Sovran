@@ -377,6 +377,10 @@ export function useAiSend() {
         { warnAtMs: 15_000, errorAtMs: 60_000 }
       );
 
+      // Set once the answer settles. Its turn may then be gone (a finished
+      // answer reads from its saved message), so a failure after that, in the
+      // title or the cost log, must not give it a new, failed one.
+      let settled = false;
       try {
         // Text chars + image-part count — never serialises base64 payloads
         // into a log line.
@@ -862,6 +866,7 @@ export function useAiSend() {
             ...(costSats != null && costSats > 0 ? { costSats } : {}),
           });
         }
+        settled = true;
         dispatchTurn(
           assistantMessageId,
           finalizePayload
@@ -912,6 +917,11 @@ export function useAiSend() {
         span.end({ outcome: 'ok', chunks: chunkCount, chars: fullContent.length });
       } catch (err: any) {
         if (useProfileStore.getState().activeAccountIndex !== profile) return;
+        if (settled) {
+          aiLog.warn('ai.send.failed_after_answer', { flowId });
+          span.end({ outcome: 'ok' });
+          return;
+        }
         if (isAbortError(err) || controller.signal.aborted) {
           aiLog.info('ai.send.aborted', { flowId });
           // The answer stays, with what had arrived, and can be asked again:

@@ -2,7 +2,14 @@
  * Where one AI answer stands (`nextTurn`), and how a saved answer with no
  * turn reads (`readAnswer`).
  */
-import { nextTurn, readAnswer, type Turn } from '@/features/ai/lib/turns';
+import {
+  dispatchTurn,
+  getTurn,
+  nextTurn,
+  readAnswer,
+  resetTurns,
+  type Turn,
+} from '@/features/ai/lib/turns';
 
 const error = { id: 'routstr.interrupted' as const, text: 'x' };
 const asking: Turn = { phase: 'asking', startedAtMs: 5 };
@@ -79,5 +86,56 @@ describe('a saved answer with no turn', () => {
 
   it('reads as its turn while there is one', () => {
     expect(readAnswer({ ...message, content: '' }, streaming)).toBe(streaming);
+  });
+});
+
+describe('which turns are kept', () => {
+  beforeEach(() => resetTurns());
+
+  /** One answer asked and settled by `event`. */
+  function settle(id: string, event: Parameters<typeof dispatchTurn>[1]) {
+    dispatchTurn(id, { type: 'asked', startedAtMs: 1 });
+    dispatchTurn(id, event);
+  }
+
+  it('drops a finished answer, whose saved message then reads the same', () => {
+    settle('a', { type: 'answered', truncation: null });
+    expect(getTurn('a')).toBeUndefined();
+    expect(
+      readAnswer({ id: 'a', role: 'assistant', timestamp: 1, content: 'yes' }, getTurn('a'))
+    ).toEqual({
+      phase: 'done',
+      truncation: null,
+    });
+  });
+
+  it('keeps a finished answer the budget cut short, since the saved message does not say so', () => {
+    settle('a', { type: 'answered', truncation: { budgetTokens: 9 } });
+    expect(getTurn('a')).toEqual({ phase: 'done', truncation: { budgetTokens: 9 } });
+  });
+
+  it('keeps the 24 latest failed, interrupted or cut-short answers, never a live one', () => {
+    dispatchTurn('live', { type: 'asked', startedAtMs: 1 });
+    for (let i = 0; i < 30; i++)
+      settle(`t${i}`, i % 2 ? { type: 'failed', error } : { type: 'interrupted' });
+
+    expect(getTurn('live')).toEqual({ phase: 'asking', startedAtMs: 1 });
+    for (let i = 0; i < 6; i++) expect(getTurn(`t${i}`)).toBeUndefined();
+    for (let i = 6; i < 30; i++) expect(getTurn(`t${i}`)).toBeDefined();
+    // A dropped one reads from its saved message, as one asked before this run.
+    expect(
+      readAnswer({ id: 't1', role: 'assistant', timestamp: 1, content: '' }, getTurn('t1'))
+    ).toEqual({
+      phase: 'interrupted',
+      text: '',
+    });
+  });
+
+  it('counts an answer asked again as the latest', () => {
+    for (let i = 0; i < 24; i++) settle(`t${i}`, { type: 'interrupted' });
+    settle('t0', { type: 'interrupted' });
+    settle('new', { type: 'interrupted' });
+    expect(getTurn('t0')).toBeDefined();
+    expect(getTurn('t1')).toBeUndefined();
   });
 });

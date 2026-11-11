@@ -418,7 +418,33 @@ describe('streaming an answer', () => {
     expect(history()[0]!.pending).toBe(false);
     expect(bubble.result.current).toEqual({ text: null, thinking: null });
     expect(hook.result.current.isSending).toBe(false);
-    expect(getTurn(assistantId)).toEqual({ phase: 'done', truncation: null });
+    // The saved message holds the answer, so its turn is dropped and it reads from there.
+    expect(getTurn(assistantId)).toBeUndefined();
+    expect(readAnswer(history()[1]!, getTurn(assistantId))).toEqual({
+      phase: 'done',
+      truncation: null,
+    });
+  });
+
+  it('a failure after the answer settled does not mark the finished answer failed', async () => {
+    const { updateSessionTitle } = useRoutstrStore.getState();
+    useRoutstrStore.setState({
+      isAnonymousMode: false,
+      updateSessionTitle: () => {
+        throw new Error('title');
+      },
+    });
+    const { assistantId, sending } = await startSend();
+
+    await act(async () => {
+      live.push(content('Done.'));
+      live.end();
+      await sending();
+    });
+
+    useRoutstrStore.setState({ updateSessionTitle });
+    expect(getTurn(assistantId)).toBeUndefined();
+    expect(readAnswer(history()[1]!, getTurn(assistantId)).phase).toBe('done');
   });
 
   it('what is saved mid-stream: the session holds the pending question and an empty answer', async () => {

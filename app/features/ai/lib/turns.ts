@@ -13,6 +13,11 @@ import { registerAccountScoped } from '@/shared/lib/account/accountRegistry';
  * gets the answer in one write when it is complete. A saved answer with no
  * turn was asked in an earlier run, or by an older build: `readAnswer` decodes
  * it, an empty one as interrupted.
+ *
+ * So a turn is kept only while it says more than its saved message: a
+ * finished answer is dropped once it settles (the saved message holds it),
+ * and of the failed, interrupted and cut-short ones only the latest
+ * `MAX_SETTLED_TURNS` are kept; one dropped reads from its saved message.
  */
 import { useSyncExternalStore } from 'react';
 
@@ -95,6 +100,10 @@ export function nextTurn(turn: Turn | undefined, event: TurnEvent): Turn | undef
   }
 }
 
+/** How many settled turns that say more than their saved message are kept. */
+const MAX_SETTLED_TURNS = 24;
+
+/** In the order they last moved, oldest first. */
 const turns = new Map<string, Turn>();
 const listeners = new Set<() => void>();
 
@@ -102,12 +111,26 @@ function notify(): void {
   for (const listener of listeners) listener();
 }
 
+/** Drop the oldest settled turns past `MAX_SETTLED_TURNS`; a live one is never dropped. */
+function dropOldestSettled(): void {
+  let settled = 0;
+  for (const turn of turns.values()) if (!isTurnLive(turn)) settled++;
+  for (const [messageId, turn] of turns) {
+    if (settled <= MAX_SETTLED_TURNS) return;
+    if (isTurnLive(turn)) continue;
+    turns.delete(messageId);
+    settled--;
+  }
+}
+
 /** Move `messageId`'s turn by `event`. */
 export function dispatchTurn(messageId: string, event: TurnEvent): void {
   const current = turns.get(messageId);
   const next = nextTurn(current, event);
   if (next === current || !next) return;
-  turns.set(messageId, next);
+  turns.delete(messageId);
+  if (next.phase !== 'done' || next.truncation !== null) turns.set(messageId, next);
+  dropOldestSettled();
   notify();
 }
 
