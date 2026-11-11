@@ -21,7 +21,10 @@
 import { afterEach, describe, it, expect, vi } from "vitest";
 import { getDecodedToken } from "@cashu/cashu-ts";
 
-import { createDefaultScreenActionHandlers } from "../../src/screen-actions/defaultHandlers";
+import {
+  createDefaultScreenActionHandlers,
+  startNewEcashSendIfFinished,
+} from "../../src/screen-actions/defaultHandlers";
 import { createScreenActionManager } from "../../src/screen-actions/createManager";
 import { deriveMintMethodCapabilityMapFromTrustedMints } from "../../src/mint-capabilities";
 import { setLogger } from "../../src/logger";
@@ -107,6 +110,7 @@ function createMockConfig(overrides?: {
     enterAmount: vi.fn(async () => {}),
     reviewMint: vi.fn(async () => {}),
     getContext: vi.fn(() => ({ unit: "sat" })),
+    getStep: vi.fn(() => "enterAmount" as const),
     ...overrides?.machine,
   };
 
@@ -1815,5 +1819,110 @@ describe("three-tier fallback", () => {
     await mgr.execute("trust");
 
     expect(ops.trustMint).toHaveBeenCalledWith(MINT1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The amount screen of an ecash send that finished
+// ---------------------------------------------------------------------------
+
+// The token screen sits over the amount screen that made it. Going Back and
+// entering another amount, or choosing a mint there, is a new token the
+// person asked for: it starts a new send, and the finished one stays as it
+// is (`settled-preview-final.test.ts` pins that a bare amount or mint on it
+// changes nothing).
+describe("amount screen after its ecash send finished", () => {
+  const sends = (tm: ReturnType<typeof createTestMachine>) =>
+    tm.operationCalls.filter(
+      (call) => call.name === "executeSend" || call.name === "executeOfflineSend",
+    );
+
+  function amountScreen(
+    tm: ReturnType<typeof createTestMachine>,
+    entry: Record<string, unknown> = {},
+  ) {
+    const handlers = createDefaultScreenActionHandlers({
+      getMachine: () => tm.machine,
+      getOperations: () => undefined,
+      notify: () => {},
+      navigation: { goBack: vi.fn() },
+    });
+    const enter = async (value: number) => {
+      const { mgr } = createManager("amountEntry", handlers, {
+        destination: "sendEcash",
+        unit: "sat",
+        selectedMintUrl: MINT1,
+        effectiveAmount: { value, unit: "sat" },
+        ...entry,
+      });
+      await mgr.execute("next");
+    };
+    return { enter };
+  }
+
+  it("sends a new token for the amount entered after Back", async () => {
+    const tm = createTestMachine();
+    await tm.machine.startSendEcash({ reset: true });
+    const screen = amountScreen(tm);
+    await screen.enter(100);
+    tm.assertStep("sendComplete");
+
+    await screen.enter(40);
+
+    tm.assertStep("sendComplete");
+    expect(sends(tm).map((call) => (call.args[0] as { amount: number }).amount)).toEqual([
+      100, 40,
+    ]);
+  });
+
+  it("keeps the recipient's mints and lock, and nothing of the old payment", async () => {
+    const lock = `02${"ab".repeat(32)}`;
+    const tm = createTestMachine();
+    await tm.machine.startSendEcash({
+      reset: true,
+      allowedMints: [MINT2],
+      p2pkLockPubkey: lock,
+    });
+    const screen = amountScreen(tm, {
+      selectedMintUrl: MINT2,
+      p2pkLockPubkey: lock,
+    });
+    await screen.enter(100);
+    tm.assertStep("sendComplete");
+
+    await screen.enter(40);
+
+    tm.assertStep("sendComplete");
+    expect(sends(tm)[1]?.args[0]).toMatchObject({
+      mintUrl: MINT2,
+      amount: 40,
+      p2pkLock: { pubkey: lock },
+    });
+    expect(tm.machine.getContext().supportedMintUrls).toEqual([MINT2]);
+  });
+
+  it("opens the mint list of a new send from the amount screen", async () => {
+    const tm = createTestMachine();
+    await tm.machine.startSendEcash({ reset: true });
+    await amountScreen(tm).enter(100);
+    tm.assertStep("sendComplete");
+
+    await startNewEcashSendIfFinished(tm.machine, "sendEcash");
+    await tm.machine.requestMintSelector();
+
+    tm.assertStep("selectMint");
+    tm.assertContext({ destination: "sendEcash" });
+    expect(tm.machine.getContext().amount).toBeUndefined();
+    expect(sends(tm)).toHaveLength(1);
+  });
+
+  it("leaves a send that has not finished alone", async () => {
+    const tm = createTestMachine();
+    await tm.machine.startSendEcash({ reset: true, entrySource: "createEcash" });
+    const context = tm.machine.getContext();
+
+    await startNewEcashSendIfFinished(tm.machine, "sendEcash");
+
+    expect(tm.machine.getContext()).toBe(context);
   });
 });

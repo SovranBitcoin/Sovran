@@ -51,6 +51,39 @@ export interface DefaultScreenActionHandlersConfig {
   navigation: NavigationCallbacks;
 }
 
+/**
+ * Starts a new ecash send when the last one finished (`sendComplete`). A
+ * finished send is final for the machine: an amount or a mint changes
+ * nothing on it, so neither can make its token again. The amount screen that
+ * made it can still be mounted under the token screen, and an amount entered
+ * there, or its mint list, is a new token the person asked for. The new send
+ * keeps what the screen was opened with (the recipient, their mints, the
+ * lock) and nothing of the finished payment (its amount, mint or token).
+ * Anywhere else, and for any other kind of amount screen, it does nothing.
+ */
+export async function startNewEcashSendIfFinished(
+  machine: PaymentMachine,
+  destination: unknown,
+): Promise<void> {
+  if (destination !== "sendEcash" || machine.getStep() !== "sendComplete") return;
+  const finished = machine.getContext();
+  logger.info("screenAction.amountEntry.newSendAfterFinished", {
+    allowedMintCount: finished.supportedMintUrls?.length ?? 0,
+    locked: !!finished.p2pkLock,
+  });
+  await machine.startSendEcash({
+    reset: true,
+    ...(finished.meltTarget ? { meltTarget: finished.meltTarget } : {}),
+    ...(finished.recipientPubkey ? { recipientPubkey: finished.recipientPubkey } : {}),
+    ...(finished.recipientProfile ? { recipientProfile: finished.recipientProfile } : {}),
+    ...(finished.p2pkLock ? { p2pkLock: finished.p2pkLock } : {}),
+    ...(finished.supportedMintUrls?.length
+      ? { allowedMints: finished.supportedMintUrls }
+      : {}),
+    ...(finished.entrySource ? { entrySource: finished.entrySource } : {}),
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -913,6 +946,7 @@ export function createDefaultScreenActionHandlers(
           });
         }
         try {
+          await startNewEcashSendIfFinished(machine, destination);
           await machine.enterAmount(effectiveAmount, mintUrl, {
             destination,
             ...(mintQuoteMethod ? { mintQuoteMethod } : {}),

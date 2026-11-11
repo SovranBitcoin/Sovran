@@ -18,6 +18,7 @@ export { getAvailableActions } from './availability';
 export { decodePaymentRequestEntryPhase } from './paymentRequestPhase';
 export {
   createDefaultScreenActionHandlers,
+  startNewEcashSendIfFinished,
   type DefaultScreenActionHandlersConfig,
   type NavigationCallbacks,
 } from './defaultHandlers';

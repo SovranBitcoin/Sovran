@@ -528,6 +528,7 @@ export {
   decorateEntry,
   meltOperationToScreenActionEntry,
   createDefaultScreenActionHandlers,
+  startNewEcashSendIfFinished,
 } from "./screen-actions";
 export type {
   ActionAvailability,

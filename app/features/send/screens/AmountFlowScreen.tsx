@@ -16,6 +16,7 @@ import {
   decodePaymentRequestInfo,
   fetchNip05Pubkey,
   minorToRawInput,
+  startNewEcashSendIfFinished,
   type RecipientProfile,
 } from 'wallet';
 
@@ -102,7 +103,11 @@ export function AmountFlowContent({ amountEntry, headerMode = 'native' }: Amount
     if (rawInput && rawInput !== '0') {
       useAmountDraftStore.getState().stash({ rawInput, inputMode, scope, unit });
     }
-    void machine.requestMintSelector();
+    // Back on the amount screen of an ecash send that finished, the list is
+    // a new send's: the finished one changes nothing for a mint.
+    void startNewEcashSendIfFinished(machine, entry?.destination).then(() =>
+      machine.requestMintSelector()
+    );
   }, [machine, entry]);
 
   // Restore the stashed amount when we return to a fresh amount step after a

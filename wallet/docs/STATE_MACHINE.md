@@ -505,7 +505,14 @@ MUST NOT:
   `__tests__/flows/settled-preview-final.test.ts`). Each leaving event starts
   from a fresh context that carries nothing of the settled payment
   (`REVIEW_MINT` keeps the context only when it interrupts a token receive),
-  so nothing done in the new flow rebuilds the old preview.
+  so nothing done in the new flow rebuilds the old preview. The amount
+  screen of a finished ecash send stays mounted under the token screen: its
+  Next and its mint list first start a new ecash send
+  (`startNewEcashSendIfFinished`, `defaultHandlers.ts`), which keeps the
+  recipient, their mints and the lock and nothing of the finished payment. A
+  melt or payment-request amount screen under a settled preview gets no such
+  restart (paying the same invoice or request again would be the old
+  payment), so its Next changes nothing.
 - Do not invent a `rolling_back` machine state. `MELT_FAILED` is a defined
   `ErrorCode` but the confirm-melt path never sets `error` with it for
   single-option flows.
