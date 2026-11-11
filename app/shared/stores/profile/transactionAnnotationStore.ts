@@ -1,7 +1,7 @@
 /**
  * @fileoverview Transaction annotation store (profile-scoped persistence)
  *
- * Backs colada's `AnnotationStoreAdapter` with MMKV/AsyncStorage so the
+ * Backs colada's `AnnotationStoreAdapter` with profile-scoped AsyncStorage so the
  * per-transaction side-data colada owns (counterparty, scan source, P2PK lock,
  * distribution, location, swap grouping) survives restart and stays
  * profile-isolated. colada owns the model, keying, and selectors; this store is
@@ -76,7 +76,7 @@ function applyPatch(key: string, patch: AnnotationRecord): void {
 
 /**
  * The adapter colada consumes. Reads are synchronous (render path); the backing
- * MMKV/AsyncStorage write happens via zustand persist after `set`.
+ * AsyncStorage write happens via zustand persist after `set`.
  */
 export const transactionAnnotationAdapter: AnnotationStoreAdapter = {
   get: (key) => useTransactionAnnotationStore.getState().annotations[key],

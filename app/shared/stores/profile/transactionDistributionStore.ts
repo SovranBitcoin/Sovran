@@ -24,7 +24,7 @@
  * never engaged, and the inferred 'displayed' clobbered the real action.
  *
  * Both `useTransactionSource` (Transaction.tsx) and
- * `screenActionsBridge.getSourceLabel` (Colada.tsx) compute the
+ * `getSourceLabel` (createSovranScreenActionsBridge.ts) compute the
  * read key with the same convention.
  *
  * Lifecycle:
@@ -33,8 +33,8 @@
  *    inference cannot overwrite it. This makes the inference a safe
  *    fallback rather than a clobber.
  *  - The 'displayed' fallback is written by a global subscription to coco's
- *    `mint-op:quote-state-changed` event in `Colada.tsx` when a quote
- *    transitions to PAID/ISSUED and no source has been recorded yet.
+ *    `mint-quote:updated` event in `createSovranScreenActionsBridge.ts` when
+ *    a quote's payment is observed and no source has been recorded yet.
  */
 
 import { defineStore as create } from '@/shared/lib/persist/defineStore';
