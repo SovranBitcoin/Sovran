@@ -413,13 +413,42 @@ describe('first-run publish of the default relays', () => {
     expect(event.tags).toEqual(DEFAULT_RELAYS.map((url) => ['r', url]));
     expect(relays).toEqual([...DEFAULT_RELAYS]);
     expect(resolveOn).toBe('all-settled');
-    // The store records the publish but keeps its (empty) entries.
+    // QUIRK (F240 D2): the store records the publish but keeps its (empty) entries.
     expect(store()).toMatchObject({
       entries: [],
       updatedAt: NOW_SEC + 1,
       hasPublished: true,
       source: 'relay',
     });
+  });
+
+  it('marks an edit made before the first-run publish as published, though only the defaults were sent', async () => {
+    const read = deferred();
+    mockGate = () => read.promise;
+    renderHook(() => useOwnRelayListSync(A, true));
+    await act(async () => {
+      jest.advanceTimersByTime(1_500);
+    });
+    // The person adds a relay in Network settings while the read is out.
+    store().addRelay('wss://mine.example', { read: true, write: true });
+    await act(async () => read.resolve());
+
+    expect(mockPublishEvent.mock.calls[0][0].event.tags).toEqual(
+      DEFAULT_RELAYS.map((url) => ['r', url])
+    );
+    // QUIRK (F240 D1): the edit is recorded as published and never sent.
+    expect(store()).toMatchObject({
+      entries: [{ url: 'wss://mine.example', read: true, write: true }],
+      source: 'relay',
+    });
+  });
+
+  it('after the first-run publish, adding one relay makes it the whole list', async () => {
+    await mountAndWait(A);
+    store().addRelay('wss://mine.example', { read: true, write: true });
+
+    // QUIRK (F240 D2): publishing this would drop the defaults from the public list.
+    expect(store().entries).toEqual([{ url: 'wss://mine.example', read: true, write: true }]);
   });
 
   it('does not publish again once a list was published', async () => {

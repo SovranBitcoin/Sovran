@@ -11,8 +11,7 @@ import { ScreenScrollView } from '@/shared/ui/composed/ScreenScrollView';
  */
 import React, { useState } from 'react';
 import { RefreshControl, View } from 'react-native';
-import { NDKEvent, useNDK } from '@nostr-dev-kit/ndk-mobile';
-import type NDK from '@nostr-dev-kit/ndk-mobile';
+import { useNDK } from '@nostr-dev-kit/ndk-mobile';
 import {
   Button,
   Card,
@@ -30,16 +29,11 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useRelayHealth, type RelayHealth } from '@/shared/hooks/useRelayHealth';
 import { useNostrTierHealth } from '@/shared/hooks/useNostrTierHealth';
 import { type TierStatus } from '@/shared/lib/nostr/tierHealth';
-import { log, useLifecycleLogger } from '@/shared/lib/logger';
-import { publishEvent } from '@/shared/lib/nostr/publish';
+import { useLifecycleLogger } from '@/shared/lib/logger';
 import { backendConfig } from '@/shared/config/backend';
-import { DEFAULT_RELAYS, safeNormalizeRelay } from '@/shared/lib/nostr/outbox/defaults';
-import { RELAY_LIST_KIND, serializeRelayList } from '@/shared/lib/nostr/outbox/nip65';
-import {
-  MAX_RELAYS,
-  getOwnWriteRelays,
-  useRelayListStore,
-} from '@/shared/lib/nostr/outbox/relayListStore';
+import { safeNormalizeRelay } from '@/shared/lib/nostr/outbox/defaults';
+import { publishRelayList } from '@/shared/lib/nostr/outbox/publishOwnRelayList';
+import { MAX_RELAYS, useRelayListStore } from '@/shared/lib/nostr/outbox/relayListStore';
 import { Section } from '@/shared/ui/composed/Section';
 import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
 import { EmptyState } from '@/shared/ui/composed/EmptyState';
@@ -50,36 +44,6 @@ import { withAlpha } from '@/shared/lib/color';
 
 const VERTEX_CREDITS_DESCRIPTION =
   "Uses your Nostr identity's free Vertex credits to refresh reputation scores for everyone. Vertex and nagg see which profiles you look up; your keys never leave the device.";
-
-async function publishRelayList(ctx: {
-  ndk: NDK;
-  entries: Parameters<typeof serializeRelayList>[0];
-  markPublished: (created: number) => void;
-  setPublishing: (publishing: boolean) => void;
-  setPublishMsg: (msg: string | null) => void;
-}): Promise<void> {
-  const { ndk, entries, markPublished, setPublishing, setPublishMsg } = ctx;
-  setPublishing(true);
-  setPublishMsg(null);
-  try {
-    const created = Math.floor(Date.now() / 1000);
-    const event = new NDKEvent(ndk);
-    event.kind = RELAY_LIST_KIND;
-    event.created_at = created;
-    event.tags = serializeRelayList(entries);
-    const targets = [...new Set([...getOwnWriteRelays(), ...DEFAULT_RELAYS])];
-    const result = await publishEvent({ ndk, event, relays: targets, resolveOn: 'all-settled' });
-    if (result.isOk()) {
-      markPublished(created);
-      log.info('settings.relays.published', { accepted: result.value.accepted.length });
-      setPublishMsg(`Published to ${result.value.accepted.length} relays.`);
-    } else {
-      setPublishMsg('Could not publish. Check your connection and try again.');
-    }
-  } finally {
-    setPublishing(false);
-  }
-}
 
 export function SettingsNetworkScreen() {
   useLifecycleLogger('SettingsNetworkScreen');
