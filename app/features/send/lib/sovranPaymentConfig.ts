@@ -62,6 +62,7 @@ import {
   NfcError,
   isUserCancelError,
   nfcReader,
+  nfcTagRead,
   nfcTapProgressed,
 } from '@/shared/lib/nfc';
 import { useNfcTapStore } from '@/shared/stores/runtime/nfcTapStore';
@@ -767,6 +768,9 @@ export function createSovranScanSources(nfcAdapter?: NfcIOAdapter): ScanSources 
           };
           try {
             const data = await nfcAdapter.readPaymentRequest();
+            // The payment machine has the session now; closing the sheet
+            // below must not cancel it.
+            nfcTagRead();
             // The flow navigates to the payment screen now — don't leave the
             // tap sheet floating over it.
             closeTapSheet();

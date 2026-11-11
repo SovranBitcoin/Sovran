@@ -8,8 +8,9 @@
  * 'Reading' when a tag connects, and keep listening until the sheet goes away
  * (success closes it, an error popup replaces it, the user closes it). Like
  * Minibits and the native Cashu wallet, a quiet read timeout re-arms rather
- * than ending the session. Closing the sheet cancels the read only before any
- * ecash is created — cancelling mid-write could spend without delivering.
+ * than ending the session. Closing the sheet cancels the read only while the
+ * tag is not read yet: after a read the payment machine needs the session to
+ * write the ecash back, and ends it itself.
  */
 
 import { Platform } from 'react-native';
@@ -32,9 +33,10 @@ const delay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve,
 
 const tapSheetOpen = () => isTapSheet(usePopupStore.getState().current);
 
-const writingBack = () => {
+/** Whether the session is the payment machine's, which a closed sheet must leave alone. */
+const sessionIsThePayments = () => {
   const reader = nfcReader();
-  return reader.holder !== 'idle' && reader.writingBack;
+  return reader.holder !== 'idle' && (reader.read || reader.writingBack);
 };
 
 export async function runTapToPayScan(scan: () => Promise<unknown> | unknown): Promise<void> {
@@ -56,7 +58,7 @@ export async function runTapToPayScan(scan: () => Promise<unknown> | unknown): P
     if (!isTapSheet(prev.current) || state.current != null) return;
     const { phase } = useNfcTapStore.getState();
     paymentLog.info('send.nfc.tap_sheet_dismissed', { phase });
-    if (!writingBack()) void releaseSession();
+    if (!sessionIsThePayments()) void releaseSession();
   });
   showActionSheet('nfc-tap', {});
 

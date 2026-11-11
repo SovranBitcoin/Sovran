@@ -187,7 +187,7 @@ describe('the reader', () => {
     const releasePress = holdNfcReader('explicit');
 
     releaseAmbientCycle();
-    expect(nfcReader()).toEqual({ holder: 'explicit', writingBack: false });
+    expect(nfcReader()).toEqual({ holder: 'explicit', read: false, writingBack: false });
     expect(await nfc()).toEqual({ empty: true });
     expect(paramPopup).toHaveBeenCalledTimes(1);
 
@@ -221,6 +221,34 @@ describe('an explicit Tap to pay press', () => {
       await run;
     }
   );
+
+  // The scan source closes the sheet itself once the tag is read; the
+  // payment machine still needs the session to write the ecash back.
+  it('keeps the session when the scan source closes its sheet after a successful read', async () => {
+    const nfc = createSovranScanSources({
+      readPaymentRequest: jest.fn(async () => {
+        await acquireSession();
+        return 'creqA-from-terminal';
+      }),
+      writeToken: jest.fn(async () => undefined),
+      releaseSession: jest.fn(async () => undefined),
+      isAvailable: jest.fn(async () => true),
+    }).nfc!;
+    let cancels = 0;
+    native.requestTechnology.mockImplementationOnce(async () => {
+      cancels = native.cancelTechnologyRequest.mock.calls.length;
+      return 'IsoDep' as never;
+    });
+    let read: unknown;
+
+    await runTapToPayScan(async () => {
+      read = await nfc();
+    });
+
+    expect(read).toEqual({ data: 'creqA-from-terminal' });
+    expect(usePopupStore.getState().current).toBeNull();
+    expect(native.cancelTechnologyRequest).toHaveBeenCalledTimes(cancels);
+  });
 
   it('cancels the read when its sheet closes while the machine is still selecting', async () => {
     const notifications = createSovranNotifications();

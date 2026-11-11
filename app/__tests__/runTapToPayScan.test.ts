@@ -4,8 +4,9 @@
  * Characterization of `runTapToPayScan`, the Send screen's explicit "Tap to
  * pay" press: on Android it shows the tap sheet, turns it to "Reading" when a
  * tag connects, re-arms while the sheet stays open, cancels the read when the
- * sheet closes, and tears down after. (That it keeps the session once ecash is
- * being created or written is pinned in nfcReaderOwnership.test.ts.)
+ * person closes the sheet before the tag is read, and tears down after. (That
+ * it keeps the session once ecash is being created or written, and through the
+ * real scan source's close, is pinned in nfcReaderOwnership.test.ts.)
  * The real NFC session code runs; only `react-native-nfc-manager` and the
  * sheet presenter are replaced. The popup and tap stores are real.
  */
@@ -14,6 +15,7 @@ import { Platform } from 'react-native';
 import NfcManager from 'react-native-nfc-manager';
 
 import { runTapToPayScan } from '@/features/send/lib/runTapToPayScan';
+import { nfcTagRead } from '@/shared/lib/nfc/reader';
 import { acquireSession } from '@/shared/lib/nfc/session';
 import { showActionSheet } from '@/shared/lib/popup';
 import { usePopupStore } from '@/shared/stores/runtime/popupStore';
@@ -129,19 +131,19 @@ it('cancels the read when the sheet is closed while reading', async () => {
   expect(scan).toHaveBeenCalledTimes(1);
 });
 
-// QUIRK: a successful read closes the tap sheet itself, before the payment
-// machine writes ecash back to the terminal; that close counts as a dismissal
-// while the phase still reads 'reading', so the session the write-back needs
-// is cancelled.
-it('cancels the session when the read closes the sheet itself', async () => {
+// A successful read closes the tap sheet itself, before the payment machine
+// writes ecash back to the terminal. That close is not the person's: the
+// session the write-back needs stays open, and the machine ends it.
+it('keeps the session when the read closes the sheet itself', async () => {
   const { scan, answer } = heldScan(async () => {
     await tagConnects();
+    nfcTagRead();
     closeSheet();
   });
   const run = runTapToPayScan(scan);
   await settle();
 
-  expect(releases()).toBe(1);
+  expect(releases()).toBe(0);
   answer();
   await run;
 });
