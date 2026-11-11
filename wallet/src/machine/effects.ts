@@ -118,10 +118,7 @@ type ConfirmSendEffectSuccess =
       data: StepDataMap['chooseProofs'];
       context?: ConfirmSendContextPatch;
     }
-  | {
-      kind: 'stale';
-      context?: ConfirmSendContextPatch;
-    };
+  | { kind: 'stale' };
 
 type ConfirmSendEffectError = {
   kind: 'failed';
@@ -874,7 +871,7 @@ function executeSendOperation(
   operation: SendOperation,
   data: StepDataMap['confirmSend'],
   options?: { p2pkLockPubkey?: string; p2pkLock?: P2pkLockSpec },
-  path: ConfirmSendEffectPath | 'forcedLocalProbe' = 'online',
+  path: ConfirmSendEffectPath = 'online',
 ): ResultAsync<SendOperationResult, unknown> {
   logger.info('effects.sendOperation.start', {
     path,
@@ -1056,10 +1053,7 @@ function handleConfirmSendFailure(args: {
               op: 'executeOfflineSend',
               path: 'offlineFallback',
             });
-            return okAsync({
-              kind: 'stale',
-              ...(contextPatch ? { context: contextPatch } : {}),
-            } as const);
+            return okAsync({ kind: 'stale' } as const);
           }
 
           return okAsync(
@@ -1082,10 +1076,7 @@ function handleConfirmSendFailure(args: {
               op: 'executeOfflineSend.catch',
               path: 'offlineFallback',
             });
-            return okAsync({
-              kind: 'stale',
-              ...(contextPatch ? { context: contextPatch } : {}),
-            } as const);
+            return okAsync({ kind: 'stale' } as const);
           }
 
           return errAsync(
