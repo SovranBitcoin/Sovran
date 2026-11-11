@@ -226,6 +226,28 @@ describe('a token received after a failed attempt', () => {
   });
 });
 
+describe('the error an entry keeps', () => {
+  it.each([
+    ['the drain starts a receive', 'pending', () => store().markStatus(HASH, 'redeeming')],
+    [
+      'the drain finds the mint untrusted',
+      'redeeming',
+      () => store().markStatus(HASH, 'untrusted-mint'),
+    ],
+    ['the reconcile closes a held entry', 'failed', () => store().markHeldSpent(HASH)],
+  ] as const)('keeps a saved empty error as it is when %s', (_name, from, call) => {
+    at(from, { lastError: '' });
+    call();
+    expect(current()).toHaveProperty('lastError', '');
+  });
+
+  it('drops even an empty error once the token is received', () => {
+    at('redeeming', { lastError: '' });
+    store().markStatus(HASH, 'redeemed');
+    expect(current()).not.toHaveProperty('lastError');
+  });
+});
+
 describe('moves the queue refuses', () => {
   const STATUSES = [
     'pending',
