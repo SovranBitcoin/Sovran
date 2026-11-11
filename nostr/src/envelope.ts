@@ -568,8 +568,7 @@ function feedItemContentEvents(items: readonly NaggFeedItem[]): NaggFeedEvent[] 
 
 /**
  * Rebuild the canonical `NaggFeedPage` (v1's feed shape, which the facade's
- * `bundleFromFeedPage` and the app's `mapNaggFeedPage` already consume) from a
- * v2 envelope. The ordering manifest carries the FULL server order — including
+ * `bundleFromFeedPage` consumes) from a v2 envelope. The ordering manifest carries the FULL server order — including
  * anchors whose events were not hydrated — so the facade can surface
  * `missingIds` for lazy backfill.
  */

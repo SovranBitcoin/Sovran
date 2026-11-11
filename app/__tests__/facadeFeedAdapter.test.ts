@@ -69,7 +69,6 @@ describe('resolvedFeedPageToParseResult', () => {
     // profiles + cursor
     expect(result.profilesMap.get(PUB)).toEqual({ name: 'alice', picture: 'http://x/a.png' });
     expect(result.paginationUntil).toBe(100);
-    expect(result.paginationOffset).toBe(2);
     // gaps for the enrichment path: the q-tagged quote + the author profile when absent
     expect(result.missingQuotedIds).toContain(QUOTED);
   });

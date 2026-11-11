@@ -23,53 +23,6 @@ export type RankedEventsInput = {
 
 export type FollowedPubkeySource = NonNullable<EventQueryInput['pubkeysFrom']>;
 
-export type FeedExclusionFilters = {
-  excludeIds?: readonly string[];
-  excludePubkeys?: readonly string[];
-};
-
-function normalizedExclusionValues(values: readonly string[] | undefined): string[] {
-  return Array.from(
-    new Set(
-      (values ?? [])
-        .map((value) => value.trim().toLowerCase())
-        .filter((value) => value.length > 0)
-    )
-  ).sort();
-}
-
-export function withEventExclusions<T extends EventQueryInput>(
-  input: T,
-  filters: FeedExclusionFilters
-): T {
-  const inputExcludeIds = input.excludeIds ?? [];
-  const inputExcludePubkeys = input.excludePubkeys ?? [];
-  const excludeIds = normalizedExclusionValues([...inputExcludeIds, ...(filters.excludeIds ?? [])]);
-  const excludePubkeys = normalizedExclusionValues([
-    ...inputExcludePubkeys,
-    ...(filters.excludePubkeys ?? []),
-  ]);
-  if (excludeIds.length === 0 && excludePubkeys.length === 0) return input;
-  return {
-    ...input,
-    ...(excludeIds.length > 0 ? { excludeIds } : {}),
-    ...(excludePubkeys.length > 0 ? { excludePubkeys } : {}),
-  } as T;
-}
-
-export function withRankedTargetExclusions<T extends RankedEventsInput>(
-  input: T,
-  filters: FeedExclusionFilters
-): T {
-  const baseTarget = input.target ?? {};
-  const target = withEventExclusions(baseTarget, filters);
-  if (target === baseTarget) return input;
-  return {
-    ...input,
-    target,
-  } as T;
-}
-
 export function followedPubkeySource(viewerPubkey: string): FollowedPubkeySource {
   return [
     {

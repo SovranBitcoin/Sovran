@@ -4,8 +4,6 @@ import {
   followedPubkeySource,
   followingPopularRankedEventsInput,
   forYouRankedEventsInput,
-  withEventExclusions,
-  withRankedTargetExclusions,
 } from "../src/recipes";
 
 describe("rank recipes", () => {
@@ -43,44 +41,6 @@ describe("rank recipes", () => {
         },
       },
     ]);
-  });
-
-  test("feed recipes apply ignored event and pubkey exclusions", () => {
-    expect(
-      withEventExclusions(
-        {
-          kinds: [1],
-          excludeIds: ["A".repeat(64)],
-        },
-        {
-          excludeIds: ["b".repeat(64), "B".repeat(64), " "],
-          excludePubkeys: ["C".repeat(64)],
-        },
-      ),
-    ).toMatchObject({
-      excludeIds: ["a".repeat(64), "b".repeat(64)],
-      excludePubkeys: ["c".repeat(64)],
-    });
-
-    expect(
-      withRankedTargetExclusions(
-        {
-          references: { kinds: [7] },
-          via: { key: "e" },
-          target: { kinds: [1] },
-        },
-        {
-          excludeIds: ["d".repeat(64)],
-          excludePubkeys: ["e".repeat(64)],
-        },
-      ),
-    ).toMatchObject({
-      target: {
-        kinds: [1],
-        excludeIds: ["d".repeat(64)],
-        excludePubkeys: ["e".repeat(64)],
-      },
-    });
   });
 });
 

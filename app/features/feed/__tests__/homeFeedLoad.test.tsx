@@ -235,7 +235,6 @@ function feedPage(contents: string[], hasMore = true) {
     missingQuotedIds: [],
     missingProfilePubkeys: [],
     paginationUntil: 1,
-    paginationOffset: contents.length,
     paginationCursor: hasMore ? { createdAt: 1, id: 'cursor' } : null,
     hasMore,
   };

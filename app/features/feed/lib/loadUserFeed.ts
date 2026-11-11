@@ -14,7 +14,6 @@ export interface UserFeedLoadCtx {
   hasMoreRef: { current: boolean };
   paginationCursorRef: { current: FeedParseResult['paginationCursor'] };
   paginationUntilRef: { current: number };
-  paginationOffsetRef: { current: number };
   loadingMoreRef: { current: boolean };
   feedItemIdsRef: { current: Set<string> };
   activeLoadMoreIdRef: { current: string | null };

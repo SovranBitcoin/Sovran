@@ -114,7 +114,7 @@ export function resolvedFeedPageToParseResult(
       for (const tag of event.tags) {
         if (tag[0] === 'q' && tag[1]) neededQuoteIds.add(tag[1]);
         // p-tag mentions render as names in note bodies — enrichment must be
-        // able to resolve them, same as the legacy mapNaggFeedPage path.
+        // able to resolve them.
         if (tag[0] === 'p' && tag[1]) neededPubkeys.add(tag[1]);
       }
     }
@@ -132,10 +132,6 @@ export function resolvedFeedPageToParseResult(
     paginationCursor: page.cursor,
     hasMore: page.hasMore,
     paginationUntil: page.cursor?.createdAt ?? 0,
-    // Pagination advance, not display count: how many ranked slots this page
-    // consumed server-side. Items the app-side include filters drop still
-    // occupied a slot, so the pre-filter count is the one to advance by.
-    paginationOffset: page.items.length,
   };
 }
 

@@ -1102,7 +1102,6 @@ async function loadMoreItemsImpl(
       userPubkey,
       limit: FEED_PAGE_LIMIT,
       cursor: paginationRef.current.cursor,
-      until: paginationRef.current.cursor?.createdAt,
       loadMore: true,
       seen: feedItemIdsRef.current,
       signal: controller.signal,

@@ -47,14 +47,8 @@ function setup(...pages: facade.ResolvedFeedPage[]) {
   jest
     .mocked(buildNostrDataLayer)
     .mockReturnValue({ getFeedPage } as unknown as facade.NostrDataLayer);
-  const fallback: Omit<FeedClient, 'getThread'> = {
-    getFeed: jest.fn(),
-    getUserFeed: jest.fn(),
-    getPostsByPubkeys: jest.fn(),
-    enrich: jest.fn(),
-    getNotifications: jest.fn(),
-  };
-  const client = createFacadeFeedClient(fallback);
+  const enrichment: Pick<FeedClient, 'enrich'> = { enrich: jest.fn() };
+  const client = createFacadeFeedClient(enrichment);
   return { client, getFeedPage };
 }
 
@@ -107,7 +101,10 @@ describe('profile post loading', () => {
 
   it('continues past reply-only pages during pagination as well as initial loading', async () => {
     const { client, getFeedPage } = setup(page(REPLY, 200, true), page(ROOT, 100));
-    const result = await client.getUserFeed({ pubkey: PUB, until: 300 });
+    const result = await client.getUserFeed({
+      pubkey: PUB,
+      cursor: { createdAt: 300, id: 'f'.repeat(64) },
+    });
     expect(result.orderedFeedItems).toHaveLength(1);
     expect(result.paginationUntil).toBe(100);
     expect(getFeedPage).toHaveBeenCalledTimes(2);
