@@ -1,4 +1,4 @@
-import { useFeedIgnoreStore } from '@/features/feed/stores/ignoreStore';
+import { useBlockedConversation } from '@/features/feed/hooks/useBlockedConversation';
 import { ModeratedDmBubble } from '@/features/user/components/ModeratedDmBubble';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 /**
@@ -113,11 +113,9 @@ export function GeohashChatScreen({
   // identity). For ble-dm it's a 16-hex BitChat peer ID — no Nostr identity,
   // so DmChatHeader falls back to nickname-only and hides the npub/QR.
   const isNostrPubkey = !!dmPeerID && Hex64.safeParse(dmPeerID).success;
-  const blocked = useFeedIgnoreStore(
-    (s) => transport === 'nostr-dm' && !!dmPeerID && s.ignoredPubkeys.includes(dmPeerID)
+  const { blocked, banner, guardSend, wordFilter } = useBlockedConversation(
+    transport === 'nostr-dm' ? dmPeerID : undefined
   );
-  const filterEnabled = useFeedIgnoreStore((s) => s.dmFilterEnabled);
-  const filterWords = useFeedIgnoreStore((s) => s.dmFilterWords);
   const ownPubkey = useNostrKeysContext().keys?.pubkey;
 
   const handleBack = () => router.back();
@@ -257,18 +255,8 @@ export function GeohashChatScreen({
         log={bitchatLog}
         messages={blocked ? [] : messages}
         composerDisabled={blocked}
-        banner={
-          blocked ? (
-            <Text>This person is blocked. Open “Block or report” to unblock them.</Text>
-          ) : undefined
-        }
-        onSend={(text) => {
-          if (
-            transport !== 'nostr-dm' ||
-            !useFeedIgnoreStore.getState().ignoredPubkeys.includes(dmPeerID ?? '')
-          )
-            return sendMessage(text);
-        }}
+        banner={banner}
+        onSend={guardSend(sendMessage)}
         composerPlaceholder="Write here"
         renderBubble={
           transport === 'ble-dm'
@@ -285,8 +273,7 @@ export function GeohashChatScreen({
                   <ModeratedDmBubble
                     {...args}
                     scope={`${ownPubkey}:${dmPeerID}:${geohash}`}
-                    enabled={filterEnabled}
-                    words={filterWords}
+                    {...wordFilter}
                   />
                 )
               : undefined
