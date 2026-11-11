@@ -3,7 +3,6 @@
  * `initialize`, `cleanup`, `isInitialized` and `peekInstance`. The database
  * and the plugins are stand-ins; the coco Manager is the real one.
  */
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Manager } from '@cashu/coco-core';
 import * as SQLite from 'expo-sqlite';
 import { getPublicKey } from 'nostr-tools/pure';
@@ -11,9 +10,6 @@ import { CocoManager } from '@/shared/lib/cashu/manager';
 import { createSovranCocoRepositories } from '@/shared/lib/cashu/cocoRepositories';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 
-jest.mock('@react-native-async-storage/async-storage', () =>
-  require('@react-native-async-storage/async-storage/jest/async-storage-mock')
-);
 jest.mock('expo-sqlite', () => ({
   deleteDatabaseAsync: jest.fn().mockResolvedValue(undefined),
   openDatabaseAsync: jest.fn(),
@@ -91,8 +87,7 @@ type Database = ReturnType<typeof database>;
 /** Every database the manager opens, in order. */
 let opened: Database[] = [];
 
-beforeEach(async () => {
-  await AsyncStorage.clear();
+beforeEach(() => {
   opened = [];
   openDatabase.mockReset();
   openDatabase.mockImplementation(async () => {
@@ -223,9 +218,7 @@ describe('starting the plugins', () => {
 
   it('closes a wallet whose plugins failed to start, and opens a new one next time', async () => {
     const dispose = jest.spyOn(Manager.prototype, 'dispose');
-    jest
-      .spyOn(Manager.prototype, 'initPlugins')
-      .mockRejectedValueOnce(new Error('plugin failed'));
+    jest.spyOn(Manager.prototype, 'initPlugins').mockRejectedValueOnce(new Error('plugin failed'));
     await expect(CocoManager.initialize()).rejects.toThrow('plugin failed');
     expect(CocoManager.isInitialized()).toBe(false);
     expect(CocoManager.peekInstance()).toBeNull();
