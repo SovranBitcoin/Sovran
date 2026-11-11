@@ -2,8 +2,8 @@
  * @fileoverview Wire shapes for the NIP-17 DM envelope transport, and the one
  * reader for an envelope's timestamp.
  *
- * Leaf module so the facade adapter and the client can share these without
- * importing each other (the adapter is what the client calls).
+ * Leaf module so the transport, the decryptor and the pager can share these
+ * without importing each other.
  */
 
 /** One encrypted gift wrap as it arrives from Nagg / the relay facade. */
