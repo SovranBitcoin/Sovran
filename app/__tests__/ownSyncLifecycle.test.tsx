@@ -28,6 +28,7 @@ let mockPubkey: string | undefined;
 let mockLayer: { getSocialGraph: jest.Mock } | null;
 let mockNdk: object | null;
 let mockInitialized = true;
+let mockOffline = false;
 let mockHydrated = true;
 let mockWriteRelays = ['wss://w1.example'];
 const mockSyncMuteList = jest.fn();
@@ -43,6 +44,9 @@ jest.mock('@/shared/lib/nostr/buildNostrDataLayer', () => ({
 jest.mock('@nostr-dev-kit/ndk-mobile', () => ({ useNDK: () => ({ ndk: mockNdk }) }));
 jest.mock('@/shared/providers/NostrNDKProvider', () => ({
   useNostrNDKContext: () => ({ isInitialized: mockInitialized }),
+}));
+jest.mock('@/shared/providers/OfflineProvider', () => ({
+  useOfflineStatus: () => ({ isOffline: mockOffline }),
 }));
 jest.mock('@/shared/lib/nostr/moderation', () => ({
   syncMuteList: (...args: unknown[]) => mockSyncMuteList(...args),
@@ -109,6 +113,7 @@ beforeEach(() => {
   mockLayer = { getSocialGraph: jest.fn(async () => graph([F1], 100)) };
   mockNdk = { id: 'ndk' };
   mockInitialized = true;
+  mockOffline = false;
   mockHydrated = true;
   mockWriteRelays = ['wss://w1.example'];
   mockSyncMuteList.mockReset();
@@ -340,6 +345,28 @@ describe('useFollowSync', () => {
     renderHook(() => useFollowSync());
     await act(async () => undefined);
     expect(mockRequestFollowSync).not.toHaveBeenCalled();
+  });
+
+  it('starts once the NDK and its signer are ready, without a tap', async () => {
+    mockInitialized = false;
+    const view = renderHook(() => useFollowSync());
+    await act(async () => undefined);
+    expect(mockRequestFollowSync).not.toHaveBeenCalled();
+    mockInitialized = true;
+    view.rerender({});
+    await act(async () => undefined);
+    expect(calls()).toEqual([[mockNdk, A]]);
+  });
+
+  it('starts again when the network comes back, without a tap or a return to the foreground', async () => {
+    mockOffline = true;
+    const view = renderHook(() => useFollowSync());
+    await act(async () => undefined);
+    expect(mockRequestFollowSync).not.toHaveBeenCalled();
+    mockOffline = false;
+    view.rerender({});
+    await act(async () => undefined);
+    expect(calls()).toEqual([[mockNdk, A]]);
   });
 
   it('starts on a tap and when a follow list arrives, not on other social writes', async () => {

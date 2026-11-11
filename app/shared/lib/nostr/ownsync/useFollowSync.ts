@@ -5,20 +5,23 @@ import { useNDK } from '@nostr-dev-kit/ndk-mobile';
 import { requestFollowSync } from '@/shared/lib/nostr/followSync';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useNostrNDKContext } from '@/shared/providers/NostrNDKProvider';
+import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
 import { useNostrSocialStore } from '@/shared/stores/profile/nostrSocialStore';
 
 /**
  * Starts the follow worker whenever outstanding follow taps could be
- * published: once the account's saved state has loaded (which resumes a tap
- * saved before the app closed), on each new tap, when a follow list arrives,
- * and on returning to the foreground.
+ * published: once the NDK and its signer are ready and the account's saved
+ * state has loaded (which resumes a tap saved before the app closed), when the
+ * network comes back, on each new tap, when a follow list arrives, and on
+ * returning to the foreground.
  */
 export function useFollowSync() {
   const { ndk } = useNDK();
   const { isInitialized } = useNostrNDKContext();
+  const { isOffline } = useOfflineStatus();
   const pubkey = useNostrKeysContext().keys?.pubkey;
   useEffect(() => {
-    if (!isInitialized || !ndk || !pubkey) return;
+    if (!isInitialized || !ndk || !pubkey || isOffline) return;
     const request = () => {
       if (useNostrSocialStore.persist.hasHydrated()) void requestFollowSync(ndk, pubkey);
     };
@@ -39,5 +42,5 @@ export function useFollowSync() {
       stopStore();
       stopHydration();
     };
-  }, [ndk, pubkey, isInitialized]);
+  }, [ndk, pubkey, isInitialized, isOffline]);
 }
