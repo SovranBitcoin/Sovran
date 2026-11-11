@@ -551,6 +551,17 @@ function TopFollowers({
   );
 }
 
+/** What the Follow button shows for the follow state the store holds. */
+export function followButtonFace(isFollowing: boolean) {
+  return {
+    label: isFollowing ? 'Following' : 'Follow',
+    icon: isFollowing ? 'mdi:check' : 'la:user-plus',
+    systemIcon: isFollowing ? 'checkmark' : 'person.badge.plus',
+    isActive: isFollowing,
+    filled: !isFollowing,
+  };
+}
+
 // ============================================================================
 // Banner with Overlapping Avatar
 // ============================================================================
@@ -880,11 +891,7 @@ function BannerWithAvatar({
               // following → `isActive` tinted pill. Both honored across
               // liquid-glass, blur and flat.
               <CapsuleButton
-                label={isFollowing ? 'Following' : 'Follow'}
-                icon={isFollowing ? 'mdi:check' : 'la:user-plus'}
-                systemIcon={isFollowing ? 'checkmark' : 'person.badge.plus'}
-                isActive={isFollowing}
-                filled={!isFollowing}
+                {...followButtonFace(isFollowing)}
                 onPress={onToggleFollow}
                 fitContent
                 height={34}

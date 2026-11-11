@@ -7,7 +7,7 @@
  */
 import { act, renderHook } from '@testing-library/react-native';
 
-import { useFollowToggle } from '@/features/user/screens/UserProfileScreen';
+import { followButtonFace, useFollowToggle } from '@/features/user/screens/UserProfileScreen';
 import {
   selectIsFollowingPubkey,
   useNostrSocialStore,
@@ -135,5 +135,27 @@ describe('the profile Follow button', () => {
     expect(social().optimisticFollowsByPubkey).toEqual({});
     expect(mockPopup).toHaveBeenCalledTimes(1);
     expect(mockPopup).toHaveBeenCalledWith('engagement-update-failed', 'follow');
+  });
+});
+
+describe('what the Follow button shows', () => {
+  it('shows Following once a published list holds the follow, Follow otherwise', () => {
+    expect(followButtonFace(true)).toEqual({
+      label: 'Following',
+      icon: 'mdi:check',
+      systemIcon: 'checkmark',
+      isActive: true,
+      filled: false,
+    });
+    expect(followButtonFace(false)).toMatchObject({ label: 'Follow', filled: true });
+  });
+
+  it('shows a follow no published list holds yet exactly as a published one', () => {
+    const { result } = renderHook(() => useFollowToggle(Z, OWN));
+    act(() => result.current());
+    expect(social().optimisticFollowsByPubkey[Z]?.pending).toBe(true);
+
+    // QUIRK (F227): nothing tells a follow waiting to sync from a published one.
+    expect(followButtonFace(selectIsFollowingPubkey(Z)(social()))).toEqual(followButtonFace(true));
   });
 });

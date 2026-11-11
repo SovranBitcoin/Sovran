@@ -520,6 +520,22 @@ describe('a discovery that did not finish', () => {
     view.unmount();
   });
 
+  it('stays unanswered, attempt after attempt, while one default relay never answers', async () => {
+    mockRelays.set(NOS, 'silent');
+    const view = await mountAndWait(A);
+    await waitOutRead();
+    for (let attempt = 0; attempt < 4; attempt++) {
+      await act(async () => triggers['returning to the foreground']());
+      await waitOutRead();
+    }
+
+    // QUIRK (F239): one silent default keeps a new account's list unpublished
+    // and every follow waiting for the session.
+    expect(getKnownOwnWriteRelays(A)).toBeNull();
+    expect(mockPublishEvent).not.toHaveBeenCalled();
+    view.unmount();
+  });
+
   it('is tried again when the network comes back', async () => {
     mockOffline = true;
     mockRelays.set(DAMUS, 'fail');

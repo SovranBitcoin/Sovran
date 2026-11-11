@@ -614,6 +614,24 @@ describe('following someone', () => {
     expect(social().optimisticFollowsByPubkey[Z]?.pending).toBe(true);
   });
 
+  it('keeps waiting, read after read, while one write relay never answers', async () => {
+    jest.useFakeTimers();
+    // Relay two never answers; relay one holds the list.
+    mockStored.set(mockRelays[0].url, [contacts(T, [['p', X]])]);
+    const { ndk } = setup();
+
+    tap(Z);
+    for (let read = 0; read < 5; read++) {
+      const run = requestFollowSync(ndk, OWN);
+      await jest.advanceTimersByTimeAsync(12_001);
+      await run;
+    }
+
+    // QUIRK (F227): a dead write relay holds every follow back for the session.
+    expect(mockPublish).not.toHaveBeenCalled();
+    expect(social().optimisticFollowsByPubkey[Z]?.pending).toBe(true);
+  });
+
   it('waits rather than build on the saved list when a write relay does not answer', async () => {
     jest.useFakeTimers();
     saveList(contacts(T, [['p', X]]));
