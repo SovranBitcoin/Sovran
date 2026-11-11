@@ -1,26 +1,23 @@
 import { parseBackendConfig } from '@/shared/config/backend';
 
 describe('backend config', () => {
-  it('defaults Nostr app-view, score, and GraphQL calls when env is unset', () => {
+  it('defaults Nostr app-view and score calls when env is unset', () => {
     expect(parseBackendConfig({})).toEqual({
       nostrAppViewBaseUrl: 'https://nagg.up.railway.app',
       scoreApiBaseUrl: 'https://nagg.up.railway.app',
-      nostrGraphqlEndpoint: 'https://nagg.up.railway.app/graphql',
       primalCacheUrls: ['wss://cache1.primal.net/v1', 'wss://cache2.primal.net/v1'],
     });
   });
 
-  it('normalizes custom backend URLs and lets score and GraphQL calls move independently', () => {
+  it('normalizes custom backend URLs', () => {
     expect(
       parseBackendConfig({
         EXPO_PUBLIC_NOSTR_APPVIEW_BASE_URL: 'http://localhost:8080/',
         EXPO_PUBLIC_SCORE_API_BASE_URL: 'http://localhost:8080/',
-        EXPO_PUBLIC_NOSTR_GRAPHQL_ENDPOINT: 'http://localhost:8081/graphql/',
       })
     ).toEqual({
       nostrAppViewBaseUrl: 'http://localhost:8080',
       scoreApiBaseUrl: 'http://localhost:8080',
-      nostrGraphqlEndpoint: 'http://localhost:8081/graphql',
       primalCacheUrls: ['wss://cache1.primal.net/v1', 'wss://cache2.primal.net/v1'],
     });
   });
@@ -32,7 +29,6 @@ describe('backend config', () => {
       })
     ).toMatchObject({
       nostrAppViewBaseUrl: 'https://legacy-nagg.example.test',
-      nostrGraphqlEndpoint: 'https://legacy-nagg.example.test/graphql',
     });
   });
 
