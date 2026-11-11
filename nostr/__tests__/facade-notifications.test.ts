@@ -170,6 +170,7 @@ describe('relay notifications — flat floor + ownership gate', () => {
     }
     // ALL keeps the reaction too.
     const all = await tier.notifications!({ viewerPubkey: ME, ownEventIds: [MYEVENT], tab: 'ALL' });
+    expect(all.kind).toBe('answered');
     if (all.kind === 'answered') {
       expect([...all.value.itemsById.values()].map((n) => n.reason)).toContain('reaction');
     }
@@ -188,12 +189,14 @@ describe('relay notifications — flat floor + ownership gate', () => {
     const direct = await tier.notifications!({
       viewerPubkey: ME, ownEventIds: [MYEVENT], tab: 'MENTIONS', replyScope: 'DIRECT',
     });
+    expect(direct.kind).toBe('answered');
     if (direct.kind === 'answered') {
       expect([...direct.value.itemsById.keys()]).toEqual(['6'.repeat(64)]); // thread reply dropped
     }
     const thread = await tier.notifications!({
       viewerPubkey: ME, ownEventIds: [MYEVENT], tab: 'MENTIONS', replyScope: 'THREAD',
     });
+    expect(thread.kind).toBe('answered');
     if (thread.kind === 'answered') {
       expect([...thread.value.itemsById.keys()].sort()).toEqual(['5'.repeat(64), '6'.repeat(64)]);
     }
