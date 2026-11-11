@@ -570,6 +570,78 @@ describe('usePaymentStatusListener', () => {
     unmount();
   });
 
+  it('confirms a processing melt toast in place when its melt finishes, keeping that melt for View', () => {
+    const { unmount } = mount();
+    usePaymentStatusStore.getState().setActive({
+      variant: 'melt',
+      id: 'melt-toast',
+      mintUrl: MINT,
+      amount: 300,
+      unit: 'sat',
+      state: 'processing',
+    });
+
+    act(() =>
+      fake.emit('melt-op:finalized', {
+        mintUrl: MINT,
+        operationId: 'mo-1',
+        operation: { quoteId: 'mq-1', amount: 300, unit: 'sat', method: 'bolt11' },
+      })
+    );
+
+    expect(active()).toMatchObject({ id: 'melt-toast', state: 'confirmed', operationId: 'mo-1' });
+    expect(mockedPopup).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it('confirms a delivered payment-request toast when its send finishes', () => {
+    const { unmount } = mount();
+    usePaymentStatusStore.getState().setActive({
+      variant: 'payment-request',
+      id: 'pr-toast',
+      mintUrl: MINT,
+      amount: 5,
+      unit: 'sat',
+      state: 'delivered',
+    });
+
+    act(() =>
+      fake.emit('send:finalized', {
+        mintUrl: MINT,
+        operationId: 'pr-send',
+        operation: { amount: 5, unit: 'sat' },
+      })
+    );
+
+    expect(active()).toMatchObject({ id: 'pr-toast', state: 'confirmed', operationId: 'pr-send' });
+    expect(mockedPopup).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it('does not stack a failed toast on one the payment flow already failed for the same rollback', () => {
+    const { unmount } = mount();
+    usePaymentStatusStore.getState().setActive({
+      variant: 'melt',
+      id: 'melt-failed-fresh',
+      mintUrl: MINT,
+      amount: 300,
+      unit: 'sat',
+      state: 'failed',
+      errorMessage: 'Route failed',
+    });
+
+    act(() =>
+      fake.emit('melt-op:rolled-back', {
+        mintUrl: MINT,
+        operation: { id: 'mo-1', quoteId: 'mq-1', amount: 300, unit: 'sat', error: 'boom' },
+      })
+    );
+
+    expect(active()).toMatchObject({ id: 'melt-failed-fresh', errorMessage: 'Route failed' });
+    expect(mockedPopup).not.toHaveBeenCalled();
+    unmount();
+  });
+
   it('stays silent while a swap is running', async () => {
     const { unmount } = mount();
     startSwap();
