@@ -21,7 +21,7 @@ interface SwapLegOperations {
 
 const MELT_ROLLED_BACK = 'The payment did not go through. The funds are back in the sending mint.';
 
-/** Saved by a run that ended, or by an older build that had no value for an unknown outcome. */
+/** Saved by a run that is gone, or by an older build that had no value for an unknown outcome. */
 const LEFT_MID_FLIGHT: ReadonlySet<SwapLegLocalStatus | undefined> = new Set([
   'melting',
   'verifying',
@@ -33,22 +33,29 @@ const LEFT_MID_FLIGHT: ReadonlySet<SwapLegLocalStatus | undefined> = new Set([
  *
  * - A leg whose melt is rolled back is `failed`, whatever it said before.
  * - `paymentPending` (the melt was sent, its outcome unknown), and a leg a
- *   finished run left at `melting` or `verifying`, becomes `settling` once the
- *   melt is finalized.
+ *   run that is gone left at `melting` or `verifying`, becomes `settling` once
+ *   the melt is finalized.
  * - `settling` (the melt was paid, the destination had not issued) becomes
  *   `done` once this leg's mint operation is finalized without an error.
  *
  * Anything else stays as it is: a leg is never called done because time has
  * passed, and a mint operation that failed after its melt was paid is money
  * still outstanding, not a failed swap.
+ *
+ * A group saved as running that no run owns (`interrupted`) is then ended
+ * once every leg is at rest: `finished` when every leg reached an outcome,
+ * `cancelled` when one stopped before it sent anything.
  */
 export async function reconcileSwapLegs(manager: SwapLegOperations): Promise<void> {
   const unsettled: { groupId: string; leg: SwapLeg }[] = [];
+  const interrupted: string[] = [];
   for (const group of Object.values(useSwapTransactionsStore.getState().groups)) {
     const phase = swapGroupPhase(group);
-    const ended = phase === 'finished' || phase === 'cancelled';
+    if (phase === 'interrupted') interrupted.push(group.id);
+    // A live run settles its own legs in flight; nothing else will.
+    const runGone = phase !== 'running';
     for (const leg of group.legs) {
-      const stale = ended && LEFT_MID_FLIGHT.has(leg.localStatus);
+      const stale = runGone && LEFT_MID_FLIGHT.has(leg.localStatus);
       if (leg.localStatus === 'settling' || leg.localStatus === 'paymentPending' || stale) {
         unsettled.push({ groupId: group.id, leg });
       }
@@ -87,6 +94,50 @@ export async function reconcileSwapLegs(manager: SwapLegOperations): Promise<voi
       cashuLog.warn('swap.reconcile.read_failed', { legId: leg.id, error: redactError(error) });
     }
   }
+
+  for (const groupId of interrupted) endInterruptedGroup(groupId);
+}
+
+/**
+ * Whether nothing more can happen to this leg's money without a run. A melt
+ * is prepared only once the leg's invoice is ready, and sent only after that,
+ * so a leg before that point sent nothing; a leg that has a melt it may have
+ * sent waits for that melt's outcome.
+ */
+function atRest(leg: SwapLeg): boolean {
+  switch (leg.localStatus) {
+    case 'done':
+    case 'failed':
+    case 'pending':
+    case 'creatingInvoice':
+      return true;
+    case undefined:
+    case 'invoiceReady':
+      return !leg.meltOperationId;
+    case 'melting':
+    case 'verifying':
+    case 'paymentPending':
+    case 'settling':
+      return false;
+    default: {
+      const exhaustive: never = leg.localStatus;
+      return exhaustive;
+    }
+  }
+}
+
+/** End an interrupted group whose legs are all at rest, as its legs prove it went. */
+function endInterruptedGroup(groupId: string): void {
+  const store = useSwapTransactionsStore.getState();
+  const group = store.groups[groupId];
+  // Read again: a run may have taken the group up while operations were read.
+  if (!group || swapGroupPhase(group) !== 'interrupted' || !group.legs.every(atRest)) return;
+  const reachedOutcome = group.legs.every(
+    (leg) => leg.localStatus === 'done' || leg.localStatus === 'failed'
+  );
+  const end = group.legs.length > 0 && reachedOutcome ? 'finished' : 'cancelled';
+  cashuLog.info('swap.reconcile.end_interrupted', { groupId, end, legs: group.legs.length });
+  store.finalizeGroup(groupId, end);
 }
 
 /**

@@ -7,6 +7,7 @@
  */
 
 import { createSwapLegReconciler, reconcileSwapLegs } from '@/shared/lib/cashu/reconcileSwapLegs';
+import { holdSwapGroup } from '@/shared/lib/cashu/swapGroupPhase';
 import { useSwapTransactionsStore } from '@/shared/stores/profile/swapTransactionsStore';
 
 jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({
@@ -26,6 +27,8 @@ jest.mock('@/shared/lib/logger', () => ({
 type Operation = { state: string; error?: string } | null;
 
 beforeEach(() => useSwapTransactionsStore.setState({ groups: {}, quoteIdToGroup: {} }));
+
+const groupState = (groupId: string) => useSwapTransactionsStore.getState().groups[groupId].state;
 
 function manager(operations: { mint?: Operation; melt?: Operation }) {
   return {
@@ -115,42 +118,154 @@ it('marks a settling leg failed when its melt turns out to have been rolled back
 });
 
 it.each(['melting', 'verifying'] as const)(
-  'settles a leg a finished run left at %s, and leaves it alone while the run is going',
+  'settles a leg a finished run left at %s, and leaves it alone while its run is going',
   async (status) => {
     const leg = savedLeg(status);
     const coco = manager({ melt: { state: 'finalized' }, mint: { state: 'finalized' } });
+    const release = holdSwapGroup(leg.groupId);
 
     await reconcileSwapLegs(coco);
     expect(leg().localStatus).toBe(status);
+    expect(groupState(leg.groupId)).toBe('running');
 
     useSwapTransactionsStore.getState().finalizeGroup(leg.groupId, 'finished');
+    release();
     await reconcileSwapLegs(coco);
     expect(leg().localStatus).toBe('done');
   }
 );
 
-it.each(['melting', 'verifying'] as const)(
-  'QUIRK: a leg a run that never ended left at %s is never reconciled, and its group stays running',
-  async (status) => {
-    // The group is saved `running` and no run in this process owns it: the
-    // app was killed mid-run, or the run threw or was aborted (F211).
-    const leg = savedLeg(status);
-    const coco = manager({ melt: { state: 'finalized' }, mint: { state: 'finalized' } });
+describe('a group saved as running that no run owns (the app was killed mid-run)', () => {
+  it.each(['melting', 'verifying'] as const)(
+    'settles a leg left at %s from its own operations and ends the group finished',
+    async (status) => {
+      const leg = savedLeg(status);
+
+      await reconcileSwapLegs(
+        manager({ melt: { state: 'finalized' }, mint: { state: 'finalized' } })
+      );
+
+      expect(leg().localStatus).toBe('done');
+      expect(groupState(leg.groupId)).toBe('finished');
+    }
+  );
+
+  it('ends the group finished once a settling leg arrives', async () => {
+    const leg = savedLeg('settling');
+
+    await reconcileSwapLegs(manager({ mint: { state: 'finalized' } }));
+
+    expect(leg().localStatus).toBe('done');
+    expect(groupState(leg.groupId)).toBe('finished');
+  });
+
+  it('ends the group finished with the leg failed when its melt was rolled back', async () => {
+    const leg = savedLeg('melting');
+
+    await reconcileSwapLegs(manager({ melt: { state: 'rolled_back' } }));
+
+    expect(leg().localStatus).toBe('failed');
+    expect(groupState(leg.groupId)).toBe('finished');
+  });
+
+  it.each([
+    ['still pending', { state: 'pending' }],
+    ['executing', { state: 'executing' }],
+    ['unknown to Coco', null],
+  ])('leaves a melting leg and its group alone while the melt is %s', async (_name, melt) => {
+    const leg = savedLeg('melting');
+
+    await reconcileSwapLegs(manager({ melt, mint: { state: 'finalized' } }));
+
+    expect(leg().localStatus).toBe('melting');
+    expect(groupState(leg.groupId)).toBe('running');
+  });
+
+  it('leaves a melting leg with no melt to read, and its group, alone', async () => {
+    // A middleman hop records its melt only once the melt has settled.
+    const leg = savedLeg('melting');
+    useSwapTransactionsStore.setState((state) => ({
+      groups: {
+        ...state.groups,
+        [leg.groupId]: {
+          ...state.groups[leg.groupId],
+          legs: [{ ...leg(), meltOperationId: undefined }],
+        },
+      },
+    }));
+    const coco = manager({ mint: { state: 'finalized' } });
 
     await reconcileSwapLegs(coco);
 
-    expect(leg().localStatus).toBe(status);
-    expect(useSwapTransactionsStore.getState().groups[leg.groupId].state).toBe('running');
-  }
-);
+    expect(coco.ops.melt.get).not.toHaveBeenCalled();
+    expect(leg().localStatus).toBe('melting');
+    expect(groupState(leg.groupId)).toBe('running');
+  });
 
-it('QUIRK: a settling leg of a group no run owns reaches done while its group stays running', async () => {
-  const leg = savedLeg('settling');
+  it('keeps the group running while a paid leg has not arrived', async () => {
+    const leg = savedLeg('settling');
 
-  await reconcileSwapLegs(manager({ mint: { state: 'finalized' } }));
+    await reconcileSwapLegs(manager({ mint: { state: 'failed' } }));
 
-  expect(leg().localStatus).toBe('done');
-  expect(useSwapTransactionsStore.getState().groups[leg.groupId].state).toBe('running');
+    expect(leg().localStatus).toBe('settling');
+    expect(groupState(leg.groupId)).toBe('running');
+  });
+
+  it('ends the group cancelled when a leg stopped before it sent anything', async () => {
+    const leg = savedLeg('done');
+    const later = useSwapTransactionsStore.getState().addLeg(leg.groupId, {
+      fromMintUrl: 'https://mint.two',
+      toMintUrl: 'https://mint.three',
+      amount: 5,
+    });
+    useSwapTransactionsStore
+      .getState()
+      .setLegStatus(leg.groupId, later, { localStatus: 'creatingInvoice' });
+    const coco = manager({});
+
+    await reconcileSwapLegs(coco);
+
+    expect(coco.ops.melt.get).not.toHaveBeenCalled();
+    expect(groupState(leg.groupId)).toBe('cancelled');
+    expect(leg().localStatus).toBe('done');
+  });
+
+  it('ends a group with no legs cancelled', async () => {
+    const groupId = useSwapTransactionsStore.getState().startGroup({ unit: 'sat' });
+
+    await reconcileSwapLegs(manager({}));
+
+    expect(groupState(groupId)).toBe('cancelled');
+  });
+
+  it('leaves a group a live run owns running, and its legs in flight alone', async () => {
+    const leg = savedLeg('melting');
+    const release = holdSwapGroup(leg.groupId);
+
+    await reconcileSwapLegs(
+      manager({ melt: { state: 'finalized' }, mint: { state: 'finalized' } })
+    );
+
+    expect(leg().localStatus).toBe('melting');
+    expect(groupState(leg.groupId)).toBe('running');
+    release();
+  });
+
+  it('does not end a group a run took up while its operations were being read', async () => {
+    const leg = savedLeg('settling');
+    let release = () => {};
+    const coco = manager({});
+    coco.ops.mint.get.mockImplementation(async () => {
+      release = holdSwapGroup(leg.groupId);
+      return { state: 'finalized' };
+    });
+
+    await reconcileSwapLegs(coco);
+
+    expect(leg().localStatus).toBe('done');
+    expect(groupState(leg.groupId)).toBe('running');
+    release();
+  });
 });
 
 it('does not overwrite a leg that changed while its operation was being read', async () => {
