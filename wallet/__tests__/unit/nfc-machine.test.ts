@@ -687,7 +687,9 @@ describe("what an NFC tap leaves behind when it ends", () => {
           return { token: "cashuB-a", operationId: "op-a", historyEntry: "{}" };
         });
         const { tm, adapter, switchUnit } = setup({ unit: "usd", operations: { executeNfcSend } });
-        adapter.readPaymentRequest.mockImplementationOnce(() => new Promise<string>(() => {}));
+        adapter.readPaymentRequest.mockImplementationOnce(
+          () => new Promise<typeof INPUTS.paymentRequestBasic>(() => {}),
+        );
         const tapA = tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
         await vi.waitFor(() => expect(executeNfcSend).toHaveBeenCalledTimes(1));
         tm.machine.reset();
