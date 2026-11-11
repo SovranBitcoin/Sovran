@@ -70,6 +70,8 @@ function setup() {
     require('@/shared/stores/global/profileStore') as typeof import('@/shared/stores/global/profileStore');
   const { restartApp } =
     require('@/shared/lib/profile/appRestart') as typeof import('@/shared/lib/profile/appRestart');
+  const { registerTransitionControls } =
+    require('@/shared/lib/profile/profileTransition') as typeof import('@/shared/lib/profile/profileTransition');
   useProfileStore.setState({
     activeAccountIndex: 0,
     profiles: [
@@ -87,6 +89,7 @@ function setup() {
     useProfileStore,
     mockRestart: jest.mocked(restartApp),
     AsyncStorage,
+    registerTransitionControls,
   };
 }
 
@@ -238,7 +241,13 @@ describe('createAndSwitchProfile — capacity', () => {
   // switches into the index it just asked for, so a refusal it ignored would
   // leave the app running as an account the store does not hold.
   it('aborts instead of switching into a profile the store refused', async () => {
-    const { createAndSwitchProfile, useProfileStore, mockRestart, AsyncStorage } = setup();
+    const {
+      createAndSwitchProfile,
+      useProfileStore,
+      mockRestart,
+      AsyncStorage,
+      registerTransitionControls,
+    } = setup();
     mockRestart.mockReturnValue(true);
     useProfileStore.setState({
       activeAccountIndex: 0,
@@ -252,10 +261,9 @@ describe('createAndSwitchProfile — capacity', () => {
 
     const resetStages = jest.fn();
     const cancelResetStages = jest.fn();
+    registerTransitionControls({ resetStages, cancelResetStages });
     const created = await createAndSwitchProfile({
       getKeysForAccount: async () => ({ pubkey: 'f'.repeat(64), privateKey: new Uint8Array() }),
-      resetStages,
-      cancelResetStages,
     });
 
     expect(created).toBe(false);
