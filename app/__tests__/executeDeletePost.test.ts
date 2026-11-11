@@ -192,6 +192,16 @@ describe('executeDeletePost', () => {
     expect(deleteStore.complete).not.toHaveBeenCalled();
   });
 
+  it('a publish that throws ends the toast as failed and does not reject', async () => {
+    publishEvent.mockRejectedValueOnce(new Error('signer went away'));
+    await expect(
+      executeDeletePost({ ndk, pubkey: 'abc', event: makeEvent() })
+    ).resolves.toBeUndefined();
+
+    expect(deleteStore.fail).toHaveBeenCalled();
+    expect(markDeleteRequested).not.toHaveBeenCalled();
+  });
+
   it('drives per-relay legs from onRelayResult', async () => {
     publishEvent.mockImplementationOnce(async (opts: Record<string, unknown>) => {
       const cb = opts.onRelayResult as (r: unknown) => void;
