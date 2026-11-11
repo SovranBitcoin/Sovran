@@ -33,7 +33,7 @@ import { act, renderHook } from '@testing-library/react-native';
 import { useAiSend } from '@/features/ai/hooks/useAiSend';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
 import { emptyLineup, type AiLineup, type LineupEntry } from '@/shared/lib/routstr/lineup';
-import { sendMessage, checkBalance, ROUTSTR_MAX_COMPLETION_TOKENS } from '@/shared/lib/routstr/api';
+import { sendMessage, ROUTSTR_MAX_COMPLETION_TOKENS } from '@/shared/lib/routstr/api';
 import {
   AFFORD_BUFFER,
   maxSpendSats,
@@ -47,7 +47,6 @@ jest.mock('@/features/ai/lib/spendConfirm', () => ({ confirmSpend: jest.fn() }))
 jest.mock('@/shared/lib/routstr/api', () => ({
   ...jest.requireActual('@/shared/lib/routstr/api'),
   sendMessage: jest.fn(),
-  checkBalance: jest.fn(),
 }));
 jest.mock('@/shared/lib/routstr/refreshLineup', () => ({ refreshRoutstrLineup: jest.fn() }));
 jest.mock('@/shared/stores/global/profileStore', () => ({
@@ -165,7 +164,6 @@ async function sendWith(
 beforeEach(async () => {
   jest.clearAllMocks();
   await useRoutstrStore.persist.rehydrate();
-  jest.mocked(checkBalance).mockResolvedValue({ balance: 99_000 });
   sendMock.mockResolvedValue(success());
 });
 

@@ -146,7 +146,7 @@ function ThinkingHeader({
   const prefix = buildThinkingPrefix(seconds, isLive);
   const hasReasoning = reasoning.length > 0;
   // Cost only renders post-stream — mid-stream we don't have it yet, since
-  // the balance-diff is computed in the post-stream `checkBalance` resolve.
+  // the send reports what it spent only once the stream settles.
   const showCost = !isLive && costSats != null && costSats > 0;
 
   const headerRow = (

@@ -316,29 +316,7 @@ const ModelsResponseSpine = z.looseObject({
   ),
 });
 
-/**
- * A count of millisats from a provider. They are whole by definition; a node
- * that sends a fraction is rounded here, at the edge, so nothing downstream
- * holds a balance that is not a whole number. Not refused: a fraction is the
- * provider's arithmetic, not a reason to lose sight of the balance.
- */
-export const RoutstrMsats = z.number().finite().transform(Math.round);
-
-const BalanceSpine = z.looseObject({
-  balance: RoutstrMsats.optional(),
-  total_spent: RoutstrMsats.optional(),
-  api_key: z.string().optional(),
-  reserved: RoutstrMsats.optional(),
-});
-
 // ── Types ────────────────────────────────────────────────────────────────
-
-interface BalanceResponse {
-  balance: number;
-  total_spent?: number;
-  api_key?: string;
-  reserved?: number;
-}
 
 interface RoutstrError {
   status: number;
@@ -496,8 +474,7 @@ async function extractErrorMessageFromHTML(response: Response): Promise<string> 
  * (the store imports this module's types and the shared lineup), so the
  * store is resolved at call time — via `require` rather than a dynamic
  * `import()` because Metro handles both but Jest's CJS VM can only
- * execute the former, and the 401/402 branches below are exactly the
- * paths that need regression tests.
+ * execute the former.
  */
 function routstrStoreState() {
   const { useRoutstrStore } =
@@ -510,19 +487,6 @@ function captureRequestScope(): () => boolean {
   const node = routstrBaseUrl();
   return () =>
     useProfileStore.getState().activeAccountIndex === profile && routstrBaseUrl() === node;
-}
-
-function applyResponseChange(
-  response: Response,
-  requestKey: string,
-  ownsScope: () => boolean
-): string {
-  const token = response.headers.get('x-cashu');
-  if (token && ownsScope() && routstrStoreState().apiKey === requestKey) {
-    routstrStoreState().applyChangeToken(token);
-    return routstrStoreState().apiKey ?? requestKey;
-  }
-  return requestKey;
 }
 
 const ErrorEvidenceSchema = z.object({
@@ -677,12 +641,7 @@ export function isUpstreamRefusal(error: unknown): boolean {
  * Throw a typed RoutstrError from a failed fetch Response.
  * Shared by all API functions to avoid duplicating the parse → format → throw chain.
  */
-async function throwResponseError(
-  response: Response,
-  requestKey?: string,
-  balanceKey = requestKey,
-  ownsScope: () => boolean = () => true
-): Promise<never> {
+async function throwResponseError(response: Response): Promise<never> {
   const errorData = await parseErrorResponse(response);
   const status = response.status;
   // `message` and `code` are the only fields that separate a wallet 402 from a
@@ -700,48 +659,6 @@ async function throwResponseError(
     requiredMsats: errorData.details?.required,
     availableMsats: errorData.details?.available,
   });
-
-  // A 401 retires the credential from active use — but it is ARCHIVED, never
-  // deleted. The key is `sk-<sha256(token)>`, a row in one node's database, and
-  // the only bearer instrument for whatever was deposited there; deleting it
-  // makes that balance permanently unreachable. Worse, the message this branch
-  // reads cannot tell the two cases apart: "the node that issued this key says
-  // it is spent" and "a node that never issued it has never heard of it" both
-  // match. A repoint produces the second, so the old behaviour turned a routine
-  // node change into silent loss. Archive, and let reclaim ask each node.
-  const ownsKey = ownsScope() && requestKey != null && routstrStoreState().apiKey === requestKey;
-  if (status === 401 && ownsKey && requestKey != null) {
-    if (/invalid|expired|spent|unknown|not found|revoked/i.test(errorData.message)) {
-      const state = routstrStoreState();
-      apiLog.warn('api.routstr.api_key_retired', { hadBalance: (state.balance ?? 0) > 0 });
-      state.archiveAccount(state.nodeBaseUrl, requestKey, state.balance);
-      state.clearApiKey();
-      state.clearBalance();
-    } else {
-      apiLog.warn('routstr.auth.kept_key');
-    }
-  }
-
-  // 402 carries the server's true available balance ("X mSats required …
-  // Y available") — sync it into the store. The local balance otherwise
-  // only refreshes after a SUCCESSFUL stream, so a drained (or
-  // reservation-held) key leaves the UI gating sends against a stale
-  // figure forever: every affordability check passes client-side, every
-  // send 402s, and the insufficient-balance popup loops. Syncing here
-  // makes the balance pill, picker fades, and estimates truthful the
-  // moment the server disagrees.
-  if (
-    status === 402 &&
-    ownsScope() &&
-    balanceKey != null &&
-    routstrStoreState().apiKey === balanceKey
-  ) {
-    const available = errorData.details?.available;
-    if (typeof available === 'number' && isFinite(available) && available >= 0) {
-      apiLog.info('api.routstr.balance_synced_from_402', { availableMsats: available });
-      routstrStoreState().setBalance(available);
-    }
-  }
 
   throw {
     status,
@@ -838,12 +755,9 @@ interface ModelsResponse {
 async function readRoutstrEnvelope<TSpine extends z.ZodType>(
   response: Response,
   spine: TSpine,
-  meta: { route: string; invalidShapeEvent: string },
-  requestKey?: string,
-  balanceKey = requestKey,
-  ownsScope: () => boolean = () => true
+  meta: { route: string; invalidShapeEvent: string }
 ): Promise<z.infer<TSpine>> {
-  if (!response.ok) await throwResponseError(response, requestKey, balanceKey, ownsScope);
+  if (!response.ok) await throwResponseError(response);
 
   const validated = spine.safeParse(await response.json());
   if (!validated.success) {
@@ -947,60 +861,6 @@ export async function getModels(controls: RequestControls = {}): Promise<Routstr
     apiLog.error('api.routstr.models.failed', {
       status: error && typeof error === 'object' && 'status' in error ? error.status : 0,
       duration_ms: Math.round((performance.now() - start) * 100) / 100,
-    });
-    toRoutstrError(error);
-  }
-}
-
-export async function checkBalance(
-  apiKey: string,
-  controls: RequestControls = {}
-): Promise<BalanceResponse> {
-  apiLog.debug('api.routstr.balance.start', { hasApiKey: !!apiKey, keyLength: apiKey?.length });
-  const start = performance.now();
-  const ownsScope = captureRequestScope();
-  try {
-    const response = await fetch(`${routstrBaseUrl()}/wallet/info`, {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-      },
-      signal: buildAbortSignal({ timeoutMs: ROUTSTR_TIMEOUT_MS, ...controls }),
-    });
-    const balanceKey = applyResponseChange(response, apiKey, ownsScope);
-    apiLog.debug('api.routstr.balance.response', {
-      status: response.status,
-      duration_ms: Math.round(performance.now() - start),
-    });
-    const data = await readRoutstrEnvelope(
-      response,
-      BalanceSpine,
-      {
-        route: '/wallet/info',
-        invalidShapeEvent: 'api.routstr.balance.invalid_shape',
-      },
-      apiKey,
-      balanceKey,
-      ownsScope
-    );
-    const result = {
-      balance: data.balance ?? 0,
-      total_spent: data.total_spent ?? 0,
-      api_key: data.api_key,
-      reserved: data.reserved ?? 0,
-    };
-    apiLog.info('api.routstr.balance.success', {
-      balance: result.balance,
-      totalSpent: result.total_spent,
-      reserved: result.reserved,
-      hasServerKey: !!result.api_key,
-      duration_ms: Math.round(performance.now() - start),
-    });
-    return result;
-  } catch (error) {
-    apiLog.error('api.routstr.balance.failed', {
-      status: error && typeof error === 'object' && 'status' in error ? error.status : 0,
-      duration_ms: Math.round(performance.now() - start),
     });
     toRoutstrError(error);
   }
@@ -1686,7 +1546,7 @@ export async function sendMessage(
     // The change, if the node returned any, is already home: a non-streaming
     // response is finalized inside `routeRequest` before it comes back.
     try {
-      await deadline.wait(throwResponseError(response, undefined, undefined, ownsScope));
+      await deadline.wait(throwResponseError(response));
     } catch (error) {
       deadline.dispose();
       const refused = bound?.payment();
