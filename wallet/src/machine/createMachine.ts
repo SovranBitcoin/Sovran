@@ -285,12 +285,15 @@ const LEAVES_SETTLED_PREVIEW: Record<FlowEvent["type"], boolean> = {
  * session the read left open, and the unit it switched the host to for the
  * terminal. One EXECUTE turn opens it and ends it in one place (`endNfcTap`),
  * which every way out reaches. A tap a reset or a newer turn overtook ends
- * there too: it lets go of the tag and the unit, and touches nothing else.
+ * there too: it lets go of the tag and the unit while they are still its own,
+ * and touches nothing else.
  */
 interface NfcTap {
   /** What the tag said. */
   input: string;
   adapter: NfcIOAdapter;
+  /** The NFC read that started it (see `nfcRead`). */
+  read: number;
   /** The write-back releases the session itself; otherwise the tap's end does. */
   session: "held" | "released";
   /** The unit the host now shows, and how to switch back to the user's. */
@@ -336,6 +339,14 @@ export function createPaymentMachine(
     createURDecoder?.() ?? null;
   let processedScanInput: string | null = null;
   let lastScanSource: string | undefined;
+  // The tag session and the unit belong to one NFC tap at a time, and the
+  // adapter cannot tell one session from the next. `nfcRead` counts the NFC
+  // reads begun: each takes the session over from any before it, so only a
+  // tap whose read is still the latest releases it. `latestNfcTap` is the last
+  // tap the machine ran: only it switches the unit back, which a newer tap
+  // may have switched and now decides for.
+  let nfcRead = 0;
+  let latestNfcTap: NfcTap | null = null;
 
   // `step` and `stepData` are written together via `setStep<S>(s, d)` so the
   // discriminated `StepDataMap` carries through every transition. Previously
@@ -1059,23 +1070,35 @@ export function createPaymentMachine(
   }
 
   /**
+   * Lets go of a tap's tag session, once. A newer read took the session
+   * over, so a tap whose read is no longer the latest leaves it alone.
+   */
+  async function releaseNfcSession(tap: NfcTap): Promise<void> {
+    if (tap.session === "released") return;
+    tap.session = "released";
+    if (tap.read !== nfcRead) {
+      logger.info("machine.nfc.release.skipped", { reason: "newerRead" });
+      return;
+    }
+    await tap.adapter.releaseSession();
+  }
+
+  /**
    * Ends an NFC tap however it left: releases the tag session unless the
    * write-back did, and switches the unit back unless the tap paid. It does
-   * both for a tap a reset or a newer turn overtook as well, then returns
-   * false, and that turn returns without touching the machine.
+   * both for a tap a reset or a newer turn overtook as well, each only while
+   * it is still the tap's own, then returns false, and that turn returns
+   * without touching the machine.
    */
   async function endNfcTap(
     tap: NfcTap,
     end: NfcTapEnd,
     generation: number,
   ): Promise<boolean> {
-    if (tap.session === "held") {
-      tap.session = "released";
-      await tap.adapter.releaseSession().catch((error: unknown) => {
-        logger.warn("machine.nfc.release.failed", { error: errField(error) });
-      });
-    }
-    if (end.kind !== "paid") {
+    await releaseNfcSession(tap).catch((error: unknown) => {
+      logger.warn("machine.nfc.release.failed", { error: errField(error) });
+    });
+    if (end.kind !== "paid" && latestNfcTap === tap) {
       await tap.unitSwitch?.restore().catch(() => undefined);
     }
     return !isStaleGeneration(generation, "nfc.tap.end");
@@ -1413,8 +1436,15 @@ export function createPaymentMachine(
       let nfcError: StepDataMap["error"] | undefined;
       const nfcTap: NfcTap | null =
         event.type === "EXECUTE" && lastScanSource === "nfc" && nfcAdapter
-          ? { input: event.input, adapter: nfcAdapter, session: "held", unitSwitch: null }
+          ? {
+              input: event.input,
+              adapter: nfcAdapter,
+              read: nfcRead,
+              session: "held",
+              unitSwitch: null,
+            }
           : null;
+      if (nfcTap) latestNfcTap = nfcTap;
       // Every read of the wallet context below goes through `readContext`,
       // which keeps the balances in the unit the tap switched the host to.
       const readContext = (): ReturnType<typeof getContext> => {
@@ -1938,7 +1968,10 @@ export function createPaymentMachine(
                   data,
                   executeNfcSend: operations.executeNfcSend,
                   rollbackSend: operations.rollbackSend,
-                  nfcAdapter: nfcTap.adapter,
+                  nfcAdapter: {
+                    writeToken: (token) => nfcTap.adapter.writeToken(token),
+                    releaseSession: () => releaseNfcSession(nfcTap),
+                  },
                   context: flowCtx,
                   onProgress: (progress) => {
                     void notifications?.onNfcPaymentProgress?.(progress);
@@ -2379,6 +2412,7 @@ export function createPaymentMachine(
           const hasData = data != null && data.length > 0;
           lastScanSource =
             options?.source ?? (hasData ? undefined : "clipboard");
+          if (lastScanSource === "nfc") nfcRead += 1;
 
           if (hasData) {
             return processScanData(data);

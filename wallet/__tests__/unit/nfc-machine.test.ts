@@ -640,6 +640,63 @@ describe("what an NFC tap leaves behind when it ends", () => {
       expect(tap.adapter.releaseSession).toHaveBeenCalledTimes(1);
       expect(unitSwitches(tap.switchUnit)).toEqual(["usd"]);
     });
+
+    // The session and the unit hold one tap at a time. A newer tap's read
+    // took the session over; a newer tap the machine runs owns the unit.
+    describe("when a newer tap began after the reset", () => {
+      it("leaves the tag and the unit to a newer tap the machine runs", async () => {
+        const createdA = deferred();
+        const createdB = deferred();
+        const executeNfcSend = vi
+          .fn()
+          .mockImplementationOnce(async () => {
+            await createdA.promise;
+            return { token: "cashuB-a", operationId: "op-a", historyEntry: "{}" };
+          })
+          .mockImplementationOnce(async () => {
+            await createdB.promise;
+            return { token: "cashuB-b", operationId: "op-b", historyEntry: "{}" };
+          });
+        const { tm, adapter, switchUnit } = setup({ unit: "usd", operations: { executeNfcSend } });
+        const tapA = tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
+        await vi.waitFor(() => expect(executeNfcSend).toHaveBeenCalledTimes(1));
+        tm.machine.reset();
+        const tapB = tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
+        await vi.waitFor(() => expect(executeNfcSend).toHaveBeenCalledTimes(2));
+
+        createdA.resolve();
+        await tapA;
+        expect(adapter.releaseSession).not.toHaveBeenCalled();
+        expect(unitSwitches(switchUnit)).toEqual(["usd"]);
+
+        createdB.resolve();
+        await tapB;
+        tm.assertStep("sendComplete");
+        expect(adapter.writeToken.mock.calls).toEqual([["cashuB-b"]]);
+        expect(adapter.releaseSession).toHaveBeenCalledTimes(1);
+        expect(unitSwitches(switchUnit)).toEqual(["usd"]);
+      });
+
+      it("switches the unit back but leaves the tag to a newer tap still reading", async () => {
+        const created = deferred();
+        const executeNfcSend = vi.fn(async () => {
+          await created.promise;
+          return { token: "cashuB-a", operationId: "op-a", historyEntry: "{}" };
+        });
+        const { tm, adapter, switchUnit } = setup({ unit: "usd", operations: { executeNfcSend } });
+        adapter.readPaymentRequest.mockImplementationOnce(() => new Promise<string>(() => {}));
+        const tapA = tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
+        await vi.waitFor(() => expect(executeNfcSend).toHaveBeenCalledTimes(1));
+        tm.machine.reset();
+        void tm.machine.scan!(undefined, { source: "nfc" });
+        await vi.waitFor(() => expect(adapter.readPaymentRequest).toHaveBeenCalledTimes(1));
+
+        created.resolve();
+        await tapA;
+        expect(adapter.releaseSession).not.toHaveBeenCalled();
+        expect(unitSwitches(switchUnit)).toEqual(["usd", "sat"]);
+      });
+    });
   });
 });
 

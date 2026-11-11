@@ -301,7 +301,9 @@ ended in one place after the auto-resolve loop: every way out, a throw
 included, releases the session unless the write-back already did and switches
 the unit back unless the tap paid (its token is on the tag). The tap checks its
 turn after every await; a tap a reset overtook still releases the session and
-switches the unit back, and touches nothing else (`endNfcTap`). A `confirmPaymentRequest()` call's result is settled only by its own
+switches the unit back, and touches nothing else (`endNfcTap`). Each only while
+it is still the tap's own: an NFC read begun since took the session over
+(`nfcRead`), and a tap the machine ran since owns the unit (`latestNfcTap`). A `confirmPaymentRequest()` call's result is settled only by its own
 turn, so a tap that sent nothing resolves `ignored`.
 
 Gather order is fixed: amount -> mint -> proofs -> terminal
