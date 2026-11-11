@@ -237,6 +237,86 @@ describe("paymentRequestAvailability — cancel", () => {
   });
 });
 
+// Every phase the confirm handler writes, and the values no writer produces,
+// with the Pay and Cancel each one leaves on screen.
+describe("paymentRequestAvailability — each phase the entry can carry", () => {
+  const base = {
+    id: "pr-preview-123",
+    type: "send",
+    mintUrl: "https://mint1.example.com",
+    amount: 100,
+  };
+
+  it("offers neither Pay nor Cancel once the ecash left and was not taken back", () => {
+    const actions = getAvailableActions("paymentRequest", {
+      ...base,
+      state: "pending",
+      operationId: "op-9",
+      metadata: { operationId: "op-9", phase: "undelivered", tokenCreated: "true" },
+    });
+    expect(actions.confirm.available).toBe(false);
+    expect(actions.cancel.available).toBe(false);
+  });
+
+  it("offers no Pay once the ecash was taken back", () => {
+    const actions = getAvailableActions("paymentRequest", {
+      ...base,
+      state: "rolledBack",
+      operationId: "pr-preview-123",
+      metadata: {
+        operationId: "pr-preview-123",
+        phase: "rolledBack",
+        tokenCreated: "true",
+      },
+    });
+    expect(actions.confirm.available).toBe(false);
+  });
+
+  it("offers neither Pay nor Cancel for a delivered entry that kept the preview id", () => {
+    const actions = getAvailableActions("paymentRequest", {
+      ...base,
+      state: "pending",
+      operationId: "pr-preview-123",
+      metadata: {
+        operationId: "pr-preview-123",
+        phase: "delivered",
+        tokenCreated: "true",
+        nostrSent: "true",
+      },
+    });
+    expect(actions.confirm.available).toBe(false);
+    expect(actions.cancel.available).toBe(false);
+  });
+
+  it("offers neither Pay nor Cancel when the phase says delivered without an operation id", () => {
+    const actions = getAvailableActions("paymentRequest", {
+      ...base,
+      metadata: { phase: "delivered" },
+    });
+    expect(actions.confirm.available).toBe(false);
+    expect(actions.cancel.available).toBe(false);
+  });
+
+  it("offers Cancel but no Pay for a phase no writer produces", () => {
+    const actions = getAvailableActions("paymentRequest", {
+      ...base,
+      metadata: { phase: "sending" },
+    });
+    expect(actions.confirm.available).toBe(false);
+    expect(actions.cancel.available).toBe(true);
+  });
+
+  it("offers neither Pay nor Cancel for an unknown phase with an operation id", () => {
+    const actions = getAvailableActions("paymentRequest", {
+      ...base,
+      operationId: "op-1",
+      metadata: { phase: "sending" },
+    });
+    expect(actions.confirm.available).toBe(false);
+    expect(actions.cancel.available).toBe(false);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // isPaymentRequestPreview
 // ---------------------------------------------------------------------------

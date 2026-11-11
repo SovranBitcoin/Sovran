@@ -995,6 +995,66 @@ describe("paymentRequest confirm outcome on the screen entry", () => {
     expect(mgr.inspect().confirm.available).toBe(false);
   });
 
+  // The strings the timeline and the payment request screen read.
+  it("writes the delivered entry with the preview id as its operation id", async () => {
+    const { mgr } = await confirmWith(async () => ({
+      historyEntry: JSON.stringify({ id: "op-1", type: "send", state: "pending" }),
+    }));
+
+    expect(mgr.getEntry()).toEqual({
+      ...previewEntry,
+      state: "pending",
+      operationId: "pr-preview-1",
+      metadata: {
+        ...previewEntry.metadata,
+        operationId: "pr-preview-1",
+        phase: "delivered",
+        tokenCreated: "true",
+        nostrSent: "true",
+      },
+    });
+    expect(mgr.inspect().cancel.available).toBe(false);
+  });
+
+  it("writes the undelivered entry with the operation's id and no sent flag", async () => {
+    const { mgr } = await confirmWith(async () => {
+      throw new PaymentRequestUndeliveredError("op-9", new Error("relay down"));
+    });
+
+    expect(mgr.getEntry()).toEqual({
+      ...previewEntry,
+      state: "pending",
+      operationId: "op-9",
+      metadata: {
+        ...previewEntry.metadata,
+        operationId: "op-9",
+        phase: "undelivered",
+        tokenCreated: "true",
+      },
+    });
+  });
+
+  it("marks the entry rolled back, with no Pay, when the ecash was taken back", async () => {
+    const { mgr } = await confirmWith(async () => ({
+      historyEntry: JSON.stringify({ id: "op-2", type: "send", state: "rolledBack" }),
+      rolledBack: true,
+      errorMessage: "relay down",
+    }));
+
+    expect(mgr.getEntry()).toEqual({
+      ...previewEntry,
+      state: "rolledBack",
+      operationId: "pr-preview-1",
+      metadata: {
+        ...previewEntry.metadata,
+        operationId: "pr-preview-1",
+        phase: "rolledBack",
+        tokenCreated: "true",
+      },
+    });
+    expect(mgr.inspect().confirm.available).toBe(false);
+  });
+
   it("tells a tap locked out by a send in flight that it was ignored", async () => {
     const tm = createTestMachine();
     await tm.machine.execute(INPUTS.paymentRequestBasic, { reset: true });
