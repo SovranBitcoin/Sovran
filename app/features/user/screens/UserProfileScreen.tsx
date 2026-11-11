@@ -1039,7 +1039,7 @@ async function startSendMoneyToProfile(ctx: {
   }
 }
 
-async function toggleFollowContacts(ctx: {
+export async function toggleFollowContacts(ctx: {
   pubkey: string;
   ownPubkey: string | undefined;
   ndk: ReturnType<typeof useNDK>['ndk'];
