@@ -16,6 +16,7 @@ export type SubscriptionEventType =
 export type ScreenActionsChangedReason =
   | 'scanHistory'
   | 'transactionDistribution'
+  | 'transactionAnnotation'
   | 'settings'
   | 'offline'
   | 'unknown';
