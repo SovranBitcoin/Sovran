@@ -34,6 +34,7 @@ import {
 } from '@/shared/stores/profile/nostrSocialStore';
 import { captureActiveProfile } from '@/shared/stores/global/profileStore';
 import {
+  MAX_FUTURE_SEC,
   matchingSigner,
   publishToRelaysRead,
   readForEdit,
@@ -149,9 +150,6 @@ const ContactEvent = z.object({
   content: z.string(),
   created_at: z.number().int().nonnegative(),
 });
-
-/** How far ahead of this device's clock a list may be dated, as for the mute list. */
-const MAX_FUTURE_SEC = 60;
 
 /**
  * Decode the read: a list only from a complete read, and only one that

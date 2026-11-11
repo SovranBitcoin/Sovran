@@ -44,6 +44,13 @@ export async function matchingSigner(ndk: NDK, pubkey: string) {
   return signer;
 }
 
+/**
+ * How far ahead of this device's clock an own event may be dated and still
+ * be built on. One dated further ahead is not a base for an edit: ours would
+ * be dated there too, and relays would keep it over every later one.
+ */
+export const MAX_FUTURE_SEC = 60;
+
 /** Now, or one second past a later-dated base: relays keep the newer replaceable event. */
 export const nextReplaceableCreatedAt = (base = 0, now = Math.floor(Date.now() / 1000)) =>
   Math.max(now, base + 1);
