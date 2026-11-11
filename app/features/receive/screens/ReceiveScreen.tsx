@@ -386,7 +386,7 @@ function ReceiveScreenForUnit({
   const creqLockPubkey = creqMintSelection.p2pkLockEffective
     ? receiveEntryData?.p2pkKey
     : undefined;
-  const bip321 = useBip321RailSelection(unit, walletContext);
+  const bip321 = useBip321RailSelection(unit);
   const creqEnabled =
     selectedTab === 'Cashu' ||
     bip321.selection.rails.some((rail) => rail.id === 'creq' && rail.state === 'included');
@@ -574,7 +574,6 @@ function ReceiveScreenForUnit({
                         )
                       }
                       unit={unit}
-                      walletContext={walletContext}
                       actions={actions}
                       muted={muted}
                       onQrPayload={onOfferPayload}
@@ -602,7 +601,6 @@ function ReceiveScreenForUnit({
                       )
                     }
                     unit={unit}
-                    walletContext={walletContext}
                     actions={actions}
                     muted={muted}
                     onQrPayload={onOnchainPayload}

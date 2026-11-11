@@ -1,11 +1,9 @@
 /** @jest-environment node */
-import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 
 import type { MintMethodCapabilityMap } from 'wallet';
 import { ReceiveReusableQuoteTab } from '@/features/receive/components/ReceiveReusableQuoteTab';
 import { useBip321RailSelection } from '@/features/receive/hooks/useBip321RailSelection';
-import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -97,16 +95,8 @@ const actions = {
 
 let selection: ReturnType<typeof useBip321RailSelection> | null = null;
 function Probe({ method }: { method: 'bolt12' | 'onchain' }) {
-  selection = useBip321RailSelection('sat', useWalletContext());
-  return (
-    <ReceiveReusableQuoteTab
-      method={method}
-      unit="sat"
-      walletContext={useWalletContext()}
-      actions={actions}
-      muted="white"
-    />
-  );
+  selection = useBip321RailSelection('sat');
+  return <ReceiveReusableQuoteTab method={method} unit="sat" actions={actions} muted="white" />;
 }
 
 function render(method: 'bolt12' | 'onchain' = 'bolt12') {

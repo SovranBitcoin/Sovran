@@ -30,7 +30,6 @@ jest.mock('wallet/react', () => ({
   useColadaManager: () => mockManager,
 }));
 jest.mock('wallet', () => ({
-  getMintMethodCapability: () => ({ supported: true }),
   buildBip321OnchainUri: (value: string) => value,
   standingPaymentRequestKey: (unit: string) => unit,
   isTestnutUnit: (unit: string) => unit.startsWith('t'),
@@ -40,7 +39,11 @@ jest.mock('@/shared/stores/global/mintTestnutStore', () => ({
   isTestnutMint: (mintUrl: string) => mintUrl.includes('testnut'),
 }));
 jest.mock('@/features/receive/hooks/useReceiveMethodMint', () => ({
-  useReceiveMethodMint: () => ({ mintUrl: 'https://mint.example', anyMintSupports: mockSupports }),
+  useReceiveMethodMint: () => ({
+    mintUrl: 'https://mint.example',
+    anyMintSupports: mockSupports,
+    supported: true,
+  }),
 }));
 jest.mock('@/shared/hooks/useMintInfo', () => ({ useMintInfo: () => null }));
 // Each poll of the standing address hands the tab a fresh summary object; a
@@ -183,7 +186,6 @@ const actions = {
 const props = {
   method: 'bolt12' as const,
   unit: 'sat',
-  walletContext: { trustedMintUrls: ['https://mint.example'], mintBalances: {} },
   actions,
   muted: 'white',
 };
