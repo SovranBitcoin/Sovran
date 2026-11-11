@@ -65,7 +65,7 @@ const STAGES = {
   'nostr-ndk': { dependsOn: ['coco'], blocking: false },
 } as const satisfies Record<string, StageConfig>;
 
-export type StageId = keyof typeof STAGES;
+type StageId = keyof typeof STAGES;
 
 interface Stage {
   id: string;

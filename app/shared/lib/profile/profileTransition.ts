@@ -85,7 +85,7 @@ export async function clearTransitionGuardOnStartup(): Promise<void> {
 }
 
 // ── Registered controls (set at runtime by layout components) ────
-export type TransitionControls = {
+type TransitionControls = {
   resetStages: (options?: { keepStagesThatOutliveAccount?: boolean }) => void;
   cancelResetStages: () => void;
 };
