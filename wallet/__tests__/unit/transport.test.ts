@@ -483,6 +483,20 @@ describe("createMeshRedeemOrchestrator", () => {
         nextAttemptAt: Number.MAX_SAFE_INTEGER,
       }),
       interrupted: entry({ token: "interrupted", status: "redeeming" }),
+      interruptedRetryDue: entry({
+        token: "interruptedRetryDue",
+        status: "redeeming",
+        attempts: 1,
+        nextAttemptAt: 1,
+      }),
+      // An older build kept the retry time when it started the receive, and
+      // the clock has since moved back: it still waits for that time.
+      interruptedBackingOff: entry({
+        token: "interruptedBackingOff",
+        status: "redeeming",
+        attempts: 1,
+        nextAttemptAt: Number.MAX_SAFE_INTEGER,
+      }),
       redeemed: entry({ token: "redeemed", status: "redeemed" }),
       spent: entry({ token: "spent", status: "spent" }),
       untrusted: entry({ token: "untrusted", status: "untrusted-mint" }),
@@ -501,7 +515,12 @@ describe("createMeshRedeemOrchestrator", () => {
       },
     });
     await orchestrator.drain();
-    expect(received).toEqual(["due", "retryDue", "interrupted"]);
+    expect(received).toEqual([
+      "due",
+      "retryDue",
+      "interrupted",
+      "interruptedRetryDue",
+    ]);
   });
 
   it("a drain with nothing arriving during it runs once", async () => {

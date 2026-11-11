@@ -22,7 +22,7 @@ import type { Manager } from "@cashu/coco-core";
 import { NetworkError, HttpResponseError } from "@cashu/coco-core";
 import { logger, mintUrlFields } from "../logger";
 import {
-  isMeshRedeemDue,
+  isMeshRedeemInPlay,
   meshRedeemPhase,
   type MeshRedeemEntry,
   type MeshRedeemStatus,
@@ -163,10 +163,14 @@ export function createMeshRedeemOrchestrator(
     // `redeeming` entries are recovered too: single-flight means they can
     // only exist from a drain interrupted by a crash or an expired
     // background budget. Retrying is safe — a receive that actually
-    // completed re-classifies as `spent`.
+    // completed re-classifies as `spent`. Like a waiting entry, one whose
+    // retry time is still to come waits for it.
     const due = Object.entries(config.queue.entries()).filter(([, entry]) => {
       const phase = meshRedeemPhase(entry);
-      return isMeshRedeemDue(phase, cutoff) || phase.kind === "redeeming";
+      return (
+        isMeshRedeemInPlay(phase) &&
+        (phase.retryAt === null || phase.retryAt <= cutoff)
+      );
     });
     if (due.length === 0) return;
 

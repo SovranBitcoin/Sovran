@@ -111,9 +111,11 @@ export type MeshRedeemPhase =
   | { kind: "waiting"; retryAt: number | null }
   /**
    * A receive was started and its end was not recorded: still running, or
-   * cut short by a kill or an expired background budget.
+   * cut short by a kill or an expired background budget. `retryAt` is the
+   * retry time the entry carried when it started (null when none); a receive
+   * cut short is resumed once that time has come, as it always was.
    */
-  | { kind: "redeeming" }
+  | { kind: "redeeming"; retryAt: number | null }
   /** Received into this wallet. */
   | { kind: "redeemed" }
   /** The mint says its proofs are spent. */
@@ -132,6 +134,8 @@ export function meshRedeemPhase(
   switch (entry.status) {
     case "pending":
       return waiting(entry.nextAttemptAt);
+    case "redeeming":
+      return { kind: "redeeming", retryAt: retryAt(entry.nextAttemptAt) };
     case "failed":
       // Only a retry that ran out sets the count this high; a refusal ends
       // an entry with the count it had.
@@ -142,7 +146,6 @@ export function meshRedeemPhase(
             ? "out-of-retries"
             : "refused",
       };
-    case "redeeming":
     case "redeemed":
     case "spent":
     case "untrusted-mint":
@@ -153,7 +156,12 @@ export function meshRedeemPhase(
 }
 
 function waiting(nextAttemptAt: number): MeshRedeemPhase {
-  return { kind: "waiting", retryAt: nextAttemptAt > 0 ? nextAttemptAt : null };
+  return { kind: "waiting", retryAt: retryAt(nextAttemptAt) };
+}
+
+/** A saved retry time of 0 means none was set. */
+function retryAt(nextAttemptAt: number): number | null {
+  return nextAttemptAt > 0 ? nextAttemptAt : null;
 }
 
 /**
@@ -172,7 +180,9 @@ export function isMeshRedeemDue(phase: MeshRedeemPhase, now: number): boolean {
 }
 
 /** In line, whether or not its time has come, or being received: work the drain still has. */
-export function isMeshRedeemInPlay(phase: MeshRedeemPhase): boolean {
+export function isMeshRedeemInPlay(
+  phase: MeshRedeemPhase,
+): phase is Extract<MeshRedeemPhase, { kind: "waiting" | "redeeming" }> {
   return phase.kind === "waiting" || phase.kind === "redeeming";
 }
 
