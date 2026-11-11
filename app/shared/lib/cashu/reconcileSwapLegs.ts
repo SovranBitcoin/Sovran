@@ -39,8 +39,13 @@ const MELT_ROLLED_BACK = 'The payment did not go through. The funds are back in 
  * A group saved as running that no run owns (`interrupted`) is then ended
  * once no leg's money may still move: `finished` when every leg reached an outcome,
  * `cancelled` when one stopped before it sent anything.
+ *
+ * Nothing is written once `isCurrent` says this pass has been replaced.
  */
-export async function reconcileSwapLegs(manager: SwapLegOperations): Promise<void> {
+export async function reconcileSwapLegs(
+  manager: SwapLegOperations,
+  isCurrent: () => boolean = () => true
+): Promise<void> {
   const unsettled: { groupId: string; leg: SwapLeg }[] = [];
   const interrupted: string[] = [];
   for (const group of Object.values(useSwapTransactionsStore.getState().groups)) {
@@ -59,11 +64,22 @@ export async function reconcileSwapLegs(manager: SwapLegOperations): Promise<voi
   for (const { groupId, leg } of unsettled) {
     try {
       let status = leg.localStatus;
-      /** Write only while the leg still says what this pass read. */
+      /**
+       * Write only while the leg is still the attempt this pass read: the
+       * same status and the same operations. A retry can prepare a new melt
+       * or mint and keep, or come back to, the same status.
+       */
       const move = (update: SwapLegStatusUpdate) => {
+        if (!isCurrent()) return false;
         const store = useSwapTransactionsStore.getState();
         const current = store.groups[groupId]?.legs.find((saved) => saved.id === leg.id);
-        if (current?.localStatus !== status) return false;
+        if (
+          current?.localStatus !== status ||
+          current.meltOperationId !== leg.meltOperationId ||
+          current.mintOperationId !== leg.mintOperationId
+        ) {
+          return false;
+        }
         store.setLegStatus(groupId, leg.id, update);
         status = update.localStatus;
         return true;
@@ -89,6 +105,7 @@ export async function reconcileSwapLegs(manager: SwapLegOperations): Promise<voi
     }
   }
 
+  if (!isCurrent()) return;
   for (const groupId of interrupted) endInterruptedGroup(groupId);
 }
 
@@ -109,7 +126,8 @@ function endInterruptedGroup(groupId: string): void {
 /**
  * Runs `reconcileSwapLegs` one pass at a time. A request that lands during a
  * pass asks for one more instead of starting its own, so a burst of operation
- * events costs two passes, not one each.
+ * events costs two passes, not one each. Once stopped it writes nothing,
+ * including from a pass that was reading when it stopped.
  */
 export function createSwapLegReconciler(manager: SwapLegOperations) {
   let active = true;
@@ -120,7 +138,7 @@ export function createSwapLegReconciler(manager: SwapLegOperations) {
     try {
       do {
         again = false;
-        await reconcileSwapLegs(manager);
+        await reconcileSwapLegs(manager, () => active);
       } while (again && active);
     } catch (error) {
       cashuLog.warn('swap.reconcile.failed', { error: redactError(error) });
@@ -129,6 +147,7 @@ export function createSwapLegReconciler(manager: SwapLegOperations) {
   };
   return {
     run: () => {
+      if (!active) return;
       if (running) again = true;
       else void pass();
     },

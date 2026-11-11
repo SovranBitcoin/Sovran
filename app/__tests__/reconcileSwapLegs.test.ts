@@ -339,6 +339,65 @@ it('does not overwrite a leg that changed while its operation was being read', a
   expect(leg().localStatus).toBe('failed');
 });
 
+describe('a result read for an earlier attempt is never applied to a later one', () => {
+  it('when a retry prepared a new melt and the leg kept its status', async () => {
+    // A retry for short inputs: the leg stays at invoiceReady and its first
+    // melt is rolled back while a new one is prepared.
+    const leg = savedLeg('invoiceReady', { mint: 'mint-1', melt: 'melt-1' });
+    useSwapTransactionsStore.getState().finalizeGroup(leg.groupId, 'cancelled');
+    const coco = manager({});
+    coco.ops.melt.get.mockImplementation(async () => {
+      useSwapTransactionsStore
+        .getState()
+        .tagMelt(leg.groupId, leg.legId, { quoteId: 'q-melt-2', operationId: 'melt-2' });
+      return { state: 'rolled_back' };
+    });
+
+    await reconcileSwapLegs(coco);
+
+    expect(leg()).toMatchObject({ localStatus: 'invoiceReady', meltOperationId: 'melt-2' });
+  });
+
+  it('when a retry came back to the same status with a new mint', async () => {
+    const leg = savedLeg('settling', { mint: 'mint-1', melt: 'melt-1' });
+    const coco = manager({ melt: { state: 'finalized' } });
+    coco.ops.mint.get.mockImplementation(async () => {
+      const store = useSwapTransactionsStore.getState();
+      for (const localStatus of ['failed', 'creatingInvoice', 'invoiceReady'] as const) {
+        store.setLegStatus(leg.groupId, leg.legId, { localStatus });
+      }
+      store.tagMintQuote(leg.groupId, leg.legId, { quoteId: 'q-mint-2', operationId: 'mint-2' });
+      store.tagMelt(leg.groupId, leg.legId, { quoteId: 'q-melt-2', operationId: 'melt-2' });
+      store.setLegStatus(leg.groupId, leg.legId, { localStatus: 'settling' });
+      return { state: 'finalized' };
+    });
+
+    await reconcileSwapLegs(coco);
+
+    expect(leg()).toMatchObject({ localStatus: 'settling', mintOperationId: 'mint-2' });
+  });
+});
+
+it('writes nothing once stopped, though a pass was reading when it stopped', async () => {
+  const leg = savedLeg('settling');
+  let finishRead: (operation: Operation) => void = () => {};
+  const coco = manager({});
+  coco.ops.mint.get.mockImplementation(
+    () => new Promise<Operation>((resolve) => (finishRead = resolve))
+  );
+  const reconciler = createSwapLegReconciler(coco);
+
+  reconciler.run();
+  await new Promise((resolve) => setImmediate(resolve));
+  expect(coco.ops.mint.get).toHaveBeenCalledTimes(1);
+  reconciler.stop();
+  finishRead({ state: 'finalized' });
+  for (let i = 0; i < 5; i++) await new Promise((resolve) => setImmediate(resolve));
+
+  expect(leg().localStatus).toBe('settling');
+  expect(groupState(leg.groupId)).toBe('running');
+});
+
 it('reads nothing when no leg is unsettled', async () => {
   savedLeg('done');
   const coco = manager({});
