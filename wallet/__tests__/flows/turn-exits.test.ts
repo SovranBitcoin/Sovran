@@ -138,6 +138,13 @@ async function isFree(machine: Machine): Promise<boolean> {
 
 const isExecuting = (machine: Machine) => machine.inspect().isExecuting;
 
+/** A subscriber whose render throws once it sees the machine executing. */
+function throwWhileExecuting(machine: Machine): () => void {
+  return machine.subscribe(() => {
+    if (machine.inspect().isExecuting) throw new Error("render failed");
+  });
+}
+
 function meltQuote(overrides?: Partial<MeltQuotePreview>): MeltQuotePreview {
   return {
     quoteId: "quote-1",
@@ -594,6 +601,46 @@ describe("Pay on a melt preview", () => {
     expect(await isFree(tm.machine)).toBe(true);
   });
 
+  // The throw reaches the caller as before, and nothing was paid; the turn
+  // finishes, so the next Pay pays.
+  it("is free and pays nothing when a listener throws as the melt starts", async () => {
+    const tm = build();
+    await toMeltPreview(tm.machine);
+    const unsubscribe = throwWhileExecuting(tm.machine);
+
+    await expect(tm.machine.confirmMelt()).rejects.toThrow("render failed");
+
+    expect(tm.calls("executeMelt")).toBe(0);
+    expect(isExecuting(tm.machine)).toBe(false);
+    expect(await isFree(tm.machine)).toBe(true);
+    unsubscribe();
+    await tm.machine.confirmMelt();
+    expect(tm.calls("executeMelt")).toBe(1);
+  });
+
+  it("is free and asks for no quote when a listener throws as an expired quote refreshes", async () => {
+    let quotes = 0;
+    const tm = build({
+      operations: {
+        quoteMelt: async () => {
+          quotes += 1;
+          return meltQuote({ quoteId: `quote-${quotes}`, expiresAt: 1 });
+        },
+      },
+    });
+    await toMeltPreview(tm.machine);
+    const unsubscribe = throwWhileExecuting(tm.machine);
+
+    await expect(tm.machine.confirmMelt()).rejects.toThrow("render failed");
+
+    expect(quotes).toBe(1);
+    expect(isExecuting(tm.machine)).toBe(false);
+    expect(await isFree(tm.machine)).toBe(true);
+    unsubscribe();
+    await tm.machine.confirmMelt();
+    expect(quotes).toBe(2);
+  });
+
   // The melt was paid: a link or notification that throws afterwards is
   // logged, and neither keeps the machine held nor lets Pay pay again.
   it("finishes and keeps the melt paid when linking it throws", async () => {
@@ -771,6 +818,20 @@ describe("Pay on a payment request", () => {
     expect(await isFree(tm.machine)).toBe(true);
     expect(await tm.machine.confirmPaymentRequest()).toEqual({ kind: "ignored" });
     expect(tm.calls("executePaymentRequest")).toBe(1);
+  });
+
+  it("is free and sends nothing when a listener throws as the send starts", async () => {
+    const tm = build();
+    await toPaymentRequest(tm.machine);
+    const unsubscribe = throwWhileExecuting(tm.machine);
+
+    await expect(tm.machine.confirmPaymentRequest()).rejects.toThrow("render failed");
+
+    expect(tm.calls("executePaymentRequest")).toBe(0);
+    expect(isExecuting(tm.machine)).toBe(false);
+    expect(await isFree(tm.machine)).toBe(true);
+    unsubscribe();
+    expect((await tm.machine.confirmPaymentRequest()).kind).toBe("delivered");
   });
 
   // A listener is the subscriber's code: its throw reaches the caller, but

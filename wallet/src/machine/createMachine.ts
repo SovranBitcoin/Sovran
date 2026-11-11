@@ -450,6 +450,19 @@ export function createPaymentMachine(
     if (announce) notify();
   }
 
+  /**
+   * Says a melt or payment request is starting. A listener that throws stops
+   * it before it starts: the turn finishes, then the throw goes on.
+   */
+  function announcePaymentStart(generation: number, op: string): void {
+    try {
+      setExecuting(true);
+    } catch (err) {
+      finishTurn(generation, op);
+      throw err;
+    }
+  }
+
   function beginCommit(generation: number): void {
     commitGeneration = generation;
   }
@@ -1117,8 +1130,8 @@ export function createPaymentMachine(
       ) {
         // The previous approval expired. Show the new quote and require a
         // second tap, even when the fee happens to be unchanged.
-        setExecuting(true);
         try {
+          setExecuting(true);
           const refreshed = await runMeltQuotePreviewEffect({
             data,
             operation: operations.quoteMelt,
@@ -1150,7 +1163,7 @@ export function createPaymentMachine(
         amount: data.amount,
         meltTargetLength: data.meltTarget?.length ?? 0,
       });
-      setExecuting(true);
+      announcePaymentStart(sendGeneration, "confirmMelt.start");
 
       void notifications?.onPaymentProcessing?.({
         variant: "melt",
@@ -1213,7 +1226,7 @@ export function createPaymentMachine(
         amount: data.amount,
         paymentRequestLength: data.paymentRequest.length,
       });
-      setExecuting(true);
+      announcePaymentStart(sendGeneration, "confirmPaymentRequest.start");
 
       void notifications?.onPaymentProcessing?.({
         variant: "paymentRequest",
