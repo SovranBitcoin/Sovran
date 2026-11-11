@@ -818,4 +818,34 @@ describe('what happens while a send or regenerate is still getting ready', () =>
       expect(messagesOf('s1')).toEqual(first);
     }
   );
+
+  it.each(['send', 'retry'] as const)(
+    'a %s whose screen closes while its image encodes is not sent, and the question stays to be asked again',
+    async (action) => {
+      const release = holdEncoding();
+      const hook = renderHook(useAiSend);
+      let pending!: Promise<unknown>;
+      act(() => {
+        pending =
+          action === 'send'
+            ? hook.result.current.send('and this?', [photo])
+            : hook.result.current.retry('a1');
+      });
+      await tick();
+      hook.unmount();
+      await release();
+      await settle(pending);
+
+      expect(sendMock).not.toHaveBeenCalled();
+      const s1 = messagesOf('s1');
+      if (action === 'retry') expect(s1).toEqual(first);
+      else {
+        expect(s1.slice(2).map((m) => [m.role, m.content])).toEqual([
+          ['user', 'and this?'],
+          ['assistant', ''],
+        ]);
+        expect(readAnswer(s1[3]!, getTurn(s1[3]!.id)).phase).toBe('interrupted');
+      }
+    }
+  );
 });

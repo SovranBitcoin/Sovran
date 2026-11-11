@@ -113,6 +113,23 @@ function availableChain(
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
+/**
+ * Run a send or regenerate with its request's controller, held in `preparing`
+ * (what closing the screen aborts) until the stream takes it or the run ends.
+ */
+async function withRequestController(
+  preparing: Set<AbortController>,
+  run: (controller: AbortController) => Promise<void>
+): Promise<void> {
+  const controller = new AbortController();
+  preparing.add(controller);
+  try {
+    await run(controller);
+  } finally {
+    preparing.delete(controller);
+  }
+}
+
 /** The account and conversation a send or regenerate belongs to, taken before its first wait. */
 type Owner = { account: number; anonymous: boolean; conversationId: string | null };
 
@@ -179,6 +196,9 @@ export function useAiSend() {
   // mid-stream stops billing. There is no longer a balance promise to wait on:
   // the cost of a request is returned by the request itself.
   const streamControllerRef = useRef<AbortController | null>(null);
+  // Each send or regenerate still getting ready (encoding images, the spend
+  // sheet): its request's controller, so closing the screen stops it too.
+  const preparingRef = useRef(new Set<AbortController>());
 
   const navigateToAddFunds = useNavigateToAddFunds();
   const funds = useRoutstrFunds();
@@ -186,12 +206,13 @@ export function useAiSend() {
   const walletSats = funds?.balanceSats ?? 0;
   const heldMints = useHeldMints();
 
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    const preparing = preparingRef.current;
+    return () => {
       streamControllerRef.current?.abort();
-    },
-    []
-  );
+      for (const controller of preparing) controller.abort();
+    };
+  }, []);
 
   /**
    * Drives a single placeholder assistant message to completion: walks the
@@ -204,6 +225,8 @@ export function useAiSend() {
       /** The conversation the answer was asked in (`selectConversationId`
        *  then): every write about it goes there, whichever is open now. */
       conversationId: string | null;
+      /** The request's controller, made when the send or regenerate started. */
+      controller: AbortController;
       assistantMessageId: string;
       apiMessages: RoutstrChatMessage[];
       /** `image_url` parts included in `apiMessages` (drives the
@@ -216,7 +239,7 @@ export function useAiSend() {
        *  ran (a retry) or the model could not be priced. */
       shownSats?: number | null;
     }) => {
-      const { conversationId, assistantMessageId, flowId } = params;
+      const { conversationId, assistantMessageId, flowId, controller } = params;
       const shownSats = params.shownSats ?? null;
       let { apiMessages, imageCount } = params;
 
@@ -284,8 +307,8 @@ export function useAiSend() {
       }
 
       streamControllerRef.current?.abort();
-      const controller = new AbortController();
       streamControllerRef.current = controller;
+      preparingRef.current.delete(controller);
 
       // Same-tier chain across the other providers as runtime fallback for
       // connect-time failures — or, on a sealed selection, the encrypted
@@ -962,8 +985,8 @@ export function useAiSend() {
     [finalizeAssistantMessage, updateSessionTitle, walletSats]
   );
 
-  const sendInner = useCallback(
-    async (userMessage: string, attachments?: ChatAttachment[]) => {
+  const prepareSend = useCallback(
+    async (controller: AbortController, userMessage: string, attachments?: ChatAttachment[]) => {
       // Every precondition in one place, decided before the optimistic bubbles
       // go in: declining after them would leave a user message with no answer
       // and nothing to retry. The gate is pure and exhaustive, so each way a
@@ -1022,17 +1045,19 @@ export function useAiSend() {
         content: '',
         timestamp: timestamp + 1,
       };
-      // Checked after every wait before the request: an account or
+      // Checked after every wait before the request. An account or
       // conversation that moved meanwhile would get the answer, and the bill,
-      // for a question asked elsewhere. Nothing is sent; a question asked in a
-      // saved conversation is left there, unanswered, to be asked again.
-      const ownerMoved = () => {
+      // for a question asked elsewhere; a screen that closed has no one to
+      // show it to. Nothing is sent; a question asked in a saved conversation
+      // is left there, unanswered, to be asked again.
+      const whyNotSend = () => {
         const change = ownerChange(owner);
-        if (change === 'none') return false;
-        aiLog.info('ai.send.owner_changed', { flowId, change });
-        if (change === 'conversation' && owner.conversationId !== null)
+        return change === 'none' && controller.signal.aborted ? 'closed' : change;
+      };
+      const leaveQuestion = (reason: 'conversation' | 'closed') => {
+        aiLog.info('ai.send.not_sent', { flowId, reason });
+        if (owner.conversationId !== null)
           addMessages(owner.conversationId, [pendingUserMessage, answerPlaceholder]);
-        return true;
       };
       // Assembly (incl. the inline-image window and per-attachment encoding)
       // is shared with retry via `assembleApiMessages` so the two flows can't
@@ -1045,7 +1070,15 @@ export function useAiSend() {
       const { messages: apiMessages, imageCount } = trimmed
         ? await assembleApiMessages([...activePath, pendingUserMessage], encodeChatImage)
         : { messages: [], imageCount: 0 };
-      if (ownerMoved()) return;
+      const afterAssembly = whyNotSend();
+      if (afterAssembly === 'account') {
+        aiLog.info('ai.send.not_sent', { flowId, reason: afterAssembly });
+        return;
+      }
+      if (afterAssembly !== 'none') {
+        leaveQuestion(afterAssembly);
+        return;
+      }
 
       // The node's admission gate for this body, computed the way the node
       // computes it. `null` when the model carries no usable pricing, which
@@ -1111,8 +1144,9 @@ export function useAiSend() {
             reserveKnown: gate.reserveKnown,
           });
           if (!allowed) return;
-          if (ownerChange(owner) === 'conversation') {
-            ownerMoved();
+          const afterSheet = whyNotSend();
+          if (afterSheet === 'conversation' || afterSheet === 'closed') {
+            leaveQuestion(afterSheet);
             return;
           }
           const current = useRoutstrStore.getState();
@@ -1152,6 +1186,7 @@ export function useAiSend() {
       try {
         await streamIntoPlaceholder({
           conversationId,
+          controller,
           assistantMessageId,
           apiMessages,
           imageCount,
@@ -1185,6 +1220,13 @@ export function useAiSend() {
   // `streamIntoPlaceholder` before the disabled flag commits, billing the
   // user twice and corrupting the active branch tree. `useSingleFlight`
   // drops the duplicate at the ref level.
+  const sendInner = useCallback(
+    (userMessage: string, attachments?: ChatAttachment[]) =>
+      withRequestController(preparingRef.current, (controller) =>
+        prepareSend(controller, userMessage, attachments)
+      ),
+    [prepareSend]
+  );
   const send = useSingleFlight(sendInner);
 
   /**
@@ -1194,8 +1236,8 @@ export function useAiSend() {
    * sibling (follow-up exchanges) drop out of view immediately and can be
    * brought back via the bubble's chevron nav.
    */
-  const retryInner = useCallback(
-    async (messageId: string) => {
+  const prepareRetry = useCallback(
+    async (controller: AbortController, messageId: string) => {
       const owner = currentOwner();
       const stateNow = useRoutstrStore.getState();
       const original = stateNow.conversationHistory.find((m) => m.id === messageId);
@@ -1217,10 +1259,14 @@ export function useAiSend() {
         aiLog.warn('ai.retry.no_context', { messageId });
         return;
       }
-      // The answer stays in its own conversation, to be asked again from there.
+      // The answer stays in its own conversation, to be asked again from
+      // there, when the account or conversation moved or the screen closed.
       const change = ownerChange(owner);
-      if (change !== 'none') {
-        aiLog.info('ai.retry.owner_changed', { messageId, change });
+      if (change !== 'none' || controller.signal.aborted) {
+        aiLog.info('ai.retry.not_sent', {
+          messageId,
+          reason: change === 'none' ? 'closed' : change,
+        });
         return;
       }
 
@@ -1248,6 +1294,7 @@ export function useAiSend() {
 
       await streamIntoPlaceholder({
         conversationId,
+        controller,
         assistantMessageId: newAssistantId,
         apiMessages,
         imageCount,
@@ -1260,6 +1307,13 @@ export function useAiSend() {
 
   // Retry shares the double-tap exposure with `send`: a rapid tap on the
   // regenerate chevron would spawn two sibling assistants and bill twice.
+  const retryInner = useCallback(
+    (messageId: string) =>
+      withRequestController(preparingRef.current, (controller) =>
+        prepareRetry(controller, messageId)
+      ),
+    [prepareRetry]
+  );
   const retry = useSingleFlight(retryInner);
 
   const balance = useRoutstrStore((s) => s.balance);
