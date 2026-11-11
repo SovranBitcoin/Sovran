@@ -602,6 +602,71 @@ describe('a screen mounted again while a run is going', () => {
   });
 });
 
+describe('a mint that times out while still restoring', () => {
+  const KEYSET_2 = '00107937db0cc865';
+
+  async function advance(ms: number) {
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(ms);
+    });
+    for (let i = 0; i < 5; i += 1) {
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(1);
+      });
+    }
+  }
+
+  /**
+   * Mint A's first keyset never answers until `finishA`; the run times the
+   * mint out after 120 s and ends, while that restore goes on behind it.
+   */
+  async function runPastTimeout(
+    options: { stop?: boolean; gateMode?: boolean } = {}
+  ): Promise<{ renderer: Renderer; finishA: () => void }> {
+    jest.useFakeTimers();
+    let finishA = () => {};
+    mockRestoreKeyset.mockImplementation(
+      (_m: unknown, { mintUrl, keysetId }: { mintUrl: string; keysetId: string }) =>
+        mintUrl === MINT_A && keysetId === KEYSET_1
+          ? new Promise<void>((resolve) => {
+              finishA = resolve;
+            })
+          : Promise.resolve()
+    );
+    const renderer = await mount(options.gateMode ? { gateMode: true, onComplete: jest.fn() } : {});
+    let ended = false;
+    await act(async () => {
+      void byTestId(renderer, 'recovery-swipe')[0]!
+        .props.onConfirm()
+        .then(() => {
+          ended = true;
+        });
+      await jest.advanceTimersByTimeAsync(0);
+    });
+    if (options.stop) {
+      await act(async () => {
+        byTestId(renderer, 'recovery-stop')[0]!.props.onPress();
+      });
+    }
+    await advance(120_000);
+    expect(ended).toBe(true);
+    return { renderer, finishA: () => finishA() };
+  }
+
+  it('after Stop, restores none of its other keysets once its late keyset answers', async () => {
+    mintsServe({ [MINT_A]: [KEYSET_1, KEYSET_2] });
+    const { renderer, finishA } = await runPastTimeout({ stop: true });
+    expect(texts(renderer)).toContain('Recovery stopped');
+    expect(mockRestoreKeyset).toHaveBeenCalledTimes(1);
+
+    finishA();
+    await advance(0);
+
+    // The stop belongs to the run that was stopped, however late its work.
+    expect(mockRestoreKeyset).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('forced recovery at startup', () => {
   it('shows no popups and no way on when every mint was skipped', async () => {
     mintsServe({ [MINT_A]: ['legacy-keyset'], [MINT_B]: ['legacy-keyset'] });

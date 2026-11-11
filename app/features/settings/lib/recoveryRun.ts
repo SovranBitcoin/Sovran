@@ -183,13 +183,17 @@ export function startRecoveryRun(
   }
   runOwned = true;
   let run = from;
+  // A stop belongs to this run, for good: a mint that timed out is still
+  // restoring behind the run, and must not go on once the run has ended.
+  let stopped = false;
   const dispatch = (event: RecoveryEvent) => {
     const next = recoveryTransition(run, event);
     if (next === run) return;
     run = next;
+    if (run.phase === 'cancelling') stopped = true;
     publish(run);
   };
-  const stopRequested = () => run.phase === 'cancelling';
+  const stopRequested = () => stopped;
   // Hold the app-wide refresh storm until the run is over — see the module
   // doc for what it costs when left on.
   beginRecoverySuppression();
