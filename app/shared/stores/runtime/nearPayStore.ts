@@ -4,9 +4,6 @@ import { storeLog } from '@/shared/lib/logger';
 
 type NearPaySessionPhase = 'picking' | 'transitioning' | 'amount';
 
-/** Every new nearby payment is locked to the authenticated recipient. */
-export type NearPayDelivery = { locked: true };
-
 export interface NearPayRecipient {
   peerID: string;
   nickname: string;
@@ -16,7 +13,6 @@ export interface NearPayRecipient {
   creq?: string;
   nostrPubkeyHex?: string;
   walletCapabilityExpiresAt?: number;
-  delivery: NearPayDelivery;
 }
 
 interface NearPaySession {
@@ -69,7 +65,6 @@ export const useNearPaySessionStore = create<NearPaySessionStore>({
       peerID: recipient.peerID,
       hasDirectLink: recipient.hasDirectLink,
       peerHasCreq: !!recipient.creq,
-      locked: recipient.delivery.locked,
     });
     set({
       active: {

@@ -740,7 +740,6 @@ describe('createSovranHandlers profile routing', () => {
         nickname: 'Bob',
         hasDirectLink: true,
         lastSeen: 0,
-        delivery: { locked: true },
       },
       presentation: 'radar',
       mintPickerOpen: false,

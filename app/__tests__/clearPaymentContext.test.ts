@@ -17,7 +17,6 @@ describe('clearPaymentContext', () => {
       hasDirectLink: true,
       lastSeen: 0,
       creq: 'creqA-confirmed',
-      delivery: { locked: true },
     });
 
     expect(useNearPaySessionStore.getState().active).not.toBeNull();

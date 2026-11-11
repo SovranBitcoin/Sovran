@@ -20,7 +20,6 @@ const RECIPIENT = {
   hasDirectLink: true,
   lastSeen: 123,
   creq: 'creqA-confirmed',
-  delivery: { locked: true } as const,
 };
 
 describe('near pay session store', () => {

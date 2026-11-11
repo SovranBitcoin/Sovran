@@ -5,7 +5,6 @@ const nearby = {
   nickname: 'Bob',
   hasDirectLink: true,
   lastSeen: 0,
-  delivery: { locked: true as const },
 };
 const contact = { pubkey: 'a'.repeat(64), delivery: 'nip17' as const };
 
