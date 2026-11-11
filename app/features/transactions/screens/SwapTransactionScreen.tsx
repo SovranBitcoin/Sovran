@@ -39,6 +39,7 @@ import { amountToNumber } from 'wallet/amount';
 import { navigateToTransactionDetail } from '@/shared/lib/nav/transactionDetailRoutes';
 import {
   useSwapTransactionsStore,
+  type SwapGroup,
   type SwapLeg,
 } from '@/shared/stores/profile/swapTransactionsStore';
 import { withAlpha } from '@/shared/lib/color';
@@ -108,6 +109,32 @@ function groupLegs(legs: SwapLeg[]): LegGroup[] {
   }
 
   return groups;
+}
+
+/** The melt row drawn for a leg whose melt Coco history lacks (v3 melts); never counted as history. */
+function standInMelt(leg: SwapLeg, group: SwapGroup): MeltHistoryEntry | undefined {
+  if (!leg.meltQuoteId) return undefined;
+  const id = leg.meltOperationId ?? leg.id;
+  return asHistoryEntry({
+    id,
+    source: 'legacy',
+    legacyHistoryId: id,
+    operationId: id,
+    createdAt: group.createdAt,
+    updatedAt: group.createdAt,
+    mintUrl: leg.fromMintUrl,
+    unit: group.unit,
+    type: 'melt' as const,
+    quoteId: leg.meltQuoteId,
+    // A settling leg's melt was paid; only the destination is outstanding.
+    state:
+      leg.localStatus === 'done' || leg.localStatus === 'settling'
+        ? MeltQuoteState.PAID
+        : leg.localStatus === 'paymentPending'
+          ? MeltQuoteState.PENDING
+          : MeltQuoteState.UNPAID,
+    amount: leg.amount,
+  }) as MeltHistoryEntry;
 }
 
 // -----------------------------------------------------------------------
@@ -309,10 +336,10 @@ export function SwapTransactionScreen({ groupId }: Props) {
     });
   }, [group]);
 
-  // ── Compute totals for the header and footer ──
-  const { totalReceived, totalSent, totalFees, stepCount } = useMemo(() => {
+  // ── Totals for the header and footer, and each shown leg's history, looked up once ──
+  const { totalReceived, totalSent, totalFees, stepCount, resolvedGroups } = useMemo(() => {
     if (!group)
-      return { totalReceived: 0, totalSent: 0, totalFees: 0, stepCount: 0, historyReady: false };
+      return { totalReceived: 0, totalSent: 0, totalFees: 0, stepCount: 0, resolvedGroups: [] };
 
     let received = 0;
     let sent = 0;
@@ -321,9 +348,9 @@ export function SwapTransactionScreen({ groupId }: Props) {
     let steps = 0;
     let hasMintHistory = false;
 
-    for (const lg of legGroups) {
+    const resolvedGroups = legGroups.map((lg) => {
       steps += lg.legs.length;
-      for (const leg of lg.legs) {
+      const resolved = lg.legs.map((leg) => {
         // Use actual history entry amounts where available; fall back to leg amounts
         const mintEntry = leg.mintQuoteId
           ? (historyByQuoteId.get(leg.mintQuoteId) as MintHistoryEntry | undefined)
@@ -346,8 +373,10 @@ export function SwapTransactionScreen({ groupId }: Props) {
           // whose mint arrived did, even if its melt is not loaded.
           if (leg.localStatus !== 'failed' || mintEntry) spent += leg.amount;
         }
-      }
-    }
+        return { leg, mintEntry, meltEntryForDisplay: meltEntry ?? standInMelt(leg, group) };
+      });
+      return { ...lg, resolved };
+    });
 
     // Don't compute fees until mint history is loaded — otherwise received=0
     // makes it look like everything was lost to fees. A run that was stopped
@@ -360,7 +389,7 @@ export function SwapTransactionScreen({ groupId }: Props) {
       totalSent: sent,
       totalFees: ready ? Math.max(0, spent - received) : 0,
       stepCount: steps,
-      historyReady: ready,
+      resolvedGroups,
     };
   }, [group, legGroups, historyByQuoteId]);
 
@@ -451,7 +480,7 @@ export function SwapTransactionScreen({ groupId }: Props) {
         {/* ── Leg cards: expanded or collapsed (Reanimated layout transition) ── */}
         <Animated.View layout={LinearTransition.duration(280)}>
           {expanded ? (
-            legGroups.map((legGroup, groupIdx) => {
+            resolvedGroups.map((legGroup, groupIdx) => {
               const isChain = legGroup.chainId != null;
 
               return (
@@ -460,40 +489,7 @@ export function SwapTransactionScreen({ groupId }: Props) {
 
                   <TransferCard accentColor={accentColor}>
                     {/* Render each leg in the group */}
-                    {legGroup.legs.map((leg, legIdx) => {
-                      const mintEntry = leg.mintQuoteId
-                        ? (historyByQuoteId.get(leg.mintQuoteId) as MintHistoryEntry | undefined)
-                        : undefined;
-                      const meltEntry = leg.meltQuoteId
-                        ? (historyByQuoteId.get(leg.meltQuoteId) as MeltHistoryEntry | undefined)
-                        : undefined;
-
-                      // Synthetic MeltHistoryEntry for v3 melts missing from Coco history
-                      const meltEntryForDisplay: MeltHistoryEntry | undefined =
-                        meltEntry ??
-                        (leg.meltQuoteId
-                          ? (asHistoryEntry({
-                              id: leg.meltOperationId ?? leg.id,
-                              source: 'legacy',
-                              legacyHistoryId: leg.meltOperationId ?? leg.id,
-                              operationId: leg.meltOperationId ?? leg.id,
-                              createdAt: group.createdAt,
-                              updatedAt: group.createdAt,
-                              mintUrl: leg.fromMintUrl,
-                              unit: group.unit,
-                              type: 'melt' as const,
-                              quoteId: leg.meltQuoteId,
-                              // A settling leg's melt was paid; only the destination is outstanding.
-                              state:
-                                leg.localStatus === 'done' || leg.localStatus === 'settling'
-                                  ? MeltQuoteState.PAID
-                                  : leg.localStatus === 'paymentPending'
-                                    ? MeltQuoteState.PENDING
-                                    : MeltQuoteState.UNPAID,
-                              amount: leg.amount,
-                            }) as MeltHistoryEntry)
-                          : undefined);
-
+                    {legGroup.resolved.map(({ leg, mintEntry, meltEntryForDisplay }, legIdx) => {
                       const fromInfo = mintInfoMap[leg.fromMintUrl];
                       const toInfo = mintInfoMap[leg.toMintUrl];
                       const fromName = getMintDisplayName(leg.fromMintUrl, fromInfo);
