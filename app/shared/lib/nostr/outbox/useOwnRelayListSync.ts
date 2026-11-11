@@ -13,7 +13,9 @@
  * (`getKnownOwnWriteRelays`). The device cache is never asked. A read that
  * failed, or that a relay did not finish answering, marks nothing and is tried
  * again on returning to the foreground, when the network comes back and when a
- * relay connects.
+ * relay connects. A retry asks every relay an earlier attempt asked as well as
+ * the saved ones now: a partial answer is taken into the store, and may have
+ * replaced the saved relay that holds the newer list.
  *
  * Ingest-before-publish: defaults are only published when every asked relay
  * says there is NO existing list — an existing list is never clobbered. Deferred via setTimeout
@@ -51,15 +53,22 @@ function discoveryRelays(): string[] | null {
   return normalizeRelayList([...getOwnWriteRelays(), ...DEFAULT_RELAYS]);
 }
 
-/** Whether this session's discovery for the account finished, or must be tried again. */
+/**
+ * Whether this session's discovery for the account finished, or must be tried
+ * again. `asked` holds every relay this session's attempts have asked, and
+ * only grows: each of them must answer the same attempt.
+ */
 async function syncOwnRelayList(
   ndk: NDK,
   pubkey: string,
+  asked: Set<string>,
   isCancelled: () => boolean
 ): Promise<'discovered' | 'unanswered'> {
   try {
-    const relays = discoveryRelays();
-    if (!relays) return 'unanswered';
+    const current = discoveryRelays();
+    if (!current) return 'unanswered';
+    for (const url of current) asked.add(url);
+    const relays = [...asked];
     const read = await readNewestOwnEvent(ndk, pubkey, RELAY_LIST_KIND, relays);
     if (isCancelled()) return 'unanswered';
 
@@ -122,9 +131,10 @@ export function useOwnRelayListSync(pubkey: string | undefined, enabled: boolean
     if (!enabled || !ndk || !pubkey) return;
     let cancelled = false;
     let phase: 'waiting' | 'reading' | 'unanswered' | 'discovered' = 'waiting';
+    const asked = new Set<string>();
     const run = async () => {
       phase = 'reading';
-      phase = await syncOwnRelayList(ndk, pubkey, () => cancelled);
+      phase = await syncOwnRelayList(ndk, pubkey, asked, () => cancelled);
     };
     const again = () => {
       if (!cancelled && phase === 'unanswered') void run();

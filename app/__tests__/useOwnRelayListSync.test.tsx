@@ -535,6 +535,46 @@ describe('a discovery that did not finish', () => {
     view.unmount();
   });
 
+  it('asks again every relay an earlier attempt asked, though a partial answer has replaced them', async () => {
+    // R, the saved write relay, holds the newer list but is down; a default
+    // relay answers with an older list that names S instead.
+    const R = 'wss://mine.example';
+    const S = 'wss://stale.example';
+    useRelayListStore.setState({
+      entries: [{ url: R, read: true, write: true }],
+      source: 'relay',
+      updatedAt: 100,
+      hasPublished: true,
+    });
+    mockRelays.set(R, 'silent');
+    mockRelays.set(DAMUS, { events: [relayList(A, 400, [S])] });
+    const view = await mountAndWait(A);
+    await waitOutRead();
+    // The partial answer is shown, but is not known.
+    expect(store().entries.map((e) => e.url)).toEqual([S]);
+    expect(getKnownOwnWriteRelays(A)).toBeNull();
+
+    // Every relay but R answers the retry: still not known.
+    let asked = mockAsked.length;
+    await act(async () => triggers['returning to the foreground']());
+    await waitOutRead();
+    expect(mockAsked.slice(asked).map((a) => a.relays?.[0])).toEqual(
+      expect.arrayContaining([R, S, ...DEFAULT_RELAYS])
+    );
+    expect(getKnownOwnWriteRelays(A)).toBeNull();
+
+    // R answers with the newer list: that is the account's list.
+    mockRelays.set(R, { events: [relayList(A, 900, ['wss://new.example'])] });
+    asked = mockAsked.length;
+    await act(async () => triggers['returning to the foreground']());
+    expect(mockAsked.slice(asked).map((a) => a.relays?.[0])).toEqual(
+      expect.arrayContaining([R, S, ...DEFAULT_RELAYS])
+    );
+    expect(getKnownOwnWriteRelays(A)).toEqual(['wss://new.example']);
+    expect(mockPublishEvent).not.toHaveBeenCalled();
+    view.unmount();
+  });
+
   it('is not tried again once it has finished', async () => {
     mockRelays.set(DAMUS, { events: [REMOTE()] });
     const view = await mountAndWait(A);
