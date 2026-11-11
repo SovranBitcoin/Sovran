@@ -6,7 +6,7 @@ State, not history. Passes run in order; one call runs one pass.
 | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 0 Pin behaviour           | **Done** (2026-11-11). Every boundary the surveys listed has a pin; the gates are closed. Branch `surgery/pass-0-gates`.                                             |
 | 1 Persisted state         | **Done** (2026-11-11), proven on every release fixture; no real upgrade was run. Cuts on `surgery/pass-1-cuts` and `surgery/pass-1-queue`, not merged. See "Pass 1". |
-| 2 Implicit state machines | Not started.                                                                                                                                                         |
+| 2 Implicit state machines | **Awaiting approval** (2026-11-11). Surveyed; 15 behaviours fixed in 20 commits on `surgery/pass-2`; 16 conversions proposed, none made. See "Pass 2".               |
 | 3 Deepen modules          | Not started.                                                                                                                                                         |
 
 Pass 0 is on branch `surgery/pass-0`; pass 1's evidence is on `surgery/pass-1` and its cuts on `surgery/pass-1-cuts`, each stacked on the one before (worktree `../sovran-surgery`,
@@ -257,3 +257,100 @@ inferred).
 - The surveys' "inferred" items: relay behaviour behind F197, other wallets' emoji decoders, whether any release
   published an `npubx.cash` address.
 - The second opinion covered proposals 1 to 11, not 12.
+
+## Pass 2: implicit state machines
+
+### Inventory
+
+Eight surveys in `pass-2/surveys/` (the brief is in its `README.md`). Each candidate there has its variables, states,
+events, the meaningless combinations, which are reachable today and how, whether it is saved, its consumers, its pins
+and a recommendation. Counts are the surveyors' own groupings; several machines appear in two surveys.
+
+| Area                                | Survey                        | Candidates | New defects |
+| ----------------------------------- | ----------------------------- | ---------- | ----------- |
+| Wallet package                      | `wallet.md`                   | 13         | 4           |
+| Send, receive, payments, NFC        | `payments.md`                 | 13         | 4           |
+| Stores and persistence              | `stores.md`                   | 15         | 6           |
+| Startup, accounts, providers        | `startup-accounts.md`         | 12         | 2           |
+| Transactions, wallet screens, mints | `transactions-wallet-mint.md` | 12         | 5           |
+| Messaging, signer, AI, map          | `messaging-signer-ai.md`      | 12         | 10          |
+| Feed, social, Nostr package         | `feed-social-nostr.md`        | 15         | 9           |
+| Shared hooks, UI, lib, settings     | `shared-settings.md`          | 11         | 3           |
+
+The house pattern for an explicit machine is `wallet/src/machine`: named steps, data that moves with its step, a pure
+`transition`, effects that return a tagged result, and a generation counter that drops stale results. No XState in
+the repo. Conversions should match it: a discriminated union for a value, a transition table for synchronous moves,
+that hand-written shape for async work.
+
+### Proposed conversions (none made; each needs the owner's approval)
+
+Ranked by reachable illegal states times money or saved-data risk, over cost. "Saved" means the shape on disk stays
+as it is and the states are decoded where it is read. Sizes: S one file, M under ten, L more.
+
+| #   | Machine                                                         | Surveys                                                 | Saved | Size | What it settles                                                                      |
+| --- | --------------------------------------------------------------- | ------------------------------------------------------- | ----- | ---- | ------------------------------------------------------------------------------------ |
+| 1   | Own follow list: unknown, seeded from nagg, or read from relays | `stores` 1, `feed-social-nostr` 1                       | yes   | S-M  | F209 (a follow can replace the whole list)                                           |
+| 2   | Payment preview phase: preview, settled, undelivered            | `wallet` C1, C2                                         | no    | S    | Replaces two optional fields and four string flags; rest of F224                     |
+| 3   | Swap group and legs: running with an owner, interrupted, final  | `stores` 2, `transactions-wallet-mint` 1-3              | yes   | M    | F211 (Pending for ever)                                                              |
+| 4   | Recovery run: one run with an owner, cancel and finalization    | `startup-accounts` 1, `shared-settings` 1               | no    | M    | F210 (deletes pending operations after a failed restore), part of F178               |
+| 5   | AI answer: one turn owned by its conversation                   | `messaging-signer-ai` 3                                 | yes   | M    | F214 (paid answers lost)                                                             |
+| 6   | Bluetooth DM delivery: transition table                         | `messaging-signer-ai` 1                                 | yes   | S-M  | F212; needs the owner's ruling on whether a timeout is final                         |
+| 7   | Redeem entry status: one transition table                       | `stores` 5, `messaging-signer-ai` 2                     | yes   | S    | Status compared in eight files; any change allowed from any status; F213             |
+| 8   | Wallet manager open, ready, closing                             | `payments` 2, `startup-accounts` 6                      | no    | M    | F217, F123                                                                           |
+| 9   | Restore status: one decoded check                               | `stores` 3, `startup-accounts` 3                        | yes   | S    | Four copies of "restore settled" that disagree; two statuses nothing writes          |
+| 10  | The turn around a machine step                                  | `wallet` C4                                             | no    | M    | Six variables that jointly say what phase a turn is in; after 2                      |
+| 11  | Follow button intent, on `reconcileToggle`                      | `feed-social-nostr` 2                                   | yes   | S    | F215                                                                                 |
+| 12  | Notification sources and own-events sync                        | `feed-social-nostr` 4, 5                                | no    | S    | Failure versus end of history; part of F221 and F222                                 |
+| 13  | Payment toast: owned by its operation                           | `shared-settings` 2, `stores` 9                         | no    | M    | F219                                                                                 |
+| 14  | White Noise DM screen: one reducer                              | `messaging-signer-ai` 4                                 | no    | S    | Replaces the loading, creating and loaded-for flags                                  |
+| 15  | NFC session ownership                                           | `payments` 4, `wallet` C5, `transactions-wallet-mint` 9 | no    | M    | Two loop exits that release nothing; ambient, explicit and write flows sharing a tag |
+| 16  | Payment routing context: one route value                        | `stores` 4                                              | no    | S    | Deletes the Routstr top-up branch nothing starts, once the owner confirms it is gone |
+
+Deferred, with the surveys' reasons (each entry in its survey): the remaining candidates, among them the receive hub
+rails, standing-quote lifecycle (F180), receive attribution (F181), history status strings in 15 files (pass 3
+size), the wallet context tracker, initialization give-up (F175), account transition, mnemonic replacement,
+`HomeFeed` and `useThread` loaders (F221), relay list publishers (F216), signer keep-running flag (F225), BitChat
+bridge, theme draft, sheet presentation. Left as they are: the feed pager, like and repost overlays, history
+pagination queue, mint batch import, picker sheet route, amount lock selection, backup challenge.
+
+### Behaviour changed in pass 2 (branch `surgery/pass-2`, stacked on `surgery/pass-1-queue`)
+
+Each with a test that failed first. None changes a saved shape, key or wire format.
+
+| Commit                   | Before                                                                                    | After                                                                                                       |
+| ------------------------ | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `126bd625f`, `610ef3378` | A payment-request send that failed before any ecash existed showed as sent, with Pay off. | It stays a preview and can be retried. A send that was delivered stays delivered if its row cannot be read. |
+| `e62206d6f`, `faae794e8` | A second Pay after a paid melt or delivered request ran the payment again.                | Ignored, also after opening and closing the mint list.                                                      |
+| `e78e21e3c`, `e1613e4f6` | Ecash that left and could not be taken back still led to other options or a second send.  | No other option is offered and the machine refuses to send again.                                           |
+| `dcef277d7`              | An event a step did not handle wiped the step's data and re-ran its handler.              | Nothing changes. Pay on a preview while the machine is on an error still does nothing (quirk, F224).        |
+| `3d2be6d3b`              | Fallback history entries always said sat.                                                 | They carry the unit paid or received.                                                                       |
+| `40118c475`              | Each tap on "Tap to retry" sent another copy of a Bluetooth message.                      | One retry per failed message for the app session.                                                           |
+| `6a715b16a`              | A Nut Drop arriving during a redeem run waited for the next foreground or message.        | One more run follows the current one.                                                                       |
+| `8f25cd414`, `73e66affe` | A White Noise message sent before the conversation loaded created a second group.         | Sending is closed until a read has finished for this client and person.                                     |
+| `630d49acf`, `9eaf49345` | A failed White Noise setup showed the success check.                                      | It shows the error and can be tried again.                                                                  |
+| `0118e71d6`              | One failed load-more ended notification paging for the visit.                             | The next load-more asks again from the same place.                                                          |
+| `84d7cde3c`              | A failed automatic rotation of a paid onchain address was never tried again.              | The next mempool report tries again.                                                                        |
+| `4543420b8`              | A closed DM feed kept showing its old error.                                              | The error clears with the feed.                                                                             |
+| `cc9723127`              | An older keyset read finishing late replaced a newer result.                              | Only the newest read publishes.                                                                             |
+| `77dcb2e46`              | Acceleration polling restarted after its screen closed or its transaction changed.        | Late results start no poll and write nothing.                                                               |
+| `9b48a279b`              | A theme Apply cancelled during its download applied anyway and cleared a newer draft.     | It applies nothing and leaves the newer draft. The wallpaper file is still downloaded, as before.           |
+
+Built by Claude Opus 5.5 (fourteen) and Claude Fable 5.2 (the six review fixes). Reviewed commit by commit by Codex
+GPT-6.1 Sol and GPT-6 Astra, which found six defects in the first fourteen; all six are fixed. Of the six review
+fixes, three were reviewed (one more defect, fixed) and three were not: `73e66affe`, `9eaf49345` and the last
+undelivered fix.
+
+### Open findings from pass 2
+
+F209 to F226 in `docs/follow-ups/`. Highest: F209 (a follow can replace the public follow list), F210 (recovery
+deletes pending operations after a failed restore), F211 (interrupted swaps), F214 (paid AI answers lost).
+
+### Not verified in pass 2
+
+- Nothing was run on iOS or Android.
+- The surveys are traces unless they say "run"; most defects left in the follow-ups were not reproduced.
+- Whether a person can reach the second Pay through the real screens was not traced end to end; the machine now
+  refuses either way.
+- Three review fixes were not reviewed by another model (above).
+- `jevlint` saved checks were not run. `audit-commit` was not run per commit; the Codex reviews stood in.
+- Each survey lists what it did not read.
