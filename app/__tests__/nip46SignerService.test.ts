@@ -33,7 +33,6 @@ jest.mock('@/features/nostrSigner/lib/nip46Engine', () => {
       completeNostrconnectPairing: jest.fn(),
       cancelNostrconnectPairing: jest.fn(() => ok(undefined)),
       resolveRequest: jest.fn(),
-      onUserVerdictNeeded: jest.fn(() => () => undefined),
       __state: state,
     },
   };

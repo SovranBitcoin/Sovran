@@ -2,7 +2,6 @@ import { describe, expect, test } from 'vitest';
 
 import {
   NaggEnvelopeSchema,
-  NaggFollowStatusEnvelopeSchema,
   NaggProfilesEnvelopeSchema,
   latestKind0ByPubkey,
 } from '../src/envelope';
@@ -14,11 +13,11 @@ import {
   PrimalNoteStatsContent,
   PrimalNotificationContent,
 } from '../src/facade/primal/schemas';
-import { NOSTR_EVENT_LIMITS, NaggProfileInfoSchema, NaggServiceInfoSchema } from '../src/schemas';
+import { NOSTR_EVENT_LIMITS, NaggProfileInfoSchema } from '../src/schemas';
 
 // What a relay or a cache hands over is held to the same ceilings as what the
-// backend hands over: an event that is not one is refused, and a list of names
-// loses the name that does not fit instead of the whole response.
+// backend hands over: an event that is not one is refused, and an entry that does
+// not fit is left out instead of the whole response.
 
 const ID = 'a'.repeat(64);
 const PUBKEY = 'b'.repeat(64);
@@ -65,36 +64,6 @@ describe('an event off a relay or a cache socket', () => {
   test('reads no more tags than one event may carry', () => {
     const tags = Array.from({ length: NOSTR_EVENT_LIMITS.tags + 5 }, (_, n) => ['p', String(n)]);
     expect(coerceTags(tags)).toHaveLength(NOSTR_EVENT_LIMITS.tags);
-  });
-});
-
-describe('the capability probe', () => {
-  const info = (overrides: Record<string, unknown> = {}) => ({
-    graphqlSchemaVersion: '1',
-    appViewVersion: 'v2',
-    capabilities: ['graphql.events', 'app.rates'],
-    appViews: [{ version: 'v2', routes: ['/nostr/capabilities', '/nostr/profile'] }],
-    ...overrides,
-  });
-
-  test('reads the live shape unchanged', () => {
-    expect(NaggServiceInfoSchema.parse(info())).toEqual(info());
-  });
-
-  test('leaves out a name that is not a short string and keeps the rest', () => {
-    const parsed = NaggServiceInfoSchema.parse(
-      info({
-        capabilities: ['graphql.events', 7, 'c'.repeat(257), 'app.rates'],
-        appViews: [{ version: 'v2', routes: ['/nostr/profile', null, 'r'.repeat(257)] }],
-      }),
-    );
-    expect(parsed.capabilities).toEqual(['graphql.events', 'app.rates']);
-    expect(parsed.appViews[0]?.routes).toEqual(['/nostr/profile']);
-  });
-
-  test('reads no more names than the ceiling', () => {
-    const capabilities = Array.from({ length: 5000 }, (_, n) => `capability.${n}`);
-    expect(NaggServiceInfoSchema.parse(info({ capabilities })).capabilities).toHaveLength(4096);
   });
 });
 
@@ -163,18 +132,13 @@ describe('what Primal names in passing', () => {
   });
 });
 
-test('provider figures and follow edges are read one pubkey at a time', () => {
+test('provider figures are read one pubkey at a time', () => {
   const base = { order: [], orderBy: 'rank', events: [], aggregates: {} };
   const profiles = NaggProfilesEnvelopeSchema.parse({
     ...base,
     providers: { [PUBKEY]: { vertex: { rank: 1 } }, 'not-a-key': { vertex: { rank: 2 } }, [ID]: 'nope' },
   });
   expect(profiles.providers).toEqual({ [PUBKEY]: { vertex: { rank: 1 } } });
-  const follows = NaggFollowStatusEnvelopeSchema.parse({
-    ...base,
-    edges: { [PUBKEY]: { out: true, in: false }, 'not-a-key': { out: true, in: true }, [ID]: { out: 'yes' } },
-  });
-  expect(follows.edges).toEqual({ [PUBKEY]: { out: true, in: false } });
 });
 
 describe('which of two replaceable events stands', () => {

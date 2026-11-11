@@ -11,7 +11,7 @@ import { act, renderHook } from '@testing-library/react-native';
 import { useAiSend } from '@/features/ai/hooks/useAiSend';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
 import { emptyLineup, type LineupEntry } from '@/shared/lib/routstr/lineup';
-import { sendMessage, checkBalance, ROUTSTR_MAX_COMPLETION_TOKENS } from '@/shared/lib/routstr/api';
+import { sendMessage, ROUTSTR_MAX_COMPLETION_TOKENS } from '@/shared/lib/routstr/api';
 import { refreshRoutstrLineup } from '@/shared/lib/routstr/refreshLineup';
 import { staticPopup } from '@/shared/lib/popup';
 import { confirmSpend } from '@/features/ai/lib/spendConfirm';
@@ -25,7 +25,6 @@ jest.mock('@/features/ai/lib/spendConfirm', () => ({ confirmSpend: jest.fn() }))
 jest.mock('@/shared/lib/routstr/api', () => ({
   ...jest.requireActual('@/shared/lib/routstr/api'),
   sendMessage: jest.fn(),
-  checkBalance: jest.fn(),
 }));
 jest.mock('@/shared/lib/routstr/refreshLineup', () => ({ refreshRoutstrLineup: jest.fn() }));
 jest.mock('@/shared/stores/global/profileStore', () => ({
@@ -175,7 +174,6 @@ describe('AI send lineup recovery', () => {
       currentSessionId: null,
       isAnonymousMode: true,
     });
-    jest.mocked(checkBalance).mockResolvedValue({ balance: 90000 });
     refreshMock.mockResolvedValue(false);
   });
 

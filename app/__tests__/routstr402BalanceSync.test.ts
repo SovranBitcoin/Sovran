@@ -1,10 +1,8 @@
 /**
- * Regression for the stale-balance 402 loop: the local Routstr balance
- * only refreshed after a SUCCESSFUL stream, so once a key drained, the UI
- * gated every send against a phantom figure (observed on device: pill at
- * 299 sats, server reporting 216 mSats available) and the
- * insufficient-balance popup recurred forever. `throwResponseError` now
- * syncs the store balance from the 402's parsed `available` mSats.
+ * What a Routstr 402 says survives into the error a send raises: the
+ * required and available mSats, and whether the wallet or the AI provider
+ * upstream refused. A send pays per request out of the wallet, so no answer
+ * rewrites the balance or key an older release saved; reclaim drains those.
  *
  * The 402 body below is byte-shaped like the live response captured in
  * log.txt (2026-07-02): FastAPI-style error envelope whose message embeds
@@ -13,7 +11,7 @@
 
 import { describeError } from '@/shared/lib/errors';
 import {
-  checkBalance,
+  getModels,
   isWalletBalanceError,
   sendMessage,
   setRoutstrNodeBaseUrl,
@@ -117,9 +115,11 @@ function stubFetch402(body: unknown) {
   ) as unknown as typeof fetch;
 }
 
-describe('402 → balance truth-sync', () => {
+const send = (model = 'gpt-oss-20b') => sendMessage([{ role: 'user', content: 'hi' }], { model });
+
+describe('402 from a send', () => {
   beforeEach(() => {
-    useRoutstrStore.getState().setApiKey('sk-test');
+    useRoutstrStore.setState({ apiKey: 'sk-test', balance: 299_841 });
     // A provider is a precondition now: nothing is sent until one is picked.
     setRoutstrNodeBaseUrl('https://node.example');
   });
@@ -130,39 +130,28 @@ describe('402 → balance truth-sync', () => {
     global.fetch = realFetch;
   });
 
-  // A chat completion no longer carries a hosted balance — it pays per request
-  // out of the wallet — so the balance sync now only has a credential to own
-  // on the wallet calls that still hold one. Those are what `reclaim` drains.
-  it('overwrites the stale store balance with the 402 available mSats', async () => {
-    useRoutstrStore.getState().setBalance(299_841); // the phantom figure
-    stubFetch402(INSUFFICIENT_BODY);
-
-    await expect(checkBalance('sk-test')).rejects.toMatchObject({ status: 402 });
-
-    expect(useRoutstrStore.getState().balance).toBe(216);
-  });
-
   it.each([
     [{ reason: 'Insufficient balance', amount_required_msat: 85577, balance_msat: 216 }, 216],
-    [{ reason: 'Insufficient balance', amount_required_msat: 85577 }, 299841],
+    [{ reason: 'Insufficient balance', amount_required_msat: 85577 }, undefined],
     [{ message: 'Insufficient balance', amount_required_msat: 85577, balance_msat: 0 }, 0],
-    [{ reason: 'Insufficient balance', amount_required_msat: 85577, balance_msat: -1 }, 299841],
-  ])('parses the v0.4.7 detail object without inventing a balance', async (detail, expected) => {
-    useRoutstrStore.getState().setBalance(299841);
+    [{ reason: 'Insufficient balance', amount_required_msat: 85577, balance_msat: -1 }, undefined],
+  ])('parses the v0.4.7 detail object without inventing a balance', async (detail, available) => {
     stubFetch402({ detail });
-    await expect(checkBalance('sk-test')).rejects.toMatchObject({
+    const error = await send().catch((e: unknown) => e);
+    expect(error).toMatchObject({
       status: 402,
       error: { message: 'Insufficient balance', details: { required: 85577 } },
     });
-    expect(useRoutstrStore.getState().balance).toBe(expected);
+    expect((error as { error: { details: { available?: number } } }).error.details.available).toBe(
+      available
+    );
   });
 
   it('keeps the legacy FastAPI string balance extraction', async () => {
     stubFetch402({ detail: 'Insufficient balance: 85577 mSats required, 216 available' });
-    await expect(checkBalance('sk-test')).rejects.toMatchObject({
+    await expect(send()).rejects.toMatchObject({
       error: { details: { required: 85577, available: 216 } },
     });
-    expect(useRoutstrStore.getState().balance).toBe(216);
   });
 
   /**
@@ -178,51 +167,42 @@ describe('402 → balance truth-sync', () => {
   };
 
   it('does not call a forwarded upstream 402 a wallet problem', async () => {
-    useRoutstrStore.getState().setBalance(100_000);
     stubFetch402(UPSTREAM_402);
 
-    const error = await sendMessage([{ role: 'user', content: 'hi' }], {
-      model: 'gpt-oss-20b',
-    }).catch((e: unknown) => e);
+    const error = await send().catch((e: unknown) => e);
 
     expect(isWalletBalanceError(error)).toBe(false);
     // The numeric code must survive parsing — dropping it is what left `type`
     // to fall through to `unknown_error` and made the two 402s look identical.
     expect(error).toMatchObject({ status: 402, error: { code: '402' } });
     expect(describeError(error, 'routstr').id).toBe('routstr.provider_declined');
-    // A funded wallet must not be rewritten by an error that is not about it.
-    expect(useRoutstrStore.getState().balance).toBe(100_000);
   });
 
   it('still calls a routstr-raised 402 a wallet problem', async () => {
     stubFetch402(INSUFFICIENT_BODY);
 
-    const error = await sendMessage([{ role: 'user', content: 'hi' }], {
-      model: 'gpt-oss-20b',
-    }).catch((e: unknown) => e);
+    const error = await send().catch((e: unknown) => e);
 
     expect(isWalletBalanceError(error)).toBe(true);
     expect(describeError(error, 'routstr').id).toBe('routstr.balance');
   });
 
-  it('leaves the balance untouched when the 402 carries no parseable available figure', async () => {
-    useRoutstrStore.getState().setBalance(299_841);
-    stubFetch402({ error: { message: 'Payment required', type: 'x' } });
+  it.each([
+    ['an available figure', INSUFFICIENT_BODY],
+    ['no available figure', { error: { message: 'Payment required', type: 'x' } }],
+  ])('leaves the saved balance and key untouched on a 402 with %s', async (_what, body) => {
+    stubFetch402(body);
 
-    await expect(
-      sendMessage([{ role: 'user', content: 'hi' }], { model: 'any' })
-    ).rejects.toMatchObject({ status: 402 });
+    await expect(send('any')).rejects.toMatchObject({ status: 402 });
 
-    expect(useRoutstrStore.getState().balance).toBe(299_841);
+    expect(useRoutstrStore.getState()).toMatchObject({ apiKey: 'sk-test', balance: 299_841 });
   });
 });
 
 /**
  * `readRoutstrEnvelope` checks HTTP status BEFORE shape. That order is
- * load-bearing and easy to lose: every Routstr spine is a `looseObject` of
- * optional fields, so an error body parses cleanly, and the balance reader's
- * `?? 0` defaults would turn a rejected key into a confident "0 sats" — the
- * figure every affordability check then gates against.
+ * load-bearing and easy to lose: read the other way round, an error body is a
+ * malformed envelope and the status the caller classifies on is gone.
  */
 describe('envelope reads gate on HTTP status before shape', () => {
   // eslint-disable-next-line no-restricted-properties -- restore seam for the stub
@@ -232,7 +212,8 @@ describe('envelope reads gate on HTTP status before shape', () => {
     global.fetch = realFetch;
   });
 
-  it('rejects a 401 /wallet/info rather than reading the error body as a zero balance', async () => {
+  it('rejects a 401 /models with its status rather than as a malformed envelope', async () => {
+    setRoutstrNodeBaseUrl('https://node.example');
     // eslint-disable-next-line no-restricted-properties -- test stub for the routstr 401 response
     global.fetch = jest.fn(
       async () =>
@@ -242,7 +223,7 @@ describe('envelope reads gate on HTTP status before shape', () => {
         })
     ) as unknown as typeof fetch;
 
-    await expect(checkBalance('sk-expired')).rejects.toMatchObject({ status: 401 });
+    await expect(getModels()).rejects.toMatchObject({ status: 401 });
   });
 });
 

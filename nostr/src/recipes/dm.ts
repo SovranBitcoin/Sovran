@@ -11,33 +11,6 @@ export type DmEnvelopesInput = {
   limit?: number;
 };
 
-export type DmConversationInput = {
-  viewer: string;
-  counterparty?: string;
-  kinds?: number[];
-  until?: number;
-  limit?: number;
-};
-
-export function dmEnvelopesInput(options: DmEnvelopesInput): DmEnvelopesInput {
-  return {
-    viewer: options.viewer,
-    kinds: options.kinds ?? [4, 1059],
-    ...(options.until ? { until: options.until } : {}),
-    limit: options.limit ?? 50,
-  };
-}
-
-export function dmConversationInput(options: DmConversationInput): DmConversationInput {
-  return {
-    viewer: options.viewer,
-    ...(options.counterparty ? { counterparty: options.counterparty } : {}),
-    kinds: options.kinds ?? [4, 1059],
-    ...(options.until ? { until: options.until } : {}),
-    limit: options.limit ?? 50,
-  };
-}
-
 /**
  * App-view binding for the DM index: `GET /nostr/dm/envelopes`. v2 answers with
  * the generic envelope, and BY DESIGN it carries no aggregates and no profile

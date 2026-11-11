@@ -994,18 +994,14 @@ async function makeAsk(
 }
 
 describe('ask path', () => {
-  it('enqueues an ungrated request with a safe preview and notifies the UI callback', async () => {
+  it('enqueues an ungrated request with a safe preview', async () => {
     pairApp();
     const harness = makeEngine();
-    const seen: string[] = [];
-    const unsubscribe = harness.engine.onUserVerdictNeeded((request) => {
-      seen.push(request.id);
-    });
 
     const { requestId, sent } = await makeAsk('sign_event', signEventParams(), harness);
 
     expect(sent).toHaveLength(0); // deferred — no response until a verdict
-    expect(seen).toEqual([requestId]);
+    expect(useNip46RequestsStore.getState().pending.map((p) => p.id)).toEqual([requestId]);
     const pending = useNip46RequestsStore.getState().pending[0]!;
     expect(pending).toMatchObject({
       clientPubkey: APP,
@@ -1014,7 +1010,6 @@ describe('ask path', () => {
       expiresAt: now + REQUEST_TTL_MS,
     });
     expect(pending.paramsPreview).toMatchObject({ type: 'sign_event' });
-    unsubscribe();
   });
 
   it('keeps ciphertext out of decrypt previews', async () => {

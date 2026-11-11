@@ -195,7 +195,7 @@ describe('an install from before accounts existed', () => {
     const { store, problems, addAccountZero } = await coldStart();
     await addAccountZero();
 
-    store.getState().setBalance(20_000);
+    store.setState({ balance: 20_000 });
     await settle();
 
     const plain = mockAsync.get(OWN_KEY)!;
@@ -209,7 +209,7 @@ describe('an install from before accounts existed', () => {
     const { store, problems } = await coldStart();
 
     // Any change made while there is still no account: a save of defaults.
-    store.getState().setBalance(0);
+    store.setState({ balance: 0 });
     await settle();
 
     expect(mockAsync.get(OWN_KEY)).toBe(PRE_ACCOUNT_BLOB);

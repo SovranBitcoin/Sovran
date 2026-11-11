@@ -28,7 +28,7 @@ import {
 } from '@/features/ai/lib/branching';
 import { getTurn, readAnswer, resetTurns, useTurn, type Turn } from '@/features/ai/lib/turns';
 import { resetModelAvailability } from '@/features/ai/lib/modelAvailability';
-import { sendMessage, checkBalance } from '@/shared/lib/routstr/api';
+import { sendMessage } from '@/shared/lib/routstr/api';
 import { refreshRoutstrLineup } from '@/shared/lib/routstr/refreshLineup';
 import { encodeChatImage } from '@/features/ai/lib/attachments';
 import { confirmSpend } from '@/features/ai/lib/spendConfirm';
@@ -42,7 +42,6 @@ jest.mock('@/features/ai/lib/spendConfirm', () => ({ confirmSpend: jest.fn() }))
 jest.mock('@/shared/lib/routstr/api', () => ({
   ...jest.requireActual('@/shared/lib/routstr/api'),
   sendMessage: jest.fn(),
-  checkBalance: jest.fn(),
 }));
 jest.mock('@/shared/lib/routstr/refreshLineup', () => ({ refreshRoutstrLineup: jest.fn() }));
 let mockAccount = 0;
@@ -230,7 +229,6 @@ beforeEach(async () => {
     currentSessionId: null,
     isAnonymousMode: true,
   });
-  jest.mocked(checkBalance).mockResolvedValue({ balance: 90000 });
   jest.mocked(refreshRoutstrLineup).mockResolvedValue(false);
 });
 

@@ -1,4 +1,3 @@
-export * from './capabilities';
 export * from './envelope';
 export * from './errors';
 export * from './log';

@@ -49,7 +49,7 @@ bridge the package's structured logs into the app logger.
   `createNaggClient`, `setNostrLogger`.
 - `nostr/recipes` — pre-built app-view query inputs/builders the feed client
   composes (`rankedFeedAppView`, `followsFeedAppView`, `threadAppView`,
-  `notificationsAppView`, `dmConversationAppView`, …).
+  `notificationsAppView`, `dmEnvelopesAppView`, …).
 - `nostr/map` — wire→domain mappers (e.g. `NaggFeedPage`).
 - `nostr/schemas` — Zod schemas for app-view payloads
   (`NaggFeedPageSchema`, `NaggThreadSchema`, …).

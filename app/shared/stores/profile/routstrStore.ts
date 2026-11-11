@@ -257,8 +257,8 @@ export interface RoutstrMessage {
   /** Reasoning/thinking text from the model (e.g. DeepSeek R1, o-series). */
   reasoningContent?: string;
   /**
-   * Whole sats this assistant message cost the user, derived from a
-   * pre/post `checkBalance` diff in `useAiSend`. Set after stream completion
+   * Whole sats this assistant message cost the user: the spent-minus-change
+   * figure the send returns to `useAiSend`. Set after stream completion
    * so it can land on a subsequent persisted write; rendered next to the
    * "Thought for…" header. Absent on user messages and on assistant
    * messages from before the cost-tracking change shipped.
@@ -561,19 +561,13 @@ interface RoutstrActions {
    *  catalog in hand, so a list that arrives after the catalog still shapes
    *  the menu this session. */
   setCuratedModels: (curated: CuratedModelsState) => void;
-  setApiKey: (apiKey: string) => void;
-  clearApiKey: () => void;
   /** Move a credential into `legacyAccounts` so its balance stays reachable.
    *  Idempotent, and never overwrites a richer record with a poorer one. */
   archiveAccount: (nodeBaseUrl: string | null, apiKey: string, balanceMsats: number | null) => void;
   /** Mark an archived credential as swept. Keeps the row (the node may still
    *  hold dust, and a refund is idempotent) but stops it being retried. */
   markAccountReclaimed: (nodeBaseUrl: string) => void;
-  applyChangeToken: (token: string) => void;
   invalidateServerLineup: () => void;
-
-  setBalance: (balance: number) => void;
-  clearBalance: () => void;
 
   /** Add messages to a conversation (`selectConversationId` when they were
    *  asked) in one write, so a question and its answer's placeholder are
@@ -1206,11 +1200,6 @@ export const useRoutstrStore = create<RoutstrStore>({ name: 'routstr-store', sco
         if (!same && cached) get().setCachedModels(cached.data);
       },
 
-      setApiKey: (apiKey: string) => {
-        storeLog.info('store.routstr.set_api_key');
-        set({ apiKey });
-      },
-
       archiveAccount: (nodeBaseUrl, apiKey, balanceMsats) => {
         if (!apiKey) return;
         set((state) => ({
@@ -1237,29 +1226,8 @@ export const useRoutstrStore = create<RoutstrStore>({ name: 'routstr-store', sco
         });
       },
 
-      applyChangeToken: (token) => {
-        if (!get().apiKey?.startsWith('cashu') || !token.startsWith('cashu')) return;
-        set({ apiKey: token });
-        aiLog.info('routstr.change_token.applied');
-      },
-
       invalidateServerLineup: () => {
         set({ serverLineupAt: null, lineup: null });
-      },
-
-      clearApiKey: () => {
-        storeLog.info('store.routstr.clear_api_key');
-        set({ apiKey: null });
-      },
-
-      setBalance: (balance: number) => {
-        storeLog.debug('store.routstr.set_balance', { balance });
-        set({ balance });
-      },
-
-      clearBalance: () => {
-        storeLog.info('store.routstr.clear_balance');
-        set({ balance: null });
       },
 
       addMessages: (conversationId, messages) => {

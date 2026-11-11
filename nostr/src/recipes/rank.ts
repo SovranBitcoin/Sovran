@@ -69,17 +69,6 @@ export type ShuffleInput = {
   strength?: number;
 };
 
-export type ReferenceRankInput = {
-  references: EventQueryInput;
-  via: TagFilterInput;
-  metric?: MetricInput;
-  weight?: number;
-  transform?: string;
-  terms?: WeightedRankTermInput[];
-  candidatePubkeyBoosts?: CandidatePubkeyBoostInput[];
-  shuffle?: ShuffleInput;
-};
-
 export type EngagementRankTermOptions = {
   pubkeyScore?: PubkeyScoreFilterInput;
 };
@@ -143,13 +132,6 @@ export function recencyTerm(weight = 1.2, halfLifeSeconds = 86_400): WeightedRan
     candidateField: 'CREATED_AT',
     transform: 'RECENCY_HALFLIFE',
     halfLifeSeconds,
-    weight,
-  };
-}
-
-export function contributionQualityTerm(weight = 3): WeightedRankTermInput {
-  return {
-    derivedMetric: 'contribution_quality',
     weight,
   };
 }

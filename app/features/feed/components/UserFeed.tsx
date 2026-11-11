@@ -514,9 +514,6 @@ export function UserFeed({
   // cannot write into a feed reset by a later author switch.
   const activeLoadMoreIdRef = useRef<string | null>(null);
 
-  // Track whether initial load has completed — skip fade-in for items after first render
-  const isFirstRender = useRef(true);
-
   // Snapshot of deleted-repost IDs taken at first feed load. Using a snapshot
   // rather than live state means unreposting while viewing won't yank items away
   // (protects against accidental taps). Nagg's app-view cache will catch up eventually.
@@ -560,7 +557,6 @@ export function UserFeed({
     const page = read.data;
     if (!page || appliedPageRef.current === page) return;
     appliedPageRef.current = page;
-    isFirstRender.current = true;
     hasMoreRef.current = page.paginationUntil > 0 && page.orderedFeedItems.length > 0;
     paginationCursorRef.current = page.paginationCursor;
     paginationUntilRef.current = page.paginationUntil;
@@ -583,10 +579,6 @@ export function UserFeed({
           })
         : page.orderedFeedItems;
     applyPage(page, displayItems);
-    // After initial render, mark first render done so subsequent items skip animation
-    requestAnimationFrame(() => {
-      isFirstRender.current = false;
-    });
     // A hand-over seed is a partial page: the network page that supersedes it
     // brings its own enrichment; enriching the seed would be wasted work.
     if (read.source === 'seed') return;
@@ -613,27 +605,22 @@ export function UserFeed({
         loadingMoreRef,
         feedItemIdsRef,
         activeLoadMoreIdRef,
-        isFirstRender,
         deletedRepostIdsRef,
         quotedRef,
         profilesRef,
-        applyPage,
         appendPage,
         applyEnrichment,
-        resetContent,
         setIsLoadingMore,
       }),
     [
       appendPage,
       applyEnrichment,
-      applyPage,
       authorName,
       authorPicture,
       isOwnProfile,
       profilesRef,
       pubkey,
       quotedRef,
-      resetContent,
     ]
   );
 

@@ -71,7 +71,7 @@ function status(messageID: string, s: StatusEvent['status'], reason?: string) {
   store().applyDeliveryStatus(event);
 }
 
-const thread = (peer = PEER_A) => store().getForPeer(peer);
+const thread = (peer = PEER_A) => store().byPeer[peer] ?? [];
 
 async function settle() {
   for (let turn = 0; turn < 20; turn++) await new Promise((resolve) => setImmediate(resolve));
@@ -139,15 +139,6 @@ describe('threads', () => {
     expect(thread()).toHaveLength(500);
     expect(thread()[0].id).toBe('m2');
     expect(thread()[499].id).toBe('m501');
-  });
-
-  it('clearing one peer leaves the other peers alone', () => {
-    store().appendIncoming(incoming('a', 1));
-    store().appendIncoming(incoming('b', 1, PEER_B));
-    store().clearForPeer(PEER_A);
-
-    expect(thread()).toEqual([]);
-    expect(thread(PEER_B).map((m) => m.id)).toEqual(['b']);
   });
 });
 

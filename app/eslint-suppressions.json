@@ -196,7 +196,7 @@
       "count": 1
     },
     "no-restricted-globals": {
-      "count": 3
+      "count": 1
     }
   },
   "shared/lib/utils.tsx": {

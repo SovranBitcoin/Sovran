@@ -398,8 +398,6 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
   // — onUpdate callbacks captured by an older request bail out when this drifts.
   const activeLoadIdRef = useRef<string | null>(null);
 
-  const isFirstRender = useRef(true);
-
   const scrollOffsetRef = useRef(0);
   const loadSequenceRef = useRef(0);
   const activeAbortControllerRef = useRef<AbortController | null>(null);
@@ -444,7 +442,6 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
           paginationRef,
           feedItemIdsRef,
           loadingMoreRef,
-          isFirstRender,
           activeAbortControllerRef,
           activeLoadIdRef,
           quotedRef,
@@ -516,7 +513,6 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
           paginationRef,
           feedItemIdsRef,
           loadingMoreRef,
-          isFirstRender,
           activeAbortControllerRef,
           activeLoadIdRef,
           quotedRef,
@@ -897,7 +893,6 @@ interface HomeFeedLoadCtx {
   paginationRef: { current: FeedPaginationState };
   feedItemIdsRef: { current: Set<string> };
   loadingMoreRef: { current: boolean };
-  isFirstRender: { current: boolean };
   activeAbortControllerRef: { current: AbortController | null };
   activeLoadIdRef: { current: string | null };
   quotedRef: FeedContentState['quotedRef'];
@@ -927,7 +922,6 @@ async function loadFeedImpl(
     paginationRef,
     feedItemIdsRef,
     loadingMoreRef,
-    isFirstRender,
     activeAbortControllerRef,
     activeLoadIdRef,
     applyPage,
@@ -968,7 +962,6 @@ async function loadFeedImpl(
     applyPage(phase1);
   };
 
-  isFirstRender.current = true;
   loadingMoreRef.current = false;
   setIsLoadingMore(false);
 
@@ -1005,9 +998,6 @@ async function loadFeedImpl(
     activeAbortControllerRef.current?.abort();
     activeAbortControllerRef.current = null;
     activeLoadIdRef.current = null;
-    requestAnimationFrame(() => {
-      isFirstRender.current = false;
-    });
     return;
   }
 
@@ -1039,9 +1029,6 @@ async function loadFeedImpl(
     setLoadError(false);
     setIsLoading(false);
     setIsRefreshing(false);
-    requestAnimationFrame(() => {
-      isFirstRender.current = false;
-    });
 
     const updates = await client.enrich({
       missingQuotedIds: phase1.missingQuotedIds,
