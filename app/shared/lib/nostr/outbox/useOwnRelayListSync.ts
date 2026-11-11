@@ -48,7 +48,9 @@ async function syncOwnRelayList(
       return;
     }
 
-    // No list anywhere — first-run-publish the defaults (never clobbers).
+    // No list anywhere: the defaults are the account's list. First-run-publish
+    // them (never clobbers).
+    useRelayListStore.getState().markNoListFound(pubkey);
     if (useRelayListStore.getState().hasPublished) return;
     const created = Math.floor(Date.now() / 1000);
     const list = new NDKEvent(ndk);

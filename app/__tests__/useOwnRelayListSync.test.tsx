@@ -89,7 +89,13 @@ beforeEach(() => {
   mockPublishEvent.mockReset();
   mockPublishEvent.mockReturnValue(okAsync({ accepted: [] }));
   mockSeedPool.mockReset();
-  useRelayListStore.setState({ entries: [], updatedAt: 0, hasPublished: false, source: 'default' });
+  useRelayListStore.setState({
+    entries: [],
+    updatedAt: 0,
+    hasPublished: false,
+    source: 'default',
+    noListFoundFor: null,
+  });
 });
 
 afterEach(() => {
@@ -173,7 +179,12 @@ describe('reading the own relay list', () => {
   it('writes nothing when the read fails', async () => {
     mockFetchEvent.mockRejectedValue(new Error('offline'));
     await mountAndWait(A);
-    expect(store()).toMatchObject({ entries: [], hasPublished: false, source: 'default' });
+    expect(store()).toMatchObject({
+      entries: [],
+      hasPublished: false,
+      source: 'default',
+      noListFoundFor: null,
+    });
     expect(mockPublishEvent).not.toHaveBeenCalled();
   });
 });
@@ -209,6 +220,8 @@ describe('first-run publish of the default relays', () => {
     mockPublishEvent.mockReturnValueOnce(errAsync({ type: 'no-relay-accepted' }));
     const first = await mountAndWait(A);
     expect(store().hasPublished).toBe(false);
+    // The defaults are the account's list all the same, for this session only.
+    expect(store().noListFoundFor).toBe(A);
     first.unmount();
 
     await mountAndWait(A);
@@ -243,6 +256,7 @@ describe('unmount and account change', () => {
     expect(mockSeedPool).not.toHaveBeenCalled();
     // B's read found nothing, so B published the defaults.
     expect(mockPublishEvent).toHaveBeenCalledTimes(1);
+    expect(store().noListFoundFor).toBe(B);
   });
 
   it('does not mark a publish that finished after unmount', async () => {

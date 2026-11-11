@@ -27,6 +27,11 @@ interface RelayListState {
   /** True once a `kind:10002` has been published for this profile. */
   hasPublished: boolean;
   source: RelayListSource;
+  /**
+   * In memory only, never saved: the account whose relay-list sync found no
+   * list on the network in this session, so the defaults are its real list.
+   */
+  noListFoundFor: string | null;
 }
 
 interface RelayListActions {
@@ -38,6 +43,8 @@ interface RelayListActions {
   setMarker: (url: string, marker: { read: boolean; write: boolean }) => void;
   restoreDefaults: () => void;
   markPublished: (createdAtSec: number) => void;
+  /** This session's sync found no relay list for `pubkey` on the network. */
+  markNoListFound: (pubkey: string) => void;
 }
 
 type RelayListStore = RelayListState & RelayListActions;
@@ -102,6 +109,7 @@ export const useRelayListStore = create<RelayListStore>({
       updatedAt: 0,
       hasPublished: false,
       source: 'default',
+      noListFoundFor: null,
 
       setFromRelay: (entries, createdAtSec) => {
         // Last-writer-wins: ignore an older or equal list than what we hold.
@@ -137,6 +145,10 @@ export const useRelayListStore = create<RelayListStore>({
       markPublished: (createdAtSec) => {
         set({ updatedAt: createdAtSec, hasPublished: true, source: 'relay' });
       },
+
+      markNoListFound: (pubkey) => {
+        set({ noListFoundFor: pubkey });
+      },
     }),
     persistConfig({
       name: 'nostr-relay-list-store',
@@ -161,4 +173,18 @@ export function getOwnWriteRelays(): string[] {
   const { entries } = useRelayListStore.getState();
   const write = entries.filter((e) => e.write).map((e) => e.url);
   return write.length > 0 ? write : [...DEFAULT_RELAYS];
+}
+
+/**
+ * `getOwnWriteRelays` once the account's relay list is known, otherwise
+ * `null`. Known means loaded for it (saved, from a relay, or edited here), or
+ * found missing on the network by this session's sync, so the defaults are the
+ * real answer. A store that has not loaded holds no entries and reads as the
+ * defaults, which may not be where the account's lists are.
+ */
+export function getKnownOwnWriteRelays(pubkey: string): string[] | null {
+  if (!useRelayListStore.persist.hasHydrated()) return null;
+  const { entries, source, noListFoundFor } = useRelayListStore.getState();
+  const known = source !== 'default' || entries.length > 0 || noListFoundFor === pubkey;
+  return known ? getOwnWriteRelays() : null;
 }

@@ -22,6 +22,8 @@ import {
   planFollowPublish,
   requestFollowSync,
 } from '@/shared/lib/nostr/followSync';
+import { DEFAULT_RELAYS } from '@/shared/lib/nostr/outbox/defaults';
+import { useRelayListStore } from '@/shared/lib/nostr/outbox/relayListStore';
 import { useFollowSync } from '@/shared/lib/nostr/ownsync/useFollowSync';
 import {
   selectContactList,
@@ -111,9 +113,6 @@ jest.mock('@/shared/stores/global/profileStore', () => ({
       return () => mockProfileListeners.delete(listener);
     },
   },
-}));
-jest.mock('@/shared/lib/nostr/outbox/relayListStore', () => ({
-  getOwnWriteRelays: () => mockRelays.map((relay) => relay.url),
 }));
 jest.mock('@/shared/lib/nostr/publish', () => ({
   publishEvent: (...args: unknown[]) => mockPublish(...args),
@@ -256,6 +255,13 @@ beforeEach(async () => {
   mockDisk.clear();
   useNostrSocialStore.setState(useNostrSocialStore.getInitialState(), true);
   await useNostrSocialStore.persist.rehydrate();
+  useRelayListStore.setState(useRelayListStore.getInitialState(), true);
+  await useRelayListStore.persist.rehydrate();
+  // The account's relay list, as the relay-list sync takes it in.
+  useRelayListStore.getState().setFromRelay(
+    mockRelays.map((relay) => ({ url: relay.url, read: true, write: true })),
+    T
+  );
 });
 
 afterEach(() => {
@@ -842,6 +848,107 @@ describe('following someone', () => {
 
     expect(mockPublish).not.toHaveBeenCalled();
     expect(social().optimisticFollowsByPubkey).toEqual({});
+  });
+});
+
+describe("the account's relay list", () => {
+  /** The relay-list store as it is before the account's list has loaded. */
+  async function relayListNotLoaded() {
+    useRelayListStore.setState(useRelayListStore.getInitialState(), true);
+    await useRelayListStore.persist.rehydrate();
+  }
+
+  it('reads and publishes nothing until the relay list is known, then builds on its relays', async () => {
+    await relayListNotLoaded();
+    // The defaults answer with an old list; the account's own relays hold the newer one.
+    for (const url of DEFAULT_RELAYS) {
+      mockPoolOnly.push({ url });
+      mockStored.set(url, [contacts(T - 100, [['p', X]])]);
+    }
+    const newer = contacts(T, [
+      ['p', X],
+      ['p', W],
+    ]);
+    relaysHold(newer);
+    const { ndk } = setup();
+
+    tap(Z);
+    await requestFollowSync(ndk, OWN);
+
+    expect(mockFilters).toEqual([]);
+    expect(mockPublish).not.toHaveBeenCalled();
+    expect(social().optimisticFollowsByPubkey[Z]?.pending).toBe(true);
+
+    useRelayListStore.getState().setFromRelay(
+      mockRelays.map((relay) => ({ url: relay.url, read: true, write: true })),
+      T
+    );
+    await requestFollowSync(ndk, OWN);
+
+    expect(mockPublish).toHaveBeenCalledTimes(1);
+    expect(mockPublish.mock.calls[0][0].relays).toEqual(mockRelays.map((relay) => relay.url));
+    expect(publishedTags()).toEqual([
+      ['p', X],
+      ['p', W],
+      ['p', Z],
+    ]);
+    for (const url of DEFAULT_RELAYS) expect(heldBy(url)).toHaveLength(1);
+  });
+
+  it('uses the defaults once the sync found no relay list for the account', async () => {
+    await relayListNotLoaded();
+    for (const url of DEFAULT_RELAYS) {
+      mockPoolOnly.push({ url });
+      mockStored.set(url, [contacts(T, [['p', X]])]);
+    }
+    useRelayListStore.getState().markNoListFound(OTHER_ACCOUNT);
+    const { ndk } = setup();
+
+    tap(Z);
+    await requestFollowSync(ndk, OWN);
+    expect(mockPublish).not.toHaveBeenCalled();
+
+    useRelayListStore.getState().markNoListFound(OWN);
+    await requestFollowSync(ndk, OWN);
+
+    expect(mockPublish.mock.calls[0][0].relays).toEqual([...DEFAULT_RELAYS]);
+    expect(publishedTags()).toEqual([
+      ['p', X],
+      ['p', Z],
+    ]);
+  });
+
+  it('reads again when the write relays change between the read and the publish', async () => {
+    relaysHold(contacts(T, [['p', X]]));
+    const added = { url: 'wss://three.example' };
+    mockPoolOnly.push(added);
+    const newer = contacts(T + 10, [
+      ['p', X],
+      ['p', W],
+    ]);
+    mockStored.set(added.url, [newer]);
+    const { ndk, signer } = setup();
+    // The relay-list sync takes in a newer relay list while the follow is signed.
+    signer.sign.mockImplementationOnce(async () => {
+      useRelayListStore.getState().setFromRelay(
+        [...mockRelays, added].map((relay) => ({ url: relay.url, read: true, write: true })),
+        T + 1
+      );
+    });
+
+    tap(Z);
+    await requestFollowSync(ndk, OWN);
+
+    expect(mockPublish).toHaveBeenCalledTimes(1);
+    expect(mockPublish.mock.calls[0][0].relays).toEqual([
+      ...mockRelays.map((relay) => relay.url),
+      added.url,
+    ]);
+    expect(publishedTags()).toEqual([
+      ['p', X],
+      ['p', W],
+      ['p', Z],
+    ]);
   });
 });
 

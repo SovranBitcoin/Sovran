@@ -56,13 +56,19 @@ jest.mock('@/shared/lib/nostr/followSync', () => ({
   requestFollowSync: (...args: unknown[]) => mockRequestFollowSync(...args),
 }));
 jest.mock('@/shared/lib/nostr/outbox/relayListStore', () => ({
-  useRelayListStore: (select: (s: { entries: { url: string; write: boolean }[] }) => unknown) =>
-    select({
-      entries: [
-        ...mockWriteRelays.map((url) => ({ url, write: true })),
-        { url: 'wss://read-only.example', write: false },
-      ],
-    }),
+  useRelayListStore: Object.assign(
+    (select: (s: { entries: { url: string; write: boolean }[] }) => unknown) =>
+      select({
+        entries: [
+          ...mockWriteRelays.map((url) => ({ url, write: true })),
+          { url: 'wss://read-only.example', write: false },
+        ],
+      }),
+    {
+      subscribe: () => () => undefined,
+      persist: { onFinishHydration: () => () => undefined },
+    }
+  ),
 }));
 jest.mock('@/features/feed/stores/ignoreStore', () => ({
   useFeedIgnoreStore: {

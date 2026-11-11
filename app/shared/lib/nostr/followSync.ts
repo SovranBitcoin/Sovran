@@ -22,6 +22,7 @@ import { z } from 'zod';
 
 import { nostrLog } from '@/shared/lib/logger';
 import { buildNostrDataLayer } from '@/shared/lib/nostr/buildNostrDataLayer';
+import { getKnownOwnWriteRelays } from '@/shared/lib/nostr/outbox/relayListStore';
 import {
   selectContactList,
   selectFollowIntents,
@@ -165,6 +166,15 @@ function sameSavedList(a: ReturnType<typeof savedList>, b: ReturnType<typeof sav
   return a.every((field, index) => field === b[index]);
 }
 
+/** Whether the account's write relays are still the ones `read` asked. */
+function sameRelays(read: readonly string[], ownPubkey: string) {
+  const now = getKnownOwnWriteRelays(ownPubkey);
+  if (!now) return false;
+  const asked = new Set(read);
+  const current = new Set(now);
+  return asked.size === current.size && [...asked].every((url) => current.has(url));
+}
+
 /**
  * Ask the tiered facade whether the account has a follow list somewhere, once
  * every enabled source has settled. No source can prove there is none (nagg
@@ -219,6 +229,12 @@ async function syncOnce(ndk: NDK, ownPubkey: string): Promise<void> {
 
       const signer = await matchingSigner(ndk, ownPubkey);
       scope.check();
+      // Until the account's relay list is known its write relays read as the
+      // defaults, which may not be where its follow list is.
+      if (!getKnownOwnWriteRelays(ownPubkey)) {
+        nostrLog.info('nostr.follow.waiting', { reason: 'relay-list-unknown' });
+        return;
+      }
       const raw = await readNewestOwnEvent(ndk, ownPubkey, Contacts);
       const read = decodeRead(raw);
       scope.check();
@@ -285,8 +301,9 @@ async function syncOnce(ndk: NDK, ownPubkey: string): Promise<void> {
       scope.check();
       if (event.pubkey !== ownPubkey || ndk.signer !== signer)
         throw new Error('Account signer changed');
-      // A list or seed arrived while signing, also one dated the same second: build again on it.
-      if (!sameSavedList(atBase, savedList())) continue;
+      // A list or seed arrived while signing, also one dated the same second,
+      // or the write relays changed since the read: read and build again.
+      if (!sameSavedList(atBase, savedList()) || !sameRelays(raw.relays, ownPubkey)) continue;
 
       // Exactly the relays the complete read covered: a relay that was not read
       // may hold a newer list, and this one would replace it there.
