@@ -253,6 +253,16 @@ describe('useOwnEventsSync', () => {
     unmount();
   });
 
+  it('never applies a profile without a time, even as the first one the session sees', () => {
+    const { rerender, unmount } = mount();
+
+    deliver(rerender, [profileEvent(id(70), 0, 'No time')]);
+
+    expect(latestProfileId()).toBeUndefined();
+    expect(cachedName(0)).toBeUndefined();
+    unmount();
+  });
+
   it('dispatches an event id only once, even when relays deliver it again', () => {
     const { rerender, unmount } = mount();
     const like = likeEvent(id(10), 'target-1');

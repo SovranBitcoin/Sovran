@@ -93,6 +93,12 @@ type OwnSyncSession = {
   profileNewest: { created_at: number; id: string } | null;
 };
 
+/** Whether `profile` is newer than every profile `session` has applied. One without a time (read as 0) never is. */
+function admitsProfile(session: OwnSyncSession, profile: OwnSyncEvent): boolean {
+  if (profile.created_at <= 0) return false;
+  return !session.profileNewest || supersedes(profile, session.profileNewest);
+}
+
 function sessionFor(
   current: OwnSyncSession | null,
   owner: string | undefined
@@ -170,7 +176,7 @@ export function useOwnEventsSync(): void {
       social.clearSettledFollowOptimistic();
     }
     const profile = part.latestProfile;
-    if (profile && (!session.profileNewest || supersedes(profile, session.profileNewest))) {
+    if (profile && admitsProfile(session, profile)) {
       const snapshot = parseOwnProfileSnapshot(profile);
       if (snapshot) ingestOwnProfileMetadata(snapshot, session.owner, active.accountIndex);
       session.profileNewest = { created_at: profile.created_at, id: profile.id };
