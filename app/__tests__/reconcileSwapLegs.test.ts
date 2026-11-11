@@ -40,7 +40,7 @@ function manager(operations: { mint?: Operation; melt?: Operation }) {
 }
 
 function savedLeg(
-  localStatus: 'settling' | 'paymentPending' | 'melting' | 'verifying' | 'done',
+  localStatus: 'settling' | 'paymentPending' | 'melting' | 'verifying' | 'invoiceReady' | 'done',
   ids = { mint: 'mint-op', melt: 'melt-op' }
 ) {
   const store = useSwapTransactionsStore.getState();
@@ -134,6 +134,62 @@ it.each(['melting', 'verifying'] as const)(
     expect(leg().localStatus).toBe('done');
   }
 );
+
+describe('a leg left at invoiceReady with a melt (killed after the melt was prepared, or mid input-shortfall retry)', () => {
+  it('settles it from its melt and mint, and ends the group finished', async () => {
+    const leg = savedLeg('invoiceReady');
+
+    await reconcileSwapLegs(
+      manager({ melt: { state: 'finalized' }, mint: { state: 'finalized' } })
+    );
+
+    expect(leg().localStatus).toBe('done');
+    expect(groupState(leg.groupId)).toBe('finished');
+  });
+
+  it('moves it to settling once the melt was paid, while the destination has not issued', async () => {
+    const leg = savedLeg('invoiceReady');
+
+    await reconcileSwapLegs(manager({ melt: { state: 'finalized' }, mint: { state: 'pending' } }));
+
+    expect(leg().localStatus).toBe('settling');
+    expect(groupState(leg.groupId)).toBe('running');
+  });
+
+  it('fails it when its melt was rolled back', async () => {
+    const leg = savedLeg('invoiceReady');
+
+    await reconcileSwapLegs(manager({ melt: { state: 'rolled_back' } }));
+
+    expect(leg()).toMatchObject({ localStatus: 'failed', errorMessage: expect.any(String) });
+    expect(groupState(leg.groupId)).toBe('finished');
+  });
+
+  it.each([
+    ['prepared', { state: 'prepared' }],
+    ['still pending', { state: 'pending' }],
+    ['unknown to Coco', null],
+  ])('leaves it and its group alone while the melt is %s', async (_name, melt) => {
+    const leg = savedLeg('invoiceReady');
+
+    await reconcileSwapLegs(manager({ melt, mint: { state: 'finalized' } }));
+
+    expect(leg().localStatus).toBe('invoiceReady');
+    expect(groupState(leg.groupId)).toBe('running');
+  });
+
+  it('leaves it alone while a live run owns its group', async () => {
+    const leg = savedLeg('invoiceReady');
+    const coco = manager({ melt: { state: 'finalized' }, mint: { state: 'finalized' } });
+    const release = holdSwapGroup(leg.groupId);
+
+    await reconcileSwapLegs(coco);
+
+    expect(coco.ops.melt.get).not.toHaveBeenCalled();
+    expect(leg().localStatus).toBe('invoiceReady');
+    release();
+  });
+});
 
 describe('a group saved as running that no run owns (the app was killed mid-run)', () => {
   it.each(['melting', 'verifying'] as const)(

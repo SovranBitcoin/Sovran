@@ -55,8 +55,9 @@ export type SwapLegLocalStatus =
 const LEG_MOVES: Record<SwapLegLocalStatus, readonly SwapLegLocalStatus[]> = {
   pending: ['creatingInvoice', 'invoiceReady', 'melting', 'failed'],
   creatingInvoice: ['invoiceReady', 'failed'],
-  // A melt whose inputs fell short is prepared again for a smaller invoice.
-  invoiceReady: ['melting', 'verifying', 'paymentPending', 'failed'],
+  // A melt whose inputs fell short is prepared again for a smaller invoice,
+  // and paid from here: a leg left here with a melt settles from that melt.
+  invoiceReady: ['melting', 'verifying', 'paymentPending', 'settling', 'failed'],
   melting: ['invoiceReady', 'verifying', 'paymentPending', 'settling', 'failed'],
   verifying: ['settling', 'done', 'failed'],
   paymentPending: ['settling', 'failed'],

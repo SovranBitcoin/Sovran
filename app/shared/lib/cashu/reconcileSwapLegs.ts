@@ -3,7 +3,6 @@ import { legMoneyMayMove, swapGroupPhase } from '@/shared/lib/cashu/swapGroupPha
 import {
   useSwapTransactionsStore,
   type SwapLeg,
-  type SwapLegLocalStatus,
   type SwapLegStatusUpdate,
 } from '@/shared/stores/profile/swapTransactionsStore';
 
@@ -22,20 +21,14 @@ interface SwapLegOperations {
 
 const MELT_ROLLED_BACK = 'The payment did not go through. The funds are back in the sending mint.';
 
-/** Saved by a run that is gone, or by an older build that had no value for an unknown outcome. */
-const LEFT_MID_FLIGHT: ReadonlySet<SwapLegLocalStatus | undefined> = new Set([
-  'melting',
-  'verifying',
-]);
-
 /**
  * Move saved swap legs that ended without a known outcome to their final
  * state, from Coco's record of each leg's own operations:
  *
  * - A leg whose melt is rolled back is `failed`, whatever it said before.
  * - `paymentPending` (the melt was sent, its outcome unknown), and a leg a
- *   run that is gone left at `melting` or `verifying`, becomes `settling` once
- *   the melt is finalized.
+ *   run that is gone left at `melting`, `verifying` or `invoiceReady` with a
+ *   melt, becomes `settling` once the melt is finalized.
  * - `settling` (the melt was paid, the destination had not issued) becomes
  *   `done` once this leg's mint operation is finalized without an error.
  *
@@ -56,8 +49,8 @@ export async function reconcileSwapLegs(manager: SwapLegOperations): Promise<voi
     // A live run settles its own legs in flight; nothing else will.
     const runGone = phase !== 'running';
     for (const leg of group.legs) {
-      const stale = runGone && LEFT_MID_FLIGHT.has(leg.localStatus);
-      if (leg.localStatus === 'settling' || leg.localStatus === 'paymentPending' || stale) {
+      const outcomeUnknown = leg.localStatus === 'settling' || leg.localStatus === 'paymentPending';
+      if (outcomeUnknown || (runGone && legMoneyMayMove(leg))) {
         unsettled.push({ groupId: group.id, leg });
       }
     }
