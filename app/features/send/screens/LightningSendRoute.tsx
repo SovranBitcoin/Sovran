@@ -7,10 +7,11 @@
  * transactions-flow re-entries leave them undefined so `LightningSendScreen`
  * renders the entry read-only.
  *
- * Validates the JSON-encoded `meltHistoryEntry` deep-link param at the
- * route boundary per AUDIT.md dim-5 (audit 23#F-002): the param is
- * `JSON.parse`d by the screen, so unguarded forwarding crashes on
- * malformed input or renders a spoofed melt entry.
+ * Bounds the JSON-encoded `meltHistoryEntry` deep-link param at the route
+ * boundary: a non-empty string of at most 64,000 characters. The shell does
+ * not parse it or check what it holds. The string is passed through to
+ * `LightningSendScreen`, which decodes it via `useScreenActions`; a seed
+ * that does not decode comes back as the screen's error.
  */
 
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
