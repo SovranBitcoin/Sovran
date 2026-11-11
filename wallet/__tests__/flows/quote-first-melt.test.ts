@@ -147,12 +147,99 @@ describe('quote-first melt preview (BTC-05)', () => {
     expect(tm.machine.inspect().isExecuting).toBe(false);
   });
 
-  it('pays the same quote again when Pay is tapped after a failed attempt', async () => {
+  /**
+   * A failed attempt uses its quote up. Pay again must not run under a quote
+   * (for a Lightning address, a new invoice too) whose fee was never shown:
+   * the first tap after a failure shows the new quote, the next one pays it.
+   */
+  function failingOnce() {
+    const counts = { quotes: 0, attempts: 0 };
+    const tm = createTestMachine({
+      operations: {
+        quoteMelt: async () =>
+          stubQuote({ quoteId: `quote-${++counts.quotes}`, feeReserve: counts.quotes === 1 ? 2 : 5 }),
+        executeMelt: async () => {
+          if (++counts.attempts === 1) throw new Error('Route not found');
+          return { historyEntry: JSON.stringify({ id: 'melt-1', type: 'melt', state: 'PAID' }) };
+        },
+      },
+    });
+    const melts = () => tm.operationCalls.filter((c) => c.name === 'executeMelt');
+    return { tm, counts, melts };
+  }
+
+  it('shows a new quote on the first Pay after a failed attempt, and pays it on the next', async () => {
+    const { tm, counts, melts } = failingOnce();
+    await tm.machine.execute(INPUTS.lightningAddress, { reset: true });
+    await tm.machine.enterAmount({ value: 200, unit: 'sat' }, MINT1);
+    await tm.machine.confirmMelt();
+    tm.assertStep('navigateToMeltPreview');
+    expect(melts()).toHaveLength(1);
+
+    await tm.machine.confirmMelt();
+
+    expect(melts()).toHaveLength(1);
+    expect(counts.quotes).toBe(2);
+    tm.assertStep('navigateToMeltPreview');
+    const previews = tm.handlerCalls.filter((c) => c.step === 'navigateToMeltPreview');
+    expect(previews.at(-1)?.data).toMatchObject({
+      phase: { kind: 'preview' },
+      meltQuote: { quoteId: 'quote-2', feeReserve: 5 },
+    });
+    expect(tm.machine.inspect().isExecuting).toBe(false);
+
+    await tm.machine.confirmMelt();
+
+    expect(melts()).toHaveLength(2);
+    expect(melts()[1]!.args[0]).toMatchObject({ quoteId: 'quote-2' });
+    expect(counts.quotes).toBe(2);
+    const processing = tm.notificationCalls.filter((c) => c.key === 'onPaymentProcessing');
+    expect(processing.map((c) => (c.data as { quoteId?: string }).quoteId)).toEqual(['quote-1', 'quote-2']);
+    expect(tm.notificationCalls.filter((c) => c.key === 'onPaymentConfirmed')).toHaveLength(1);
+
+    // Paid: a further Pay does nothing.
+    await tm.machine.confirmMelt();
+    expect(melts()).toHaveLength(2);
+  });
+
+  it('shows a new quote after a failed attempt when the mint list was opened and closed', async () => {
+    const { tm, counts, melts } = failingOnce();
+    await tm.machine.execute(INPUTS.lightningAddress, { reset: true });
+    await tm.machine.enterAmount({ value: 200, unit: 'sat' }, MINT1);
+    await tm.machine.confirmMelt();
+
+    await tm.machine.requestMintSelector();
+    await tm.machine.confirmMelt();
+
+    expect(melts()).toHaveLength(1);
+    expect(counts.quotes).toBe(2);
+    await tm.machine.confirmMelt();
+    expect(melts()[1]!.args[0]).toMatchObject({ quoteId: 'quote-2' });
+  });
+
+  it('never pays the used-up quote when the same mint is picked again after a failed attempt', async () => {
+    const { tm, melts } = failingOnce();
+    await tm.machine.execute(INPUTS.lightningAddress, { reset: true });
+    await tm.machine.enterAmount({ value: 200, unit: 'sat' }, MINT1);
+    await tm.machine.confirmMelt();
+
+    await tm.machine.changeMint(MINT1);
+    await tm.machine.confirmMelt();
+    await tm.machine.confirmMelt();
+
+    expect(melts()).toHaveLength(2);
+    expect(melts()[1]!.args[0]).toMatchObject({ quoteId: 'quote-2' });
+  });
+
+  it('keeps Pay retrying when the new quote cannot be made after a failed attempt', async () => {
     let quotes = 0;
     let attempts = 0;
     const tm = createTestMachine({
       operations: {
-        quoteMelt: async () => stubQuote({ quoteId: `quote-${++quotes}`, feeReserve: quotes === 1 ? 2 : 5 }),
+        quoteMelt: async () => {
+          if (++quotes === 2) throw new Error('mint unavailable');
+          return stubQuote({ quoteId: `quote-${quotes}` });
+        },
         executeMelt: async () => {
           if (++attempts === 1) throw new Error('Route not found');
           return { historyEntry: JSON.stringify({ id: 'melt-1', type: 'melt', state: 'PAID' }) };
@@ -162,14 +249,42 @@ describe('quote-first melt preview (BTC-05)', () => {
     await tm.machine.execute(INPUTS.lightningAddress, { reset: true });
     await tm.machine.enterAmount({ value: 200, unit: 'sat' }, MINT1);
     await tm.machine.confirmMelt();
+
+    await tm.machine.confirmMelt();
+    expect(attempts).toBe(1);
     tm.assertStep('navigateToMeltPreview');
+    expect(tm.machine.inspect().isExecuting).toBe(false);
+
+    await tm.machine.confirmMelt();
+    expect(attempts).toBe(1);
+    expect(quotes).toBe(3);
+
+    await tm.machine.confirmMelt();
+    expect(attempts).toBe(2);
+    const melts = tm.operationCalls.filter((c) => c.name === 'executeMelt');
+    expect(melts[1]!.args[0]).toMatchObject({ quoteId: 'quote-3' });
+  });
+
+  it('pays again at once after a failed attempt when the preview showed no quote', async () => {
+    let attempts = 0;
+    const tm = createTestMachine({
+      operations: {
+        quoteMelt: async () => {
+          throw new Error('mint unreachable');
+        },
+        executeMelt: async () => {
+          if (++attempts === 1) throw new Error('Route not found');
+          return { historyEntry: JSON.stringify({ id: 'melt-1', type: 'melt', state: 'PAID' }) };
+        },
+      },
+    });
+    await tm.machine.execute(INPUTS.lightningAddress, { reset: true });
+    await tm.machine.enterAmount({ value: 200, unit: 'sat' }, MINT1);
+    await tm.machine.confirmMelt();
 
     await tm.machine.confirmMelt();
 
-    expect(quotes).toBe(1);
-    const melts = tm.operationCalls.filter((c) => c.name === 'executeMelt');
-    expect(melts).toHaveLength(2);
-    expect(melts[1]!.args[0]).toMatchObject({ quoteId: 'quote-1' });
+    expect(attempts).toBe(2);
   });
 
   it('navigates without a quote when quote creation fails (Pay falls back to at-execution quoting)', async () => {

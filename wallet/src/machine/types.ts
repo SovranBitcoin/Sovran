@@ -489,6 +489,13 @@ export interface FlowContext {
    */
   meltQuotePreview?: MeltQuotePreview;
   /**
+   * The id of the preview quote a failed Pay was sent with. The attempt used
+   * that quote up, so the next Pay on a preview still holding it asks for a
+   * new quote and shows it instead of paying. Cleared when a new quote is
+   * attached.
+   */
+  spentMeltQuoteId?: string;
+  /**
    * When true, use local proof routing for ecash sends instead of relying on
    * an online swap. Exact local composition can still go straight to token
    * creation; non-exact composition asks the user to choose a nearby amount.

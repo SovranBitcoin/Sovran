@@ -449,6 +449,8 @@ EXECUTE (melt* intent) / AMOUNT_ENTERED(destination=meltQuote)
    -> CONFIRM_MELT -- in place --> operations.executeMelt({ …, quoteId })
         success: setStep('navigateToMeltPreview', {...data, phase: settled {historyEntry}})  (step STAYS)
         failure: routeOperationFailure -> chooseFallbackOption | ALL_OPTIONS_DISABLED | stay
+   -> CONFIRM_MELT (quote expired, or used by a failed attempt) -- in place -->
+        operations.quoteMelt -> the preview again with the new quote; nothing is paid
 ```
 
 | Effect / operation | When | Network |
@@ -459,7 +461,12 @@ EXECUTE (melt* intent) / AMOUNT_ENTERED(destination=meltQuote)
 | `operations.rollbackMelt` | screen action `meltQuote.cancel` | conditional |
 
 Failure + fallback: a single-option melt failure leaves the step on
-`navigateToMeltPreview` so the user can retry Pay; no `error` step is set. A
+`navigateToMeltPreview` so the user can retry Pay; no `error` step is set. The
+failed attempt used up the quote the preview showed (`flowCtx.spentMeltQuoteId`
+names it), so the first Pay after it pays nothing: it asks `quoteMelt` for a new
+quote, puts it on the step and dispatches the preview again, and the next Pay
+executes against that quote. A preview that showed no quote (onchain, or quote
+creation failed) retries at once. A
 BIP321 multi-option failure routes to `chooseFallbackOption` (failed option
 disabled) or `error` `ALL_OPTIONS_DISABLED`. If `melt.execute` throws after
 prepare, `executeMelt` cancels the melt operation to release reserved proofs,
@@ -473,8 +480,11 @@ data and `flowCtx.meltQuotePreview`; the confirm screen renders Amount
 against THAT quote — the displayed fee is the charged fee. Quote creation is
 best-effort: a failure navigates without a quote and Pay falls back to creating
 one at execution. A mint/amount/unit/target change invalidates the stored quote
-(`meltQuotePreviewMatches`) and re-quotes. Onchain targets keep the at-execution
-NUT-30 fee picker instead.
+(`meltQuotePreviewMatches`) and re-quotes. A Pay on a preview whose quote has
+expired, or went with a failed attempt, re-quotes too and waits for a second
+tap, even when the fee is unchanged; if that re-quote fails nothing is paid and
+the next Pay tries it again. Onchain targets keep the at-execution NUT-30 fee
+picker instead.
 
 MUST:
 
@@ -511,6 +521,9 @@ MUST NOT:
   second Pay is ignored (for a Lightning address it would fetch a fresh
   invoice and pay twice). A failed attempt leaves the phase `preview`, so Pay
   after a failure still retries.
+- `CONFIRM_MELT` must not execute against a quote the preview did not show:
+  when the step's quote has expired or a failed attempt used it up, Pay shows
+  a new quote and only the following Pay executes.
 - A settled payment (melt `settled`, payment request `settled` or
   `undelivered`, and `sendComplete`, whose token exists) is final for its
   flow. Only an event that starts another flow (`EXECUTE`, `RESET`, a

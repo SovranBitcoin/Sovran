@@ -1151,15 +1151,22 @@ export function createPaymentMachine(
       const originalStep = step;
       // A paid preview never reaches here (see the settled guard above): a
       // second executeMelt would pay twice. A failed attempt leaves the
-      // phase `preview`, so Pay after a failure still retries.
+      // phase `preview`, so Pay after a failure still retries: at once when
+      // the preview showed no quote, after showing a new one when it did.
       const data = stepData as StepDataMap["navigateToMeltPreview"];
-      if (
+      const quoteExpired =
         data.meltQuote?.expiresAt != null &&
-        data.meltQuote.expiresAt <= Date.now() / 1000 &&
-        operations.quoteMelt
-      ) {
-        // The previous approval expired. Show the new quote and require a
-        // second tap, even when the fee happens to be unchanged.
+        data.meltQuote.expiresAt <= Date.now() / 1000;
+      // A failed attempt used the quote up: paying again would run under a
+      // new quote, and for a Lightning address a new invoice, at a fee the
+      // preview never showed.
+      const quoteSpent =
+        data.meltQuote != null &&
+        data.meltQuote.quoteId === flowCtx.spentMeltQuoteId;
+      if ((quoteExpired || quoteSpent) && operations.quoteMelt) {
+        // The previous approval expired, or its quote went with a failed
+        // attempt. Show the new quote and require a second tap, even when
+        // the fee happens to be unchanged.
         try {
           setExecuting(true);
           const refreshed = await runMeltQuotePreviewEffect({
@@ -1169,7 +1176,11 @@ export function createPaymentMachine(
           });
           if (refreshed.isOk()) {
             if (refreshed.value.kind === "stale") return;
-            flowCtx = { ...flowCtx, meltQuotePreview: refreshed.value.quote };
+            flowCtx = {
+              ...flowCtx,
+              meltQuotePreview: refreshed.value.quote,
+              spentMeltQuoteId: undefined,
+            };
             setStep("navigateToMeltPreview", {
               ...data,
               meltQuote: refreshed.value.quote,
@@ -1231,6 +1242,9 @@ export function createPaymentMachine(
         logger.warn("machine.melt.failed", {
           error: errField(effect.error.cause),
         });
+        if (data.meltQuote) {
+          flowCtx = { ...flowCtx, spentMeltQuoteId: data.meltQuote.quoteId };
+        }
         routeOperationFailure(
           effect.error.cause,
           "melt",
@@ -2139,7 +2153,11 @@ export function createPaymentMachine(
           });
           if (effect.isOk()) {
             if (effect.value.kind === "stale") return;
-            flowCtx = { ...flowCtx, meltQuotePreview: effect.value.quote };
+            flowCtx = {
+              ...flowCtx,
+              meltQuotePreview: effect.value.quote,
+              spentMeltQuoteId: undefined,
+            };
             setStep("navigateToMeltPreview", {
               ...data,
               meltQuote: effect.value.quote,
