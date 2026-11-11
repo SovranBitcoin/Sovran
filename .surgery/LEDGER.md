@@ -377,7 +377,9 @@ Messages, follows, feed, AI:
 Surveys: Claude Opus 5.5 (four areas), Codex GPT-6.1 Sol and GPT-6 Astra (two each). Builds: Claude Opus 5.5; small
 review fixes and the merge: Claude Fable 5.2. Every build was reviewed commit by commit by Codex GPT-6.1 Sol or GPT-6
 Astra from the diff and the tests; each review found defects, most of them older bugs the named states exposed, and
-each was followed by a fix run. The last fix round's review is recorded below.
+each was followed by a fix run. The last fix round was reviewed too; what that review found was NOT repaired and
+is filed as F235 (payments and NFC, including one regression: sending again from the amount screen after a send does
+nothing), F236 (follow, AI, White Noise) and F237 (swaps, recovery, toast). Repair those before this branch merges.
 
 `persistence-release-safety` for the store-touching conversions (1, 3, 5, 6, 7, 9, 11): every upgrade test passes,
 the schema drift snapshots are unchanged and every release fixture loads; **no real upgrade was run**, so the verdict
@@ -385,7 +387,7 @@ is INCONCLUSIVE, not PASS.
 
 ### Open findings from pass 2
 
-In `docs/follow-ups/`: F213, F216, F218, F220 to F234. Highest: F227 (a follow can wait for ever with nothing on
+In `docs/follow-ups/`: F213, F216, F218, F220 to F237. Highest: F235 to F237 (above), F227 (a follow can wait for ever with nothing on
 screen saying so), F228 (the NFC and Tap to pay changes have not been run on a phone), F230 (swap leftovers, among
 them upgraded legs that cannot reach done and proofs that can stay reserved), F232 (AI answer text not saved across
 a kill).
