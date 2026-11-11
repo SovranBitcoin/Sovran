@@ -1,19 +1,22 @@
 /**
  * @fileoverview Syncs the active profile's NIP-65 relay list with the network.
  *
- * Runs once NDK is initialized: reads the profile's own `kind:10002`, ingests
- * it into the relay-list store, and seeds the pool with those relays. If the
- * relays answer that no list exists yet, it first-run-publishes the default
+ * Runs once NDK is initialized: reads the profile's own `kind:10002` from each
+ * saved write relay and each default relay, ingests the newest into the
+ * relay-list store, and seeds the pool with those relays. If every one of them
+ * answers that no list exists yet, it first-run-publishes the default
  * bootstrap set as the user's `kind:10002` so followers/outbox-aware clients
  * can discover them.
  *
- * Either answer marks the account's list as discovered for this session, which
- * is what lets the follow worker read and publish (`getKnownOwnWriteRelays`).
- * A read nobody answered marks nothing and is tried again on returning to the
- * foreground, when the network comes back and when a relay connects.
+ * Only an answer from every asked relay marks the account's list as discovered
+ * for this session, which is what lets the follow worker read and publish
+ * (`getKnownOwnWriteRelays`). The device cache is never asked. A read that
+ * failed, or that a relay did not finish answering, marks nothing and is tried
+ * again on returning to the foreground, when the network comes back and when a
+ * relay connects.
  *
- * Ingest-before-publish: defaults are only published when the network has NO
- * existing list — an existing list is never clobbered. Deferred via setTimeout
+ * Ingest-before-publish: defaults are only published when every asked relay
+ * says there is NO existing list — an existing list is never clobbered. Deferred via setTimeout
  * (not `runAfterInteractions`, which can stall behind the splash morph, per the
  * NDK provider's note) so it never competes with init.
  */
@@ -25,55 +28,27 @@ import type NDK from '@nostr-dev-kit/ndk-mobile';
 
 import { nostrLog } from '@/shared/lib/logger';
 import { publishEvent } from '@/shared/lib/nostr/publish';
-import { DEFAULT_RELAYS } from '@/shared/lib/nostr/outbox/defaults';
+import { readNewestOwnEvent } from '@/shared/lib/nostr/ownReplaceableEvent';
+import { DEFAULT_RELAYS, normalizeRelayList } from '@/shared/lib/nostr/outbox/defaults';
 import {
   RELAY_LIST_KIND,
   parseRelayList,
   serializeRelayList,
 } from '@/shared/lib/nostr/outbox/nip65';
-import { useRelayListStore } from '@/shared/lib/nostr/outbox/relayListStore';
+import { getOwnWriteRelays, useRelayListStore } from '@/shared/lib/nostr/outbox/relayListStore';
 import { seedPool } from '@/shared/lib/nostr/outbox/seedPool';
 import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
 
 const SYNC_DEFER_MS = 1_500;
-const READ_TIMEOUT_MS = 10_000;
-
-/** What the relays said: a list, that there is none (they answered), or nothing. */
-type RelayListRead =
-  { status: 'found'; event: NDKEvent } | { status: 'none' } | { status: 'unanswered' };
 
 /**
- * The newest relay list in the pool. Only an end-of-stored-events answer says
- * there is none; a read that times out without a list, or fails, is unanswered.
+ * The relays asked for the list: the saved write relays (where another client
+ * would have put it) and the defaults (where this app puts it). A store that
+ * has not loaded has no saved relays to name, so it is not asked yet.
  */
-function readOwnRelayList(ndk: NDK, pubkey: string): Promise<RelayListRead> {
-  return new Promise((resolve) => {
-    let newest: NDKEvent | undefined;
-    let settled = false;
-    const subscription = ndk.subscribe(
-      { kinds: [RELAY_LIST_KIND], authors: [pubkey] },
-      { closeOnEose: true },
-      undefined,
-      false
-    );
-    const finish = (answered: boolean) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      subscription.stop();
-      if (newest) resolve({ status: 'found', event: newest });
-      else resolve(answered ? { status: 'none' } : { status: 'unanswered' });
-    };
-    const timer = setTimeout(() => finish(false), READ_TIMEOUT_MS);
-    subscription.on('event', (event: NDKEvent) => {
-      if (!newest || (newest.created_at ?? 0) < (event.created_at ?? 0)) newest = event;
-    });
-    subscription.on('eose', () => finish(true));
-    Promise.resolve(subscription.start()).catch(() => {
-      newest = undefined;
-      finish(false);
-    });
-  });
+function discoveryRelays(): string[] | null {
+  if (!useRelayListStore.persist.hasHydrated()) return null;
+  return normalizeRelayList([...getOwnWriteRelays(), ...DEFAULT_RELAYS]);
 }
 
 /** Whether this session's discovery for the account finished, or must be tried again. */
@@ -83,28 +58,31 @@ async function syncOwnRelayList(
   isCancelled: () => boolean
 ): Promise<'discovered' | 'unanswered'> {
   try {
-    const read = await readOwnRelayList(ndk, pubkey);
+    const relays = discoveryRelays();
+    if (!relays) return 'unanswered';
+    const read = await readNewestOwnEvent(ndk, pubkey, RELAY_LIST_KIND, relays);
     if (isCancelled()) return 'unanswered';
-    if (read.status === 'unanswered') {
-      nostrLog.warn('nostr.relays.sync_unanswered');
-      return 'unanswered';
-    }
 
-    if (read.status === 'found') {
-      const { event } = read;
-      const entries = parseRelayList({ tags: event.tags });
-      useRelayListStore.getState().setFromRelay(entries, event.created_at ?? 0);
-      useRelayListStore.getState().markDiscovered(pubkey);
+    const { newest } = read;
+    if (newest) {
+      // A list any relay returned is taken in, even before the others answered.
+      const entries = parseRelayList({ tags: newest.tags });
+      useRelayListStore.getState().setFromRelay(entries, newest.created_at ?? 0);
       seedPool(
         ndk,
         entries.map((e) => e.url)
       );
-      return 'discovered';
     }
+    // Only every asked relay's answer makes the list known, or says there is none.
+    if (read.outcome !== 'complete') {
+      nostrLog.warn('nostr.relays.sync_unanswered', { outcome: read.outcome });
+      return 'unanswered';
+    }
+    useRelayListStore.getState().markDiscovered(pubkey);
+    if (newest) return 'discovered';
 
     // The relays hold no list: the defaults are the account's list.
     // First-run-publish them (never clobbers).
-    useRelayListStore.getState().markDiscovered(pubkey);
     if (useRelayListStore.getState().hasPublished) return 'discovered';
     const created = Math.floor(Date.now() / 1000);
     const list = new NDKEvent(ndk);
