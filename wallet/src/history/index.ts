@@ -67,8 +67,6 @@ export {
   getStatusHeader,
   isSettledStepType,
 } from "./timeline";
-export { groupTimeline } from "./grouping";
-export type { ColadaTimelineItem, SwapTimelineState } from "./grouping";
 export {
   getAiPayment,
   groupAiRequests,

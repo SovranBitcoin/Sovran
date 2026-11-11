@@ -142,7 +142,6 @@ profiles and mint review events through `events(input:)` and
 
 Colada exports wallet seed helpers for Coco `seedGetter` setup:
 
-- `generateCashuMnemonic()` creates a standard 12-word BIP-39 mnemonic.
 - `deriveStandardCashuSeed(mnemonic)` returns the standard 64-byte BIP-39 seed.
 - `createCashuSeedGetter({ getMnemonic })` returns a lazy Coco-compatible
   `() => Promise<Uint8Array>`.
@@ -249,8 +248,8 @@ React.
 
 ## Copy And Localization
 
-Use `createPaymentCopyResolver` (with per-key `overrides`), `resolvePaymentCopy`,
-`getPaymentCopy`, and `registerPaymentCopyLocale` for payment-state text.
+Use `createPaymentCopyResolver` (with per-key `overrides`), `resolvePaymentCopy`
+and `getPaymentCopy` for payment-state text.
 
 Apps may override individual copy keys, but default payment copy belongs in
 Colada. New payment states should declare copy keys beside the state/action

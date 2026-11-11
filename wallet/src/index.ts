@@ -29,8 +29,6 @@ export {
   CashuSeedError,
   createCashuSeedGetter,
   deriveStandardCashuSeed,
-  generateCashuMnemonic,
-  isValidCashuMnemonic,
   normalizeCashuMnemonic,
   tryDeriveStandardCashuSeed,
 } from "./wallet-seed";
@@ -41,7 +39,6 @@ export type {
   CashuSeedResult,
   CreateCashuSeedGetterConfig,
   DeriveStandardCashuSeedOptions,
-  GenerateCashuMnemonicOptions,
 } from "./wallet-seed";
 
 // Logger seam — consumers inject a structured logger via the `logger` option
@@ -95,7 +92,6 @@ export {
   PAYMENT_REQUEST_COPY,
   paymentCopyDefaults,
   RECEIVE_COPY,
-  registerPaymentCopyLocale,
   resolvePaymentCopy,
   SEND_COPY,
   TOAST_COPY,
@@ -124,7 +120,6 @@ export {
   getStatusHeader,
   getAiPayment,
   groupAiRequests,
-  groupTimeline,
   isAiRequestLeg,
   isSettledStepType,
   inFlightReceiveToHistoryEntry,
@@ -173,12 +168,10 @@ export type {
   AiRequestGroup,
   AiRequestState,
   BuildTimelineInput,
-  ColadaTimelineItem,
   OnchainConfirmationProgress,
   SendTokenReachabilityStatus,
   SendTokenReachabilityWarningOptions,
   SendTokenWarningCopy,
-  SwapTimelineState,
   TimelineFlow,
   TimelineFlowVariant,
   TimelineItem,
@@ -204,7 +197,6 @@ export {
   createInMemoryAnnotationStore,
   decodeAnnotation,
   encodeAnnotation,
-  firstAnnotationRecord,
   getAnnotation,
   getCounterparty,
   getDistribution,
@@ -391,7 +383,6 @@ export { defaultDetectors } from "./detectors";
 export { annotateOptions } from "./annotate";
 export {
   selectMint,
-  selectMintForMelt,
   rankMintCandidates,
   type MintSelectionConfig,
 } from "./mint-selection";
@@ -442,8 +433,6 @@ export {
 } from "./units/accounts";
 export {
   validateIntent,
-  checkWalletCapabilities,
-  checkAllCapabilities,
   isValidSatAmount,
   MAX_SAT_AMOUNT,
 } from "./guards";
@@ -463,8 +452,6 @@ export {
   buildExactOfflineAmountIndex,
   composeSatoshis,
   composeFiat,
-  getRoundedFiatMinorUnitForSats,
-  getSatRangeForDisplayedFiatMinorUnit,
 } from "./offline";
 
 // Machine types
@@ -648,10 +635,7 @@ export type {
   MintReviewsFetcher,
   MintReviewsSummary,
   GuardResult,
-  WalletCapability,
-  CapabilityCheckResult,
   ExactOfflineAmountIndex,
-  FiatMinorUnitSatRange,
   CompositionResult,
   FiatCompositionResult,
 } from "./types";

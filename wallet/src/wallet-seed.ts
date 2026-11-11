@@ -1,5 +1,4 @@
 import {
-  generateMnemonic,
   mnemonicToSeedSync,
   validateMnemonic,
 } from '@scure/bip39';
@@ -48,29 +47,12 @@ export interface CreateCashuSeedGetterConfig {
   cache?: CashuSeedCache;
 }
 
-export interface GenerateCashuMnemonicOptions {
-  strength?: number;
-}
-
 export interface DeriveStandardCashuSeedOptions {
   passphrase?: string;
 }
 
 export function normalizeCashuMnemonic(input: string): string {
   return input.trim().toLowerCase().split(/\s+/).filter(Boolean).join(' ');
-}
-
-export function isValidCashuMnemonic(input: string): boolean {
-  return validateMnemonic(normalizeCashuMnemonic(input), wordlist);
-}
-
-export function generateCashuMnemonic(
-  options: GenerateCashuMnemonicOptions = {},
-): string {
-  logger.info('walletSeed.mnemonic.generate', {
-    strength: options.strength ?? 128,
-  });
-  return generateMnemonic(wordlist, options.strength ?? 128);
 }
 
 export function deriveStandardCashuSeed(

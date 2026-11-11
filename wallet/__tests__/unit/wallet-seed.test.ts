@@ -5,8 +5,6 @@ import {
   CashuSeedError,
   createCashuSeedGetter,
   deriveStandardCashuSeed,
-  generateCashuMnemonic,
-  isValidCashuMnemonic,
   normalizeCashuMnemonic,
   tryDeriveStandardCashuSeed,
 } from '../../src/wallet-seed';
@@ -19,12 +17,6 @@ function testSeed(fill: number): Uint8Array {
 }
 
 describe('wallet seed helpers', () => {
-  it('generates a valid 12-word BIP-39 mnemonic by default', () => {
-    const mnemonic = generateCashuMnemonic();
-
-    expect(mnemonic.split(' ')).toHaveLength(12);
-    expect(isValidCashuMnemonic(mnemonic)).toBe(true);
-  });
 
   it('normalizes whitespace and casing', () => {
     expect(normalizeCashuMnemonic(`  ${VALID_MNEMONIC.toUpperCase()}  `)).toBe(

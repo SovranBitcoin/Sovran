@@ -51,8 +51,6 @@ import {
   composeSatoshis,
   composeFiat,
   buildExactOfflineAmountIndex,
-  getRoundedFiatMinorUnitForSats,
-  getSatRangeForDisplayedFiatMinorUnit,
 } from '../../src/offline';
 import { resolveAmount } from '../../src/amount-actions/resolve';
 
@@ -366,95 +364,5 @@ describe('buildExactOfflineAmountIndex', () => {
     // The reachable sums should start at the smallest positive composition.
     const index = buildExactOfflineAmountIndex([1, 2]);
     expect(index.reachableSums).not.toContain(0);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// getRoundedFiatMinorUnitForSats
-// ---------------------------------------------------------------------------
-
-/**
- * getRoundedFiatMinorUnitForSats converts a sat amount to fiat "minor units"
- * (cents, pennies, etc.) at a given BTC price, with rounding.
- *
- * Example: 1 BTC = $100,000. 100 sats = $0.10 = 10 cents (minor units).
- *
- * Returns null for invalid inputs (0, negative, fractional sats, invalid price).
- */
-describe('getRoundedFiatMinorUnitForSats', () => {
-  it('converts sats to fiat minor units (cents)', () => {
-    // 1 BTC = $100,000 → 1 sat = $0.001 → 100 sats = $0.10 = 10 cents
-    const result = getRoundedFiatMinorUnitForSats(100, 100_000);
-    expect(result).toBe(10);
-  });
-
-  it('returns null for invalid inputs', () => {
-    // 0 sats, negative sats, 0 price, negative price, fractional sats
-    // are all invalid inputs that should return null
-    expect(getRoundedFiatMinorUnitForSats(0, 100_000)).toBeNull();
-    expect(getRoundedFiatMinorUnitForSats(-1, 100_000)).toBeNull();
-    expect(getRoundedFiatMinorUnitForSats(100, 0)).toBeNull();
-    expect(getRoundedFiatMinorUnitForSats(100, -1)).toBeNull();
-    // Fractional sats don't exist in Bitcoin
-    expect(getRoundedFiatMinorUnitForSats(1.5, 100_000)).toBeNull();
-  });
-
-  it('rounds correctly', () => {
-    // 1 BTC = $50,000 → 1 sat = $0.0005 → 1 sat = 0.05 cents
-    // This rounds to 0 cents — the sat amount is too small to register
-    // as even a single cent at this price.
-    const result = getRoundedFiatMinorUnitForSats(1, 50_000);
-    expect(result).toBe(0);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// getSatRangeForDisplayedFiatMinorUnit
-// ---------------------------------------------------------------------------
-
-/**
- * getSatRangeForDisplayedFiatMinorUnit is the inverse of
- * getRoundedFiatMinorUnitForSats. Given a fiat minor unit (e.g. 10 cents)
- * and a BTC price, it returns the range of sat amounts that would all
- * display as that fiat amount after rounding.
- *
- * This is critical for the offline amount picker: if the user selects
- * "$0.10", we need to know which sat amounts count as "$0.10" so we can
- * check if any of those amounts are composable from available proofs.
- */
-describe('getSatRangeForDisplayedFiatMinorUnit', () => {
-  it('returns a valid sat range for a given minor unit', () => {
-    // 1 BTC = $100,000. 10 cents ($0.10) corresponds to ~100 sats.
-    // The range should include 100 and nearby values that also round to 10¢.
-    const result = getSatRangeForDisplayedFiatMinorUnit(10, 100_000);
-    expect(result).not.toBeNull();
-    expect(result!.minSat).toBeLessThanOrEqual(result!.maxSat);
-  });
-
-  it('returns null for invalid inputs', () => {
-    // Negative minor unit, zero price, negative price → invalid
-    expect(getSatRangeForDisplayedFiatMinorUnit(-1, 100_000)).toBeNull();
-    expect(getSatRangeForDisplayedFiatMinorUnit(10, 0)).toBeNull();
-    expect(getSatRangeForDisplayedFiatMinorUnit(10, -1)).toBeNull();
-  });
-
-  it('round-trips with getRoundedFiatMinorUnitForSats', () => {
-    // This verifies the two functions are inverses: converting sats → fiat
-    // and then fiat → sat range should produce a range that contains the
-    // original sat amount. This is the fundamental correctness property.
-    const btcPrice = 100_000;
-    const sats = 100;
-
-    // Step 1: 100 sats → X cents
-    const minorUnit = getRoundedFiatMinorUnitForSats(sats, btcPrice);
-    expect(minorUnit).not.toBeNull();
-
-    // Step 2: X cents → [minSat, maxSat]
-    const range = getSatRangeForDisplayedFiatMinorUnit(minorUnit!, btcPrice);
-    expect(range).not.toBeNull();
-
-    // Step 3: The original 100 sats should be within the range
-    expect(range!.minSat).toBeLessThanOrEqual(sats);
-    expect(range!.maxSat).toBeGreaterThanOrEqual(sats);
   });
 });

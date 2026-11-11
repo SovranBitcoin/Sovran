@@ -580,22 +580,6 @@ export interface GuardResult {
 // required capabilities for a given intent are covered.
 // ---------------------------------------------------------------------------
 
-export type WalletCapability =
-  | 'amountEntry'
-  | 'mintSelection'
-  | 'optionSelection'
-  | 'proofSelection'
-  | 'meltQuoteFetch'
-  | 'tokenReceive'
-  | 'httpTransport'
-  | 'mintInfo'
-  | 'profileView';
-
-export interface CapabilityCheckResult {
-  covered: boolean;
-  missing: WalletCapability[];
-}
-
 // ---------------------------------------------------------------------------
 // Proof Composition — pure math primitives for subset-sum analysis.
 // The wallet uses these to power its own proof selection UX.
@@ -604,11 +588,6 @@ export interface CapabilityCheckResult {
 export interface ExactOfflineAmountIndex {
   reachableSums: number[];
   totalReadyBalance: number;
-}
-
-export interface FiatMinorUnitSatRange {
-  minSat: number;
-  maxSat: number;
 }
 
 export interface CompositionResult {

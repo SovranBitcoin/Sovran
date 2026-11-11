@@ -279,19 +279,3 @@ export function preselectMintForSend(
   }
   return funded?.mintUrl ?? candidate;
 }
-
-/**
- * Select the best mint for a Lightning melt operation.
- * Lightning melts can use any trusted mint with balance.
- * Prefers the wallet's preferred mint if it has sufficient balance.
- */
-export function selectMintForMelt(
-  ctx: WalletContext,
-  minAmount?: number,
-): MintSelectionResult {
-  logger.debug("mintSelection.selectForMelt.start", {
-    trustedMintCount: ctx.trustedMintUrls.length,
-    hasMinAmount: minAmount != null && minAmount > 0,
-  });
-  return selectMint(ctx, { minAmount, strategy: "highestBalance" });
-}

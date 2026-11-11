@@ -31,10 +31,6 @@ import { rankMintCandidates } from "../../src/mint-selection";
  *          (machine routes to selectMint step for user to choose)
  *       5. If no valid mints → 'noValidMint' with reason
  *
- *   selectMintForMelt(wallet, minAmount?)
- *     Specialized for Lightning melts — same as selectMint but uses the
- *     melt-specific minAmount (invoice amount) for filtering.
- *
  * Wallet fixtures used:
  *   default:             2 mints (MINT1=1000, MINT2=500), preferred=MINT1
  *   singleMint:          1 mint (MINT1=1000), preferred=MINT1
@@ -50,7 +46,6 @@ import {
   pickPreferredCandidate,
   preselectMintForSend,
   selectMint,
-  selectMintForMelt,
 } from '../../src/mint-selection';
 import {
   WALLETS,
@@ -66,8 +61,8 @@ import {
 
 /**
  * getValidMintCandidates is the foundation — it produces the list of mints
- * that COULD be used. selectMint and selectMintForMelt both call this
- * internally and then apply auto-selection logic on top.
+ * that COULD be used. selectMint calls this internally and then applies
+ * auto-selection logic on top.
  */
 describe('getValidMintCandidates', () => {
   it('returns trusted mints with balance > 0', () => {
@@ -250,38 +245,6 @@ describe('selectMint — multiMintUnbalanced', () => {
     // Require ≥ 200 sats. MINT2 (preferred, 100 sats) is too low.
     // Falls through to MINT1 (5000 sats) which has enough balance.
     const result = selectMint(WALLETS.multiMintUnbalanced, { minAmount: 200 });
-    if (result.type === 'selected') {
-      expect(result.mintUrl).toBe(MINT1);
-    }
-  });
-});
-
-// ---------------------------------------------------------------------------
-// selectMintForMelt
-// ---------------------------------------------------------------------------
-
-/**
- * selectMintForMelt is used for Lightning payments (melts). It works like
- * selectMint but takes a minAmount parameter directly (the invoice amount)
- * rather than through an options object.
- *
- * The key difference: melt operations should prefer the mint with the
- * most balance (to maximize success probability), but still respect
- * the user's preferred mint when it's viable.
- */
-describe('selectMintForMelt', () => {
-  it('selects mint with highest balance', () => {
-    // For melts, we want the highest-balance mint for reliability.
-    // The preferred mint (MINT2, 100 sats) is still in the valid set,
-    // so if it's preferred, it takes priority.
-    const result = selectMintForMelt(WALLETS.multiMintUnbalanced);
-    expect(result.type).toBe('selected');
-  });
-
-  it('respects minAmount', () => {
-    // Melt for 200 sats. MINT2 (preferred, 100 sats) can't cover it.
-    // Must fall back to MINT1 (5000 sats).
-    const result = selectMintForMelt(WALLETS.multiMintUnbalanced, 200);
     if (result.type === 'selected') {
       expect(result.mintUrl).toBe(MINT1);
     }

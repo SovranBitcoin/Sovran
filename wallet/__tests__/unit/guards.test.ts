@@ -40,23 +40,16 @@
  *
  *   ignore:
  *     - supported: Always fails (input not recognized)
- *
- * There are also two capability-checking functions:
- *   - checkWalletCapabilities: Given a set of UI capabilities (amountEntry,
- *     mintSelection, etc.) and an intent, are all required capabilities covered?
- *   - checkAllCapabilities: Across ALL intent types, what capabilities are missing?
  */
 
 import { describe, it, expect } from 'vitest';
 import {
   validateIntent,
-  checkWalletCapabilities,
-  checkAllCapabilities,
   isValidSatAmount,
   MAX_SAT_AMOUNT,
 } from '../../src/guards';
 import { WALLETS, MINT1, UNTRUSTED_MINT } from '../_harness/fixtures';
-import type { ResolvedIntent, PaymentOption, WalletCapability } from '../../src/types';
+import type { ResolvedIntent, PaymentOption } from '../../src/types';
 
 /**
  * Helper to create a PaymentOption with optional amount. The amount field
@@ -367,117 +360,6 @@ describe('validateIntent — ignore', () => {
     expect(results).toHaveLength(1);
     expect(results[0].guard).toBe('supported');
     expect(results[0].passed).toBe(false);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// checkWalletCapabilities
-// ---------------------------------------------------------------------------
-
-/**
- * checkWalletCapabilities verifies that the wallet app has registered
- * enough UI capabilities to handle a given intent. Each intent type
- * requires certain capabilities:
- *   - sendPaymentRequest needs: amountEntry, mintSelection, proofSelection, httpTransport
- *   - meltLightningInvoice needs: amountEntry, mintSelection, meltQuoteFetch
- *   - receiveToken needs: tokenReceive
- *   - etc.
- *
- * If the wallet hasn't registered a required capability, the check returns
- * covered=false with a list of missing capabilities. This allows colada
- * to warn at startup: "Your wallet doesn't support mint selection."
- */
-describe('checkWalletCapabilities', () => {
-  it('returns covered=true when all capabilities present', () => {
-    // Provide all possible capabilities → everything is covered
-    const caps = new Set<WalletCapability>([
-      'amountEntry',
-      'mintSelection',
-      'proofSelection',
-      'httpTransport',
-    ]);
-    const intent: ResolvedIntent = {
-      type: 'sendPaymentRequest',
-      option: makeOption('paymentRequest', 'creq'),
-      info: { mints: [], amount: 100, unit: 'sat' },
-    };
-    const result = checkWalletCapabilities(caps, intent);
-    expect(result.covered).toBe(true);
-    expect(result.missing).toHaveLength(0);
-  });
-
-  it('returns missing capabilities', () => {
-    // Only provide amountEntry — missing mintSelection for sendPaymentRequest
-    const caps = new Set<WalletCapability>(['amountEntry']);
-    const intent: ResolvedIntent = {
-      type: 'sendPaymentRequest',
-      option: makeOption('paymentRequest', 'creq'),
-      info: { mints: [], amount: 100, unit: 'sat' },
-    };
-    const result = checkWalletCapabilities(caps, intent);
-    expect(result.covered).toBe(false);
-    // mintSelection is required for payment requests but not provided
-    expect(result.missing).toContain('mintSelection');
-  });
-
-  it.each(['meltBolt12Offer', 'meltOnchainAddress'] as const)(
-    'requires the amount-entry melt capabilities for %s',
-    (type) => {
-      // Both rails arrive amountless, like a Lightning address: the user enters
-      // the amount, then the wallet picks a mint, proofs and a melt quote.
-      const intent: ResolvedIntent = {
-        type,
-        option: makeOption(type === 'meltBolt12Offer' ? 'bolt12Offer' : 'onchainAddress', 'dest'),
-      };
-      const result = checkWalletCapabilities(new Set<WalletCapability>(), intent);
-      expect(result.covered).toBe(false);
-      expect([...result.missing].sort()).toEqual([
-        'amountEntry',
-        'meltQuoteFetch',
-        'mintSelection',
-        'proofSelection',
-      ]);
-    }
-  );
-});
-
-// ---------------------------------------------------------------------------
-// checkAllCapabilities
-// ---------------------------------------------------------------------------
-
-/**
- * checkAllCapabilities is a comprehensive check — it verifies capabilities
- * across ALL possible intent types at once. This is useful at app startup
- * to identify any flows that won't work due to missing UI components.
- *
- * Returns an array of gaps: { intentType, missing[] } for each intent
- * type that has missing capabilities.
- */
-describe('checkAllCapabilities', () => {
-  it('returns empty when all capabilities covered', () => {
-    // Provide every known capability — no gaps should exist
-    const all = new Set<WalletCapability>([
-      'tokenReceive',
-      'amountEntry',
-      'mintSelection',
-      'proofSelection',
-      'httpTransport',
-      'meltQuoteFetch',
-      'mintInfo',
-      'profileView',
-      'optionSelection',
-    ]);
-    const gaps = checkAllCapabilities(all);
-    expect(gaps).toHaveLength(0);
-  });
-
-  it('reports gaps for missing capabilities', () => {
-    // Only provide tokenReceive — most intent types will have gaps
-    const partial = new Set<WalletCapability>(['tokenReceive']);
-    const gaps = checkAllCapabilities(partial);
-    expect(gaps.length).toBeGreaterThan(0);
-    // sendPaymentRequest requires multiple capabilities we didn't provide
-    expect(gaps.some((g) => g.intentType === 'sendPaymentRequest')).toBe(true);
   });
 });
 

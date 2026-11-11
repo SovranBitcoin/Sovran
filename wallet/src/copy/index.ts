@@ -2,7 +2,6 @@ export { paymentCopyDefaults } from './defaults';
 export {
   createPaymentCopyResolver,
   getPaymentCopy,
-  registerPaymentCopyLocale,
   resolvePaymentCopy,
 } from './resolve';
 export {

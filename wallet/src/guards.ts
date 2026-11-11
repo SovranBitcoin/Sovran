@@ -10,8 +10,6 @@ import type {
   ResolvedIntent,
   WalletContext,
   GuardResult,
-  WalletCapability,
-  CapabilityCheckResult,
 } from "./types";
 import { logger } from "./logger";
 
@@ -299,86 +297,3 @@ export function validateIntent(
 // wallets verify at build time (or test time) that they've implemented
 // all necessary flows.
 // ---------------------------------------------------------------------------
-
-const CAPABILITIES_BY_INTENT: Record<
-  ResolvedIntent["type"],
-  WalletCapability[]
-> = {
-  receiveToken: ["tokenReceive"],
-  sendPaymentRequest: [
-    "amountEntry",
-    "mintSelection",
-    "proofSelection",
-    "httpTransport",
-  ],
-  meltLightningInvoice: ["mintSelection", "proofSelection", "meltQuoteFetch"],
-  meltBolt12Offer: [
-    "amountEntry",
-    "mintSelection",
-    "proofSelection",
-    "meltQuoteFetch",
-  ],
-  meltLightningAddress: [
-    "amountEntry",
-    "mintSelection",
-    "proofSelection",
-    "meltQuoteFetch",
-  ],
-  meltLnurlp: [
-    "amountEntry",
-    "mintSelection",
-    "proofSelection",
-    "meltQuoteFetch",
-  ],
-  meltOnchainAddress: [
-    "amountEntry",
-    "mintSelection",
-    "proofSelection",
-    "meltQuoteFetch",
-  ],
-  openMint: ["mintInfo"],
-  openProfile: ["profileView"],
-  chooseOption: ["optionSelection"],
-  ignore: [],
-};
-
-export function checkWalletCapabilities(
-  walletCapabilities: Set<WalletCapability>,
-  intent: ResolvedIntent,
-): CapabilityCheckResult {
-  const required = CAPABILITIES_BY_INTENT[intent.type];
-  const missing = required.filter((c) => !walletCapabilities.has(c));
-  const result = { covered: missing.length === 0, missing };
-  logger.info("guards.capabilities.intent", {
-    intentType: intent.type,
-    providedCount: walletCapabilities.size,
-    required,
-    missing,
-    covered: result.covered,
-  });
-  return result;
-}
-
-/**
- * Check all possible intent types against the wallet's capabilities.
- * Returns the list of intent types that have missing capabilities.
- */
-export function checkAllCapabilities(
-  walletCapabilities: Set<WalletCapability>,
-): { intentType: string; missing: WalletCapability[] }[] {
-  const gaps: { intentType: string; missing: WalletCapability[] }[] = [];
-
-  for (const [intentType, required] of Object.entries(CAPABILITIES_BY_INTENT)) {
-    const missing = required.filter((c) => !walletCapabilities.has(c));
-    if (missing.length > 0) {
-      gaps.push({ intentType, missing });
-    }
-  }
-
-  logger.info("guards.capabilities.all", {
-    providedCount: walletCapabilities.size,
-    gapCount: gaps.length,
-    gaps,
-  });
-  return gaps;
-}
