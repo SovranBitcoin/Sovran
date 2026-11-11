@@ -31,10 +31,12 @@ type RelayEvent = {
 };
 
 const mockPublish = jest.fn();
+const mockAfterSign = jest.fn();
 /** Per relay, the kind 10002s it holds, or `fail` for one whose read throws. */
 const mockHeld = new Map<string, RelayEvent[] | 'fail'>();
 const mockAsked: string[] = [];
 const mockProfile = { activeAccountIndex: 0, profiles: [{ accountIndex: 0, pubkey: OWN }] };
+const mockProfileListeners = new Set<(state: typeof mockProfile) => void>();
 const mockRelayObjects = new Map<string, Relay>();
 const mockRelay = (url: string) => {
   if (!mockRelayObjects.has(url)) mockRelayObjects.set(url, { url });
@@ -62,6 +64,7 @@ jest.mock('@nostr-dev-kit/ndk-mobile', () => ({
     async sign(signer: { user: () => Promise<{ pubkey: string }> }) {
       this.pubkey = (await signer.user()).pubkey;
       this.id = 'e'.repeat(64);
+      mockAfterSign();
     }
   },
 }));
@@ -73,7 +76,12 @@ jest.mock('@/shared/stores/global/profileStore', () => ({
     .requireActual<typeof import('./helpers/profileStoreMock')>('./helpers/profileStoreMock')
     .activeAccountReaders(
       () => mockProfile,
-      () => () => undefined
+      (listener) => {
+        mockProfileListeners.add(listener);
+        return () => {
+          mockProfileListeners.delete(listener);
+        };
+      }
     ),
 }));
 jest.mock('@/shared/lib/logger', () => {
@@ -138,9 +146,11 @@ const sent = () => mockPublish.mock.calls[0][0];
 beforeEach(() => {
   jest.useFakeTimers({ now: NOW_SEC * 1000, doNotFake: ['nextTick', 'setImmediate'] });
   forgetSilentRelays();
+  mockProfile.activeAccountIndex = 0;
   mockHeld.clear();
   mockAsked.length = 0;
   mockPublish.mockReset();
+  mockAfterSign.mockReset();
   mockPublish.mockImplementation(({ relays }: { relays: string[] }) =>
     okAsync({ accepted: relays.map((url) => ({ url, ok: true })) })
   );
@@ -154,6 +164,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  expect(mockProfileListeners.size).toBe(0);
   jest.useRealTimers();
 });
 
@@ -343,4 +354,34 @@ it('known quirk: a local relay snapshot overwrites remote additions and permissi
     ['r', MINE],
     ['r', 'wss://local-addition.example'],
   ]);
+});
+
+it('does not send if the signer changes after the signing helper checked it', async () => {
+  const ndk = relayFake();
+  mockAfterSign.mockImplementation(() => {
+    // The helper checks its signer before returning. Replace it in the gap
+    // between that continuation and the publisher resuming from its await.
+    void Promise.resolve().then(() =>
+      Promise.resolve().then(() => {
+        Object.assign(ndk, { signer: { user: async () => ({ pubkey: OWN }) } });
+      })
+    );
+  });
+  await publishOwnRelayList(ndk, OWN, store().entries);
+  expect(mockPublish).not.toHaveBeenCalled();
+  expect(store().source).toBe('local');
+});
+
+it('does not send if the account changes after the signing helper checked it', async () => {
+  mockAfterSign.mockImplementation(() => {
+    void Promise.resolve().then(() =>
+      Promise.resolve().then(() => {
+        mockProfile.activeAccountIndex = 1;
+        for (const listener of mockProfileListeners) listener(mockProfile);
+      })
+    );
+  });
+  await publishOwnRelayList(relayFake(), OWN, store().entries);
+  expect(mockPublish).not.toHaveBeenCalled();
+  expect(store().source).toBe('local');
 });

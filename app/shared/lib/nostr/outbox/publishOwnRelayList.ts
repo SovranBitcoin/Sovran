@@ -122,7 +122,8 @@ export async function publishOwnRelayList(
       tags: serializeRelayList(entries),
       content: '',
     });
-    if (!wanted()) return err({ type: 'waiting' });
+    scope.check();
+    if (!wanted() || ndk.signer !== signer) return err({ type: 'waiting' });
     const published = await publishToRelaysRead(ndk, event, read.relays);
     scope.check();
     if (ndk.signer !== signer) return err({ type: 'failed' });
