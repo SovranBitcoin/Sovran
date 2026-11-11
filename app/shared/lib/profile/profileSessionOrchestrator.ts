@@ -121,10 +121,7 @@ export async function switchToExistingProfile(opts: {
   }
   const lock = acquireTransition();
   if (!lock) return false;
-  if (!(await lock.takeDiskGuard())) {
-    await lock.release();
-    return false;
-  }
+  if (!(await lock.takeDiskGuard())) return false;
   try {
     log.info('profile.orchestrator.switch_start', { accountIndex: opts.accountIndex });
     // Without a restart, a stage owned above the account providers never
@@ -287,10 +284,7 @@ export async function createAndSwitchProfile(opts?: {
     return false;
   }
 
-  if (!(await lock.takeDiskGuard())) {
-    await lock.release();
-    return false;
-  }
+  if (!(await lock.takeDiskGuard())) return false;
   try {
     lock.holdSplash();
     usePopupStore.getState().close();
@@ -382,10 +376,7 @@ export async function importAndSwitchProfile(opts: {
   }
   const lock = acquireTransition();
   if (!lock) return 'busy';
-  if (!(await lock.takeDiskGuard())) {
-    await lock.release();
-    return 'busy';
-  }
+  if (!(await lock.takeDiskGuard())) return 'busy';
   try {
     const inProcess = useSettingsStore.getState().inProcessProfileSwitch;
     lock.holdSplash({ keepStagesThatOutliveAccount: inProcess });
@@ -583,10 +574,7 @@ export async function recoverMnemonicSession(mnemonic: string): Promise<boolean>
 export async function deleteAllProfiles(): Promise<boolean> {
   const lock = acquireTransition();
   if (!lock) return false;
-  if (!(await lock.takeDiskGuard())) {
-    await lock.release();
-    return false;
-  }
+  if (!(await lock.takeDiskGuard())) return false;
   // Set once the first irreversible deletion starts.
   let erasing = false;
   try {

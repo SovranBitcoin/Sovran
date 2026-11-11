@@ -66,12 +66,11 @@ it('writes the on-disk guard only when asked, and removes it on release', async 
   expect(await AsyncStorage.getItem(GUARD)).toBeNull();
 });
 
-it('refuses the on-disk guard while another runtime’s transition is recent, and leaves it alone', async () => {
+it('refuses the on-disk guard while another runtime’s transition is recent, releases itself, and leaves that guard alone', async () => {
   await AsyncStorage.setItem(GUARD, JSON.stringify({ startedAt: Date.now() }));
 
   const lock = acquireTransition()!;
   expect(await lock.takeDiskGuard()).toBe(false);
-  await lock.release();
 
   // The guard belongs to the other transition; this lock never took it.
   expect(await AsyncStorage.getItem(GUARD)).not.toBeNull();

@@ -194,7 +194,8 @@ export async function cleanupCocoWithTimeout(): Promise<void> {
 interface TransitionLock {
   /**
    * Take the on-disk guard as well. False when a transition started in an
-   * earlier runtime is still recent; the caller then releases and gives up.
+   * earlier runtime is still recent: the lock is then already released, and
+   * the caller gives up.
    */
   takeDiskGuard(): Promise<boolean>;
   /** Cover the app with the splash, through the registered controls, until `release`. */
@@ -218,9 +219,18 @@ export function acquireTransition(): TransitionLock | null {
   let diskGuardTaken = false;
   let cancelSplash: (() => void) | undefined;
   let splashHeld = false;
+  const release = async () => {
+    if (splashHeld) cancelSplash?.();
+    transitionInFlight = false;
+    if (diskGuardTaken) {
+      diskGuardTaken = false;
+      await endTransition();
+    }
+  };
   return {
     async takeDiskGuard() {
       diskGuardTaken = await beginTransition();
+      if (!diskGuardTaken) await release();
       return diskGuardTaken;
     },
     holdSplash(options) {
@@ -228,14 +238,7 @@ export function acquireTransition(): TransitionLock | null {
       cancelSplash = registeredControls?.cancelResetStages;
       registeredControls?.resetStages(options);
     },
-    async release() {
-      if (splashHeld) cancelSplash?.();
-      transitionInFlight = false;
-      if (diskGuardTaken) {
-        diskGuardTaken = false;
-        await endTransition();
-      }
-    },
+    release,
   };
 }
 
