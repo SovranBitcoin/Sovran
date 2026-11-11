@@ -147,6 +147,31 @@ describe('quote-first melt preview (BTC-05)', () => {
     expect(tm.machine.inspect().isExecuting).toBe(false);
   });
 
+  it('pays the same quote again when Pay is tapped after a failed attempt', async () => {
+    let quotes = 0;
+    let attempts = 0;
+    const tm = createTestMachine({
+      operations: {
+        quoteMelt: async () => stubQuote({ quoteId: `quote-${++quotes}`, feeReserve: quotes === 1 ? 2 : 5 }),
+        executeMelt: async () => {
+          if (++attempts === 1) throw new Error('Route not found');
+          return { historyEntry: JSON.stringify({ id: 'melt-1', type: 'melt', state: 'PAID' }) };
+        },
+      },
+    });
+    await tm.machine.execute(INPUTS.lightningAddress, { reset: true });
+    await tm.machine.enterAmount({ value: 200, unit: 'sat' }, MINT1);
+    await tm.machine.confirmMelt();
+    tm.assertStep('navigateToMeltPreview');
+
+    await tm.machine.confirmMelt();
+
+    expect(quotes).toBe(1);
+    const melts = tm.operationCalls.filter((c) => c.name === 'executeMelt');
+    expect(melts).toHaveLength(2);
+    expect(melts[1]!.args[0]).toMatchObject({ quoteId: 'quote-1' });
+  });
+
   it('navigates without a quote when quote creation fails (Pay falls back to at-execution quoting)', async () => {
     const tm = createTestMachine({
       operations: {
