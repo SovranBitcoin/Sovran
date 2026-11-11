@@ -370,6 +370,7 @@ describe('usePaymentStatusListener', () => {
     usePaymentStatusStore.getState().setActive({
       variant: 'send',
       id: 'send-1',
+      owner: { kind: 'send', operationId: 'send-1' },
       mintUrl: MINT,
       amount: 5,
       unit: 'sat',
@@ -387,6 +388,7 @@ describe('usePaymentStatusListener', () => {
     usePaymentStatusStore.getState().setActive({
       variant: 'payment-request',
       id: 'pr-toast',
+      owner: { kind: 'send', operationId: 'pr-send' },
       mintUrl: MINT,
       amount: 5,
       unit: 'sat',
@@ -481,6 +483,7 @@ describe('usePaymentStatusListener', () => {
     usePaymentStatusStore.getState().setActive({
       variant: 'melt',
       id: 'melt-toast-123',
+      owner: { kind: 'melt', quoteId: 'mq-123' },
       mintUrl: 'https://other.example',
       amount: 1,
       unit: 'sat',
@@ -524,6 +527,7 @@ describe('usePaymentStatusListener', () => {
     usePaymentStatusStore.getState().setActive({
       variant: 'melt',
       id: 'melt-toast',
+      owner: { kind: 'melt', quoteId: 'mq-1' },
       mintUrl: MINT,
       amount: 300,
       unit: 'sat',
@@ -575,6 +579,7 @@ describe('usePaymentStatusListener', () => {
     usePaymentStatusStore.getState().setActive({
       variant: 'melt',
       id: 'melt-toast',
+      owner: { kind: 'melt', quoteId: 'mq-1' },
       mintUrl: MINT,
       amount: 300,
       unit: 'sat',
@@ -599,6 +604,7 @@ describe('usePaymentStatusListener', () => {
     usePaymentStatusStore.getState().setActive({
       variant: 'payment-request',
       id: 'pr-toast',
+      owner: { kind: 'send', operationId: 'pr-send' },
       mintUrl: MINT,
       amount: 5,
       unit: 'sat',
@@ -623,6 +629,7 @@ describe('usePaymentStatusListener', () => {
     usePaymentStatusStore.getState().setActive({
       variant: 'melt',
       id: 'melt-failed-fresh',
+      owner: { kind: 'pending', key: 'melt-failed-fresh' },
       mintUrl: MINT,
       amount: 300,
       unit: 'sat',

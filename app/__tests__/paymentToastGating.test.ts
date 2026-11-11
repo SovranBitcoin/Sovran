@@ -102,7 +102,12 @@ const BASE = { mintUrl: 'https://mint1.example.com', amount: 200, unit: 'sat' };
 // NUT-18 request with id 'req-1' for 200 sat at BASE.mintUrl.
 const PAYMENT_REQUEST =
   'creqApWF0gGFpZXJlcS0xYWEYyGF1Y3NhdGFtgXgZaHR0cHM6Ly9taW50MS5leGFtcGxlLmNvbQ==';
-const PROCESSING_MELT = { variant: 'melt' as const, id: 'melt-1', state: 'processing' as const };
+const PROCESSING_MELT = {
+  variant: 'melt' as const,
+  id: 'melt-1',
+  owner: { kind: 'pending' as const, key: 'melt-1' },
+  state: 'processing' as const,
+};
 const activeStatus = () => usePaymentStatusStore.getState().active;
 
 describe('payment toast gating (onchain melt)', () => {
@@ -251,5 +256,65 @@ describe('payment confirmation history parsing', () => {
       paymentRequest: { role: 'payer', requestId: 'req-1', transport: 'nostr' },
     });
     expect(activeStatus()).toMatchObject({ id: 'melt-1', state: 'delivered' });
+  });
+});
+
+describe('the payment a processing toast belongs to', () => {
+  beforeEach(() => {
+    usePaymentStatusStore.setState({ active: null });
+  });
+
+  it('is the quote of a melt from a preview, from the start', () => {
+    void createSovranNotifications().onPaymentProcessing!({
+      variant: 'melt',
+      quoteId: 'mq-1',
+      ...BASE,
+    });
+    expect(activeStatus()).toMatchObject({
+      state: 'processing',
+      owner: { kind: 'melt', quoteId: 'mq-1' },
+    });
+  });
+
+  it('is held under the starter’s key until a payment request’s send reports its operation', () => {
+    const notifications = createSovranNotifications();
+    void notifications.onPaymentProcessing!({ variant: 'paymentRequest', ...BASE });
+    const key = activeStatus()!.id;
+    expect(activeStatus()).toMatchObject({ owner: { kind: 'pending', key } });
+
+    void notifications.onPaymentConfirmed!({
+      variant: 'paymentRequest',
+      ...BASE,
+      historyEntry: JSON.stringify({ id: 'h1', type: 'send', operationId: 'op-1' }),
+    });
+    expect(activeStatus()).toMatchObject({
+      id: key,
+      state: 'delivered',
+      owner: { kind: 'send', operationId: 'op-1' },
+    });
+  });
+
+  it('is the quote of a melt without a preview once its flow reports it, even still pending', () => {
+    const notifications = createSovranNotifications();
+    void notifications.onPaymentProcessing!({ variant: 'melt', ...BASE });
+    void notifications.onPaymentConfirmed!({
+      variant: 'melt',
+      ...BASE,
+      historyEntry: JSON.stringify({ id: 'mo-9', type: 'melt', quoteId: 'mq-9', state: 'PENDING' }),
+    });
+    expect(activeStatus()).toMatchObject({
+      state: 'processing',
+      owner: { kind: 'melt', quoteId: 'mq-9' },
+    });
+  });
+
+  it('is not bound by another flow', () => {
+    void createSovranNotifications().onPaymentProcessing!({ variant: 'paymentRequest', ...BASE });
+    void createSovranNotifications().onPaymentConfirmed!({
+      variant: 'paymentRequest',
+      ...BASE,
+      historyEntry: JSON.stringify({ id: 'h1', type: 'send', operationId: 'op-other' }),
+    });
+    expect(activeStatus()).toMatchObject({ owner: { kind: 'pending' } });
   });
 });

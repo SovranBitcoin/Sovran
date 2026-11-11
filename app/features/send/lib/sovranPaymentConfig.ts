@@ -111,6 +111,11 @@ export function createSovranNotifications(
   config?: CreateSovranNotificationsConfig
 ): NotificationHandlerMap {
   paymentLog.debug('payment.notifications.created');
+  /**
+   * The key of the processing toast this payment flow opened before its
+   * payment had an id. Only this flow can bind that toast to the payment.
+   */
+  let startedToastKey: string | null = null;
   return {
     NO_AMOUNT: ({ code: _code, message: _message, data: _data }) => {
       paymentLog.warn('payment.notification.no_amount');
@@ -207,9 +212,17 @@ export function createSovranNotifications(
         activeState: store.active?.state ?? null,
         expectedNext: 'processing_to_terminal_or_delivered',
       });
+      // A melt from a preview already has its quote, which every event of the
+      // melt carries. A payment request's send gets its id while it runs:
+      // until then the toast is held under a key only this flow knows.
+      startedToastKey = id;
       store.setActive({
         variant,
         id,
+        owner:
+          data.variant === 'melt' && data.quoteId
+            ? { kind: 'melt', quoteId: data.quoteId }
+            : { kind: 'pending', key: id },
         mintUrl: data.mintUrl,
         amount: data.amount,
         unit: data.unit,
@@ -273,6 +286,22 @@ export function createSovranNotifications(
           paymentLog.warn('payment.confirmed.pr_annotation_failed', {
             error: error instanceof Error ? error.message : String(error),
           });
+        }
+      }
+
+      // The payment's ids are in its history entry: bind this flow's toast to
+      // them, so the wallet events of this payment (and no other) reach it.
+      const entryOperationId =
+        typeof confirmedEntry?.operationId === 'string'
+          ? confirmedEntry.operationId
+          : typeof confirmedEntry?.id === 'string' && data.variant === 'melt'
+            ? confirmedEntry.id
+            : undefined;
+      if (startedToastKey) {
+        if (data.variant === 'paymentRequest' && entryOperationId) {
+          store.bindOwner(startedToastKey, { kind: 'send', operationId: entryOperationId });
+        } else if (data.variant === 'melt' && typeof confirmedEntry?.quoteId === 'string') {
+          store.bindOwner(startedToastKey, { kind: 'melt', quoteId: confirmedEntry.quoteId });
         }
       }
 
@@ -374,6 +403,8 @@ export function createSovranNotifications(
         store.setActive({
           variant,
           id,
+          // Final when shown: nothing is ever matched to it.
+          owner: { kind: 'pending', key: id },
           mintUrl: data.mintUrl,
           amount: data.amount,
           unit: data.unit,

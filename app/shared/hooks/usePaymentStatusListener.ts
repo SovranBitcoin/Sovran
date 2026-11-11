@@ -749,6 +749,7 @@ export function usePaymentStatusListener(): void {
       store.setActive({
         variant: 'send',
         id: operationId,
+        owner: { kind: 'send', operationId },
         mintUrl,
         amount,
         unit,
@@ -815,6 +816,7 @@ export function usePaymentStatusListener(): void {
       store.setActive({
         variant: 'melt',
         id,
+        owner: quoteId ? { kind: 'melt', quoteId } : { kind: 'pending', key: id },
         mintUrl,
         amount,
         unit,
@@ -883,6 +885,7 @@ export function usePaymentStatusListener(): void {
           store.setActive({
             variant: 'melt',
             id: operation.quoteId,
+            owner: { kind: 'melt', quoteId: operation.quoteId },
             mintUrl,
             amount,
             unit,

@@ -5,9 +5,25 @@ import { paymentLog } from '@/shared/lib/logger';
 
 type PaymentStatusState = 'processing' | 'delivered' | 'waiting' | 'confirmed' | 'failed';
 
-interface ActivePaymentStatus {
-  variant: 'receive' | 'send' | 'melt' | 'receive-ecash' | 'payment-request';
-  /** quoteId (receive) or operationId (send) or receiveHistoryEntry.id (receive-ecash) */
+/**
+ * The payment a send, melt or payment-request toast belongs to. A wallet
+ * event changes the toast only when it is for this payment.
+ */
+export type PaymentToastOwner =
+  /**
+   * Started before the wallet issued an id for it: a key only its starter
+   * holds, bound to the payment's id when the starter learns it.
+   */
+  | { kind: 'pending'; key: string }
+  /** A melt, by its quote: every event of the melt carries it. */
+  | { kind: 'melt'; quoteId: string }
+  /** A send (plain ecash, or a payment request's), by its operation. */
+  | { kind: 'send'; operationId: string };
+
+type BoundOwner = Exclude<PaymentToastOwner, { kind: 'pending' }>;
+
+interface PaymentStatusFields {
+  /** The toast's handle (what its popup clears): quoteId, operationId, entry id or the starter's key. */
   id: string;
   mintUrl: string;
   amount: number;
@@ -25,10 +41,65 @@ interface ActivePaymentStatus {
   subtitleOverride?: string;
 }
 
+type ActivePaymentStatus = PaymentStatusFields &
+  (
+    | { variant: 'receive' | 'receive-ecash' }
+    | { variant: 'send' | 'melt' | 'payment-request'; owner: PaymentToastOwner }
+  );
+
+/** The payment a toast belongs to; null for a receive toast, which has none. */
+function ownerOf(active: ActivePaymentStatus | null): PaymentToastOwner | null {
+  if (!active) return null;
+  switch (active.variant) {
+    case 'send':
+    case 'melt':
+    case 'payment-request':
+      return active.owner;
+    case 'receive':
+    case 'receive-ecash':
+      return null;
+  }
+}
+
+/** Whether `active` is the toast of this send (by its operation). */
+export function ownsSend(active: ActivePaymentStatus | null, operationId: string): boolean {
+  const owner = ownerOf(active);
+  return owner?.kind === 'send' && owner.operationId === operationId;
+}
+
+/** Whether `active` is the toast of this melt (by its quote). */
+export function ownsMelt(active: ActivePaymentStatus | null, quoteId: string): boolean {
+  const owner = ownerOf(active);
+  return owner?.kind === 'melt' && owner.quoteId === quoteId;
+}
+
+/**
+ * Whether `active` is the toast of a `variants` payment still in flight. An
+ * event for another payment neither changes nor replaces it: the person is
+ * watching this one, and its own events or its starter end it.
+ */
+export function paymentInFlight(
+  active: ActivePaymentStatus | null,
+  variants: readonly ('send' | 'melt' | 'payment-request')[]
+): boolean {
+  if (active?.state !== 'processing') return false;
+  switch (active.variant) {
+    case 'send':
+    case 'melt':
+    case 'payment-request':
+      return variants.includes(active.variant);
+    case 'receive':
+    case 'receive-ecash':
+      return false;
+  }
+}
+
 type PaymentStatusStore = {
   active: ActivePaymentStatus | null;
   setActive: (payment: ActivePaymentStatus | null) => void;
   clearActive: (id?: string) => void;
+  /** Bind the toast its starter opened under `key` to the payment's id, once it is known. */
+  bindOwner: (key: string, owner: BoundOwner) => void;
   setWaiting: (id: string, copy: { title: string; subtitle: string }) => void;
   setDelivered: (id: string) => void;
   setConfirmed: (id: string, extra?: { operationId?: string; receiveEntryId?: string }) => void;
@@ -98,6 +169,21 @@ export const usePaymentStatusStore = create<PaymentStatusStore>({
         requestedId: id ?? null,
       });
       return { active: null };
+    }),
+  bindOwner: (key, owner) =>
+    set((s) => {
+      const active = s.active;
+      const current = ownerOf(active);
+      if (!active || current?.kind !== 'pending' || current.key !== key) {
+        logSkip('payment.status.bind_owner.skipped', s, key, 'not_pending_for_key');
+        return s;
+      }
+      paymentLog.info('payment.status.bind_owner', {
+        id: active.id,
+        variant: active.variant,
+        owner: owner.kind,
+      });
+      return { active: { ...active, owner } };
     }),
   setWaiting: (id, copy) =>
     set((s) => {
