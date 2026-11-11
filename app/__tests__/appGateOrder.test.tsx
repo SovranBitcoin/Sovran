@@ -11,6 +11,7 @@
  * restore is complete unless a case says otherwise.
  */
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Text } from 'react-native';
 import { act, render, screen } from '@testing-library/react-native';
 
@@ -211,6 +212,23 @@ describe('AppGate order', () => {
     expect(useSettingsHydration.getState().status).toBe('loading');
     expect(rehydrate).toHaveBeenCalledTimes(1);
     expect(shown()).toBe('nothing');
+  });
+
+  it('shows the settings error page for settings it cannot read, and the wallet once a retry reads them', async () => {
+    given({});
+    jest.mocked(useSettingsStore.persist.hasHydrated).mockRestore();
+    await AsyncStorage.setItem('settings-store', '{not json');
+    await act(async () => useSettingsStore.persist.rehydrate());
+
+    await renderGate();
+    expect(shown()).toBe('settings error');
+
+    const saved = { legalAcceptance: CURRENT, hasSeenOnboarding: true };
+    await AsyncStorage.setItem('settings-store', JSON.stringify({ state: saved, version: 0 }));
+    await act(async () => mockTerms!.onRetry!());
+    await settle();
+
+    expect(shown()).toBe('wallet');
   });
 
   it('shows terms before onboarding, and accepting writes the current revisions', async () => {
