@@ -1892,6 +1892,15 @@ export function createPaymentMachine(
               if (effect.isOk()) {
                 if (effect.value.kind === "stale") return;
                 setStep(effect.value.step, effect.value.data);
+                // The request is paid and its flow is over: the context keeps
+                // nothing (request, intent, amount, mint) that choosing a mint
+                // or an amount could rebuild a preview from for Pay to send.
+                flowCtx = {
+                  unit: flowCtx.unit,
+                  source: flowCtx.source,
+                  rawInput: flowCtx.rawInput,
+                  offline: flowCtx.offline,
+                };
                 announcePayment(effect.value);
                 end = { kind: "paid" };
               } else {

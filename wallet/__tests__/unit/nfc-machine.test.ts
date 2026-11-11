@@ -162,7 +162,8 @@ describe("NFC terminal unit and mints", () => {
       await tm.machine.scan!(input, { source: "nfc" });
       expect(switchUnit).toHaveBeenCalledWith("usd");
       tm.assertStep("sendComplete");
-      tm.assertContext({ unit: "usd", amount: 50, mintUrl: accepted });
+      // Paid: the flow keeps its unit and nothing of the request.
+      tm.assertContext({ unit: "usd" });
       expect(sentMint(tm)?.args).toEqual([{ mintUrl: accepted, amount: 50, unit: "usd" }]);
       expect(tm.notificationCalls).toContainEqual({
         key: "onNfcPaymentProgress",
@@ -589,5 +590,22 @@ describe("a paid NFC tap", () => {
     await tm.machine.confirmPaymentRequest();
 
     expect(sent(tm)).toBe(1);
+  });
+
+  it("is not sent again after choosing a mint or an amount", async () => {
+    for (const choose of [
+      (tm: ReturnType<typeof createTestMachine>) => tm.machine.changeMint(accepted),
+      (tm: ReturnType<typeof createTestMachine>) =>
+        tm.machine.enterAmount({ value: 50, unit: "sat" }, accepted),
+    ]) {
+      const { tm } = setup();
+      await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
+      tm.assertStep("sendComplete");
+
+      await choose(tm);
+      await tm.machine.confirmPaymentRequest();
+
+      expect(sent(tm)).toBe(1);
+    }
   });
 });
