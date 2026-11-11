@@ -299,7 +299,6 @@ export const icons: string[] = [
   'mdi:radiobox-marked',
   'mdi:checkbox-blank-outline',
   'mdi:radiobox-blank',
-  'mdi:server-network-off',
   'mdi:wifi-off',
   'mdi:account-multiple-plus-outline',
   'mdi:share-variant-outline',

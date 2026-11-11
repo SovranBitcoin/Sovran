@@ -130,6 +130,7 @@ exports[`Design System component inventory tracks the complete reusable componen
     "features/send/components/RecipientHeader.tsx",
     "features/send/components/SpendingConditionsCard.tsx",
     "features/settings/components/ProfileDetailsScreen.tsx",
+    "features/settings/components/RelayListSettings.tsx",
     "features/theme/components/AlbumPillTabs.tsx",
     "features/theme/components/UnitPreviewCard.tsx",
     "features/theme/components/WallpaperThumbnail.tsx",
@@ -289,6 +290,6 @@ exports[`Design System component inventory tracks the complete reusable componen
     "shared/ui/primitives/View/Stack.tsx",
     "shared/ui/primitives/icon-symbol.tsx",
   ],
-  "total": 283,
+  "total": 284,
 }
 `;
