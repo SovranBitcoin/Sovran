@@ -23,7 +23,7 @@ import { useScanHistoryStore } from '@/shared/stores/profile/scanHistoryStore';
 import { useTransactionDistributionStore } from '@/shared/stores/profile/transactionDistributionStore';
 import { useTransactionLocationStore } from '@/shared/stores/profile/transactionLocationStore';
 import { useSwapTransactionsStore } from '@/shared/stores/profile/swapTransactionsStore';
-import { useProfileStore } from '@/shared/stores/global/profileStore';
+import { activePubkey } from '@/shared/stores/global/profileStore';
 import { storeLog } from '@/shared/lib/logger';
 import { whenLoaded } from '@/shared/lib/persist/hydrationOutcome';
 
@@ -52,9 +52,9 @@ const DATA_MIGRATIONS: DataMigrationStep[] = [
  * ordering is preserved; it retries next launch.
  */
 export async function runDataMigrations(): Promise<void> {
-  const pubkey = useProfileStore.getState().getActiveProfile()?.pubkey;
+  const pubkey = activePubkey();
   const assertActiveProfile = () => {
-    if (useProfileStore.getState().getActiveProfile()?.pubkey !== pubkey) {
+    if (activePubkey() !== pubkey) {
       throw new Error('Active profile changed during data migration');
     }
   };

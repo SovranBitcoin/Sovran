@@ -23,7 +23,11 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useNostrNDKContext } from '@/shared/providers/NostrNDKProvider';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
-import { selectActiveProfile, useProfileStore } from '@/shared/stores/global/profileStore';
+import {
+  activePubkey,
+  selectActiveProfile,
+  useProfileStore,
+} from '@/shared/stores/global/profileStore';
 import { useOwnedMediaStore } from '@/shared/stores/profile/ownedMediaStore';
 import {
   useOwnProfileMetadataStore,
@@ -204,8 +208,7 @@ function ProfileEditor({
   const [upload, setUpload] = useState<{ uri: string; progress: number } | null>(null);
   const controller = useRef<AbortController | null>(null);
   const mounted = useRef(true);
-  const isOwner = () =>
-    mounted.current && useProfileStore.getState().getActiveProfile()?.pubkey === pubkey;
+  const isOwner = () => mounted.current && activePubkey() === pubkey;
 
   const cached = useLatestRef({ name: cachedName, picture: cachedPicture });
   const baseRef = useLatestRef(base);

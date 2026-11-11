@@ -42,8 +42,8 @@ jest.mock('@/features/payments/lib/dmEcashRecovery', () => ({
 jest.mock('@/features/nearPay/lib/nutDropAutoRedeem', () => ({
   drainNutDropRedeemQueue: () => mockDrain(),
 }));
-jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({
-  getActiveProfilePubkey: () => mockActiveProfile,
+jest.mock('@/shared/stores/global/profileStore', () => ({
+  activePubkey: () => mockActiveProfile,
 }));
 jest.mock('@/shared/lib/cashu/manager', () => ({ CocoManager: { isInitialized: () => false } }));
 jest.mock('@/shared/lib/routstr/spentProbe', () => ({ isTokenSpent: jest.fn() }));

@@ -10,7 +10,7 @@ import { publishEvent } from '@/shared/lib/nostr/publish/publishEvent';
 import type { PublishError, PublishResult } from '@/shared/lib/nostr/publish/types';
 import { getOwnWriteRelays } from '@/shared/lib/nostr/outbox/relayListStore';
 import { resolveWriteRelays } from '@/shared/lib/nostr/outbox/resolveWriteRelays';
-import { useProfileStore } from '@/shared/stores/global/profileStore';
+import { activePubkey, useProfileStore } from '@/shared/stores/global/profileStore';
 import {
   OwnProfileSnapshotSchema,
   useOwnProfileMetadataStore,
@@ -147,10 +147,7 @@ export async function loadOwnProfileMetadata(
     }),
     () => null
   ).unwrapOr({ status: 'unavailable' } as const);
-  const latest =
-    useProfileStore.getState().getActiveProfile()?.pubkey === pubkey
-      ? useOwnProfileMetadataStore.getState().latest
-      : null;
+  const latest = activePubkey() === pubkey ? useOwnProfileMetadataStore.getState().latest : null;
   if (
     latest &&
     (remote.status !== 'found' ||
@@ -186,8 +183,7 @@ export function publishOwnProfileMetadata({
   if (existing) return existing;
   let eventId: string | undefined;
   let changed = false;
-  const isOwner = () =>
-    !changed && useProfileStore.getState().getActiveProfile()?.pubkey === pubkey;
+  const isOwner = () => !changed && activePubkey() === pubkey;
   const unsubscribe = useProfileStore.subscribe(() => {
     if (!isOwner()) {
       changed = true;

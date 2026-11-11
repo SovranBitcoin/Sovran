@@ -15,7 +15,7 @@ import { mintLocalId } from '@/shared/lib/id';
 import { cashuLog } from '@/shared/lib/logger';
 import { swapStatusPopup } from '@/shared/lib/popup';
 import { useSwapTransactionsStore } from '@/shared/stores/profile/swapTransactionsStore';
-import { getActiveProfilePubkey } from '@/shared/lib/cashu/profileScopedStorage';
+import { activePubkey } from '@/shared/stores/global/profileStore';
 import { useSwapStatusStore } from '@/shared/stores/runtime/swapStatusStore';
 import { anySwapGroupHeld, holdSwapGroup } from '@/shared/lib/cashu/swapGroupPhase';
 import type { MiddlemanRoutingSettings } from '@/shared/stores/global/settingsStore';
@@ -202,7 +202,7 @@ export function useMintRebalanceOrchestrator({
     }
     prepare?.();
     const groupId = swapGroupRef.current?.id ?? null;
-    const account = swapGroupRef.current ? swapGroupRef.current.account : getActiveProfilePubkey();
+    const account = swapGroupRef.current ? swapGroupRef.current.account : activePubkey();
     if (groupId) swapHistoryOf(account)?.reopenGroup(groupId);
     const toast = toastFor(groupId);
     if (toast) toast.resume();
@@ -342,7 +342,7 @@ export function useMintRebalanceOrchestrator({
         // account's reconcile the next time it is open.
         beforeLegOpens: () => {
           const run = currentRun();
-          if (getActiveProfilePubkey() === run.account || !giveUpRun(run)) return;
+          if (activePubkey() === run.account || !giveUpRun(run)) return;
           cashuLog.info('mint.rebalance.run_ended_other_account', { groupId: run.groupId });
           setRunStatus('cancelled');
           toastFor(run.groupId)?.cancel();
@@ -389,7 +389,7 @@ export function useMintRebalanceOrchestrator({
       // Start a swap group for this run (used for Transactions grouping)
       swapLegIdByStepIdRef.current = {};
       const groupId = useSwapTransactionsStore.getState().startGroup({ unit, title: 'Swap' });
-      swapGroupRef.current = { id: groupId, account: getActiveProfilePubkey() };
+      swapGroupRef.current = { id: groupId, account: activePubkey() };
       const initialStates = createInitialStepStates(snapshot.steps);
       stepStatesRef.current = initialStates;
       setStepStates(initialStates);

@@ -12,7 +12,7 @@ import Icon from '@/assets/icons';
 import { Section } from '@/shared/ui/composed/Section';
 import { ListRow } from '@/shared/ui/composed/ListRow';
 import { E2EHerouiMenuProbe } from '@/shared/lib/popup/E2EActionMenuProbe';
-import { useProfileStore } from '@/shared/stores/global/profileStore';
+import { selectActiveProfile, useProfileStore } from '@/shared/stores/global/profileStore';
 import {
   DEFAULT_BLOSSOM_SERVER,
   isValidHttpsUrl,
@@ -197,9 +197,7 @@ export const SettingsMediaScreen = () => {
   const { pad, item } = useStylePaint().style.space;
   const { ndk } = useNDK();
   const server = useMediaServerStore((s) => s.server);
-  const currentPicture = useProfileStore(
-    (s) => s.profiles.find((p) => p.accountIndex === s.activeAccountIndex)?.cachedPicture
-  );
+  const currentPicture = useProfileStore((s) => selectActiveProfile(s)?.cachedPicture);
   const editServer = () => {
     actionMenuPopup({
       title: 'Upload server',

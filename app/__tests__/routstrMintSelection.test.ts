@@ -61,14 +61,20 @@ jest.mock('@/shared/lib/http/requestSignal', () => ({
   buildAbortSignal: () => undefined,
 }));
 
-jest.mock('@/shared/stores/global/profileStore', () => ({
-  useProfileStore: {
+jest.mock('@/shared/stores/global/profileStore', () => {
+  const useProfileStore = {
     getState: () => ({
       activeAccountIndex: 0,
       profiles: [{ accountIndex: 0, pubkey: 'a'.repeat(64) }],
     }),
-  },
-}));
+  };
+  return {
+    useProfileStore,
+    ...jest
+      .requireActual<typeof import('./helpers/profileStoreMock')>('./helpers/profileStoreMock')
+      .activeAccountReaders(() => useProfileStore.getState()),
+  };
+});
 
 jest.mock('@/shared/stores/profile/mintStore', () => ({
   useMintStore: { getState: () => ({ selectedMint: mockSelectedMint }) },

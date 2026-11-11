@@ -48,7 +48,7 @@ import { restartApp } from '@/shared/lib/profile/appRestart';
 import { clearAllQueryCaches } from '@/shared/lib/cache/createQueryCacheStore';
 import { resetRoutstrClient } from '@/shared/lib/routstr/sdk/client';
 import { usePopupStore } from '@/shared/stores/runtime/popupStore';
-import { useProfileStore } from '@/shared/stores/global/profileStore';
+import { activePubkey, useProfileStore } from '@/shared/stores/global/profileStore';
 import { useBTCMapStore } from '@/shared/stores/global/btcMapStore';
 
 import {
@@ -178,7 +178,7 @@ async function switchWithoutRestart(
   release: () => Promise<void>
 ): Promise<boolean> {
   const previousIndex = useProfileStore.getState().activeAccountIndex;
-  const previousPubkey = useProfileStore.getState().getActiveProfile()?.pubkey;
+  const previousPubkey = activePubkey();
   try {
     await runInProcessProfileSwitch({
       cleanupCoco: () => CocoManager.cleanup({ requireSuccess: true }),

@@ -29,15 +29,21 @@ jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({
     removeItem: async () => {},
   }),
 }));
-jest.mock('@/shared/stores/global/profileStore', () => ({
-  useProfileStore: {
+jest.mock('@/shared/stores/global/profileStore', () => {
+  const useProfileStore = {
     getState: () => ({
       getActiveProfile: () => ({ pubkey: 'a'.repeat(64), accountIndex: 0 }),
       updateProfileMetadata: mockUpdate,
     }),
     subscribe: jest.fn(() => () => {}),
-  },
-}));
+  };
+  return {
+    useProfileStore,
+    ...jest
+      .requireActual<typeof import('./helpers/profileStoreMock')>('./helpers/profileStoreMock')
+      .activeAccountReaders(() => useProfileStore.getState()),
+  };
+});
 const mockUpdate = jest.fn();
 jest.mock('@/shared/lib/nostr/buildNostrDataLayer', () => ({
   buildNostrDataLayer: () => ({

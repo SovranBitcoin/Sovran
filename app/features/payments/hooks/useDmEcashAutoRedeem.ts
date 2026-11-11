@@ -23,7 +23,7 @@ import { AppState } from 'react-native';
 
 import { drainNutDropRedeemQueue } from '@/features/nearPay/lib/nutDropAutoRedeem';
 import { CocoManager } from '@/shared/lib/cashu/manager';
-import { getActiveProfilePubkey } from '@/shared/lib/cashu/profileScopedStorage';
+import { activePubkey } from '@/shared/stores/global/profileStore';
 import { paymentLog, redactError } from '@/shared/lib/logger';
 import { useStoreLoad } from '@/shared/lib/persist/hydrationOutcome';
 import { giftWrapCache } from '@/shared/lib/nostr/giftWrapCache';
@@ -127,7 +127,7 @@ function useDmEcashAutoRedeem(): void {
     // provider can stay mounted with the keys it had, and a write then would
     // land in unscoped storage and bring the wiped tokens back. The queue is
     // only this wallet's while the stores are scoped to this profile.
-    const stillCurrent = () => !disposed && getActiveProfilePubkey() === pubkey;
+    const stillCurrent = () => !disposed && activePubkey() === pubkey;
     // Envelope ids already handed to intake this session. Once one walk has
     // read the whole inbox, a later walk stops at the first page that holds
     // nothing new and lies past the backdating window, instead of rereading

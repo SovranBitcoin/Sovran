@@ -35,8 +35,8 @@ jest.mock('@/shared/lib/popup', () => ({ swapStatusPopup: jest.fn() }));
 jest.mock('@/shared/stores/profile/transactionAnnotationStore', () => ({
   setTransactionAnnotation: jest.fn(),
 }));
-jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({
-  getActiveProfilePubkey: () => 'account-a',
+jest.mock('@/shared/stores/global/profileStore', () => ({
+  activePubkey: () => 'account-a',
 }));
 jest.mock('@/shared/stores/profile/swapTransactionsStore', () => ({
   useSwapTransactionsStore: { getState: () => mockTransactions },

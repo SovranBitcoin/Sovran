@@ -105,15 +105,21 @@ jest.mock('@nostr-dev-kit/ndk-mobile', () => ({
     }
   },
 }));
-jest.mock('@/shared/stores/global/profileStore', () => ({
-  useProfileStore: {
+jest.mock('@/shared/stores/global/profileStore', () => {
+  const useProfileStore = {
     getState: () => mockProfile,
     subscribe: (listener: (state: typeof mockProfile) => void) => {
       mockProfileListeners.add(listener);
       return () => mockProfileListeners.delete(listener);
     },
-  },
-}));
+  };
+  return {
+    useProfileStore,
+    ...jest
+      .requireActual<typeof import('./helpers/profileStoreMock')>('./helpers/profileStoreMock')
+      .activeAccountReaders(() => useProfileStore.getState(), useProfileStore.subscribe),
+  };
+});
 jest.mock('@/shared/lib/nostr/publish', () => ({
   publishEvent: (...args: unknown[]) => mockPublish(...args),
 }));

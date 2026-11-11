@@ -38,9 +38,15 @@ jest.mock('@/shared/lib/nostr/nostrTierConfig', () => ({
     relay: { enabled: false, relays: [] },
   }),
 }));
-jest.mock('@/shared/stores/global/profileStore', () => ({
-  useProfileStore: { getState: () => ({ getActiveProfile: () => mockOwnProfile }) },
-}));
+jest.mock('@/shared/stores/global/profileStore', () => {
+  const useProfileStore = { getState: () => ({ getActiveProfile: () => mockOwnProfile }) };
+  return {
+    useProfileStore,
+    ...jest
+      .requireActual<typeof import('./helpers/profileStoreMock')>('./helpers/profileStoreMock')
+      .activeAccountReaders(() => useProfileStore.getState()),
+  };
+});
 jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({
   createProfileScopedStorage: () => ({
     getItem: async (key: string) => mockDisk.get(key) ?? null,

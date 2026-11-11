@@ -134,13 +134,19 @@ jest.mock('@/shared/lib/profile/profileSessionOrchestrator', () => ({
   recoverMnemonicSession: jest.fn(),
   deleteAllProfiles: jest.fn(),
 }));
-jest.mock('@/shared/stores/global/profileStore', () => ({
-  useProfileStore: Object.assign(
+jest.mock('@/shared/stores/global/profileStore', () => {
+  const useProfileStore = Object.assign(
     (selector: (state: { activeAccountIndex: number; profiles: never[] }) => unknown) =>
       selector({ activeAccountIndex: 0, profiles: [] }),
     { getState: jest.fn() }
-  ),
-}));
+  );
+  return {
+    useProfileStore,
+    ...jest
+      .requireActual<typeof import('./helpers/profileStoreMock')>('./helpers/profileStoreMock')
+      .activeAccountReaders(() => useProfileStore.getState()),
+  };
+});
 
 describe('AppGate locked recovery', () => {
   beforeEach(() => {

@@ -211,6 +211,10 @@ export function selectActiveProfile(
   return memoActiveProfile;
 }
 
+/** The active account's key, as a selector. */
+export const selectActivePubkey = (state: Pick<ProfileState, 'profiles' | 'activeAccountIndex'>) =>
+  selectActiveProfile(state)?.pubkey;
+
 export const useProfileStore = create<ProfileStore>({ name: 'profile-store', scope: 'global' })(
   persist(
     (set, get) => ({
@@ -371,7 +375,7 @@ export const useProfileStore = create<ProfileStore>({ name: 'profile-store', sco
         // The schema cannot express "the active index is one of these", and a
         // refine that could would discard the whole blob — the failure this
         // store is most exposed to. Repair instead: an active index with no
-        // profile behind it makes `getActiveProfilePubkey()` undefined, and
+        // profile behind it makes `activePubkey()` undefined, and
         // `createProfileScopedStorage` then falls back to the BARE key, so
         // every profile-scoped store silently reads and writes unscoped state
         // shared across profiles.
@@ -385,3 +389,26 @@ export const useProfileStore = create<ProfileStore>({ name: 'profile-store', sco
     })
   )
 );
+
+/** The active account's key now. Compared with a key taken earlier, it asks about this moment only. */
+export const activePubkey = (): string | undefined =>
+  selectActivePubkey(useProfileStore.getState());
+
+/** Watches that `pubkey` stays the active account; switching away and back still counts as changed. */
+export function captureActiveProfile(pubkey: string) {
+  const initial = useProfileStore.getState();
+  let current = selectActivePubkey(initial) === pubkey;
+  const dispose = useProfileStore.subscribe((state) => {
+    if (
+      state.activeAccountIndex !== initial.activeAccountIndex ||
+      selectActivePubkey(state) !== pubkey
+    )
+      current = false;
+  });
+  return {
+    check: () => {
+      if (!current) throw new Error('Profile changed');
+    },
+    dispose,
+  };
+}

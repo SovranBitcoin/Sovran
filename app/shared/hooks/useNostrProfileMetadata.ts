@@ -1,5 +1,5 @@
 import { useOwnProfileMetadataStore } from '@/shared/stores/profile/ownProfileMetadataStore';
-import { useProfileStore } from '@/shared/stores/global/profileStore';
+import { selectActivePubkey, useProfileStore } from '@/shared/stores/global/profileStore';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { getMockProfileMetadata } from '@/shared/stores/runtime/mockDataStore';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -101,11 +101,7 @@ export function useNostrProfileMetadata(pubkey: string | undefined): UseNostrPro
   const fixture = mockMode && pubkey ? getMockProfileMetadata(pubkey) : undefined;
   const cached = useCachedNostrProfile(pubkey ?? '');
   const baseMetadata = fixture ?? cached.metadata;
-  const isOwn = useProfileStore(
-    (s) =>
-      !!pubkey &&
-      s.profiles.find((profile) => profile.accountIndex === s.activeAccountIndex)?.pubkey === pubkey
-  );
+  const isOwn = useProfileStore((s) => !!pubkey && selectActivePubkey(s) === pubkey);
   const optimistic = useOwnProfileMetadataStore((s) => (isOwn ? s.optimistic : null));
   const metadata = optimistic
     ? {

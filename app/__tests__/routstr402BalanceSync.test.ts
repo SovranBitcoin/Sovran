@@ -26,14 +26,20 @@ afterEach(async () => {
   await settleRoutstrClient();
 });
 
-jest.mock('@/shared/stores/global/profileStore', () => ({
-  useProfileStore: {
+jest.mock('@/shared/stores/global/profileStore', () => {
+  const useProfileStore = {
     getState: () => ({
       activeAccountIndex: 0,
       profiles: [{ accountIndex: 0, pubkey: 'a'.repeat(64) }],
     }),
-  },
-}));
+  };
+  return {
+    useProfileStore,
+    ...jest
+      .requireActual<typeof import('./helpers/profileStoreMock')>('./helpers/profileStoreMock')
+      .activeAccountReaders(() => useProfileStore.getState()),
+  };
+});
 jest.mock('@/shared/lib/routstr/securePersistence', () => ({
   createRoutstrPersistence: () =>
     jest.requireMock('@/shared/lib/cashu/profileScopedStorage').createProfileScopedStorage(),

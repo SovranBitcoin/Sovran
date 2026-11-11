@@ -5,7 +5,7 @@ import { registerAccountScoped } from '@/shared/lib/account/accountRegistry';
 import { log } from '@/shared/lib/logger';
 import { getNostrTierConfig } from '@/shared/lib/nostr/nostrTierConfig';
 import { registerNostrDataLayer } from '@/shared/lib/nostr/dataLayerRegistry';
-import { useProfileStore } from '@/shared/stores/global/profileStore';
+import { activePubkey, useProfileStore } from '@/shared/stores/global/profileStore';
 import {
   cachedProfileToMetadata,
   useNostrMetadataCache,
@@ -136,7 +136,7 @@ function startProfilePersistence(
   let timer: ReturnType<typeof setTimeout> | undefined;
   const flush = () => {
     timer = undefined;
-    if (activeViewerPubkey() !== owner) return;
+    if (activePubkey() !== owner) return;
     const records: Record<string, NostrProfileMetadata> = {};
     for (const record of layer.cache.profiles.values()) {
       const mapped = cachedProfileToMetadata(record);
@@ -157,10 +157,6 @@ function startProfilePersistence(
     // Records the cache already observed are not lost with the pending timer.
     if (pending === 'write') flush();
   };
-}
-
-function activeViewerPubkey(): string | undefined {
-  return useProfileStore.getState().getActiveProfile()?.pubkey;
 }
 
 /**
@@ -195,7 +191,7 @@ export function buildNostrDataLayer(): facade.NostrDataLayer | null {
   bridgeNostrLoggerOnce();
   const config = getNostrTierConfig();
   const configKey = JSON.stringify(config);
-  const pubkey = activeViewerPubkey();
+  const pubkey = activePubkey();
 
   if (memo && memo.configKey === configKey && memo.pubkey === pubkey) return memo.layer;
 

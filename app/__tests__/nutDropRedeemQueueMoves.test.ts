@@ -24,6 +24,9 @@ jest.mock('@/shared/lib/logger', () => ({
 }));
 // Every value the store saves, newest last.
 const mockSaved: string[] = [];
+jest.mock('@/shared/stores/global/profileStore', () => ({
+  activePubkey: () => 'a'.repeat(64),
+}));
 jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({
   createProfileScopedStorage: () => ({
     getItem: async () => null,
@@ -32,7 +35,6 @@ jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({
     },
     removeItem: async () => {},
   }),
-  getActiveProfilePubkey: () => 'a'.repeat(64),
 }));
 
 type Entry = ReturnType<typeof useNutDropRedeemQueueStore.getState>['byTokenHash'][string];

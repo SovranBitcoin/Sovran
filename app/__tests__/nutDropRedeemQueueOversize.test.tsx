@@ -28,11 +28,13 @@ let mockBleListener: ((event: BleEvent) => void) | undefined;
 
 // The disk lives inside the mock: the store reads it while the imports above load,
 // before this file's own top-level variables exist.
+jest.mock('@/shared/stores/global/profileStore', () => ({
+  activePubkey: () => 'ab'.repeat(32),
+}));
 jest.mock('@/shared/lib/cashu/profileScopedStorage', () => {
   const disk = new Map<string, string>();
   return {
     disk,
-    getActiveProfilePubkey: () => 'ab'.repeat(32),
     createProfileScopedStorage: () => ({
       getItem: async (key: string) => disk.get(key) ?? null,
       setItem: async (key: string, value: string) => void disk.set(key, value),

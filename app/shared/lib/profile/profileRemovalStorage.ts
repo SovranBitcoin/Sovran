@@ -15,6 +15,7 @@ import { removePlaintextCaches } from '@/shared/lib/cache/createPubkeyScopedCach
 import '@/shared/lib/nostr/giftWrapCache';
 import '@/shared/lib/nostr/nip04Cache';
 import {
+  selectActiveProfile,
   useProfileStore,
   PROFILE_STORE_PERSIST_VERSION,
   type ProfileEntry,
@@ -77,9 +78,7 @@ const deletedWallets = new Set<string>();
 const securePlans = new Map<string, () => Promise<void>>();
 // A profile used after a partial removal must be re-inspected; it can hold new funds.
 useProfileStore.subscribe((state) => {
-  const active = state.profiles.find(
-    (profile) => profile.accountIndex === state.activeAccountIndex
-  );
+  const active = selectActiveProfile(state);
   if (active) {
     securePlans.delete(active.pubkey);
     deletedWallets.delete(active.pubkey);

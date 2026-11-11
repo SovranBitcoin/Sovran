@@ -5,30 +5,9 @@
  * signer fixed across each wait so a switch never writes to the wrong account.
  */
 import NDK, { NDKEvent, NDKRelaySet, NDKSubscriptionCacheUsage } from '@nostr-dev-kit/ndk-mobile';
-import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { getOwnWriteRelays } from './outbox/relayListStore';
 
 const READ_TIMEOUT_MS = 12_000;
-
-/** Watches transitions, including switching away and back while a signer is open. */
-export function captureProfile(pubkey: string) {
-  const initial = useProfileStore.getState();
-  let current =
-    initial.profiles.find((p) => p.accountIndex === initial.activeAccountIndex)?.pubkey === pubkey;
-  const dispose = useProfileStore.subscribe((state) => {
-    if (
-      state.activeAccountIndex !== initial.activeAccountIndex ||
-      state.profiles.find((p) => p.accountIndex === state.activeAccountIndex)?.pubkey !== pubkey
-    )
-      current = false;
-  });
-  return {
-    check: () => {
-      if (!current) throw new Error('Profile changed');
-    },
-    dispose,
-  };
-}
 
 /** Signed by `pubkey`, of `kind`, with an id and signature that verify. */
 export function validOwnEvent(event: NDKEvent, pubkey: string, kind: number): boolean {

@@ -46,15 +46,20 @@ jest.mock('@/shared/ui/composed/CapsuleButton', () => ({
   }) => require('react').createElement('capsule', { testID, label, onPress }),
 }));
 const mockNdk = {};
-jest.mock('@/shared/stores/global/profileStore', () => ({
-  useProfileStore: Object.assign(
+jest.mock('@/shared/stores/global/profileStore', () => {
+  const useProfileStore = Object.assign(
     (selector: (state: typeof mockState) => unknown) => selector(mockState),
     {
       getState: () => mockState,
     }
-  ),
-  selectActiveProfile: (state: typeof mockState) => state.getActiveProfile(),
-}));
+  );
+  return {
+    useProfileStore,
+    ...jest
+      .requireActual<typeof import('./helpers/profileStoreMock')>('./helpers/profileStoreMock')
+      .activeAccountReaders(() => useProfileStore.getState()),
+  };
+});
 jest.mock('@nostr-dev-kit/ndk-mobile', () => ({ useNDK: () => ({ ndk: mockNdk }) }), {
   virtual: true,
 });

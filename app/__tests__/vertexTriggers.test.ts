@@ -18,11 +18,17 @@ jest.mock('@/shared/lib/nostr/vertex/signVertexRequest', () => ({
 jest.mock('@/shared/stores/global/settingsStore', () => ({
   useSettingsStore: { getState: () => ({ vertexCreditsEnabled: mockEnabled }) },
 }));
-jest.mock('@/shared/stores/global/profileStore', () => ({
-  useProfileStore: {
+jest.mock('@/shared/stores/global/profileStore', () => {
+  const useProfileStore = {
     getState: () => ({ activeAccountIndex: 0, profiles: [{ accountIndex: 0, pubkey: mockOwner }] }),
-  },
-}));
+  };
+  return {
+    useProfileStore,
+    ...jest
+      .requireActual<typeof import('./helpers/profileStoreMock')>('./helpers/profileStoreMock')
+      .activeAccountReaders(() => useProfileStore.getState()),
+  };
+});
 jest.mock('@/shared/lib/nostr/nostrTierConfig', () => ({
   getNostrTierConfig: () => ({
     nagg: { enabled: mockNaggEnabled, appViewBaseUrl: 'https://nagg.test' },
