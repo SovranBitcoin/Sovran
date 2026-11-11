@@ -75,8 +75,6 @@ interface TransactionDistributionActions {
    * entries pass `quoteId`, for everything else pass `historyEntry.id`.
    */
   setDistribution: (key: string, source: DistributionSource) => void;
-  /** Get the distribution entry for a key, or null. */
-  getDistribution: (key: string) => DistributionEntry | null;
 }
 
 type TransactionDistributionStore = TransactionDistributionState & TransactionDistributionActions;
@@ -92,7 +90,7 @@ const PersistedDistributionEntry = z.looseObject({
 
 const PersistedTransactionDistributionStore = z.object({
   // An entry with an unrecognized `source` (written by a newer build) is
-  // dropped alone — `getDistribution` already treats a missing key as "never
+  // dropped alone — readers already treat a missing key as "never
   // recorded" — instead of failing the whole-blob parse, which would wipe
   // every recorded distribution (persist merge discards the blob).
   distributions: tolerantRecord(z.string().max(256), PersistedDistributionEntry),
@@ -131,10 +129,6 @@ export const useTransactionDistributionStore = create<TransactionDistributionSto
               },
             },
           }));
-        },
-
-        getDistribution: (key: string) => {
-          return get().distributions[key] ?? null;
         },
       }),
       persistConfig({

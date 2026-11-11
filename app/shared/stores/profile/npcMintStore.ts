@@ -14,7 +14,6 @@ import { DEFAULT_MINT_URL } from '@/shared/lib/cashu/defaultMints';
 interface NpcMintState {
   /** Persisted NPC receive mint URL for the active profile. */
   mintUrl: string | undefined;
-  isSyncing: boolean;
   isUpdating: boolean;
 }
 
@@ -69,7 +68,6 @@ export const useNpcMintStore = create<NpcMintStore>({ name: 'npc-mint-store', sc
     persist(
       (set, get) => ({
         mintUrl: undefined,
-        isSyncing: false,
         isUpdating: false,
 
         getActiveMintUrl: () => get().mintUrl ?? DEFAULT_MINT_URL,
