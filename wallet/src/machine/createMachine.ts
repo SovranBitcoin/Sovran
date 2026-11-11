@@ -1973,16 +1973,10 @@ export function createPaymentMachine(
           const data = stepData as StepDataMap["confirmSend"];
           const walletCtx = getContext();
           const proofAmounts = walletCtx.proofAmounts[data.mintUrl] ?? [];
-          const localProofs = buildProofSuggestions(proofAmounts, data.amount);
-          const hasExactLocalProofs =
-            proofAmounts.length > 0 && localProofs.exactMatch;
-          const shouldCreateLocalTokenFirst =
-            hasExactLocalProofs && !!operations.executeOfflineSend;
+          // Which path the send takes is decided, and logged, by the effect.
           logger.info("machine.confirmSend.start", {
             ...mintUrlFields(data.mintUrl),
             amount: data.amount,
-            hasExactLocalProofs,
-            localFirst: shouldCreateLocalTokenFirst,
           });
           setExecuting(true);
           beginCommit(sendGeneration);
