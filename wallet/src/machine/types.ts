@@ -753,6 +753,12 @@ export type NotificationHandlerMap = {
      * slow-settling methods (onchain) and show only the terminal one.
      */
     method?: MeltQuoteMethod;
+    /**
+     * The melt quote this payment executes, when it was created before the
+     * user confirmed (BTC-05). Every later event of the melt carries it, so
+     * the wallet can tell this payment's events from another's.
+     */
+    quoteId?: string;
   }) => MaybeAsync;
   /**
    * Called when a multi-step operation completes successfully.
