@@ -22,6 +22,7 @@ import { AppleMaps, GoogleMaps } from 'expo-maps';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { withAlpha } from '@/shared/lib/color';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import { useScreenInsets } from '@/shared/hooks/useScreenInsets';
 import { spacing } from '@/shared/styles/tokens';
 import { useEffect, useState } from 'react';
@@ -93,7 +94,10 @@ export function MapScreen() {
     return () => clearTimeout(timer);
   }, []);
 
-  // Get user location on mount — DEFERRED and non-blocking
+  // Get user location on mount — DEFERRED and non-blocking. Once: `moveTo`
+  // changes with the window's aspect ratio, and a resize must not send the
+  // camera back to the person's position.
+  const latestMoveTo = useLatestRef(moveTo);
   useEffect(() => {
     const task = InteractionManager.runAfterInteractions(async () => {
       try {
@@ -103,14 +107,14 @@ export function MapScreen() {
         const loc = await Location.getCurrentPositionAsync({});
         // Privacy: offset camera so it doesn't centre on exact position
         const safe = applySafetyOffset(loc.coords);
-        moveTo({ lat: safe.latitude, lon: safe.longitude, zoom: 12 });
+        latestMoveTo.current({ lat: safe.latitude, lon: safe.longitude, zoom: 12 });
       } catch (err) {
         log.error('map.location.error', { error: err });
       }
     });
 
     return () => task.cancel();
-  }, [moveTo]);
+  }, [latestMoveTo]);
 
   const handleMyLocation = async () => {
     try {

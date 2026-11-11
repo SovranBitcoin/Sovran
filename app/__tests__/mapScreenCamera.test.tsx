@@ -51,6 +51,11 @@ const mockManager = {
 };
 const mockSetCameraPosition = jest.fn();
 
+let mockWindow = { width: 400, height: 800, scale: 2, fontScale: 1 };
+jest.mock('react-native-web/dist/exports/useWindowDimensions', () => ({
+  __esModule: true,
+  default: () => mockWindow,
+}));
 jest.mock('@/shared/stores/global/btcMapStore', () => ({
   useBTCMapStore: (select: (state: typeof mockStore) => unknown) => select(mockStore),
 }));
@@ -158,6 +163,28 @@ it('zooming in and out moves the map by two levels and recomputes the pins at on
   });
   expect(lastMove()).toEqual({ coordinates: { latitude: 48, longitude: 10 }, zoom: 4 });
   expect(lastQueryZoom()).toBe(4);
+});
+
+it('asks for the location once on opening, not again when the window is resized', async () => {
+  const { requestForegroundPermissionsAsync } = jest.requireMock<{
+    requestForegroundPermissionsAsync: jest.Mock;
+  }>('expo-location');
+  const upright = mockWindow;
+  await open();
+  expect(requestForegroundPermissionsAsync).toHaveBeenCalledTimes(1);
+
+  // The phone is turned on its side.
+  mockWindow = { ...upright, width: upright.height, height: upright.width };
+  await act(async () => {
+    renderer.update(<MapScreen />);
+    // Long enough for a deferred location read to have started, were one queued.
+    await new Promise((resolve) => setTimeout(resolve, 400));
+  });
+  mockWindow = upright;
+  const stats = renderer.root.find((node) => String(node.type) === 'StatsCard');
+  expect(stats.props.cardWidth).toBe(768);
+
+  expect(requestForegroundPermissionsAsync).toHaveBeenCalledTimes(1);
 });
 
 it('My Location moves the map to the position at zoom 15 and recomputes the pins', async () => {
