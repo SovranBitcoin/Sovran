@@ -29,7 +29,6 @@ import { Button } from '@/shared/ui/primitives/Button';
 import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
-import type { OnReceiveQrPayload } from '@/features/receive/lib/qrPayload';
 import type { CreqMintSelection } from '@/features/receive/lib/creqMintSelection';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import Icon from 'assets/icons';
@@ -51,9 +50,6 @@ interface ReceivePaymentRequestTabProps {
    *  gating under the P2PK lock) — derived by ReceiveScreen, the owner of
    *  the creq input, so the toggles and the encoding can't drift. */
   mintSelection: CreqMintSelection;
-  /** Reports the encoded creq upward for the QR display's footer Copy
-   *  button. */
-  onQrPayload?: OnReceiveQrPayload;
 }
 
 export const ReceivePaymentRequestTab = memo(function ReceivePaymentRequestTab({
@@ -64,7 +60,6 @@ export const ReceivePaymentRequestTab = memo(function ReceivePaymentRequestTab({
   muted,
   creq,
   mintSelection,
-  onQrPayload,
 }: ReceivePaymentRequestTabProps) {
   // P2PK lock (absorbs the old P2PK tab): when on, the DISPLAYED request
   // advertises a NUT-10 lock to the keyring key — payers lock their ecash to
@@ -90,14 +85,6 @@ export const ReceivePaymentRequestTab = memo(function ReceivePaymentRequestTab({
     },
     [setCreqMintExcluded]
   );
-
-  useEffect(() => {
-    onQrPayload?.(
-      request?.encodedRequest
-        ? { value: request.encodedRequest, copyTarget: 'paymentRequest' }
-        : null
-    );
-  }, [request?.encodedRequest, onQrPayload]);
 
   // Only a request that arrives after the placeholder gets the decode-in.
   const [revealPending, setRevealPending] = useState(!request);

@@ -5,8 +5,8 @@
  * Entry, copy, and mint-change actions come from `useScreenActions('receive')`
  * with the payment machine from ColadaProvider. Paste / Fixed Amount / Scan QR
  * live on the receive hub (ReceiveHubScreen); the footer here is a single
- * Copy of whatever payload the visible tab's QR is showing (each rail
- * reports its value via `onQrPayload`).
+ * Copy of whatever payload the visible tab's QR is showing (the quote rails
+ * report theirs via `onQrPayload`; the address and the request are read here).
  */
 
 import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
@@ -279,8 +279,8 @@ function ReceiveScreenForUnit({
   const receiveEntryData = useMemo(() => (entry ? readReceiveHubEntry(entry) : null), [entry]);
   const hasReceiveEntryData = Boolean(receiveEntryData);
 
-  // Each rail reports its copyable payload as it resolves; the footer Copy
-  // copies whichever rail the visible tab is showing.
+  // The quote rails report their copyable payload as it resolves; the footer
+  // Copy copies whichever rail the visible tab is showing.
   const [qrPayloads, setQrPayloads] = useState<Record<string, ReceiveQrPayload | null>>({});
   const setQrPayload = useCallback((key: string, payload: ReceiveQrPayload | null) => {
     setQrPayloads((prev) => {
@@ -309,39 +309,6 @@ function ReceiveScreenForUnit({
     (p: ReceiveQrPayload | null) => setQrPayload('onchain', p),
     [setQrPayload]
   );
-  const onCashuPayload = useCallback(
-    (p: ReceiveQrPayload | null) => setQrPayload('cashu', p),
-    [setQrPayload]
-  );
-
-  const npcAddress = unit === 'sat' ? receiveEntryData?.npcAddress : undefined;
-  const activePayload: ReceiveQrPayload | null = useMemo(
-    () =>
-      selectedTab === 'Lightning'
-        ? lightningMode === 'address'
-          ? npcAddress
-            ? { value: npcAddress, copyTarget: 'address' }
-            : null
-          : (qrPayloads['lightning-offer'] ?? null)
-        : selectedTab === 'Unified'
-          ? (qrPayloads['unified'] ?? null)
-          : selectedTab === 'Onchain'
-            ? (qrPayloads['onchain'] ?? null)
-            : (qrPayloads['cashu'] ?? null),
-    [selectedTab, lightningMode, npcAddress, qrPayloads]
-  );
-
-  const handleFooterCopy = useCallback(async () => {
-    if (!activePayload) return;
-    await EnhancedHaptics.copyHaptic();
-    await setStringAsync(activePayload.value);
-    copyPopup(activePayload.copyTarget);
-    paymentLog.info('receive.qr.footer_copied', {
-      tab: selectedTab,
-      copyTarget: activePayload.copyTarget,
-      valueLength: activePayload.value.length,
-    });
-  }, [activePayload, selectedTab]);
 
   const isNpcMintUpdating = useNpcMintStore((s) => s.isUpdating);
   const mintInfo = useMintInfo(mintUrl);
@@ -435,6 +402,38 @@ function ReceiveScreenForUnit({
     standingQuoteIdentityStore,
     { freshOnMount: true }
   );
+
+  const creqCopyValue = creq.request?.encodedRequest;
+  const npcAddress = unit === 'sat' ? receiveEntryData?.npcAddress : undefined;
+  const activePayload: ReceiveQrPayload | null = useMemo(
+    () =>
+      selectedTab === 'Lightning'
+        ? lightningMode === 'address'
+          ? npcAddress
+            ? { value: npcAddress, copyTarget: 'address' }
+            : null
+          : (qrPayloads['lightning-offer'] ?? null)
+        : selectedTab === 'Unified'
+          ? (qrPayloads['unified'] ?? null)
+          : selectedTab === 'Onchain'
+            ? (qrPayloads['onchain'] ?? null)
+            : creqCopyValue
+              ? { value: creqCopyValue, copyTarget: 'paymentRequest' }
+              : null,
+    [selectedTab, lightningMode, npcAddress, qrPayloads, creqCopyValue]
+  );
+
+  const handleFooterCopy = useCallback(async () => {
+    if (!activePayload) return;
+    await EnhancedHaptics.copyHaptic();
+    await setStringAsync(activePayload.value);
+    copyPopup(activePayload.copyTarget);
+    paymentLog.info('receive.qr.footer_copied', {
+      tab: selectedTab,
+      copyTarget: activePayload.copyTarget,
+      valueLength: activePayload.value.length,
+    });
+  }, [activePayload, selectedTab]);
 
   const tabs = useMemo(() => computeReceiveTabs(), []);
 
@@ -618,7 +617,6 @@ function ReceiveScreenForUnit({
                     muted={muted}
                     creq={creq}
                     mintSelection={creqMintSelection}
-                    onQrPayload={onCashuPayload}
                   />
                 </TabPane>
               </>
