@@ -517,7 +517,9 @@ describe('ReceiveScreen layout stability', () => {
     expect(onchain.props.active).toBe(true);
     expect(renderer.root.findByType(ReceiveUnifiedTab).props.active).toBe(false);
 
-    act(() => onchain.props.onQrPayload({ value: 'bc1qfixture', copyTarget: 'address' }));
+    act(() => {
+      onchain.props.onQrPayload({ value: 'bc1qfixture', copyTarget: 'address' });
+    });
     const copyButton = findByTestID(renderer, 'receive-copy');
     expect(copyButton.props.disabled).toBe(false);
     await act(async () => copyButton.props.onPress());
