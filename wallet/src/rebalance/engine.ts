@@ -39,6 +39,7 @@ import type {
   RebalanceMintSnapshot,
   RebalancePreparedMelt,
   RebalanceRoute,
+  RebalanceRunActivity,
   RebalanceRunCallbacks,
   RebalanceRunResult,
   RebalanceTransfer,
@@ -79,9 +80,8 @@ function arrivingFor(lock: object): Map<string, ArrivingReceipt[]> {
   return arriving;
 }
 
-interface TransferRun {
+interface TransferRun extends RebalanceRunActivity {
   step: RebalanceTransfer;
-  isActive: () => boolean;
   sink: RebalanceEventSink;
   /** Mints holding a melt whose outcome is unknown; their proofs are never restored. */
   unsettledMints: Set<string>;
@@ -103,7 +103,7 @@ export interface RebalanceEngine {
   /** Run one transfer to a terminal outcome. Never throws for wallet failures. */
   executeTransfer(
     step: RebalanceTransfer,
-    options: { isActive: () => boolean; sink: RebalanceEventSink }
+    options: RebalanceRunActivity & { sink: RebalanceEventSink }
   ): Promise<RebalanceTransferOutcome>;
   /** Run transfers in order, skipping those already settled. */
   runTransfers(
@@ -148,6 +148,12 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
   const clock = config.clock ?? defaultRebalanceClock;
   const log = config.logger ?? packageLogger;
   const debug = (entry: Record<string, unknown>) => log.debug('mint.rebalance.step', entry);
+
+  /** Whether a new leg may open: the caller is asked first, and may end the run. */
+  function mayOpenLeg(activity: RebalanceRunActivity): boolean {
+    activity.beforeLegOpens?.();
+    return activity.isActive();
+  }
 
   // ── Wallet reads with documented fallbacks ────────────────────────────
 
@@ -639,7 +645,7 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
     try {
       let finalReceipt: RebalanceMintReceipt | null = null;
       for (let index = 0; index < hopCount; index++) {
-        if (!run.isActive()) return { status: 'incomplete', finalHopLegId, sentHops };
+        if (!mayOpenLeg(run)) return { status: 'incomplete', finalHopLegId, sentHops };
         const legId = hopLegIds[index];
         finalHopLegId = legId;
         startedHops = index + 1;
@@ -727,7 +733,7 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
 
     let lastError: unknown = noRouteError;
     for (let index = 0; index < routes.length; index++) {
-      if (!run.isActive()) return 'aborted';
+      if (!mayOpenLeg(run)) return 'aborted';
       const route = routes[index];
       debug({
         event: 'trying_candidate_route',
@@ -1038,9 +1044,9 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
 
   async function executeTransfer(
     step: RebalanceTransfer,
-    options: { isActive: () => boolean; sink: RebalanceEventSink }
+    options: RebalanceRunActivity & { sink: RebalanceEventSink }
   ): Promise<RebalanceTransferOutcome> {
-    if (!options.isActive()) return { status: 'aborted' };
+    if (!mayOpenLeg(options)) return { status: 'aborted' };
     // Coco operations are stateful (proof selection, inflight tracking);
     // transfers run one at a time.
     if (!(await lock.acquire())) {
@@ -1048,7 +1054,8 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
       return { status: 'busy' };
     }
     try {
-      if (!options.isActive()) return { status: 'aborted' };
+      // The wait for the lock can be long.
+      if (!mayOpenLeg(options)) return { status: 'aborted' };
       return await transfer({ step, ...options, unsettledMints: new Set() });
     } finally {
       lock.release();
@@ -1068,7 +1075,7 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
     let anyPending = false;
     try {
       for (const step of steps) {
-        if (!callbacks.isActive()) return { status: 'aborted' };
+        if (!mayOpenLeg(callbacks)) return { status: 'aborted' };
         // Legs settled by an earlier run (e.g. a retry of failed legs only).
         if (callbacks.isSettled(step.id)) continue;
         // A step that spends money still on its way to its source is left as
@@ -1083,6 +1090,7 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
         const stepStart = clock.now();
         const outcome = await executeTransfer(step, {
           isActive: callbacks.isActive,
+          beforeLegOpens: callbacks.beforeLegOpens,
           sink: callbacks.sinkFor(step),
         });
         if (outcome.status === 'pending' || outcome.status === 'settling') anyPending = true;

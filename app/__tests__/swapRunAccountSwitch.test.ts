@@ -3,10 +3,11 @@
  * the switch unmounts the account's tree (`AccountScopedProviders` is keyed by
  * account), so the screen's hook is gone, but its run is a closure that keeps
  * the manager it started with and never sees B's. The swap history store is
- * reset and loaded again for B while that run goes on: its late writes (the
- * next leg, its quote tags and annotations, the run's end) must not land in
- * B's history. A's saved group is left running, and the next time A is open
- * the reconciler settles it from its own operations.
+ * reset and loaded again for B while that run goes on: its late writes must
+ * not land in B's history, and it must not start new work for A from under
+ * B: the leg in flight finishes, and before the next one opens the run ends
+ * and gives up its hold. A's saved group is left running, and the next time A
+ * is open the reconciler settles it from its own operations.
  *
  * The real swap history store runs over the real profile-scoped storage
  * (backed by the AsyncStorage mock) and the real profile store; the real
@@ -28,6 +29,7 @@ import {
   unblockProfilePersistWrites,
 } from '@/shared/lib/cashu/profileScopedStorage';
 import { reconcileSwapLegs } from '@/shared/lib/cashu/reconcileSwapLegs';
+import { anySwapGroupHeld } from '@/shared/lib/cashu/swapGroupPhase';
 import { setTransactionAnnotation } from '@/shared/stores/profile/transactionAnnotationStore';
 
 jest.mock('@react-native-async-storage/async-storage', () =>
@@ -191,7 +193,7 @@ afterEach(() => {
   jest.useRealTimers();
 });
 
-it('a run that outlives an account switch writes nothing into the next account, and its own group settles when that account opens again', async () => {
+it('a run that outlives an account switch finishes its leg in flight, starts no other, writes nothing into the next account, and its own group settles when that account opens again', async () => {
   const { result, unmount } = renderHook(() =>
     useMintRebalanceOrchestrator({
       unit: 'sat',
@@ -235,23 +237,29 @@ it('a run that outlives an account switch writes nothing into the next account, 
   await switchTo(1);
   expect(useSwapTransactionsStore.getState().groups[groupId]?.title).toBe('B');
 
-  // A's first transfer arrives and its run moves on to the second: a new leg,
-  // its quote and melt tags and their annotations, then the run's end.
+  // A's first transfer arrives. The run would move on to the second, but the
+  // open account is no longer A: it pays nothing more and lets the group go,
+  // so a swap can start in B.
   recipientState = 'finalized';
   await flush(16000);
   await flush(16000);
-  expect(managerA.ops.melt.execute).toHaveBeenCalledTimes(2);
+  expect(managerA.ops.melt.execute).toHaveBeenCalledTimes(1);
+  expect(managerA.quotes.mint.create).toHaveBeenCalledTimes(1);
+  expect(anySwapGroupHeld()).toBe(false);
 
   // B's history is untouched, in memory and saved, and no annotation was written for it.
   expect(useSwapTransactionsStore.getState().groups[groupId]).toEqual(bGroup);
   expect((await saved(ACCOUNT_B)).groups[groupId]).toEqual(bGroup);
   expect(setTransactionAnnotation).toHaveBeenCalledTimes(annotationsBeforeSwitch);
 
-  // A's saved group is left as the run last wrote it before the switch.
-  expect((await saved(ACCOUNT_A)).groups[groupId]).toMatchObject({
+  // A's saved group is left as the run last wrote it before the switch: one
+  // leg, its melt paid, its mint not yet seen.
+  const savedA = (await saved(ACCOUNT_A)).groups[groupId];
+  expect(savedA).toMatchObject({
     state: 'running',
-    legs: [{ localStatus: 'verifying' }],
+    legs: [{ localStatus: 'verifying', meltOperationId: 'melt-op-1' }],
   });
+  expect(savedA.legs).toHaveLength(1);
 
   // A opens again: no run owns the group, so the reconciler settles it.
   await switchTo(0);

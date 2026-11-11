@@ -82,7 +82,7 @@ type StartRun = (
  */
 interface OwnedRun {
   groupId: string | null;
-  /** The account the group was started for. */
+  /** The account the run, and its group, were started for. */
   account: string | undefined;
   release: () => void;
 }
@@ -202,7 +202,7 @@ export function useMintRebalanceOrchestrator({
     }
     prepare?.();
     const groupId = swapGroupRef.current?.id ?? null;
-    const account = swapGroupRef.current?.account;
+    const account = swapGroupRef.current ? swapGroupRef.current.account : getActiveProfilePubkey();
     if (groupId) swapHistoryOf(account)?.reopenGroup(groupId);
     const toast = toastFor(groupId);
     if (toast) toast.resume();
@@ -336,6 +336,17 @@ export function useMintRebalanceOrchestrator({
       };
       const callbacks: Parameters<StartRun>[0] = {
         isActive: () => isRunActive(currentRun()),
+        // Once another account is open the run starts nothing more: it would
+        // pay from this account's wallet and hold every account's swaps back.
+        // A leg in flight goes on; the saved group is left running, for this
+        // account's reconcile the next time it is open.
+        beforeLegOpens: () => {
+          const run = currentRun();
+          if (getActiveProfilePubkey() === run.account || !giveUpRun(run)) return;
+          cashuLog.info('mint.rebalance.run_ended_other_account', { groupId: run.groupId });
+          setRunStatus('cancelled');
+          toastFor(run.groupId)?.cancel();
+        },
         isSettled: (stepId) => {
           const status = stepStatesRef.current[stepId]?.status;
           // Settling and payment-pending count: the money has left or may
@@ -428,6 +439,7 @@ export function useMintRebalanceOrchestrator({
         async (callbacks) => {
           const outcome = await engine.executeTransfer(step, {
             isActive: callbacks.isActive,
+            beforeLegOpens: callbacks.beforeLegOpens,
             sink: callbacks.sinkFor(step),
           });
           callbacks.onTransferSettled?.(step, outcome);

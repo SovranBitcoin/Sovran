@@ -419,6 +419,74 @@ describe('rebalance engine — runs', () => {
     expect(settled).toEqual(['a:failed', 'c:done']);
   });
 
+  describe('a caller that ends the run before a leg opens', () => {
+    /** Ends the run at the next leg once `switched` is set, as an account switch does. */
+    function endsAtNextLeg() {
+      const state = { switched: false, active: true };
+      return {
+        state,
+        isActive: () => state.active,
+        beforeLegOpens: () => {
+          if (state.switched) state.active = false;
+        },
+      };
+    }
+
+    it('lets the transfer in flight finish and starts no other', async () => {
+      const { engine, wallet, recorder } = setup();
+      const control = endsAtNextLeg();
+      wallet.port.executeMelt.mockImplementation(async (id) => {
+        control.state.switched = true;
+        wallet.payInvoice(wallet.invoiceByMelt.get(id) ?? '');
+        return { id, state: 'finalized' };
+      });
+      const settled: string[] = [];
+      const result = await engine.runTransfers(
+        [
+          { ...STEP, id: 'a' },
+          { ...STEP, id: 'b' },
+        ],
+        {
+          isActive: control.isActive,
+          beforeLegOpens: control.beforeLegOpens,
+          isSettled: () => false,
+          sinkFor: () => recorder.sink,
+          onTransferSettled: (step, outcome) => settled.push(`${step.id}:${outcome.status}`),
+        }
+      );
+      expect(result).toEqual({ status: 'aborted' });
+      expect(settled).toEqual(['a:done']);
+      expect(wallet.port.executeMelt).toHaveBeenCalledTimes(1);
+      expect(recorder.statuses('b')).toEqual([]);
+    });
+
+    it('stops a middleman chain before its next hop', async () => {
+      const route: RebalanceRoute = {
+        path: [SOURCE, MIDDLEMAN, DESTINATION],
+        pathNames: ['Source', 'Middleman', 'Destination'],
+        source: 'local_history',
+      };
+      const { engine, wallet, recorder } = setup({
+        balances: { [SOURCE]: 1000, [MIDDLEMAN]: 100, [DESTINATION]: 0 },
+        routes: [route],
+      });
+      const control = endsAtNextLeg();
+      wallet.port.executeMelt
+        .mockRejectedValueOnce(new MintOperationError(20004, 'no_route'))
+        .mockImplementationOnce(async (id) => {
+          control.state.switched = true;
+          wallet.payInvoice(wallet.invoiceByMelt.get(id) ?? '');
+          return { id, state: 'finalized' };
+        });
+      await expect(
+        engine.executeTransfer(STEP, { ...control, sink: recorder.sink })
+      ).resolves.toEqual({ status: 'aborted' });
+      expect(wallet.port.executeMelt).toHaveBeenCalledTimes(2);
+      expect(recorder.statuses('step-1-hop-1-1')).toEqual([]);
+      expect(wallet.port.releaseTrust).toHaveBeenCalledWith([MIDDLEMAN]);
+    });
+  });
+
   it('serializes transfers that start concurrently', async () => {
     const { run, wallet } = setup();
     let executing = 0;
