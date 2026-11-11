@@ -28,8 +28,8 @@ import {
   useNostrSocialStore,
   type ContactList,
 } from '@/shared/stores/profile/nostrSocialStore';
+import { captureActiveProfile } from '@/shared/stores/global/profileStore';
 import {
-  captureProfile,
   matchingSigner,
   nextReplaceableCreatedAt,
   readNewestOwnEvent,
@@ -286,7 +286,7 @@ async function askIndexers(pubkey: string): Promise<{ indexed: IndexedList; seed
 
 /** One pass for one account, with the account and its signer pinned across every wait. */
 async function syncOnce(ndk: NDK, ownPubkey: string): Promise<void> {
-  const scope = captureProfile(ownPubkey);
+  const scope = captureActiveProfile(ownPubkey);
   const social = () => useNostrSocialStore.getState();
   try {
     for (;;) {

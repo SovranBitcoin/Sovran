@@ -4,7 +4,7 @@ import { err, ok } from 'neverthrow';
 
 import { getLatestVersion } from '@/shared/lib/apiClient';
 import { useLatestVersionFetch } from '@/shared/hooks/useLatestVersionFetch';
-import { useSettingsHydration, useSettingsStore } from '@/shared/stores/global/settingsStore';
+import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 
 let mockBootDone = true;
 let mockIsOffline = false;
@@ -44,7 +44,6 @@ beforeEach(async () => {
   await useSettingsStore.persist.rehydrate();
   jest.clearAllMocks();
   useSettingsStore.setState({ lastKnownAppVersion: null });
-  useSettingsHydration.setState({ status: 'ready' });
   mockBootDone = true;
   mockIsOffline = false;
   mockNativeVersion = '0.1.1';
@@ -53,7 +52,7 @@ beforeEach(async () => {
 
 it('waits for boot and settings hydration, then persists success', async () => {
   mockBootDone = false;
-  useSettingsHydration.setState({ status: 'loading' });
+  const unread = jest.spyOn(useSettingsStore.persist, 'hasHydrated').mockReturnValue(false);
   const view = await mount();
   expect(mockGetLatestVersion).not.toHaveBeenCalled();
   mockBootDone = true;
@@ -63,7 +62,10 @@ it('waits for boot and settings hydration, then persists success', async () => {
   const payload = { version: '0.1.3', minVersion: '0.1.2', message: 'Please update' };
   mockGetLatestVersion.mockResolvedValueOnce(ok(payload));
   const beforeFetch = Date.now();
-  await act(async () => useSettingsHydration.setState({ status: 'ready' }));
+  await act(async () => {
+    unread.mockRestore();
+    await useSettingsStore.persist.rehydrate();
+  });
 
   expect(mockGetLatestVersion).toHaveBeenCalledTimes(1);
   expect(mockGetLatestVersion).toHaveBeenCalledWith({

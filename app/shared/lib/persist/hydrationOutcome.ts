@@ -1,5 +1,8 @@
+import { useCallback, useState, useSyncExternalStore } from 'react';
+
 /**
- * Whether a persisted store's saved data could be read.
+ * Whether a persisted store's saved data could be read, and the one way to
+ * wait for it.
  *
  * Zustand reports a successful load (`hasHydrated`, `onFinishHydration`) and
  * says nothing when the read or the parse throws, so anything waiting for a
@@ -8,13 +11,18 @@
 const failed = new Set<string>();
 const listeners = new Set<() => void>();
 
+const notify = () => {
+  for (const listener of [...listeners]) listener();
+};
+
 export function markHydrationStarted(name: string): void {
   failed.delete(name);
+  notify();
 }
 
 export function markHydrationFailed(name: string): void {
   failed.add(name);
-  for (const listener of [...listeners]) listener();
+  notify();
 }
 
 interface PersistedStore {
@@ -26,22 +34,88 @@ interface PersistedStore {
   };
 }
 
-/** True once the store has loaded; false if its saved data could not be read. */
-export function hydrationSettled(store: PersistedStore): Promise<boolean> {
-  const name = store.persist.getOptions().name ?? '';
-  return new Promise((resolve) => {
-    const stops: (() => void)[] = [];
-    const settle = () => {
-      const loaded = store.persist.hasHydrated();
-      if (!loaded && !failed.has(name)) return;
-      for (const stop of stops) stop();
-      resolve(loaded);
-    };
-    stops.push(store.persist.onFinishHydration(settle));
-    listeners.add(settle);
-    stops.push(() => listeners.delete(settle));
-    settle();
-  });
+type StoreLoad = 'loading' | 'loaded' | 'failed';
+
+type Persist = PersistedStore['persist'];
+
+const nameOf = (persist: Persist) => persist.getOptions().name ?? '';
+
+function loadOf(persist: Persist): StoreLoad {
+  if (persist.hasHydrated()) return 'loaded';
+  return failed.has(nameOf(persist)) ? 'failed' : 'loading';
+}
+
+/**
+ * Where the store's current read stands. Follows every read: a later one shows
+ * as `loading` again. Takes `useXStore.persist`: a hook cannot be passed as a value.
+ */
+export function useStoreLoad(persist: Persist): StoreLoad {
+  const subscribe = useCallback(
+    (onChange: () => void) => {
+      const stop = persist.onFinishHydration(onChange);
+      listeners.add(onChange);
+      return () => {
+        stop();
+        listeners.delete(onChange);
+      };
+    },
+    [persist]
+  );
+  const read = () => loadOf(persist);
+  return useSyncExternalStore(subscribe, read, read);
+}
+
+/** True from the first render that sees the store loaded, for as long as the component stays mounted. */
+export function useStoreLoadLatched(persist: Persist): boolean {
+  const loaded = useStoreLoad(persist) === 'loaded';
+  const [latched, setLatched] = useState(loaded);
+  if (loaded && !latched) setLatched(true);
+  return latched || loaded;
+}
+
+interface WaitOptions {
+  /** Give up with `false` when a read fails, instead of waiting for a later one that succeeds. */
+  orFailed?: boolean;
+  /** Give up after this long, with whether the store has loaded by then. */
+  timeoutMs?: number;
+}
+
+/**
+ * Calls `run` once the store has loaded: at once if it already has, otherwise
+ * when a read finishes (or as `options` says, when one fails or time is up).
+ */
+export function onceLoaded(
+  store: PersistedStore,
+  run: (loaded: boolean) => void,
+  { orFailed = false, timeoutMs }: WaitOptions = {}
+): void {
+  const stops: (() => void)[] = [];
+  let done = false;
+  const settle = (timedOut = false) => {
+    if (done) return true;
+    const loaded = store.persist.hasHydrated();
+    if (!loaded && !timedOut && !(orFailed && failed.has(nameOf(store.persist)))) return false;
+    done = true;
+    for (const stop of stops) stop();
+    run(loaded);
+    return true;
+  };
+  if (settle()) return;
+  stops.push(store.persist.onFinishHydration(() => settle()));
+  if (orFailed) {
+    const onOutcome = () => settle();
+    listeners.add(onOutcome);
+    stops.push(() => listeners.delete(onOutcome));
+  }
+  if (timeoutMs !== undefined) {
+    const timer = setTimeout(() => settle(true), timeoutMs);
+    stops.push(() => clearTimeout(timer));
+  }
+}
+
+/** `onceLoaded` as a promise of whether the store loaded. */
+export function whenLoaded(store: PersistedStore, options?: WaitOptions): Promise<boolean> {
+  return new Promise((resolve) => onceLoaded(store, resolve, options));
 }
 
 /**
@@ -55,12 +129,12 @@ export async function loadRequiredStores(
   changedOnDisk: ReadonlySet<string> = new Set()
 ): Promise<void> {
   for (const store of stores) {
-    const name = store.persist.getOptions().name ?? '';
     // `rehydrate` marks the store as not loaded before it returns, so the wait
     // below is for this read and not the earlier one.
+    const name = nameOf(store.persist);
     if (failed.has(name) || changedOnDisk.has(name)) void store.persist.rehydrate();
   }
-  const loaded = await Promise.all(stores.map(hydrationSettled));
+  const loaded = await Promise.all(stores.map((store) => whenLoaded(store, { orFailed: true })));
   const unread = stores
     .filter((_, index) => !loaded[index])
     .map((store) => store.persist.getOptions().name ?? 'unnamed');

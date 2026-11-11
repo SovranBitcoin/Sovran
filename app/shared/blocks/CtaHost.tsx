@@ -12,6 +12,7 @@ import { useWalletLifecycleStore } from '@/shared/stores/global/walletLifecycleS
 import { isRestoreAsked } from '@/shared/stores/global/walletRestorePhase';
 import { useLatestVersionFetch } from '@/shared/hooks/useLatestVersionFetch';
 import { selectNextCta } from '@/shared/lib/cta/selectNextCta';
+import { useStoreLoadLatched } from '@/shared/lib/persist/hydrationOutcome';
 
 export function CtaHost() {
   const navigation = useRootNavigationState();
@@ -32,21 +33,16 @@ export function CtaHost() {
   const previewOverride = useCtaStore((s) => s.previewOverride);
   const previewSeq = useCtaStore((s) => s.previewSeq);
   useLatestVersionFetch(activeId === 'update-required' && previewOverride === null);
-  const [hydrated, setHydrated] = useState(useCtaStore.persist.hasHydrated);
+  const hydrated = useStoreLoadLatched(useCtaStore.persist);
   const [nowMs, setNowMs] = useState(Date.now);
   const observedRoute = useRef(false);
   const automation = __DEV__ && !!process.env.EXPO_PUBLIC_E2E_STATE_MIRROR;
 
   useEffect(() => {
-    const unsub = useCtaStore.persist.onFinishHydration(() => setHydrated(true));
-    setHydrated(useCtaStore.persist.hasHydrated());
     const appState = AppState.addEventListener('change', (state) => {
       if (state === 'active') setNowMs(Date.now());
     });
-    return () => {
-      unsub();
-      appState.remove();
-    };
+    return () => appState.remove();
   }, []);
 
   useEffect(() => {

@@ -8,14 +8,6 @@ import { persistConfig } from '@/shared/lib/persist/persistConfig';
 import { tolerantArray } from '@/shared/lib/persist/tolerant';
 import { legalRevisions, type LegalAcceptance } from '@/shared/lib/legal/legalDocuments';
 
-// Separate, non-persisted status: setting an error must never write default settings over unreadable data.
-export const useSettingsHydration = create<{ status: 'loading' | 'ready' | 'error' }>({
-  name: 'useSettingsHydration',
-  scope: 'global',
-})(() => ({
-  status: 'loading',
-}));
-
 interface TermsAccepted {
   termsAccepted: boolean;
   date: string;
@@ -549,7 +541,6 @@ export const useSettingsStore = create<SettingsStore>({ name: 'settings-store', 
           primalHostsDisabled: state.primalHostsDisabled,
         }),
         afterHydrate: (state, error) => {
-          useSettingsHydration.setState({ status: error ? 'error' : 'ready' });
           if (error) return;
           // Resume on-device file logging if it was left on (dev-only; no-op in
           // production). Mirrors the persisted toggle into the logger transport.

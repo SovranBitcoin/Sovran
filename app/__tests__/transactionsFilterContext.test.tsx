@@ -30,20 +30,14 @@ it('counts a currency-only filter as active, as the filter sheet does', () => {
       </TransactionsFilterProvider>
     );
   });
-  expect(filter.hasActiveFilters).toBe(false);
   expect(filter.activeFilterCount).toBe(0);
 
-  act(() => filter.setCurrency('usd'));
-  expect(filter.hasActiveFilters).toBe(true);
+  act(() => filter.updateFilters({ currency: 'usd' }));
   expect(filter.activeFilterCount).toBe(1);
 
-  act(() => filter.setPaymentType('lightning'));
+  act(() => filter.updateFilters({ paymentType: 'lightning' }));
   expect(filter.activeFilterCount).toBe(2);
 
-  act(() => {
-    filter.setCurrency('sat');
-    filter.setPaymentType('all');
-  });
-  expect(filter.hasActiveFilters).toBe(false);
+  act(() => filter.updateFilters({ currency: 'sat', paymentType: 'all' }));
   expect(filter.activeFilterCount).toBe(0);
 });

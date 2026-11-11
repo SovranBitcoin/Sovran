@@ -10,13 +10,19 @@ import { usePageInsteadOfWallet } from '@/shared/lib/qrButtonAnchor';
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 let mockSource = 'derived';
-jest.mock('@/shared/stores/global/profileStore', () => ({
-  useProfileStore: (select: (state: object) => unknown) =>
+jest.mock('@/shared/stores/global/profileStore', () => {
+  const useProfileStore = (select: (state: object) => unknown) =>
     select({
       activeAccountIndex: 0,
       profiles: [{ accountIndex: 0, source: mockSource }],
-    }),
-}));
+    });
+  return {
+    useProfileStore,
+    ...jest
+      .requireActual<typeof import('./helpers/profileStoreMock')>('./helpers/profileStoreMock')
+      .activeAccountReaders(() => ({})),
+  };
+});
 jest.mock('@/shared/lib/profile/profileSessionOrchestrator', () => ({
   deleteAllProfiles: jest.fn(),
 }));

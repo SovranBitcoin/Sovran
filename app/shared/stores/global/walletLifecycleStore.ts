@@ -1,5 +1,4 @@
 import { BACKUP_FLOW_REVISION } from '@/shared/lib/backup/revision';
-import * as React from 'react';
 import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { persist } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -90,24 +89,3 @@ export const useWalletLifecycleStore = create<WalletLifecycleState>({
     })
   )
 );
-
-/**
- * React hook returning true once the persisted lifecycle store has finished
- * rehydrating from AsyncStorage. Components that gate on `restoreStatus` /
- * `seedCreatedAt` MUST wait for this — reading those fields before hydration
- * returns the in-memory initial values (`'unknown'` / `null`) which would
- * trigger a false-positive restore redirect on every boot for existing users.
- */
-export function useWalletLifecycleHydrated(): boolean {
-  const [hydrated, setHydrated] = React.useState(() =>
-    useWalletLifecycleStore.persist.hasHydrated()
-  );
-  React.useEffect(() => {
-    if (hydrated) return;
-    const unsub = useWalletLifecycleStore.persist.onFinishHydration(() => setHydrated(true));
-    // Fallback: hasHydrated may have flipped between initial render and effect run.
-    if (useWalletLifecycleStore.persist.hasHydrated()) setHydrated(true);
-    return unsub;
-  }, [hydrated]);
-  return hydrated;
-}

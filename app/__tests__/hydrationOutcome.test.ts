@@ -1,8 +1,9 @@
 import {
-  hydrationSettled,
   loadRequiredStores,
   markHydrationFailed,
   markHydrationStarted,
+  onceLoaded,
+  whenLoaded,
 } from '@/shared/lib/persist/hydrationOutcome';
 
 /** A stand-in for a persisted store whose load the test decides. */
@@ -36,12 +37,12 @@ describe('hydration outcome', () => {
   it('settles true for a store that has already loaded', async () => {
     const a = fakeStore('outcome-a');
     a.load();
-    await expect(hydrationSettled(a.store)).resolves.toBe(true);
+    await expect(whenLoaded(a.store, { orFailed: true })).resolves.toBe(true);
   });
 
   it('settles true when the load finishes later, and stops listening', async () => {
     const a = fakeStore('outcome-b');
-    const settled = hydrationSettled(a.store);
+    const settled = whenLoaded(a.store, { orFailed: true });
     a.load();
     await expect(settled).resolves.toBe(true);
     expect(a.waiting()).toBe(0);
@@ -49,7 +50,7 @@ describe('hydration outcome', () => {
 
   it('settles false when the saved data cannot be read, instead of waiting for ever', async () => {
     const a = fakeStore('outcome-c');
-    const settled = hydrationSettled(a.store);
+    const settled = whenLoaded(a.store, { orFailed: true });
     a.fail();
     await expect(settled).resolves.toBe(false);
   });
@@ -57,7 +58,41 @@ describe('hydration outcome', () => {
   it('settles false for a failure that happened before anyone waited', async () => {
     const a = fakeStore('outcome-d');
     a.fail();
-    await expect(hydrationSettled(a.store)).resolves.toBe(false);
+    await expect(whenLoaded(a.store, { orFailed: true })).resolves.toBe(false);
+  });
+
+  it('runs at once for a store that has already loaded', () => {
+    const a = fakeStore('outcome-now');
+    a.load();
+    const run = jest.fn();
+    onceLoaded(a.store, run);
+    expect(run).toHaveBeenCalledWith(true);
+    expect(a.waiting()).toBe(0);
+  });
+
+  it('waits through a failed read for a later one that succeeds, unless told to give up', async () => {
+    const a = fakeStore('outcome-patient');
+    const patient = jest.fn();
+    onceLoaded(a.store, patient);
+    const givesUp = whenLoaded(a.store, { orFailed: true });
+    a.fail();
+    await expect(givesUp).resolves.toBe(false);
+    expect(patient).not.toHaveBeenCalled();
+    a.load();
+    expect(patient).toHaveBeenCalledWith(true);
+  });
+
+  it('gives up after the time it is given, with whether the store has loaded', async () => {
+    jest.useFakeTimers();
+    try {
+      const a = fakeStore('outcome-bounded');
+      const bounded = whenLoaded(a.store, { timeoutMs: 2_000 });
+      jest.advanceTimersByTime(2_000);
+      await expect(bounded).resolves.toBe(false);
+      expect(a.waiting()).toBe(0);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('refuses to start while a required store is unread, naming it', async () => {
@@ -122,7 +157,7 @@ describe('hydration outcome of a real persisted store', () => {
     const cut = '{"state":{"count":4';
     const disk = new Map([['outcome-real-cut', cut]]);
     const store = mount('outcome-real-cut', disk, { fails: false });
-    await expect(hydrationSettled(store)).resolves.toBe(false);
+    await expect(whenLoaded(store, { orFailed: true })).resolves.toBe(false);
     await expect(loadRequiredStores([store])).rejects.toThrow('outcome-real-cut');
     expect(disk.get('outcome-real-cut')).toBe(cut);
   });
@@ -141,7 +176,7 @@ describe('hydration outcome of a real persisted store', () => {
   it('reads a loaded store again when its row has changed on disk since', async () => {
     const disk = new Map<string, string>();
     const store = mount('outcome-real-rewritten', disk, { fails: false });
-    await expect(hydrationSettled(store)).resolves.toBe(true);
+    await expect(whenLoaded(store, { orFailed: true })).resolves.toBe(true);
     // A migration writes the row after the store has loaded nothing.
     disk.set('outcome-real-rewritten', '{"state":{"count":9},"version":1}');
 

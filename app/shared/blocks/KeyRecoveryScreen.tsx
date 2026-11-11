@@ -5,7 +5,7 @@ import { AppState } from 'react-native';
 import { retrieveMnemonic } from '@/shared/lib/nostr/secureStorage';
 import { useShownInsteadOfWallet } from '@/shared/lib/qrButtonAnchor';
 import { restartApp } from '@/shared/lib/profile/appRestart';
-import { useProfileStore } from '@/shared/stores/global/profileStore';
+import { selectActiveProfile, useProfileStore } from '@/shared/stores/global/profileStore';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -57,11 +57,7 @@ export function KeyRecoveryScreen({ locked = true }: { locked?: boolean }) {
   const [failed, setFailed] = useState(false);
   const [retryFailed, setRetryFailed] = useState(false);
   const retrying = useRef(false);
-  const imported = useProfileStore(
-    (state) =>
-      state.profiles.find((profile) => profile.accountIndex === state.activeAccountIndex)
-        ?.source === 'imported'
-  );
+  const imported = useProfileStore((state) => selectActiveProfile(state)?.source === 'imported');
   const recoverPhrase = locked || !imported;
   const retry = useCallback(async () => {
     if (retrying.current) return;

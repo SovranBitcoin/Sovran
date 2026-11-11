@@ -27,8 +27,10 @@ jest.mock('@/shared/lib/cashu/cocoFeedback', () => ({ reportCocoApiFailure: jest
 jest.mock('@/shared/lib/getDiscoveredMintMetadata', () => ({
   getDiscoveredMintMetadata: jest.fn(),
 }));
+jest.mock('@/shared/stores/global/profileStore', () => ({
+  activePubkey: () => 'account-a',
+}));
 jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({
-  getActiveProfilePubkey: () => 'account-a',
   createProfileScopedStorage: () => ({
     getItem: async () => null,
     setItem: async () => {},

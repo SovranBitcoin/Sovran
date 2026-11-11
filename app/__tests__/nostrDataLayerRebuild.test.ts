@@ -29,11 +29,17 @@ jest.mock('@/shared/lib/nostr/nostrTierConfig', () => ({
     relay: { enabled: mockRelayTier, relays: ['wss://relay.invalid'] },
   }),
 }));
-jest.mock('@/shared/stores/global/profileStore', () => ({
-  useProfileStore: {
+jest.mock('@/shared/stores/global/profileStore', () => {
+  const useProfileStore = {
     getState: () => ({ getActiveProfile: () => (mockPubkey ? { pubkey: mockPubkey } : null) }),
-  },
-}));
+  };
+  return {
+    useProfileStore,
+    ...jest
+      .requireActual<typeof import('./helpers/profileStoreMock')>('./helpers/profileStoreMock')
+      .activeAccountReaders(() => useProfileStore.getState()),
+  };
+});
 jest.mock('@/shared/stores/global/nostrMetadataCache', () => ({
   cachedProfileToMetadata: (record: facade.CachedProfile) => ({ name: record.name }),
   useNostrMetadataCache: {

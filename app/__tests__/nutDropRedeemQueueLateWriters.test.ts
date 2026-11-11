@@ -88,13 +88,15 @@ jest.mock('@/shared/lib/logger', () => {
     redactError: (e: unknown) => e,
   };
 });
+jest.mock('@/shared/stores/global/profileStore', () => ({
+  activePubkey: () => 'a'.repeat(64),
+}));
 jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({
   createProfileScopedStorage: () => ({
     getItem: async () => null,
     setItem: async () => {},
     removeItem: async () => {},
   }),
-  getActiveProfilePubkey: () => 'a'.repeat(64),
 }));
 
 const store = () => useNutDropRedeemQueueStore.getState();

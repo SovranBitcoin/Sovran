@@ -18,8 +18,8 @@ jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({
     removeItem: async () => {},
   }),
 }));
-jest.mock('@/shared/stores/global/profileStore', () => ({
-  useProfileStore: {
+jest.mock('@/shared/stores/global/profileStore', () => {
+  const useProfileStore = {
     getState: () => ({
       activeAccountIndex: mockAccount,
       profiles: [
@@ -27,8 +27,14 @@ jest.mock('@/shared/stores/global/profileStore', () => ({
         { accountIndex: 1, pubkey: 'b'.repeat(64) },
       ],
     }),
-  },
-}));
+  };
+  return {
+    useProfileStore,
+    ...jest
+      .requireActual<typeof import('./helpers/profileStoreMock')>('./helpers/profileStoreMock')
+      .activeAccountReaders(() => useProfileStore.getState()),
+  };
+});
 jest.mock('@/shared/lib/persist/secureVault', () => ({
   createSecureVault: (owner: string) => ({
     read: async () => null,

@@ -45,7 +45,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   // Only gate on wallpaperStore — it's a global store and always hydrates.
   // themeStore is profile-scoped and its hydration is gated on
   // `_migrationGate`, which signals AFTER AccountScopedProviders mounts
-  // lower in the tree. Gating ThemeProvider on themeStore._hasHydrated
+  // lower in the tree. Gating ThemeProvider on themeStore's load
   // here would deadlock the splash screen.
   const wallpaperHydrated = useWallpaperStore((s) => s._hasHydrated);
   // The chrome theme follows the ACTIVE WALLET UNIT: switching the wallet to

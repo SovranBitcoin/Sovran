@@ -11,13 +11,15 @@
  * restore is complete unless a case says otherwise.
  */
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Text } from 'react-native';
 import { act, render, screen } from '@testing-library/react-native';
 
 import AppGate from '@/shared/blocks/AppGate';
 import { legalRevisions } from '@/shared/lib/legal/legalDocuments';
 import { retrieveMnemonic } from '@/shared/lib/nostr/secureStorage';
-import { useSettingsHydration, useSettingsStore } from '@/shared/stores/global/settingsStore';
+import { markHydrationFailed, markHydrationStarted } from '@/shared/lib/persist/hydrationOutcome';
+import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useWalletLifecycleStore } from '@/shared/stores/global/walletLifecycleStore';
 import { useSecureStoreState } from '@/shared/stores/runtime/secureStoreState';
 
@@ -124,7 +126,9 @@ function given(state: {
     errorName: state.locked ? 'Error' : null,
   });
   mockKeys = { isReady: true, isLoading: false, error: null, ...state.keys };
-  useSettingsHydration.setState({ status: state.hydration ?? 'ready' });
+  const hydration = state.hydration ?? 'ready';
+  jest.mocked(useSettingsStore.persist.hasHydrated).mockReturnValue(hydration === 'ready');
+  if (hydration === 'error') markHydrationFailed('settings-store');
   useSettingsStore.setState({
     legalAcceptance: state.legal === undefined ? CURRENT : state.legal,
     termsAccepted: null,
@@ -148,6 +152,7 @@ beforeEach(() => {
 
 afterEach(() => {
   jest.restoreAllMocks();
+  markHydrationStarted('settings-store');
   useSecureStoreState.setState({ secureStoreState: 'available', errorName: null });
 });
 
@@ -198,9 +203,10 @@ describe('AppGate order', () => {
 
   it('shows the settings error page, whose retry goes back to loading and rereads settings', async () => {
     given({ hydration: 'error', legal: null });
+    // A read starting is all the page waits for; the read itself is pinned below.
     const rehydrate = jest
       .spyOn(useSettingsStore.persist, 'rehydrate')
-      .mockResolvedValue(undefined as never);
+      .mockImplementation(async () => markHydrationStarted('settings-store'));
 
     await renderGate();
     expect(shown()).toBe('settings error');
@@ -208,9 +214,25 @@ describe('AppGate order', () => {
 
     await act(async () => mockTerms!.onRetry!());
 
-    expect(useSettingsHydration.getState().status).toBe('loading');
     expect(rehydrate).toHaveBeenCalledTimes(1);
     expect(shown()).toBe('nothing');
+  });
+
+  it('shows the settings error page for settings it cannot read, and the wallet once a retry reads them', async () => {
+    given({});
+    jest.mocked(useSettingsStore.persist.hasHydrated).mockRestore();
+    await AsyncStorage.setItem('settings-store', '{not json');
+    await act(async () => useSettingsStore.persist.rehydrate());
+
+    await renderGate();
+    expect(shown()).toBe('settings error');
+
+    const saved = { legalAcceptance: CURRENT, hasSeenOnboarding: true };
+    await AsyncStorage.setItem('settings-store', JSON.stringify({ state: saved, version: 0 }));
+    await act(async () => mockTerms!.onRetry!());
+    await settle();
+
+    expect(shown()).toBe('wallet');
   });
 
   it('shows terms before onboarding, and accepting writes the current revisions', async () => {

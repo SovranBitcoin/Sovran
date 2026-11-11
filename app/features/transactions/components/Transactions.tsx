@@ -23,6 +23,7 @@ import { HistoryEntry, SendHistoryEntry } from '@cashu/coco-core';
 import Icon from 'assets/icons';
 import { SwapTransactionRow } from '@/features/transactions/components/SwapTransactionRow';
 import { Transaction } from '@/features/transactions/components/Transaction';
+import { transactionsRouteParams } from '@/features/transactions/components/TransactionsFilterContext';
 import { aiRequestDisplayAmount } from '@/features/transactions/lib/aiRequestPresentation';
 import { navigateToAiRequest } from '@/shared/lib/nav/transactionDetailRoutes';
 import { SectionHeading } from '@/shared/ui/composed/SectionHeading';
@@ -855,7 +856,10 @@ export const Transactions = React.memo(
                 onPress={() =>
                   router.navigate({
                     pathname: '/transactions',
-                    params: { filterCurrency: account.unit, filterStatus: 'Confirmed' },
+                    params: transactionsRouteParams({
+                      currency: account.unit,
+                      status: 'Confirmed',
+                    }),
                   })
                 }
                 testID="transactions-view-all"

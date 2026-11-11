@@ -217,7 +217,7 @@ export async function launch(fixture: ReleaseFixture): Promise<Launch> {
 
   const { migrateThenLoad } =
     require('@/shared/lib/migrations/migrateThenLoad') as typeof import('@/shared/lib/migrations/migrateThenLoad');
-  const { hydrationSettled } =
+  const { whenLoaded } =
     require('@/shared/lib/persist/hydrationOutcome') as typeof import('@/shared/lib/persist/hydrationOutcome');
   const { signalMigrationsComplete } =
     require('@/shared/lib/cashu/profileScopedStorage') as typeof import('@/shared/lib/cashu/profileScopedStorage');
@@ -253,7 +253,7 @@ export async function launch(fixture: ReleaseFixture): Promise<Launch> {
     for (const entry of persisted) {
       const loaded = await withTimeout(
         `${entry.name} hydration`,
-        hydrationSettled(entry.store as unknown as Parameters<typeof hydrationSettled>[0])
+        whenLoaded(entry.store as unknown as Parameters<typeof whenLoaded>[0], { orFailed: true })
       );
       if (!loaded) unreadStores.push(entry.name);
     }

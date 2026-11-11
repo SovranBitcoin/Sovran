@@ -19,7 +19,6 @@ import { storeLog } from '@/shared/lib/logger';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
 import { PersistedThemeStore, ThemeMode } from '@sovranbitcoin/schemas';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
-import { withSkippedPersistWrites } from '@/shared/lib/persist/profileWriteBarrier';
 
 const profileStorage = createProfileScopedStorage();
 
@@ -67,7 +66,6 @@ export function migrateThemeStore(state: unknown, version: number): PersistedThe
 }
 
 interface ThemeState {
-  _hasHydrated: boolean;
   activeAlbumSlug: string | null;
   unitWallpapers: Record<UnitId, string>;
   mode: ThemeMode;
@@ -83,7 +81,6 @@ type ThemeStore = ThemeState & ThemeActions;
 export const useThemeStore = create<ThemeStore>({ name: 'theme-store', scope: 'profile' })(
   persist(
     (set) => ({
-      _hasHydrated: false,
       activeAlbumSlug: null,
       unitWallpapers: {},
       mode: DEFAULT_MODE,
@@ -106,12 +103,12 @@ export const useThemeStore = create<ThemeStore>({ name: 'theme-store', scope: 'p
         unitWallpapers: state.unitWallpapers,
         mode: state.mode,
       }),
-      // After a failed read the store holds defaults. Marking it hydrated must
-      // not persist them over the wallpaper choices that could not be read.
-      afterHydrate: (_state, error) =>
-        error
-          ? withSkippedPersistWrites(() => useThemeStore.setState({ _hasHydrated: true }))
-          : useThemeStore.setState({ _hasHydrated: true }),
+      // Saves what was read straight back, as every release has. After a failed
+      // read the store holds defaults, which must not replace the wallpaper
+      // choices that could not be read.
+      afterHydrate: (_state, error) => {
+        if (!error) useThemeStore.setState({});
+      },
     })
   )
 );

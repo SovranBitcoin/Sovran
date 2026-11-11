@@ -79,7 +79,11 @@ import { nostrLog } from '@/shared/lib/logger';
 import { popup, type ActionSheetPayloads } from '@/shared/lib/popup';
 import type { CustomSheetSharedProps } from '@/shared/lib/popup/sheets/types';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
-import { useProfileStore, type ProfileEntry } from '@/shared/stores/global/profileStore';
+import {
+  selectActiveProfile,
+  useProfileStore,
+  type ProfileEntry,
+} from '@/shared/stores/global/profileStore';
 import { isCustomSheetPayload, usePopupStore } from '@/shared/stores/runtime/popupStore';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { Button } from '@/shared/ui/primitives/Button';
@@ -536,9 +540,7 @@ function ConnectReview({
   // Whole map: the reconnect matcher scans all connections, not one key.
   const apps = useNip46ConnectionsStore((s) => s.apps);
   const connection = apps[parsed.clientPubkey];
-  const activeProfile = useProfileStore((s) =>
-    s.profiles.find((profile) => profile.accountIndex === s.activeAccountIndex)
-  );
+  const activeProfile = useProfileStore(selectActiveProfile);
 
   const isUpdate = connection !== undefined;
   // Same app, NEW ephemeral client key? (Exact-pubkey update takes precedence;

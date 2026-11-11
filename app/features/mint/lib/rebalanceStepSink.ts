@@ -12,7 +12,7 @@ import {
   type TransferStep,
 } from '@/features/mint/components/rebalance';
 import { formatCandidateRoutingDetail } from '@/features/mint/lib/rebalanceRunState';
-import { getActiveProfilePubkey } from '@/shared/lib/cashu/profileScopedStorage';
+import { activePubkey } from '@/shared/stores/global/profileStore';
 import { describeError } from '@/shared/lib/errors';
 import { mintLocalId } from '@/shared/lib/id';
 import { cashuLog } from '@/shared/lib/logger';
@@ -35,7 +35,7 @@ export interface StartedGroup {
  * late write from a run started for the old one must not land there.
  */
 function profileStoresHold(account: string | undefined): boolean {
-  if (getActiveProfilePubkey() === account) return true;
+  if (activePubkey() === account) return true;
   cashuLog.info('mint.rebalance.group_write_skipped_other_account');
   return false;
 }

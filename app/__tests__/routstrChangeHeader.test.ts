@@ -3,8 +3,8 @@ import { settleRoutstrClient } from '@/shared/lib/routstr/sdk/client';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
 
 let mockProfile = 0;
-jest.mock('@/shared/stores/global/profileStore', () => ({
-  useProfileStore: {
+jest.mock('@/shared/stores/global/profileStore', () => {
+  const useProfileStore = {
     getState: () => ({
       activeAccountIndex: mockProfile,
       profiles: [
@@ -12,8 +12,14 @@ jest.mock('@/shared/stores/global/profileStore', () => ({
         { accountIndex: 1, pubkey: 'b'.repeat(64) },
       ],
     }),
-  },
-}));
+  };
+  return {
+    useProfileStore,
+    ...jest
+      .requireActual<typeof import('./helpers/profileStoreMock')>('./helpers/profileStoreMock')
+      .activeAccountReaders(() => useProfileStore.getState()),
+  };
+});
 jest.mock('@/shared/lib/routstr/securePersistence', () => ({
   createRoutstrPersistence: () =>
     jest.requireMock('@/shared/lib/cashu/profileScopedStorage').createProfileScopedStorage(),

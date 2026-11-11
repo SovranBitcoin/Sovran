@@ -2,7 +2,7 @@ import { useOwnProfileMetadataStore } from '@/shared/stores/profile/ownProfileMe
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { PUBLIC_DEMO_METADATA } from '@/shared/stores/runtime/mockPublicProfile';
 import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata';
-import { useProfileStore } from '@/shared/stores/global/profileStore';
+import { selectActivePubkey, useProfileStore } from '@/shared/stores/global/profileStore';
 import { resolveIdentityName } from '@/shared/lib/identity';
 
 /**
@@ -22,10 +22,7 @@ export function useProfileDisplay(pubkey: string): {
   pictureResolved: boolean;
 } {
   const profile = useProfileStore((s) => s.profiles.find((p) => p.pubkey === pubkey));
-  const isOwn = useProfileStore(
-    (s) =>
-      s.profiles.find((profile) => profile.accountIndex === s.activeAccountIndex)?.pubkey === pubkey
-  );
+  const isOwn = useProfileStore((s) => selectActivePubkey(s) === pubkey);
   const optimistic = useOwnProfileMetadataStore((s) => (isOwn ? s.optimistic : null));
   const mockMode = useSettingsStore((s) => s.mockMode);
   const demo = mockMode ? PUBLIC_DEMO_METADATA.get(pubkey) : undefined;

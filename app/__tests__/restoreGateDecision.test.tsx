@@ -32,8 +32,6 @@ jest.mock('@/shared/stores/global/settingsStore', () => {
     completeOnboarding: () => undefined,
   };
   return {
-    useSettingsHydration: (selector: (s: { status: string }) => unknown) =>
-      selector({ status: 'ready' }),
     useSettingsStore: Object.assign((selector: (s: typeof state) => unknown) => selector(state), {
       getState: () => state,
       persist: { hasHydrated: () => true, onFinishHydration: () => () => undefined },

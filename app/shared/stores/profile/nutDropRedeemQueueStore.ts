@@ -13,12 +13,10 @@ import {
 } from 'wallet/redeemEntry';
 import { z } from 'zod';
 
-import {
-  createProfileScopedStorage,
-  getActiveProfilePubkey,
-} from '@/shared/lib/cashu/profileScopedStorage';
+import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
 import { storeLog } from '@/shared/lib/logger';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
+import { activePubkey } from '@/shared/stores/global/profileStore';
 
 /**
  * Persisted queue of P2PK-locked Nut Drop tokens awaiting redemption.
@@ -364,7 +362,7 @@ export const useNutDropRedeemQueueStore = create<NutDropRedeemQueueStore>({
       // holds tokens waiting to be redeemed. Folded back in by token hash; an
       // entry already queued wins, so its status is never rolled back.
       recoverUnreadable: {
-        owner: getActiveProfilePubkey,
+        owner: activePubkey,
         merge: (recovered, copyId): NutDropRedeemQueueStore => {
           const state = useNutDropRedeemQueueStore.getState();
           return {

@@ -27,7 +27,7 @@ import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 
 import { nostrLog } from '@/shared/lib/logger';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
-import { useProfileStore } from '@/shared/stores/global/profileStore';
+import { selectActivePubkey, useProfileStore } from '@/shared/stores/global/profileStore';
 import { useNostrSocialStore } from '@/shared/stores/profile/nostrSocialStore';
 import { useOwnContentStore } from '@/shared/stores/profile/ownContentStore';
 import { useOwnProfileMetadataStore } from '@/shared/stores/profile/ownProfileMetadataStore';
@@ -121,9 +121,7 @@ export function useOwnEventsSync(): void {
   const { keys } = useNostrKeysContext();
   const pubkey = keys?.pubkey;
   // Read for its changes only: the check below reads the store as it is now.
-  const activePubkey = useProfileStore(
-    (s) => s.profiles.find((p) => p.accountIndex === s.activeAccountIndex)?.pubkey
-  );
+  const activePubkey = useProfileStore(selectActivePubkey);
 
   // Stable per-pubkey filters (since computed once per pubkey, not per render).
   const filters = useMemo(() => {

@@ -28,6 +28,10 @@ interface MockStorage {
   };
 }
 
+jest.mock('@/shared/stores/global/profileStore', () => ({
+  activePubkey: () =>
+    jest.requireMock<MockStorage>('@/shared/lib/cashu/profileScopedStorage').account.active,
+}));
 // The disk lives inside the mock: the store reads it while modules load.
 jest.mock('@/shared/lib/cashu/profileScopedStorage', () => {
   const disk = new Map<string, string>();
@@ -41,7 +45,6 @@ jest.mock('@/shared/lib/cashu/profileScopedStorage', () => {
     disk,
     account,
     faults,
-    getActiveProfilePubkey: () => account.active,
     createProfileScopedStorage: () => ({
       getItem: async (name: string) => disk.get(keyFor(name)) ?? null,
       setItem: async (name: string, value: string) => {

@@ -4,18 +4,19 @@ import * as Application from 'expo-application';
 import { getLatestVersion } from '@/shared/lib/apiClient';
 import { useBootMorphCompleted } from '@/shared/lib/qrButtonAnchor';
 import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
-import { useSettingsHydration, useSettingsStore } from '@/shared/stores/global/settingsStore';
+import { useStoreLoad } from '@/shared/lib/persist/hydrationOutcome';
+import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 
 const FETCH_INTERVAL_MS = 6 * 60 * 60 * 1000;
 export function useLatestVersionFetch(blockingUpdateShown = false) {
   const bootDone = useBootMorphCompleted();
   const { isOffline } = useOfflineStatus();
-  const hydration = useSettingsHydration((state) => state.status);
+  const hydration = useStoreLoad(useSettingsStore.persist);
   const lastAttempt = useRef<number | null>(null);
   const forcedForGate = useRef(false);
   useEffect(() => {
     if (!blockingUpdateShown) forcedForGate.current = false;
-    if (!bootDone || hydration !== 'ready' || isOffline) return;
+    if (!bootDone || hydration !== 'loaded' || isOffline) return;
     const controller = new AbortController();
     let inFlight = false;
     let forcedAttempt = false;

@@ -2,17 +2,15 @@ import { KeyRecoveryScreen } from './KeyRecoveryScreen';
 import { useSecureStoreState } from '@/shared/stores/runtime/secureStoreState';
 import React, { useEffect, useState } from 'react';
 
-import { useSettingsStore, useSettingsHydration } from '@/shared/stores/global/settingsStore';
+import { useSettingsStore } from '@/shared/stores/global/settingsStore';
+import { useStoreLoad, useStoreLoadLatched } from '@/shared/lib/persist/hydrationOutcome';
 import { hasCurrentLegalAcceptance } from '@/shared/lib/legal/legalDocuments';
 import { TermsAndConditionsScreen } from '@/features/onboarding/screens/TermsAndConditionsScreen';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import OnboardingScreen from '@/features/onboarding/components/OnboardingScreen';
 import { log, Log, initLog, useInitMount, useLifecycleLogger } from '@/shared/lib/logger';
 import { retrieveMnemonic } from '@/shared/lib/nostr/secureStorage';
-import {
-  useWalletLifecycleStore,
-  useWalletLifecycleHydrated,
-} from '@/shared/stores/global/walletLifecycleStore';
+import { useWalletLifecycleStore } from '@/shared/stores/global/walletLifecycleStore';
 import { isRestoreAsked, needsRestoreDecision } from '@/shared/stores/global/walletRestorePhase';
 import { SettingsRecoveryScreen } from '@/features/settings/screens/SettingsRecoveryScreen';
 import { useShownInsteadOfWallet } from '@/shared/lib/qrButtonAnchor';
@@ -39,17 +37,8 @@ type ReinstallState = 'checking' | 'none' | 'detected';
  */
 export function useReinstallDetection(hasSeenOnboarding: boolean): ReinstallState {
   const [state, setState] = useState<ReinstallState>('checking');
-  const [settingsHydrated, setSettingsHydrated] = useState(() =>
-    useSettingsStore.persist.hasHydrated()
-  );
-  const lifecycleHydrated = useWalletLifecycleHydrated();
-
-  useEffect(() => {
-    if (settingsHydrated) return;
-    const unsubscribe = useSettingsStore.persist.onFinishHydration(() => setSettingsHydrated(true));
-    if (useSettingsStore.persist.hasHydrated()) setSettingsHydrated(true);
-    return unsubscribe;
-  }, [settingsHydrated]);
+  const settingsHydrated = useStoreLoadLatched(useSettingsStore.persist);
+  const lifecycleHydrated = useStoreLoadLatched(useWalletLifecycleStore.persist);
 
   useEffect(() => {
     // hasSeenOnboarding defaults to false until settingsStore rehydrates from
@@ -138,20 +127,17 @@ const AppGate: React.FC<AppGateProps> = ({ children }) => {
   const hasSeenOnboarding = useSettingsStore((state) => state.hasSeenOnboarding);
   const completeOnboarding = useSettingsStore((state) => state.completeOnboarding);
   const reinstallState = useReinstallDetection(hasSeenOnboarding);
-  const hydration = useSettingsHydration((s) => s.status);
+  const hydration = useStoreLoad(useSettingsStore.persist);
   if (locked) return <KeyRecoveryScreen />;
   if (error && !isReady) return <KeyRecoveryScreen locked={false} />;
   if (hydration === 'loading') return null;
-  if (hydration === 'error') {
+  if (hydration === 'failed') {
     return (
       <InsteadOfWallet>
         <TermsAndConditionsScreen
           onClose={acceptLegalDocuments}
           settingsError
-          onRetry={() => {
-            useSettingsHydration.setState({ status: 'loading' });
-            void useSettingsStore.persist.rehydrate();
-          }}
+          onRetry={() => void useSettingsStore.persist.rehydrate()}
         />
       </InsteadOfWallet>
     );
@@ -251,7 +237,7 @@ async function evaluateRestoreStatus(ctx: {
 }
 
 const RestoreGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const hydrated = useWalletLifecycleHydrated();
+  const hydrated = useStoreLoadLatched(useWalletLifecycleStore.persist);
   const restoreStatus = useWalletLifecycleStore((s) => s.restoreStatus);
   const seedCreatedAt = useWalletLifecycleStore((s) => s.seedCreatedAt);
   const setRestoreStatus = useWalletLifecycleStore((s) => s.setRestoreStatus);

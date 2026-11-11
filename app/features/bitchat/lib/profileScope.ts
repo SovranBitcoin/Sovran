@@ -1,4 +1,8 @@
-import { useProfileStore } from '@/shared/stores/global/profileStore';
+import {
+  activePubkey,
+  selectActivePubkey,
+  useProfileStore,
+} from '@/shared/stores/global/profileStore';
 
 /**
  * Stable scope identifier for native BitChat state that must follow the active
@@ -6,17 +10,9 @@ import { useProfileStore } from '@/shared/stores/global/profileStore';
  * imported profiles and any future index reshuffle keep their own storage.
  */
 export function getBitchatProfileScope(): string {
-  const state = useProfileStore.getState();
-  return (
-    state.profiles.find((profile) => profile.accountIndex === state.activeAccountIndex)?.pubkey ??
-    ''
-  );
+  return activePubkey() ?? '';
 }
 
 export function useBitchatProfileScope(): string {
-  return useProfileStore(
-    (state) =>
-      state.profiles.find((profile) => profile.accountIndex === state.activeAccountIndex)?.pubkey ??
-      ''
-  );
+  return useProfileStore((state) => selectActivePubkey(state) ?? '');
 }

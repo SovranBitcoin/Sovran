@@ -308,12 +308,12 @@ test('failed settings hydration preserves the unreadable blob and exposes retrya
   jest.resetModules();
   mockMemory[STORAGE_KEY] = '{broken json';
   const store = await loadStore();
-  const { useSettingsHydration } = require('@/shared/stores/global/settingsStore');
-  expect(useSettingsHydration.getState().status).toBe('error');
+  const { whenLoaded } = require('@/shared/lib/persist/hydrationOutcome');
+  await expect(whenLoaded(store, { orFailed: true })).resolves.toBe(false);
   expect(mockMemory[STORAGE_KEY]).toBe('{broken json');
   preload({ displayCurrency: 'eur', hasSeenOnboarding: true });
   await store.persist.rehydrate();
-  expect(useSettingsHydration.getState().status).toBe('ready');
+  await expect(whenLoaded(store, { orFailed: true })).resolves.toBe(true);
   expect(store.getState().displayCurrency).toBe('eur');
 });
 

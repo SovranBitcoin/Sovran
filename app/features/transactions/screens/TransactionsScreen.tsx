@@ -39,19 +39,8 @@ import { useRollbackStore } from '@/shared/stores/runtime/rollbackStore';
 import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
 import { belongsToAccount } from '@/shared/lib/cashu/accountScope';
 import { useIsTestnutMint } from '@/shared/stores/global/mintTestnutStore';
-import {
-  matchesTransactionFilters,
-  type TransactionDirection,
-  type TransactionPaymentType,
-} from 'wallet';
-import type {
-  TransactionSourceFilter,
-  TransactionLockFilter,
-  TransactionCounterpartyFilter,
-  TransactionZapFilter,
-} from '../components/TransactionsFilterContext';
-
-type StatusTab = 'All' | 'Confirmed' | 'Pending' | 'Expired';
+import { matchesTransactionFilters } from 'wallet';
+import type { TransactionFilters } from '../components/TransactionsFilterContext';
 
 const MONTH_SELECTOR_HEIGHT = 48;
 
@@ -63,25 +52,10 @@ const MONTH_SELECTOR_HEIGHT = 48;
 const HISTORY_PAGE_SIZE = 10;
 
 interface TransactionsScreenProps {
-  initialTab?: StatusTab;
+  /** The filters chosen in the filter flow; `status` picks the tab. */
+  filters: TransactionFilters;
   /** Called when a transaction is tapped - used for flow-aware navigation */
   onTransactionPress?: (historyEntry: HistoryEntry) => void;
-  /** External filter: currency (from filter flow) */
-  filterCurrency?: string;
-  /** External filter: payment type (from filter flow) */
-  filterPaymentType?: TransactionPaymentType;
-  /** External filter: direction (from filter flow) */
-  filterDirection?: TransactionDirection;
-  /** External filter: mint URL (from filter flow) */
-  filterMintUrl?: string;
-  /** External filter: source/transport (qr/nfc/ble/paste/deeplink) */
-  filterSource?: TransactionSourceFilter;
-  /** External filter: P2PK lock state */
-  filterLock?: TransactionLockFilter;
-  /** External filter: has a nostr counterparty */
-  filterCounterparty?: TransactionCounterpartyFilter;
-  /** External filter: paid for a nostr post (zap annotation) */
-  filterZap?: TransactionZapFilter;
   /**
    * External month key (format: "YYYY-MM"). No longer a filter — it names the
    * month the viewport is on / should jump to.
@@ -92,16 +66,8 @@ interface TransactionsScreenProps {
 }
 
 export function TransactionsScreen({
-  initialTab = 'All',
+  filters,
   onTransactionPress,
-  filterCurrency,
-  filterPaymentType = 'all',
-  filterDirection = 'all',
-  filterMintUrl = 'all',
-  filterSource = 'all',
-  filterLock = 'all',
-  filterCounterparty = 'all',
-  filterZap = 'all',
   filterMonth,
   onMonthChange,
 }: TransactionsScreenProps) {
@@ -109,11 +75,8 @@ export function TransactionsScreen({
   const manager = useManager();
   const { isOffline } = useOfflineStatus();
 
-  const selectedCurrency = filterCurrency || 'sat';
+  const { currency: selectedCurrency, paymentType, direction, status: tab, mintUrl } = filters;
   const isTestnutMint = useIsTestnutMint();
-  const paymentType = filterPaymentType;
-  const direction = filterDirection;
-  const tab = initialTab;
 
   const [internalMonth, setInternalMonth] = useState<string | null>(null);
   const selectedMonth = filterMonth !== undefined ? filterMonth : internalMonth;
@@ -217,7 +180,7 @@ export function TransactionsScreen({
 
   // No month in the key: the active month changes as the user scrolls, and a
   // remount on every month change would reset the scroll position it tracks.
-  const listKey = `${paymentType}-${direction}-${tab}-${selectedCurrency}-${filterMintUrl}`;
+  const listKey = `${paymentType}-${direction}-${tab}-${selectedCurrency}-${mintUrl}`;
 
   const filteredByTypeHistory = history.filter((historyEntry) => {
     if (!belongsToAccount(selectedCurrency, historyEntry, isTestnutMint)) return false;
@@ -322,11 +285,11 @@ export function TransactionsScreen({
         isFetching={isFetching}
         filter={direction}
         type={paymentType}
-        mintUrlFilter={filterMintUrl}
-        source={filterSource}
-        lock={filterLock}
-        counterparty={filterCounterparty}
-        zap={filterZap}
+        mintUrlFilter={mintUrl}
+        source={filters.source}
+        lock={filters.lock}
+        counterparty={filters.counterparty}
+        zap={filters.zap}
         at="all"
         tab={tab}
         onTransactionPress={onTransactionPress}

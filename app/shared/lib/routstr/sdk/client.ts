@@ -16,7 +16,7 @@ import {
 
 import { apiLog } from '@/shared/lib/logger';
 import { captureProfileStorageOwner } from '@/shared/lib/cashu/profileScopedStorage';
-import { useProfileStore } from '@/shared/stores/global/profileStore';
+import { activePubkey } from '@/shared/stores/global/profileStore';
 import { routstrMintKey } from '../payingMint';
 
 import { createSdkStorageDriver } from './driver';
@@ -126,13 +126,7 @@ async function buildRoutstrClient(baseUrl: string, canDispatch: () => boolean = 
   if (built.owner === stoppedOwner) throw new Error('Routstr profile stopped');
   const key = providerKey(baseUrl);
   const assertOwner = () => {
-    const profile = useProfileStore.getState();
-    if (
-      profile.profiles.find((p) => p.accountIndex === profile.activeAccountIndex)?.pubkey !==
-      built.owner
-    ) {
-      throw new Error('Payment belongs to another profile');
-    }
+    if (activePubkey() !== built.owner) throw new Error('Payment belongs to another profile');
   };
   const assertDispatch = () => {
     assertOwner();
@@ -530,13 +524,7 @@ async function runRecoverySweep(
 ): Promise<void> {
   try {
     const assertOwner = () => {
-      const profile = useProfileStore.getState();
-      if (
-        profile.profiles.find((p) => p.accountIndex === profile.activeAccountIndex)?.pubkey !==
-        built.owner
-      ) {
-        throw new Error('Payment belongs to another profile');
-      }
+      if (activePubkey() !== built.owner) throw new Error('Payment belongs to another profile');
     };
     const wallet = walletAdapter(assertOwner);
     const { tokenAmountSats } = require('./walletAdapter') as typeof import('./walletAdapter');

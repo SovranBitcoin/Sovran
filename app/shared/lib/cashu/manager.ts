@@ -1622,8 +1622,7 @@ export class CocoManager {
     // Resolve the active profile's pubkey so the sync cursor is pubkey-keyed
     // (not accountIndex-keyed); guards against index recycling when the
     // highest-numbered profile is deleted.
-    const { useProfileStore } = await import('@/shared/stores/global/profileStore');
-    const activePubkey = useProfileStore.getState().getActiveProfile()?.pubkey;
+    const activePubkey = (await import('@/shared/stores/global/profileStore')).activePubkey();
 
     if (!activePubkey) {
       cashuLog.warn('cashu.manager.npc_skip_no_pubkey');

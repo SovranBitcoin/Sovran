@@ -9,7 +9,7 @@ import { useCtaStore } from '@/shared/stores/global/ctaStore';
 import { useLegacyEcashStore } from '@/shared/stores/global/legacyEcashStore';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { useWalletLifecycleStore } from '@/shared/stores/global/walletLifecycleStore';
-import { useSettingsHydration, useSettingsStore } from '@/shared/stores/global/settingsStore';
+import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import {
   ABANDONED_BACKUP_GRACE_MS,
   BACKUP_SNOOZE_MS,
@@ -131,7 +131,6 @@ beforeEach(async () => {
     backupStartedAt: null,
   });
   useSettingsStore.setState({ lastKnownAppVersion: null, mockMode: false });
-  useSettingsHydration.setState({ status: 'ready' });
   useWalletLifecycleStore.setState({
     seedCreatedAt: Date.now(),
     restoreStatus: 'complete',

@@ -9,8 +9,8 @@ import {
   type ReportReason,
 } from '@/features/feed/lib/moderation';
 import type { NostrEventId, NostrPubkeyHex } from '@/shared/lib/protocolIds';
+import { captureActiveProfile } from '@/shared/stores/global/profileStore';
 import {
-  captureProfile,
   matchingSigner,
   nextReplaceableCreatedAt,
   readNewestOwnEvent,
@@ -50,7 +50,7 @@ async function readMuteList(ndk: NDK, pubkey: string): Promise<MuteList | null> 
 }
 
 export async function syncMuteList(ndk: NDK, pubkey: string): Promise<void> {
-  const scope = captureProfile(pubkey);
+  const scope = captureActiveProfile(pubkey);
   try {
     if (!useFeedIgnoreStore.persist.hasHydrated())
       throw new Error('Moderation preferences are loading');
@@ -76,7 +76,7 @@ export function setPersonBlocked(
 ): Promise<void> {
   const pubkey = normalizeIgnoreHex(target);
   if (!pubkey || pubkey === ownPubkey) return Promise.reject(new Error('Invalid block target'));
-  const scope = captureProfile(ownPubkey);
+  const scope = captureActiveProfile(ownPubkey);
   try {
     scope.check();
   } catch (error) {
@@ -166,7 +166,7 @@ export async function publishReport(
   reason: ReportReason,
   publicEventId?: NostrEventId
 ): Promise<void> {
-  const scope = captureProfile(ownPubkey);
+  const scope = captureActiveProfile(ownPubkey);
   try {
     scope.check();
     const tags = reportTags(target, reason, publicEventId);
