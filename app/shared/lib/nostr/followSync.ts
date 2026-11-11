@@ -35,13 +35,11 @@ import {
 import { captureActiveProfile } from '@/shared/stores/global/profileStore';
 import {
   matchingSigner,
-  nextReplaceableCreatedAt,
-  readNewestOwnEvent,
-  signOwnEvent,
-  worthReadingAgain,
-  type OwnEventReadOutcome,
+  publishToRelaysRead,
+  readForEdit,
+  signReplacement,
+  type ReadForEdit,
 } from './ownReplaceableEvent';
-import { publishEvent } from './publish';
 
 type FollowIntents = ReturnType<typeof selectFollowIntents>;
 
@@ -160,8 +158,8 @@ const MAX_FUTURE_SEC = 60;
  * parses and is not dated in the future (building on it would date ours there
  * too, and relays would keep it over every later list).
  */
-function decodeRead(read: { outcome: OwnEventReadOutcome; newest: unknown }): ListRead {
-  if (read.outcome !== 'complete') return { status: 'incomplete' };
+function decodeRead(read: ReadForEdit): ListRead {
+  if (read.status !== 'read') return { status: 'incomplete' };
   if (!read.newest) return { status: 'empty' };
   const parsed = ContactEvent.safeParse(read.newest);
   if (!parsed.success || parsed.data.created_at > Math.floor(Date.now() / 1000) + MAX_FUTURE_SEC)
@@ -286,16 +284,14 @@ async function syncOnce(ndk: NDK, ownPubkey: string): Promise<void> {
 
       const signer = await matchingSigner(ndk, ownPubkey);
       scope.check();
+      const raw = await readForEdit(ndk, ownPubkey, Contacts);
+      scope.check();
       // Until the account's relay list is known its write relays read as the
       // defaults, which may not be where its follow list is.
-      if (!getKnownOwnWriteRelays(ownPubkey)) {
+      if (raw.status === 'waiting' && raw.reason === 'relay-list-unknown') {
         nostrLog.info('nostr.follow.waiting', { reason: 'relay-list-unknown' });
         return;
       }
-      const raw = await readNewestOwnEvent(ndk, ownPubkey, Contacts, { leaveOutSilent: true });
-      scope.check();
-      // A write relay that stays silent is read without after a few reads in a row.
-      if (worthReadingAgain(raw)) continue;
       const read = decodeRead(raw);
 
       let intents = selectFollowIntents(social());
@@ -331,6 +327,8 @@ async function syncOnce(ndk: NDK, ownPubkey: string): Promise<void> {
         }
       }
 
+      // Settling or publishing stands only on a complete read.
+      if (raw.status !== 'read') return;
       // The plan stands on this read, so it is kept now, never before the plan:
       // the store takes it unless a list relays keep over it arrived meanwhile.
       if (read.status === 'found')
@@ -349,11 +347,10 @@ async function syncOnce(ndk: NDK, ownPubkey: string): Promise<void> {
       // A signer replaced during the read never signs. Signing can fail but
       // never refuses (the only signer is the account's own key), so a
       // failure keeps the taps for the next pass.
-      if (ndk.signer !== signer) throw new Error('Account signer changed');
-      const event = await signOwnEvent(ndk, signer, scope, {
+      const event = await signReplacement(ndk, signer, scope, {
         kind: Contacts,
         pubkey: ownPubkey,
-        created_at: nextReplaceableCreatedAt(plan.base.createdAt),
+        replaces: plan.base.createdAt,
         tags: plan.tags,
         content: plan.base.content,
       });
@@ -361,15 +358,7 @@ async function syncOnce(ndk: NDK, ownPubkey: string): Promise<void> {
       // or the write relays changed since the read: read and build again.
       if (!sameSavedList(atBase, savedList()) || !sameRelays(raw.asked, ownPubkey)) continue;
 
-      // Exactly the relays the complete read covered: a relay that was not read,
-      // also one left out as silent, may hold a newer list, and this one would
-      // replace it there.
-      const published = await publishEvent({
-        ndk,
-        event,
-        relays: raw.relays,
-        resolveOn: 'all-settled',
-      });
+      const published = await publishToRelaysRead(ndk, event, raw.relays);
       scope.check();
       if (published.isErr()) throw new Error(`Follow list publish failed: ${published.error.type}`);
       // Published, but not recorded for a signer that changed meanwhile: the next pass reads it back.

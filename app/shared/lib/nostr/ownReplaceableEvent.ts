@@ -1,15 +1,23 @@
 /**
- * Reading and replacing one of the account's own replaceable lists (the mute
- * list, the follow list) without losing what another client wrote: read the
- * newest signed copy from every write relay, leaving out one that has stopped
- * answering, and hold the account and its signer fixed across each wait so a
- * switch never writes to the wrong account.
+ * Reading and replacing one of the account's own replaceable events (the
+ * follow list, the mute list, the profile, the relay list) without losing
+ * what another client wrote. One rule for all of them: read the newest signed
+ * copy from every relay of the account (`readForEdit`), leaving out one that
+ * has stopped answering; change it; date the change after the event it
+ * replaces and sign it with the account's own signer (`signReplacement`);
+ * send it to exactly the relays read (`publishToRelaysRead`). A read that
+ * could not be completed is waiting, never a base to publish on. The account
+ * and its signer are held fixed across each wait so a switch never writes to
+ * the wrong account.
  */
 import NDK, { NDKEvent, NDKRelaySet, NDKSubscriptionCacheUsage } from '@nostr-dev-kit/ndk-mobile';
 import type { NDKSigner } from '@nostr-dev-kit/ndk-mobile';
+import { errAsync } from 'neverthrow';
 import { supersedes } from 'nostr';
 import { nostrLog } from '@/shared/lib/logger';
-import { getOwnWriteRelays } from './outbox/relayListStore';
+import { publishEvent } from '@/shared/lib/nostr/publish';
+import type { PublishOptions } from '@/shared/lib/nostr/publish/types';
+import { getKnownOwnWriteRelays, getOwnWriteRelays } from './outbox/relayListStore';
 
 const READ_TIMEOUT_MS = 12_000;
 
@@ -228,4 +236,66 @@ export async function readNewestOwnEvent(
       finish('failed');
     }
   });
+}
+
+/** The base an edit of an own event stands on, or why the edit waits. */
+export type ReadForEdit =
+  | { status: 'waiting'; reason: 'relay-list-unknown' | Exclude<OwnEventReadOutcome, 'complete'> }
+  | { status: 'read'; newest: NDKEvent | undefined; relays: string[]; asked: string[] };
+
+/**
+ * Read the newest own event of `kind` to build an edit on: only once this
+ * session knows the account's relays (`relays`, by default its known write
+ * relays), and only from a complete read of them, a relay silent for
+ * `SILENT_READS_BEFORE_LEFT_OUT` reads in a row left out. A silent relay is
+ * read again at once until that is decided.
+ */
+export async function readForEdit(
+  ndk: NDK,
+  pubkey: string,
+  kind: number,
+  relays: readonly string[] | null = getKnownOwnWriteRelays(pubkey)
+): Promise<ReadForEdit> {
+  if (!relays) return { status: 'waiting', reason: 'relay-list-unknown' };
+  let read: OwnEventRead;
+  do read = await readNewestOwnEvent(ndk, pubkey, kind, { relays, leaveOutSilent: true });
+  while (worthReadingAgain(read));
+  if (read.outcome !== 'complete') return { status: 'waiting', reason: read.outcome };
+  return { status: 'read', newest: read.newest, relays: read.relays, asked: read.asked };
+}
+
+/**
+ * Sign a replacement for the event dated `replaces`: dated now, or one second
+ * past it when that is later (relays keep the newer one), signed by the
+ * pinned signer and refused before and after signing if the account or the
+ * signer changed.
+ */
+export function signReplacement(
+  ndk: NDK,
+  signer: NDKSigner,
+  scope: { check: () => void },
+  fields: { kind: number; pubkey: string; replaces?: number; tags: string[][]; content: string }
+) {
+  const { replaces, ...event } = fields;
+  if (ndk.signer !== signer) return Promise.reject(new Error('Account signer changed'));
+  return signOwnEvent(ndk, signer, scope, {
+    ...event,
+    created_at: nextReplaceableCreatedAt(replaces),
+  });
+}
+
+/**
+ * Send a replacement to exactly the relays its base was read from: a relay
+ * that was not read may hold a newer copy, and this one would replace it
+ * there. Never to no relay, which `publishEvent` would read as every relay in
+ * the pool.
+ */
+export function publishToRelaysRead(
+  ndk: NDK,
+  event: NDKEvent,
+  relays: readonly string[],
+  resolveOn: PublishOptions['resolveOn'] = 'all-settled'
+) {
+  if (relays.length === 0) return errAsync({ type: 'no-relays' } as const);
+  return publishEvent({ ndk, event, relays: [...relays], resolveOn });
 }
