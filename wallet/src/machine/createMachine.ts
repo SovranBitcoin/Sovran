@@ -299,11 +299,13 @@ interface NfcTap {
 
 /**
  * How a tap's loop left. A paid tap keeps the terminal's unit; a stopped one
- * switches back, then shows `error` when it has one.
+ * switches back, then shows `error` when it has one; one that threw switches
+ * back, then throws on.
  */
 type NfcTapEnd =
   | { kind: "paid" }
-  | { kind: "stopped"; error?: StepDataMap["error"] };
+  | { kind: "stopped"; error?: StepDataMap["error"] }
+  | { kind: "threw"; error: unknown };
 
 // ---------------------------------------------------------------------------
 // createPaymentMachine
@@ -1613,229 +1615,46 @@ export function createPaymentMachine(
 
         // Loop because auto-resolving one step (e.g. chooseOption) may produce
         // another step (e.g. selectMint) that also needs auto-resolution.
-        while (!end) {
-          if (step === "chooseOption" || step === "chooseFallbackOption") {
-            const optionData = stepData as StepDataMap["chooseOption"];
-            const options = optionData.options;
-            const best =
-              options.find(
-                (o) =>
-                  o.option.kind === "paymentRequest" && o.status !== "disabled",
-              ) ??
-              options.find(
-                (o) =>
-                  o.option.kind === "lightningInvoice" &&
-                  o.status !== "disabled",
-              ) ??
-              options.find((o) => o.status !== "disabled");
-            if (best) {
-              const invoiceAlternative =
-                best.option.kind === "paymentRequest"
-                  ? options.find(
-                      (o) =>
-                        o !== best &&
-                        o.option.kind === "lightningInvoice" &&
-                        o.status !== "disabled",
-                    )
-                  : undefined;
-              nfcAlternative = invoiceAlternative
-                ? { ctx: { ...flowCtx }, data: optionData, option: invoiceAlternative }
-                : null;
-              logger.info("machine.nfc.optionChosen", {
-                kind: best.option.kind,
-                optionCount: options.length,
-                hasInvoiceFallback: !!invoiceAlternative,
-              });
-              const walletCtxInner = readContext();
-              const unitInner = getUnit?.() ?? configUnit;
-              const r = transition(
-                step,
-                flowCtx,
-                { type: "OPTION_CHOSEN", option: best.option },
-                detectors,
-                walletCtxInner,
-                unitInner,
-                offline,
-                enableEcashSendMemo,
-                getSatsPerUnitMinor,
-              );
-              // This event always moves to a step; "unchanged" is not reached.
-              if ("kind" in r) break;
-              flowCtx = r.context;
-              flowCtx.source = "nfc";
-              setStep(r.step, r.data);
-              continue;
-            }
-            // No viable option
-            logger.info("machine.nfc.noViableOption", {
-              optionCount: options.length,
-            });
-            end = { kind: "stopped" };
-          } else if (step === "selectMint") {
-            const data = stepData as StepDataMap["selectMint"];
-            const walletCtxInner = readContext();
-            const info = flowCtx.paymentRequest
-              ? detectors.getPaymentRequestInfo(flowCtx.paymentRequest)
-              : null;
-            const amount = flowCtx.amount ?? 0;
-            const ranked = rankMintCandidates(
-              data.candidates.filter(
-                (candidate) =>
-                  candidate.status !== "disabled" &&
-                  !nfcRefusedMints.has(candidate.mintUrl),
-              ),
-              {
-                preferredMints: info?.mints ?? [],
-                amount,
-                unitBalances:
-                  walletCtxInner.unitBalances?.[flowCtx.unit] ??
-                  walletCtxInner.mintBalances,
-                canPayLocally: (mintUrl) =>
-                  buildProofSuggestions(
-                    walletCtxInner.proofAmounts[mintUrl] ?? [],
-                    amount,
-                  ).exactMatch,
-              },
-            );
-            // A NUT-18 amount is net of the receiver's input fees, and the
-            // send cannot add them yet, so `executeNfcSend` refuses a mint
-            // whose keysets charge fees. Ask before choosing: the answer is a
-            // local keyset read, whereas learning it inside the write-back
-            // tore the session down and reported "NFC write failed" for a
-            // token that was never created.
-            let best: (typeof ranked)[number] | undefined;
-            let refusal: string | undefined = [...nfcRefusedMints.values()].at(-1);
-            for (const candidate of ranked) {
-              const payability = operations?.paymentRequestPayabilityFrom
-                ? await operations.paymentRequestPayabilityFrom({
-                    mintUrl: candidate.mintUrl,
-                    unit: flowCtx.unit,
-                  })
-                : { payable: true as const };
-              if (isStaleGeneration(sendGeneration, "nfc.payability")) return;
-              if (payability.payable) {
-                nfcPayableMints.add(candidate.mintUrl);
-                best = candidate;
-                break;
-              }
-              refusal = payability.reason;
-              nfcRefusedMints.set(candidate.mintUrl, payability.reason);
-              logger.info("machine.nfc.mintSkipped", {
-                ...mintUrlFields(candidate.mintUrl),
-                reason: payability.reason,
-              });
-            }
-            if (best) {
-              logger.info("machine.nfc.mintChosen", {
-                ...mintUrlFields(best.mintUrl),
-                rankedCount: ranked.length,
-              });
-              void notifications?.onNfcPaymentProgress?.({
-                phase: "selecting",
-              });
-              const unitInner = getUnit?.() ?? configUnit;
-              const r = transition(
-                step,
-                flowCtx,
-                { type: "MINT_SELECTED", mintUrl: best.mintUrl },
-                detectors,
-                walletCtxInner,
-                unitInner,
-                offline,
-                enableEcashSendMemo,
-                getSatsPerUnitMinor,
-              );
-              // This event always moves to a step; "unchanged" is not reached.
-              if ("kind" in r) break;
-              flowCtx = r.context;
-              flowCtx.source = "nfc";
-              setStep(r.step, r.data);
-              continue;
-            }
-            if (nfcAlternative) {
-              // Ecash is off the table for this tap; the tag also offered a
-              // Lightning invoice, so pay that. The preview step that follows
-              // is terminal for the NFC loop: the session is released and the
-              // user confirms on screen, exactly as for an invoice-only tag.
-              logger.info("machine.nfc.fallbackToInvoice", {
-                reason: refusal ?? "no funded mint",
-                rankedCount: ranked.length,
-              });
-              const alternative = nfcAlternative;
-              nfcAlternative = null;
-              flowCtx = alternative.ctx;
-              setStep("chooseOption", alternative.data);
-              const unitInner = getUnit?.() ?? configUnit;
-              const r = transition(
-                step,
-                flowCtx,
-                { type: "OPTION_CHOSEN", option: alternative.option.option },
-                detectors,
-                walletCtxInner,
-                unitInner,
-                offline,
-                enableEcashSendMemo,
-                getSatsPerUnitMinor,
-              );
-              // This event always moves to a step; "unchanged" is not reached.
-              if ("kind" in r) break;
-              flowCtx = r.context;
-              flowCtx.source = "nfc";
-              setStep(r.step, r.data);
-              continue;
-            }
-            // Every funded mint was refused and there is nothing else on the
-            // tag: say why, instead of showing a picker whose rows would all
-            // fail the same way. No candidates at all: the selectMint handler
-            // shows the picker.
-            end = refusal
-              ? {
-                  kind: "stopped",
-                  error: { code: "PAYMENT_REQUEST_FAILED", message: refusal },
-                }
-              : { kind: "stopped" };
-          } else if (step === "enterAmount") {
-            // NFC requires amount in payment request — if we reach enterAmount, the request lacked it
-            end = {
-              kind: "stopped",
-              error: {
-                code: "NFC_READ_FAILED",
-                message: "Payment request must include an amount for NFC payment",
-              },
-            };
-          } else if (
-            step === "navigateToPaymentRequest" &&
-            operations?.executeNfcSend
-          ) {
-            const data = stepData as StepDataMap["navigateToPaymentRequest"];
-            // The resolver picks a mint without a picker when one is the
-            // obvious choice (the terminal's only listed mint, the preferred
-            // mint). Apply the same gate here as in selectMint before money
-            // moves; a refusal re-opens selection with this mint excluded,
-            // and selectMint then finds another mint, the tag's invoice, or
-            // the reason to show.
-            if (
-              operations.paymentRequestPayabilityFrom &&
-              !nfcRefusedMints.has(data.mintUrl) &&
-              !nfcPayableMints.has(data.mintUrl)
-            ) {
-              const payability = await operations.paymentRequestPayabilityFrom({
-                mintUrl: data.mintUrl,
-                unit: data.unit,
-              });
-              if (isStaleGeneration(sendGeneration, "nfc.payability")) return;
-              if (!payability.payable) {
-                nfcRefusedMints.set(data.mintUrl, payability.reason);
-                logger.info("machine.nfc.mintRefused", {
-                  ...mintUrlFields(data.mintUrl),
-                  reason: payability.reason,
+        try {
+          while (!end) {
+            if (step === "chooseOption" || step === "chooseFallbackOption") {
+              const optionData = stepData as StepDataMap["chooseOption"];
+              const options = optionData.options;
+              const best =
+                options.find(
+                  (o) =>
+                    o.option.kind === "paymentRequest" && o.status !== "disabled",
+                ) ??
+                options.find(
+                  (o) =>
+                    o.option.kind === "lightningInvoice" &&
+                    o.status !== "disabled",
+                ) ??
+                options.find((o) => o.status !== "disabled");
+              if (best) {
+                const invoiceAlternative =
+                  best.option.kind === "paymentRequest"
+                    ? options.find(
+                        (o) =>
+                          o !== best &&
+                          o.option.kind === "lightningInvoice" &&
+                          o.status !== "disabled",
+                      )
+                    : undefined;
+                nfcAlternative = invoiceAlternative
+                  ? { ctx: { ...flowCtx }, data: optionData, option: invoiceAlternative }
+                  : null;
+                logger.info("machine.nfc.optionChosen", {
+                  kind: best.option.kind,
+                  optionCount: options.length,
+                  hasInvoiceFallback: !!invoiceAlternative,
                 });
                 const walletCtxInner = readContext();
                 const unitInner = getUnit?.() ?? configUnit;
                 const r = transition(
                   step,
                   flowCtx,
-                  { type: "REQUEST_MINT_SELECTOR" },
+                  { type: "OPTION_CHOSEN", option: best.option },
                   detectors,
                   walletCtxInner,
                   unitInner,
@@ -1850,52 +1669,241 @@ export function createPaymentMachine(
                 setStep(r.step, r.data);
                 continue;
               }
-            }
-            // Auto-execute: create token → write back to NFC tag
-            setExecuting(true);
-
-            beginCommit(sendGeneration);
-            let effect: Awaited<ReturnType<typeof runNfcWriteBackEffect>>;
-            try {
-              effect = await runNfcWriteBackEffect({
-                data,
-                executeNfcSend: operations.executeNfcSend,
-                rollbackSend: operations.rollbackSend,
-                nfcAdapter: nfcTap.adapter,
-                context: flowCtx,
-                onProgress: (progress) => {
-                  void notifications?.onNfcPaymentProgress?.(progress);
-                },
-                isStale: (op) => isStaleGeneration(sendGeneration, op),
+              // No viable option
+              logger.info("machine.nfc.noViableOption", {
+                optionCount: options.length,
               });
-            } finally {
-              endCommit(sendGeneration);
-            }
-            // The write-back released the session, whatever it reports.
-            nfcTap.session = "released";
-
-            if (effect.isOk()) {
-              if (effect.value.kind === "stale") return;
-              setStep(effect.value.step, effect.value.data);
-              announcePayment(effect.value);
-              end = { kind: "paid" };
-            } else {
-              for (const notification of effect.error.notifications) {
-                if (notification.type === "onNfcWriteFailed") {
-                  void notifications?.onNfcWriteFailed?.(notification.data);
+              end = { kind: "stopped" };
+            } else if (step === "selectMint") {
+              const data = stepData as StepDataMap["selectMint"];
+              const walletCtxInner = readContext();
+              const info = flowCtx.paymentRequest
+                ? detectors.getPaymentRequestInfo(flowCtx.paymentRequest)
+                : null;
+              const amount = flowCtx.amount ?? 0;
+              const ranked = rankMintCandidates(
+                data.candidates.filter(
+                  (candidate) =>
+                    candidate.status !== "disabled" &&
+                    !nfcRefusedMints.has(candidate.mintUrl),
+                ),
+                {
+                  preferredMints: info?.mints ?? [],
+                  amount,
+                  unitBalances:
+                    walletCtxInner.unitBalances?.[flowCtx.unit] ??
+                    walletCtxInner.mintBalances,
+                  canPayLocally: (mintUrl) =>
+                    buildProofSuggestions(
+                      walletCtxInner.proofAmounts[mintUrl] ?? [],
+                      amount,
+                    ).exactMatch,
+                },
+              );
+              // A NUT-18 amount is net of the receiver's input fees, and the
+              // send cannot add them yet, so `executeNfcSend` refuses a mint
+              // whose keysets charge fees. Ask before choosing: the answer is a
+              // local keyset read, whereas learning it inside the write-back
+              // tore the session down and reported "NFC write failed" for a
+              // token that was never created.
+              let best: (typeof ranked)[number] | undefined;
+              let refusal: string | undefined = [...nfcRefusedMints.values()].at(-1);
+              for (const candidate of ranked) {
+                const payability = operations?.paymentRequestPayabilityFrom
+                  ? await operations.paymentRequestPayabilityFrom({
+                      mintUrl: candidate.mintUrl,
+                      unit: flowCtx.unit,
+                    })
+                  : { payable: true as const };
+                if (isStaleGeneration(sendGeneration, "nfc.payability")) return;
+                if (payability.payable) {
+                  nfcPayableMints.add(candidate.mintUrl);
+                  best = candidate;
+                  break;
+                }
+                refusal = payability.reason;
+                nfcRefusedMints.set(candidate.mintUrl, payability.reason);
+                logger.info("machine.nfc.mintSkipped", {
+                  ...mintUrlFields(candidate.mintUrl),
+                  reason: payability.reason,
+                });
+              }
+              if (best) {
+                logger.info("machine.nfc.mintChosen", {
+                  ...mintUrlFields(best.mintUrl),
+                  rankedCount: ranked.length,
+                });
+                void notifications?.onNfcPaymentProgress?.({
+                  phase: "selecting",
+                });
+                const unitInner = getUnit?.() ?? configUnit;
+                const r = transition(
+                  step,
+                  flowCtx,
+                  { type: "MINT_SELECTED", mintUrl: best.mintUrl },
+                  detectors,
+                  walletCtxInner,
+                  unitInner,
+                  offline,
+                  enableEcashSendMemo,
+                  getSatsPerUnitMinor,
+                );
+                // This event always moves to a step; "unchanged" is not reached.
+                if ("kind" in r) break;
+                flowCtx = r.context;
+                flowCtx.source = "nfc";
+                setStep(r.step, r.data);
+                continue;
+              }
+              if (nfcAlternative) {
+                // Ecash is off the table for this tap; the tag also offered a
+                // Lightning invoice, so pay that. The preview step that follows
+                // is terminal for the NFC loop: the session is released and the
+                // user confirms on screen, exactly as for an invoice-only tag.
+                logger.info("machine.nfc.fallbackToInvoice", {
+                  reason: refusal ?? "no funded mint",
+                  rankedCount: ranked.length,
+                });
+                const alternative = nfcAlternative;
+                nfcAlternative = null;
+                flowCtx = alternative.ctx;
+                setStep("chooseOption", alternative.data);
+                const unitInner = getUnit?.() ?? configUnit;
+                const r = transition(
+                  step,
+                  flowCtx,
+                  { type: "OPTION_CHOSEN", option: alternative.option.option },
+                  detectors,
+                  walletCtxInner,
+                  unitInner,
+                  offline,
+                  enableEcashSendMemo,
+                  getSatsPerUnitMinor,
+                );
+                // This event always moves to a step; "unchanged" is not reached.
+                if ("kind" in r) break;
+                flowCtx = r.context;
+                flowCtx.source = "nfc";
+                setStep(r.step, r.data);
+                continue;
+              }
+              // Every funded mint was refused and there is nothing else on the
+              // tag: say why, instead of showing a picker whose rows would all
+              // fail the same way. No candidates at all: the selectMint handler
+              // shows the picker.
+              end = refusal
+                ? {
+                    kind: "stopped",
+                    error: { code: "PAYMENT_REQUEST_FAILED", message: refusal },
+                  }
+                : { kind: "stopped" };
+            } else if (step === "enterAmount") {
+              // NFC requires amount in payment request — if we reach enterAmount, the request lacked it
+              end = {
+                kind: "stopped",
+                error: {
+                  code: "NFC_READ_FAILED",
+                  message: "Payment request must include an amount for NFC payment",
+                },
+              };
+            } else if (
+              step === "navigateToPaymentRequest" &&
+              operations?.executeNfcSend
+            ) {
+              const data = stepData as StepDataMap["navigateToPaymentRequest"];
+              // The resolver picks a mint without a picker when one is the
+              // obvious choice (the terminal's only listed mint, the preferred
+              // mint). Apply the same gate here as in selectMint before money
+              // moves; a refusal re-opens selection with this mint excluded,
+              // and selectMint then finds another mint, the tag's invoice, or
+              // the reason to show.
+              if (
+                operations.paymentRequestPayabilityFrom &&
+                !nfcRefusedMints.has(data.mintUrl) &&
+                !nfcPayableMints.has(data.mintUrl)
+              ) {
+                const payability = await operations.paymentRequestPayabilityFrom({
+                  mintUrl: data.mintUrl,
+                  unit: data.unit,
+                });
+                if (isStaleGeneration(sendGeneration, "nfc.payability")) return;
+                if (!payability.payable) {
+                  nfcRefusedMints.set(data.mintUrl, payability.reason);
+                  logger.info("machine.nfc.mintRefused", {
+                    ...mintUrlFields(data.mintUrl),
+                    reason: payability.reason,
+                  });
+                  const walletCtxInner = readContext();
+                  const unitInner = getUnit?.() ?? configUnit;
+                  const r = transition(
+                    step,
+                    flowCtx,
+                    { type: "REQUEST_MINT_SELECTOR" },
+                    detectors,
+                    walletCtxInner,
+                    unitInner,
+                    offline,
+                    enableEcashSendMemo,
+                    getSatsPerUnitMinor,
+                  );
+                  // This event always moves to a step; "unchanged" is not reached.
+                  if ("kind" in r) break;
+                  flowCtx = r.context;
+                  flowCtx.source = "nfc";
+                  setStep(r.step, r.data);
+                  continue;
                 }
               }
+              // Auto-execute: create token → write back to NFC tag
+              setExecuting(true);
 
-              setStep("error", effect.error.data);
+              beginCommit(sendGeneration);
+              let effect: Awaited<ReturnType<typeof runNfcWriteBackEffect>>;
+              try {
+                effect = await runNfcWriteBackEffect({
+                  data,
+                  executeNfcSend: operations.executeNfcSend,
+                  rollbackSend: operations.rollbackSend,
+                  nfcAdapter: nfcTap.adapter,
+                  context: flowCtx,
+                  onProgress: (progress) => {
+                    void notifications?.onNfcPaymentProgress?.(progress);
+                  },
+                  isStale: (op) => isStaleGeneration(sendGeneration, op),
+                });
+              } finally {
+                endCommit(sendGeneration);
+              }
+              // The write-back released the session, whatever it reports.
+              nfcTap.session = "released";
+
+              if (effect.isOk()) {
+                if (effect.value.kind === "stale") return;
+                setStep(effect.value.step, effect.value.data);
+                announcePayment(effect.value);
+                end = { kind: "paid" };
+              } else {
+                for (const notification of effect.error.notifications) {
+                  if (notification.type === "onNfcWriteFailed") {
+                    void notifications?.onNfcWriteFailed?.(notification.data);
+                  }
+                }
+
+                setStep("error", effect.error.data);
+                end = { kind: "stopped" };
+              }
+
+              setExecuting(false, false);
+            } else {
+              // Terminal step that isn't navigateToPaymentRequest (e.g. navigateToMeltPreview,
+              // error, receiveToken) — release NFC session and proceed normally.
               end = { kind: "stopped" };
             }
-
-            setExecuting(false, false);
-          } else {
-            // Terminal step that isn't navigateToPaymentRequest (e.g. navigateToMeltPreview,
-            // error, receiveToken) — release NFC session and proceed normally.
-            end = { kind: "stopped" };
           }
+        } catch (error) {
+          // A throw ends the tap too, before the safety net finishes the turn.
+          if (isStaleGeneration(sendGeneration, "nfc.tap.threw")) throw error;
+          end = { kind: "threw", error };
         }
 
         // The tap ends here, however the loop left it.
@@ -1907,6 +1915,7 @@ export function createPaymentMachine(
           await nfcTap.unitSwitch?.restore().catch(() => undefined);
           if (isStaleGeneration(sendGeneration, "nfc.revertUnit")) return;
         }
+        if (end?.kind === "threw") throw end.error;
         if (end?.kind === "stopped" && end.error) setStep("error", end.error);
       }
 

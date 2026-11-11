@@ -531,6 +531,25 @@ describe("what an NFC tap leaves behind when it ends", () => {
     expect(unitSwitches(switchUnit)).toEqual([]);
   });
 
+  // The throw still ends in the turn's safety net; the tap ends first.
+  it("releases the tag and restores the unit when a check throws mid-tap", async () => {
+    const { tm, adapter, switchUnit } = setup({
+      unit: "usd",
+      operations: {
+        paymentRequestPayabilityFrom: vi.fn(async () => {
+          throw new Error("keysets unreadable");
+        }),
+      },
+    });
+    await expect(
+      tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" }),
+    ).resolves.toBeDefined();
+    expect(sentMint(tm)).toBeUndefined();
+    expect(adapter.releaseSession).toHaveBeenCalledTimes(1);
+    expect(unitSwitches(switchUnit)).toEqual(["usd", "sat"]);
+    expect(tm.machine.inspect().isExecuting).toBe(false);
+  });
+
   // A reset owns the machine now: the stranded tap releases nothing and
   // restores nothing.
   it("releases and restores nothing after a reset overtakes the switch", async () => {
