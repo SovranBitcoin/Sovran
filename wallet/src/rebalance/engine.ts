@@ -27,6 +27,7 @@ import {
 } from './amounts';
 import {
   classifyRebalanceError,
+  isMintRejection,
   RebalanceMeltRolledBackError,
   RebalanceRoutesExhaustedError,
 } from './errors';
@@ -63,8 +64,12 @@ const NEXT_TRANSFER_PAUSE_MS = 500;
 /** How long a settled melt's receipt is waited for before it is given up on. An invoice lives less. */
 const ARRIVING_MAX_MS = 60 * 60 * 1000;
 
-/** Melt states in which the payment may already have left the mint. */
-const MELT_IN_FLIGHT_STATES = new Set(['executing', 'pending', 'finalized']);
+/**
+ * Melt states that prove the payment did not leave the mint: coco never sent
+ * it (`init`, `prepared`), or settled it as unpaid and gave its inputs back.
+ * Every other state, and a state that cannot be read, may still pay.
+ */
+const MELT_NOT_PAID_STATES = new Set(['init', 'prepared', 'failed', 'rolled_back']);
 
 type Settlement = 'finalized' | 'pending' | 'aborted';
 
@@ -224,7 +229,6 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
     try {
       return (await wallet.getMeltOperation(operationId))?.state ?? null;
     } catch (error) {
-      // An unreadable state falls back to the error's own classification.
       log.warn('mint.rebalance.melt_state_read_failed', { operationId, error });
       return null;
     }
@@ -232,8 +236,11 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
 
   /**
    * Execute a prepared melt once and report how it settled. When `execute`
-   * throws, the melt is reconciled against coco's state before the error is
-   * believed: a melt that is in flight is awaited, never repeated.
+   * throws, the error is believed (the melt failed, its proofs freed or
+   * another payment prepared) only once the melt is known not to have paid:
+   * its state says so or, when its state cannot be read, the mint itself
+   * refused the request. Any other melt is awaited as in flight, never
+   * repeated, and stays pending when it does not settle.
    */
   async function executeMeltOnce(
     run: TransferRun,
@@ -272,11 +279,10 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
         return settle(melt.id);
       }
       const state = await readMeltState(melt.id);
-      if (state !== null && MELT_IN_FLIGHT_STATES.has(state)) {
-        debug({ event: 'melt_error_in_flight', stepId: run.step.id, operationId: melt.id, state });
-        return settle(melt.id);
-      }
-      throw error;
+      const notPaid = state === null ? isMintRejection(error) : MELT_NOT_PAID_STATES.has(state);
+      if (notPaid) throw error;
+      debug({ event: 'melt_error_in_flight', stepId: run.step.id, operationId: melt.id, state });
+      return settle(melt.id);
     }
     if (!run.isActive()) return 'aborted';
     if (result?.state === 'pending') return settle(result.id ?? melt.id);
@@ -971,8 +977,8 @@ export function createRebalanceEngine(config: RebalanceEngineConfig): RebalanceE
             finalReceipt = receipt;
             break;
           } catch (error) {
-            // `executeMeltOnce` already confirmed the melt is not in flight,
-            // so the mint rejected its inputs before paying anything.
+            // `executeMeltOnce` already established the melt did not pay, so
+            // the mint rejected its inputs before paying anything.
             const shortfall = classifyRebalanceError(error) === 'input_shortfall';
             if (!shortfall || attempt >= MAX_EXECUTE_RETRIES) throw error;
             transferAmount -= RETRY_REDUCE_SATS;

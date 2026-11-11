@@ -262,6 +262,85 @@ describe('rebalance engine — direct transfer', () => {
     expect(wallet.port.executeMelt).toHaveBeenCalledTimes(1);
   });
 
+  describe('a melt whose execute threw is failed only once it is known not to have paid', () => {
+    it.each([
+      ['finds nothing', () => null],
+      [
+        'cannot be read',
+        () => {
+          throw new Error('database is locked');
+        },
+      ],
+    ])(
+      'keeps it pending, its proofs reserved, when the response was lost and its state %s',
+      async (_name, readState) => {
+        const { run, wallet, recorder, findRoutes } = setup();
+        wallet.port.executeMelt.mockRejectedValueOnce(new NetworkError('socket hang up'));
+        wallet.port.getMeltOperation.mockImplementation(async () => readState());
+        wallet.port.refreshMelt.mockRejectedValue(new NetworkError('socket hang up'));
+        await expect(run()).resolves.toEqual({ status: 'pending', operationId: 'melt-1' });
+        expect(recorder.statuses('step-1').at(-1)).toBe('paymentPending');
+        expect(recorder.statuses('step-1')).not.toContain('failed');
+        expect(wallet.port.restoreInflightProofs).not.toHaveBeenCalled();
+        expect(wallet.port.executeMelt).toHaveBeenCalledTimes(1);
+        expect(wallet.port.prepareMelt).toHaveBeenCalledTimes(1);
+        expect(findRoutes).not.toHaveBeenCalled();
+      }
+    );
+
+    it.each([
+      ['reads as no route', new Error('no_route')],
+      ['reads as short inputs', new Error('not enough inputs provided for melt')],
+    ])(
+      'never routes or pays again when an error that is not the mint answering %s',
+      async (_name, error) => {
+        const { run, wallet, findRoutes } = setup();
+        wallet.port.executeMelt.mockRejectedValueOnce(error);
+        wallet.port.refreshMelt.mockRejectedValue(new NetworkError('socket hang up'));
+        await expect(run()).resolves.toEqual({ status: 'pending', operationId: 'melt-1' });
+        expect(wallet.port.executeMelt).toHaveBeenCalledTimes(1);
+        expect(wallet.port.prepareMelt).toHaveBeenCalledTimes(1);
+        expect(findRoutes).not.toHaveBeenCalled();
+        expect(wallet.port.restoreInflightProofs).not.toHaveBeenCalled();
+      }
+    );
+
+    it('settles it from the mint once a read answers, paying nothing twice', async () => {
+      const { run, wallet } = setup();
+      wallet.port.executeMelt.mockRejectedValueOnce(new NetworkError('socket hang up'));
+      wallet.port.refreshMelt.mockImplementationOnce(async (id) => {
+        wallet.payInvoice('invoice-quote-1');
+        return { id, state: 'finalized' };
+      });
+      await expect(run()).resolves.toEqual({ status: 'done' });
+      expect(wallet.port.executeMelt).toHaveBeenCalledTimes(1);
+      expect(wallet.port.restoreInflightProofs).not.toHaveBeenCalled();
+    });
+
+    it.each(['prepared', 'rolled_back', 'failed'])(
+      'fails it and frees its proofs when its state reads %s: nothing was paid',
+      async (state) => {
+        const { run, wallet } = setup();
+        wallet.port.executeMelt.mockRejectedValueOnce(new NetworkError('socket hang up'));
+        wallet.port.getMeltOperation.mockResolvedValueOnce({ state });
+        const outcome = await run();
+        expect(outcome.status).toBe('failed');
+        expect(wallet.port.restoreInflightProofs).toHaveBeenCalledWith(SOURCE);
+        expect(wallet.port.executeMelt).toHaveBeenCalledTimes(1);
+      }
+    );
+
+    it('fails it when the mint itself refused the melt, though its state cannot be read', async () => {
+      const { run, wallet } = setup();
+      wallet.port.executeMelt.mockRejectedValueOnce(
+        new MintOperationError(11001, 'Token already spent')
+      );
+      const outcome = await run();
+      expect(outcome.status).toBe('failed');
+      expect(wallet.port.restoreInflightProofs).toHaveBeenCalledWith(SOURCE);
+    });
+  });
+
   it('keeps a melt that never settles pending, without failing it or freeing its proofs', async () => {
     const { run, wallet, recorder } = setup();
     wallet.port.executeMelt.mockResolvedValue({ id: 'melt-1', state: 'pending' });

@@ -7,7 +7,7 @@
  * recording fakes.
  */
 import { act, renderHook } from '@testing-library/react-native';
-import { Amount } from '@cashu/coco-core';
+import { Amount, MintOperationError } from '@cashu/coco-core';
 import { useMintRebalanceOrchestrator } from '@/features/mint/hooks/useMintRebalanceOrchestrator';
 import type { RebalancePlan } from '@/features/mint/components/rebalance/rebalancePlanner';
 import { cashuLog } from '@/shared/lib/logger';
@@ -463,7 +463,8 @@ describe('a reroute cancelled while its intermediary is being trusted', () => {
   /** Leave step-1 failed with a route through `via` suggested: the automatic route could not start. */
   async function failWithSuggestedRoute() {
     mockLocalCandidates = [via];
-    mockManager.ops.melt.execute.mockRejectedValueOnce(new Error('no_route'));
+    // The mint answers that Lightning found no route.
+    mockManager.ops.melt.execute.mockRejectedValueOnce(new MintOperationError(20004, 'no_route'));
     mockManager.quotes.mint.create.mockImplementation(async (input) => {
       if (input.mintUrl === via) throw new Error('middleman offline');
       return {

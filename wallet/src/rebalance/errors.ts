@@ -52,6 +52,15 @@ function mintErrorCode(err: unknown): number | undefined {
   return undefined;
 }
 
+/**
+ * Whether the mint itself answered the request with an error (a NUT error
+ * code). A lost response, a timeout or a local failure is not: it says
+ * nothing about whether the mint went on to process the request.
+ */
+export function isMintRejection(err: unknown): boolean {
+  return mintErrorCode(err) !== undefined;
+}
+
 export function classifyRebalanceError(err: unknown): RebalanceErrorKind {
   if (err instanceof OperationInProgressError) return 'operation_in_progress';
 

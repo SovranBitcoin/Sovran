@@ -1,5 +1,5 @@
 import { act, renderHook } from '@testing-library/react-native';
-import { Amount } from '@cashu/coco-core';
+import { Amount, MintOperationError } from '@cashu/coco-core';
 import { useMintRebalanceOrchestrator } from '@/features/mint/hooks/useMintRebalanceOrchestrator';
 import type { RebalancePlan } from '@/features/mint/components/rebalance/rebalancePlanner';
 import { cashuLog } from '@/shared/lib/logger';
@@ -486,7 +486,8 @@ function configureMiddleman() {
     [via]: { total: Amount.from(100) },
   }));
   mockManager.ops.melt.execute
-    .mockRejectedValueOnce(new Error('no_route'))
+    // The mint answers that Lightning found no route.
+    .mockRejectedValueOnce(new MintOperationError(20004, 'no_route'))
     .mockImplementation(async () => {
       const latest = receipts.get(`quote-${nextQuote}`)!;
       latest.state = 'finalized';
