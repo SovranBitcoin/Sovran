@@ -248,6 +248,92 @@ describe('the invoice and the status poll', () => {
     expect(status).not.toHaveBeenCalled();
   });
 
+  it('starts no poll when the screen closes before the invoice comes back', async () => {
+    let finishInvoice!: (value: Awaited<ReturnType<typeof createAccelerationInvoice>>) => void;
+    invoice.mockReturnValueOnce(
+      new Promise((done) => {
+        finishInvoice = done;
+      })
+    );
+    const { result, unmount } = mount();
+    await flush();
+    let pending: Promise<string | null> = Promise.resolve(null);
+    act(() => {
+      pending = result.current.requestInvoice();
+    });
+    status.mockClear();
+
+    unmount();
+    await act(async () => {
+      finishInvoice({ invoiceId: 'i-1', bolt11: 'lnbc1accel', expiresAtSec: 1 });
+      await pending;
+    });
+    status.mockResolvedValue({ txid: TXID, status: 'accelerating' });
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(60_000);
+    });
+
+    expect(status).not.toHaveBeenCalled();
+    expect(setTransactionAnnotation).not.toHaveBeenCalled();
+  });
+
+  it("keeps the new transaction's poll when the old transaction's invoice comes back late", async () => {
+    let finishOldInvoice!: (value: Awaited<ReturnType<typeof createAccelerationInvoice>>) => void;
+    invoice.mockReturnValueOnce(
+      new Promise((done) => {
+        finishOldInvoice = done;
+      })
+    );
+    const { result, rerender } = mount();
+    await flush();
+    let oldPending: Promise<string | null> = Promise.resolve(null);
+    act(() => {
+      oldPending = result.current.requestInvoice();
+    });
+
+    rerender({ txid: OTHER_TXID, quoteId: 'q-1', alreadyAccelerated: false, enabled: true });
+    await flush();
+    await act(async () => {
+      await result.current.requestInvoice();
+    });
+    await act(async () => {
+      finishOldInvoice({ invoiceId: 'i-old', bolt11: 'lnbc1old', expiresAtSec: 1 });
+      await oldPending;
+    });
+    status.mockClear();
+
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(30_000);
+    });
+
+    expect(status.mock.calls).toEqual([[OTHER_TXID], [OTHER_TXID]]);
+  });
+
+  it('saves no acknowledgement that arrives after the screen closed', async () => {
+    const { result, unmount } = mount();
+    await flush();
+    await act(async () => {
+      await result.current.requestInvoice();
+    });
+    let finishStatus!: (value: Awaited<ReturnType<typeof fetchAccelerationStatus>>) => void;
+    status.mockReturnValueOnce(
+      new Promise((done) => {
+        finishStatus = done;
+      })
+    );
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(15_000);
+    });
+
+    unmount();
+    await act(async () => {
+      finishStatus({ txid: TXID, status: 'accelerating' });
+    });
+    await flush();
+
+    expect(setTransactionAnnotation).not.toHaveBeenCalled();
+  });
+
   it('starts no poll when no invoice comes back or creating it fails', async () => {
     const { result } = mount();
     await flush();

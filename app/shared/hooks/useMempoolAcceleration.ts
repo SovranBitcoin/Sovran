@@ -61,6 +61,10 @@ export function useMempoolAcceleration(params: {
   const estimateRef = useRef<{ txid: string; estimate: AccelerationEstimate } | null>(null);
   const invoiceRequestRef = useRef<{ txid: string; promise: Promise<string | null> } | null>(null);
   const statusPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // The effect run that owns invoice/status work: an invoice or status check
+  // that comes back after its run was cleaned up (unmount, another txid,
+  // disabled) must not start a poll, stop the current one or save anything.
+  const ownerRef = useRef<object | null>(null);
 
   const stopStatusPoll = useCallback(() => {
     if (statusPollRef.current) {
@@ -93,6 +97,8 @@ export function useMempoolAcceleration(params: {
       return;
     }
     let mounted = true;
+    const owner = {};
+    ownerRef.current = owner;
     void (async () => {
       try {
         const [estimate, status, etaMinutes] = await Promise.all([
@@ -124,6 +130,7 @@ export function useMempoolAcceleration(params: {
     })();
     return () => {
       mounted = false;
+      if (ownerRef.current === owner) ownerRef.current = null;
       stopStatusPoll();
     };
   }, [enabled, txid, alreadyAccelerated, markAccelerated, stopStatusPoll]);
@@ -134,6 +141,8 @@ export function useMempoolAcceleration(params: {
     if (invoiceRequestRef.current?.txid === txid) {
       return invoiceRequestRef.current.promise;
     }
+    const owner = ownerRef.current;
+    const stillOwned = () => owner !== null && ownerRef.current === owner;
 
     const promise = (async (): Promise<string | null> => {
       try {
@@ -149,6 +158,7 @@ export function useMempoolAcceleration(params: {
 
         // The payment happens in the normal lightning send flow; acknowledge by
         // polling the public status for a few minutes.
+        if (!stillOwned()) return invoice.bolt11;
         stopStatusPoll();
         const startedAt = Date.now();
         statusPollRef.current = setInterval(() => {
@@ -159,6 +169,7 @@ export function useMempoolAcceleration(params: {
             }
             try {
               const status = await fetchAccelerationStatus(txid);
+              if (!stillOwned()) return;
               if (isAcknowledgedAccelerationStatus(status)) {
                 stopStatusPoll();
                 markAccelerated('post_invoice_poll', txid);
