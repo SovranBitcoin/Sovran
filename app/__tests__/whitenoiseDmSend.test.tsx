@@ -18,6 +18,7 @@ import { act, renderHook } from '@testing-library/react-native';
 import { useLayoutEffect, type ReactNode } from 'react';
 
 import { WhitenoiseContext } from '@/features/whitenoise/WhitenoiseContext';
+import { relays } from '@/shared/ndk';
 import { useWhitenoiseDM } from '@/features/whitenoise/hooks/useWhitenoiseDM';
 
 jest.mock('@react-native-async-storage/async-storage', () =>
@@ -43,7 +44,8 @@ jest.mock('@/shared/lib/logger', () => {
 
 const SELF = 'a'.repeat(64);
 const PEER = 'b'.repeat(64);
-const PROVIDER_RELAYS = ['wss://app-one.example', 'wss://app-two.example'];
+/** The app's relays, which the provider hands White Noise. */
+const PROVIDER_RELAYS = relays;
 const INDEX_KEY = `whitenoise:0:dm-index:${PEER}`;
 
 type Rumor = { id?: string; pubkey: string; content: string; created_at: number };
