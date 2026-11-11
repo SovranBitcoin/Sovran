@@ -35,6 +35,7 @@ import { ingestOwnMediaBlobs } from '@/shared/stores/profile/ownedMediaStore';
 import { OWN_EVENT_KINDS, partitionOwnEvents, type OwnSyncEvent } from './partitionOwnEvents';
 import { Contacts, Metadata } from 'nostr-tools/kinds';
 import { hasFeature } from '@/shared/config/features';
+import { supersedes } from 'nostr';
 
 /**
  * Without the feed (ADR 0021) only the profile and follow list are consumed,
@@ -88,14 +89,17 @@ type OwnSyncSession = {
   owner: string;
   /** Event ids already dispatched for `owner`. */
   seen: Set<string>;
-  /** `created_at` of the newest profile applied; an older one in a later batch is ignored. */
-  profileNewestAt: number;
+  /** The newest profile applied, by `supersedes`; one it does not supersede in a later batch is ignored. */
+  profileNewest: { created_at: number; id: string } | null;
 };
 
-function sessionFor(current: OwnSyncSession | null, owner: string | undefined) {
+function sessionFor(
+  current: OwnSyncSession | null,
+  owner: string | undefined
+): OwnSyncSession | null {
   if (!owner) return null;
   if (current?.owner === owner) return current;
-  return { owner, seen: new Set<string>(), profileNewestAt: 0 };
+  return { owner, seen: new Set<string>(), profileNewest: null };
 }
 
 export function useOwnEventsSync(): void {
@@ -165,10 +169,11 @@ export function useOwnEventsSync(): void {
       });
       social.clearSettledFollowOptimistic();
     }
-    if (part.latestProfile && part.latestProfile.created_at > session.profileNewestAt) {
-      const snapshot = parseOwnProfileSnapshot(part.latestProfile);
+    const profile = part.latestProfile;
+    if (profile && (!session.profileNewest || supersedes(profile, session.profileNewest))) {
+      const snapshot = parseOwnProfileSnapshot(profile);
       if (snapshot) ingestOwnProfileMetadata(snapshot, session.owner, active.accountIndex);
-      session.profileNewestAt = part.latestProfile.created_at;
+      session.profileNewest = { created_at: profile.created_at, id: profile.id };
     }
 
     nostrLog.debug('nostr.ownsync.ingested', {

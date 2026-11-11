@@ -241,18 +241,15 @@ describe('useOwnEventsSync', () => {
     unmount();
   });
 
-  it('ignores an equal-time, lower-id profile that arrives in a later batch', () => {
+  it('picks the lower id between equal-time profiles across batches too', () => {
     const { rerender, unmount } = mount();
 
     deliver(rerender, [profileEvent(id('b'), T, 'B-id')]);
     deliver(rerender, [profileEvent(id('b'), T, 'B-id'), profileEvent(id('a'), T, 'A-id')]);
 
-    // QUIRK: the hook admits only a strictly newer timestamp, so the event that would win in
-    // a single batch is dropped when it comes later; the result depends on batching
-    // (nostr D2). A fix that compares timestamp then id should change this assertion on
-    // purpose.
-    expect(latestProfileId()).toBe(id('b'));
-    expect(cachedName(0)).toBe('B-id');
+    // The same profile wins however the events are split into batches (F182).
+    expect(latestProfileId()).toBe(id('a'));
+    expect(cachedName(0)).toBe('A-id');
     unmount();
   });
 
