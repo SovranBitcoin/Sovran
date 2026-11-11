@@ -103,8 +103,10 @@ export function TransactionsFilterProvider({ children }: TransactionsFilterProvi
     selectedMonth,
   ]);
 
+  // Any currency but sats is a filter, as the filter sheet (which offers Reset for it) counts it.
   const hasActiveFilters = useMemo(() => {
     return (
+      currency.toLowerCase() !== 'sat' ||
       paymentType !== 'all' ||
       direction !== 'all' ||
       status !== 'All' ||
@@ -114,10 +116,11 @@ export function TransactionsFilterProvider({ children }: TransactionsFilterProvi
       counterparty !== 'all' ||
       zap !== 'all'
     );
-  }, [paymentType, direction, status, mintUrl, source, lock, counterparty, zap]);
+  }, [currency, paymentType, direction, status, mintUrl, source, lock, counterparty, zap]);
 
   const activeFilterCount = useMemo(() => {
     let count = 0;
+    if (currency.toLowerCase() !== 'sat') count++;
     if (paymentType !== 'all') count++;
     if (direction !== 'all') count++;
     if (status !== 'All') count++;
@@ -127,7 +130,7 @@ export function TransactionsFilterProvider({ children }: TransactionsFilterProvi
     if (counterparty !== 'all') count++;
     if (zap !== 'all') count++;
     return count;
-  }, [paymentType, direction, status, mintUrl, source, lock, counterparty, zap]);
+  }, [currency, paymentType, direction, status, mintUrl, source, lock, counterparty, zap]);
 
   const value = useMemo(
     () => ({

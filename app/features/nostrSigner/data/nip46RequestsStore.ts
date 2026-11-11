@@ -165,7 +165,13 @@ interface Nip46RequestsActions {
    */
   grantSessionAllow: (clientPubkey: string, grantKey: GrantKey) => Result<void, SessionAllowError>;
   hasSessionAllow: (clientPubkey: string, grantKey: GrantKey) => boolean;
-  revokeSessionAllows: (clientPubkey: string) => void;
+  /**
+   * End one app's session: every session grant (all methods, all peers) and
+   * every session allow it holds. Disconnect, block and a re-pair that
+   * replaces the client all call this, so a key that pairs again in the same
+   * engine session is asked again rather than inheriting what it was allowed.
+   */
+  endClientSession: (clientPubkey: string) => void;
   /** Record an app's cooldown end (epoch ms), or clear the flag with `null`. */
   setAppThrottled: (clientPubkey: string, cooldownUntil: number | null) => void;
   setServiceHotRequested: (hot: boolean) => void;
@@ -294,10 +300,14 @@ export const useNip46RequestsStore = create<Nip46RequestsStore>({
   hasSessionAllow: (clientPubkey, grantKey) =>
     get().sessionAllows.some((a) => a.clientPubkey === clientPubkey && a.grantKey === grantKey),
 
-  revokeSessionAllows: (clientPubkey) => {
+  endClientSession: (clientPubkey) => {
     set((state) => {
+      const sessionGrants = state.sessionGrants.filter((g) => g.clientPubkey !== clientPubkey);
       const sessionAllows = state.sessionAllows.filter((a) => a.clientPubkey !== clientPubkey);
-      return sessionAllows.length === state.sessionAllows.length ? state : { sessionAllows };
+      return sessionGrants.length === state.sessionGrants.length &&
+        sessionAllows.length === state.sessionAllows.length
+        ? state
+        : { sessionGrants, sessionAllows };
     });
   },
 

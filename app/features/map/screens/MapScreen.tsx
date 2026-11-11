@@ -213,6 +213,12 @@ export function MapScreen() {
     }
   };
 
+  // Retry loads the places again; hiding the error alone would leave an empty map.
+  const handleRetry = () => {
+    setError(null);
+    fetchPlaces().catch((err) => log.error('map.places.fetch_failed', { error: err }));
+  };
+
   const mapUnavailableOnAndroid = Platform.OS === 'android' && !HAS_ANDROID_GOOGLE_MAPS_KEY;
 
   if (error || mapUnavailableOnAndroid) {
@@ -226,7 +232,7 @@ export function MapScreen() {
               : error}
           </Text>
           <Pressable
-            onPress={mapUnavailableOnAndroid ? () => router.back() : () => setError(null)}
+            onPress={mapUnavailableOnAndroid ? () => router.back() : handleRetry}
             style={[styles.retryButton, { backgroundColor: accent }]}>
             <Text size={14} heavy style={{ color: '#fff' }}>
               {mapUnavailableOnAndroid ? 'Go back' : 'Retry'}

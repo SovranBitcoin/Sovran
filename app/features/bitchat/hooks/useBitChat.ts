@@ -182,8 +182,11 @@ export function useBitChat(
     // start.
     if (!profileScope || !identityMaterial) return;
 
+    // A start that resolves after this chat was left must not mark it connected.
+    let cancelled = false;
     startBLE({ nickname, profileScope, identityMaterial })
       .then(() => {
+        if (cancelled) return;
         const state = getBLEState();
         bitchatLog.info('bitchat.hook.ble_started', { state });
         setIsConnected(true);
@@ -227,6 +230,7 @@ export function useBitChat(
     });
 
     return () => {
+      cancelled = true;
       sub.remove();
       stateSub.remove();
       peerSub.remove();
@@ -269,9 +273,13 @@ export function useBitChat(
 
     bitchatLog.info('bitchat.hook.ble_dm_setup', { peerID: dmPeerID });
 
-    // Reuse the mesh if it's already running (no-op); otherwise start it.
+    // Reuse the mesh if it's already running (no-op); otherwise start it. A
+    // start that resolves after this thread was left must not mark it connected.
+    let cancelled = false;
     startBLE({ nickname, profileScope, identityMaterial })
-      .then(() => setIsConnected(true))
+      .then(() => {
+        if (!cancelled) setIsConnected(true);
+      })
       .catch((err) => {
         bitchatLog.error('bitchat.hook.ble_start_failed', {
           error: err instanceof Error ? err.message : String(err),
@@ -287,6 +295,7 @@ export function useBitChat(
     });
 
     return () => {
+      cancelled = true;
       // Deliberately DON'T stopBLE — other screens (public mesh chat,
       // NetworkSheet) may still be using it. Message buffer lives in the
       // store, so nothing per-screen to tear down.
