@@ -470,6 +470,47 @@ describe('a send before the conversation has loaded', () => {
     expect(await AsyncStorage.getItem(INDEX_KEY)).toBe('{"v":1,"d":"0102"}');
   });
 
+  it('while the saved history is read: the group is open and listening, and a send is refused', async () => {
+    const group = makeGroup([0x01, 0x02]);
+    const history = deferred<{ rumor: Rumor }[]>();
+    group.history.loadMessages.mockReturnValueOnce(history.promise);
+    fake.groups.set('0102', group);
+    await seedIndex('0102');
+    const { result } = await mount();
+
+    expect(result.current).toMatchObject({ isLoading: true, hasGroup: true });
+    expect(fake.client.network.subscription).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      await result.current.send('too early');
+    });
+    expect(group.sendChatMessage).not.toHaveBeenCalled();
+
+    await act(async () => {
+      history.resolve([]);
+    });
+    await act(async () => {
+      await result.current.send('on time');
+    });
+    expect(group.sendChatMessage).toHaveBeenCalledWith('on time');
+  });
+
+  it('after the groups could not be loaded: a send goes through and creates a group', async () => {
+    fake.client.loadAllGroups.mockRejectedValueOnce(new Error('group state unreadable'));
+    await seedIndex('0102');
+    const { result } = await mount();
+    expect(result.current.error).toBe('group state unreadable');
+
+    await act(async () => {
+      await result.current.send('hello');
+    });
+
+    // QUIRK: a failed read cannot tell whether a group exists, yet the send
+    // creates one and points the saved conversation at it.
+    expect(fake.client.createGroup).toHaveBeenCalledTimes(1);
+    expect(await AsyncStorage.getItem(INDEX_KEY)).toBe('{"v":1,"d":"c0de"}');
+    expect(result.current).toMatchObject({ error: null, hasGroup: true });
+  });
+
   it('with no saved group: is refused and creates nothing until loading has found none', async () => {
     const { result, loading } = await mountWhileLoading();
 
