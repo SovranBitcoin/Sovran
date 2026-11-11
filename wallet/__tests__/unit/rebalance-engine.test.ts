@@ -351,6 +351,8 @@ describe('rebalance engine — direct transfer', () => {
       [20006, 'Invoice already paid'],
       [11003, 'Outputs already signed'],
       [12002, 'Keyset is inactive'],
+      // CDK answers a unit mismatch after its backend reported the payment paid.
+      [11010, 'Unit mismatch'],
     ])(
       'keeps it pending, its proofs reserved, when the mint answered %s and its state cannot be read',
       async (code, detail) => {

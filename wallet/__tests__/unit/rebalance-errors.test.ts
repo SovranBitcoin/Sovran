@@ -79,7 +79,7 @@ describe('classifyRebalanceError', () => {
 
 describe('meltRefusedBeforePaying', () => {
   it('believes only codes that a melt which paid cannot be answered with', () => {
-    for (const code of [10001, 11005, 11007, 11008, 11009, 11010, 20004]) {
+    for (const code of [10001, 11005, 11007, 11008, 11009, 20004]) {
       expect(meltRefusedBeforePaying(new MintOperationError(code, 'refused'))).toBe(true);
     }
     const foreign = Object.assign(new Error('failed'), { name: 'MintOperationError', code: 20004 });
@@ -88,7 +88,10 @@ describe('meltRefusedBeforePaying', () => {
 
   it('treats an answer that may be this melt having paid, or no answer, as proving nothing', () => {
     // Proofs spent, outputs signed or the invoice paid: perhaps by this melt.
-    for (const code of [11001, 11003, 20006, 11002, 11004, 20005, 12001, 12002, 11006, 50000]) {
+    // CDK answers a unit mismatch (11010) after its backend reported the payment paid.
+    for (const code of [
+      11001, 11003, 20006, 11002, 11004, 20005, 12001, 12002, 11006, 11010, 50000,
+    ]) {
       expect(meltRefusedBeforePaying(new MintOperationError(code, 'answered'))).toBe(false);
     }
     expect(meltRefusedBeforePaying(new NetworkError('socket hang up'))).toBe(false);

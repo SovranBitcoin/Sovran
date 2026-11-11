@@ -60,8 +60,9 @@ function mintErrorCode(err: unknown): number | undefined {
  * sent only once the mint's backend reported the payment failed and its
  * inputs were released (nutshell and cdk both). Every other code may be this
  * melt having paid: "proofs already spent" (11001), "outputs already signed"
- * (11003) and "invoice already paid" (20006) among them, and a code whose
- * meaning is in doubt stays off this list.
+ * (11003) and "invoice already paid" (20006) among them, and "unit mismatch"
+ * (11010), which cdk also returns after its backend reported the payment paid.
+ * A code whose meaning is in doubt stays off this list.
  */
 const MELT_REFUSED_CODES: ReadonlySet<number> = new Set([
   10001, // proof verification failed
@@ -69,7 +70,6 @@ const MELT_REFUSED_CODES: ReadonlySet<number> = new Set([
   11007, // duplicate inputs
   11008, // duplicate outputs
   11009, // inputs or outputs of more than one unit
-  11010, // inputs and outputs of different units
   20004, // Lightning payment failed
 ]);
 
