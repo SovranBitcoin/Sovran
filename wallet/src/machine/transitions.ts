@@ -788,9 +788,17 @@ export function transition(
     case "SHOW_RECEIVE_QR":
       return stamp(startReceiveQrFlow(walletCtx, unit));
     case "REVIEW_MINT":
+      // Reviewing a mint is part of receiving a token. It carries on the
+      // token receive the machine shows (whose scanned input the scan history
+      // needs); from anywhere else it starts afresh, so nothing of a payment
+      // the machine still holds (its request, amount, mint) can rebuild that
+      // payment's preview for Pay to send again.
       return stamp({
         step: "reviewMint",
-        context: { ...currentCtx, reviewToken: event.token },
+        context: {
+          ...(currentStep === "receiveToken" ? currentCtx : { unit }),
+          reviewToken: event.token,
+        },
         data: { mintUrl: event.mintUrl, token: event.token },
       });
     case "MINT_TRUSTED": {

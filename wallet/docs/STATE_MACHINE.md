@@ -496,7 +496,10 @@ MUST NOT:
   it; every other event changes nothing, since re-resolving the amount, mint
   or option would rebuild a preview that Pay sends again
   (`LEAVES_SETTLED_PREVIEW`, `createMachine.ts`;
-  `__tests__/flows/settled-preview-final.test.ts`).
+  `__tests__/flows/settled-preview-final.test.ts`). Each leaving event starts
+  from a fresh context that carries nothing of the settled payment
+  (`REVIEW_MINT` keeps the context only when it interrupts a token receive),
+  so nothing done in the new flow rebuilds the old preview.
 - Do not invent a `rolling_back` machine state. `MELT_FAILED` is a defined
   `ErrorCode` but the confirm-melt path never sets `error` with it for
   single-option flows.

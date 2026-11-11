@@ -181,6 +181,44 @@ function eventsOf(type: FlowEvent["type"], s: Settled): FlowEvent[] {
 
 const TYPES = Object.keys(EXPECTED) as FlowEvent["type"][];
 
+/**
+ * What a person can do after leaving a settled preview, ending in Pay. Each
+ * would rebuild the old preview if the new flow still carried its payment.
+ */
+const FOLLOW_THROUGH: { name: string; run: (tm: Built, s: Settled) => Promise<unknown> }[] = [
+  { name: "Pay", run: (tm, s) => s.pay(tm) },
+  {
+    name: "the mint list, then Pay",
+    run: async (tm, s) => {
+      await tm.machine.requestMintSelector();
+      return s.pay(tm);
+    },
+  },
+  {
+    name: "a mint, then Pay",
+    run: async (tm, s) => {
+      await tm.machine.changeMint(MINT1);
+      await tm.machine.changeMint(s.otherMint);
+      return s.pay(tm);
+    },
+  },
+  {
+    name: "an amount, then Pay",
+    run: async (tm, s) => {
+      await tm.machine.enterAmount({ value: s.amount, unit: "sat" }, MINT1);
+      return s.pay(tm);
+    },
+  },
+  {
+    name: "trusting the mint, the mint list, then Pay",
+    run: async (tm, s) => {
+      await tm.machine.mintTrusted();
+      await tm.machine.requestMintSelector();
+      return s.pay(tm);
+    },
+  },
+];
+
 describe.each(SETTLED)("$name", (s) => {
   it.each(TYPES.filter((type) => EXPECTED[type] === "unchanged"))(
     "%s changes nothing, and Pay does not send again",
@@ -217,4 +255,23 @@ describe.each(SETTLED)("$name", (s) => {
       }
     },
   );
+
+  // The new flow carries nothing of the old payment, so nothing done in it
+  // rebuilds the old preview for Pay to send again.
+  describe.each(FOLLOW_THROUGH)("then $name", (follow) => {
+    it.each(TYPES.filter((type) => EXPECTED[type] === "newFlow"))(
+      "%s does not send the old payment again",
+      async (type) => {
+        for (const event of eventsOf(type, s)) {
+          const tm = build(s.operations);
+          await s.reach(tm);
+
+          await tm.machine.send(event);
+          await follow.run(tm, s);
+
+          expect(tm.calls(s.operation)).toBe(1);
+        }
+      },
+    );
+  });
 });

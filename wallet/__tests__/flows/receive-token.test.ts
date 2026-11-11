@@ -134,6 +134,17 @@ describe('receive token — trust review flow', () => {
     await tm.machine.reviewMint('https://new.mint.example.com', INPUTS.cashuTokenV3);
     tm.assertContext({ reviewToken: INPUTS.cashuTokenV3 });
   });
+
+  it('keeps the scanned input of the token receive it interrupts', async () => {
+    // The redeem after trusting matches the scan history by this input.
+    const tm = createTestMachine();
+    await tm.machine.execute(INPUTS.cashuTokenV3);
+    tm.assertStep('receiveToken');
+    await tm.machine.reviewMint('https://new.mint.example.com', INPUTS.cashuTokenV3);
+    await tm.machine.mintTrusted();
+    tm.assertStep('receiveToken');
+    tm.assertContext({ rawInput: INPUTS.cashuTokenV3 });
+  });
 });
 
 // ---------------------------------------------------------------------------
