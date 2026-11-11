@@ -58,28 +58,31 @@ export type MeshRedeemArrival = Extract<
 >;
 
 /**
- * What can happen to an entry already queued, by the status it ends in, plus
- * the two moves back into line: `retry` (an attempt failed and may be tried
- * again, or the attempts ran out) and `requeue` (the person, or a newly
- * trusted mint, puts a held entry back). No move leads to `pending` otherwise.
+ * What can happen to an entry already queued. The drain's moves are named by
+ * the status they end in, plus `retry` (an attempt failed and may be tried
+ * again, or the attempts ran out). Two moves start from a held entry:
+ * `requeue` (the person, or a newly trusted mint, puts it back in line; no
+ * other move leads to `pending`) and `held-spent` (the reconcile found its
+ * token redeemed by hand).
  */
 export type MeshRedeemMove =
-  Exclude<MeshRedeemStatus, "pending"> | "retry" | "requeue";
+  Exclude<MeshRedeemStatus, "pending"> | "retry" | "requeue" | "held-spent";
 
 /**
  * The statuses each move may start from. Any other start is refused: a late
  * answer from an older attempt or probe never overwrites a settled entry, a
- * received token never goes back into line, and an entry is put back in
- * line only from being held.
+ * received token never goes back into line, an entry is put back in line
+ * only from being held, and an entry the drain has started is moved only by
+ * the drain.
  */
 const MESH_REDEEM_MOVES: Record<MeshRedeemMove, readonly MeshRedeemStatus[]> = {
   // The drain starts a receive, or resumes one a kill cut short.
   redeeming: ["pending", "redeeming"],
-  // Only the drain, after the receive succeeded. From `spent` too: a probe
-  // that ran while this wallet's own receive was finishing saw it spent.
+  // Only the drain, after the receive succeeded. From `spent` too: a token
+  // this wallet received is recorded as received, whatever was said of it.
   redeemed: ["redeeming", "spent"],
-  // The drain's receive, or the reconcile of a held entry redeemed by hand.
-  spent: ["redeeming", "untrusted-mint", "failed"],
+  // The mint answered the drain's receive that the token is spent.
+  spent: ["redeeming"],
   // Only the drain's trust check, before it starts or resumes a receive.
   "untrusted-mint": ["pending", "redeeming"],
   // The mint refused the drain's receive.
@@ -87,6 +90,8 @@ const MESH_REDEEM_MOVES: Record<MeshRedeemMove, readonly MeshRedeemStatus[]> = {
   // The drain's trust check or receive failed in a way worth retrying.
   retry: ["pending", "redeeming"],
   requeue: ["untrusted-mint", "failed"],
+  // Only while still held: once it is back in line the drain asks the mint.
+  "held-spent": ["untrusted-mint", "failed"],
 };
 
 export function canMeshRedeemMove(

@@ -90,6 +90,11 @@ interface NutDropRedeemQueueActions {
    * again. Any other entry is left as it is.
    */
   requeue: (tokenHash: string) => void;
+  /**
+   * Close a held entry (`untrusted-mint`, `failed`) whose token was found
+   * spent. Any other entry is left as it is: one back in line is the drain's.
+   */
+  markHeldSpent: (tokenHash: string) => void;
   prune: () => void;
 }
 
@@ -271,6 +276,19 @@ export const useNutDropRedeemQueueStore = create<NutDropRedeemQueueStore>({
             ...state.byTokenHash,
             [tokenHash]: { ...rest, status: 'pending', attempts: 0, nextAttemptAt: 0 },
           },
+        }));
+      },
+
+      markHeldSpent: (tokenHash) => {
+        const existing = get().byTokenHash[tokenHash];
+        if (!existing || !allowsMove(tokenHash, existing, 'held-spent')) return;
+        storeLog.info('store.nut_drop_queue.status', {
+          tokenHash: tokenHash.slice(0, 12),
+          status: 'spent',
+          from: existing.status,
+        });
+        set((state) => ({
+          byTokenHash: { ...state.byTokenHash, [tokenHash]: { ...existing, status: 'spent' } },
         }));
       },
 

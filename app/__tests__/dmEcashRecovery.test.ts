@@ -142,6 +142,34 @@ describe('message ecash the queue has parked', () => {
     expect(store().byTokenHash.a?.status).toBe('redeemed');
   });
 
+  it.each([
+    ['in line', (): void => {}, 'pending'],
+    [
+      'being received',
+      (): void => {
+        store().markStatus('a', 'redeeming');
+      },
+      'redeeming',
+    ],
+  ] as const)(
+    'leaves a token put back in line while the mint was asked to the drain: %s',
+    async (_name, drainStep, expected) => {
+      park('a', 'untrusted-mint', 'nostr');
+      mockIsTrustedMint.mockResolvedValue(true);
+      let answer!: (spent: boolean) => void;
+      mockIsTokenSpent.mockReturnValue(new Promise<boolean>((resolve) => (answer = resolve)));
+      const reconciling = reconcileParkedMessageEcash(ME, () => true);
+      await new Promise((resolve) => setImmediate(resolve));
+      // Meanwhile "Receive all" put it back in line, and the drain may have
+      // started its receive: the mint's answer is now the drain's to act on.
+      store().requeue('a');
+      drainStep();
+      answer(true);
+      await reconciling;
+      expect(store().byTokenHash.a?.status).toBe(expected);
+    }
+  );
+
   it('never retries a failed entry by itself', async () => {
     park('a', 'failed', 'nostr');
     mockIsTrustedMint.mockResolvedValue(true);
@@ -184,7 +212,7 @@ describe('message ecash the queue has parked', () => {
 describe('requeue', () => {
   it('never revives a terminal entry', () => {
     park('a', 'failed', 'nostr');
-    store().markStatus('a', 'spent');
+    store().markHeldSpent('a');
     store().requeue('a');
     expect(store().byTokenHash.a?.status).toBe('spent');
   });

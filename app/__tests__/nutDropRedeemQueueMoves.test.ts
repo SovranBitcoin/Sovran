@@ -165,13 +165,8 @@ describe('moves the queue accepts', () => {
     ],
     ['receive all / try again', 'untrusted-mint', () => store().requeue(HASH), 'pending'],
     ['receive all / try again', 'failed', () => store().requeue(HASH), 'pending'],
-    [
-      'reconcile: redeemed by hand',
-      'untrusted-mint',
-      () => store().markStatus(HASH, 'spent'),
-      'spent',
-    ],
-    ['reconcile: redeemed by hand', 'failed', () => store().markStatus(HASH, 'spent'), 'spent'],
+    ['reconcile: redeemed by hand', 'untrusted-mint', () => store().markHeldSpent(HASH), 'spent'],
+    ['reconcile: redeemed by hand', 'failed', () => store().markHeldSpent(HASH), 'spent'],
     [
       'drain: received after a probe already called it spent',
       'spent',
@@ -248,16 +243,18 @@ describe('moves the queue refuses', () => {
     failed: () => store().markStatus(HASH, 'failed', 'late'),
     retry: () => store().scheduleRetry(HASH, 'late'),
     requeue: () => store().requeue(HASH),
+    'held-spent': () => store().markHeldSpent(HASH),
   } as const;
   // From which statuses each move means something; every other start is refused.
   const ALLOWED: Record<keyof typeof MOVES, readonly Entry['status'][]> = {
     redeeming: ['pending', 'redeeming'],
     redeemed: ['redeeming', 'spent'],
-    spent: ['redeeming', 'untrusted-mint', 'failed'],
+    spent: ['redeeming'],
     'untrusted-mint': ['pending', 'redeeming'],
     failed: ['redeeming'],
     retry: ['pending', 'redeeming'],
     requeue: ['untrusted-mint', 'failed'],
+    'held-spent': ['untrusted-mint', 'failed'],
   };
   const refused = STATUSES.flatMap((from) =>
     (Object.keys(MOVES) as (keyof typeof MOVES)[])
