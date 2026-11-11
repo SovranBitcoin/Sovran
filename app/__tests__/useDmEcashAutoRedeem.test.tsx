@@ -232,6 +232,31 @@ describe('reading the message inbox for ecash', () => {
     expect(mockDrain).toHaveBeenCalledTimes(1);
   });
 
+  it.each([
+    ['unknown', 'complete', 1],
+    ['pending', 'complete', 1],
+    ['in-progress', 'complete', 1],
+    ['failed', 'complete', 1],
+    ['pending', 'not-needed', 1],
+    ['not-needed', 'complete', 0],
+    ['pending', 'failed', 0],
+    ['pending', 'unknown', 0],
+  ] as const)(
+    'serves the queue when the restore status moves from %s to %s: %s drain',
+    async (from, to, drains) => {
+      useWalletLifecycleStore.setState({ restoreStatus: from });
+      mockFetch.mockResolvedValue(page([], 0, false));
+      await mount();
+      mockQueueHasWork = true;
+      mockDrain.mockClear();
+      act(() => {
+        useWalletLifecycleStore.setState({ restoreStatus: to });
+      });
+      await settle();
+      expect(mockDrain).toHaveBeenCalledTimes(drains);
+    }
+  );
+
   it('stops when the transport ignores the cursor and returns the same inbox again', async () => {
     // The relay tier answers every request with the whole inbox.
     mockFetch.mockResolvedValue(page(['a', 'b'], 1000, true));

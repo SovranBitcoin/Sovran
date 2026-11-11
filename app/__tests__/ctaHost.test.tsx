@@ -194,6 +194,18 @@ it('does nothing during pending/failed RestoreGate and evaluates once ready', as
   await act(async () => useWalletLifecycleStore.setState({ restoreStatus: 'complete' }));
   expect(mockPush).toHaveBeenCalledTimes(1);
 });
+it.each([
+  ['unknown', 1],
+  ['not-needed', 1],
+  ['pending', 0],
+  ['in-progress', 1],
+  ['complete', 1],
+  ['failed', 0],
+] as const)('with a saved %s restore status, opens %s prompt', (restoreStatus, prompts) => {
+  useWalletLifecycleStore.setState({ restoreStatus });
+  render(<HostWithScreen />);
+  expect(mockPush).toHaveBeenCalledTimes(prompts);
+});
 it('reacts to balance and verification changes without showing in Mock Mode', async () => {
   mockBalance = 0;
   const view = render(<HostWithScreen />);

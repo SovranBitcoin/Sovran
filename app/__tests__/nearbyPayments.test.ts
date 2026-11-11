@@ -50,8 +50,9 @@ jest.mock('@/features/bitchat/hooks/useBLEPeers', () => ({
 jest.mock('@/shared/stores/runtime/nearPayStore', () => ({
   useNearPaySessionStore: { getState: () => ({ active: mockActive, complete: mockComplete }) },
 }));
+const mockLifecycle = { restoreStatus: 'complete' };
 jest.mock('@/shared/stores/global/walletLifecycleStore', () => ({
-  useWalletLifecycleStore: { getState: () => ({ restoreStatus: 'complete' }) },
+  useWalletLifecycleStore: { getState: () => mockLifecycle },
 }));
 const mockPrepareNostr = jest.fn();
 jest.mock('@/shared/lib/nostr/sendDirectMessage', () => ({
@@ -124,6 +125,7 @@ function manager() {
   } as unknown as Manager;
 }
 beforeEach(() => {
+  mockLifecycle.restoreStatus = 'complete';
   mockStorage.clear();
   mockAnnotations.clear();
   mockFailWrite = false;
@@ -245,6 +247,25 @@ it('retains rejected payment bytes across restart without claiming them again', 
   await nearbyPayments(mockManager).drain(new Uint8Array(32).fill(1), identity, 'Alice');
   expect(mockManager.paymentRequests.incoming.ingestPayload).not.toHaveBeenCalled();
 });
+
+it.each([
+  ['unknown', false],
+  ['not-needed', true],
+  ['pending', false],
+  ['in-progress', false],
+  ['complete', true],
+  ['failed', false],
+] as const)(
+  'claims a payment that arrived nearby only once the restore has settled: %s, %s',
+  async (restoreStatus, claims) => {
+    mockLifecycle.restoreStatus = restoreStatus;
+    await nearbyPayments(mockManager).ingest(incomingPayload(), pubkey);
+    await nearbyPayments(mockManager).drain(new Uint8Array(32).fill(1), identity, 'Alice');
+    expect(mockManager.paymentRequests.incoming.ingestPayload).toHaveBeenCalledTimes(
+      claims ? 1 : 0
+    );
+  }
+);
 
 it('refuses invalid radio input before it occupies durable inbox capacity', async () => {
   const payload = JSON.stringify({

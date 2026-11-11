@@ -175,3 +175,24 @@ it('uses revision 1 for definitions without an explicit revision', () => {
     )
   ).toBeNull();
 });
+
+describe('what each prompt makes of the saved restore status', () => {
+  // Pinned as it is: both prompts are held only while a restore is pending.
+  // `unknown`, `in-progress` and `failed` do not hold them here (the host
+  // holds the whole queue for `failed`; see ctaHost.test.tsx).
+  it.each([
+    ['unknown', true],
+    ['not-needed', true],
+    ['pending', false],
+    ['in-progress', true],
+    ['complete', true],
+    ['failed', true],
+  ] as const)('%s: shows %s', (restoreStatus, shows) => {
+    const lifecycle = { ...ctx.lifecycle, restoreStatus };
+    const backup = CTA_DEFINITIONS.find((cta) => cta.id === 'backup-recovery-phrase');
+    const claim = CTA_DEFINITIONS.find((cta) => cta.id === 'claim-old-ecash');
+    const oldEcash = { mintUrl: 'https://mint.example', amount: 21, unit: 'sat' };
+    expect(backup?.shouldShow({ ...ctx, lifecycle })).toBe(shows);
+    expect(claim?.shouldShow({ ...ctx, lifecycle, oldEcash })).toBe(shows);
+  });
+});

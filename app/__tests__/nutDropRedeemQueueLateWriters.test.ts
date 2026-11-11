@@ -74,8 +74,9 @@ jest.mock('@/shared/stores/runtime/paymentStatusStore', () => ({
     }),
   },
 }));
+const mockLifecycle = { restoreStatus: 'complete' };
 jest.mock('@/shared/stores/global/walletLifecycleStore', () => ({
-  useWalletLifecycleStore: { getState: () => ({ restoreStatus: 'complete' }) },
+  useWalletLifecycleStore: { getState: () => mockLifecycle },
 }));
 jest.mock('@/shared/lib/logger', () => {
   const log = () => ({ debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() });
@@ -121,6 +122,7 @@ beforeEach(() => {
   mockExecuteAutoRedeem.mockReset();
   mockSetTransactionAnnotation.mockReset();
   mockAppState.currentState = 'background';
+  mockLifecycle.restoreStatus = 'complete';
   mockToast.active = null;
   mockToast.setWaiting.mockReset();
   mockToast.setFailed.mockReset();
@@ -249,5 +251,22 @@ describe('the toast for a queued token says what the queue recorded', () => {
     expect(current()).toMatchObject({ status: 'failed', attempts: 5 });
     expect(mockToast.setWaiting).not.toHaveBeenCalled();
     expect(mockToast.setFailed).toHaveBeenCalledWith(HASH, new Error('Redeem failed'));
+  });
+});
+
+describe('the drain waits for the wallet restore', () => {
+  it.each([
+    ['unknown', false],
+    ['not-needed', true],
+    ['pending', false],
+    ['in-progress', false],
+    ['complete', true],
+    ['failed', false],
+  ] as const)('with a saved %s restore status, receives: %s', async (restoreStatus, receives) => {
+    mockLifecycle.restoreStatus = restoreStatus;
+    store().enqueue(HASH, { token: TOKEN, mintUrl: MINT_URL, amount: 21, unit: 'sat' });
+    mockExecuteAutoRedeem.mockResolvedValue({ historyEntryId: null });
+    await drainNutDropRedeemQueue();
+    expect(mockExecuteAutoRedeem).toHaveBeenCalledTimes(receives ? 1 : 0);
   });
 });

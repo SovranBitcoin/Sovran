@@ -90,3 +90,22 @@ describe('awaitRestoreReady (audit 28.json F-004 / 40.json F-003)', () => {
     await expect(promise).resolves.toBeUndefined();
   });
 });
+
+describe('which saved restore statuses are ready', () => {
+  it.each([
+    ['unknown', false],
+    ['not-needed', true],
+    ['pending', false],
+    ['in-progress', false],
+    ['complete', true],
+    ['failed', false],
+  ] as const)('%s: %s', async (status, ready) => {
+    const store = makeFakeStore(status);
+    let resolved = false;
+    void awaitRestoreReady(store).then(() => {
+      resolved = true;
+    });
+    await Promise.resolve();
+    expect(resolved).toBe(ready);
+  });
+});
