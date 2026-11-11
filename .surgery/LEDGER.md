@@ -46,7 +46,7 @@ surveyors' own groupings.
 | Feed and social                      | `feed-social.md`                | 44         | 13                     |
 | Shared hooks, UI, lib                | `shared.md`                     | 52         | 16                     |
 
-### Pinned in pass 0 (29 test files, 322 tests, each seen to fail under a broken variant)
+### Pinned in pass 0 (29 test files at the time; the Routstr top-up one was deleted with its code in pass 2; 322 tests, each seen to fail under a broken variant)
 
 All in `app/__tests__/`. A `// QUIRK:` comment marks behaviour pinned as it is although it looks wrong.
 
@@ -77,7 +77,6 @@ All in `app/__tests__/`. A `// QUIRK:` comment marks behaviour pinned as it is a
 | Settings setters and migrate                              | `settingsStoreSetters.test.ts`              |
 | Whitenoise storage, DM index, history                     | `whitenoiseStorage.test.ts`                 |
 | BitChat durable delivery store                            | `bitchatDmMessages.test.ts`                 |
-| Routstr top-up                                            | `routstrTopUp.test.ts`                      |
 | Zap start                                                 | `useZapStart.test.tsx`                      |
 | Fixed-amount ecash receive screen                         | `receivePaymentRequestQuoteScreen.test.tsx` |
 | NFC session                                               | `nfcSessionBoundary.test.ts`                |
@@ -520,3 +519,55 @@ defects and four missing features), F242 (cuts stopped on, and the two wallet-co
 - The Bluetooth label fix and the restoring commit were not reviewed by another model.
 - `jevlint` saved checks were not run; `audit-commit` was not run per commit.
 - Some pin commits and intermediate commits do not type-check alone; the branch head passes every check.
+
+## Sweeps
+
+### Sweep 1 (2026-11-12)
+
+Branch `surgery/sweep-1`, stacked on `surgery/pass-3`. Eight surveys in `sweep-1/surveys/` (brief in its
+`README.md`), one per area plus one for configuration, tests and documentation; each finding carries a verdict, fix
+or list. The fix brief is `sweep-1/FIX-BRIEF.md`.
+
+Surveyed by Claude Fable 5.2 (wallet, stores and shared code, feed and Nostr), Claude Opus 5.5 (messaging, signer,
+AI), Codex GPT-6.1 Sol (payments; transactions, wallet, mint) and Codex GPT-6 Astra (startup and settings;
+configuration, tests, docs). Fixed by Claude Fable 5.2 (two lanes) and Claude Opus 5.5 (one lane).
+
+Of 72 findings marked fix, 61 were fixed or removed in 57 commits and 11 were left by the builders on a closer
+look (not confirmed by a failing test, two reasonable repairs, or a change to something saved or sent). Product code
+went from 369,727 to 369,529 lines.
+
+Behaviour changed (each with a test that failed first; nothing saved or sent changed):
+
+| Commit      | Before                                                                                  | After                                                    |
+| ----------- | --------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| `17ef4d80a` | A mint list that finished loading for an earlier picker replaced the open picker's rows | Only the latest load applies                             |
+| `f5c9a388e` | A payment-request send that failed before Coco started it left its ecash reserved       | It is cancelled, as the other send paths do              |
+| `f8c246bcc` | A preview restored after a dismissed mint list lost its recipient on a quote refresh    | It keeps it                                              |
+| `f0ddbde35` | A failing cancel replaced the error that explained the failure                          | The first error is kept                                  |
+| `215675d07` | A single-rail build's receive screen opened on Unified                                  | It opens on its own rail, and Copy copies it             |
+| `3eabe8784` | A removed mint stayed in mint contacts and the spinner stuck                            | Both clear                                               |
+| `039c696e7` | A mint contact's key was read from the first Nostr contact                              | It is read from the npub that admitted the mint          |
+| `82c05fa3d` | An older inbox snapshot erased a live DM; a live arrival replaced the seeded rows       | Both are kept                                            |
+| `ed4aa3871` | A later, worse data source overwrote the first answer for profiles, follows, note stats | Only a better-ranked source replaces it                  |
+| `99832507a` | A search hit that held only AI providers wrote no profile stats                         | It writes them                                           |
+| `afc0c056f` | A failed post delete threw past its caller                                              | It ends its toast as failed and logs why                 |
+| `cfcdc20ba` | The map re-centred and asked for location again on every rotation or resize             | It asks once                                             |
+| `7c7acb993` | The AI model picker ignored a tap on a model that arrived while it was open             | The pick resolves against the current lineup             |
+| `49b125fd6` | White Noise teardown left the key copy un-wiped if a listener removal threw             | It is wiped                                              |
+| `069a4daaa` | Four copy buttons said "Copied" before the clipboard write finished                     | They say it after; a refused write says "Failed to copy" |
+| `6f21bad47` | A cached read cancelled by leaving the screen showed "fetching" for ever                | It clears                                                |
+| `d3ad07d3f` | Stopping the price feed mid-request left it loading                                     | Loading ends                                             |
+| `e3f1ea10f` | Relay health probes restarted on every render                                           | One probe each until the hosts change                    |
+| `04375eee5` | The rating bar chart kept its first fill                                                | It follows the rating                                    |
+
+Also: unreachable code and exports removed, identical copies merged (tier rank table, note metrics, the
+payment announcements, the timeout helper), three tests that could not fail rewritten so they can, and stale
+comments and documentation corrected against the code.
+
+Listed for the owner, not fixed: F243 (money and saved data), F244 (behaviour needing a decision), F245
+(unreachable code that carries tests, repeated work not yet measured, leftovers from passes 2 and 3). No decisions
+have been taken on that list yet.
+
+Not verified: nothing was run on iOS or Android; no real upgrade was run (no saved shape changed); the surveys did
+not read every file (each lists what it skipped, among them most of `shared/ui`, the large stores and much of the
+feed UI); the unmeasured speed-ups are listed, not made.
