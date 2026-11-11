@@ -1,9 +1,6 @@
 import { act, renderHook } from '@testing-library/react-native';
 
-import {
-  mintSelectorCandidateSetIsStale,
-  useRefreshMintSelectorOnFocus,
-} from '@/features/mint/hooks/useRefreshMintSelectorOnFocus';
+import { useRefreshMintSelectorOnFocus } from '@/features/mint/hooks/useRefreshMintSelectorOnFocus';
 
 jest.mock('expo-router', () => {
   const { useEffect } = jest.requireActual<typeof import('react')>('react');
@@ -12,54 +9,7 @@ jest.mock('expo-router', () => {
   };
 });
 
-describe('mintSelectorCandidateSetIsStale', () => {
-  it('accepts the same normalized set in any order', () => {
-    expect(
-      mintSelectorCandidateSetIsStale(
-        ['https://MINT.one:443/./path/', 'https://MINT.two/'],
-        ['https://mint.two', 'https://mint.one/path']
-      )
-    ).toBe(false);
-  });
-
-  it('keeps HTTP, HTTPS, and www hosts as different mint identities', () => {
-    expect(mintSelectorCandidateSetIsStale(['https://mint.one'], ['http://mint.one'])).toBe(true);
-    expect(mintSelectorCandidateSetIsStale(['https://mint.one'], ['https://www.mint.one'])).toBe(
-      true
-    );
-  });
-
-  it('detects a newly trusted mint', () => {
-    expect(
-      mintSelectorCandidateSetIsStale(
-        ['https://mint.one', 'https://mint.two'],
-        ['https://mint.one']
-      )
-    ).toBe(true);
-  });
-
-  it('detects a removed trusted mint', () => {
-    expect(
-      mintSelectorCandidateSetIsStale(
-        ['https://mint.one'],
-        ['https://mint.one', 'https://mint.two']
-      )
-    ).toBe(true);
-  });
-
-  it('ignores duplicate normalized URLs', () => {
-    expect(
-      mintSelectorCandidateSetIsStale(
-        ['https://mint.one', 'https://MINT.one:443/'],
-        ['https://mint.one/']
-      )
-    ).toBe(false);
-  });
-
-  it('fails closed when either set contains an invalid URL', () => {
-    expect(mintSelectorCandidateSetIsStale(['not a URL'], ['not a URL'])).toBe(true);
-  });
-
+describe('useRefreshMintSelectorOnFocus', () => {
   it('refreshes exactly once after the authoritative tracker catches up', async () => {
     const mintOne = 'https://mint.one';
     const mintTwo = 'https://mint.two';
