@@ -365,7 +365,7 @@ describe('usePaymentStatusListener', () => {
     unmount();
   });
 
-  it('confirms the matching send toast, and any processing payment-request toast whatever its id', () => {
+  it('confirms the toast of the send that finished, and no other payment’s', () => {
     const { unmount } = mount();
     usePaymentStatusStore.getState().setActive({
       variant: 'send',
@@ -401,14 +401,40 @@ describe('usePaymentStatusListener', () => {
         operation: { amount: 99, unit: 'sat' },
       })
     );
-    // QUIRK: any payment-request toast that is processing or delivered is confirmed by an
-    // unrelated send finishing, and takes that send's operation id. A fix that matches by id
-    // should change this assertion on purpose.
+    // The delivered payment request is not confirmed by another send (F219): that send
+    // gets a toast of its own.
     expect(active()).toMatchObject({
-      id: 'pr-toast',
+      variant: 'send',
+      id: 'unrelated-send',
+      owner: { kind: 'send', operationId: 'unrelated-send' },
       state: 'confirmed',
-      operationId: 'unrelated-send',
     });
+    expect(mockedPopup).toHaveBeenCalledWith(expect.objectContaining({ id: 'unrelated-send' }));
+    unmount();
+  });
+
+  it('leaves a payment request still being paid alone when another send finishes', () => {
+    const { unmount } = mount();
+    usePaymentStatusStore.getState().setActive({
+      variant: 'payment-request',
+      id: 'pr-toast',
+      owner: { kind: 'pending', key: 'pr-toast' },
+      mintUrl: MINT,
+      amount: 5,
+      unit: 'sat',
+      state: 'processing',
+    });
+
+    act(() =>
+      fake.emit('send:finalized', {
+        mintUrl: MINT,
+        operationId: 'unrelated-send',
+        operation: { amount: 5, unit: 'sat' },
+      })
+    );
+
+    expect(active()).toEqual(expect.objectContaining({ id: 'pr-toast', state: 'processing' }));
+    expect(active()).not.toHaveProperty('operationId');
     expect(mockedPopup).not.toHaveBeenCalled();
     unmount();
   });
@@ -478,7 +504,7 @@ describe('usePaymentStatusListener', () => {
     unmount();
   });
 
-  it('confirms any melt toast by variant alone, and a background melt toast says sats', () => {
+  it('gives another melt its own toast instead of the one shown, and a background melt toast says its unit', () => {
     const { unmount } = mount();
     usePaymentStatusStore.getState().setActive({
       variant: 'melt',
@@ -497,11 +523,17 @@ describe('usePaymentStatusListener', () => {
         operation: { quoteId: 'mq-x', amount: 900, unit: 'sat', method: 'bolt11' },
       })
     );
-    // QUIRK: a melt toast for another mint and amount, already confirmed, takes this melt's
-    // operation id because the match is by variant only. A fix that matches the quote should
-    // change this assertion on purpose.
-    expect(active()).toMatchObject({ id: 'melt-toast-123', operationId: 'melt-op-x' });
-    expect(mockedPopup).not.toHaveBeenCalled();
+    // The confirmed toast of another melt keeps its own View target (F219); this melt gets
+    // a toast of its own.
+    expect(active()).toMatchObject({
+      id: 'mq-x',
+      owner: { kind: 'melt', quoteId: 'mq-x' },
+      state: 'confirmed',
+    });
+    expect(mockedPopup).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'mq-x', operationId: 'melt-op-x' })
+    );
+    mockedPopup.mockClear();
 
     usePaymentStatusStore.getState().setActive(null);
     act(() =>
@@ -519,6 +551,70 @@ describe('usePaymentStatusListener', () => {
       unit: 'usd',
       operationId: 'melt-op-usd',
     });
+    unmount();
+  });
+
+  it('leaves a melt in flight alone when another melt finishes or rolls back, then confirms it by its own', () => {
+    const { unmount } = mount();
+    usePaymentStatusStore.getState().setActive({
+      variant: 'melt',
+      id: 'melt-a',
+      owner: { kind: 'melt', quoteId: 'mq-a' },
+      mintUrl: MINT,
+      amount: 300,
+      unit: 'sat',
+      state: 'processing',
+    });
+
+    act(() =>
+      fake.emit('melt-op:finalized', {
+        mintUrl: MINT,
+        operationId: 'mo-b',
+        operation: { quoteId: 'mq-b', amount: 300, unit: 'sat', method: 'bolt11' },
+      })
+    );
+    expect(active()).toEqual(expect.objectContaining({ id: 'melt-a', state: 'processing' }));
+    expect(active()).not.toHaveProperty('operationId');
+    expect(mockedPopup).not.toHaveBeenCalled();
+
+    act(() =>
+      fake.emit('melt-op:finalized', {
+        mintUrl: MINT,
+        operationId: 'mo-a',
+        operation: { quoteId: 'mq-a', amount: 300, unit: 'sat', method: 'bolt11' },
+      })
+    );
+    expect(active()).toMatchObject({ id: 'melt-a', state: 'confirmed', operationId: 'mo-a' });
+    expect(mockedPopup).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it('does not fail a melt in flight for another melt’s rollback of the same amount', () => {
+    const { unmount } = mount();
+    usePaymentStatusStore.getState().setActive({
+      variant: 'melt',
+      id: 'melt-a',
+      owner: { kind: 'melt', quoteId: 'mq-a' },
+      mintUrl: MINT,
+      amount: 300,
+      unit: 'sat',
+      state: 'processing',
+    });
+
+    act(() =>
+      fake.emit('melt-op:rolled-back', {
+        mintUrl: MINT,
+        operation: { id: 'mo-b', quoteId: 'mq-b', amount: 300, unit: 'sat', error: 'boom' },
+      })
+    );
+
+    // The other melt's failure is shown, as its own toast: funds coming back are never silent.
+    expect(active()).toMatchObject({
+      id: 'mq-b',
+      owner: { kind: 'melt', quoteId: 'mq-b' },
+      state: 'failed',
+    });
+    expect(mockedPopup).toHaveBeenCalledWith(expect.objectContaining({ id: 'mq-b' }));
     unmount();
   });
 

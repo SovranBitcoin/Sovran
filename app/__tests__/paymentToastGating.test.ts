@@ -308,6 +308,21 @@ describe('the payment a processing toast belongs to', () => {
     });
   });
 
+  it('takes its melt for View when the flow confirms it', () => {
+    const notifications = createSovranNotifications();
+    void notifications.onPaymentProcessing!({ variant: 'melt', ...BASE });
+    void notifications.onPaymentConfirmed!({
+      variant: 'melt',
+      ...BASE,
+      historyEntry: JSON.stringify({ id: 'mo-9', type: 'melt', quoteId: 'mq-9', state: 'PAID' }),
+    });
+    expect(activeStatus()).toMatchObject({
+      state: 'confirmed',
+      owner: { kind: 'melt', quoteId: 'mq-9' },
+      operationId: 'mo-9',
+    });
+  });
+
   it('is not bound by another flow', () => {
     void createSovranNotifications().onPaymentProcessing!({ variant: 'paymentRequest', ...BASE });
     void createSovranNotifications().onPaymentConfirmed!({

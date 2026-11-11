@@ -338,7 +338,12 @@ export function createSovranNotifications(
           activeId: store.active.id,
           activeState: store.active.state,
         });
-        store.setConfirmed(store.active.id);
+        // The melt for View: its own event may have come while the toast was
+        // still waiting for its quote, and was left to this.
+        store.setConfirmed(
+          store.active.id,
+          entryOperationId ? { operationId: entryOperationId } : undefined
+        );
       } else {
         paymentLog.info('payment.confirmed.route', {
           variant: data.variant,
