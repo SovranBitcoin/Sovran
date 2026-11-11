@@ -20,6 +20,8 @@ const mockProfile = {
   ],
 };
 const mockListeners = new Set<(state: typeof mockProfile) => void>();
+/** Whether this session's relay-list sync has found the account's relays. */
+let mockDiscovered = true;
 const mockPublish = jest.fn(async (..._args: unknown[]) => ({ isErr: () => false }));
 let mockEventId = 100;
 
@@ -68,6 +70,7 @@ jest.mock('@/shared/stores/global/profileStore', () => {
 });
 jest.mock('@/shared/lib/nostr/outbox/relayListStore', () => ({
   getOwnWriteRelays: () => mockRelays.map((relay) => relay.url),
+  getKnownOwnWriteRelays: () => (mockDiscovered ? mockRelays.map((relay) => relay.url) : null),
 }));
 jest.mock('@/shared/lib/nostr/publish', () => ({
   publishEvent: (...args: unknown[]) => mockPublish(...args),
@@ -118,6 +121,7 @@ function event(overrides: Record<string, unknown> = {}) {
 }
 
 beforeEach(() => {
+  mockDiscovered = true;
   mockRelays.splice(0, mockRelays.length, mockRelay);
   mockProfile.activeAccountIndex = 0;
   mockPublish.mockClear();
@@ -353,4 +357,30 @@ it('never falls back to an older list when the newest authenticated list is unsu
     await expect(setPersonBlocked(ndk, own, target, true)).rejects.toThrow('Unsupported mute list');
     expect(mockPublish).not.toHaveBeenCalled();
   }
+});
+
+describe('where a block is sent', () => {
+  it('sends it to the write relays held when publishing, also one the read did not ask', async () => {
+    const { ndk, signer } = setup();
+    const added = { url: 'wss://added.example' };
+    signer.encrypt.mockImplementationOnce(async (_user, content) => {
+      mockRelays.push(added);
+      return content;
+    });
+    await setPersonBlocked(ndk, own, target, true);
+    // QUIRK (F227): the relay added after the read is sent a list built
+    // without reading it.
+    expect((mockPublish.mock.calls[0][0] as { relays: string[] }).relays).toEqual([
+      mockRelay.url,
+      added.url,
+    ]);
+  });
+
+  it("publishes before this session's relay-list sync has found the account's relays", async () => {
+    mockDiscovered = false;
+    const { ndk } = setup();
+    await setPersonBlocked(ndk, own, target, true);
+    // QUIRK (F227): the write relays may still read as the defaults.
+    expect(mockPublish).toHaveBeenCalledTimes(1);
+  });
 });
