@@ -48,6 +48,7 @@ import type {
   MeltQuoteMethod,
   MintQuoteMethod,
   MintSelectorScope,
+  NfcIOAdapter,
   PaymentMachine,
   PaymentRequestConfirmOutcome,
   PaymentRequestPreviewPhase,
@@ -278,6 +279,31 @@ const LEAVES_SETTLED_PREVIEW: Record<FlowEvent["type"], boolean> = {
   CONFIRM_MELT: false,
   CONFIRM_PAYMENT_REQUEST: false,
 };
+
+/**
+ * What an NFC tap holds from the read that started it until it ends: the tag
+ * session the read left open, and the unit it switched the host to for the
+ * terminal. One EXECUTE turn opens it and ends it in one place, which every
+ * way out of its auto-resolve loop reaches. A tap a reset or a newer turn
+ * overtook owns nothing and ends nowhere.
+ */
+interface NfcTap {
+  /** What the tag said. */
+  input: string;
+  adapter: NfcIOAdapter;
+  /** The write-back releases the session itself; otherwise the tap's end does. */
+  session: "held" | "released";
+  /** The unit the host now shows, and how to switch back to the user's. */
+  unitSwitch: { unit: string; restore: () => Promise<void> } | null;
+}
+
+/**
+ * How a tap's loop left. A paid tap keeps the terminal's unit; a stopped one
+ * switches back, then shows `error` when it has one.
+ */
+type NfcTapEnd =
+  | { kind: "paid" }
+  | { kind: "stopped"; error?: StepDataMap["error"] };
 
 // ---------------------------------------------------------------------------
 // createPaymentMachine
@@ -1328,27 +1354,27 @@ export function createPaymentMachine(
       let walletCtx = getContext();
       let unit = getUnit?.() ?? configUnit;
       let nfcError: StepDataMap["error"] | undefined;
-      // Set when the NFC branch switched the host unit; a failed or abandoned tap
-      // must restore the user's unit instead of leaving a terminal's choice behind.
-      let revertNfcUnit: (() => Promise<void>) | null = null;
-      // The unit an NFC request switched the host to, for the rest of this
-      // dispatch. Every read of the wallet context below goes through
-      // `readContext`, which keeps the balances in that unit.
-      let nfcSwitchedUnit: string | null = null;
+      const nfcTap: NfcTap | null =
+        event.type === "EXECUTE" && lastScanSource === "nfc" && nfcAdapter
+          ? { input: event.input, adapter: nfcAdapter, session: "held", unitSwitch: null }
+          : null;
+      // Every read of the wallet context below goes through `readContext`,
+      // which keeps the balances in the unit the tap switched the host to.
       const readContext = (): ReturnType<typeof getContext> => {
         const ctx = getContext();
-        if (!nfcSwitchedUnit) return ctx;
+        const switchedUnit = nfcTap?.unitSwitch?.unit;
+        if (!switchedUnit) return ctx;
         // No balances for the unit after all: no mint can pay, rather than
         // the old unit's balances standing in for them.
         return {
           ...ctx,
-          mintBalances: ctx.unitBalances?.[nfcSwitchedUnit.trim().toLowerCase()] ?? {},
+          mintBalances: ctx.unitBalances?.[switchedUnit.trim().toLowerCase()] ?? {},
         };
       };
       // A terminal chooses one unit. Switch the host's whole cached view before
       // the ordinary transition can reject a cross-unit request (including BIP21).
-      if (event.type === "EXECUTE" && lastScanSource === "nfc" && nfcAdapter) {
-        const request = parsePaymentInput(event.input, detectors).options.find(
+      if (nfcTap) {
+        const request = parsePaymentInput(nfcTap.input, detectors).options.find(
           (option) => option.kind === "paymentRequest",
         );
         const info = request && detectors.getPaymentRequestInfo(request.value);
@@ -1391,11 +1417,6 @@ export function createPaymentMachine(
               const switched = await ResultAsync.fromThrowable(async () =>
                 switchUnit(requestedUnit),
               )();
-              if (switched.isOk()) {
-                revertNfcUnit = async () => {
-                  await switchUnit(previousUnit);
-                };
-              }
               if (switched.isErr()) {
                 nfcError = {
                   code: "NFC_READ_FAILED",
@@ -1408,7 +1429,14 @@ export function createPaymentMachine(
               // re-runs its binding, so its `mintBalances` may still be the old
               // unit's here. `unitBalances` holds every unit and does not lag:
               // it is what found this request funded above.
-              if (switched.isOk()) nfcSwitchedUnit = unit;
+              if (switched.isOk()) {
+                nfcTap.unitSwitch = {
+                  unit,
+                  restore: async () => {
+                    await switchUnit(previousUnit);
+                  },
+                };
+              }
               walletCtx = readContext();
               // A missing/unsupported host switch keeps the existing unit hard-stop.
             }
@@ -1566,8 +1594,8 @@ export function createPaymentMachine(
       // REQUEST_MINT_SELECTOR from the preview's mint pill used to open
       // selectMint and immediately auto-pick the same mint again, so the
       // list never appeared.
-      if (event.type === "EXECUTE" && flowCtx.source === "nfc" && nfcAdapter) {
-        let nfcResolved = false;
+      if (nfcTap) {
+        let end: NfcTapEnd | null = null;
         // A BIP321 tag usually carries a Lightning invoice next to the ecash
         // request. When the ecash path is chosen first and then turns out to
         // be unpayable (no mint passes the payment-request gate), the option
@@ -1585,7 +1613,7 @@ export function createPaymentMachine(
 
         // Loop because auto-resolving one step (e.g. chooseOption) may produce
         // another step (e.g. selectMint) that also needs auto-resolution.
-        while (!nfcResolved) {
+        while (!end) {
           if (step === "chooseOption" || step === "chooseFallbackOption") {
             const optionData = stepData as StepDataMap["chooseOption"];
             const options = optionData.options;
@@ -1642,7 +1670,7 @@ export function createPaymentMachine(
             logger.info("machine.nfc.noViableOption", {
               optionCount: options.length,
             });
-            nfcResolved = true;
+            end = { kind: "stopped" };
           } else if (step === "selectMint") {
             const data = stepData as StepDataMap["selectMint"];
             const walletCtxInner = readContext();
@@ -1756,32 +1784,25 @@ export function createPaymentMachine(
               setStep(r.step, r.data);
               continue;
             }
-            if (refusal) {
-              // Every funded mint was refused and there is nothing else on
-              // the tag: say why, instead of showing a picker whose rows
-              // would all fail the same way.
-              await nfcAdapter.releaseSession();
-              if (isStaleGeneration(sendGeneration, "nfc.releaseSession")) return;
-              await revertNfcUnit?.().catch(() => undefined);
-              if (isStaleGeneration(sendGeneration, "nfc.revertUnit")) return;
-              setStep("error", {
-                code: "PAYMENT_REQUEST_FAILED",
-                message: refusal,
-              });
-            }
-            // No candidates at all — the selectMint handler shows the picker.
-            nfcResolved = true;
+            // Every funded mint was refused and there is nothing else on the
+            // tag: say why, instead of showing a picker whose rows would all
+            // fail the same way. No candidates at all: the selectMint handler
+            // shows the picker.
+            end = refusal
+              ? {
+                  kind: "stopped",
+                  error: { code: "PAYMENT_REQUEST_FAILED", message: refusal },
+                }
+              : { kind: "stopped" };
           } else if (step === "enterAmount") {
             // NFC requires amount in payment request — if we reach enterAmount, the request lacked it
-            await nfcAdapter.releaseSession();
-            if (isStaleGeneration(sendGeneration, "nfc.releaseSession")) return;
-            await revertNfcUnit?.().catch(() => undefined);
-            if (isStaleGeneration(sendGeneration, "nfc.revertUnit")) return;
-            setStep("error", {
-              code: "NFC_READ_FAILED",
-              message: "Payment request must include an amount for NFC payment",
-            });
-            nfcResolved = true;
+            end = {
+              kind: "stopped",
+              error: {
+                code: "NFC_READ_FAILED",
+                message: "Payment request must include an amount for NFC payment",
+              },
+            };
           } else if (
             step === "navigateToPaymentRequest" &&
             operations?.executeNfcSend
@@ -1840,7 +1861,7 @@ export function createPaymentMachine(
                 data,
                 executeNfcSend: operations.executeNfcSend,
                 rollbackSend: operations.rollbackSend,
-                nfcAdapter,
+                nfcAdapter: nfcTap.adapter,
                 context: flowCtx,
                 onProgress: (progress) => {
                   void notifications?.onNfcPaymentProgress?.(progress);
@@ -1850,11 +1871,14 @@ export function createPaymentMachine(
             } finally {
               endCommit(sendGeneration);
             }
+            // The write-back released the session, whatever it reports.
+            nfcTap.session = "released";
 
             if (effect.isOk()) {
               if (effect.value.kind === "stale") return;
               setStep(effect.value.step, effect.value.data);
               announcePayment(effect.value);
+              end = { kind: "paid" };
             } else {
               for (const notification of effect.error.notifications) {
                 if (notification.type === "onNfcWriteFailed") {
@@ -1863,22 +1887,27 @@ export function createPaymentMachine(
               }
 
               setStep("error", effect.error.data);
-              await revertNfcUnit?.().catch(() => undefined);
-              if (isStaleGeneration(sendGeneration, "nfc.revertUnit")) return;
+              end = { kind: "stopped" };
             }
 
             setExecuting(false, false);
-            nfcResolved = true;
           } else {
             // Terminal step that isn't navigateToPaymentRequest (e.g. navigateToMeltPreview,
             // error, receiveToken) — release NFC session and proceed normally.
-            await nfcAdapter.releaseSession();
-            if (isStaleGeneration(sendGeneration, "nfc.releaseSession")) return;
-            await revertNfcUnit?.().catch(() => undefined);
-            if (isStaleGeneration(sendGeneration, "nfc.revertUnit")) return;
-            nfcResolved = true;
+            end = { kind: "stopped" };
           }
         }
+
+        // The tap ends here, however the loop left it.
+        if (nfcTap.session === "held") {
+          await nfcTap.adapter.releaseSession();
+          if (isStaleGeneration(sendGeneration, "nfc.releaseSession")) return;
+        }
+        if (end?.kind !== "paid") {
+          await nfcTap.unitSwitch?.restore().catch(() => undefined);
+          if (isStaleGeneration(sendGeneration, "nfc.revertUnit")) return;
+        }
+        if (end?.kind === "stopped" && end.error) setStep("error", end.error);
       }
 
       // Intercept action steps when operations are provided.
