@@ -32,6 +32,7 @@ import { describe, it, expect } from 'vitest';
 import { createTestMachine, runScenario } from '../_harness';
 import { WALLETS, MINT1, INPUTS } from '../_harness/fixtures';
 import type { FlowScenario } from '../_harness/types';
+import { PaymentRequestUndeliveredError } from '../../src/errors';
 
 // ---------------------------------------------------------------------------
 // Payment request — happy path (matching mint + sufficient balance)
@@ -320,6 +321,25 @@ describe('payment request — confirm after delivery', () => {
     expect((await tm.machine.confirmPaymentRequest()).kind).toBe('ignored');
 
     expect(tm.operationCalls.filter((c) => c.name === 'executePaymentRequest')).toHaveLength(1);
+    tm.assertStep('navigateToPaymentRequest');
+  });
+
+  it('offers no other way to pay when the ecash left and could not be taken back', async () => {
+    const tm = createTestMachine({
+      operations: {
+        executePaymentRequest: async () => {
+          throw new PaymentRequestUndeliveredError('op-9', new Error('relay down'));
+        },
+      },
+    });
+    await tm.machine.execute(`bitcoin:?lightning=${INPUTS.bolt11WithAmount}&creq=${INPUTS.paymentRequestBasic}`, { reset: true });
+    tm.assertStep('chooseOption');
+    const request = tm.machine.getContext().parsed!.options.find((o) => o.kind === 'paymentRequest')!;
+    await tm.machine.chooseOption(request);
+    tm.assertStep('navigateToPaymentRequest');
+
+    expect((await tm.machine.confirmPaymentRequest()).kind).toBe('undelivered');
+
     tm.assertStep('navigateToPaymentRequest');
   });
 

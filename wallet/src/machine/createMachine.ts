@@ -618,7 +618,7 @@ export function createPaymentMachine(
     variant: "melt" | "paymentRequest",
     failedValue: string,
     data: { mintUrl: string; amount: number; unit: string },
-    opts?: { rolledBack?: boolean },
+    opts?: { rolledBack?: boolean; undelivered?: boolean },
   ): void {
     // A deliberate user cancel (e.g. dismissed fee sheet, nothing reserved)
     // dismisses the processing indicator quietly — no failure toast, and the
@@ -651,6 +651,10 @@ export function createPaymentMachine(
       authored,
       rolledBack: opts?.rolledBack,
     });
+
+    // The ecash left the wallet and could not be taken back, so the recipient
+    // may already hold it. Offering another option could pay them twice.
+    if (opts?.undelivered) return;
 
     // BIP321 multi-option: route to fallback or exhausted error.
     if (flowCtx.originalOptions && flowCtx.originalOptions.length > 1) {
@@ -1150,7 +1154,9 @@ export function createPaymentMachine(
             ? { kind: "undelivered", operationId: cause.operationId }
             : { kind: "failed" },
         );
-        routeOperationFailure(cause, "paymentRequest", data.paymentRequest, data);
+        routeOperationFailure(cause, "paymentRequest", data.paymentRequest, data, {
+          undelivered,
+        });
       }
 
       if (isStaleGeneration(sendGeneration, "executePaymentRequest.finalize"))
