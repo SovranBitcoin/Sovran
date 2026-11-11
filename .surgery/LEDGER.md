@@ -579,7 +579,9 @@ feed UI); the unmeasured speed-ups are listed, not made.
 
 ## Decisions (owner, 2026-11-12, after sweep 1)
 
-None of these is built yet. Each names the follow-up it settles.
+The chosen changes are implemented on `surgery/decisions-1`; verification and remaining limits are in
+"Decisions implementation" below. Each row names the follow-up it addresses, not a claim that every item in that
+follow-up is closed.
 
 | Decision                                                                                                                                                         | Settles                       |
 | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- |
@@ -615,3 +617,82 @@ second account, the branch build did not.
 
 Not done: Android; a store-signed build on a phone; NFC and Bluetooth; paying or sending from the new build; Follow,
 posting, an AI question. By the persistence rule the verdict stays INCONCLUSIVE until Android is run.
+
+## Decisions implementation (2026-11-11, resumed with GPT-6.1 Sol)
+
+Branch `surgery/decisions-1`, stacked on `surgery/sweep-1`. The owner additionally chose to read the latest relay
+list before editing and review changes before publication, without adding saved state. The new editor replaces
+Network settings' direct edits to the saved relay list; old saved local proposals remain available for explicit
+review. This decisions slice is implemented; native verification is incomplete (F246), so it is not release-certified.
+
+### Behaviour changed
+
+Every behavioral repair below was preceded by a failing test; the original pin commits remain in the branch.
+
+| Decision or repair                      | Commits                                            | Result                                                                                                                                                                                                    |
+| --------------------------------------- | -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Pay again                               | `127fb1e5c`, `70ab560b0`                           | The first retry shows the new fee; the second pays only after a definitely unpaid attempt. Finalized recovery supplies paid evidence; an unresolved payment blocks another execution for the same intent. |
+| Offline reachability                    | `dafd167e4`, `97a4d4dd8`                           | A relay or selected mint can show the network is reachable when the single Sovran server is down. The native URL setter defect found in review was repaired.                                              |
+| Backup reminder                         | `f90fdc748`                                        | A supported non-sat balance also triggers the reminder.                                                                                                                                                   |
+| AI spend confirmation                   | `4ef0daeb3`                                        | Regenerate and Retry use the same spend/funds gate as a normal send.                                                                                                                                      |
+| Invitations                             | `591ee6519`                                        | White Noise asks for invitations from the previous three days.                                                                                                                                            |
+| Follow waiting and silent relays        | `55d047d5e`, `b93a76185`, `7f54c9e95`, `f4a16fbd5` | Unpublished intents show syncing; sequential silence can exclude a known relay, overlapping failures count once, and alternating failures cannot hold a read forever.                                     |
+| Shared own-list rule                    | `e312bbc27`, `257399840`, `8d831ea62`, `9b7ac1206` | Follows, mutes, profiles and relays use complete reads and publish only to relays read. Subsequent repairs below close the stale-base gaps found by independent review.                                   |
+| Publish ownership and profile freshness | `ce1d0891a`, `8703cf276`, `946a0085f`              | Edits/account/signer changes across awaits cannot stamp newer data as published; profile saves stop when newer confirmed knowledge arrives during verification or signing.                                |
+| Old relay destinations                  | `4bd2df785`                                        | A learned old write relay remains eligible for the next edit's read and publication, without being called already queried.                                                                                |
+| Read, edit, review relay changes        | `45b30eded`, `d0095085b`                           | A complete read opens an in-memory draft. Review shows actual additions, removals and permissions; a changed remote base requires another review. Publishing exposes accessible busy state.               |
+
+The audit correction `b70b7472f` also changes behavior: untested and connecting draft relays no longer
+show a false Offline badge. Its negative cases failed before the guard and passed afterwards.
+
+The wallet-only extraction `3cc58bfbc` reuses the existing melt-outcome classifier; it is not a separate behavior
+change. The decided unused actions, wallet exports, unreachable feed/wallet paths and their exclusive tests were
+removed. No persisted schema, key, version, database or migration was changed by the resumed repairs; existing
+success paths save the reviewed list using the same representation. Edited drafts are intentionally not saved.
+
+### Review and evidence
+
+The original decisions were built by Claude Fable 5.2 and Opus 5.5, then reviewed by Codex GPT-6.1 Sol and
+GPT-6 Astra. Those reviews found ambiguous-payment retry and stale relay publication defects. After Claude's
+weekly limit, GPT-6.1 Sol completed the payment and relay fixes and built the owner's additional review flow.
+Independent GPT-6.1 Sol reviewers inspected those resumed commits against their parents and installed Coco/NDK
+behavior. They found no new payment defect; the relay/UI review found a false Offline label for untested draft
+relays, repaired with a failing component test. Cross-provider re-review remains unavailable, not silently replaced.
+
+Final verification and remaining evidence limits are recorded below. Follow-ups F200,
+F216, F227, F239, F240 and F243 distinguish completed repairs from remaining work; F246 owns native verification.
+
+The final UI review's false Offline label is repaired in `b70b7472f`: an untested or connecting relay has no
+terminal badge. Its two new negative cases failed before the guard; all twelve component cases then passed.
+`48b236c13` removes the icon whose only caller was replaced and updates the component inventory. The first full
+app run exposed both inventory failures; the corrected full suite passed. These small corrections were
+self-audited against their parents; another independent review was not repeated.
+
+### Final checks at the decision-slice source (`48b236c13`)
+
+- App: `bun run test -- --maxWorkers=4`, 802 suites, 9,480 passed, three skipped, 271 snapshots passed.
+- Wallet: `bun run test`, 118 files, 2,156 passed. Nostr: `bun run test`, 364 passed. These packages were
+  unchanged by the final relay-editor commits; both ran on the merged payment/social source.
+- Upgrade fixtures: `bun run test:upgrade`, six suites, 981 passed, two skipped; no snapshot was rewritten.
+- Root `bun run type-check` passed all workspaces and the app's iOS and Android configurations.
+- App lint: zero errors, 241 existing warnings. Styling, React Compiler (no new bailouts), knip, copy lint,
+  native scenario validation, whitespace and follow-up checks passed. The new component inventory entry is
+  the only updated snapshot; the icon exclusive to the replaced UI was removed from both registry and data.
+- Fresh Metro exports of final source succeeded for both iOS and Android. These are build evidence, not native
+  screen runs. Existing dependency export-resolution warnings remain.
+- The task harness first failed 11 collector cases with the default Node 23.10.0. Its unchanged source and test
+  file reproduced the failures on main; Node's required `test.expectFailure` API is absent there. The installed
+  Node 24.14.1 provides that API; its full rerun passed all 176 tests across 14 files. No runtime or dependency was installed.
+
+### Verification limits
+
+- The saved-check executable is absent on this machine; an earlier worker also encountered HTTP 402. No
+  automated saved-check verdict is claimed. Reviewers read the applicable contracts and source directly.
+- Neither current native flow was run or visually inspected on iOS or Android; the registered relay scenario
+  lacks its controlled relay fixture. No public publication, live payment or real-wallet destructive test ran.
+- No current real upgrade or full persistence certification was performed. The release-fixture gates and
+  unchanged schema snapshots are test evidence only; the persistence verdict remains INCONCLUSIVE.
+- The app runner still force-exits a worker after the green suite because of the known teardown gap (F55).
+- Unknown relay lists, pending mute delivery/signer continuation, and the pending-follow reversal label remain
+  reported in the follow-up ledger; they were not silently fixed across the saved-state boundary.
+- No resumed work was pushed, no PR was opened, and nothing on main's product code changed.

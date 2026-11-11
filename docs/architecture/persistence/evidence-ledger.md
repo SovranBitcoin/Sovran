@@ -1,5 +1,24 @@
 # Evidence ledger
 
+**Decision-slice verdict, 2026-11-11, candidate `48b236c1399c7dbd34fa8669f940746726854a8f`
+(`surgery/decisions-1`): INCONCLUSIVE.**
+
+No saved schema, storage key, database or migration was changed by the resumed decision repairs.
+The relay editor's draft and reviewed base are memory-only; an old saved local proposal is retained
+until explicit review, and success uses the existing saved representation. This is limited verification,
+not a refreshed certification of every shipped install. Existing release provenance and fixtures were reused.
+
+| Evidence                                                  | Current result                                                                                                                               |
+| --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bun run test:upgrade`                                    | Six suites, 981 tests passed, two skipped; fixture, frozen-writer, surface and Coco database upgrade gates ran at the decision-slice source. |
+| Saved-schema drift                                        | Existing snapshots passed unchanged in the full app suite; the relay flow added no saved field.                                              |
+| Current real upgrade                                      | NOT RUN on either platform; the surgery simulator record below predates the current decisions.                                               |
+| Native relay/payment flow                                 | NOT RUN on iOS or Android; the controlled relay fixture is unavailable. F246 records the required work.                                      |
+| Full release re-certification and cross-provider verifier | NOT RUN; Claude usage limit prevents the latter. Older invariant rows and unknown historical builds remain unresolved.                       |
+
+The previous verdict and release-specific evidence below are historical; their device results do not
+certify this candidate.
+
 **Verdict, 2026-10-11, candidate 0.1.4 (`feat/offline-send-just-works`): INCONCLUSIVE.**
 
 - Upgrades from **0.1.3 on Android: PASS.** The released 0.1.3 APK was upgraded in place to a
