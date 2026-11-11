@@ -389,4 +389,49 @@ describe('receive rail presentation', () => {
     mockActiveUnit = 'sat';
     act(() => renderer.unmount());
   });
+  it('says a row was copied only once the clipboard took it, and says so when it did not', async () => {
+    const { setStringAsync } = jest.requireMock<{ setStringAsync: jest.Mock }>('expo-clipboard');
+    const popup = jest.requireMock<{ copyPopup: jest.Mock; staticPopup: jest.Mock }>(
+      '@/shared/lib/popup'
+    );
+    popup.copyPopup.mockClear();
+    popup.staticPopup.mockClear();
+    mockRail = 'bolt12';
+    mockLoadItems.mockResolvedValue([
+      {
+        key: 'offer',
+        rail: 'bolt12',
+        request: 'lno-offer',
+        status: 'reusable',
+        createdAt: 1,
+        copyTarget: 'bolt12Offer',
+      },
+    ]);
+    let renderer!: TestRenderer.ReactTestRenderer;
+    await act(async () => {
+      renderer = TestRenderer.create(<ReceiveRailListScreen />);
+    });
+    const press = () =>
+      renderer.root.findAllByProps({ testID: 'receive-rail-item-offer' })[0].props.onPress();
+
+    let write!: { resolve: () => void; reject: (error: Error) => void };
+    setStringAsync.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve, reject) => {
+          write = { resolve, reject };
+        })
+    );
+    await act(async () => press());
+    expect(setStringAsync).toHaveBeenLastCalledWith('lno-offer');
+    expect(popup.copyPopup).not.toHaveBeenCalled();
+    await act(async () => write.resolve());
+    expect(popup.copyPopup).toHaveBeenCalledWith('bolt12Offer');
+
+    popup.copyPopup.mockClear();
+    setStringAsync.mockRejectedValueOnce(new Error('clipboard unavailable'));
+    await act(async () => press());
+    expect(popup.copyPopup).not.toHaveBeenCalled();
+    expect(popup.staticPopup).toHaveBeenCalledWith('copy-failed');
+    act(() => renderer.unmount());
+  });
 });
