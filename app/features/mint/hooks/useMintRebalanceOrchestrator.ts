@@ -199,24 +199,23 @@ export function useMintRebalanceOrchestrator({
   );
 
   /**
-   * Whether this screen may start a run: it owns none, and no other screen's
-   * run owns a swap group. Decided from ownership, not the toast, which the
-   * person can swipe away while a run goes on.
+   * Make a new run this screen's current one, or null when it may not start:
+   * this screen owns a run, or another screen's run owns a swap group. Decided
+   * from ownership, not the toast, which the person can swipe away while a run
+   * goes on. Every start goes through here. `prepare` runs once the run is
+   * allowed and before it is held (a new swap starts its group there).
+   *
+   * Its swap group reads as running while it is; a group an earlier run ended
+   * is reopened for it, with its toast (shown again if it was dismissed), so
+   * the retry's end is the one they show.
    */
-  const mayStartRun = useCallback(() => {
-    if (runRef.current) return false;
-    if (!anySwapGroupHeld()) return true;
-    cashuLog.info('mint.rebalance.start_blocked_by_active_swap');
-    return false;
-  }, []);
-
-  /**
-   * Make a new run this screen's current one. Its swap group reads as running
-   * while it is; a group an earlier run ended is reopened for it, with its
-   * toast (shown again if it was dismissed), so the retry's end is the one
-   * they show.
-   */
-  const claimRun = useCallback((): OwnedRun => {
+  const claimRun = useCallback((prepare?: () => void): OwnedRun | null => {
+    if (runRef.current) return null;
+    if (anySwapGroupHeld()) {
+      cashuLog.info('mint.rebalance.start_blocked_by_active_swap');
+      return null;
+    }
+    prepare?.();
     const groupId = swapGroupRef.current?.id ?? null;
     const account = swapGroupRef.current?.account;
     if (groupId) swapHistoryOf(account)?.reopenGroup(groupId);
@@ -384,39 +383,39 @@ export function useMintRebalanceOrchestrator({
   );
 
   const handleStart = useCallback(() => {
-    // A prior screen mount may still be running a swap (the person backed out
-    // and reopened): a second one would overlap coco's mint/melt services.
-    if (!mayStartRun()) return;
-
     // Freeze the plan snapshot
     const snapshot = computedPlan;
-    setRunPlan(snapshot);
+    // A prior screen mount may still be running a swap (the person backed out
+    // and reopened): a second one would overlap coco's mint/melt services.
+    const run = claimRun(() => {
+      setRunPlan(snapshot);
 
-    // Start a swap group for this run (used for Transactions grouping)
-    swapLegIdByStepIdRef.current = {};
-    const groupId = useSwapTransactionsStore.getState().startGroup({ unit, title: 'Swap' });
-    swapGroupRef.current = { id: groupId, account: getActiveProfilePubkey() };
-    const initialStates = createInitialStepStates(snapshot.steps);
-    stepStatesRef.current = initialStates;
-    setStepStates(initialStates);
+      // Start a swap group for this run (used for Transactions grouping)
+      swapLegIdByStepIdRef.current = {};
+      const groupId = useSwapTransactionsStore.getState().startGroup({ unit, title: 'Swap' });
+      swapGroupRef.current = { id: groupId, account: getActiveProfilePubkey() };
+      const initialStates = createInitialStepStates(snapshot.steps);
+      stepStatesRef.current = initialStates;
+      setStepStates(initialStates);
 
-    // The unified Swap status toast, which `claimRun` shows: while it is
-    // running, `usePaymentStatusListener` skips per-op toasts, so the person
-    // sees one progress notification instead of N.
-    toastStartRef.current = {
-      id: groupId,
-      legs: snapshot.steps.map((s) => ({
-        id: s.id,
-        label: `${extractDomain(s.fromMintUrl)} → ${extractDomain(s.toMintUrl)}`,
-      })),
-      meta: {
-        unit,
-        totalAmount: snapshot.steps.reduce((sum, s) => sum + (s.amount ?? 0), 0),
-        // Backs the toast's "View" button so completion → tap → SwapTransactionScreen.
-        groupId,
-      },
-    };
-    const run = claimRun();
+      // The unified Swap status toast, which `claimRun` shows: while it is
+      // running, `usePaymentStatusListener` skips per-op toasts, so the person
+      // sees one progress notification instead of N.
+      toastStartRef.current = {
+        id: groupId,
+        legs: snapshot.steps.map((s) => ({
+          id: s.id,
+          label: `${extractDomain(s.fromMintUrl)} → ${extractDomain(s.toMintUrl)}`,
+        })),
+        meta: {
+          unit,
+          totalAmount: snapshot.steps.reduce((sum, s) => sum + (s.amount ?? 0), 0),
+          // Backs the toast's "View" button so completion → tap → SwapTransactionScreen.
+          groupId,
+        },
+      };
+    });
+    if (!run) return;
     setRunStatus('running');
 
     // Run without awaiting to keep the UI responsive; the snapshot steps stay
@@ -426,15 +425,14 @@ export function useMintRebalanceOrchestrator({
       (callbacks) => engine.runTransfers(snapshot.steps, callbacks),
       () => run
     ).catch((error: unknown) => {
-      cashuLog.warn('mint.rebalance.run_failed', { groupId, error });
+      cashuLog.warn('mint.rebalance.run_failed', { groupId: run.groupId, error });
     });
-  }, [claimRun, computedPlan, mayStartRun, runSteps, unit, engine]);
+  }, [claimRun, computedPlan, runSteps, unit, engine]);
 
   const handleRetry = useCallback(
     async (step: TransferStep) => {
-      if (!mayStartRun()) return;
-
       const run = claimRun();
+      if (!run) return;
       setRunStatus('running');
       updateStepState(step.id, {
         status: 'pending',
@@ -453,7 +451,7 @@ export function useMintRebalanceOrchestrator({
         () => run
       );
     },
-    [claimRun, engine, mayStartRun, runSteps, updateStepState]
+    [claimRun, engine, runSteps, updateStepState]
   );
 
   const handleSkip = useCallback(
@@ -466,9 +464,8 @@ export function useMintRebalanceOrchestrator({
 
   const handleRetryFailed = useCallback(async () => {
     if (!runPlan) return;
-    if (!mayStartRun()) return;
-
     const run = claimRun();
+    if (!run) return;
     setRunStatus('running');
 
     // Reset only failed steps to pending
@@ -479,13 +476,11 @@ export function useMintRebalanceOrchestrator({
       (callbacks) => engine.runTransfers(steps, callbacks),
       () => run
     );
-  }, [claimRun, mayStartRun, runPlan, runSteps, engine]);
+  }, [claimRun, runPlan, runSteps, engine]);
 
   const handleRouteThrough = useCallback(
     async (step: TransferStep) => {
       if (!runPlan) return;
-      if (!mayStartRun()) return;
-
       const suggestion = stepStatesRef.current[step.id]?.routeSuggestion;
       if (!suggestion || suggestion.status !== 'found' || !suggestion.path) return;
 
@@ -493,7 +488,8 @@ export function useMintRebalanceOrchestrator({
       if (chainPath.length < 3) return; // Need at least A → via → B
 
       // Held while the intermediaries are trusted, so nothing else starts.
-      let run = claimRun();
+      const run = claimRun();
+      if (!run) return;
 
       // One engine action: it makes a step per hop, trusts the intermediaries
       // for the run, and runs them. The original step stays visible (skipped)
@@ -506,17 +502,19 @@ export function useMintRebalanceOrchestrator({
             onRunFinished: report,
             makeId: mintLocalId,
             onRerouted: (hops) => {
+              // A Cancel pressed while the intermediaries were being trusted
+              // gave the run up, and another swap may hold one now: the late
+              // answer is dropped, and the engine, finding the run no longer
+              // active, runs nothing and gives the trust back.
+              if (!isRunActive(run)) return;
               insertChainRows(step.id, hops);
-              // The run starts here. A Cancel pressed while the intermediaries
-              // were being trusted does not stop it: it is claimed again.
-              if (runRef.current !== run) run = claimRun();
               setRunStatus('running');
             },
           }),
         () => run
       );
     },
-    [claimRun, mayStartRun, runPlan, runSteps, engine, insertChainRows]
+    [claimRun, isRunActive, runPlan, runSteps, engine, insertChainRows]
   );
 
   const handleCancelRun = useCallback(() => {

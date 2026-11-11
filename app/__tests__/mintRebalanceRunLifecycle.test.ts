@@ -454,3 +454,96 @@ test('retry-failed before any run does nothing', async () => {
   expect(result.current.runStatus).toBe('idle');
   expect(mockManager.ops.melt.execute).not.toHaveBeenCalled();
 });
+
+describe('a reroute cancelled while its intermediary is being trusted', () => {
+  const via = 'https://middleman.example';
+  const rerouteRows = (screen: { result: { current: { plan: RebalancePlan } } }) =>
+    screen.result.current.plan.steps.filter((s) => s.id.startsWith('reroute-'));
+
+  /** Leave step-1 failed with a route through `via` suggested: the automatic route could not start. */
+  async function failWithSuggestedRoute() {
+    mockLocalCandidates = [via];
+    mockManager.ops.melt.execute.mockRejectedValueOnce(new Error('no_route'));
+    mockManager.quotes.mint.create.mockImplementation(async (input) => {
+      if (input.mintUrl === via) throw new Error('middleman offline');
+      return { quoteId: 'mint-quote-1', mintUrl: DESTINATION, unit: 'sat', request: 'lnbc-fixture' };
+    });
+    // The row shows the route found before its hop rows are inserted.
+    let trustedForAutoRoute!: () => void;
+    mockManager.mint.addMint.mockImplementationOnce(
+      () => new Promise<undefined>((resolve) => (trustedForAutoRoute = () => resolve(undefined)))
+    );
+    const screen = mount();
+    await act(async () => screen.result.current.handleStart());
+    await act(async () => {
+      trustedForAutoRoute();
+      await jest.advanceTimersByTimeAsync(2000);
+    });
+    expect(screen.result.current.stepStates['step-1']).toMatchObject({
+      status: 'failed',
+      routeSuggestion: { status: 'found', path: [SOURCE, via, DESTINATION] },
+    });
+    return screen;
+  }
+
+  test('does not start once the trust arrives, while another screen’s swap runs', async () => {
+    const a = await failWithSuggestedRoute();
+    let trusted!: () => void;
+    mockManager.mint.addMint.mockImplementationOnce(
+      () => new Promise<undefined>((resolve) => (trusted = () => resolve(undefined)))
+    );
+
+    // A reroutes and waits for the intermediary to be trusted; Cancel.
+    let reroute: Promise<void> = Promise.resolve();
+    await act(async () => {
+      reroute = a.result.current.handleRouteThrough(step);
+    });
+    expect(mockManager.mint.addMint).toHaveBeenLastCalledWith(via, { trusted: true });
+    act(() => a.result.current.handleCancelRun());
+    expect(a.result.current.runStatus).toBe('cancelled');
+
+    // Another screen starts its own swap, which stays in flight.
+    mockTransactions.startGroup.mockReturnValueOnce('group-b');
+    keepRecipientPending();
+    const b = mount();
+    await act(async () => b.result.current.handleStart());
+    expect(b.result.current.runStatus).toBe('running');
+    const melts = mockManager.ops.melt.execute.mock.calls.length;
+    const quotes = mockManager.quotes.mint.create.mock.calls.length;
+    const reopens = mockTransactions.reopenGroup.mock.calls.length;
+
+    // The late trust answer is dropped: A's reroute never runs.
+    await act(async () => {
+      trusted();
+      await jest.advanceTimersByTimeAsync(1000);
+      await reroute;
+    });
+    expect(a.result.current.runStatus).toBe('cancelled');
+    expect(rerouteRows(a)).toEqual([]);
+    expect(mockManager.quotes.mint.create).toHaveBeenCalledTimes(quotes);
+    expect(mockManager.ops.melt.execute).toHaveBeenCalledTimes(melts);
+    expect(mockTransactions.reopenGroup).toHaveBeenCalledTimes(reopens);
+    // Its intermediary is given back all the same.
+    expect(mockReleaseTrust).toHaveBeenLastCalledWith(mockManager, [via]);
+    expect(b.result.current.runStatus).toBe('running');
+  });
+
+  test('runs once the trust arrives when nothing cancelled it', async () => {
+    const a = await failWithSuggestedRoute();
+    mockManager.quotes.mint.create.mockImplementation(async (input) => ({
+      quoteId: `quote-${input.mintUrl}`,
+      mintUrl: input.mintUrl,
+      unit: 'sat',
+      request: `invoice-${input.mintUrl}`,
+    }));
+    await act(async () => {
+      void a.result.current.handleRouteThrough(step);
+      await jest.advanceTimersByTimeAsync(100);
+    });
+    expect(a.result.current.runStatus).toBe('running');
+    expect(rerouteRows(a)).toHaveLength(2);
+    expect(mockManager.quotes.mint.create).toHaveBeenCalledWith(
+      expect.objectContaining({ mintUrl: via })
+    );
+  });
+});
