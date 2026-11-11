@@ -20,7 +20,7 @@ import { storeLog } from '@/shared/lib/logger';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
 import { tolerantRecord } from '@/shared/lib/persist/tolerant';
 
-export type SwapGroupState = 'running' | 'finished' | 'cancelled';
+type SwapGroupState = 'running' | 'finished' | 'cancelled';
 
 /**
  * What a saved group can become next. A run ends its group once; a retry
