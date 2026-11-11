@@ -22,6 +22,7 @@ import { z } from 'zod';
 import { nostrLog } from '@/shared/lib/logger';
 import { buildNostrDataLayer } from '@/shared/lib/nostr/buildNostrDataLayer';
 import { getKnownOwnWriteRelays } from '@/shared/lib/nostr/outbox/relayListStore';
+import { TIMED_OUT, settleWithin } from '@/shared/lib/profile/settleWithin';
 import {
   selectContactList,
   selectFollowIntents,
@@ -223,21 +224,6 @@ function sameRelays(read: readonly string[], ownPubkey: string) {
  */
 const INDEXERS_SETTLE_MS = tiers.DEFAULT_SOURCE_TIMEOUT_MS + 5_000;
 
-/** `promise`'s value, or `undefined` once `ms` have passed without one. */
-async function within<V>(promise: Promise<V>, ms: number): Promise<V | undefined> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  try {
-    return await Promise.race([
-      promise,
-      new Promise<undefined>((resolve) => {
-        timer = setTimeout(() => resolve(undefined), ms);
-      }),
-    ]);
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
 /**
  * Ask the tiered facade whether the account has a follow list somewhere, once
  * every enabled source has settled. No source can prove there is none (nagg
@@ -270,8 +256,8 @@ async function askIndexers(pubkey: string): Promise<{ indexed: IndexedList; seed
   if (!result.value.provenance) return { indexed: 'unanswered' };
   const graph = result.value.provenance.complete
     ? result.value
-    : await within(settled, INDEXERS_SETTLE_MS);
-  if (!graph) return { indexed: 'unanswered' };
+    : await settleWithin(settled, INDEXERS_SETTLE_MS);
+  if (graph === TIMED_OUT) return { indexed: 'unanswered' };
   if (graph.contactsUpdatedAt > 0)
     return {
       indexed: 'exists',
