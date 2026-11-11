@@ -13,6 +13,7 @@ import {
   MAX_FUTURE_SEC,
   SILENT_READS_BEFORE_LEFT_OUT,
   forgetSilentRelays,
+  readNewestOwnEvent,
 } from '@/shared/lib/nostr/ownReplaceableEvent';
 import { useOwnProfileMetadataStore } from '@/shared/stores/profile/ownProfileMetadataStore';
 import { publishEvent } from '@/shared/lib/nostr/publish/publishEvent';
@@ -585,4 +586,48 @@ describe('the profile a save builds on, and where it is sent', () => {
     expect(JSON.parse(event.content)).toMatchObject({ about: 'opened' });
     expect(event.created_at).toBeGreaterThan(30);
   });
+});
+
+describe('silence accounting at a fixed clock', () => {
+  it('does not exclude a relay after overlapping same-clock failures', async () => {
+    jest.useFakeTimers();
+    const ndk = makeNdk();
+    ndk.onStart.mockRejectedValue(new Error('offline'));
+    const clock = jest.spyOn(Date, 'now').mockReturnValue(1000);
+    await Promise.all(
+      Array.from({ length: 3 }, () => readNewestOwnEvent(ndk, pubkey, 0, { relays: [RELAY] }))
+    );
+    ndk.onStart.mockImplementation(async (subscription) => {
+      if (subscription.url !== RELAY) subscription.eose();
+    });
+    const reading = readNewestOwnEvent(ndk, pubkey, 0, {
+      relays: [RELAY, 'wss://healthy.example/'],
+      leaveOutSilent: true,
+    });
+    await jest.advanceTimersByTimeAsync(12_000);
+    expect((await reading).outcome).toBe('timed-out');
+    clock.mockRestore();
+    jest.useRealTimers();
+  });
+});
+
+it('excludes after sequential same-clock failures and restores on a late answer', async () => {
+  jest.useFakeTimers();
+  const ndk = makeNdk();
+  ndk.onStart.mockRejectedValue(new Error('offline'));
+  const clock = jest.spyOn(Date, 'now').mockReturnValue(1000);
+  for (let i = 0; i < 3; i++) await readNewestOwnEvent(ndk, pubkey, 0, { relays: [RELAY] });
+  ndk.onStart.mockImplementation(async (subscription) => {
+    if (subscription.url !== RELAY) subscription.eose();
+  });
+  const relays = [RELAY, 'wss://healthy.example/'];
+  const read = await readNewestOwnEvent(ndk, pubkey, 0, { relays, leaveOutSilent: true });
+  expect(read).toMatchObject({ outcome: 'complete', relays: ['wss://healthy.example/'] });
+  // The excluded probe answers after the read returned. Next read must wait for it.
+  ndk.subscriptions.at(-2)!.eose();
+  const next = readNewestOwnEvent(ndk, pubkey, 0, { relays, leaveOutSilent: true });
+  await jest.advanceTimersByTimeAsync(12_000);
+  expect((await next).outcome).toBe('timed-out');
+  clock.mockRestore();
+  jest.useRealTimers();
 });
