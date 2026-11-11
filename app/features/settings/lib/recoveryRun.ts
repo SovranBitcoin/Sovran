@@ -450,7 +450,7 @@ async function recover(
             durationMs,
           }
         : stoppedBeforeLastKeyset
-          ? { ...base, status: 'skipped', reason: 'cancelled' }
+          ? { ...base, status: 'skipped', reason: 'cancelled', fundsFound: found }
           : skippedKeysets > 0 && attemptedKeysets === 0
             ? {
                 ...base,
@@ -492,7 +492,7 @@ async function recover(
     const mintUrl = allMintUrls[i]!;
     const base = { mint: mintUrl, isDiscovered: i >= knownMintUrls.length };
     if (stopRequested()) {
-      update(i, { ...base, status: 'skipped', reason: 'cancelled' });
+      update(i, { ...base, status: 'skipped', reason: 'cancelled', fundsFound: false });
       continue;
     }
     try {

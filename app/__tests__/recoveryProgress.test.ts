@@ -56,6 +56,7 @@ const cancelled = (where: Where = {}): MintRecoveryState => ({
   ...at(where),
   status: 'skipped',
   reason: 'cancelled',
+  fundsFound: false,
 });
 const notRestorable = (where: Where = {}, funds = false): MintRecoveryState => ({
   ...at(where),

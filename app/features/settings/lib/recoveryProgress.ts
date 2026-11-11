@@ -36,7 +36,12 @@ type MintRecoveryProgress =
     }
   | { status: 'failed'; error: string; fundsFound: boolean; durationMs: number | null }
   | { status: 'timed-out' }
-  | { status: 'skipped'; reason: 'cancelled' }
+  | {
+      status: 'skipped';
+      reason: 'cancelled';
+      /** A mint the stop cut short may already hold what its first keysets restored. */
+      fundsFound: boolean;
+    }
   | { status: 'skipped'; reason: 'not-restorable'; fundsFound: boolean; durationMs: number };
 
 type MintRecoveryStatus = MintRecoveryProgress['status'];
@@ -96,9 +101,8 @@ export function fundsFound(state: MintRecoveryState): boolean {
     case 'done':
     case 'already-recovered':
     case 'failed':
-      return state.fundsFound;
     case 'skipped':
-      return state.reason === 'not-restorable' && state.fundsFound;
+      return state.fundsFound;
     case 'waiting':
     case 'restoring':
     case 'timed-out':

@@ -425,6 +425,33 @@ describe('stopping a run', () => {
     expect(deleteMintOperation).not.toHaveBeenCalled();
   });
 
+  it('keeps trusting a discovered mint the stop cut short once funds were restored there', async () => {
+    mockMints = [];
+    const FOUND = 'https://found.example';
+    jest.mocked(discoverMints).mockResolvedValue(
+      ok({
+        mints: [
+          { mintUrl: FOUND, hasAudit: true, state: 'OK', averageScore: null, reviewCount: 0 },
+        ],
+      }) as never
+    );
+    jest.mocked(probeMintForHistory).mockResolvedValue(true);
+    mintsServe({ [FOUND]: [KEYSET_1, '00107937db0cc865'] });
+    mockBalancesByMint.mockResolvedValue({ [FOUND]: { total: 21 } });
+    const release = holdNextKeyset();
+    const renderer = await mount();
+    await act(async () => {
+      byTestId(renderer, 'recovery-search-all-toggle')[0]!.props.onSelectedChange(true);
+    });
+    const run = await startHeld(renderer);
+
+    await stopAndFinish(renderer, release, run);
+
+    expect(mockRestoreKeyset).toHaveBeenCalledTimes(1);
+    expect(texts(renderer)).toContain('Recovery stopped');
+    expect(mockUntrustMint).not.toHaveBeenCalled();
+  });
+
   it('while searching discovered mints, asks no further batch and restores nothing', async () => {
     mockMints = [{ mintUrl: MINT_A, mintInfo: { name: 'Mint A' } }];
     const candidates = [1, 2, 3, 4, 5].map((n) => `https://found-${n}.example`);
