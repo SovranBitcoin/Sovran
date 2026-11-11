@@ -333,8 +333,9 @@ export function createPaymentMachine(
   // intent included, while it is the current generation.
   let commitGeneration: number | null = null;
   // Result holders of `confirmPaymentRequest` calls no turn has taken yet.
-  // A call registers before `send`; a payment-request turn takes them all
-  // right after it begins, so a caller the lock drops keeps its `ignored`.
+  // A call registers before `send`, and its turn takes it as it begins, so
+  // only that turn's own send settles it; a caller the lock drops keeps its
+  // `ignored`.
   let pendingPaymentRequestConfirms: {
     outcome: PaymentRequestConfirmOutcome;
   }[] = [];
@@ -413,16 +414,14 @@ export function createPaymentMachine(
    * The one way out of a turn. Returns false, doing nothing, when a reset or
    * a superseding event took the machine from it. By default the turn stops
    * executing and tells listeners; `executing: "keep"` leaves
-   * `inspect().isExecuting` as it is, `notify: false` tells no one, and
-   * `guard: "none"` frees the machine without asking whether this turn still
-   * holds it (one exit does, see its QUIRK).
+   * `inspect().isExecuting` as it is and `notify: false` tells no one.
    */
   function finishTurn(
     generation: number,
     op: string,
-    exit: { executing?: "keep"; notify?: false; guard?: "none" } = {},
+    exit: { executing?: "keep"; notify?: false } = {},
   ): boolean {
-    if (!exit.guard && isStaleGeneration(generation, op)) return false;
+    if (isStaleGeneration(generation, op)) return false;
     if (!exit.executing) setExecuting(false, false);
     sendLocked = false;
     if (exit.notify !== false) notify();
@@ -967,6 +966,11 @@ export function createPaymentMachine(
   const send = async (event: FlowEvent): Promise<void> => {
     const sendGeneration = beginTurn(event.type);
     if (sendGeneration === null) return;
+    // This caller's result holder, taken before anything awaits: only this
+    // turn's own send settles it, so a tap that sends nothing stays
+    // `ignored` whatever a later turn delivers.
+    const settleConfirm =
+      event.type === "CONFIRM_PAYMENT_REQUEST" ? takeConfirms() : () => {};
     logger.info("machine.event.received", {
       type: event.type,
       currentStep: step,
@@ -1054,9 +1058,7 @@ export function createPaymentMachine(
       try {
         await dispatchHandler(step, stepData);
       } finally {
-        // QUIRK: frees the machine even when fresh intent took it over while
-        // the handler ran, so the newer turn loses its lock (turn-exits test).
-        finishTurn(sendGeneration, "confirm.noMintSelected", { guard: "none" });
+        finishTurn(sendGeneration, "confirm.noMintSelected");
       }
       return;
     }
@@ -1187,9 +1189,6 @@ export function createPaymentMachine(
       // A delivered or undelivered preview never reaches here (see the
       // settled guard above), so its caller's outcome stays `ignored`.
       const data = stepData as StepDataMap["navigateToPaymentRequest"];
-      // Callers that arrive during the await below are dropped by the lock
-      // and keep their own holder, which this turn never took.
-      const settle = takeConfirms();
       logger.info("machine.confirmPaymentRequest.start", {
         ...mintUrlFields(data.mintUrl),
         amount: data.amount,
@@ -1229,7 +1228,7 @@ export function createPaymentMachine(
             ...mintUrlFields(data.mintUrl),
             errorMessage: effect.value.errorMessage,
           });
-          settle({ kind: "rolledBack" });
+          settleConfirm({ kind: "rolledBack" });
           routeOperationFailure(
             effect.value.cause,
             "paymentRequest",
@@ -1242,7 +1241,7 @@ export function createPaymentMachine(
           logger.info("machine.paymentRequest.success", {
             ...mintUrlFields(data.mintUrl),
           });
-          settle({ kind: "delivered" });
+          settleConfirm({ kind: "delivered" });
 
           for (const link of effect.value.links) {
             if (link.type === "linkTransaction") {
@@ -1269,7 +1268,7 @@ export function createPaymentMachine(
         });
         const cause = effect.error.cause;
         const undelivered = cause instanceof PaymentRequestUndeliveredError;
-        settle(
+        settleConfirm(
           undelivered
             ? { kind: "undelivered", operationId: cause.operationId }
             : { kind: "failed" },

@@ -291,10 +291,10 @@ Every exit of a turn goes through `finishTurn` (`createMachine.ts`, section
 state (generation, lock, `isExecuting`, the commit generation and the
 payment-request confirm holders) is written only by the functions in that
 section. `__tests__/flows/turn-exits.test.ts` pins every exit, including the
-quirks left as they are: Pay with no mint chosen frees the machine without the
-ownership check, a throw between a melt or payment request result and its
-handler leaves the machine held, and an NFC tap does not check its turn after
-releasing the tag session.
+quirks left as they are: a throw between a melt or payment request result and
+its handler leaves the machine held, and an NFC tap does not check its turn
+after releasing the tag session. A `confirmPaymentRequest()` call's result is
+settled only by its own turn, so a tap that sent nothing resolves `ignored`.
 
 Gather order is fixed: amount -> mint -> proofs -> terminal
 (`resolveNext.ts:256-264`).

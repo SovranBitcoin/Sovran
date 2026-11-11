@@ -421,13 +421,10 @@ describe("a turn superseded by fresh intent", () => {
     expect(await isFree(tm.machine)).toBe(true);
   });
 
-  // QUIRK: Pay with no mint chosen re-runs the mint list handler and then
-  // frees the machine without checking that its turn still holds it. When
-  // fresh intent took over while that handler ran, the newer turn's lock is
-  // freed under it: Pay runs while the newer turn still waits for its quote,
-  // and `inspect()` stops saying it is executing. The app's mint list handler
-  // returns at once, so the window is one microtask there.
-  it("frees the newer turn's lock when Pay with no mint chosen is superseded", async () => {
+  // Pay with no mint chosen re-runs the mint list handler. When fresh intent
+  // takes over while that handler runs, the newer turn keeps its lock: Pay
+  // cannot run while it still waits for its quote.
+  it("keeps the newer turn's lock when Pay with no mint chosen is superseded", async () => {
     const selector = deferred();
     let holdSelector = false;
     const quote = deferred<MeltQuotePreview>();
@@ -446,23 +443,21 @@ describe("a turn superseded by fresh intent", () => {
 
     selector.resolve();
     await pay;
-    expect(isExecuting(tm.machine)).toBe(false);
-    expect(await isFree(tm.machine)).toBe(true);
+    expect(isExecuting(tm.machine)).toBe(true);
+    expect(await isFree(tm.machine)).toBe(false);
     await tm.machine.confirmMelt();
-    expect(tm.calls("executeMelt")).toBe(1);
+    expect(tm.calls("executeMelt")).toBe(0);
 
     quote.resolve(meltQuote());
     await newer;
     expect(tm.machine.getStep()).toBe("navigateToMeltPreview");
+    expect(isExecuting(tm.machine)).toBe(false);
     expect(await isFree(tm.machine)).toBe(true);
   });
 
-  // QUIRK: a confirm tapped on the mint list with no mint chosen keeps its
-  // result holder registered while the mint list handler runs. If fresh
-  // intent takes over and a later confirm delivers, that later confirm
-  // settles every registered holder, so the first caller is told its
-  // payment was delivered although its own tap sent nothing.
-  it("tells a superseded confirm that a later confirm's payment was delivered", async () => {
+  // A confirm tapped on the mint list with no mint chosen sends nothing, so
+  // a later confirm's payment is not its outcome.
+  it("tells a superseded confirm that sent nothing that it was ignored", async () => {
     const selector = deferred();
     let holdSelector = false;
     const tm = build({
@@ -478,7 +473,7 @@ describe("a turn superseded by fresh intent", () => {
     selector.resolve();
 
     expect(second.kind).toBe("delivered");
-    expect((await first).kind).toBe("delivered");
+    expect(await first).toEqual({ kind: "ignored" });
     expect(tm.calls("executePaymentRequest")).toBe(1);
   });
 });
