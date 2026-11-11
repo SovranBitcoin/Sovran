@@ -373,12 +373,14 @@ export function createNotificationsSession(
   async function loadMore(): Promise<ResolvedNotifications> {
     await Promise.allSettled(
       options.sources.map(async (source) => {
-        const current = per.get(source.tier);
-        const cursor = current && olderPageCursor(current);
-        if (!current || !cursor) return;
+        const asked = per.get(source.tier);
+        const cursor = asked && olderPageCursor(asked);
+        if (!asked || !cursor) return;
         const outcome = await source.fetch(sourceRequest(cursor));
         if (closed) return;
-        per.set(source.tier, afterPage(current, outcome));
+        // Judge the answer against where the source stands now: an overlapping
+        // loadMore may have moved it on while this page was in flight.
+        per.set(source.tier, afterPage(per.get(source.tier) ?? asked, outcome));
         if (outcome.kind === 'answered') absorb(source.tier, outcome.value);
       }),
     );

@@ -207,6 +207,45 @@ describe('notifications session', () => {
     session.close();
   });
 
+  it('two overlapping older pages are judged against where the source stands when each answers', async () => {
+    // First page gives cursor 100; two loadMore calls both ask from 100. The
+    // first answers 50, the second 75: 75 is not older than the 50 the source
+    // now stands at, so the source ends rather than going back to 75.
+    const answers: Array<(outcome: TierOutcome<NotificationsBundle>) => void> = [];
+    const nagg = source('nagg', (req) => {
+      if (!req.cursor) {
+        return Promise.resolve(
+          answered(bundle([flatItem('n1', 'alice', 'reply', 100)], { createdAt: 100, id: 'n1' })),
+        );
+      }
+      return new Promise((resolve) => answers.push(resolve));
+    });
+    const timers = manualTimers();
+    const session = createNotificationsSession({
+      request: REQUEST,
+      sources: [nagg],
+      scheduleAfter: timers.scheduleAfter,
+    });
+    await session.firstPage();
+
+    const first = session.loadMore();
+    const second = session.loadMore();
+    expect(nagg.requests.map((r) => r.cursor)).toEqual([
+      undefined,
+      { createdAt: 100, id: 'n1' },
+      { createdAt: 100, id: 'n1' },
+    ]);
+    answers[0]!(answered(bundle([], { createdAt: 50, id: 'n50' })));
+    await first;
+    answers[1]!(answered(bundle([], { createdAt: 75, id: 'n75' })));
+    await second;
+
+    expect(session.hasMore()).toBe(false);
+    await session.loadMore();
+    expect(nagg.requests).toHaveLength(3);
+    session.close();
+  });
+
   it('a failed older page leaves the source to be asked again from the same cursor', async () => {
     const nagg = source('nagg', [
       answered(bundle([flatItem('n1', 'alice', 'reply', 30)], { createdAt: 30, id: 'n1' })),
