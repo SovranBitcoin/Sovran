@@ -378,9 +378,14 @@ export function createNotificationsSession(
         if (!asked || !cursor) return;
         const outcome = await source.fetch(sourceRequest(cursor));
         if (closed) return;
-        // Judge the answer against where the source stands now: an overlapping
-        // loadMore may have moved it on while this page was in flight.
-        per.set(source.tier, afterPage(per.get(source.tier) ?? asked, outcome));
+        // An overlapping loadMore may have moved the source on while this page
+        // was in flight. Then the answer only shows this request was stale: it
+        // says nothing about where the source's history ends, so its paging
+        // stays as it is (its rows are still taken in).
+        const now = per.get(source.tier) ?? asked;
+        const from = olderPageCursor(now);
+        if (from && from.createdAt === cursor.createdAt && from.id === cursor.id)
+          per.set(source.tier, afterPage(now, outcome));
         if (outcome.kind === 'answered') absorb(source.tier, outcome.value);
       }),
     );
