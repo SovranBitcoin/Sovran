@@ -48,8 +48,6 @@ import {
   nextMessageEcashRetryAt,
 } from '../lib/parkedMessageEcash';
 
-/** NIP-04 and NIP-17 gift wraps: the kinds the conversation list reads. */
-const DM_KINDS = [4, 1059];
 const PAGE_LIMIT = 50;
 /**
  * Upper bound on pages read in one pass, so a pathological inbox is not read
@@ -237,7 +235,6 @@ function useDmEcashAutoRedeem(): void {
     const readPage = async (cursor: DmEnvelopeCursor, pageIndex: number): Promise<boolean> => {
       const page = await fetchDmEnvelopes({
         viewer: pubkey,
-        kinds: DM_KINDS,
         limit: PAGE_LIMIT,
         refresh: pageIndex === 0,
         ...(pageIndex > 0 ? { until: cursor.nextUntil() } : {}),

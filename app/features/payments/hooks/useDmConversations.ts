@@ -22,9 +22,6 @@ import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { isMockContactPubkey } from '@/shared/stores/runtime/mockDataStore';
 import { useDmEnvelopePages, type DmPageMeta } from './useDmEnvelopePages';
 
-/** Fetched DM kinds: NIP-04 (kind 4) + NIP-17 gift wraps (kind 1059). */
-const DM_KINDS = [4, 1059];
-
 export interface DmConversation {
   counterparty: string;
   lastMessagePreview: string;
@@ -151,7 +148,6 @@ export function useDmConversations(
     (args: { until?: number; refresh: boolean; signal?: AbortSignal }) =>
       fetchDmEnvelopes({
         viewer: viewerPubkey ?? '',
-        kinds: DM_KINDS,
         limit: PAGE_LIMIT,
         ...args,
       }),

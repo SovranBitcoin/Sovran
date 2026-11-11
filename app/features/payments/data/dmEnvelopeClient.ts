@@ -18,7 +18,6 @@ const EMPTY_PAGE: DmEnvelopePage = { envelopes: [], hasNextPage: false };
  */
 export async function fetchDmEnvelopes(args: {
   viewer: string;
-  kinds?: number[];
   until?: number;
   limit?: number;
   refresh?: boolean;
