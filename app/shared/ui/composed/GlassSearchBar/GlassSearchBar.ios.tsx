@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { TextInput, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
 
 import { GlassView } from 'expo-glass-effect';
 
@@ -9,43 +9,25 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { supportsLiquidGlass } from '@/shared/lib/version';
 import { withAlpha } from '@/shared/lib/color';
 import type { GlassSearchBarProps } from './types';
-import { useDebouncedSearchText } from './useDebouncedSearchText';
+import { SearchTextInput } from './searchTextInput';
 
 export const GlassSearchBar = memo(function GlassSearchBar({
-  testID,
   width,
   height = 44,
-  clearKey,
-  onChangeText,
-  placeholder,
-  keyboardType = 'web-search',
-  autoFocus,
-  debounceMs,
-  seedText = '',
+  ...field
 }: GlassSearchBarProps) {
   const [foreground, surfaceSecondary] = useThemeColor([
     'foreground',
     'surface-secondary',
   ] as const);
-  const handleTextChange = useDebouncedSearchText({ onChangeText, debounceMs, clearKey });
 
   // Liquid devices get a real glass capsule (the component's namesake);
   // everywhere else keeps the flat surface-secondary field.
   const liquid = supportsLiquidGlass();
   const input = (
-    <TextInput
-      testID={testID}
-      key={clearKey}
-      defaultValue={seedText}
-      placeholder={placeholder}
+    <SearchTextInput
+      {...field}
       placeholderTextColor={withAlpha(foreground, 0.33)}
-      onChangeText={handleTextChange}
-      keyboardType={keyboardType}
-      autoCorrect={false}
-      autoCapitalize="none"
-      autoFocus={autoFocus}
-      accessibilityLabel={placeholder}
-      accessibilityRole="search"
       style={[
         styles.input,
         liquid

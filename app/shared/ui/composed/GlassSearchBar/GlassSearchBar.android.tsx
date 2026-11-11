@@ -1,5 +1,4 @@
-import { memo, useRef } from 'react';
-import { TextInput } from 'react-native';
+import { memo } from 'react';
 import { withAlpha } from '@/shared/lib/color';
 
 import { Log } from '@/shared/lib/logger';
@@ -7,26 +6,17 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { radius } from '@/shared/styles/tokens';
 import type { GlassSearchBarProps } from './types';
-import { useDebouncedSearchText } from './useDebouncedSearchText';
+import { SearchTextInput } from './searchTextInput';
 
 export const GlassSearchBar = memo(function GlassSearchBar({
-  testID,
-  clearKey,
-  onChangeText,
-  placeholder,
-  keyboardType = 'web-search',
-  autoFocus,
-  debounceMs,
-  seedText = '',
   width,
   height = 44,
+  ...field
 }: GlassSearchBarProps) {
   const [foreground, surfaceSecondary] = useThemeColor([
     'foreground',
     'surface-secondary',
   ] as const);
-  const inputRef = useRef<TextInput>(null);
-  const handleTextChange = useDebouncedSearchText({ onChangeText, debounceMs, clearKey });
 
   return (
     <Log name="GlassSearchBar">
@@ -45,26 +35,15 @@ export const GlassSearchBar = memo(function GlassSearchBar({
           borderRadius: radius.lg,
           paddingHorizontal: 12,
         }}>
-        <TextInput
-          testID={testID}
-          key={clearKey}
-          ref={inputRef}
-          defaultValue={seedText}
-          onChangeText={handleTextChange}
-          placeholder={placeholder}
+        <SearchTextInput
+          {...field}
           placeholderTextColor={withAlpha(foreground, 0.33)}
-          accessibilityLabel={placeholder}
-          accessibilityRole="search"
           style={{
             flex: 1,
             color: foreground,
             fontSize: 16,
             fontFamily: 'OxygenRegular',
           }}
-          keyboardType={keyboardType}
-          autoCorrect={false}
-          autoCapitalize="none"
-          autoFocus={autoFocus}
         />
       </View>
     </Log>
