@@ -366,6 +366,187 @@ describe('a search across discovered mints', () => {
   });
 });
 
+describe('stopping a run', () => {
+  /** Holds the next keyset restore open until the returned release is called. */
+  function holdNextKeyset() {
+    let release: () => void = () => {};
+    mockRestoreKeyset.mockImplementationOnce(
+      () => new Promise<undefined>((resolve) => (release = () => resolve(undefined)))
+    );
+    return () => release();
+  }
+
+  async function startHeld(renderer: Renderer) {
+    jest.useFakeTimers();
+    let ended = false;
+    await act(async () => {
+      void byTestId(renderer, 'recovery-swipe')[0]!
+        .props.onConfirm()
+        .then(() => {
+          ended = true;
+        });
+      await jest.advanceTimersByTimeAsync(0);
+    });
+    return () => ended;
+  }
+
+  async function stopAndFinish(renderer: Renderer, release: () => void, ended: () => boolean) {
+    await act(async () => {
+      byTestId(renderer, 'recovery-stop')[0]!.props.onPress();
+    });
+    await act(async () => {
+      release();
+      await jest.advanceTimersByTimeAsync(10);
+    });
+    expect(ended()).toBe(true);
+  }
+
+  it('between keysets, restores none of the rest and skips the later mints', async () => {
+    mintsServe({ [MINT_A]: [KEYSET_1, '00107937db0cc865'] });
+    mockListPending.mockResolvedValue([
+      { id: 'op-a', mintUrl: MINT_A },
+      { id: 'op-b', mintUrl: MINT_B },
+    ]);
+    const release = holdNextKeyset();
+    const renderer = await mount();
+    const run = await startHeld(renderer);
+
+    await stopAndFinish(renderer, release, run);
+
+    expect(mockRestoreKeyset).toHaveBeenCalledTimes(1);
+    expect(mockAddMint.mock.calls.map((call) => call[0])).toEqual([MINT_A]);
+    expect(texts(renderer)).toContain('Recovery stopped');
+    expect(texts(renderer)).toContain('Cancelled');
+    expect(byTestId(renderer, 'recovery-swipe')).toHaveLength(1);
+    expect(paramPopup).not.toHaveBeenCalled();
+    expect(staticPopup).not.toHaveBeenCalled();
+    // QUIRK (F210): mint A stopped before its second keyset and mint B was never
+    // asked, yet the pending operations of both are deleted.
+    expect(jest.mocked(deleteMintOperation).mock.calls.map((call) => call[1])).toEqual([
+      'op-a',
+      'op-b',
+    ]);
+  });
+
+  it('while searching discovered mints, asks no further batch and restores nothing', async () => {
+    mockMints = [{ mintUrl: MINT_A, mintInfo: { name: 'Mint A' } }];
+    const candidates = [1, 2, 3, 4, 5].map((n) => `https://found-${n}.example`);
+    jest.mocked(discoverMints).mockResolvedValue(
+      ok({
+        mints: candidates.map((mintUrl) => ({
+          mintUrl,
+          hasAudit: true,
+          state: 'OK',
+          averageScore: null,
+          reviewCount: 0,
+        })),
+      }) as never
+    );
+    let releaseProbe: () => void = () => {};
+    jest.mocked(probeMintForHistory).mockImplementation(
+      (_m, url) =>
+        new Promise<boolean>((resolve) => {
+          if (url === candidates[0]) releaseProbe = () => resolve(true);
+          else resolve(false);
+        })
+    );
+    const renderer = await mount();
+    await act(async () => {
+      byTestId(renderer, 'recovery-search-all-toggle')[0]!.props.onSelectedChange(true);
+    });
+    const run = await startHeld(renderer);
+    expect(texts(renderer)).toContain('Checking 4 of 5 mints');
+
+    await stopAndFinish(renderer, releaseProbe, run);
+
+    expect(jest.mocked(probeMintForHistory).mock.calls.map((call) => call[1])).toEqual(
+      candidates.slice(0, 4)
+    );
+    expect(mockAddMint).not.toHaveBeenCalled();
+    expect(texts(renderer)).toContain('Recovery stopped');
+    // Every probed mint is untrusted again, the one that held history among them:
+    // it was never restored, so no funds were found there.
+    expect(mockUntrustMint.mock.calls.map((call) => call[0]).sort()).toEqual(
+      candidates.slice(0, 4).sort()
+    );
+  });
+});
+
+describe('the end of a run', () => {
+  it('QUIRK (F210): deletes the pending operations of a mint whose restore failed', async () => {
+    mockAddMint.mockImplementation(async (url: string) => {
+      if (url === MINT_B) throw new Error('unreachable');
+      return { mint: { mintUrl: url }, keysets: [{ id: KEYSET_1, unit: 'sat' }] };
+    });
+    mockListPending.mockResolvedValue([
+      { id: 'op-a', mintUrl: MINT_A },
+      { id: 'op-b', mintUrl: MINT_B },
+    ]);
+    const renderer = await mount();
+
+    await swipe(renderer);
+
+    expect(texts(renderer)).toContain('Recovery Partial');
+    expect(jest.mocked(deleteMintOperation).mock.calls.map((call) => call[1])).toEqual([
+      'op-a',
+      'op-b',
+    ]);
+  });
+
+  it('carries on when the pending operations cannot be listed, or one cannot be deleted', async () => {
+    mockListPending.mockRejectedValueOnce(new Error('database locked'));
+    const first = await mount();
+    await swipe(first);
+    expect(texts(first)).toContain('Recovery Complete');
+    expect(deleteMintOperation).not.toHaveBeenCalled();
+    expect(mockLoadMints).toHaveBeenCalledTimes(1);
+
+    mockListPending.mockResolvedValue([
+      { id: 'op-1', mintUrl: MINT_A },
+      { id: 'op-2', mintUrl: MINT_A },
+    ]);
+    jest.mocked(deleteMintOperation).mockRejectedValueOnce(new Error('busy'));
+    const second = await mount();
+    await swipe(second);
+    expect(jest.mocked(deleteMintOperation).mock.calls.map((call) => call[1])).toEqual([
+      'op-1',
+      'op-2',
+    ]);
+    expect(texts(second)).toContain('Recovery Complete');
+  });
+});
+
+describe('a screen mounted again while a run is going', () => {
+  it('starts idle, and its swipe starts nothing', async () => {
+    let release: () => void = () => {};
+    mockRestoreKeyset.mockImplementationOnce(
+      () => new Promise<undefined>((resolve) => (release = () => resolve(undefined)))
+    );
+    const first = await mount();
+    jest.useFakeTimers();
+    let run!: Promise<void>;
+    await act(async () => {
+      run = byTestId(first, 'recovery-swipe')[0]!.props.onConfirm();
+      await jest.advanceTimersByTimeAsync(0);
+    });
+    expect(mockRestoreKeyset).toHaveBeenCalledTimes(1);
+    await act(async () => first.unmount());
+    mockAddMint.mockClear();
+
+    const second = await mount();
+    expect(texts(second)).toContain('Recover ecash');
+    await swipe(second);
+    expect(mockAddMint).not.toHaveBeenCalled();
+    expect(texts(second)).toContain('Recover ecash');
+
+    await act(async () => {
+      release();
+      await jest.advanceTimersByTimeAsync(10);
+      await run;
+    });
+  });
+});
+
 describe('forced recovery at startup', () => {
   it('shows no popups and no way on when every mint was skipped', async () => {
     mintsServe({ [MINT_A]: ['legacy-keyset'], [MINT_B]: ['legacy-keyset'] });
