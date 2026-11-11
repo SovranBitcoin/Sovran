@@ -33,8 +33,9 @@ jest.mock('@/shared/hooks/useGuardedRouter', () => ({
   guardedRouter: { back: jest.fn(), navigate: jest.fn() },
 }));
 jest.mock('@/shared/hooks/useThemeColor', () => ({
-  useThemeColor: (tokens: readonly string[]) => tokens.map(() => '#808080'),
+  useThemeColor: (tokens: readonly string[]) => tokens.map(() => 'rgb(128, 128, 128)'),
 }));
+jest.mock('@/shared/lib/color', () => ({ withAlpha: (color: string) => color }));
 jest.mock('@/shared/hooks/useScreenInsets', () => ({ useScreenInsets: () => ({ bottom: 0 }) }));
 jest.mock('@/shared/lib/logger', () => ({
   Log: ({ children }: { children: React.ReactNode }) => children,
@@ -70,8 +71,9 @@ it('fetches the places again when Retry is pressed after a failed load', async (
   expect(mockStore.fetchPlaces).toHaveBeenCalledTimes(1);
   const retry = renderer.root.find(
     (node) =>
-      node.type === 'Pressable' &&
-      node.findAll((child) => child.type === 'Text' && child.props.children === 'Retry').length > 0
+      String(node.type) === 'Pressable' &&
+      node.findAll((child) => String(child.type) === 'Text' && child.props.children === 'Retry')
+        .length > 0
   );
   const before = mockStore.fetchPlaces.mock.calls.length;
 

@@ -30,7 +30,11 @@ const entry = (modelId: string, reserveSats: number, visionInput: boolean): Line
 const lineup = emptyLineup();
 // The chosen slot takes images but costs more than the wallet holds; the next
 // rung of the chain is affordable and text-only, so that is where a send goes.
-lineup.openai = { max: entry('vision-max', 5_000, true), pro: entry('text-pro', 20, false) };
+lineup.openai = {
+  ...lineup.openai,
+  max: entry('vision-max', 5_000, true),
+  pro: entry('text-pro', 20, false),
+};
 
 const mockRoutstr = {
   selectedTier: 'max',
@@ -87,7 +91,7 @@ jest.mock('expo-image', () => ({ Image: 'Image' }));
 jest.mock('assets/icons', () => ({ __esModule: true, default: () => null }));
 jest.mock('@/shared/ui/primitives/Pressable', () => ({ Pressable: 'Pressable' }));
 jest.mock('@/shared/ui/composed/PatternBackground', () => ({ PatternBackground: () => null }));
-jest.mock('@/shared/hooks/useThemeColor', () => ({ useThemeColor: () => '#808080' }));
+jest.mock('@/shared/hooks/useThemeColor', () => ({ useThemeColor: () => 'rgb(128, 128, 128)' }));
 jest.mock('@/shared/ui/composed/chat/LiquidChatComposer', () => ({
   LiquidChatComposer: 'LiquidChatComposer',
 }));
