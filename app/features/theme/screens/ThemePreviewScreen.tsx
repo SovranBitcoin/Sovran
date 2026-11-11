@@ -48,8 +48,6 @@ const PREVIEW_UNITS: PreviewUnit[] = SWITCHABLE_UNITS.map((id) => ({
   sublabel: id === 'sat' ? 'SATS' : accountUnitLabel(id),
 }));
 
-const UNIT_IDS = PREVIEW_UNITS.map((u) => u.id);
-
 // Tighter card so the footer Theme button sits above the fold on standard
 // phone heights without scrolling.
 const CARD_RATIO = 1.82;
@@ -113,7 +111,7 @@ export function ThemePreviewScreen() {
   const album = activeAlbumSlug ? getAlbum(activeAlbumSlug) : undefined;
 
   useEffect(() => {
-    if (!draftActive) beginDraft(UNIT_IDS);
+    if (!draftActive) beginDraft();
   }, [draftActive, beginDraft]);
 
   const handleCancel = useCallback(async () => {
