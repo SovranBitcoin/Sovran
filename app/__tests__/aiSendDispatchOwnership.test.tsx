@@ -9,6 +9,10 @@
  * minted and dispatched, and the question waits in its own conversation to be
  * asked again.
  *
+ * The last group covers what is checked before any of that: a regenerate and
+ * the error pill's Retry pass the same provider, mint and funds checks and the
+ * same spend sheet as a send.
+ *
  * The real `useAiSend`, `sendMessage`, Routstr store and turns run. Replaced:
  * the payment client (`getRoutstrClient`; its request asks `canDispatch` the
  * way the client's `sendToken` does before it mints and before it hands the
@@ -329,63 +333,117 @@ describe('a request whose conversation is switched away after it was handed over
 });
 
 describe('what a regenerate or a Retry checks before it spends', () => {
+  // The error pill's Retry and the regenerate button both call `retry`.
   const answered = () =>
     mockRoute.mockResolvedValue(new Response('data: [DONE]\n\n', { status: 200 }));
-
-  it('a send asks with the spend sheet before it is paid for', async () => {
+  const askFirst = (answer: boolean | (() => Promise<boolean>)) => {
     useRoutstrStore.setState({ confirmSpend: true });
-    jest.mocked(confirmSpend).mockResolvedValue(false);
-    const { settle } = start('send');
-    await settle();
+    jest
+      .mocked(confirmSpend)
+      .mockImplementation(typeof answer === 'function' ? answer : async () => answer);
+  };
 
-    expect(confirmSpend).toHaveBeenCalledTimes(1);
-    expect(mockRoute).not.toHaveBeenCalled();
-  });
+  it.each(['send', 'retry'] as const)(
+    'a %s is not paid for when the spend sheet is declined',
+    async (action) => {
+      askFirst(false);
+      const { settle } = start(action);
+      await settle();
 
-  it('a regenerate is paid for without the spend sheet', async () => {
-    useRoutstrStore.setState({ confirmSpend: true });
-    jest.mocked(confirmSpend).mockResolvedValue(false);
+      expect(confirmSpend).toHaveBeenCalledTimes(1);
+      expect(mockRoute).not.toHaveBeenCalled();
+      // No question and no new answer is left behind.
+      expect(messagesOf('s1')).toEqual(first);
+    }
+  );
+
+  it('a regenerate is paid for once the spend sheet is accepted, and is shown what the model holds', async () => {
+    askFirst(true);
     answered();
     const { settle } = start('retry');
     await settle();
 
-    expect(confirmSpend).not.toHaveBeenCalled();
+    expect(confirmSpend).toHaveBeenCalledWith({
+      modelName: 'model-pro',
+      reserveSats: expect.any(Number),
+      reserveKnown: expect.any(Boolean),
+    });
     expect(mockRoute).toHaveBeenCalledTimes(1);
+    expect(messagesOf('s1').map((m) => [m.role, m.parentId])).toEqual([
+      ['user', null],
+      ['assistant', 'u1'],
+      ['assistant', 'u1'],
+    ]);
   });
 
-  it('a regenerate goes ahead when the wallet cannot cover what the model holds', async () => {
+  it('a regenerate opens Add funds when the wallet cannot cover what the model holds', async () => {
     mockWalletSats = 0;
     answered();
     const { settle } = start('retry');
     await settle();
 
-    expect(mockAddFunds).not.toHaveBeenCalled();
-    expect(mockRoute).toHaveBeenCalledTimes(1);
+    expect(mockAddFunds).toHaveBeenCalledTimes(1);
+    expect(mockRoute).not.toHaveBeenCalled();
+    expect(messagesOf('s1')).toEqual(first);
   });
 
-  it('a regenerate goes ahead when no provider is chosen', async () => {
+  it('a regenerate with no provider chosen says so and opens the provider list', async () => {
     useRoutstrStore.setState({ userNodeBaseUrl: null });
     answered();
     const { settle } = start('retry');
     await settle();
 
-    expect(staticPopup).not.toHaveBeenCalled();
-    expect(guardedRouter.navigate).not.toHaveBeenCalled();
+    expect(staticPopup).toHaveBeenCalledWith('ai-no-provider');
+    expect(guardedRouter.navigate).toHaveBeenCalledWith('/(ai-flow)/providers');
+    expect(mockRoute).not.toHaveBeenCalled();
+    expect(messagesOf('s1')).toEqual(first);
   });
 
-  it('a regenerate goes ahead when the provider takes only a mint the wallet does not hold', async () => {
+  it('a regenerate is refused when the provider takes only a mint the wallet does not hold', async () => {
+    const provider = useRoutstrStore.getState().knownProviders['https://node.example'];
     useRoutstrStore.setState({
       knownProviders: {
-        'https://node.example': {
-          ...useRoutstrStore.getState().knownProviders['https://node.example'],
-          mints: ['https://other-mint.example'],
-        },
-      } as never,
+        'https://node.example': { ...provider, mints: ['https://other-mint.example'] },
+      },
     });
     answered();
     const { settle } = start('retry');
     await settle();
 
+    expect(staticPopup).toHaveBeenCalledWith('ai-mint-not-accepted');
+    expect(mockRoute).not.toHaveBeenCalled();
+    expect(messagesOf('s1')).toEqual(first);
+  });
+
+  it.each(['send', 'retry'] as const)(
+    'a %s is not paid for when the model is changed while its spend sheet is open',
+    async (action) => {
+      askFirst(async () => {
+        useRoutstrStore.setState({ selectedProvider: 'claude' });
+        return true;
+      });
+      answered();
+      const { settle } = start(action);
+      await settle();
+
+      expect(staticPopup).toHaveBeenCalledWith('ai-payment-options-changed');
+      expect(mockRoute).not.toHaveBeenCalled();
+      expect(messagesOf('s1')).toEqual(first);
+    }
+  );
+
+  it('a regenerate is not paid for when the conversation is switched while its spend sheet is open', async () => {
+    askFirst(async () => {
+      useRoutstrStore.getState().switchSession('s2');
+      return true;
+    });
+    answered();
+    const { settle } = start('retry');
+    await settle();
+
+    expect(mockRoute).not.toHaveBeenCalled();
     expect(staticPopup).not.toHaveBeenCalled();
+    expect(messagesOf('s1')).toEqual(first);
+    expect(messagesOf('s2')).toEqual(other);
   });
 });

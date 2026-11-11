@@ -79,6 +79,11 @@ const STREAM_STALL_THRESHOLD_MS = 500;
  * upstream is down would otherwise fan out across all twelve lineup cells.
  */
 const MAX_DECLINED_ATTEMPTS = 3;
+/**
+ * What the send gate is given as the typed text for a regenerate. Nothing is
+ * typed for one; the gate only asks whether there is something to send.
+ */
+const REASKED_QUESTION = 'regenerate';
 
 /**
  * The candidate chain for a selection, with models this node refused recently
@@ -1036,6 +1041,146 @@ export function useAiSend() {
     [finalizeAssistantMessage, updateSessionTitle, walletSats]
   );
 
+  /**
+   * Everything that is checked, and asked, before a request may spend: a
+   * provider is chosen, it takes a mint the wallet holds, the wallet covers
+   * what the model will hold, and the person agreed on the spend sheet to the
+   * figure for this exact request. A send, a regenerate and the error pill's
+   * Retry all pass through here, so none of them is a way to spend without
+   * being asked.
+   *
+   * Resolves to the figure that was shown when the request may go ahead, and
+   * to `null` when it may not; whatever there is to say has been said by then.
+   */
+  const passSendGate = useCallback(
+    async (request: {
+      flowId: string;
+      watch: OwnerWatch;
+      controller: AbortController;
+      /** What was typed, trimmed; `null` for a regenerate, which types nothing. */
+      typed: string | null;
+      /** The request body the node will price, already assembled. */
+      apiMessages: Awaited<ReturnType<typeof assembleApiMessages>>['messages'];
+      imageParts: number;
+      /** Images counted by the typical-case estimate when the model has no price. */
+      attachedImages: number;
+      /** What the quote is made from, read before anything was awaited. */
+      quoted: {
+        store: ReturnType<typeof useRoutstrStore.getState>;
+        funds: typeof latestFunds.current;
+        entry: LineupEntry | null;
+      };
+      /** The conversation moved or the screen closed while the sheet was open. */
+      onLeft: (reason: 'conversation' | 'closed') => void;
+    }): Promise<{ shownSats: number | null } | null> => {
+      const { flowId, watch, controller, typed, apiMessages, quoted } = request;
+      const { owner } = watch;
+      const storeNow = quoted.store;
+      const activeProvider = storeNow.userNodeBaseUrl;
+      const plannedEntry = quoted.entry;
+      // The gate's first question is whether anything was typed. A regenerate
+      // re-asks a saved question that is already known not to be empty.
+      const text = typed ?? REASKED_QUESTION;
+
+      // The node's admission gate for this body, computed the way the node
+      // computes it. `null` when the model carries no usable pricing, which
+      // the gate turns back into the typical-case estimate and the sheet
+      // labels as one.
+      const plannedMaxTokens = sendMaxTokens(plannedEntry?.maxCompletionTokens);
+      const reservedSats = text
+        ? reservedSatsForSend({
+            entry: plannedEntry,
+            models: storeNow.modelsCache?.data ?? [],
+            messages: apiMessages,
+            maxTokens: plannedMaxTokens,
+          })
+        : null;
+
+      const gate = evaluateSendGate({
+        text,
+        providerBaseUrl: activeProvider,
+        providerMints: activeProvider ? (storeNow.knownProviders[activeProvider]?.mints ?? []) : [],
+        heldMints,
+        walletSats,
+        entry: plannedEntry,
+        imageCount: request.attachedImages,
+        confirmSpend: storeNow.confirmSpend,
+        reservedSats,
+      });
+
+      // The figure the user is about to be shown, recorded under the same
+      // flowId as the money that follows it. It used to live only on screen,
+      // which is why a 30x overstatement could only be found by someone
+      // watching their own balance.
+      const shownSats =
+        gate.state === 'confirm' || gate.state === 'ready' ? gate.reserveSats : null;
+      aiLog.info('ai.send.gate', {
+        flowId,
+        state: gate.state,
+        shownSats,
+        reserveKnown: gate.state === 'confirm' || gate.state === 'ready' ? gate.reserveKnown : null,
+        model: plannedEntry?.modelId ?? null,
+        maxTokens: plannedMaxTokens,
+        promptMessages: apiMessages.length,
+        imageParts: request.imageParts,
+        walletSats,
+      });
+      switch (gate.state) {
+        case 'empty':
+          return null;
+        case 'no-provider':
+          // The one refusal with somewhere to go: the list is the answer.
+          staticPopup('ai-no-provider');
+          router.navigate('/(ai-flow)/providers');
+          return null;
+        case 'mint-not-accepted':
+          staticPopup('ai-mint-not-accepted');
+          return null;
+        case 'insufficient-funds':
+          navigateToAddFunds();
+          return null;
+        case 'confirm': {
+          const allowed = await confirmSpend({
+            modelName: gate.modelName,
+            reserveSats: gate.reserveSats,
+            reserveKnown: gate.reserveKnown,
+          });
+          if (!allowed) return null;
+          const change = watch.change();
+          const afterSheet = change === 'none' && controller.signal.aborted ? 'closed' : change;
+          if (afterSheet === 'conversation' || afterSheet === 'closed') {
+            request.onLeft(afterSheet);
+            return null;
+          }
+          const current = useRoutstrStore.getState();
+          const currentFunds = latestFunds.current;
+          if (
+            useProfileStore.getState().activeAccountIndex !== owner.account ||
+            current.userNodeBaseUrl !== activeProvider ||
+            current.selectedProvider !== storeNow.selectedProvider ||
+            current.selectedTier !== storeNow.selectedTier ||
+            current.lineup !== storeNow.lineup ||
+            // The conversation itself is now part of the quote: the sheet
+            // priced this tree, so a tree that moved while it was open is a
+            // different request at a different price.
+            current.conversationHistory !== storeNow.conversationHistory ||
+            current.activeChildren !== storeNow.activeChildren ||
+            currentFunds?.mintUrl !== quoted.funds?.mintUrl ||
+            currentFunds?.balanceSats !== quoted.funds?.balanceSats
+          ) {
+            staticPopup('ai-payment-options-changed');
+            return null;
+          }
+          break;
+        }
+        case 'ready':
+          break;
+      }
+      return { shownSats };
+    },
+    [walletSats, heldMints, latestFunds, navigateToAddFunds]
+  );
+
   const prepareSend = useCallback(
     async (
       controller: AbortController,
@@ -1053,7 +1198,6 @@ export function useAiSend() {
       const { owner } = watch;
       const storeNow = useRoutstrStore.getState();
       const quotedFunds = latestFunds.current;
-      const activeProvider = storeNow.userNodeBaseUrl;
       // Quoted from the same chain the send will walk, refused models last, so
       // the sheet names the model — and the figure — that actually goes first.
       const plannedEntry = selectFromChain(selectedChain(storeNow).chain, walletSats);
@@ -1128,99 +1272,19 @@ export function useAiSend() {
         return;
       }
 
-      // The node's admission gate for this body, computed the way the node
-      // computes it. `null` when the model carries no usable pricing, which
-      // the gate turns back into the typical-case estimate and the sheet
-      // labels as one.
-      const plannedMaxTokens = sendMaxTokens(plannedEntry?.maxCompletionTokens);
-      const reservedSats = trimmed
-        ? reservedSatsForSend({
-            entry: plannedEntry,
-            models: storeNow.modelsCache?.data ?? [],
-            messages: apiMessages,
-            maxTokens: plannedMaxTokens,
-          })
-        : null;
-
-      const gate = evaluateSendGate({
-        text: trimmed,
-        providerBaseUrl: activeProvider,
-        providerMints: activeProvider ? (storeNow.knownProviders[activeProvider]?.mints ?? []) : [],
-        heldMints,
-        walletSats,
-        entry: plannedEntry,
-        imageCount: attachments?.length ?? 0,
-        confirmSpend: storeNow.confirmSpend,
-        reservedSats,
-      });
-
-      // The figure the user is about to be shown, recorded under the same
-      // flowId as the money that follows it. It used to live only on screen,
-      // which is why a 30x overstatement could only be found by someone
-      // watching their own balance.
-      const shownSats =
-        gate.state === 'confirm' || gate.state === 'ready' ? gate.reserveSats : null;
-      aiLog.info('ai.send.gate', {
+      const passed = await passSendGate({
         flowId,
-        state: gate.state,
-        shownSats,
-        reserveKnown: gate.state === 'confirm' || gate.state === 'ready' ? gate.reserveKnown : null,
-        model: plannedEntry?.modelId ?? null,
-        maxTokens: plannedMaxTokens,
-        promptMessages: apiMessages.length,
+        watch,
+        controller,
+        typed: trimmed,
+        apiMessages,
         imageParts: imageCount,
-        walletSats,
+        attachedImages: attachments?.length ?? 0,
+        quoted: { store: storeNow, funds: quotedFunds, entry: plannedEntry },
+        onLeft: leaveQuestion,
       });
-      switch (gate.state) {
-        case 'empty':
-          return;
-        case 'no-provider':
-          // The one refusal with somewhere to go: the list is the answer.
-          staticPopup('ai-no-provider');
-          router.navigate('/(ai-flow)/providers');
-          return;
-        case 'mint-not-accepted':
-          staticPopup('ai-mint-not-accepted');
-          return;
-        case 'insufficient-funds':
-          navigateToAddFunds();
-          return;
-        case 'confirm': {
-          const allowed = await confirmSpend({
-            modelName: gate.modelName,
-            reserveSats: gate.reserveSats,
-            reserveKnown: gate.reserveKnown,
-          });
-          if (!allowed) return;
-          const afterSheet = whyNotSend();
-          if (afterSheet === 'conversation' || afterSheet === 'closed') {
-            leaveQuestion(afterSheet);
-            return;
-          }
-          const current = useRoutstrStore.getState();
-          const currentFunds = latestFunds.current;
-          if (
-            useProfileStore.getState().activeAccountIndex !== owner.account ||
-            current.userNodeBaseUrl !== activeProvider ||
-            current.selectedProvider !== storeNow.selectedProvider ||
-            current.selectedTier !== storeNow.selectedTier ||
-            current.lineup !== storeNow.lineup ||
-            // The conversation itself is now part of the quote: the sheet
-            // priced this tree, so a tree that moved while it was open is a
-            // different request at a different price.
-            current.conversationHistory !== storeNow.conversationHistory ||
-            current.activeChildren !== storeNow.activeChildren ||
-            currentFunds?.mintUrl !== quotedFunds?.mintUrl ||
-            currentFunds?.balanceSats !== quotedFunds?.balanceSats
-          ) {
-            staticPopup('ai-payment-options-changed');
-            return;
-          }
-          break;
-        }
-        case 'ready':
-          break;
-      }
+      if (!passed) return;
+      const { shownSats } = passed;
 
       if (willStartNewSession) {
         createSession();
@@ -1257,9 +1321,8 @@ export function useAiSend() {
       setMessagePending,
       streamIntoPlaceholder,
       walletSats,
-      heldMints,
       latestFunds,
-      navigateToAddFunds,
+      passSendGate,
     ]
   );
 
@@ -1288,6 +1351,9 @@ export function useAiSend() {
     async (controller: AbortController, watch: OwnerWatch, messageId: string) => {
       const { owner } = watch;
       const stateNow = useRoutstrStore.getState();
+      const quotedFunds = latestFunds.current;
+      // Quoted from the chain the request will walk, as a send's is.
+      const plannedEntry = selectFromChain(selectedChain(stateNow).chain, walletSats);
       const original = stateNow.conversationHistory.find((m) => m.id === messageId);
       if (!original || original.role !== 'assistant') {
         aiLog.warn('ai.retry.invalid_target', { messageId, role: original?.role });
@@ -1324,6 +1390,22 @@ export function useAiSend() {
       const flowId = `ai-retry-${timestamp}`;
       const parentId = original.parentId ?? null;
 
+      // Asking again costs what asking did, so it is checked and asked the
+      // way a send is, before the new answer's bubble goes in. Declined or
+      // refused, the answer that was there stays as it was.
+      const passed = await passSendGate({
+        flowId,
+        watch,
+        controller,
+        typed: null,
+        apiMessages,
+        imageParts: imageCount,
+        attachedImages: imageCount,
+        quoted: { store: stateNow, funds: quotedFunds, entry: plannedEntry },
+        onLeft: (reason) => aiLog.info('ai.retry.not_sent', { messageId, reason }),
+      });
+      if (!passed) return;
+
       addMessages(conversationId, [
         {
           id: newAssistantId,
@@ -1347,10 +1429,11 @@ export function useAiSend() {
         apiMessages,
         imageCount,
         flowId,
+        shownSats: passed.shownSats,
         retriedFromMessageId: messageId,
       });
     },
-    [addMessages, setActiveBranch, streamIntoPlaceholder]
+    [addMessages, setActiveBranch, streamIntoPlaceholder, passSendGate, latestFunds, walletSats]
   );
 
   // Retry shares the double-tap exposure with `send`: a rapid tap on the
