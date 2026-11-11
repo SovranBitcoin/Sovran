@@ -955,6 +955,22 @@ describe("a notification that throws", () => {
     expect(tm.calls("executeMelt")).toBe(2);
     expect(unhandled).toEqual([]);
   });
+
+  it.each([
+    ["throws", throwing],
+    ["rejects", rejecting],
+  ])("as a scan resolves (%s): still opens the next step, and the machine is free", async (_how, notify) => {
+    const tm = build({ notifications: { onScanResolved: notify } });
+
+    await tm.machine.execute(INPUTS.cashuTokenV3, { reset: true });
+    await settle();
+
+    expect(tm.machine.getStep()).toBe("receiveToken");
+    expect(tm.handled("receiveToken")).toBe(1);
+    expect(isExecuting(tm.machine)).toBe(false);
+    expect(await isFree(tm.machine)).toBe(true);
+    expect(unhandled).toEqual([]);
+  });
 });
 
 describe("the main path", () => {

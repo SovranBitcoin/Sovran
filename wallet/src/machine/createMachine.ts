@@ -562,15 +562,10 @@ export function createPaymentMachine(
   }
 
   /**
-   * Links a settled payment to its scan and tells the wallet about it. The
-   * payment happened and its step already says so: a link or notification
-   * that throws is logged, and neither undoes the payment nor keeps the turn
-   * from finishing.
-   */
-  /**
-   * Calls one of the host's notifications around a payment. They are fire and
-   * forget: a throw, at once or from the promise it returns, is logged and
-   * changes nothing about the payment, the turn or the caller's outcome.
+   * Calls one of the host's notifications. Every notification goes through
+   * here. They are fire and forget: a throw, at once or from the promise it
+   * returns, is logged and changes nothing about the payment, the turn, the
+   * next step's handler or the caller's outcome.
    */
   function tell(name: string, call: () => unknown): void {
     const failed = (err: unknown) => {
@@ -583,19 +578,18 @@ export function createPaymentMachine(
     }
   }
 
+  /**
+   * Links a settled payment to its scan and tells the wallet about it. The
+   * payment happened and its step already says so: a link or notification
+   * that throws is logged, and neither undoes the payment nor keeps the turn
+   * from finishing.
+   */
   function announcePayment(news: {
     links: MachineEffectLink[];
     notifications: MachineEffectNotification[];
   }): void {
-    const announce = (run: () => void) => {
-      try {
-        run();
-      } catch (err) {
-        logger.warn("machine.payment.announce.failed", { error: errField(err) });
-      }
-    };
     for (const link of news.links) {
-      announce(() =>
+      tell("linkTransaction", () =>
         operations?.linkTransaction?.({
           scannedInput: link.input,
           transactionId: link.transactionId,
@@ -603,20 +597,16 @@ export function createPaymentMachine(
       );
     }
     for (const notification of news.notifications) {
-      announce(() => {
+      tell(notification.type, () => {
         switch (notification.type) {
           case "onPaymentConfirmed":
-            void notifications?.onPaymentConfirmed?.(notification.data);
-            return;
+            return notifications?.onPaymentConfirmed?.(notification.data);
           case "onTransactionCreated":
-            void notifications?.onTransactionCreated?.(notification.data);
-            return;
+            return notifications?.onTransactionCreated?.(notification.data);
           case "onMeltQuoteCreated":
-            void notifications?.onMeltQuoteCreated?.(notification.data);
-            return;
+            return notifications?.onMeltQuoteCreated?.(notification.data);
           case "onNfcWriteFailed":
-            void notifications?.onNfcWriteFailed?.(notification.data);
-            return;
+            return notifications?.onNfcWriteFailed?.(notification.data);
           default: {
             const unreachable: never = notification;
             return unreachable;
@@ -1140,9 +1130,11 @@ export function createPaymentMachine(
       logger.warn("machine.nfc.release.failed", { error: errField(error) });
     });
     if (handover.taken === "dropped") {
-      void notifications?.onScanError?.(
-        "nfc",
-        new Error("NFC read not taken: a payment is in progress"),
+      tell("onScanError", () =>
+        notifications?.onScanError?.(
+          "nfc",
+          new Error("NFC read not taken: a payment is in progress"),
+        ),
       );
     }
   }
@@ -1270,7 +1262,7 @@ export function createPaymentMachine(
       // surface "choose a mint" and re-dispatch the selector handler so the
       // flow can complete instead of dead-ending on an inert Pay button.
       logger.warn("machine.confirm.noMintSelected", { type: event.type });
-      void notifications?.onMissingMintForAmount?.();
+      tell("onMissingMintForAmount", () => notifications?.onMissingMintForAmount?.());
       try {
         await dispatchHandler(step, stepData);
       } finally {
@@ -1573,9 +1565,9 @@ export function createPaymentMachine(
                 }),
               };
             } else if (operations?.switchUnit) {
-              void notifications?.onNfcPaymentProgress?.({
-                phase: "selecting",
-              });
+              tell("onNfcPaymentProgress", () =>
+                notifications?.onNfcPaymentProgress?.({ phase: "selecting" }),
+              );
               const switchUnit = operations.switchUnit;
               const previousUnit = unit;
               const switched = await ResultAsync.fromThrowable(async () =>
@@ -1716,21 +1708,22 @@ export function createPaymentMachine(
             flowCtx.parsed.options.length > 0
               ? [...new Set(flowCtx.parsed.options.map((o) => o.kind))]
               : undefined;
-          void notifications.onScanResolved({
+          const resolved = {
             rawInput: event.input,
             parsedType: flowCtx.parsed.type ?? "unknown",
             intentType: flowCtx.intent?.type ?? "unknown",
             source: scanSource,
             container: flowCtx.parsed.container ?? undefined,
             optionKinds,
-          });
+          };
+          tell("onScanResolved", () => notifications?.onScanResolved?.(resolved));
         }
       }
 
       if (eventForTransition.type === "AMOUNT_ENTERED") {
         const e = eventForTransition;
         if (e.amount > 0 && !String(e.mintUrl ?? "").trim()) {
-          void notifications?.onMissingMintForAmount?.();
+          tell("onMissingMintForAmount", () => notifications?.onMissingMintForAmount?.());
         }
       }
 
@@ -1739,19 +1732,21 @@ export function createPaymentMachine(
       // onPreferredMintChanged when applicable.
       if (event.type === "MINT_SELECTED") {
         if (event.scope === "npc") {
-          void notifications?.onNpcMintChanged?.({ mintUrl: event.mintUrl });
+          tell("onNpcMintChanged", () =>
+            notifications?.onNpcMintChanged?.({ mintUrl: event.mintUrl }),
+          );
         } else if (event.scope === "bolt12" || event.scope === "onchain") {
-          void notifications?.onReceiveMethodMintChanged?.({
-            method: event.scope,
-            mintUrl: event.mintUrl,
-          });
+          const change = { method: event.scope, mintUrl: event.mintUrl };
+          tell("onReceiveMethodMintChanged", () =>
+            notifications?.onReceiveMethodMintChanged?.(change),
+          );
         } else {
           const isPersistOnlyPath = step === "dismiss" && !flowCtx.destination;
           const shouldPersist = event.persist ?? isPersistOnlyPath;
           if (shouldPersist) {
-            void notifications?.onPreferredMintChanged?.({
-              mintUrl: event.mintUrl,
-            });
+            tell("onPreferredMintChanged", () =>
+              notifications?.onPreferredMintChanged?.({ mintUrl: event.mintUrl }),
+            );
           }
         }
       }
@@ -1909,9 +1904,9 @@ export function createPaymentMachine(
                   ...mintUrlFields(best.mintUrl),
                   rankedCount: ranked.length,
                 });
-                void notifications?.onNfcPaymentProgress?.({
-                  phase: "selecting",
-                });
+                tell("onNfcPaymentProgress", () =>
+                  notifications?.onNfcPaymentProgress?.({ phase: "selecting" }),
+                );
                 const unitInner = getUnit?.() ?? configUnit;
                 const r = transition(
                   step,
@@ -2050,7 +2045,9 @@ export function createPaymentMachine(
                   },
                   context: flowCtx,
                   onProgress: (progress) => {
-                    void notifications?.onNfcPaymentProgress?.(progress);
+                    tell("onNfcPaymentProgress", () =>
+                      notifications?.onNfcPaymentProgress?.(progress),
+                    );
                   },
                   isStale: (op) => isStaleGeneration(sendGeneration, op),
                   locale: getLocale?.() ?? "en",
@@ -2074,7 +2071,9 @@ export function createPaymentMachine(
               } else {
                 for (const notification of effect.error.notifications) {
                   if (notification.type === "onNfcWriteFailed") {
-                    void notifications?.onNfcWriteFailed?.(notification.data);
+                    tell("onNfcWriteFailed", () =>
+                      notifications?.onNfcWriteFailed?.(notification.data),
+                    );
                   }
                 }
 
@@ -2158,7 +2157,9 @@ export function createPaymentMachine(
 
               for (const notification of effect.value.notifications) {
                 if (notification.type === "onTransactionCreated") {
-                  void notifications?.onTransactionCreated?.(notification.data);
+                  tell("onTransactionCreated", () =>
+                    notifications?.onTransactionCreated?.(notification.data),
+                  );
                 }
               }
             } else {
@@ -2215,7 +2216,9 @@ export function createPaymentMachine(
 
             for (const notification of effect.value.notifications) {
               if (notification.type === "onTransactionCreated") {
-                void notifications?.onTransactionCreated?.(notification.data);
+                tell("onTransactionCreated", () =>
+                  notifications?.onTransactionCreated?.(notification.data),
+                );
               }
             }
           } else {
@@ -2373,7 +2376,7 @@ export function createPaymentMachine(
         const errorData = stepData as StepDataMap["error"];
         const notificationHandler = notifications[errorData.code];
         if (notificationHandler) {
-          void notificationHandler(errorData);
+          tell(errorData.code, () => notificationHandler(errorData));
         }
       }
 
@@ -2521,9 +2524,11 @@ export function createPaymentMachine(
           try {
             result = await sourceFn();
           } catch (err) {
-            void notifications?.onScanError?.(
-              source,
-              err instanceof Error ? err : new Error(String(err)),
+            tell("onScanError", () =>
+              notifications?.onScanError?.(
+                source,
+                err instanceof Error ? err : new Error(String(err)),
+              ),
             );
             return { urInProgress: false };
           }
@@ -2532,11 +2537,11 @@ export function createPaymentMachine(
             return { urInProgress: false };
           }
           if ("empty" in result && result.empty) {
-            void notifications?.onScanEmpty?.(source);
+            tell("onScanEmpty", () => notifications?.onScanEmpty?.(source));
             return { urInProgress: false };
           }
           if ("error" in result && result.error) {
-            void notifications?.onScanError?.(source, result.error);
+            tell("onScanError", () => notifications?.onScanError?.(source, result.error));
             return { urInProgress: false };
           }
           if ("data" in result && result.data) {
