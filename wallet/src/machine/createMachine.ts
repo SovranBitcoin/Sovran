@@ -259,11 +259,10 @@ export function createPaymentMachine(
   let latestNfcTap: NfcTap | null = null;
 
   // `step` and `stepData` are written together via `setStep<S>(s, d)` so the
-  // discriminated `StepDataMap` carries through every transition. Previously
-  // each site cast through `as any`, defeating the union check and letting
-  // typos like `mintListItems = items` silently mutate state behind a stale
-  // `details` reference. The helper is the only legal seam for advancing the
-  // step; readers narrow via `stepData as StepDataMap[S]` at the use site.
+  // discriminated `StepDataMap` carries through every transition: a step
+  // advances only through it. `mirrorRecipientOntoStepData` alone replaces
+  // `stepData` under an unchanged step. Readers narrow via
+  // `stepData as StepDataMap[S]` at the use site.
   let step: FlowStep = "idle";
   let flowCtx: FlowContext = { unit: configUnit };
   const idleData: StepDataMap["idle"] = {};
@@ -392,8 +391,9 @@ export function createPaymentMachine(
 
   /**
    * A reset: strands the running turn, restarts the flow, then frees the
-   * machine. The machine stays held while `restartFlow` runs, so an event it
-   * sends is dropped, and if it throws the machine is not freed.
+   * machine. A turn that was running keeps the machine held while
+   * `restartFlow` runs, so an event it sends is dropped, and if it throws the
+   * machine is not freed.
    */
   function abandonTurn(restartFlow: () => void): void {
     flowGeneration += 1;
@@ -779,7 +779,6 @@ export function createPaymentMachine(
     };
   }
 
-  // Helper: route an operation failure to BIP321 fallback or error.
   /**
    * Route an operation failure. For BIP321 multi-option flows, marks the
    * failed option and routes to fallback or ALL_OPTIONS_DISABLED error.
@@ -1492,8 +1491,9 @@ export function createPaymentMachine(
               // unit's here. `unitBalances` holds every unit and does not lag:
               // it is what found this request funded above.
               walletCtx = readContext();
-              // A missing/unsupported host switch keeps the existing unit hard-stop.
             }
+            // With no host switch the transition below turns the request down
+            // for its unit.
           }
         }
       }

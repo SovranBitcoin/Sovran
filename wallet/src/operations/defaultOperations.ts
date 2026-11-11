@@ -615,7 +615,7 @@ export interface DefaultOperationsConfig {
   shouldMockFailPaymentRequest?: () => boolean;
   /** Dev-only: when true, executeMelt throws after prepare so the cancel-rescue path runs. */
   shouldMockFailMelt?: () => boolean;
-  /** Dev-only: when true, executeSend throws before prepare. */
+  /** Dev-only: when true, executeSend throws after prepare so the cancel-rescue path runs. */
   shouldMockFailSend?: () => boolean;
   /**
    * Per-request timeout for external lightning calls (LNURL pay-params,
@@ -2174,7 +2174,7 @@ export function createDefaultOperations(
 }
 
 // ---------------------------------------------------------------------------
-// Receive history lookup helper
+// Payment-request fallback entry and receive history lookup
 // ---------------------------------------------------------------------------
 
 function buildSyntheticPaymentRequestEntry(

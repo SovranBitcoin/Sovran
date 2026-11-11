@@ -1372,7 +1372,7 @@ export function runConfirmMeltEffect({
  * quote's `fee_reserve` and mint-quoted amount are what the confirm screen
  * displays; `confirmMelt` later executes against the same quote. Best-effort
  * by contract of the caller: a failure must NOT block navigation — the
- * preview degrades to today's pay-then-quote shape instead.
+ * preview opens without a quote and Pay creates one as it executes.
  */
 export function runMeltQuotePreviewEffect({
   data,
