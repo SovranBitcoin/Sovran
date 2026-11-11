@@ -8,30 +8,29 @@
 
 import { useEffect, useMemo } from 'react';
 import { Stack } from 'expo-router';
-import { z } from 'zod';
 import { useScreenActions, type BoundAction } from 'wallet/react';
 
+import { useReceiveRailRoute } from '@/features/receive/hooks/useReceiveRailRoute';
 import { useMintInfo } from '@/shared/hooks/useMintInfo';
 import { paymentLog } from '@/shared/lib/logger';
-import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 import { ScreenErrorState, ScreenLoadingState } from '@/shared/ui/composed/ScreenStates';
 
 import { OnchainReceiveScreen, type OnchainReceiveEntry } from './OnchainReceiveScreen';
 
-const ParamsSchema = z.object({
-  mintHistoryEntry: z.string().min(1).max(64_000),
-  unit: z.string().max(16).optional(),
-});
-
 interface OnchainReceiveRouteProps {
   /** Log scope for invalid-params telemetry; e.g. `'receive-flow.onchainReceive'`. */
   where: string;
-  onRequestMintList?: () => void;
+  /** The receive flow's mint pill swaps mints; omitted for read-only re-entries. */
+  editableMint?: boolean;
 }
 
-export function OnchainReceiveRoute({ where, onRequestMintList }: OnchainReceiveRouteProps) {
-  const params = useRouteParams(ParamsSchema, { where });
-  if (!params) return null;
+export function OnchainReceiveRoute({ where, editableMint = false }: OnchainReceiveRouteProps) {
+  const { params, onRequestMintList, flowBinding } = useReceiveRailRoute(
+    'onchain',
+    where,
+    editableMint
+  );
+  if (!params) return flowBinding;
   paymentLog.info('receive.onchain.route_ready', {
     where,
     mintHistoryEntryLength: params.mintHistoryEntry.length,
@@ -40,10 +39,13 @@ export function OnchainReceiveRoute({ where, onRequestMintList }: OnchainReceive
   });
 
   return (
-    <OnchainReceiveRouteContent
-      mintHistoryEntry={params.mintHistoryEntry}
-      onRequestMintList={onRequestMintList}
-    />
+    <>
+      <OnchainReceiveRouteContent
+        mintHistoryEntry={params.mintHistoryEntry}
+        onRequestMintList={onRequestMintList}
+      />
+      {flowBinding}
+    </>
   );
 }
 
