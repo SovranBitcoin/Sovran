@@ -7,7 +7,7 @@ State, not history. Passes run in order; one call runs one pass.
 | 0 Pin behaviour           | **Done** (2026-11-11). Every boundary the surveys listed has a pin; the gates are closed. Branch `surgery/pass-0-gates`.                                             |
 | 1 Persisted state         | **Done** (2026-11-11), proven on every release fixture; no real upgrade was run. Cuts on `surgery/pass-1-cuts` and `surgery/pass-1-queue`, not merged. See "Pass 1". |
 | 2 Implicit state machines | **Done** (2026-11-11). All sixteen approved conversions built on `surgery/pass-2` (one partly: the machine turn); not merged, nothing run on a device. See "Pass 2". |
-| 3 Deepen modules          | Not started.                                                                                                                                                         |
+| 3 Deepen modules          | **Awaiting approval** (2026-11-12). Surveyed; twelve defects fixed on `surgery/pass-3`; proposals below, none made. See "Pass 3".                                    |
 
 Pass 0 is on branch `surgery/pass-0`; pass 1's evidence is on `surgery/pass-1` and its cuts on `surgery/pass-1-cuts`, each stacked on the one before (worktree `../sovran-surgery`,
 based on `main` at `e5d70b590`). Neither is pushed. Until they merge, this file and the survey folders also sit
@@ -408,3 +408,96 @@ a kill).
 - `jevlint` saved checks were not run. `audit-commit` was not run per commit; the Codex reviews stood in.
 - Some intermediate commits do not type-check on their own (each is fixed by the commit after it); the branch head
   passes every check.
+
+## Pass 3: deepen modules
+
+Branch `surgery/pass-3`, stacked on `surgery/pass-2`. Product code at the start of the pass: 373,414 lines (app,
+wallet and Nostr sources without tests). The pass is done when that number went down and each cut removed something
+a caller had to know.
+
+### Inventory
+
+Eight surveys in `pass-3/surveys/` (the brief is in its `README.md`). Each candidate has its callers, the obligation
+they carry, the proposed shape, the deletion test, the lines it deletes, its risk, its pins and its size.
+
+| Area                                | Survey                        | Candidates |
+| ----------------------------------- | ----------------------------- | ---------- |
+| Wallet package                      | `wallet.md`                   | 15         |
+| Send, receive, payments, NFC        | `payments.md`                 | 10         |
+| Stores and persistence              | `stores.md`                   | 13         |
+| Startup, accounts, settings         | `startup-settings.md`         | 10         |
+| Transactions, wallet screens, mints | `transactions-wallet-mint.md` | 11         |
+| Messaging, signer, AI, map          | `messaging-signer-ai.md`      | 15         |
+| Feed, social, Nostr package         | `feed-social-nostr.md`        | 12         |
+| Shared hooks, UI, lib               | `shared.md`                   | 10         |
+
+Facts the surveys established: `bun run knip` does not see unused exports of the wallet package's own entry files,
+unused store actions (they are members, not exports), or code only tests import; the surveys found those by counting
+callers. `createMachine.ts` should lose its pure NFC rules to their own module and gain one `advance(event)` helper;
+its turn functions and settled-step table should stay where they are.
+
+### Proposed cuts (none made; each needs the owner's approval)
+
+Line counts are the surveyors' estimates of product lines removed, net. Group A deletes code nothing reaches. Group
+B gives a duplicated rule one owner. Group C needs a ruling first.
+
+| #   | Cut                                                                                                      | Survey                            | Lines  | Risk                                                      |
+| --- | -------------------------------------------------------------------------------------------------------- | --------------------------------- | ------ | --------------------------------------------------------- |
+| A1  | Nostr package: the capability cache and recipe builders nothing sends                                    | `feed-social-nostr` 1             | 650    | None found; closes F190                                   |
+| A2  | Wallet package: hooks, options and flow definitions with no caller; the loader's page mode               | `wallet` 2, 13, 14                | 500    | None found                                                |
+| A3  | BitChat: a delivery module only its test imports, seven bridge wrappers, two store actions               | `messaging-signer-ai` 1           | 360    | Native side untouched                                     |
+| A4  | Routstr: API-key readers, branches and store actions unreachable since the top-up was deleted            | `messaging-signer-ai` 2           | 200    | Saved `apiKey` and `balance` fields stay as saved         |
+| A5  | Wallet: `inspect()` fields no screen reads; the trust-mint path the app never drives                     | `wallet` 3, 4                     | 280    | Machine; tests move to the error step                     |
+| A6  | Store actions and runtime state with no production caller (20 of 24; four are in C3)                     | `stores` 2                        | 140    | None saved                                                |
+| A7  | Small dead parameters and surface across feed loaders, theme draft, DM kinds, history unit, signer       | several                           | 150    | None found                                                |
+| B1  | One way to wait for a store to load (18 hand-written waits in five shapes)                               | `stores` 1                        | 90     | Startup order; one behaviour choice to keep as is         |
+| B2  | One reader for the active account's key and "still the same account" (15 inline copies)                  | `stores` 3                        | 30     | Account switch guards                                     |
+| B3  | One transaction filter value and route codec                                                             | `transactions-wallet-mint` 1      | 90-140 | Route params keep their encoding                          |
+| B4  | `HomeFeed` page 0 on `useCachedRead`, as `UserFeed` does                                                 | `feed-social-nostr` 2             | 150    | Feed loading; settles F185 and part of F221               |
+| B5  | `ColadaProvider`: drop props that duplicate the instance; one owner of the wallet context                | `wallet` 5, 6                     | 200    | Provider wiring                                           |
+| B6  | Machine: one `advance(event)`, pure NFC rules in `nfcTap.ts`, one preview-step builder                   | `wallet` 7, 8, 10                 | 120    | Payment machine, behaviour-preserving                     |
+| B7  | History: one date-section builder, one chain grouping, swap legs resolved once, one mint-info reader     | `transactions-wallet-mint` 2 to 6 | 100    | Totals and grouping keep their pins                       |
+| B8  | Own replaceable events: one signing step, one `created_at` rule, one "newest" rule                       | `feed-social-nostr` 4             | 35     | Nothing sent changes                                      |
+| B9  | AI: one owner for "the model a send goes to" (worked out six times)                                      | `messaging-signer-ai` 4           | 40     | Which model is paid for                                   |
+| B10 | `useBitChat` returns bubble-ready rows and owns retry                                                    | `messaging-signer-ai` 3           | 80     | Chat screens                                              |
+| B11 | Startup: fold the one-client initialization gate, fixed stage graph, one timeout helper, no splash knobs | `startup-settings` 1, 3, 4, 6     | 100    | Startup order; F175 constrains it                         |
+| B12 | Shared UI: details modal handshake, toast submission, cached-read options, read policy, popup factory    | `shared` 1, 2, 6, 7, 9            | 120    | Presentation                                              |
+| B13 | Payments: receive rails resolved once, route params parsed once, DM inbox fetch inside its paginator     | `payments` 1 to 5                 | 150    | Receive screens                                           |
+| B14 | Messaging and signer smalls: map hook, White Noise context and teardown, signer leases                   | `messaging-signer-ai` 6 to 15     | 150    | Mixed                                                     |
+| C1  | Wallet entry files export 135 values and 209 types nothing imports                                       | `wallet` 1                        | 300    | Needs: is the package meant to be published?              |
+| C2  | Facade `getOwnHistory` and `discoverMints` have no caller                                                | `feed-social-nostr` 3             | 380    | Needs: ADR 0003 planned the first as a seed               |
+| C3  | Four unused store actions that look like missing features                                                | `stores` 2                        | 30     | Needs: build or delete (F241)                             |
+| C4  | One writer for the saved profile list (four hand-built writers)                                          | `stores` 4                        | 25     | Writes saved data; second opinion and upgrade tests first |
+| C5  | One owner for read-change-publish of own replaceable lists                                               | `feed-social-nostr` 6, 10         | 160    | Changes what is published; F227 and F240 first            |
+
+### Behaviour changed in pass 3
+
+Each with a test that failed first; none changes a saved shape or anything sent.
+
+| Commit      | Before                                                                                    | After                                                        |
+| ----------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| `f04617475` | A notification that threw inside the payment machine skipped the next step's handler      | Every notification is logged on failure and the turn goes on |
+| `03eadc142` | A mint advertising a malformed method or unit crashed the discovery list                  | The malformed entry is dropped                               |
+| `aaa6e6d53` | A numeric-string timestamp gave the DM pager no cursor, so older messages stopped loading | It reads as the number                                       |
+| `ed0415cc8` | "Copied" showed before the clipboard write finished, even if it then failed               | It shows after the write; a failure shows "Failed to copy"   |
+| `1b8011983` | After changing mint, the previous mint's details showed until the new ones arrived        | Nothing shows until the new mint's details arrive            |
+| `4a8f1fcdc` | A transaction's source label disappeared from its screen while its row still showed it    | The screen reads what the row reads                          |
+| `59c8c3f21` | The filter sheet counted zero for the test account while the list showed its entries      | The count uses the list's rule                               |
+| `f68cefe30` | A currency-only filter showed no badge                                                    | It counts as one filter                                      |
+| `581a57fab` | The map's Retry cleared the error and fetched nothing                                     | It fetches again                                             |
+| `0eed57d62` | The AI image button chose its model from a balance nothing writes                         | It uses the wallet balance the send uses                     |
+| `c4e87d666` | A replaced signer connection kept its session allows, so re-pairing skipped the prompt    | Disconnect, block and replace all end the client's session   |
+| `0ccc36cbf` | The Bluetooth connection dot could come back on after leaving a chat                      | A late result changes nothing                                |
+
+Built by Claude Opus 5.5. Review by Codex GPT-6.1 Sol: see "Not verified" until its result is recorded here.
+
+### Open findings from pass 3
+
+F240 (relay list and profile edits: marked published without being sent, or built on older data), F241 (smaller
+defects and four missing features).
+
+### Not verified in pass 3
+
+- Nothing was run on iOS or Android.
+- The surveys' line counts are estimates; no cut has been tried.
+- The twelve fixes' independent review had not returned when this was written.
