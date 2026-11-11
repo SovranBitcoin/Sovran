@@ -348,6 +348,31 @@ describe('useOwnEventsSync', () => {
     unmount();
   });
 
+  it('applies events left unseen mid-switch when the account later subscribes again', () => {
+    jest.spyOn(Date, 'now').mockReturnValue(T * 1000);
+    mockRelayHonoursFilters = true;
+    const { rerender, unmount } = mount();
+    const aFilters = mockSubscribeFilters.at(-1);
+    // The active account has moved to B; the keys still hold A's.
+    useProfileStore.setState({ activeAccountIndex: 1 });
+    deliver(rerender, [likeEvent(id(80), 'target-6'), profileEvent(id(81), T, 'Alice')]);
+    expect(liked('target-6')).toBeUndefined();
+
+    // The keys follow to B: A's subscription is replaced before A's events were written.
+    activate(B, 1);
+    act(() => rerender());
+    expect(liked('target-6')).toBeUndefined();
+
+    // Back to A: its new subscription asks the same filters, so the relay
+    // delivers the same events again and they are written then.
+    activate(A, 0);
+    act(() => rerender());
+    expect(mockSubscribeFilters.at(-1)).toEqual(aFilters);
+    expect(liked('target-6')).toBe(id(80));
+    expect(latestProfileId()).toBe(id(81));
+    unmount();
+  });
+
   it('starts over for a new account, and leaves the previous account events out of it', () => {
     const { rerender, unmount } = mount();
     const like = likeEvent(id(40), 'target-3');
