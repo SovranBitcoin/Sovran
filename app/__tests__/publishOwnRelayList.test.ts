@@ -317,3 +317,30 @@ it('does not send an older rendered list after the current entries changed', asy
   expect(mockPublish).not.toHaveBeenCalled();
   expect(store().entries.map((entry) => entry.url)).toContain('wss://during.example');
 });
+
+// Known quirk, NOT the approved edit semantics. No pre-edit baseline survives in
+// the relay store: [MINE,C] can mean "add C to old [MINE]" or "remove B and
+// change MINE's permission in [MINE,B]". A union would erase intentional removal.
+// The desired assertion retaining B and MINE's remote read marker failed here.
+// Left for the owner: a durable intent/baseline or a new explicit edit/review flow.
+it('known quirk: a local relay snapshot overwrites remote additions and permission changes', async () => {
+  const remoteOnly = 'wss://remote-only.example';
+  mockHeld.set(MINE, [
+    {
+      kind: 10002,
+      pubkey: OWN,
+      created_at: 200,
+      id: 'b'.repeat(64),
+      tags: [
+        ['r', MINE, 'read'],
+        ['r', remoteOnly],
+      ],
+    },
+  ]);
+  store().addRelay('wss://local-addition.example', { read: true, write: true });
+  await publish();
+  expect(sent().event.tags).toEqual([
+    ['r', MINE],
+    ['r', 'wss://local-addition.example'],
+  ]);
+});
