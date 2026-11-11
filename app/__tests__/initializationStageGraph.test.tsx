@@ -6,7 +6,6 @@
  * the wallet but do not hold the splash; only the migration stage survives an
  * in-process account switch.
  */
-import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 
 import {
@@ -29,32 +28,13 @@ const stages: Record<string, Stage> = {};
 let splashUp = false;
 let reset: ReturnType<typeof useInitializationReset>;
 
-/** The registrations GlobalMigrationGate, NostrKeysProvider, CocoProvider and NostrNDKProvider make. */
+/** The stages GlobalMigrationGate, NostrKeysProvider, CocoProvider and NostrNDKProvider register. */
 function Providers() {
-  stages['global-migrations'] = useInitializationStage('global-migrations', {
-    message: 'Running global migrations...',
-    blocking: true,
-    outlivesAccount: true,
-  });
-  stages.nostr = useInitializationStage('nostr', {
-    message: 'Initializing keys...',
-    dependsOn: ['global-migrations'],
-  });
-  stages.coco = useInitializationStage('coco', {
-    message: 'Initializing Coco...',
-    dependsOn: ['nostr'],
-    blocking: true,
-  });
-  stages['coco-background'] = useInitializationStage('coco-background', {
-    message: 'Background tasks...',
-    dependsOn: ['coco'],
-    blocking: false,
-  });
-  stages['nostr-ndk'] = useInitializationStage('nostr-ndk', {
-    message: 'Initializing Nostr...',
-    dependsOn: ['coco'],
-    blocking: false,
-  });
+  stages['global-migrations'] = useInitializationStage('global-migrations');
+  stages.nostr = useInitializationStage('nostr');
+  stages.coco = useInitializationStage('coco');
+  stages['coco-background'] = useInitializationStage('coco-background');
+  stages['nostr-ndk'] = useInitializationStage('nostr-ndk');
   splashUp = useInitializationState().isInitializing;
   reset = useInitializationReset();
   return null;

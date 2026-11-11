@@ -100,7 +100,7 @@ let mockControls: ReturnType<typeof useInitializationReset> | undefined;
 
 /** Above the account providers, as GlobalMigrationGate and the registrar are. */
 function Above({ children }: { children: React.ReactNode }) {
-  const migrations = useInitializationStage('global-migrations', { outlivesAccount: true });
+  const migrations = useInitializationStage('global-migrations');
   const controls = useInitializationReset();
   const { isInitializing } = useInitializationState();
   mockSplashUp = isInitializing;
@@ -114,7 +114,7 @@ function Above({ children }: { children: React.ReactNode }) {
 
 /** Stands in for NostrKeysProvider's stage: completes as soon as it may start. */
 function KeysStage({ children }: { children: React.ReactNode }) {
-  const stage = useInitializationStage('nostr', { dependsOn: ['global-migrations'] });
+  const stage = useInitializationStage('nostr');
   useEffect(() => {
     if (stage.canStart) stage.complete();
   }, [stage]);

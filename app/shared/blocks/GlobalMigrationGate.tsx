@@ -71,12 +71,7 @@ interface GlobalMigrationGateProps {
 export default function GlobalMigrationGate({ children }: GlobalMigrationGateProps) {
   useInitMount(TAG);
   useLifecycleLogger(TAG);
-  // Mounted above the account providers, so its stage outlives an account switch.
-  const stage = useInitializationStage('global-migrations', {
-    message: MESSAGE,
-    blocking: true,
-    outlivesAccount: true,
-  });
+  const stage = useInitializationStage('global-migrations');
   const [status, setStatus] = useState<Status>('pending');
   // Bumped by a retry; the effect runs once per attempt.
   const [attempt, setAttempt] = useState(0);
