@@ -10,7 +10,7 @@
 import type { PaymentRequestConfirmOutcome } from "../machine/types";
 
 /** What a payment request screen entry says happened to its send. */
-export type PaymentRequestEntryPhase =
+type PaymentRequestEntryPhase =
   /** Nothing sent yet: Pay is offered. */
   | { kind: "preview" }
   /** The transport took the ecash. */
