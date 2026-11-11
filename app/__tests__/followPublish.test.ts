@@ -918,6 +918,42 @@ describe('following someone', () => {
     expect(social().optimisticFollowsByPubkey[Z]?.pending).toBe(true);
   });
 
+  it('keeps waiting when the own-events sync brings a different list from the same second as one saved without its id', async () => {
+    // Saved by an earlier session: the store keeps no id.
+    const savedTags = [
+      ['p', X],
+      ['p', W],
+    ];
+    mockDisk.set(
+      'nostr-social-store',
+      JSON.stringify({
+        version: 2,
+        state: {
+          contactsTags: savedTags,
+          contactsContent: '',
+          contactsUpdatedAt: T,
+          followingPubkeys: { [X]: true, [W]: true },
+        },
+      })
+    );
+    await useNostrSocialStore.persist.rehydrate();
+    const other = { ...contacts(T, [['p', X]]), id: '9'.repeat(64) };
+    relaysHold(other);
+    const { ndk } = setup();
+
+    tap(Z);
+    await requestFollowSync(ndk, OWN);
+    expect(mockPublish).not.toHaveBeenCalled();
+
+    saveList(other);
+    expect(social().contactsTags).toEqual(savedTags);
+    expect(social().followingPubkeys).toEqual({ [X]: true, [W]: true });
+    await requestFollowSync(ndk, OWN);
+
+    expect(mockPublish).not.toHaveBeenCalled();
+    expect(social().optimisticFollowsByPubkey[Z]?.pending).toBe(true);
+  });
+
   it('waits rather than build on a list dated in the future', async () => {
     const future = Math.floor(Date.now() / 1000) + 3600;
     relaysHold(contacts(future, [['p', X]]));
@@ -1015,7 +1051,9 @@ describe("the account's relay list", () => {
       })
     );
     await useRelayListStore.persist.rehydrate();
-    expect(useRelayListStore.getState().entries).toEqual([{ url: old.url, read: true, write: true }]);
+    expect(useRelayListStore.getState().entries).toEqual([
+      { url: old.url, read: true, write: true },
+    ]);
     const { ndk } = setup();
 
     tap(Z);
@@ -1288,8 +1326,11 @@ describe('the follow sync hook with the real worker', () => {
 });
 
 describe('what wakes a waiting follow', () => {
-  it('a list from the same second the own-events sync takes in', async () => {
-    // Saved by an earlier session, with no id; the relays hold a different list from that second.
+  it('the saved list itself, with its id, from the own-events sync', async () => {
+    // Saved by an earlier session, with no id; the relays hold a different list
+    // from that second, with a lower id, so they keep it over the saved one.
+    // Only the saved list's own event may tell the store its id (a different
+    // list from that second is not taken in: see "keeps waiting when ...").
     mockDisk.set(
       'nostr-social-store',
       JSON.stringify({
@@ -1302,8 +1343,8 @@ describe('what wakes a waiting follow', () => {
       })
     );
     await useNostrSocialStore.persist.rehydrate();
-    const held = contacts(T, [['p', X]]);
-    relaysHold(held);
+    const saved = { ...contacts(T, [['p', W]]), id: '9'.repeat(64) };
+    relaysHold({ ...contacts(T, [['p', X]]), id: '1'.repeat(64) });
     const { ndk } = setup();
     mockHookNdk = ndk;
     const view = renderHook(() => useFollowSync());
@@ -1312,7 +1353,7 @@ describe('what wakes a waiting follow', () => {
     await act(async () => undefined);
     expect(mockPublish).not.toHaveBeenCalled();
 
-    act(() => saveList(held));
+    act(() => saveList(saved));
     await waitFor(() => expect(mockPublish).toHaveBeenCalledTimes(1));
     expect(publishedTags()).toEqual([
       ['p', X],

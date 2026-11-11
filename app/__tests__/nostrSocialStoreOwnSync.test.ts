@@ -135,6 +135,45 @@ describe('nostrSocialStore follow list', () => {
     });
   });
 
+  it('takes, of lists from the second of one saved without its id, only that list itself; a newer one replaces it', () => {
+    const social = () => useNostrSocialStore.getState();
+    // As loaded from storage: the saved fields, no id.
+    useNostrSocialStore.setState({
+      contactsTags: [['p', X]],
+      contactsContent: 'saved',
+      contactsUpdatedAt: T,
+      followingPubkeys: { [X]: true },
+    });
+    social().setContactsFromRelay({
+      tags: [],
+      content: 'other',
+      createdAtSec: T,
+      eventId: '1'.repeat(64),
+    });
+    expect(social()).toMatchObject({ contactsContent: 'saved', followingPubkeys: { [X]: true } });
+    expect(selectContactList(social())).toEqual({ status: 'known', updatedAt: T });
+
+    social().setContactsFromRelay({
+      tags: [['p', X]],
+      content: 'saved',
+      createdAtSec: T,
+      eventId: '9'.repeat(64),
+    });
+    expect(selectContactList(social())).toEqual({
+      status: 'known',
+      updatedAt: T,
+      eventId: '9'.repeat(64),
+    });
+
+    social().setContactsFromRelay({
+      tags: [],
+      content: 'newer',
+      createdAtSec: T + 1,
+      eventId: 'e2',
+    });
+    expect(social()).toMatchObject({ contactsContent: 'newer', followingPubkeys: {} });
+  });
+
   it('counts a list that was loaded empty, or follows saved without a stamp, as known', () => {
     useNostrSocialStore
       .getState()

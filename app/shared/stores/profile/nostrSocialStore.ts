@@ -246,6 +246,24 @@ function extractFollowingFromTags(tags: string[][]): Record<string, true> {
   return map;
 }
 
+function sameKeys(a: Record<string, true>, b: Record<string, true>): boolean {
+  const keys = Object.keys(a);
+  return keys.length === Object.keys(b).length && keys.every((key) => b[key]);
+}
+
+/**
+ * Whether `tags` and `content` are the list the store holds: the same follows
+ * and, unless the saved tags are an older list's left under a seed (their
+ * follows are not the held ones), the same tags and content.
+ */
+function holdsHeldList(state: NostrSocialState, tags: string[][], content: string): boolean {
+  if (!sameKeys(extractFollowingFromTags(tags), state.followingPubkeys)) return false;
+  if (!sameKeys(extractFollowingFromTags(state.contactsTags), state.followingPubkeys)) return true;
+  return (
+    state.contactsContent === content && JSON.stringify(state.contactsTags) === JSON.stringify(tags)
+  );
+}
+
 /** Delete a key from a record immutably. */
 function omitKey<V>(record: Record<string, V>, key: string): Record<string, V> {
   const next = { ...record };
@@ -466,18 +484,19 @@ export const useNostrSocialStore = create<NostrSocialStore>({
       setContactsFromRelay: ({ tags, content, createdAtSec, eventId }) => {
         set((state) => {
           // Of two lists from the same second the lower id wins, as on relays.
-          // Without the held list's id (loaded from storage, or a seed) the
-          // newer arrival is taken, and `followSync` waits rather than build on it.
+          // Without the held list's id (loaded from storage, or a seed) only
+          // the held list itself is taken, which records its id; any other
+          // could be the one relays drop, and building on it would lose follows.
           const held = heldContactsEventId(state);
-          if (
-            createdAtSec < state.contactsUpdatedAt ||
-            (createdAtSec === state.contactsUpdatedAt &&
-              held !== undefined &&
-              !supersedes(
-                { created_at: createdAtSec, id: eventId },
-                { created_at: createdAtSec, id: held }
-              ))
-          ) {
+          const sameSecondKept =
+            createdAtSec === state.contactsUpdatedAt &&
+            (held === undefined
+              ? !holdsHeldList(state, tags, content)
+              : !supersedes(
+                  { created_at: createdAtSec, id: eventId },
+                  { created_at: createdAtSec, id: held }
+                ));
+          if (createdAtSec < state.contactsUpdatedAt || sameSecondKept) {
             storeLog.debug('social.contacts.stale', {
               createdAtSec,
               current: state.contactsUpdatedAt,
