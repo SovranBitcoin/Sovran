@@ -289,7 +289,6 @@ interface Nip46ConnectionsActions {
     opts?: { denied?: boolean; grantKey?: GrantKey; peerGrantPubkey?: string }
   ) => void;
   blockApp: (clientPubkey: string) => void;
-  unblockApp: (clientPubkey: string) => void;
   /** Deletes the record entirely (Block keeps it with status 'blocked'). */
   disconnectApp: (clientPubkey: string) => void;
   /** Deletes EVERY record — the hub's Reset Remote Login. */
@@ -624,11 +623,6 @@ export const useNip46ConnectionsStore = create<Nip46ConnectionsStore>({
         blockApp: (clientPubkey) => {
           storeLog.info('store.nip46_connections.block');
           patchApp(clientPubkey, (app) => ({ ...app, status: 'blocked' }));
-        },
-
-        unblockApp: (clientPubkey) => {
-          storeLog.info('store.nip46_connections.unblock');
-          patchApp(clientPubkey, (app) => ({ ...app, status: 'active' }));
         },
 
         disconnectApp: (clientPubkey) => {

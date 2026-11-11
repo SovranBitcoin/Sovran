@@ -149,7 +149,35 @@ describe('the inbox subscription', () => {
     );
   });
 
-  it('with a saved cursor subscribes from one minute before it', async () => {
+  it('with a saved cursor subscribes from three days before it', async () => {
+    await AsyncStorage.setItem(CURSOR_KEY, '{"v":1,"d":1700000000}');
+
+    renderHook(() => useWhitenoiseInbox(), { wrapper });
+    await flush();
+
+    expect(client!.network.subscription).toHaveBeenCalledWith(
+      ['wss://my-inbox.example'],
+      [{ kinds: [1059], '#p': [SELF], since: 1_700_000_000 - 3 * 24 * 60 * 60 }]
+    );
+  });
+
+  it('asks for an invitation dated two days before the newest gift wrap seen', async () => {
+    // Senders move a gift wrap's date back by up to two days, so one sent
+    // after the newest wrap seen can be dated well before it.
+    const newestSeen = 1_700_000_000;
+    const backdatedInvite = newestSeen - 2 * 24 * 60 * 60;
+    await AsyncStorage.setItem(CURSOR_KEY, `{"v":1,"d":${newestSeen}}`);
+
+    renderHook(() => useWhitenoiseInbox(), { wrapper });
+    await flush();
+
+    const [filter] = jest.mocked(client!.network.subscription).mock.calls[0][1] as {
+      since: number;
+    }[];
+    expect(filter.since).toBeLessThanOrEqual(backdatedInvite);
+  });
+
+  it('never asks from before time zero', async () => {
     await AsyncStorage.setItem(CURSOR_KEY, '{"v":1,"d":1000}');
 
     renderHook(() => useWhitenoiseInbox(), { wrapper });
@@ -157,7 +185,7 @@ describe('the inbox subscription', () => {
 
     expect(client!.network.subscription).toHaveBeenCalledWith(
       ['wss://my-inbox.example'],
-      [{ kinds: [1059], '#p': [SELF], since: 940 }]
+      [{ kinds: [1059], '#p': [SELF], since: 0 }]
     );
   });
 
@@ -296,6 +324,20 @@ describe('each incoming gift wrap', () => {
 
     expect(reader!.decryptGiftWrap).not.toHaveBeenCalled();
     expect(await AsyncStorage.getItem(CURSOR_KEY)).toBeNull();
+  });
+
+  it('wraps fetched again by the three-day look-back are not processed twice and leave the cursor alone', async () => {
+    await AsyncStorage.setItem(CURSOR_KEY, '{"v":1,"d":1700000000}');
+    // The reader keeps the ids it has seen on the phone, across restarts.
+    reader!.ingestEvent.mockResolvedValue(false);
+    const { deliver } = await started();
+
+    await deliver(giftWrap('seen-yesterday', 1_700_000_000 - 24 * 60 * 60));
+    await deliver(giftWrap('seen-newest', 1_700_000_000));
+
+    expect(reader!.ingestEvent).toHaveBeenCalledTimes(2);
+    expect(reader!.decryptGiftWrap).not.toHaveBeenCalled();
+    expect(await AsyncStorage.getItem(CURSOR_KEY)).toBe('{"v":1,"d":1700000000}');
   });
 
   it('ignores events of another kind or without an id', async () => {

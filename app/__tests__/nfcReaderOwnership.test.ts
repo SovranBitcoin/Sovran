@@ -139,7 +139,7 @@ beforeEach(() => {
   originalOS = Platform.OS;
   Object.defineProperty(Platform, 'OS', { value: 'android', configurable: true });
   usePopupStore.setState({ current: null, isOpen: false });
-  useNfcTapStore.setState({ armed: false, phase: 'armed' });
+  useNfcTapStore.setState({ phase: 'armed' });
 });
 
 afterEach(() => {

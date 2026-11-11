@@ -509,6 +509,10 @@ describe('streaming an answer', () => {
     expect(question).toMatchObject({ id: 'u1', pending: false });
     expect(readAnswer(answer!, getTurn('a1'))).toEqual({ phase: 'interrupted', text: '' });
 
+    // Asking again is a spend, so it passes the send gate: a provider is
+    // chosen (the saved blob above names none) and the spend sheet is accepted.
+    useRoutstrStore.setState({ userNodeBaseUrl: 'https://node.example', confirmSpend: true });
+    jest.mocked(confirmSpend).mockResolvedValueOnce(true);
     arrangeStream();
     const { result } = renderHook(useAiSend);
     let retrying!: Promise<unknown>;
@@ -516,6 +520,7 @@ describe('streaming an answer', () => {
       retrying = result.current.retry('a1');
     });
     await tick();
+    expect(confirmSpend).toHaveBeenCalledTimes(1);
     await act(async () => {
       live.push(content('answered now'));
       live.end();

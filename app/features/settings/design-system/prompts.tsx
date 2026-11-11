@@ -117,7 +117,7 @@ interface CtaSample {
   body: CtaBodyView;
 }
 
-const NO_CLAIM: CtaBodyView = { balanceTotalSat: 0, oldEcash: null };
+const NO_CLAIM: CtaBodyView = { holdsMoney: false, oldEcash: null };
 
 /**
  * The data each prompt is shown on. Keyed by `CtaId`, so a prompt added to
@@ -132,7 +132,7 @@ export const CTA_SAMPLES: Record<CtaId, readonly CtaSample[]> = {
     {
       id: 'funded',
       label: 'A wallet holding 21,000 sats',
-      body: { balanceTotalSat: 21_000, oldEcash: null },
+      body: { holdsMoney: true, oldEcash: null },
     },
     { id: 'empty', label: 'An empty wallet, a week after it was made', body: NO_CLAIM },
   ],
@@ -141,7 +141,7 @@ export const CTA_SAMPLES: Record<CtaId, readonly CtaSample[]> = {
       id: 'sats',
       label: 'A named mint holding 2,100 sats',
       body: {
-        balanceTotalSat: 0,
+        holdsMoney: false,
         oldEcash: describeLegacyClaim(
           { mintUrl: SAMPLE_MINT_URL, amount: 2_100, unit: 'sat' },
           'Minibits'
@@ -152,7 +152,7 @@ export const CTA_SAMPLES: Record<CtaId, readonly CtaSample[]> = {
       id: 'fiat',
       label: 'A mint with no name holding $12.50',
       body: {
-        balanceTotalSat: 0,
+        holdsMoney: false,
         oldEcash: describeLegacyClaim(
           { mintUrl: 'https://mint.example', amount: 1_250, unit: 'usd' },
           undefined
@@ -163,7 +163,7 @@ export const CTA_SAMPLES: Record<CtaId, readonly CtaSample[]> = {
       id: 'unknown-unit',
       label: 'An amount in a unit the old app never recorded',
       body: {
-        balanceTotalSat: 0,
+        holdsMoney: false,
         oldEcash: describeLegacyClaim(
           { mintUrl: SAMPLE_MINT_URL, amount: 2_100, unit: null },
           'Minibits'

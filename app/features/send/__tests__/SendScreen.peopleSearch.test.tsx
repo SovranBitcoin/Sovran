@@ -122,7 +122,7 @@ jest.mock('@/shared/stores/profile/recentPeopleStore', () => ({
 }));
 jest.mock('@/shared/lib/nfc', () => ({ useNfcSupported: () => false }));
 jest.mock('@/shared/stores/runtime/nfcTapStore', () => ({
-  useNfcTapStore: (sel: (s: { armed: boolean }) => unknown) => sel({ armed: false }),
+  useNfcTapStore: (sel: (s: { phase: string }) => unknown) => sel({ phase: 'armed' }),
 }));
 jest.mock('@/shared/lib/popup', () => ({ showActionSheet: () => {} }));
 jest.mock('@/shared/hooks/useGuardedRouter', () => ({

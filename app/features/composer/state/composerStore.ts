@@ -31,10 +31,7 @@ function emptyTextBlock(): ComposerBlock {
 interface ComposerState {
   target: ComposerTarget | null;
   blocks: ComposerBlock[];
-  contentWarning?: string;
   poll?: PollDraft;
-  /** Pubkeys inserted via @-mention, for `p` tags. */
-  mentionPubkeys: string[];
   /** The post being replied to (display-only; kept out of the pure target). */
   parentEvent?: FeedEvent;
   parentProfile?: ProfileInfo;
@@ -45,9 +42,7 @@ interface ComposerState {
   addMediaBlock: (block: Omit<MediaBlock, 'id'>) => string;
   updateBlock: (id: string, patch: Partial<MediaBlock>) => void;
   removeBlock: (id: string) => void;
-  setContentWarning: (cw: string | undefined) => void;
   setPoll: (poll: PollDraft | undefined) => void;
-  addMention: (pubkey: string) => void;
 }
 
 export const useComposerStore = create<ComposerState>({
@@ -56,9 +51,7 @@ export const useComposerStore = create<ComposerState>({
 })((set, get) => ({
   target: null,
   blocks: [emptyTextBlock()],
-  contentWarning: undefined,
   poll: undefined,
-  mentionPubkeys: [],
   parentEvent: undefined,
   parentProfile: undefined,
 
@@ -66,9 +59,7 @@ export const useComposerStore = create<ComposerState>({
     set({
       target,
       blocks: [emptyTextBlock()],
-      contentWarning: undefined,
       poll: undefined,
-      mentionPubkeys: [],
       parentEvent: context?.parentEvent,
       parentProfile: context?.parentProfile,
     }),
@@ -98,7 +89,5 @@ export const useComposerStore = create<ComposerState>({
 
   removeBlock: (id) => set({ blocks: get().blocks.filter((b) => b.id !== id) }),
 
-  setContentWarning: (cw) => set({ contentWarning: cw }),
   setPoll: (poll) => set({ poll }),
-  addMention: (pubkey) => set({ mentionPubkeys: [...new Set([...get().mentionPubkeys, pubkey])] }),
 }));

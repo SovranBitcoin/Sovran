@@ -30,6 +30,8 @@ const mockScreenNavigation = {
 };
 
 let mockBalance = 100;
+/** What the wallet holds in units other than sat, in each unit's smallest part. */
+let mockOtherUnits: Record<string, number> = {};
 jest.mock('heroui-native', () => {
   const React = require('react');
   const host = (name: string) =>
@@ -60,9 +62,18 @@ jest.mock('@/shared/hooks/useGuardedRouter', () => {
   return { guardedRouter, useGuardedRouter: () => guardedRouter };
 });
 jest.mock('expo-application', () => ({ nativeApplicationVersion: '1.0.0' }));
-jest.mock('wallet/react', () => ({ useColadaBalance: () => ({ total: mockBalance }) }), {
-  virtual: true,
-});
+jest.mock('@cashu/coco-react', () => ({
+  useBalanceContext: () => ({
+    balances: {
+      totalByUnit: Object.fromEntries(
+        Object.entries({ sat: mockBalance, ...mockOtherUnits }).map(([unit, total]) => [
+          unit,
+          { total, unit },
+        ])
+      ),
+    },
+  }),
+}));
 jest.mock('@/shared/lib/qrButtonAnchor', () => ({ useBootMorphCompleted: () => true }));
 jest.mock('@/shared/providers/OfflineProvider', () => ({
   useOfflineStatus: () => ({ isOffline: false }),
@@ -143,6 +154,7 @@ beforeEach(async () => {
   useProfileStore.setState({ activeAccountIndex: 0 });
   mockPush.mockClear();
   mockBalance = 100;
+  mockOtherUnits = {};
   delete process.env.EXPO_PUBLIC_E2E_STATE_MIRROR;
 });
 afterEach(() => {
@@ -215,6 +227,22 @@ it('reacts to balance and verification changes without showing in Mock Mode', as
   expect(mockPush).not.toHaveBeenCalled();
   await act(async () => useWalletLifecycleStore.getState().markRecoveryPhraseVerified());
   await act(async () => useSettingsStore.setState({ mockMode: false }));
+  expect(mockPush).not.toHaveBeenCalled();
+});
+it('asks a new wallet holding only dollars to back up, and says it holds money', () => {
+  mockBalance = 0;
+  mockOtherUnits = { usd: 500 };
+  const view = render(<HostWithScreen id="backup-recovery-phrase" />);
+  expect(mockPush).toHaveBeenCalledWith({
+    pathname: '/(prompt-flow)/cta',
+    params: { id: 'backup-recovery-phrase' },
+  });
+  expect(view.getByText(/You have money here now/)).toBeTruthy();
+});
+it('does not ask a new wallet that is empty in every unit', () => {
+  mockBalance = 0;
+  mockOtherUnits = { usd: 0, eur: 0 };
+  render(<HostWithScreen />);
   expect(mockPush).not.toHaveBeenCalled();
 });
 it('suppresses automation but allows preview, close and reopening a dismissed CTA', async () => {

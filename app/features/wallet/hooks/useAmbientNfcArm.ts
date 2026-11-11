@@ -85,7 +85,7 @@ export function useAmbientNfcArm(machine: AmbientNfcMachine): void {
       // ~1.2s after every dismissal, mid-exit-animation). Cleared when the
       // sheet is shown again (explicit button press) or the loop restarts.
       let userDismissedSheet = false;
-      const { setArmed, setPhase } = useNfcTapStore.getState();
+      const { setPhase } = useNfcTapStore.getState();
 
       const unsubscribePopup = usePopupStore.subscribe((state, prev) => {
         const wasTapSheet =
@@ -119,7 +119,6 @@ export function useAmbientNfcArm(machine: AmbientNfcMachine): void {
           // was asked: this loop is over, and must not start a scan.
           if (!active) break;
           if (!enabled) {
-            useNfcTapStore.getState().setArmed(false);
             await delay(DISABLED_RECHECK_MS);
             continue;
           }
@@ -137,7 +136,6 @@ export function useAmbientNfcArm(machine: AmbientNfcMachine): void {
             await delay(POPUP_RECHECK_MS);
             continue;
           }
-          setArmed(true);
           releaseReader = holdNfcReader('ambient', onTagConnected);
           // Root-entry reset (sovran-payments): wallet focused +
           // no payment popup up means no flow is active, so clearing stale
@@ -154,7 +152,6 @@ export function useAmbientNfcArm(machine: AmbientNfcMachine): void {
         active = false;
         unsubscribePopup();
         releaseReader();
-        useNfcTapStore.getState().setArmed(false);
         setPhase('armed');
         // Don't leave a sheet claiming "listening" after the listener is
         // gone (e.g. navigating away with the sheet up).
