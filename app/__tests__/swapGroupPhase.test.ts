@@ -77,3 +77,97 @@ describe('what a saved group shows: money still moving first, then a failed leg,
     }
   );
 });
+
+describe('a failed attempt that a later successful attempt replaced does not fail the group', () => {
+  const A = 'https://a.example';
+  const B = 'https://b.example';
+  const C = 'https://c.example';
+  const D = 'https://d.example';
+  const direct = (localStatus: SwapLeg['localStatus'], id = 'direct'): SwapLeg => ({
+    id,
+    fromMintUrl: A,
+    toMintUrl: C,
+    amount: 800,
+    localStatus,
+  });
+  /** One hop of a chain over `path`, as the engine saves it. */
+  const hop = (
+    chainId: string,
+    path: string[],
+    index: number,
+    localStatus: SwapLeg['localStatus']
+  ): SwapLeg => ({
+    id: `${chainId}-${index}`,
+    fromMintUrl: path[index],
+    toMintUrl: path[index + 1],
+    amount: 790,
+    chainId,
+    chainPath: path,
+    chainHopIndex: index,
+    localStatus,
+  });
+  const outcome = (legs: SwapLeg[], state: SwapGroup['state'] = 'finished') =>
+    swapGroupOutcome({ id: 'g-replaced', state, legs });
+
+  it('a direct leg that failed, then a route through another mint that arrived, is finished', () => {
+    expect(
+      outcome([
+        direct('failed'),
+        hop('ch1', [A, B, C], 0, 'done'),
+        hop('ch1', [A, B, C], 1, 'done'),
+      ])
+    ).toBe('finished');
+  });
+
+  it('a route that failed, then another route for the same transfer that arrived, is finished', () => {
+    expect(
+      outcome([
+        direct('failed'),
+        hop('ch1', [A, B, C], 0, 'failed'),
+        hop('ch2', [A, D, C], 0, 'done'),
+        hop('ch2', [A, D, C], 1, 'done'),
+      ])
+    ).toBe('finished');
+  });
+
+  it('a cancelled run whose transfer arrived by another route reads cancelled, not failed', () => {
+    expect(
+      outcome(
+        [direct('failed'), hop('ch1', [A, B, C], 0, 'done'), hop('ch1', [A, B, C], 1, 'done')],
+        'cancelled'
+      )
+    ).toBe('cancelled');
+  });
+
+  it('a route whose last hop did not arrive replaces nothing', () => {
+    expect(
+      outcome([
+        direct('failed'),
+        hop('ch1', [A, B, C], 0, 'done'),
+        hop('ch1', [A, B, C], 1, 'failed'),
+      ])
+    ).toBe('failed');
+    expect(outcome([direct('failed'), hop('ch1', [A, B, C], 0, 'done')])).toBe('failed');
+  });
+
+  it('a route to another destination, or one that arrived before the failure, replaces nothing', () => {
+    expect(
+      outcome([
+        direct('failed'),
+        hop('ch1', [A, B, D], 0, 'done'),
+        hop('ch1', [A, B, D], 1, 'done'),
+      ])
+    ).toBe('failed');
+    expect(
+      outcome([
+        hop('ch1', [A, B, C], 0, 'done'),
+        hop('ch1', [A, B, C], 1, 'done'),
+        direct('failed'),
+      ])
+    ).toBe('failed');
+  });
+
+  it('a direct transfer that arrived does not replace another direct transfer that failed', () => {
+    expect(outcome([direct('failed', 'first'), direct('done', 'second')])).toBe('failed');
+  });
+});

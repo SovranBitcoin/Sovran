@@ -439,8 +439,9 @@ describe('a chain that replaces a direct leg', () => {
 
     await render();
 
-    expect(details()).toMatchObject({ Steps: '2', 'Total Fees': '20 sat' });
-    expect(header()).toMatchObject({ amount: 1570 });
+    // The transfer arrived by the chain, so the swap is complete, as its history row says.
+    expect(details()).toMatchObject({ Status: 'Complete', Steps: '2', 'Total Fees': '20 sat' });
+    expect(header()).toMatchObject({ amount: 1570, color: 'success' });
     expect(renderer.root.findAllByType('TransferCard' as never)).toHaveLength(1);
   });
 });

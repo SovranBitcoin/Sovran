@@ -79,6 +79,38 @@ export function legMoneyMayMove(leg: Pick<SwapLeg, 'localStatus' | 'meltOperatio
   }
 }
 
+/** The transfer a leg was made for: its chain's ends, or its own. */
+function transferOf(leg: Pick<SwapLeg, 'fromMintUrl' | 'toMintUrl' | 'chainPath'>) {
+  const path = leg.chainPath;
+  return path && path.length >= 2
+    ? { from: path[0], to: path[path.length - 1] }
+    : { from: leg.fromMintUrl, to: leg.toMintUrl };
+}
+
+/**
+ * Whether a later leg is a route through other mints that delivered the
+ * transfer `failed` was made for: the last hop of another chain between the
+ * same two mints, done. The engine saves a reroute that way, after the attempt
+ * it replaces (a retry reuses its leg instead). A direct leg never replaces
+ * another: two plan steps can share their mints.
+ */
+function replacedLater(legs: readonly SwapLeg[], index: number): boolean {
+  const failed = legs[index];
+  const wanted = transferOf(failed);
+  return legs.slice(index + 1).some((later) => {
+    const path = later.chainPath;
+    if (later.localStatus !== 'done' || !later.chainId || !path || path.length < 3) return false;
+    if (later.chainId === failed.chainId || later.toMintUrl !== path[path.length - 1]) return false;
+    const delivered = transferOf(later);
+    return delivered.from === wanted.from && delivered.to === wanted.to;
+  });
+}
+
+/** A failed leg that no later attempt replaced. */
+function failedOutstanding(legs: readonly SwapLeg[]): boolean {
+  return legs.some((leg, index) => leg.localStatus === 'failed' && !replacedLater(legs, index));
+}
+
 /**
  * What a saved group shows the person, in this order:
  *
@@ -86,7 +118,8 @@ export function legMoneyMayMove(leg: Pick<SwapLeg, 'localStatus' | 'meltOperatio
  *   may still move, whatever the group was saved as. A run that ended (an
  *   abort, Cancel) can leave a leg mid-payment, and one failed leg says nothing
  *   about another that is still moving.
- * - `failed` once nothing can still move and a leg failed.
+ * - `failed` once nothing can still move and a leg failed that no later
+ *   route delivered in its place.
  * - Otherwise how the run ended: `finished` or `cancelled`.
  *
  * The history row and the detail screen both read this, so they agree.
@@ -104,7 +137,7 @@ export function swapGroupOutcome(
       return 'inProgress';
     case 'finished':
     case 'cancelled':
-      return group.legs.some((leg) => leg.localStatus === 'failed') ? 'failed' : phase;
+      return failedOutstanding(group.legs) ? 'failed' : phase;
     default: {
       const exhaustive: never = phase;
       return exhaustive;
