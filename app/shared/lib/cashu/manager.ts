@@ -739,6 +739,9 @@ export class CocoManager {
     this.instance = null;
     const initStart = performance.now();
     const doInitialize = async (): Promise<Manager> => {
+      // The database this open holds once it has one: an open that fails
+      // closes it, so no handle is left that nothing will close.
+      let acquired: SQLite.SQLiteDatabase | null = null;
       try {
         // The whole identity is read here, before the first await. The database
         // name is fixed on the next line; reading the phrase or the imported
@@ -797,6 +800,7 @@ export class CocoManager {
           throw new Error('Wallet was reset while it was opening');
         }
         this.db = db;
+        acquired = db;
         const database = db as unknown as ExpoSqliteRepositoriesOptions['database'];
         // The profile's signer key is imported into coco's keyring (p2pk-import
         // plugin below) so P2PK receives auto-sign — but it must never reach
@@ -986,6 +990,10 @@ export class CocoManager {
 
         return this.instance;
       } catch (error) {
+        if (acquired && this.db === acquired) {
+          this.db = null;
+          await acquired.closeAsync().catch(() => undefined);
+        }
         cashuLog.error('cashu.manager.init_failed', { error });
         // Manager/repositories init failing is exactly what upstream needs
         // to hear about (schema migration or adapter contract breakage).

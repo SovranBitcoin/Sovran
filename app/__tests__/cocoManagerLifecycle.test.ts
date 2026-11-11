@@ -237,3 +237,25 @@ describe('starting the plugins', () => {
     expect(CocoManager.peekInstance()).toBe(wallet);
   });
 });
+
+// F217: whatever an open acquired is closed when the open fails, so no
+// database handle is left outside the manager's reach.
+describe('an open that fails after the database opened', () => {
+  it('closes the database, and the next open opens it again', async () => {
+    repositories.mockReturnValueOnce({
+      init: async () => {
+        throw new Error('migration failed');
+      },
+    });
+    await expect(CocoManager.initialize()).rejects.toThrow('migration failed');
+    expect(opened[0].closeAsync).toHaveBeenCalledTimes(1);
+
+    await CocoManager.cleanup();
+    expect(opened[0].closeAsync).toHaveBeenCalledTimes(1);
+
+    CocoManager.setCashuMnemonic('phrase of account a');
+    CocoManager.setSignerKey(SIGNER_KEY);
+    await expect(CocoManager.initialize()).resolves.toBeDefined();
+    expect(openDatabase).toHaveBeenCalledTimes(2);
+  });
+});
