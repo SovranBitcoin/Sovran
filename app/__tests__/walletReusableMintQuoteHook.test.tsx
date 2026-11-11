@@ -213,7 +213,7 @@ test('rotate keeps the current quote on screen until the new one is created', as
 
   const pending = deferred<Quote>();
   fake.manager.quotes.mint.create.mockImplementationOnce(() => pending.promise);
-  let rotation: Promise<void> = Promise.resolve();
+  let rotation: Promise<boolean> = Promise.resolve(false);
   await act(async () => {
     rotation = result.current.rotate('deposit_received');
   });
@@ -226,7 +226,7 @@ test('rotate keeps the current quote on screen until the new one is created', as
     const next = quote('rotated');
     fake.quotes.set('rotated', next);
     pending.resolve(next);
-    await rotation;
+    await expect(rotation).resolves.toBe(true);
   });
   expect(result.current.quote?.quoteId).toBe('rotated');
   expect(store.get(KEY)).toBe('rotated');
@@ -238,7 +238,7 @@ test('a failed rotate reports the error and keeps the current quote', async () =
   fake.manager.quotes.mint.create.mockRejectedValueOnce(new Error('mint offline'));
 
   await act(async () => {
-    await result.current.rotate();
+    await expect(result.current.rotate()).resolves.toBe(false);
   });
   expect(result.current.error).toEqual({ message: 'mint offline', authored: false });
   expect(result.current.quote?.quoteId).toBe('created-1');

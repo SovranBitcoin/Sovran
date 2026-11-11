@@ -43,9 +43,26 @@ jest.mock('@/features/receive/hooks/useReceiveMethodMint', () => ({
   useReceiveMethodMint: () => ({ mintUrl: 'https://mint.example', anyMintSupports: mockSupports }),
 }));
 jest.mock('@/shared/hooks/useMintInfo', () => ({ useMintInfo: () => null }));
-jest.mock('@/shared/hooks/useMempoolAddressSummary', () => ({
-  useMempoolAddressSummary: () => ({ summary: null }),
-}));
+// Each poll of the standing address hands the tab a fresh summary object; a
+// test publishes one with `mockReportMempool` and the tab re-renders on it.
+let mockMempoolSummary: { totalReceivedSats: number } | null = null;
+const mockMempoolListeners = new Set<() => void>();
+const mockReportMempool = (summary: { totalReceivedSats: number } | null) => {
+  mockMempoolSummary = summary;
+  mockMempoolListeners.forEach((listener) => listener());
+};
+jest.mock('@/shared/hooks/useMempoolAddressSummary', () => {
+  const { useSyncExternalStore } = jest.requireActual<typeof import('react')>('react');
+  const subscribe = (listener: () => void) => {
+    mockMempoolListeners.add(listener);
+    return () => mockMempoolListeners.delete(listener);
+  };
+  return {
+    useMempoolAddressSummary: () => ({
+      summary: useSyncExternalStore(subscribe, () => mockMempoolSummary),
+    }),
+  };
+});
 jest.mock('@/features/receive/lib/standingQuoteIdentityStore', () => ({
   standingQuoteIdentityStore: {},
 }));
@@ -208,6 +225,51 @@ describe('receive rail presentation', () => {
       {}
     );
     act(() => renderer.unmount());
+  });
+  it('tries the automatic address rotation again on the next report after one fails', async () => {
+    let finishFirst!: (rotated: boolean) => void;
+    const rotate = jest
+      .fn<Promise<boolean>, unknown[]>()
+      .mockImplementationOnce(
+        () =>
+          new Promise((done) => {
+            finishFirst = done;
+          })
+      )
+      .mockResolvedValue(true);
+    mockQuote.mockImplementation(() => ({
+      quote: { request: 'bc1qpaid', expiry: 10_000_000_000 },
+      error: null,
+      rotate,
+    }));
+    let renderer!: TestRenderer.ReactTestRenderer;
+    try {
+      await act(async () => {
+        renderer = TestRenderer.create(<ReceiveReusableQuoteTab {...props} method="onchain" />);
+      });
+      await act(async () => mockReportMempool({ totalReceivedSats: 1000 }));
+      expect(rotate).toHaveBeenCalledTimes(1);
+      expect(rotate).toHaveBeenLastCalledWith('deposit_received');
+
+      // A report while the first rotation is still running does not start a second.
+      await act(async () => mockReportMempool({ totalReceivedSats: 1000 }));
+      expect(rotate).toHaveBeenCalledTimes(1);
+
+      // The mint refused the replacement: the paid address is still on screen.
+      await act(async () => finishFirst(false));
+      await act(async () => mockReportMempool({ totalReceivedSats: 1000 }));
+      expect(rotate).toHaveBeenCalledTimes(2);
+      expect(rotate).toHaveBeenLastCalledWith('deposit_received');
+    } finally {
+      act(() => renderer?.unmount());
+      mockReportMempool(null);
+      mockQuote.mockReset();
+      mockQuote.mockImplementation(() => ({
+        quote: { request: 'lno-fixture', expiry: 10_000_000_000 },
+        error: null,
+        rotate: jest.fn(),
+      }));
+    }
   });
   it('opens Discover only once on a rapid double tap', () => {
     mockSupports = false;

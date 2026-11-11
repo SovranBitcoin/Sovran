@@ -203,21 +203,26 @@ export const ReceiveReusableQuoteTab = memo(function ReceiveReusableQuoteTab({
   // deposit still auto-mints. Bolt12 offers never watch/rotate.
   const onchainStandingAddress = method === 'onchain' ? request : null;
   const standingMempool = useMempoolAddressSummary(onchainStandingAddress);
-  const depositObserved =
-    !!standingMempool.summary && standingMempool.summary.totalReceivedSats > 0;
+  const mempoolReport = standingMempool.summary;
+  const depositObserved = !!mempoolReport && mempoolReport.totalReceivedSats > 0;
   const rotatedForAddressRef = useRef<string | null>(null);
   React.useEffect(() => {
     if (!onchainStandingAddress || !depositObserved) return;
     // One rotation per observed address — the poll keeps reporting the payment
-    // until `request` swaps to the fresh (unpaid) address.
+    // until `request` swaps to the fresh (unpaid) address. A rotation that did
+    // not go through releases the address, so the next report tries again.
     if (rotatedForAddressRef.current === onchainStandingAddress) return;
     rotatedForAddressRef.current = onchainStandingAddress;
     paymentLog.info('receive.onchain.rotate_requested', {
       source: 'deposit_detected',
       addressLength: onchainStandingAddress.length,
     });
-    void rotate('deposit_received');
-  }, [onchainStandingAddress, depositObserved, rotate]);
+    void rotate('deposit_received').then((rotated) => {
+      if (!rotated && rotatedForAddressRef.current === onchainStandingAddress) {
+        rotatedForAddressRef.current = null;
+      }
+    });
+  }, [onchainStandingAddress, depositObserved, mempoolReport, rotate]);
 
   // "View all": push the rail's list into this same (receive-flow) stack so a
   // paid onchain address can open its deposit transaction to the side. The list

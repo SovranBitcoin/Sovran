@@ -31,8 +31,10 @@ export interface UseReusableMintQuoteResult {
    * policy). Keeps showing the current quote until the replacement resolves.
    * `reason` distinguishes a user "new address" tap (`"manual"`, default) from
    * an automatic deposit-detected rotation (`"deposit_received"`).
+   * Resolves `true` once the replacement is recorded, `false` when it was not
+   * (the current quote stays and `error` says why).
    */
-  rotate: (reason?: "manual" | "deposit_received") => Promise<void>;
+  rotate: (reason?: "manual" | "deposit_received") => Promise<boolean>;
 }
 
 /**
@@ -210,16 +212,17 @@ export function useReusableMintQuote(
   // not running (Jest), not only once compiled.
   const rotate = useCallback(
     async (reason: "manual" | "deposit_received" = "manual") => {
-      if (!mintUrl || !method || !unit) return;
+      if (!mintUrl || !method || !unit) return false;
       const outcome = await rotateReusableQuote(
         manager,
         { mintUrl, method, unit },
         identityStoreRef.current,
         reason,
       );
-      if (!mountedRef.current) return;
+      if (!mountedRef.current) return outcome.ok;
       if (outcome.ok) setQuote(outcome.quote);
       else setError(outcome.failure);
+      return outcome.ok;
     },
     [manager, mintUrl, method, unit, identityStoreRef, mountedRef],
   );
