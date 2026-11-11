@@ -13,7 +13,8 @@ export interface CtaContext {
     recoveryPhraseVerifiedRevision?: number | null;
     restoreStatus: RestoreStatus;
   };
-  balanceTotalSat: number;
+  /** The wallet holds a non-zero balance in at least one unit, sats or any other. */
+  holdsMoney: boolean;
   backupStartedAt?: number | null;
   /** An untrusted mint holding unspent ecash from before 0.0.45, for the open account. */
   oldEcash: LegacyClaimPrompt | null;
@@ -23,7 +24,8 @@ export interface CtaContext {
 }
 /** What a prompt's body is written from. */
 export interface CtaBodyView {
-  balanceTotalSat: number;
+  /** The wallet holds a non-zero balance in at least one unit, sats or any other. */
+  holdsMoney: boolean;
   /** The mint and amount as shown to the person, or null when there is nothing to claim. */
   oldEcash: { mint: string; amount: string | null } | null;
 }

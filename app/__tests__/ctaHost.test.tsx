@@ -62,15 +62,18 @@ jest.mock('@/shared/hooks/useGuardedRouter', () => {
   return { guardedRouter, useGuardedRouter: () => guardedRouter };
 });
 jest.mock('expo-application', () => ({ nativeApplicationVersion: '1.0.0' }));
-jest.mock(
-  'wallet/react',
-  () => ({
-    useColadaBalance: (unit = 'sat') => ({
-      total: unit === 'sat' ? mockBalance : (mockOtherUnits[unit] ?? 0),
-    }),
+jest.mock('@cashu/coco-react', () => ({
+  useBalanceContext: () => ({
+    balances: {
+      totalByUnit: Object.fromEntries(
+        Object.entries({ sat: mockBalance, ...mockOtherUnits }).map(([unit, total]) => [
+          unit,
+          { total, unit },
+        ])
+      ),
+    },
   }),
-  { virtual: true }
-);
+}));
 jest.mock('@/shared/lib/qrButtonAnchor', () => ({ useBootMorphCompleted: () => true }));
 jest.mock('@/shared/providers/OfflineProvider', () => ({
   useOfflineStatus: () => ({ isOffline: false }),
@@ -226,23 +229,21 @@ it('reacts to balance and verification changes without showing in Mock Mode', as
   await act(async () => useSettingsStore.setState({ mockMode: false }));
   expect(mockPush).not.toHaveBeenCalled();
 });
-it('does not ask a new wallet holding only dollars to back up', () => {
+it('asks a new wallet holding only dollars to back up, and says it holds money', () => {
   mockBalance = 0;
   mockOtherUnits = { usd: 500 };
-  render(<HostWithScreen />);
-  expect(mockPush).not.toHaveBeenCalled();
-});
-it('tells a week-old wallet holding only dollars to back up without mentioning money', () => {
-  mockBalance = 0;
-  mockOtherUnits = { usd: 500 };
-  useWalletLifecycleStore.setState({ seedCreatedAt: Date.now() - 8 * 24 * 60 * 60 * 1000 });
   const view = render(<HostWithScreen id="backup-recovery-phrase" />);
   expect(mockPush).toHaveBeenCalledWith({
     pathname: '/(prompt-flow)/cta',
     params: { id: 'backup-recovery-phrase' },
   });
-  expect(view.queryByText(/You have money here now/)).toBeNull();
-  expect(view.getByText(/Write down your recovery phrase/)).toBeTruthy();
+  expect(view.getByText(/You have money here now/)).toBeTruthy();
+});
+it('does not ask a new wallet that is empty in every unit', () => {
+  mockBalance = 0;
+  mockOtherUnits = { usd: 0, eur: 0 };
+  render(<HostWithScreen />);
+  expect(mockPush).not.toHaveBeenCalled();
 });
 it('suppresses automation but allows preview, close and reopening a dismissed CTA', async () => {
   process.env.EXPO_PUBLIC_E2E_STATE_MIRROR = '1';

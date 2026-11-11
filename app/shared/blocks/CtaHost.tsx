@@ -3,7 +3,6 @@ import { AppState } from 'react-native';
 import { useRootNavigationState } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import * as Application from 'expo-application';
-import { useColadaBalance } from 'wallet/react';
 import { useCtaStore } from '@/shared/stores/global/ctaStore';
 import { legacyClaimPrompt, useLegacyEcashStore } from '@/shared/stores/global/legacyEcashStore';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
@@ -12,6 +11,7 @@ import { useWalletLifecycleStore } from '@/shared/stores/global/walletLifecycleS
 import { isRestoreAsked } from '@/shared/stores/global/walletRestorePhase';
 import { useLatestVersionFetch } from '@/shared/hooks/useLatestVersionFetch';
 import { selectNextCta } from '@/shared/lib/cta/selectNextCta';
+import { useHoldsMoney } from '@/shared/lib/cta/useHoldsMoney';
 import { useStoreLoadLatched } from '@/shared/lib/persist/hydrationOutcome';
 
 export function CtaHost() {
@@ -24,7 +24,7 @@ export function CtaHost() {
     (s) => s.recoveryPhraseVerifiedRevision
   );
   const restoreStatus = useWalletLifecycleStore((s) => s.restoreStatus);
-  const balance = useColadaBalance('sat');
+  const holdsMoney = useHoldsMoney();
   const legacyGroups = useLegacyEcashStore((s) => s.groups);
   const accountIndex = useProfileStore((s) => s.activeAccountIndex);
   const dismissed = useCtaStore((s) => s.dismissed);
@@ -61,7 +61,7 @@ export function CtaHost() {
           recoveryPhraseVerifiedRevision,
           restoreStatus,
         },
-        balanceTotalSat: balance.total,
+        holdsMoney,
         backupStartedAt,
         oldEcash: legacyClaimPrompt(legacyGroups, accountIndex),
         dismissed,
@@ -106,7 +106,7 @@ export function CtaHost() {
     recoveryPhraseVerifiedAt,
     recoveryPhraseVerifiedRevision,
     restoreStatus,
-    balance.total,
+    holdsMoney,
     backupStartedAt,
     legacyGroups,
     accountIndex,

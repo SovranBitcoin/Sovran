@@ -34,19 +34,19 @@ export const CTA_DEFINITIONS: readonly CtaDefinition[] = [
     priority: 10,
     presentation: 'dismissable-modal',
     dismissPolicy: 'do-not-ask-again',
-    shouldShow: ({ lifecycle, mockMode, balanceTotalSat, nowMs, backupStartedAt }) =>
+    shouldShow: ({ lifecycle, mockMode, holdsMoney, nowMs, backupStartedAt }) =>
       (lifecycle.recoveryPhraseVerifiedRevision == null ||
         lifecycle.recoveryPhraseVerifiedRevision < BACKUP_FLOW_REVISION) &&
       !isRestorePending(lifecycle.restoreStatus) &&
       !mockMode &&
       (backupStartedAt == null || nowMs - backupStartedAt >= ABANDONED_BACKUP_GRACE_MS) &&
-      (balanceTotalSat > 0 ||
+      (holdsMoney ||
         (lifecycle.seedCreatedAt !== null && nowMs - lifecycle.seedCreatedAt > 7 * DAY_MS)),
     content: {
       icon: 'mdi:shield',
       title: 'Back up your wallet',
-      body: ({ balanceTotalSat }) =>
-        `${balanceTotalSat > 0 ? 'You have money here now. ' : ''}Write down your recovery phrase and check each word to keep a way back to your wallet.`,
+      body: ({ holdsMoney }) =>
+        `${holdsMoney ? 'You have money here now. ' : ''}Write down your recovery phrase and check each word to keep a way back to your wallet.`,
       primary: { label: 'Back up now', action: 'back-up' },
       secondary: { label: 'Not now' },
     },

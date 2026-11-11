@@ -1,3 +1,5 @@
+import { Amount } from '@cashu/coco-core';
+import { holdsMoneyInAnyUnit } from '@/shared/lib/cta/useHoldsMoney';
 import { selectNextCta } from '@/shared/lib/cta/selectNextCta';
 import { CTA_DEFINITIONS, BACKUP_SNOOZE_MS, DAY_MS } from '@/shared/lib/cta/definitions';
 import { isNewerVersion } from '@/shared/lib/cta/version';
@@ -7,7 +9,7 @@ const ctx: CtaContext = {
   nativeVersion: '1.0.0',
   latest: { version: '2.0.0', fetchedAt: 10 * DAY_MS },
   lifecycle: { seedCreatedAt: 0, recoveryPhraseVerifiedAt: null, restoreStatus: 'complete' },
-  balanceTotalSat: 1,
+  holdsMoney: true,
   oldEcash: null,
   dismissed: {},
   mockMode: false,
@@ -99,12 +101,12 @@ it('requires an unverified, eligible lifecycle and balance or a known seed older
       selectNextCta({
         ...ctx,
         latest: null,
-        balanceTotalSat: 0,
+        holdsMoney: false,
         lifecycle: { ...ctx.lifecycle, seedCreatedAt },
       })
     ).toBeNull();
   }
-  expect(selectNextCta({ ...ctx, latest: null, balanceTotalSat: 0 })?.id).toBe(
+  expect(selectNextCta({ ...ctx, latest: null, holdsMoney: false })?.id).toBe(
     'backup-recovery-phrase'
   );
 });
@@ -195,4 +197,23 @@ describe('what each prompt makes of the saved restore status', () => {
     expect(backup?.shouldShow({ ...ctx, lifecycle })).toBe(shows);
     expect(claim?.shouldShow({ ...ctx, lifecycle, oldEcash })).toBe(shows);
   });
+});
+it('counts a wallet as holding money when any one unit is above zero', () => {
+  const totals = (byUnit: Record<string, number>) =>
+    Object.fromEntries(
+      Object.entries(byUnit).map(([unit, total]) => [
+        unit,
+        {
+          unit,
+          spendable: Amount.from(total),
+          reserved: Amount.zero(),
+          total: Amount.from(total),
+        },
+      ])
+    );
+  expect(holdsMoneyInAnyUnit(totals({}))).toBe(false);
+  expect(holdsMoneyInAnyUnit(totals({ sat: 0, usd: 0 }))).toBe(false);
+  expect(holdsMoneyInAnyUnit(totals({ sat: 21 }))).toBe(true);
+  expect(holdsMoneyInAnyUnit(totals({ sat: 0, usd: 500 }))).toBe(true);
+  expect(holdsMoneyInAnyUnit(totals({ sat: 0, eur: 1 }))).toBe(true);
 });
