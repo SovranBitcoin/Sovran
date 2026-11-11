@@ -25,10 +25,16 @@ import { resetModelAvailability } from '@/features/ai/lib/modelAvailability';
 import { setRoutstrNodeBaseUrl } from '@/shared/lib/routstr/api';
 import { emptyLineup, type LineupEntry } from '@/shared/lib/routstr/lineup';
 import { useRoutstrStore, type RoutstrMessage } from '@/shared/stores/profile/routstrStore';
+import { confirmSpend } from '@/features/ai/lib/spendConfirm';
+import { staticPopup } from '@/shared/lib/popup';
+import { guardedRouter } from '@/shared/hooks/useGuardedRouter';
 
 const mockRoute = jest.fn<Promise<Response>, [{ modelId?: string }]>();
 let mockClientGate: Promise<void> = Promise.resolve();
 let mockBalancesGate: Promise<void> = Promise.resolve();
+/** What the wallet holds at the one mint, in sats. */
+let mockWalletSats = 100_000;
+const mockAddFunds = jest.fn();
 jest.mock('@/shared/lib/routstr/sdk/client', () => ({
   getRoutstrClient: async (_origin: string, canDispatch: () => boolean = () => true) => {
     await mockClientGate;
@@ -67,7 +73,7 @@ jest.mock('@/shared/lib/routstr/sdk/walletAdapter', () => ({
   },
 }));
 jest.mock('@/features/ai/lib/navigateToAddFunds', () => ({
-  useNavigateToAddFunds: () => jest.fn(),
+  useNavigateToAddFunds: () => mockAddFunds,
 }));
 jest.mock('@/features/ai/lib/spendConfirm', () => ({ confirmSpend: jest.fn() }));
 jest.mock('@/shared/lib/routstr/refreshLineup', () => ({
@@ -128,7 +134,9 @@ jest.mock('@/shared/lib/logger', () => {
 jest.mock('@cashu/coco-react', () => ({
   useBalanceContext: () => ({
     balances: {
-      byMint: { 'https://mint.example': { total: 100_000, spendable: 100_000, unit: 'sat' } },
+      byMint: {
+        'https://mint.example': { total: mockWalletSats, spendable: mockWalletSats, unit: 'sat' },
+      },
     },
   }),
 }));
@@ -185,6 +193,7 @@ beforeEach(async () => {
   resetModelAvailability();
   mockClientGate = Promise.resolve();
   mockBalancesGate = Promise.resolve();
+  mockWalletSats = 100_000;
   mockRoute.mockReset().mockRejectedValue(new Error('the test does not answer'));
   await useRoutstrStore.persist.rehydrate();
   const lineup = emptyLineup();
@@ -316,5 +325,67 @@ describe('a request whose conversation is switched away after it was handed over
       'model-pro',
       'other-pro',
     ]);
+  });
+});
+
+describe('what a regenerate or a Retry checks before it spends', () => {
+  const answered = () =>
+    mockRoute.mockResolvedValue(new Response('data: [DONE]\n\n', { status: 200 }));
+
+  it('a send asks with the spend sheet before it is paid for', async () => {
+    useRoutstrStore.setState({ confirmSpend: true });
+    jest.mocked(confirmSpend).mockResolvedValue(false);
+    const { settle } = start('send');
+    await settle();
+
+    expect(confirmSpend).toHaveBeenCalledTimes(1);
+    expect(mockRoute).not.toHaveBeenCalled();
+  });
+
+  it('a regenerate is paid for without the spend sheet', async () => {
+    useRoutstrStore.setState({ confirmSpend: true });
+    jest.mocked(confirmSpend).mockResolvedValue(false);
+    answered();
+    const { settle } = start('retry');
+    await settle();
+
+    expect(confirmSpend).not.toHaveBeenCalled();
+    expect(mockRoute).toHaveBeenCalledTimes(1);
+  });
+
+  it('a regenerate goes ahead when the wallet cannot cover what the model holds', async () => {
+    mockWalletSats = 0;
+    answered();
+    const { settle } = start('retry');
+    await settle();
+
+    expect(mockAddFunds).not.toHaveBeenCalled();
+    expect(mockRoute).toHaveBeenCalledTimes(1);
+  });
+
+  it('a regenerate goes ahead when no provider is chosen', async () => {
+    useRoutstrStore.setState({ userNodeBaseUrl: null });
+    answered();
+    const { settle } = start('retry');
+    await settle();
+
+    expect(staticPopup).not.toHaveBeenCalled();
+    expect(guardedRouter.navigate).not.toHaveBeenCalled();
+  });
+
+  it('a regenerate goes ahead when the provider takes only a mint the wallet does not hold', async () => {
+    useRoutstrStore.setState({
+      knownProviders: {
+        'https://node.example': {
+          ...useRoutstrStore.getState().knownProviders['https://node.example'],
+          mints: ['https://other-mint.example'],
+        },
+      } as never,
+    });
+    answered();
+    const { settle } = start('retry');
+    await settle();
+
+    expect(staticPopup).not.toHaveBeenCalled();
   });
 });
