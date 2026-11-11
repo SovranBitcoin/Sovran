@@ -52,22 +52,18 @@ type FollowOptimisticState = {
 };
 
 /**
- * The account's own follow list as the saved fields can vouch for it.
+ * What the saved fields say about the account's own follow list.
  *
- * - `unknown`: nothing loaded from anywhere.
- * - `seeded`: the follow set came from nagg or Primal (pubkeys only) and the
- *   saved raw list does not match it, so the raw list is missing or older.
- * - `authoritative`: the saved raw list is the one the follow set was read
- *   from, at `updatedAt`; a follow can be built on it.
+ * - `unknown`: no list and no seed was ever loaded for the account.
+ * - `known`: a list (from relays) or a seed (from nagg or Primal) was loaded;
+ *   `updatedAt` is the newest one's `created_at`.
  *
- * Decoded from the saved fields, which stay as they are. The stamp is shared:
- * a seed with exactly the saved list's follows reads as `authoritative` at the
- * seed's time while its tags are the older list's.
+ * Decoded from the saved fields, which stay as they are. The saved raw tags
+ * are never a base for a publish: the stamp is shared with seeds, so they can
+ * be older than `updatedAt` says. `followSync` builds only on the list a
+ * complete relay read just returned.
  */
-export type ContactList =
-  | { status: 'unknown' }
-  | { status: 'seeded'; updatedAt: number }
-  | { status: 'authoritative'; tags: string[][]; content: string; updatedAt: number };
+export type ContactList = { status: 'unknown' } | { status: 'known'; updatedAt: number };
 
 type EngagementOptimisticState = {
   value: boolean;
@@ -148,7 +144,7 @@ interface NostrSocialActions {
    * (nagg → Primal → relay). Read-only accelerator: it sets `followingPubkeys`
    * and bumps the LWW gate but NEVER writes `contactsTags`/`content` — the
    * facade's parsed `follows` drop the relay hints and petnames, so only a raw
-   * kind-3 can be built on (see `selectContactList`). LWW-gated by the kind-3
+   * kind-3 can be built on (see `followSync`). LWW-gated by the kind-3
    * `created_at` so a facade seed and a relay delta can't fight — the newer
    * contact list wins.
    */
@@ -773,19 +769,12 @@ export const useNostrSocialStore = create<NostrSocialStore>({
 // ---------------------------------------------------------------------------
 
 export function selectContactList(state: NostrSocialState): ContactList {
-  const listed = extractFollowingFromTags(state.contactsTags);
-  const shown = Object.keys(state.followingPubkeys);
-  const agree =
-    shown.length === Object.keys(listed).length && shown.every((pubkey) => listed[pubkey]);
-  if (!agree) return { status: 'seeded', updatedAt: state.contactsUpdatedAt };
-  if (state.contactsUpdatedAt === 0 && state.contactsTags.length === 0 && !state.contactsContent)
-    return { status: 'unknown' };
-  return {
-    status: 'authoritative',
-    tags: state.contactsTags,
-    content: state.contactsContent,
-    updatedAt: state.contactsUpdatedAt,
-  };
+  const loaded =
+    state.contactsUpdatedAt > 0 ||
+    state.contactsTags.length > 0 ||
+    !!state.contactsContent ||
+    Object.keys(state.followingPubkeys).length > 0;
+  return loaded ? { status: 'known', updatedAt: state.contactsUpdatedAt } : { status: 'unknown' };
 }
 
 /** Follows and unfollows the person asked for that no published list holds yet. */

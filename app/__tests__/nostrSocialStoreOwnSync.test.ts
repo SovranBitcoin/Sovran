@@ -90,7 +90,7 @@ describe('nostrSocialStore follow list', () => {
     expect(selectContactList(useNostrSocialStore.getState())).toEqual({ status: 'unknown' });
     useNostrSocialStore.getState().seedFollowsFromFacade({ follows: [X], createdAtSec: T });
     expect(selectContactList(useNostrSocialStore.getState())).toEqual({
-      status: 'seeded',
+      status: 'known',
       updatedAt: T,
     });
     useNostrSocialStore.getState().setContactsFromRelay({
@@ -102,19 +102,28 @@ describe('nostrSocialStore follow list', () => {
       createdAtSec: T,
     });
     expect(selectContactList(useNostrSocialStore.getState())).toEqual({
-      status: 'authoritative',
-      tags: [
-        ['p', X],
-        ['t', 'a'],
-      ],
-      content: 'c',
+      status: 'known',
       updatedAt: T,
     });
-    // A newer seed with fewer follows: the saved tags are no longer the list.
+    // A newer seed, also one with no follows, moves the stamp on.
     useNostrSocialStore.getState().seedFollowsFromFacade({ follows: [], createdAtSec: T + 1 });
     expect(selectContactList(useNostrSocialStore.getState())).toEqual({
-      status: 'seeded',
+      status: 'known',
       updatedAt: T + 1,
+    });
+  });
+
+  it('counts a list that was loaded empty, or follows saved without a stamp, as known', () => {
+    useNostrSocialStore.getState().setContactsFromRelay({ tags: [], content: '', createdAtSec: T });
+    expect(selectContactList(useNostrSocialStore.getState())).toEqual({
+      status: 'known',
+      updatedAt: T,
+    });
+    useNostrSocialStore.setState(useNostrSocialStore.getInitialState(), true);
+    useNostrSocialStore.setState({ followingPubkeys: { [X]: true } });
+    expect(selectContactList(useNostrSocialStore.getState())).toEqual({
+      status: 'known',
+      updatedAt: 0,
     });
   });
 

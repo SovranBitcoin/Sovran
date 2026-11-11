@@ -99,13 +99,13 @@ export function planFollowPublish(input: {
       return { step: 'wait', reason: 'unusable-list' };
     case 'found':
       // A seed or a list newer than any write relay holds: the read is stale.
-      if (known.status !== 'unknown' && known.updatedAt > read.list.createdAt)
+      if (known.status === 'known' && known.updatedAt > read.list.createdAt)
         return { step: 'wait', reason: 'newer-known' };
       base = read.list;
       break;
     case 'empty':
       // A list or seed was loaded for the account but no write relay has it.
-      if (known.status !== 'unknown') return { step: 'wait', reason: 'list-elsewhere' };
+      if (known.status === 'known') return { step: 'wait', reason: 'list-elsewhere' };
       if (input.indexed === undefined) return { step: 'ask-indexers' };
       if (input.indexed !== 'none') return { step: 'wait', reason: 'no-list' };
       base = EMPTY_LIST;

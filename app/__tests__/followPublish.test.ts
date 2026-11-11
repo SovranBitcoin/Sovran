@@ -241,7 +241,10 @@ describe('following someone', () => {
     expect(mockPublish.mock.calls[0][0].event.created_at).toBeGreaterThan(T);
     expect(social().followingPubkeys).toEqual({ [X]: true, [Y]: true, [Z]: true });
     expect(social().optimisticFollowsByPubkey).toEqual({});
-    expect(selectContactList(social())).toMatchObject({ status: 'authoritative' });
+    expect(selectContactList(social())).toEqual({
+      status: 'known',
+      updatedAt: mockPublish.mock.calls[0][0].event.created_at,
+    });
   });
 
   it('reads the newest list with no time window from every write relay', async () => {
@@ -778,12 +781,7 @@ describe('the plan', () => {
   it('builds only on the list a complete read returned', () => {
     const intents = { [Z]: { value: true, pending: true, updatedAt: 1 } };
     const list = { tags: [['p', X]], content: 'c', createdAt: T };
-    const saved = {
-      status: 'authoritative' as const,
-      tags: [['p', Y]],
-      content: 'saved',
-      updatedAt: T,
-    };
+    const saved = { status: 'known' as const, updatedAt: T };
     expect(planFollowPublish({ intents, known: saved, read: { status: 'incomplete' } })).toEqual({
       step: 'wait',
       reason: 'read-incomplete',
