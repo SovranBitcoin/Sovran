@@ -115,7 +115,7 @@ beforeEach(() => {
   jest.mocked(isNfcSupported).mockResolvedValue(true);
   jest.mocked(isNfcEnabled).mockResolvedValue(true);
   usePopupStore.setState({ current: null, isOpen: false });
-  useNfcTapStore.setState({ armed: false, phase: 'armed' });
+  useNfcTapStore.setState({ phase: 'armed' });
   useSwapStatusStore.setState(loose({ active: null }));
 });
 
@@ -143,7 +143,6 @@ describe('arming', () => {
     await flush(10_000);
 
     expect(scan).not.toHaveBeenCalled();
-    expect(useNfcTapStore.getState().armed).toBe(false);
   });
 
   it('arms, clears the payment context, holds the reader as ambient and asks for an NFC scan', async () => {
@@ -151,7 +150,6 @@ describe('arming', () => {
     renderHook(() => useAmbientNfcArm({ scan }));
     await flush();
 
-    expect(useNfcTapStore.getState().armed).toBe(true);
     expect(clearPaymentContext).toHaveBeenCalledWith('wallet.nfc_ambient');
     expect(holdNfcReader).toHaveBeenCalledWith('ambient', expect.any(Function));
     expect(holding()).toBe(true);
@@ -180,12 +178,10 @@ describe('arming', () => {
     renderHook(() => useAmbientNfcArm({ scan }));
     await flush(3_999);
     expect(scan).not.toHaveBeenCalled();
-    expect(useNfcTapStore.getState().armed).toBe(false);
 
     jest.mocked(isNfcEnabled).mockResolvedValue(true);
     await flush(1);
     expect(scan).toHaveBeenCalledTimes(1);
-    expect(useNfcTapStore.getState().armed).toBe(true);
   });
 
   it('pauses without clearing anything while another popup is up, and resumes after it closes', async () => {
@@ -293,7 +289,7 @@ describe('disarming', () => {
 
     expect(releaseSession).toHaveBeenCalledTimes(1);
     expect(holding()).toBe(false);
-    expect(useNfcTapStore.getState()).toMatchObject({ armed: false, phase: 'armed' });
+    expect(useNfcTapStore.getState().phase).toBe('armed');
     expect(usePopupStore.getState().current).toBeNull();
   });
 
