@@ -489,7 +489,8 @@ Each with a test that failed first; none changes a saved shape or anything sent.
 | `c4e87d666` | A replaced signer connection kept its session allows, so re-pairing skipped the prompt    | Disconnect, block and replace all end the client's session   |
 | `0ccc36cbf` | The Bluetooth connection dot could come back on after leaving a chat                      | A late result changes nothing                                |
 
-Built by Claude Opus 5.5. Review by Codex GPT-6.1 Sol: see "Not verified" until its result is recorded here.
+Built by Claude Opus 5.5. Reviewed commit by commit by Codex GPT-6.1 Sol: eleven clean, one incomplete (the source
+label had no entry for Bluetooth), fixed in `aaa1ea2e9` by Claude Fable 5.2 and not re-reviewed.
 
 ### Open findings from pass 3
 
@@ -500,4 +501,4 @@ defects and four missing features).
 
 - Nothing was run on iOS or Android.
 - The surveys' line counts are estimates; no cut has been tried.
-- The twelve fixes' independent review had not returned when this was written.
+- The Bluetooth label fix was not reviewed by another model.
