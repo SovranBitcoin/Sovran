@@ -57,6 +57,10 @@ import { formatAmount } from '@/shared/lib/currency';
 import { getMintDisplayName } from '@/shared/lib/url';
 import { swapGroupOutcome, type SwapGroupOutcome } from '@/shared/lib/cashu/swapGroupPhase';
 import { useSwapMintInfo } from '../hooks/useSwapMintInfo';
+import {
+  groupAdjacentChains,
+  type ChainGroup,
+} from '@/features/mint/components/rebalance/groupSteps';
 import { getTransactionActionDirection } from '@/features/transactions/lib/transactionPresentation';
 import Icon from 'assets/icons';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
@@ -70,46 +74,6 @@ interface Props {
 // -----------------------------------------------------------------------
 // Helpers
 // -----------------------------------------------------------------------
-
-/** Groups consecutive legs that share a chainId into a single visual group. */
-interface LegGroup {
-  id: string;
-  chainId: string | null;
-  legs: SwapLeg[];
-  /** Full chain path when this is a middleman group. */
-  chainPath?: string[];
-}
-
-function groupLegs(legs: SwapLeg[]): LegGroup[] {
-  const groups: LegGroup[] = [];
-
-  for (const leg of legs) {
-    if (leg.chainId) {
-      // Try to append to the last group if it shares the same chainId
-      const last = groups[groups.length - 1];
-      if (last && last.chainId === leg.chainId) {
-        last.legs.push(leg);
-        continue;
-      }
-      // Start a new chain group
-      groups.push({
-        id: `chain-${leg.chainId}`,
-        chainId: leg.chainId,
-        legs: [leg],
-        chainPath: leg.chainPath,
-      });
-    } else {
-      // Standalone leg
-      groups.push({
-        id: leg.id,
-        chainId: null,
-        legs: [leg],
-      });
-    }
-  }
-
-  return groups;
-}
 
 /** The melt row drawn for a leg whose melt Coco history lacks (v3 melts); never counted as history. */
 function standInMelt(leg: SwapLeg, group: SwapGroup): MeltHistoryEntry | undefined {
@@ -177,7 +141,7 @@ function buildSwapEntryRowProps(
 // -----------------------------------------------------------------------
 
 interface CollapsedLegGroupProps {
-  legGroup: LegGroup;
+  legGroup: ChainGroup<SwapLeg>;
   mintInfoMap: Record<string, { name?: string; icon_url?: string } | null>;
 }
 
@@ -185,8 +149,8 @@ const CollapsedLegGroup = React.memo(({ legGroup, mintInfoMap }: CollapsedLegGro
   const foreground = useThemeColor('foreground');
 
   // Source = first leg's from, Destination = last leg's to
-  const firstLeg = legGroup.legs[0];
-  const lastLeg = legGroup.legs[legGroup.legs.length - 1];
+  const firstLeg = legGroup.items[0];
+  const lastLeg = legGroup.items[legGroup.items.length - 1];
   const srcUrl = firstLeg?.fromMintUrl ?? '';
   const dstUrl = lastLeg?.toMintUrl ?? '';
   const srcInfo = mintInfoMap[srcUrl];
@@ -315,7 +279,7 @@ export function SwapTransactionScreen({ groupId }: Props) {
   // legs whose route was superseded by a middleman chain.
   const legGroups = useMemo(() => {
     if (!group) return [];
-    const raw = groupLegs(group.legs);
+    const raw = groupAdjacentChains(group.legs);
 
     // Collect routes covered by a chain group
     const chainRoutes = new Set<string>();
@@ -329,7 +293,7 @@ export function SwapTransactionScreen({ groupId }: Props) {
     // Remove standalone legs whose route is covered by a chain
     return raw.filter((lg) => {
       if (lg.chainId) return true;
-      const leg = lg.legs[0];
+      const leg = lg.items[0];
       if (!leg) return true;
       const routeKey = `${leg.fromMintUrl}→${leg.toMintUrl}`;
       return !chainRoutes.has(routeKey);
@@ -349,8 +313,8 @@ export function SwapTransactionScreen({ groupId }: Props) {
     let hasMintHistory = false;
 
     const resolvedGroups = legGroups.map((lg) => {
-      steps += lg.legs.length;
-      const resolved = lg.legs.map((leg) => {
+      steps += lg.items.length;
+      const resolved = lg.items.map((leg) => {
         // Use actual history entry amounts where available; fall back to leg amounts
         const mintEntry = leg.mintQuoteId
           ? (historyByQuoteId.get(leg.mintQuoteId) as MintHistoryEntry | undefined)
@@ -498,7 +462,7 @@ export function SwapTransactionScreen({ groupId }: Props) {
 
                       // Skip the separator between chained legs when the previous
                       // leg's destination is the same mint as this leg's source
-                      const prevLeg = legIdx > 0 ? legGroup.legs[legIdx - 1] : null;
+                      const prevLeg = legIdx > 0 ? legGroup.items[legIdx - 1] : null;
                       const sameMintAsPrev =
                         prevLeg != null && prevLeg.toMintUrl === leg.fromMintUrl;
 

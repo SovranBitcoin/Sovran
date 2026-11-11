@@ -23,7 +23,7 @@ const shape = (steps: TransferStep[], states: Record<string, StepState> = {}) =>
     g.id,
     g.chainId,
     g.chainPath,
-    g.steps.map((s) => s.id),
+    g.items.map((s) => s.id),
   ]);
 
 describe('groupStepsForDisplay', () => {
