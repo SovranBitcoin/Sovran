@@ -22,6 +22,7 @@ import type { MintSearchRow } from '@/features/mint/lib/mintDiscoveryRows';
 import { resolveMintStatus, type MintStatus } from '@/shared/lib/cashu/mintHealth';
 import { useMintPresence } from '@/features/mint/hooks/useMintPresence';
 import { useMintMetadataStore } from '@/shared/stores/global/mintMetadataStore';
+import type { MintMetadataEntry } from '@/shared/stores/global/mintMetadataTypes';
 import { useMintProfiles } from '@/features/mint/hooks/useMintProfiles';
 import {
   extractDomain,
@@ -110,14 +111,12 @@ interface DisplayMint {
 
 type SearchableMint = DisplayMint | PseudoMint | SkeletonMint;
 
-function adaptSearchResult(result: MintSearchRow): DisplayMint {
-  const profile = useMintMetadataStore.getState().getCached(result.url);
-  const info = (result.info ?? {}) as {
-    icon_url?: string | null;
-    name?: string;
-    description?: string | null;
-    contact?: { method: string; info: string }[];
-  };
+/** A discovery row as the list shows it, with the saved metadata for its mint (`profile`). */
+function adaptSearchResult(
+  result: MintSearchRow,
+  profile: MintMetadataEntry | undefined
+): DisplayMint {
+  const info = (result.info ?? {}) as NonNullable<DisplayMint['mintInfo']>;
   return {
     url: result.url,
     name: info.name || result.name || extractDomain(result.url),
@@ -382,17 +381,11 @@ export function MintAddScreen() {
 
   const { mints: knownMints } = useMintManagement();
 
-  // Subscribe to the unified metadata cache so that when `useMintProfiles`
-  // finishes resolving an operator's Nostr profile, `adaptSearchResult` re-runs
-  // and the row picks up `contactFollowers` / `contactReputation`.
-  const mintProfileCache = useMintMetadataStore((s) => s.byMintUrl);
+  // Rows re-project as operator profiles resolved by `useMintProfiles` land here.
+  const metadataByUrl = useMintMetadataStore((s) => s.byMintUrl);
 
   // Adapt server results to display format, filter out already-known mints.
-  // KEPT under React Compiler: the dep array deliberately includes
-  // `mintProfileCache` (unused in the body) so the compute re-runs when the
-  // metadata store updates — `adaptSearchResult` reads the store non-reactively
-  // via getState(). The compiler would memoize on actual reads and drop that
-  // subscription-driven recompute.
+  // Manual memo: the compute log below should fire once per input change.
   // ast-grep-ignore: no-manual-memo-tsx
   const displayMints = useMemo((): SearchableMint[] => {
     const t0 = performance.now();
@@ -400,51 +393,35 @@ export function MintAddScreen() {
     const filteredOut = searchResults.filter((r) => knownMintUrls.has(normalizeMintUrlKey(r.url)));
     const adapted = searchResults
       .filter((r) => !knownMintUrls.has(normalizeMintUrlKey(r.url)))
-      .map(adaptSearchResult);
-
-    let hasPseudo = false;
+      .map((r) => adaptSearchResult(r, metadataByUrl[normalizeMintUrlKey(r.url)]));
 
     // If searching with a URL-like query that validated as a mint, prepend it
+    let pseudoMint: PseudoMint | null = null;
     if (searchQuery.trim() && validationState.isValid === true && customMintInfo !== null) {
       const apiUrl = normalizeUrlForApi(searchQuery);
       const normalizedInput = normalizeMintUrlKey(apiUrl);
       const alreadyInResults = adapted.some((m) => normalizeMintUrlKey(m.url) === normalizedInput);
       if (!alreadyInResults && !knownMintUrls.has(normalizedInput)) {
-        const pseudoMint: PseudoMint = {
+        pseudoMint = {
           url: apiUrl,
           isPseudoMint: true,
           mintInfo: customMintInfo,
           name: extractDomain(apiUrl),
         };
-        hasPseudo = true;
-        const result = [pseudoMint, ...adapted];
-        const duration = Math.round((performance.now() - t0) * 100) / 100;
-        cashuLog.debug('mint.add.display_mints.compute', {
-          serverResults: searchResults.length,
-          knownFiltered: filteredOut.length,
-          displayed: result.length,
-          hasPseudoMint: true,
-          withIcons: adapted.filter((m) => m.mintInfo?.icon_url).length,
-          duration_ms: duration,
-        });
-        return result;
       }
     }
+    const result: SearchableMint[] = pseudoMint ? [pseudoMint, ...adapted] : adapted;
 
-    const duration = Math.round((performance.now() - t0) * 100) / 100;
     cashuLog.debug('mint.add.display_mints.compute', {
       serverResults: searchResults.length,
       knownFiltered: filteredOut.length,
-      displayed: adapted.length,
-      hasPseudoMint: hasPseudo,
+      displayed: result.length,
+      hasPseudoMint: pseudoMint !== null,
       withIcons: adapted.filter((m) => m.mintInfo?.icon_url).length,
-      duration_ms: duration,
+      duration_ms: Math.round((performance.now() - t0) * 100) / 100,
     });
-    return adapted;
-    // `mintProfileCache` is a deliberate trigger, not an input: the adapt step
-    // reads it through a closure, so the list must rebuild as operator profiles
-    // resolve even though the body never names the cache.
-  }, [searchResults, knownMints, searchQuery, validationState, customMintInfo, mintProfileCache]);
+    return result;
+  }, [searchResults, knownMints, searchQuery, validationState, customMintInfo, metadataByUrl]);
 
   // Kick off Nostr profile fetches for any search result that has an operator
   // pubkey in NUT-06 contact info. Results land in `mintMetadataStore`
