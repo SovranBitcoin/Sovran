@@ -385,6 +385,43 @@ it('clamps a future base and logs only its delta once per publish', async () => 
   jest.useRealTimers();
 });
 
+it('of two profiles from the same second, takes the one with the lower id, remote or saved', async () => {
+  const emitting = (...events: { id: string; about: string }[]) => {
+    const ndk = makeNdk();
+    ndk.subscription.start.mockImplementation(async () => {
+      for (const { id, about } of events)
+        ndk.subscription.emit('event', {
+          pubkey,
+          kind: 0,
+          id,
+          created_at: 20,
+          content: JSON.stringify({ about }),
+        });
+      ndk.eose();
+    });
+    return ndk;
+  };
+  const low = 'c'.repeat(64);
+  const high = 'd'.repeat(64);
+  const remote = await loadOwnProfileMetadata(
+    emitting({ id: high, about: 'high' }, { id: low, about: 'low' }),
+    pubkey
+  );
+  expect(remote).toMatchObject({ status: 'found', snapshot: { eventId: low } });
+
+  useOwnProfileMetadataStore
+    .getState()
+    .setLatest({ content: { about: 'saved' }, createdAt: 20, eventId: 'b'.repeat(64) });
+  const saved = await loadOwnProfileMetadata(emitting({ id: low, about: 'low' }), pubkey);
+  expect(saved).toMatchObject({ status: 'found', snapshot: { eventId: 'b'.repeat(64) } });
+
+  useOwnProfileMetadataStore
+    .getState()
+    .setLatest({ content: { about: 'saved' }, createdAt: 20, eventId: high });
+  const remoteWins = await loadOwnProfileMetadata(emitting({ id: low, about: 'low' }), pubkey);
+  expect(remoteWins).toMatchObject({ status: 'found', snapshot: { eventId: low } });
+});
+
 it('refuses a changed identity before publishing when the domain does not match', async () => {
   jest
     .mocked(verifyNip05)

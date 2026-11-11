@@ -276,6 +276,56 @@ it('does not overwrite a newer list learned while the signer was open', async ()
   expect(useFeedIgnoreStore.getState().blockOverrides[target]).toBe(true);
 });
 
+it('dates a replacement mute list now, or one second past a base dated ahead of this clock', async () => {
+  const now = Math.floor(Date.now() / 1000);
+  const older = setup([event({ created_at: 10 })]);
+  await setPersonBlocked(older.ndk, own, target, true);
+  const first = (mockPublish.mock.calls[0][0] as { event: Record<string, unknown> }).event;
+  expect(first).toMatchObject({ kind: 10000, pubkey: own });
+  expect(first.created_at).toBeGreaterThanOrEqual(now);
+  expect(first.created_at).toBeLessThan(now + 5);
+
+  useFeedIgnoreStore.setState(useFeedIgnoreStore.getInitialState(), true);
+  const ahead = setup([event({ created_at: now + 30 })]);
+  await setPersonBlocked(ahead.ndk, own, target, true);
+  const second = (mockPublish.mock.calls[1][0] as { event: Record<string, unknown> }).event;
+  expect(second.created_at).toBe(now + 31);
+});
+
+it('refuses a mute list whose signer was replaced before signing, after asking the old signer', async () => {
+  const { NDKEvent } = jest.requireMock('@nostr-dev-kit/ndk-mobile');
+  const sign = jest.spyOn(NDKEvent.prototype, 'sign');
+  const { ndk, signer } = setup();
+  signer.encrypt.mockImplementationOnce(async (_user, content) => {
+    (ndk as unknown as { signer: unknown }).signer = { ...signer };
+    return content;
+  });
+  await expect(setPersonBlocked(ndk, own, target, true)).rejects.toThrow('Account signer changed');
+  // QUIRK: no check before signing, so the replaced signer is still asked.
+  expect(sign).toHaveBeenCalledWith(signer);
+  expect(mockPublish).not.toHaveBeenCalled();
+  sign.mockRestore();
+});
+
+it('publishes a report as a kind 1984 with empty content, and refuses one whose signer changed while signing', async () => {
+  const ok = setup();
+  await publishReport(ok.ndk, own, target, 'spam');
+  expect(mockPublish).toHaveBeenCalledTimes(1);
+  const published = (mockPublish.mock.calls[0][0] as { event: Record<string, unknown> }).event;
+  expect(published).toMatchObject({ kind: 1984, pubkey: own, content: '' });
+  expect(published.tags).toEqual([['p', target, 'spam']]);
+
+  const { ndk, signer } = setup();
+  signer.user
+    .mockImplementationOnce(async () => ({ pubkey: own }))
+    .mockImplementationOnce(async () => {
+      (ndk as unknown as { signer: unknown }).signer = { ...signer };
+      return { pubkey: own };
+    });
+  await expect(publishReport(ndk, own, target, 'spam')).rejects.toThrow('Account signer changed');
+  expect(mockPublish).toHaveBeenCalledTimes(1);
+});
+
 it('rejects invalid IDs, timestamps and signatures before parsing a list', async () => {
   const { ndk } = setup();
   for (const bad of [
