@@ -4,8 +4,11 @@
  * state) — kept separate so the contact graph doesn't bloat the active
  * profile's serialized state and confuse its semantics.
  *
- * SWR: reads return synchronously from cache; entries older than
- * `STALE_TTL_MS` trigger a background refresh via `useNostrProfileMetadata`.
+ * Not read for rendering: it is the durable, write-behind mirror of the
+ * nagg-ts entity cache, which screens read (`useCachedNostrProfile`,
+ * `useProfileRecordsMany`). `buildNostrDataLayer` boot-seeds that cache from
+ * here and writes its snapshot back. Entries older than
+ * `NOSTR_METADATA_STALE_TTL_MS` are refetched by `useNostrProfileMetadata`.
  *
  * Persisted blob is profile-scoped via `createProfileScopedStorage` so
  * profile-A's contact metadata doesn't leak into profile-B's view.

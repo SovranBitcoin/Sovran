@@ -255,10 +255,10 @@ interface UseNostrProfileMetadataManyResult {
 }
 
 /**
- * SWR over many pubkeys at once. Backed by the same `nostrMetadataCache`
- * as the single-pubkey hook — populating one set of contacts warms the
- * cache for every other surface that consumes them (UserMessagesScreen,
- * UserProfileScreen, the picker, …). One batched kind-0 subscription
+ * SWR over many pubkeys at once. Reads the same entity cache as the
+ * single-pubkey hook — populating one set of contacts warms it for every
+ * other surface that consumes them (UserMessagesScreen, UserProfileScreen,
+ * the picker, …). One batched kind-0 subscription
  * per render with `authors: missingOrStale` so we don't repeatedly hit
  * relays for entries we already have.
  */
