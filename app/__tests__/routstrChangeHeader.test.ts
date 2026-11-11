@@ -1,8 +1,4 @@
-import {
-  checkBalance,
-  sendMessage,
-  setRoutstrNodeBaseUrl,
-} from '@/shared/lib/routstr/api';
+import { checkBalance, sendMessage, setRoutstrNodeBaseUrl } from '@/shared/lib/routstr/api';
 import { settleRoutstrClient } from '@/shared/lib/routstr/sdk/client';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
 import { apiLog, aiLog } from '@/shared/lib/logger';
@@ -78,9 +74,7 @@ const completion = () =>
 // A chat completion no longer carries a stored credential — it pays per
 // request out of the wallet — so it is not part of this matrix. The wallet
 // operations below still hold a node-issued key and still rotate it.
-const operations = [
-  ['balance', (key: string) => checkBalance(key)],
-] as const;
+const operations = [['balance', (key: string) => checkBalance(key)]] as const;
 const response = (status = 200, message = 'upstream unavailable', change = 'cashuB-test-change') =>
   new Response(JSON.stringify(status === 200 ? { balance: 10 } : { detail: message }), {
     status,

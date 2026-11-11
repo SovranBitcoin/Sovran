@@ -16,8 +16,7 @@
 import { nfcLog } from '../logger';
 
 type NfcReader =
-  | { holder: 'idle' }
-  | { holder: 'ambient' | 'explicit'; read: boolean; writingBack: boolean };
+  { holder: 'idle' } | { holder: 'ambient' | 'explicit'; read: boolean; writingBack: boolean };
 
 interface Hold {
   holder: 'ambient' | 'explicit';
