@@ -231,10 +231,8 @@ export function createColada(config: ColadaConfig): ColadaInstance {
   });
   logger.info("core.createColada.operations.ready", {
     operationCount: Object.keys(operations).length,
-    hasExecuteReceive: !!operations.executeReceive,
     hasExecuteSend: !!operations.executeSend,
     hasExecuteOfflineSend: !!operations.executeOfflineSend,
-    hasExecuteMintQuote: !!operations.executeMintQuote,
     hasExecuteMelt: !!operations.executeMelt,
     hasExecutePaymentRequest: !!operations.executePaymentRequest,
     hasExecuteNfcSend: !!operations.executeNfcSend,

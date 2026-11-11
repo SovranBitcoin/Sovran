@@ -43,11 +43,10 @@ needed by *every* consumer. These are candidates for upstreaming:
 
 **`wallet`**
 
-- **Real persisted history ids** — the app overrides `executeReceive` /
-  `executeMintQuote` because the defaults synthesize fallback ids
-  (`redeemed-${Date.now()}`) instead of returning Coco's real persisted ids,
-  which breaks the transaction-detail link. Defaulting to real ids would remove
-  the override from every consumer.
+- **Real persisted history ids** — the app wires `executeReceive` and
+  `executeMintQuote` itself, from the package's `createExecuteReceive` and
+  `createExecuteMintQuote`, which return Coco's real persisted ids. The package
+  has no default for either.
 - **Mint catalog / NUT-06 caching** — the app reimplements cache-first/cache-only
   selection, per-mint deadline bounding, and write-through (~100 lines). This is
   generic mint-info plumbing that could live in the package with an injectable

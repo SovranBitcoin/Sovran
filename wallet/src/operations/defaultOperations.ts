@@ -7,6 +7,8 @@
 // primitives.
 //
 // App-side operations (NOT included here, injected via enrichment callbacks):
+//   executeReceive,
+//   executeMintQuote      — built by the host from `receiveOperations.ts`
 //   linkTransaction       — needs app-specific scan history store
 //   Mint catalog data     — bulk fetch (audit / KYM / operator profile),
 //                           injected via fetchMintCatalog
@@ -25,12 +27,11 @@ import type {
   BoltMeltQuote,
   Manager,
   Mint,
-  ReceiveHistoryEntry,
   SendHistoryEntry,
 } from "@cashu/coco-core";
 import { getEncodedToken, operationHistoryId } from "@cashu/coco-core";
 import { emitPaymentRequestCreated } from "../paymentRequestEvents";
-import { normalizeP2pkLock, proofsHaveP2PK } from "../p2pk";
+import { normalizeP2pkLock } from "../p2pk";
 import type {
   MachineOperations,
   SendRollbackResult,
@@ -868,68 +869,6 @@ export function createDefaultOperations(
       );
     },
 
-    executeMintQuote: async ({ mintUrl, amount, unit: _unit, method = "bolt11" }) => {
-      const mgr = requireManager();
-      const unit = _unit || "sat";
-      logger.info("operations.executeMintQuote.prepare", {
-        ...mintUrlFields(mintUrl),
-        amount,
-        method,
-        unit,
-      });
-
-      // v2 quote-first: create the canonical quote row (remote quote happens
-      // here), then prepare the durable mint operation against it. Onchain
-      // quotes are reusable and get a FRESH address per create() — the
-      // fixed-amount receive path relies on that for payment attribution.
-      const quote =
-        method === "onchain"
-          ? await mgr.quotes.mint.create({ mintUrl, method: "onchain", unit })
-          : await mgr.quotes.mint.create({
-              mintUrl,
-              method: "bolt11",
-              amount: { amount, unit },
-            });
-      logger.info("operations.executeMintQuote.quoteCreated", {
-        ...mintUrlFields(mintUrl),
-        quoteId: quote.quoteId,
-        method,
-        unit: quote.unit,
-        reusable: quote.reusable,
-        requestLength: quote.request.length,
-      });
-
-      // Reusable (onchain) quotes derive nothing from the quote amount —
-      // the operation amount must be explicit in v2.
-      const mintOp = await mgr.ops.mint.prepare({ quote, amount });
-      logger.info("operations.executeMintQuote.created", {
-        operationId: mintOp.id,
-        quoteId: mintOp.quoteId,
-        method,
-        state: quote.state ?? "UNPAID",
-        unit: mintOp.unit,
-      });
-
-      // Build entry directly from the operation result to avoid a race
-      // where getPaginatedHistory runs before HistoryService persists the
-      // row. State uses the legacy quote-state family; the read-model
-      // normalizer treats it interchangeably with v2 operation states.
-      const entry = {
-        id: mintOp.id,
-        type: "mint" as const,
-        operationId: mintOp.id,
-        createdAt: mintOp.createdAt,
-        mintUrl: mintOp.mintUrl,
-        unit: mintOp.unit,
-        quoteId: mintOp.quoteId,
-        state: quote.state ?? ("UNPAID" as const),
-        amount: amountToNumber(mintOp.amount),
-        paymentRequest: quote.request,
-        metadata: { operationId: mintOp.id },
-      };
-      return { historyEntry: JSON.stringify(entry) };
-    },
-
     buildMintListItems: async (
       data: StepDataMap["selectMint"],
     ): Promise<MintListItem[]> => {
@@ -1376,71 +1315,6 @@ export function createDefaultOperations(
         state: operation.state,
       });
       return { state: operation.state };
-    },
-
-    executeReceive: async ({ tokenString, mintUrl }) => {
-      const mgr = requireManager();
-      logger.info("operations.executeReceive.start", {
-        ...mintUrlFields(mintUrl),
-        tokenLength: tokenString.length,
-      });
-      await mgr.wallet.receive(tokenString);
-      logger.info("operations.executeReceive.received", {
-        ...mintUrlFields(mintUrl),
-      });
-
-      let hadP2PK = false;
-      let tokenAmount = 0;
-      let tokenUnit = "sat";
-      try {
-        const metadata = getTokenMetadata(tokenString);
-        hadP2PK = proofsHaveP2PK(metadata.incompleteProofs);
-        tokenAmount = amountToNumber(metadata.amount);
-        tokenUnit = metadata.unit ?? "sat";
-        logger.info("operations.executeReceive.tokenDecoded", {
-          ...mintUrlFields(mintUrl),
-          amount: tokenAmount,
-          unit: metadata.unit ?? "sat",
-          proofCount: metadata.incompleteProofs.length,
-          hadP2PKProofs: hadP2PK,
-        });
-      } catch (e) {
-        logger.warn("operations.executeReceive.p2pkDetectionFailed", {
-          error: errField(e),
-        });
-      }
-
-      // Try history first, fall back to constructing from known data
-      // to avoid race where history write hasn't flushed yet.
-      const historyEntry = await findReceiveHistoryEntry(
-        mgr,
-        tokenString,
-        mintUrl,
-      );
-      if (historyEntry) {
-        logger.info("operations.executeReceive.historyFound", {
-          ...mintUrlFields(mintUrl),
-          hadP2PKProofs: hadP2PK,
-        });
-        return { historyEntry, hadP2PKProofs: hadP2PK };
-      }
-
-      logger.warn("operations.executeReceive.historyMissing", {
-        ...mintUrlFields(mintUrl),
-      });
-      // Synthetic fallback only — coco-core's history row is the canonical
-      // store of the encoded token. Echoing it here would put a bearer
-      // instrument into notifications.onTransactionCreated subscribers and
-      // every entry-update listener that doesn't read from the DB.
-      const entry = {
-        id: `redeemed-${Date.now()}`,
-        type: "receive" as const,
-        createdAt: Date.now(),
-        mintUrl,
-        unit: tokenUnit,
-        amount: tokenAmount,
-      };
-      return { historyEntry: JSON.stringify(entry), hadP2PKProofs: hadP2PK };
     },
 
     isMintTrusted: async (mintUrl) => {
@@ -2185,30 +2059,4 @@ function buildSyntheticPaymentRequestEntry(
     operationId,
     state: "pending",
   };
-}
-
-async function findReceiveHistoryEntry(
-  mgr: Manager,
-  tokenString: string,
-  mintUrl: string,
-): Promise<string | null> {
-  logger.debug("operations.history.receive.lookup.start", {
-    ...mintUrlFields(mintUrl),
-    tokenLength: tokenString.length,
-    limit: 50,
-  });
-  const history = await mgr.history.getPaginatedHistory(0, 50);
-  const entry = history.find(
-    (h): h is ReceiveHistoryEntry =>
-      h.type === "receive" &&
-      h.mintUrl === mintUrl &&
-      h.metadata?.rawToken === tokenString,
-  );
-  logger.debug("operations.history.receive.lookup.done", {
-    ...mintUrlFields(mintUrl),
-    found: !!entry,
-    historyCount: history.length,
-    entryState: entry?.state ?? null,
-  });
-  return entry ? JSON.stringify(entry) : null;
 }

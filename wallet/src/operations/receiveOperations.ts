@@ -1,10 +1,10 @@
 // ---------------------------------------------------------------------------
 // Receive and mint-quote operations that follow Coco's own operation records.
 //
-// The plain versions in `defaultOperations.ts` hand back a history entry built
-// from what the call returned. These wait for the row Coco saved and use its
-// id, so nothing downstream is keyed to an id that history never shows, and a
-// receive that cannot reach the mint is reported as pending, not failed.
+// The wallet's only receive and mint-quote operations: `defaultOperations.ts`
+// has none. They wait for the row Coco saved and use its id, so nothing
+// downstream is keyed to an id that history never shows, and a receive that
+// cannot reach the mint is reported as pending, not failed.
 //
 // What only the app knows is passed in: how to check a token offline, how to
 // prepare a mint quote, the words for a pending receive, and a local id.

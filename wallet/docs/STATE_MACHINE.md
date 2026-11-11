@@ -77,6 +77,7 @@ Source paths are relative to the Colada package root.
 | Platform adapters (clipboard, share, NFC, scan sources) | the app owns | `src/adapters/types.ts` |
 | Secret storage, seed derivation, P2PK key rotation policy | the app owns | reacts to `onP2PKReceiveCompleted` |
 | `linkTransaction`, `sendNostrDM`, `resolveRecipientProfile` | the app owns | not implemented in `defaultOperations.ts:10-11` |
+| `executeReceive`, `executeMintQuote` | the app wires them | built by `createExecuteReceive` / `createExecuteMintQuote` in `src/operations/receiveOperations.ts`; `defaultOperations.ts` has neither |
 | Offline detection source (`getOffline`) | the app owns the value; Colada owns the routing | `src/core/createColada.ts`, `runConfirmSendEffect` in `effects.ts` |
 
 Colada is agnostic of `@cashu/coco-core`: `ScreenActionContext.manager` is typed
@@ -586,11 +587,10 @@ MUST:
 - Offline mint quotes are rejected before any I/O; `executeMintQuote` is never
   called offline. `runMintQuoteEffect`. This gate uses the machine `getOffline`
   provider only, NOT `ctx.offline`.
-- Onchain mint quotes are unsupported; `executeMintQuote` throws on `'onchain'`
-  and always prepares `'bolt11'`. `defaultOperations.ts:411-413,418`.
-- Only `'sat'` is supported (`requireSatUnit`). `defaultOperations.ts:118-121`.
+- `executeMintQuote` has no default: the host supplies it
+  (`createExecuteMintQuote`, `operations/receiveOperations.ts`).
 - The created quote invoice is UNPAID at creation; the machine never awaits
-  payment. `defaultOperations.ts:437`.
+  payment.
 - `onTransactionCreated` fires only when the parsed `historyEntry` has an id; a
   malformed entry silently drops the wallet's only minting handoff signal.
   `buildTransactionCreatedNotifications`.
@@ -642,8 +642,8 @@ MUST:
   `defaultHandlers.ts:212-217`.
 - Trust-then-redeem is a two-press loop: trusting on the mint page does NOT
   auto-redeem.
-- The synthetic receive fallback must not echo the encoded token into
-  `onTransactionCreated`. `defaultOperations.ts:714-727`.
+- `executeReceive` has no default: the host supplies it
+  (`createExecuteReceive`, `operations/receiveOperations.ts`).
 - `linkTransaction` must prefer `flowCtx.rawInput` over the re-encoded token so
   the scan store can match `processed === raw`. `defaultHandlers.ts:261-269`.
 - `resolveNext` short-circuits a `receiveToken` intent to
@@ -1461,8 +1461,7 @@ Shipped NFC behavior is Section 5.6. The following are intended, not shipped:
 
 - Current: onchain is a recognized capability type (`METHODS = ['bolt11','onchain']`,
   `mint-capabilities.ts`) but is operationally OFF. Onchain RECEIVE forwards to
-  `operations.executeMintQuote`, whose default throws on `'onchain'`
-  (`defaultOperations.ts:411-413`); onchain SEND errors before any preview
+  `operations.executeMintQuote`, which the host supplies; onchain SEND errors before any preview
   (`UNSUPPORTED_PAYMENT_METHOD`, `resolveNext.ts:284-296`). The variant menu never
   builds an onchain row because `isMethodImplemented('onchain')` is false
   (`availability.ts:318-323`).

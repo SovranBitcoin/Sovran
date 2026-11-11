@@ -323,14 +323,17 @@ describe('unit and operations', () => {
     }
   );
 
-  it('keeps every other wallet operation and overrides receive and mint quote', async () => {
+  it('keeps every other wallet operation and supplies receive and mint quote', async () => {
     await mount();
     const { operations, instance } = props();
 
     expect(operations.executeSend).toBe(instance.operations.executeSend);
     expect(operations.executeMelt).toBe(instance.operations.executeMelt);
-    expect(operations.executeReceive).not.toBe(instance.operations.executeReceive);
-    expect(operations.executeMintQuote).not.toBe(instance.operations.executeMintQuote);
+    // The package has no receive or mint-quote operation of its own.
+    expect(instance.operations.executeReceive).toBeUndefined();
+    expect(instance.operations.executeMintQuote).toBeUndefined();
+    expect(typeof operations.executeReceive).toBe('function');
+    expect(typeof operations.executeMintQuote).toBe('function');
     expect(typeof operations.npcAddressForPubkey).toBe('function');
     expect(typeof operations.resolveRecipientProfile).toBe('function');
   });

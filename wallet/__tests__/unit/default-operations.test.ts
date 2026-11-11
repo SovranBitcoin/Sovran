@@ -961,63 +961,6 @@ describe("buildMintReviewInfo — social enrichment", () => {
   });
 });
 
-describe("executeMintQuote — onchain", () => {
-  it("creates a fresh reusable onchain quote and prepares the operation against it (quote-first)", async () => {
-    const quote = {
-      mintUrl: MINT1,
-      method: "onchain",
-      quoteId: "oq-1",
-      request: "bc1qexampleaddress",
-      unit: "sat",
-      reusable: true,
-      expiry: null,
-    };
-    const prepared = {
-      id: "mint-op-1",
-      mintUrl: MINT1,
-      quoteId: "oq-1",
-      createdAt: 1111,
-      unit: "sat",
-      amount: 123,
-      request: "bc1qexampleaddress",
-      state: "pending",
-    };
-    const create = vi.fn().mockResolvedValue(quote);
-    const prepare = vi.fn().mockResolvedValue(prepared);
-    const mockManager = createMockManager({
-      quotes: { mint: { create } },
-      ops: { mint: { prepare } },
-    });
-
-    const ops = createDefaultOperations({
-      getManager: () => mockManager as unknown as Manager,
-    });
-
-    const result = await ops.executeMintQuote!({ mintUrl: MINT1, amount: 123, unit: "sat", method: "onchain" });
-
-    // v2 quote-first contract: the canonical quote row exists before the
-    // durable operation, and reusable quotes take an explicit amount.
-    expect(create).toHaveBeenCalledWith({
-      mintUrl: MINT1,
-      method: "onchain",
-      unit: "sat",
-    });
-    expect(prepare).toHaveBeenCalledWith({ quote, amount: 123 });
-    expect(create.mock.invocationCallOrder[0]).toBeLessThan(
-      prepare.mock.invocationCallOrder[0],
-    );
-
-    const entry = JSON.parse(result.historyEntry);
-    expect(entry).toMatchObject({
-      type: "mint",
-      quoteId: "oq-1",
-      state: "UNPAID",
-      amount: 123,
-      paymentRequest: "bc1qexampleaddress",
-    });
-  });
-});
-
 describe("executeMelt — onchain (coco v2)", () => {
   const ADDRESS = "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4";
   const FEE_OPTIONS = [
@@ -1871,36 +1814,6 @@ describe("synthetic history entries keep the operation's unit", () => {
     expect(JSON.parse(result.historyEntry)).toMatchObject({
       id: "op-1",
       amount: 100,
-      unit: "usd",
-    });
-  });
-
-  it("builds a usd receive entry when the history row is missing", async () => {
-    const token = getEncodedToken({
-      mint: MINT1,
-      unit: "usd",
-      proofs: [
-        {
-          id: "00".repeat(8),
-          amount: Amount.from(25),
-          C: "02" + "ab".repeat(32),
-          secret: "synthetic",
-        },
-      ],
-    });
-    const manager = createMockManager({
-      wallet: { receive: vi.fn().mockResolvedValue(undefined) },
-      history: { getPaginatedHistory: vi.fn().mockResolvedValue([]) },
-    });
-    const ops = createDefaultOperations({
-      getManager: () => manager as unknown as Manager,
-    });
-
-    const result = await ops.executeReceive!({ tokenString: token, mintUrl: MINT1, amount: 25 });
-
-    expect(JSON.parse(result.historyEntry)).toMatchObject({
-      type: "receive",
-      amount: 25,
       unit: "usd",
     });
   });

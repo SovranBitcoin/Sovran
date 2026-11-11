@@ -126,9 +126,7 @@ describe('createColada', () => {
 
     // Core operations provided by defaultOperations
     expect(ops.executeSend).toBeDefined();
-    expect(ops.executeMintQuote).toBeDefined();
     expect(ops.executeMelt).toBeDefined();
-    expect(ops.executeReceive).toBeDefined();
     expect(ops.buildMintListItems).toBeDefined();
     expect(ops.buildMintReviewInfo).toBeDefined();
     expect(ops.checkSendStatus).toBeDefined();
