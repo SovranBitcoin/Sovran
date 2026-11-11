@@ -353,9 +353,10 @@ export function createPaymentMachine(
   let cachedSnapshot: ExecutionState = deriveExecutionState("idle", idleData);
 
   function resetInternal() {
-    abandonTurn();
-    flowCtx = { unit: getUnit?.() ?? configUnit };
-    setStep("idle", {});
+    abandonTurn(() => {
+      flowCtx = { unit: getUnit?.() ?? configUnit };
+      setStep("idle", {});
+    });
     processedScanInput = null;
     lastScanSource = undefined;
     if (createURDecoder) {
@@ -432,11 +433,16 @@ export function createPaymentMachine(
   /** Frees the machine and leaves `inspect()` and its listeners alone. */
   const QUIET_EXIT = { executing: "keep", notify: false } as const;
 
-  /** A reset: strands the running turn and frees the machine. */
-  function abandonTurn(): void {
+  /**
+   * A reset: strands the running turn, restarts the flow, then frees the
+   * machine. The machine stays held while `restartFlow` runs, so an event it
+   * sends is dropped, and if it throws the machine is not freed.
+   */
+  function abandonTurn(restartFlow: () => void): void {
     flowGeneration += 1;
-    pendingPaymentRequestConfirms = [];
+    restartFlow();
     finishTurn(flowGeneration, "reset", { notify: false });
+    pendingPaymentRequestConfirms = [];
   }
 
   function setExecuting(value: boolean, announce = true): void {
@@ -473,32 +479,6 @@ export function createPaymentMachine(
     return (outcome) => {
       for (const h of holders) h.outcome = outcome;
     };
-  }
-
-  /**
-   * After a melt or a payment request settled: stop executing, run the
-   * handler of the step the result moved to while still holding the machine
-   * (so a second Pay cannot race the navigation), then finish the turn.
-   */
-  async function finishPayment(
-    generation: number,
-    fromStep: FlowStep,
-    variant: "melt" | "paymentRequest",
-  ): Promise<void> {
-    const [operation, confirm] =
-      variant === "melt"
-        ? ["executeMelt", "confirmMelt"]
-        : ["executePaymentRequest", "confirmPaymentRequest"];
-    if (isStaleGeneration(generation, `${operation}.finalize`)) return;
-    try {
-      setExecuting(false);
-      if (step !== fromStep) {
-        await dispatchHandler(step, stepData);
-        notify();
-      }
-    } finally {
-      finishTurn(generation, `${confirm}.unlock`, QUIET_EXIT);
-    }
   }
 
   /**
@@ -1113,6 +1093,13 @@ export function createPaymentMachine(
       return;
     }
 
+    // The melt or payment request this turn settled, for the tail both share.
+    let settledPayment: {
+      fromStep: FlowStep;
+      finalize: string;
+      unlock: string;
+    } | null = null;
+
     if (
       event.type === "CONFIRM_MELT" &&
       step === "navigateToMeltPreview" &&
@@ -1205,8 +1192,11 @@ export function createPaymentMachine(
         );
       }
 
-      await finishPayment(sendGeneration, originalStep, "melt");
-      return;
+      settledPayment = {
+        fromStep: originalStep,
+        finalize: "executeMelt.finalize",
+        unlock: "confirmMelt.unlock",
+      };
     }
 
     if (
@@ -1294,7 +1284,28 @@ export function createPaymentMachine(
         });
       }
 
-      await finishPayment(sendGeneration, originalStep, "paymentRequest");
+      settledPayment = {
+        fromStep: originalStep,
+        finalize: "executePaymentRequest.finalize",
+        unlock: "confirmPaymentRequest.unlock",
+      };
+    }
+
+    // After a melt or a payment request settled: stop executing, run the
+    // handler of the step the result moved to while still holding the machine
+    // (so a second Pay cannot race the navigation), then finish the turn.
+    // Inline rather than a helper, so Pay settles as soon as the turn ends.
+    if (settledPayment) {
+      if (isStaleGeneration(sendGeneration, settledPayment.finalize)) return;
+      try {
+        setExecuting(false);
+        if (step !== settledPayment.fromStep) {
+          await dispatchHandler(step, stepData);
+          notify();
+        }
+      } finally {
+        finishTurn(sendGeneration, settledPayment.unlock, QUIET_EXIT);
+      }
       return;
     }
 
@@ -2160,9 +2171,9 @@ export function createPaymentMachine(
     } catch (err) {
       // Safety net: finish the turn so the machine doesn't stay held if
       // transition() or an operation throws before the inner finally runs.
-      if (finishTurn(sendGeneration, "machine.transition.safetyNet")) {
-        logger.warn("machine.transition.safetyNet", { error: errField(err) });
-      }
+      if (isStaleGeneration(sendGeneration, "machine.transition.safetyNet")) return;
+      logger.warn("machine.transition.safetyNet", { error: errField(err) });
+      finishTurn(sendGeneration, "machine.transition.safetyNet");
     }
   };
 

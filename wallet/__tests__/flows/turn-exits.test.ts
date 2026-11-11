@@ -72,6 +72,8 @@ function build(
     nfcAdapter?: NfcIOAdapter;
     notifications?: Record<string, (data: unknown) => unknown>;
     wallet?: Partial<WalletContext>;
+    getContext?: (wallet: WalletContext) => WalletContext;
+    getUnit?: () => string;
   } = {},
 ) {
   resetTxCounter();
@@ -98,8 +100,8 @@ function build(
   const machine = createPaymentMachine({
     handlers,
     detectors: defaultDetectors,
-    getContext: () => wallet,
-    getUnit: () => "sat",
+    getContext: () => config.getContext?.(wallet) ?? wallet,
+    getUnit: config.getUnit ?? (() => "sat"),
     operations: {
       ...createMockOperations(config.operations, operationCalls),
       ...config.direct,
@@ -909,6 +911,145 @@ describe("the main path", () => {
     expect(tm.machine.getStep()).toBe("mintQuoteCreated");
     expect(isExecuting(tm.machine)).toBe(false);
     expect(await isFree(tm.machine)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Order of a turn's bookkeeping
+// ---------------------------------------------------------------------------
+
+/**
+ * Microtasks from the last time `run`'s turn told listeners anything to the
+ * moment its promise settles. Counting restarts at each announcement and
+ * stops after a bound, so a turn that waits on a timer is not starved.
+ */
+async function ticksFromLastAnnouncement(
+  machine: Machine,
+  run: () => Promise<unknown>,
+): Promise<number> {
+  let tick = 0;
+  let counting = false;
+  let settled = false;
+  const count = () => {
+    tick += 1;
+    counting = !settled && tick < 50;
+    if (counting) queueMicrotask(count);
+  };
+  const unsubscribe = machine.subscribe(() => {
+    tick = 0;
+    if (!counting) {
+      counting = true;
+      queueMicrotask(count);
+    }
+  });
+  let settledAt = -1;
+  await run().then(() => {
+    settled = true;
+    settledAt = tick;
+  });
+  unsubscribe();
+  return settledAt;
+}
+
+describe("the order of a turn's bookkeeping", () => {
+  it("logs the safety net before it frees the machine and tells listeners", async () => {
+    let throwing = false;
+    const tm = build({
+      getContext: (wallet) => {
+        if (throwing) throw new Error("wallet closed");
+        return wallet;
+      },
+    });
+    const sawWarning: boolean[] = [];
+    tm.machine.subscribe(() => {
+      sawWarning.push(logs.some((line) => line.event === "machine.transition.safetyNet"));
+    });
+
+    throwing = true;
+    await expect(tm.machine.submitSendMemo()).resolves.toBeUndefined();
+    throwing = false;
+
+    expect(sawWarning).toEqual([true]);
+    expect(isExecuting(tm.machine)).toBe(false);
+    expect(await isFree(tm.machine)).toBe(true);
+  });
+
+  it("drops an event the unit read sends while a reset still holds the machine", async () => {
+    const quote = deferred<{ historyEntry: string }>();
+    let reenter: (() => void) | null = null;
+    const tm = build({
+      operations: { executeMintQuote: () => quote.promise },
+      getUnit: () => {
+        const run = reenter;
+        reenter = null;
+        run?.();
+        return "sat";
+      },
+    });
+    await tm.machine.startReceiveLightning({ reset: true });
+    void tm.machine.enterAmount({ value: 1000, unit: "sat" }, MINT1, {
+      destination: "mintQuote",
+    });
+    expect(await isFree(tm.machine)).toBe(false);
+
+    const from = logs.length;
+    reenter = () => void tm.machine.submitSendMemo();
+    tm.machine.reset();
+
+    const memo = logs
+      .slice(from)
+      .filter((line) => line.fields?.type === "SEND_MEMO_SUBMITTED")
+      .map((line) => line.event);
+    expect(memo).toEqual(["machine.event.ignored"]);
+    expect(await isFree(tm.machine)).toBe(true);
+    quote.resolve(mintQuoteEntry("q1", 1000));
+  });
+
+  // QUIRK: a reset whose unit read throws has stranded the running turn but
+  // not yet freed the machine, so it stays held until the next reset.
+  it("leaves the machine held when the unit read throws during a reset", async () => {
+    const quote = deferred<{ historyEntry: string }>();
+    let unitThrows = false;
+    const tm = build({
+      operations: { executeMintQuote: () => quote.promise },
+      getUnit: () => {
+        if (unitThrows) throw new Error("settings closed");
+        return "sat";
+      },
+    });
+    await tm.machine.startReceiveLightning({ reset: true });
+    const press = tm.machine.enterAmount({ value: 1000, unit: "sat" }, MINT1, {
+      destination: "mintQuote",
+    });
+
+    unitThrows = true;
+    expect(() => tm.machine.reset()).toThrow("settings closed");
+    unitThrows = false;
+    quote.resolve(mintQuoteEntry("q1", 1000));
+    await press;
+
+    expect(tm.machine.getStep()).toBe("createMintQuote");
+    expect(await isFree(tm.machine)).toBe(false);
+    tm.machine.reset();
+    expect(await isFree(tm.machine)).toBe(true);
+  });
+
+  it("settles Pay on a melt preview in the microtask after its last announcement", async () => {
+    const tm = build();
+    await toMeltPreview(tm.machine);
+    expect(await ticksFromLastAnnouncement(tm.machine, () => tm.machine.confirmMelt())).toBe(1);
+    expect(tm.calls("executeMelt")).toBe(1);
+  });
+
+  it("settles Pay on a payment request in the microtask after its last announcement", async () => {
+    const tm = build();
+    await toPaymentRequest(tm.machine);
+    expect(
+      await ticksFromLastAnnouncement(tm.machine, () =>
+        tm.machine.send({ type: "CONFIRM_PAYMENT_REQUEST" }),
+      ),
+    ).toBe(1);
+    expect(tm.calls("executePaymentRequest")).toBe(1);
   });
 });
 
