@@ -9,8 +9,6 @@
  *     that never takes over a turn, so a held lock shows as "ignored"),
  *   - what a waiting `confirmPaymentRequest()` resolves with,
  *   - whether `inspect()` still says a handler is executing.
- *
- * `// QUIRK:` marks behaviour pinned as it is although it looks wrong.
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -969,11 +967,9 @@ describe("an NFC tap", () => {
     expect(await isFree(tm.machine)).toBe(true);
   });
 
-  // QUIRK: the tap does not check its turn after releasing the tag session.
-  // A reset while the session is released lets the old tap carry on: it runs
-  // the handler of the step the reset left (idle) and leaves `inspect()`
-  // saying it executes, with nothing running.
-  it("carries on after a reset while it releases the session", async () => {
+  // A reset while the tag session is released strands the tap: it runs no
+  // handler and leaves `inspect()` and the lock to the reset.
+  it("does nothing more after a reset while it releases the session", async () => {
     const released = deferred();
     const adapter = nfcAdapter({ releaseSession: vi.fn(() => released.promise) });
     const tm = build({
@@ -990,9 +986,8 @@ describe("an NFC tap", () => {
     await tap;
 
     expect(tm.machine.getStep()).toBe("idle");
-    expect(tm.handled("idle")).toBe(1);
-    expect(isExecuting(tm.machine)).toBe(true);
+    expect(tm.handled("idle")).toBe(0);
+    expect(isExecuting(tm.machine)).toBe(false);
     expect(await isFree(tm.machine)).toBe(true);
-    expect(isExecuting(tm.machine)).toBe(true);
   });
 });

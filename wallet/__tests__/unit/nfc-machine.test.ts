@@ -239,6 +239,31 @@ describe("NFC terminal unit and mints", () => {
     tm.assertStep("idle");
     expect(sentMint(tm)).toBeUndefined();
   });
+  it("does nothing more after a reset while it restores the unit", async () => {
+    const { tm, switchUnit, adapter } = setup({ unit: "usd" });
+    adapter.writeToken.mockRejectedValueOnce(new Error("tag lost"));
+    let restored!: () => void;
+    switchUnit.mockImplementationOnce(async () => {});
+    switchUnit.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          restored = resolve;
+        }),
+    );
+    const pending = tm.machine.scan!(INPUTS.paymentRequestBasic, {
+      source: "nfc",
+    });
+    await vi.waitFor(() => expect(switchUnit).toHaveBeenCalledWith("sat"));
+    const handled = tm.handlerCalls.length;
+
+    tm.machine.reset();
+    restored();
+    await pending;
+
+    tm.assertStep("idle");
+    expect(tm.handlerCalls).toHaveLength(handled);
+    expect(tm.machine.inspect().isExecuting).toBe(false);
+  });
   it("rejects amountless requests before switching units", async () => {
     const { tm, switchUnit } = setup({ unit: "usd", amount: null });
     await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });

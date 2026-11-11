@@ -1738,7 +1738,9 @@ export function createPaymentMachine(
               // the tag: say why, instead of showing a picker whose rows
               // would all fail the same way.
               await nfcAdapter.releaseSession();
+              if (isStaleGeneration(sendGeneration, "nfc.releaseSession")) return;
               await revertNfcUnit?.().catch(() => undefined);
+              if (isStaleGeneration(sendGeneration, "nfc.revertUnit")) return;
               setStep("error", {
                 code: "PAYMENT_REQUEST_FAILED",
                 message: refusal,
@@ -1749,6 +1751,7 @@ export function createPaymentMachine(
           } else if (step === "enterAmount") {
             // NFC requires amount in payment request — if we reach enterAmount, the request lacked it
             await nfcAdapter.releaseSession();
+            if (isStaleGeneration(sendGeneration, "nfc.releaseSession")) return;
             setStep("error", {
               code: "NFC_READ_FAILED",
               message: "Payment request must include an amount for NFC payment",
@@ -1836,6 +1839,7 @@ export function createPaymentMachine(
 
               setStep("error", effect.error.data);
               await revertNfcUnit?.().catch(() => undefined);
+              if (isStaleGeneration(sendGeneration, "nfc.revertUnit")) return;
             }
 
             setExecuting(false, false);
@@ -1843,10 +1847,10 @@ export function createPaymentMachine(
           } else {
             // Terminal step that isn't navigateToPaymentRequest (e.g. navigateToMeltPreview,
             // error, receiveToken) — release NFC session and proceed normally.
-            // QUIRK: no stale check after these awaits, so a reset meanwhile
-            // lets this turn carry on (turn-exits test).
             await nfcAdapter.releaseSession();
+            if (isStaleGeneration(sendGeneration, "nfc.releaseSession")) return;
             await revertNfcUnit?.().catch(() => undefined);
+            if (isStaleGeneration(sendGeneration, "nfc.revertUnit")) return;
             nfcResolved = true;
           }
         }
