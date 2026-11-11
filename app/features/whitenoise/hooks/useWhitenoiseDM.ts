@@ -78,8 +78,9 @@ type Conversation =
   /** The first send is creating the group and inviting the peer. */
   | { phase: 'creating-group'; for: OpenedFor }
   /**
-   * The read, the group's creation or a send failed. QUIRK: a send is still
-   * allowed, and after a failed read it creates a group (pinned).
+   * The read, the group's creation or a send failed. A send is still allowed;
+   * with no group it first reads the conversation again, since a failed read
+   * cannot tell whether one exists.
    */
   | { phase: 'failed'; for: OpenedFor; group: WnGroup | null; error: string };
 
@@ -87,6 +88,7 @@ type ConversationEvent =
   | { type: 'closed' }
   | { type: 'send-without-client' }
   | { type: 'load-started'; for: OpenedFor }
+  | { type: 'reload-started'; for: OpenedFor }
   | { type: 'group-found'; for: OpenedFor; group: WnGroup }
   | { type: 'loaded'; for: OpenedFor; group: WnGroup | null }
   | { type: 'send-started'; for: OpenedFor }
@@ -108,6 +110,8 @@ function conversationStep(state: Conversation, event: ConversationEvent): Conver
   }
   if (state.phase === 'closed' || state.for !== event.for) return state;
   switch (event.type) {
+    case 'reload-started':
+      return state.phase === 'failed' ? { phase: 'loading', for: state.for } : state;
     case 'group-found':
       return state.phase === 'loading'
         ? { phase: 'reading-history', for: state.for, group: event.group }
@@ -315,6 +319,7 @@ export function useWhitenoiseDM(counterpartyPubkey: string): UseWhitenoiseDMStat
         client: now.client,
         relays: now.relays,
         opened: openedForNow(machine.current, now),
+        current: () => machine.current,
         dispatch,
         setMessages,
       },
@@ -414,6 +419,8 @@ interface SendDmCtx {
   relays: ReturnType<typeof useWhitenoise>['relays'];
   /** The conversation, when it was opened for the current client, account and peer. */
   opened: OpenedConversation | null;
+  /** The conversation as it is now, after a wait. */
+  current: () => Conversation;
   dispatch: (event: ConversationEvent) => void;
   setMessages: React.Dispatch<React.SetStateAction<WhitenoiseDmMessage[]>>;
 }
@@ -435,10 +442,25 @@ async function sendDmImpl(ctx: SendDmCtx, text: string): Promise<void> {
     dispatch({ type: 'failed', for: target, error: 'No active Nostr key' });
     return;
   }
+  let read: { group: WnGroup | null } = opened;
+  if (opened.phase === 'failed' && !opened.group) {
+    // Creating a group here could split an existing conversation in two (the
+    // peer gets a second invitation): read it again first, and send only on
+    // what that read says. A second failure refuses the send with its error.
+    dispatch({ type: 'reload-started', for: target });
+    const stillFor = () => {
+      const now = ctx.current();
+      return now.phase !== 'closed' && now.for === target;
+    };
+    await loadDmGroupImpl(target, () => !stillFor(), { dispatch, setMessages });
+    const after = ctx.current();
+    if (after.phase !== 'ready' || after.for !== target) return;
+    read = after;
+  }
   dispatch({ type: 'send-started', for: target });
 
   // Lazy-create the group on first send.
-  const activeGroup = opened.group ?? (await createDmGroup(ctx, target));
+  const activeGroup = read.group ?? (await createDmGroup(ctx, target));
   if (!activeGroup) return;
 
   const optimisticId = mintLocalId('pending');

@@ -511,8 +511,10 @@ describe('a send before the conversation has loaded', () => {
     expect(group.sendChatMessage).toHaveBeenCalledWith('on time');
   });
 
-  it('after the groups could not be loaded: a send goes through and creates a group', async () => {
+  it('after the groups could not be loaded: a send reads the conversation again and sends into the group it finds', async () => {
     fake.client.loadAllGroups.mockRejectedValueOnce(new Error('group state unreadable'));
+    const group = makeGroup([0x01, 0x02]);
+    fake.groups.set('0102', group);
     await seedIndex('0102');
     const { result } = await mount();
     expect(result.current.error).toBe('group state unreadable');
@@ -521,11 +523,45 @@ describe('a send before the conversation has loaded', () => {
       await result.current.send('hello');
     });
 
-    // QUIRK: a failed read cannot tell whether a group exists, yet the send
-    // creates one and points the saved conversation at it.
+    expect(fake.client.loadAllGroups).toHaveBeenCalledTimes(2);
+    expect(fake.client.createGroup).not.toHaveBeenCalled();
+    expect(group.sendChatMessage).toHaveBeenCalledWith('hello');
+    expect(await AsyncStorage.getItem(INDEX_KEY)).toBe('{"v":1,"d":"0102"}');
+    expect(result.current).toMatchObject({ error: null, hasGroup: true, isLoading: false });
+  });
+
+  it('after the groups could not be loaded: a send that reads again and finds no group creates one', async () => {
+    fake.client.loadAllGroups.mockRejectedValueOnce(new Error('group state unreadable'));
+    const { result } = await mount();
+
+    await act(async () => {
+      await result.current.send('hello');
+    });
+
     expect(fake.client.createGroup).toHaveBeenCalledTimes(1);
     expect(await AsyncStorage.getItem(INDEX_KEY)).toBe('{"v":1,"d":"c0de"}');
     expect(result.current).toMatchObject({ error: null, hasGroup: true });
+  });
+
+  it('after the groups could not be loaded: a send whose second read fails too is refused with the error', async () => {
+    fake.client.loadAllGroups
+      .mockRejectedValueOnce(new Error('group state unreadable'))
+      .mockRejectedValueOnce(new Error('still unreadable'));
+    await seedIndex('0102');
+    const { result } = await mount();
+
+    await act(async () => {
+      await result.current.send('hello');
+    });
+
+    expect(fake.client.network.request).not.toHaveBeenCalled();
+    expect(fake.client.createGroup).not.toHaveBeenCalled();
+    expect(await AsyncStorage.getItem(INDEX_KEY)).toBe('{"v":1,"d":"0102"}');
+    expect(result.current).toMatchObject({
+      error: 'still unreadable',
+      hasGroup: false,
+      messages: [],
+    });
   });
 
   it('with no saved group: is refused and creates nothing until loading has found none', async () => {
