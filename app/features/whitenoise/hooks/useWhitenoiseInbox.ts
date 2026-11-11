@@ -12,10 +12,16 @@ type GiftWrapEvent = Parameters<InviteReader['ingestEvent']>[0];
 
 const GIFT_WRAP_KIND = 1059;
 const CURSOR_KEY = 'last-seen-at';
-// Seconds. NIP-01 `since` is inclusive of the boundary; one minute of
-// overlap absorbs relay clock skew without re-downloading more than a
-// negligible window.
-const CURSOR_SLACK_SECONDS = 60;
+/**
+ * How far before the newest gift wrap seen the inbox asks relays to start, in
+ * seconds: three days. A gift wrap's `created_at` is not when it was sent.
+ * The sender moves it back at random, by up to two days (NIP-59; Marmot moves
+ * a Welcome back by up to an hour), so an invitation sent after the newest
+ * wrap seen can carry an earlier date. Two days of backdating plus a day for
+ * relay clocks and a late delivery. Wraps fetched again are dropped by the
+ * invite reader's saved `seen` list before anything is decrypted.
+ */
+const INVITE_LOOKBACK_SECONDS = 3 * 24 * 60 * 60;
 
 /**
  * Long-running subscription that watches for incoming gift-wrapped events
@@ -39,7 +45,8 @@ export function useWhitenoiseInbox() {
 
   // Persist the latest `created_at` we've ingested so subsequent cold
   // starts subscribe with `since:` and don't re-download every historical
-  // gift wrap. Per-account so profile switches don't share cursors.
+  // gift wrap, only the last three days before it. Per-account so profile
+  // switches don't share cursors.
   const cursorStore = useMemo(
     () =>
       new AsyncStorageKVBackend<number>(
@@ -82,7 +89,9 @@ export function useWhitenoiseInbox() {
       if (cancelled) return;
       cursorHighSec = persistedCursorSec ?? 0;
       const since =
-        persistedCursorSec !== null ? persistedCursorSec - CURSOR_SLACK_SECONDS : undefined;
+        persistedCursorSec !== null
+          ? Math.max(0, persistedCursorSec - INVITE_LOOKBACK_SECONDS)
+          : undefined;
 
       wnLog.info('whitenoise.inbox.start', {
         relayCount: inboxRelays.length,
