@@ -88,7 +88,7 @@ jest.mock('@/shared/lib/logger', () => ({
   Log: ({ children }: { children: React.ReactNode }) => children,
   useLifecycleLogger: jest.fn(),
   log: { error: jest.fn(), info: jest.fn() },
-  mapLog: { debug: jest.fn() },
+  mapLog: { debug: jest.fn(), error: jest.fn() },
   deferWork: (_name: string, work: () => void) => {
     work();
     return { cancel: jest.fn() };

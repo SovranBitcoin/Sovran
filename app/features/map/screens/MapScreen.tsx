@@ -31,7 +31,7 @@ import { BITCOIN_ACCENT } from '@/shared/lib/brandColors';
 import { applySafetyOffset } from '@/shared/lib/map/locationPrivacy';
 import { CircleActionButton } from '@/shared/ui/composed/CircleActionButton';
 import { Spinner } from '@/shared/ui/primitives/Spinner';
-import { Log, log, useLifecycleLogger } from '@/shared/lib/logger';
+import { Log, mapLog, useLifecycleLogger } from '@/shared/lib/logger';
 import { StatsCard, type CategoryFilter } from '../components/StatsCard';
 import { useMerchantMap } from '../hooks/useMerchantMap';
 
@@ -109,7 +109,7 @@ export function MapScreen() {
         const safe = applySafetyOffset(loc.coords);
         latestMoveTo.current({ lat: safe.latitude, lon: safe.longitude, zoom: 12 });
       } catch (err) {
-        log.error('map.location.error', { error: err });
+        mapLog.error('map.location.error', { error: err });
       }
     });
 
@@ -122,7 +122,7 @@ export function MapScreen() {
       const safe = applySafetyOffset(loc.coords);
       moveTo({ lat: safe.latitude, lon: safe.longitude, zoom: 15 });
     } catch (err) {
-      log.error('map.location.error', { error: err });
+      mapLog.error('map.location.error', { error: err });
     }
   };
 
