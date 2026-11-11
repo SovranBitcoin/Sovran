@@ -145,6 +145,7 @@ export function useDmEnvelopePages({
       setRefreshing(false);
       setHasLoadedOnce(false);
       setPainted(false);
+      setError(null);
       return;
     }
     const mode: DmPageMeta['mode'] = lastKeyRef.current === feedKey ? 'refresh' : 'initial';

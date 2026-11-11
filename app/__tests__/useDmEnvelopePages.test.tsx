@@ -194,6 +194,21 @@ describe('useDmEnvelopePages', () => {
     expect(result.current.hasLoadedOnce).toBe(true);
   });
 
+  it("drops a failed feed's error once the feed can no longer be loaded", async () => {
+    const fetchPage = jest.fn(async () => {
+      throw new Error('nagg unavailable');
+    });
+    const { result, rerender, options } = setup({ fetchPage });
+    await waitFor(() => expect(result.current.error?.message).toBe('nagg unavailable'));
+    expect(result.current.status).toBe('error');
+
+    rerender({ ...options, feedKey: null });
+
+    await waitFor(() => expect(result.current.status).toBe('idle'));
+    expect(result.current.error).toBeNull();
+    expect(fetchPage).toHaveBeenCalledTimes(1);
+  });
+
   it('re-fetches the first page with `refresh` set once refresh() is called', async () => {
     const fetchPage = jest
       .fn<Promise<DmEnvelopePage>, [{ until?: number; refresh: boolean }]>()
