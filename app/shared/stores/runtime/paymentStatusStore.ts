@@ -70,26 +70,22 @@ function ownerOf(active: ActivePaymentStatus | null): PaymentToastOwner | null {
   }
 }
 
-/** Whether `active` is the toast of this send (by its operation). */
-export function ownsSend(active: ActivePaymentStatus | null, operationId: string): boolean {
-  const owner = ownerOf(active);
-  return owner?.kind === 'send' && owner.operationId === operationId;
-}
-
 /** Whether `active` is the toast of this melt (by its quote). */
 export function ownsMelt(active: ActivePaymentStatus | null, quoteId: string): boolean {
   const owner = ownerOf(active);
   return owner?.kind === 'melt' && owner.quoteId === quoteId;
 }
 
+type OwnedVariant = 'send' | 'melt' | 'payment-request';
+
 /**
  * Whether `active` is the toast of a `variants` payment still in flight. An
  * event for another payment neither changes nor replaces it: the person is
  * watching this one, and its own events or its starter end it.
  */
-export function paymentInFlight(
+function paymentInFlight(
   active: ActivePaymentStatus | null,
-  variants: readonly ('send' | 'melt' | 'payment-request')[]
+  variants: readonly OwnedVariant[]
 ): boolean {
   if (active?.state !== 'processing') return false;
   switch (active.variant) {
@@ -104,29 +100,87 @@ export function paymentInFlight(
 }
 
 /**
- * A wallet result left to a toast still in flight: a send or melt that
- * finished while a toast whose payment was not yet known was on screen. It
- * may be that toast's own, so it is held: the toast catches up with it once
- * its flow binds it to that payment. Otherwise it is another payment's, and
- * gets `toast` of its own once the toast on screen ends.
+ * A send or melt that finished, with the toast it gets when it is shown on
+ * its own. While a toast whose payment was not yet known is in flight, it may
+ * be that toast's own, so it is held: the toast catches up with it once its
+ * flow binds it to that payment. Otherwise it is another payment's, and gets
+ * `toast` once the toast on screen ends.
  */
-interface HeldResult {
+interface PaymentResult {
   owner: BoundOwner;
   /** The melt or send operation, for View. */
   operationId: string;
   toast: ActivePaymentStatus;
 }
 
-/** Results held at once; the oldest goes first. */
+interface HeldResult extends PaymentResult {
+  /** The key of the toast that was waiting to be bound when it was held, if one was. */
+  heldWhileWaiting: string | null;
+}
+
+/**
+ * Results held at once, oldest dropped first, except those held while the
+ * toast still on screen waited to be bound: one of them may be its own, and
+ * they are kept, past the limit if need be, for as long as it waits.
+ */
 const MAX_HELD_RESULTS = 20;
+
+/** Results remembered as shown, so one delivered again is not shown again. */
+const MAX_SHOWN_RESULTS = 20;
+
+/** What became of a finished payment's result. */
+type ResultDelivery =
+  /** It confirmed the toast on screen, which is its own. */
+  | 'confirmed'
+  /** It waits for the toast in flight to be bound or to end. */
+  | 'held'
+  /** It is on screen in a toast of its own. */
+  | 'shown'
+  /** It was shown before, and is not shown again. */
+  | 'alreadyShown';
+
+/** The key of the toast on screen while it waits to be bound to its payment. */
+function waitingKey(active: ActivePaymentStatus | null): string | null {
+  const owner = ownerOf(active);
+  return owner?.kind === 'pending' ? owner.key : null;
+}
+
+function withHeld(
+  held: readonly HeldResult[],
+  result: PaymentResult,
+  waiting: string | null
+): HeldResult[] {
+  const next = [
+    ...held.filter((h) => !sameOwner(h.owner, result.owner)),
+    { ...result, heldWhileWaiting: waiting },
+  ];
+  let excess = next.length - MAX_HELD_RESULTS;
+  if (excess <= 0) return next;
+  return next.filter((h) => {
+    const mayBeTheWaitingToasts = waiting !== null && h.heldWhileWaiting === waiting;
+    if (excess <= 0 || mayBeTheWaitingToasts) return true;
+    excess -= 1;
+    return false;
+  });
+}
+
+function withShown(shown: readonly BoundOwner[], owner: BoundOwner): BoundOwner[] {
+  return [...shown.filter((o) => !sameOwner(o, owner)), owner].slice(-MAX_SHOWN_RESULTS);
+}
 
 type PaymentStatusStore = {
   active: ActivePaymentStatus | null;
   held: HeldResult[];
-  /** Hold a finished payment's result for a toast that may yet be bound to it. */
-  holdResult: (result: HeldResult) => void;
+  /** Results shown, newest last: enough to know one delivered again. */
+  shown: BoundOwner[];
+  /**
+   * A send or melt finished: confirm its own toast on screen, hold it while
+   * another of `inFlight` is in flight, or show it in a toast of its own. A
+   * result is shown once, and showing it uses up its held copy.
+   */
+  deliverResult: (result: PaymentResult, inFlight: readonly OwnedVariant[]) => ResultDelivery;
   /** With no toast on screen, show the oldest held result's toast; null when there is none. */
-  takeHeld: () => HeldResult | null;
+  takeHeld: () => PaymentResult | null;
   setActive: (payment: ActivePaymentStatus | null) => void;
   clearActive: (id?: string) => void;
   /**
@@ -163,23 +217,83 @@ function withoutStatusCopy(active: ActivePaymentStatus): ActivePaymentStatus {
   return next;
 }
 
+/**
+ * `s` with the toast `id` confirmed, merging `extra` into one already
+ * confirmed; `s` itself when it is another toast, or is waiting or failed.
+ */
+function confirmActive(
+  s: { active: ActivePaymentStatus | null },
+  id: string,
+  extra?: { operationId?: string; receiveEntryId?: string }
+): { active: ActivePaymentStatus | null } {
+  if (s.active?.id !== id) {
+    logSkip('payment.status.confirmed.skipped', s, id, 'id_mismatch');
+    return s;
+  }
+  if (s.active.state === 'confirmed') {
+    // Already confirmed — only merge extra data (operationId, receiveEntryId)
+    paymentLog.debug('payment.status.confirmed.merge_extra', { id, hasExtra: !!extra });
+    return extra ? { active: { ...s.active, ...extra } } : s;
+  }
+  if (s.active.state === 'waiting') {
+    paymentLog.debug('payment.status.confirmed.skip_waiting', { id });
+    return s;
+  }
+  if (s.active.state === 'failed') {
+    paymentLog.debug('payment.status.confirmed.skip_failed', { id });
+    return s;
+  }
+  paymentLog.info('payment.status.confirmed', {
+    id,
+    variant: s.active.variant,
+    from: s.active.state,
+    to: 'confirmed',
+    hasOperationId: !!extra?.operationId,
+    hasReceiveEntryId: !!extra?.receiveEntryId,
+  });
+  return {
+    active: { ...withoutStatusCopy(s.active), state: 'confirmed' as const, ...extra },
+  };
+}
+
 export const usePaymentStatusStore = create<PaymentStatusStore>({
   name: 'usePaymentStatusStore',
   scope: 'session',
 })((set) => ({
   active: null,
   held: [],
-  holdResult: (result) =>
+  shown: [],
+  deliverResult: (result, inFlight) => {
+    let delivery: ResultDelivery = 'alreadyShown';
     set((s) => {
-      paymentLog.info('payment.status.hold_result', {
-        owner: result.owner.kind,
-        held: s.held.length + 1,
-      });
-      const others = s.held.filter((h) => !sameOwner(h.owner, result.owner));
-      return { held: [...others, result].slice(-MAX_HELD_RESULTS) };
-    }),
+      const { owner } = result;
+      const current = ownerOf(s.active);
+      const held = s.held.filter((h) => !sameOwner(h.owner, owner));
+      if (s.active && current && current.kind !== 'pending' && sameOwner(current, owner)) {
+        delivery = 'confirmed';
+        const next = confirmActive(s, s.active.id, { operationId: result.operationId });
+        if (next.active?.state !== 'confirmed') return next;
+        return { ...next, held, shown: withShown(s.shown, owner) };
+      }
+      if (s.shown.some((o) => sameOwner(o, owner))) {
+        delivery = 'alreadyShown';
+        return s;
+      }
+      if (paymentInFlight(s.active, inFlight)) {
+        delivery = 'held';
+        paymentLog.info('payment.status.hold_result', {
+          owner: owner.kind,
+          held: held.length + 1,
+        });
+        return { held: withHeld(s.held, result, waitingKey(s.active)) };
+      }
+      delivery = 'shown';
+      return { active: result.toast, held, shown: withShown(s.shown, owner) };
+    });
+    return delivery;
+  },
   takeHeld: () => {
-    let taken: HeldResult | null = null;
+    let taken: PaymentResult | null = null;
     set((s) => {
       const [next, ...rest] = s.held;
       if (s.active || !next) return s;
@@ -189,7 +303,7 @@ export const usePaymentStatusStore = create<PaymentStatusStore>({
         id: next.toast.id,
         stillHeld: rest.length,
       });
-      return { active: next.toast, held: rest };
+      return { active: next.toast, held: rest, shown: withShown(s.shown, next.owner) };
     });
     return taken;
   },
@@ -259,6 +373,7 @@ export const usePaymentStatusStore = create<PaymentStatusStore>({
           operationId: result.operationId,
         },
         held,
+        shown: withShown(s.shown, owner),
       };
     }),
   setWaiting: (id, copy) =>
@@ -309,37 +424,7 @@ export const usePaymentStatusStore = create<PaymentStatusStore>({
       });
       return { active: { ...s.active, state: 'delivered' as const } };
     }),
-  setConfirmed: (id, extra) =>
-    set((s) => {
-      if (s.active?.id !== id) {
-        logSkip('payment.status.confirmed.skipped', s, id, 'id_mismatch');
-        return s;
-      }
-      if (s.active.state === 'confirmed') {
-        // Already confirmed — only merge extra data (operationId, receiveEntryId)
-        paymentLog.debug('payment.status.confirmed.merge_extra', { id, hasExtra: !!extra });
-        return extra ? { active: { ...s.active!, ...extra } } : s;
-      }
-      if (s.active.state === 'waiting') {
-        paymentLog.debug('payment.status.confirmed.skip_waiting', { id });
-        return s;
-      }
-      if (s.active.state === 'failed') {
-        paymentLog.debug('payment.status.confirmed.skip_failed', { id });
-        return s;
-      }
-      paymentLog.info('payment.status.confirmed', {
-        id,
-        variant: s.active.variant,
-        from: s.active.state,
-        to: 'confirmed',
-        hasOperationId: !!extra?.operationId,
-        hasReceiveEntryId: !!extra?.receiveEntryId,
-      });
-      return {
-        active: { ...withoutStatusCopy(s.active!), state: 'confirmed' as const, ...extra },
-      };
-    }),
+  setConfirmed: (id, extra) => set((s) => confirmActive(s, id, extra)),
   setFailed: (id, error, text) =>
     set((s) => {
       if (s.active?.id !== id) {

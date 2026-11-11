@@ -130,6 +130,8 @@ export function isRecoveryActive(run: RecoveryRun): boolean {
  * that, and running two restores against one wallet database races counters.
  */
 let runOwned = false;
+/** Runs started in this process; a run is the latest while no other has started since. */
+let runsStarted = 0;
 
 export interface RecoveryRunOwner {
   /** Ask the run to stop after the mint or keyset in flight. */
@@ -190,6 +192,7 @@ export function startRecoveryRun(
     return { status: 'noMints' };
   }
   runOwned = true;
+  const generation = ++runsStarted;
   let run = from;
   // A stop belongs to this run, for good: a mint that timed out is still
   // restoring behind the run, and must not go on once the run has ended.
@@ -209,7 +212,12 @@ export function startRecoveryRun(
     const t0 = performance.now();
     let end: RecoveryEnd;
     try {
-      end = await recover(input, { dispatch, stopRequested, rows: () => rowsOf(run) });
+      end = await recover(input, {
+        dispatch,
+        stopRequested,
+        rows: () => rowsOf(run),
+        isLatestRun: () => runsStarted === generation,
+      });
     } catch (error) {
       end = { kind: 'error', message: describeError(error, 'cashu').text };
     } finally {
@@ -239,6 +247,22 @@ async function pendingMintOperationIds(
   }
 }
 
+/** Untrust a mint the run trusted and found nothing at; a failure is logged, never thrown. */
+async function untrustProbedMint(
+  manager: ReturnType<typeof CocoManager.getInstance>,
+  mint: string
+): Promise<void> {
+  try {
+    await manager.mint.untrustMint(mint);
+    cashuLog.info('recovery.cleanup.discovered_mint_untrusted', { ...mintUrlLogFields(mint) });
+  } catch (e) {
+    cashuLog.warn('recovery.cleanup.untrust_failed', {
+      ...mintUrlLogFields(mint),
+      error: redactError(e),
+    });
+  }
+}
+
 function rowsOf(run: RecoveryRun): MintRecoveryState[] {
   return run.phase === 'idle' ? [] : run.rows;
 }
@@ -247,11 +271,13 @@ interface RunControl {
   dispatch: (event: RecoveryEvent) => void;
   stopRequested: () => boolean;
   rows: () => MintRecoveryState[];
+  /** False once another run has started: it may hold this run's mints as its own. */
+  isLatestRun: () => boolean;
 }
 
 async function recover(
   { knownMintUrls, probeCandidates, loadMints }: RecoveryInput,
-  { dispatch, stopRequested, rows }: RunControl
+  { dispatch, stopRequested, rows, isLatestRun }: RunControl
 ): Promise<RecoveryEnd> {
   const t0 = performance.now();
   let allMintUrls = knownMintUrls;
@@ -317,7 +343,8 @@ async function recover(
   const update = (index: number, state: MintRecoveryState) =>
     dispatch({ type: 'mintUpdated', index, state });
 
-  const restoreOneUrl = async (mintUrl: string, i: number) => {
+  /** Restore one mint; resolves whether it holds funds after the restore. */
+  const restoreOneUrl = async (mintUrl: string, i: number): Promise<boolean> => {
     const isDiscovered = i >= knownMintUrls.length;
     const mintT0 = performance.now();
     cashuLog.info('recovery.mint.start', {
@@ -486,6 +513,38 @@ async function recover(
       skippedKeysets,
       fundsFound: found,
     });
+    return found;
+  };
+
+  // A discovered mint that timed out is left trusted by the tidy-up below:
+  // its restore goes on behind the run and may yet find funds. Its late
+  // result decides it as the tidy-up would have, however late it comes:
+  // untrusted when it found nothing, kept when it found funds. One whose
+  // result never comes stays trusted, and so does one a later run has taken
+  // up: that run lists it as trusted and restores it as its own.
+  const awaitingLateResult = new Set<string>();
+  const decideWhenRestored = (mintUrl: string, restore: Promise<boolean>) => {
+    awaitingLateResult.add(mintUrl);
+    void restore.then(
+      async (found) => {
+        awaitingLateResult.delete(mintUrl);
+        if (found || !isLatestRun()) {
+          cashuLog.info('recovery.cleanup.timed_out_mint_kept', {
+            ...mintUrlLogFields(mintUrl),
+            fundsFound: found,
+          });
+          return;
+        }
+        await untrustProbedMint(manager, mintUrl);
+      },
+      (error: unknown) => {
+        awaitingLateResult.delete(mintUrl);
+        cashuLog.warn('recovery.cleanup.timed_out_mint_left_trusted', {
+          ...mintUrlLogFields(mintUrl),
+          error: redactError(error),
+        });
+      }
+    );
   };
 
   // ONE MINT AT A TIME.
@@ -507,8 +566,9 @@ async function recover(
       update(i, { ...base, status: 'skipped', reason: 'cancelled', fundsFound: false });
       continue;
     }
+    const restore = restoreOneUrl(mintUrl, i);
     try {
-      await withTimeout(restoreOneUrl(mintUrl, i), MINT_RESTORE_TIMEOUT_MS, 'recovery.mint');
+      await withTimeout(restore, MINT_RESTORE_TIMEOUT_MS, 'recovery.mint');
     } catch (error) {
       // coco's request provider has no HTTP timeout, so one unresponsive
       // mint would otherwise stall every mint behind it.
@@ -532,13 +592,17 @@ async function recover(
         timeoutMs: MINT_RESTORE_TIMEOUT_MS,
         error: redactError(error),
       });
+      // Only a mint this run trusted is this run's to untrust.
+      if (timedOut && base.isDiscovered && !knownMintUrls.includes(mintUrl)) {
+        decideWhenRestored(mintUrl, restore);
+      }
     }
   }
 
   dispatch({ type: 'finalizing' });
 
   // Untrust discovered mints that returned no funds; one that timed out
-  // may yet, and is left trusted. `wallet.restore`
+  // may yet, and is left trusted until its late result decides it. `wallet.restore`
   // calls `mintService.addMintByUrl(url, { trusted: true })` for every
   // probed URL (see ../coco/packages/core/api/WalletApi.ts), which would
   // otherwise leave attacker-supplied URLs from the audit API permanently
@@ -553,21 +617,12 @@ async function recover(
   ].filter((url) => !knownMintUrls.includes(url));
   if (untrustUrls.length > 0) {
     dispatch({ type: 'labelled', label: `Tidying up ${untrustUrls.length} probed mints` });
-    await Promise.allSettled(
-      untrustUrls.map(async (mint) => {
-        try {
-          await manager.mint.untrustMint(mint);
-          cashuLog.info('recovery.cleanup.discovered_mint_untrusted', {
-            ...mintUrlLogFields(mint),
-          });
-        } catch (e) {
-          cashuLog.warn('recovery.cleanup.untrust_failed', {
-            ...mintUrlLogFields(mint),
-            error: redactError(e),
-          });
-        }
-      })
-    );
+    await Promise.all(untrustUrls.map((mint) => untrustProbedMint(manager, mint)));
+  }
+  if (awaitingLateResult.size > 0) {
+    cashuLog.info('recovery.cleanup.timed_out_mints_left_trusted', {
+      count: awaitingLateResult.size,
+    });
   }
 
   // Clean up stuck pending mint operations from before the restore.

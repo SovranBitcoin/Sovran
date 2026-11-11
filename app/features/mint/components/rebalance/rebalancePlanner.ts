@@ -8,27 +8,10 @@
  */
 
 import { TOTAL_BASIS_POINTS } from '@/shared/stores/profile/mintDistributionStore';
+import { ESTIMATED_FEE_BPS, estimatedTransferFee, MIN_FEE_RESERVE } from './transferFee';
 
 /** Default minimum transfer amount in sats (used as fallback when no setting is provided). */
 const MIN_TRANSFER_THRESHOLD = 5;
-
-/**
- * Estimated fee for Lightning transfers in basis points (200 = 2%), so sat
- * amounts stay in integer math.
- * This is a conservative estimate to ensure we don't over-allocate from surplus mints.
- * Actual fees may be lower, but it's better to under-transfer than fail.
- */
-const ESTIMATED_FEE_BPS = 200;
-
-/**
- * Minimum fee reserve in sats.
- * Must be high enough to cover the mint's Lightning fee_reserve (typically 2–10 sats)
- * plus potential input fees per proof.  5 sats is a safer planning floor that
- * reduces the chance of steps being skipped at execution time due to insufficient
- * headroom.  The executor handles the real fee_reserve dynamically via melt quote
- * probes, so this only affects upfront planning accuracy.
- */
-export const MIN_FEE_RESERVE = 5;
 
 interface MintBalance {
   mintUrl: string;
@@ -214,11 +197,7 @@ function computeTransferSteps(
     // Deduct transfer amount + estimated fee for this step.
     // This ensures later steps from the same surplus see the real
     // remaining balance, not an inflated one that ignores prior fees.
-    const estimatedStepFee = Math.max(
-      Math.ceil((transferAmount * ESTIMATED_FEE_BPS) / TOTAL_BASIS_POINTS),
-      MIN_FEE_RESERVE
-    );
-    surplus.amount -= transferAmount + estimatedStepFee;
+    surplus.amount -= transferAmount + estimatedTransferFee(transferAmount);
     deficit.amount -= transferAmount;
 
     // Remove exhausted entries

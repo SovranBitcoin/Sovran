@@ -1,3 +1,4 @@
+import { estimatedTransferFee } from '@/features/mint/components/rebalance/transferFee';
 import type { SwapGroup, SwapLeg } from '@/shared/stores/profile/swapTransactionsStore';
 
 /**
@@ -88,21 +89,40 @@ function transferOf(leg: Pick<SwapLeg, 'fromMintUrl' | 'toMintUrl' | 'chainPath'
 }
 
 /**
- * Whether a later leg is a route through other mints that delivered the
- * transfer `failed` was made for: the last hop of another chain between the
- * same two mints, done. The engine saves a reroute that way, after the attempt
- * it replaces (a retry reuses its leg instead). A direct leg never replaces
- * another: two plan steps can share their mints.
+ * Whether `amount` is what a route carried for a transfer of `wanted`, over
+ * `hops` transfers: each may have cost up to the fee the planner budgets for
+ * one, and the engine shrinks a transfer to what its source can pay after fees.
+ */
+function carries(amount: number, wanted: number, hops: number): boolean {
+  return amount >= wanted - hops * estimatedTransferFee(wanted);
+}
+
+/**
+ * Whether a later route through other mints delivered, in place of `failed`,
+ * the transfer it was made for. The engine saves a reroute as a chain of hops
+ * between the same two mints, after the attempt it replaces (a retry reuses
+ * its leg instead). The saved legs carry no plan step, so a route is tied to
+ * the failed attempt by its ends, by coming later, and by its amount: its
+ * first hop set out with the failed attempt's amount and its last hop, done,
+ * delivered it, less fees. Anything less leaves the failure standing. A direct
+ * leg never replaces another: two plan steps can share their mints.
  */
 function replacedLater(legs: readonly SwapLeg[], index: number): boolean {
   const failed = legs[index];
   const wanted = transferOf(failed);
-  return legs.slice(index + 1).some((later) => {
-    const path = later.chainPath;
-    if (later.localStatus !== 'done' || !later.chainId || !path || path.length < 3) return false;
-    if (later.chainId === failed.chainId || later.toMintUrl !== path[path.length - 1]) return false;
-    const delivered = transferOf(later);
-    return delivered.from === wanted.from && delivered.to === wanted.to;
+  const later = legs.slice(index + 1);
+  return later.some((last) => {
+    const path = last.chainPath;
+    if (last.localStatus !== 'done' || !last.chainId || !path || path.length < 3) return false;
+    if (last.chainId === failed.chainId || last.toMintUrl !== path[path.length - 1]) return false;
+    const delivered = transferOf(last);
+    if (delivered.from !== wanted.from || delivered.to !== wanted.to) return false;
+    const first = later.find((leg) => leg.chainId === last.chainId && leg.chainHopIndex === 0);
+    return (
+      !!first &&
+      carries(first.amount, failed.amount, 1) &&
+      carries(last.amount, failed.amount, path.length - 1)
+    );
   });
 }
 

@@ -95,12 +95,13 @@ describe('a failed attempt that a later successful attempt replaced does not fai
     chainId: string,
     path: string[],
     index: number,
-    localStatus: SwapLeg['localStatus']
+    localStatus: SwapLeg['localStatus'],
+    amount = 790
   ): SwapLeg => ({
     id: `${chainId}-${index}`,
     fromMintUrl: path[index],
     toMintUrl: path[index + 1],
-    amount: 790,
+    amount,
     chainId,
     chainPath: path,
     chainHopIndex: index,
@@ -165,6 +166,39 @@ describe('a failed attempt that a later successful attempt replaced does not fai
         direct('failed'),
       ])
     ).toBe('failed');
+  });
+
+  it('a route that delivered far less than the failed attempt had to carry replaces nothing', () => {
+    // The reviewer's case: 800 fails, and a route of 10 between the same mints arrives.
+    expect(
+      outcome([
+        direct('failed'),
+        hop('ch1', [A, B, C], 0, 'done', 10),
+        hop('ch1', [A, B, C], 1, 'done', 10),
+      ])
+    ).toBe('failed');
+    // It set out with the amount, but what reached the destination was far short of it.
+    expect(
+      outcome([
+        direct('failed'),
+        hop('ch1', [A, B, C], 0, 'done', 800),
+        hop('ch1', [A, B, C], 1, 'done', 10),
+      ])
+    ).toBe('failed');
+  });
+
+  it('a route whose first hop is not in the saved legs cannot be tied to the attempt it replaced', () => {
+    expect(outcome([direct('failed'), hop('ch1', [A, B, C], 1, 'done', 800)])).toBe('failed');
+  });
+
+  it('a route that delivered the amount less the fees of its hops replaces the failed attempt', () => {
+    expect(
+      outcome([
+        direct('failed'),
+        hop('ch1', [A, B, C], 0, 'done', 784),
+        hop('ch1', [A, B, C], 1, 'done', 768),
+      ])
+    ).toBe('finished');
   });
 
   it('a direct transfer that arrived does not replace another direct transfer that failed', () => {

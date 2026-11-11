@@ -1,3 +1,5 @@
+import { meltNeverSent, meltSettledUnpaid } from 'wallet';
+
 import { cashuLog, redactError } from '@/shared/lib/logger';
 import { legMoneyMayMove, swapGroupPhase } from '@/shared/lib/cashu/swapGroupPhase';
 import {
@@ -25,7 +27,11 @@ const MELT_ROLLED_BACK = 'The payment did not go through. The funds are back in 
  * Move saved swap legs that ended without a known outcome to their final
  * state, from Coco's record of each leg's own operations:
  *
- * - A leg whose melt is rolled back is `failed`, whatever it said before.
+ * - A leg whose melt Coco settled unpaid (rolled back, or failed with its
+ *   inputs given back) is `failed`, whatever it said before. So is a
+ *   `paymentPending` leg whose melt was only ever prepared: the engine gave
+ *   up on it unsent, and nothing else sends it. Before that point a run that
+ *   was cancelled may still send a prepared melt, so it proves nothing.
  * - `paymentPending` (the melt was sent, its outcome unknown), and a leg a
  *   run that is gone left at `melting`, `verifying` or `invoiceReady` with a
  *   melt, becomes `settling` once the melt is finalized.
@@ -93,7 +99,11 @@ export async function reconcileSwapLegs(
 
       if (leg.meltOperationId) {
         const melt = await manager.ops.melt.get(leg.meltOperationId);
-        if (melt?.state === 'rolled_back') {
+        const didNotPay =
+          !!melt &&
+          (meltSettledUnpaid(melt.state) ||
+            (status === 'paymentPending' && meltNeverSent(melt.state)));
+        if (didNotPay) {
           move({ localStatus: 'failed', errorMessage: MELT_ROLLED_BACK });
           continue;
         }

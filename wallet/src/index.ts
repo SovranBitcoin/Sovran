@@ -316,6 +316,8 @@ export {
   createRebalanceEngine,
   createRebalanceLock,
   insertStepsAfter,
+  meltNeverSent,
+  meltSettledUnpaid,
   RebalanceMeltRolledBackError,
   RebalanceRoutesExhaustedError,
 } from "./rebalance";
