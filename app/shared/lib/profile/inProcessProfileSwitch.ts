@@ -13,24 +13,15 @@ import {
   liveStores,
   accountHolders,
 } from '@/shared/lib/account/accountRegistry';
+import { TIMED_OUT, settleWithin } from './settleWithin';
 
 const STEP_TIMEOUT_MS = 5_000;
 
 export async function switchStep<T>(operation: () => T | Promise<T>): Promise<T> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  try {
-    return await Promise.race([
-      Promise.resolve().then(operation),
-      new Promise<never>((_, reject) => {
-        timer = setTimeout(
-          () => reject(new Error('Profile switch step timed out')),
-          STEP_TIMEOUT_MS
-        );
-      }),
-    ]);
-  } finally {
-    if (timer) clearTimeout(timer);
-  }
+  // `then` also turns a synchronous throw into a rejection.
+  const result = await settleWithin(Promise.resolve().then(operation), STEP_TIMEOUT_MS);
+  if (result === TIMED_OUT) throw new Error('Profile switch step timed out');
+  return result;
 }
 
 export async function holdProfileSwitchForRestart(): Promise<void> {

@@ -181,23 +181,12 @@ export function isTransitionInFlight(): boolean {
 const COCO_CLEANUP_TIMEOUT_MS = 5_000;
 
 export async function cleanupCocoWithTimeout(): Promise<void> {
-  let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
   try {
-    await Promise.race([
-      CocoManager.cleanup(),
-      new Promise<void>((resolve) => {
-        timeoutHandle = setTimeout(() => {
-          log.warn('profile.orchestrator.cleanup_timeout', {
-            timeoutMs: COCO_CLEANUP_TIMEOUT_MS,
-          });
-          resolve();
-        }, COCO_CLEANUP_TIMEOUT_MS);
-      }),
-    ]);
+    if ((await settleWithin(CocoManager.cleanup(), COCO_CLEANUP_TIMEOUT_MS)) === TIMED_OUT) {
+      log.warn('profile.orchestrator.cleanup_timeout', { timeoutMs: COCO_CLEANUP_TIMEOUT_MS });
+    }
   } catch (error) {
     log.warn('profile.orchestrator.cleanup_failed', { error: redactError(error) });
-  } finally {
-    if (timeoutHandle) clearTimeout(timeoutHandle);
   }
 }
 
