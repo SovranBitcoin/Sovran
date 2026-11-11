@@ -6,9 +6,7 @@
  * counterparty after decryption, then deduped by id.
  */
 import { useCallback, useRef, useState } from 'react';
-import { giftWrapCache } from '@/shared/lib/nostr/giftWrapCache';
-import { nip04Cache } from '@/shared/lib/nostr/nip04Cache';
-import { decryptDmEnvelopes } from '../data/dmDecryptPipeline';
+import { decryptDmEnvelopes, hydrateDmDecryptCaches } from '../data/dmDecryptPipeline';
 import type { DmEnvelopePage, DmProtocol } from '../data/dmEnvelopeTypes';
 import { useDmLastMessageStore } from '@/shared/stores/profile/dmLastMessageStore';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
@@ -120,9 +118,7 @@ export function useDmThread({
     if (!useDmLastMessageStore.persist.hasHydrated()) {
       await useDmLastMessageStore.persist.rehydrate();
     }
-    await (protocol === 'nip04'
-      ? nip04Cache.hydrate(viewerPubkey)
-      : giftWrapCache.cache.hydrate(viewerPubkey));
+    await hydrateDmDecryptCaches(viewerPubkey, protocol);
   }, [protocol, viewerPubkey]);
 
   const pages = useDmEnvelopePages({

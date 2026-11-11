@@ -11,10 +11,8 @@
  * arrivals in through the same decrypt/bucket path.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { giftWrapCache } from '@/shared/lib/nostr/giftWrapCache';
-import { nip04Cache } from '@/shared/lib/nostr/nip04Cache';
 import { subscribeDmEnvelopesLive } from '../data/dmEnvelopeClient';
-import { decryptDmEnvelopes } from '../data/dmDecryptPipeline';
+import { decryptDmEnvelopes, hydrateDmDecryptCaches } from '../data/dmDecryptPipeline';
 import type { DmEnvelopePage, DmProtocol } from '../data/dmEnvelopeTypes';
 import { dmConversationsCache, dmConversationsKey } from '../data/dmSnapshotCaches';
 import { useDmLastMessageStore } from '@/shared/stores/profile/dmLastMessageStore';
@@ -136,10 +134,7 @@ export function useDmConversations(
     if (!useDmLastMessageStore.persist.hasHydrated()) {
       await useDmLastMessageStore.persist.rehydrate();
     }
-    await Promise.all([
-      giftWrapCache.cache.hydrate(viewerPubkey),
-      nip04Cache.hydrate(viewerPubkey),
-    ]);
+    await hydrateDmDecryptCaches(viewerPubkey);
   }, [viewerPubkey]);
 
   const pages = useDmEnvelopePages({

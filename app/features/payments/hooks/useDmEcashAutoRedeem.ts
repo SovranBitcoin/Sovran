@@ -26,8 +26,6 @@ import { CocoManager } from '@/shared/lib/cashu/manager';
 import { activePubkey } from '@/shared/stores/global/profileStore';
 import { paymentLog, redactError } from '@/shared/lib/logger';
 import { useStoreLoad } from '@/shared/lib/persist/hydrationOutcome';
-import { giftWrapCache } from '@/shared/lib/nostr/giftWrapCache';
-import { nip04Cache } from '@/shared/lib/nostr/nip04Cache';
 import { cashuP2pkPubkeyFromNostrHex } from '@/shared/lib/protocolIds';
 import { isTokenSpent } from '@/shared/lib/routstr/spentProbe';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
@@ -37,7 +35,7 @@ import { useWalletLifecycleStore } from '@/shared/stores/global/walletLifecycleS
 import { isSafeToMint } from '@/shared/stores/global/walletRestorePhase';
 import { useNutDropRedeemQueueStore } from '@/shared/stores/profile/nutDropRedeemQueueStore';
 
-import { decryptDmEnvelopes } from '../data/dmDecryptPipeline';
+import { decryptDmEnvelopes, hydrateDmDecryptCaches } from '../data/dmDecryptPipeline';
 import { fetchDmEnvelopes, subscribeDmEnvelopesLive } from '../data/dmEnvelopeClient';
 import type { DmEnvelopePage } from '../data/dmEnvelopeTypes';
 import { createDmEnvelopeCursor, type DmEnvelopeCursor } from '../data/dmPagination';
@@ -254,7 +252,7 @@ function useDmEcashAutoRedeem(): void {
       const page = async () => {
         if (disposed) return false;
         if (pageIndex === 0) {
-          await Promise.all([giftWrapCache.cache.hydrate(pubkey), nip04Cache.hydrate(pubkey)]);
+          await hydrateDmDecryptCaches(pubkey);
         }
         return readPage(cursor, pageIndex);
       };

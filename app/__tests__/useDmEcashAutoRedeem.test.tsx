@@ -30,6 +30,9 @@ jest.mock('@/features/payments/data/dmEnvelopeClient', () => ({
 // One message per envelope, carrying the envelope id, so intake calls can be
 // traced back to pages.
 jest.mock('@/features/payments/data/dmDecryptPipeline', () => ({
+  hydrateDmDecryptCaches: jest.requireActual<
+    typeof import('@/features/payments/data/dmDecryptPipeline')
+  >('@/features/payments/data/dmDecryptPipeline').hydrateDmDecryptCaches,
   decryptDmEnvelopes: (envelopes: { id: string }[]) =>
     (mockSteps.push('decrypt'), envelopes).map(({ id }) => ({ id })),
 }));

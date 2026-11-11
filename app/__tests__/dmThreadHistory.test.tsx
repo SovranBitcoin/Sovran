@@ -54,6 +54,9 @@ jest.mock('@/shared/stores/runtime/mockDataStore', () => ({
   isMockContactPubkey: (pubkey: string) => pubkey === mockFictionalPeer,
 }));
 jest.mock('@/features/payments/data/dmDecryptPipeline', () => ({
+  hydrateDmDecryptCaches: jest.requireActual<
+    typeof import('@/features/payments/data/dmDecryptPipeline')
+  >('@/features/payments/data/dmDecryptPipeline').hydrateDmDecryptCaches,
   decryptDmEnvelopes: (envelopes: DmEnvelopePage['envelopes']) =>
     (mockSteps.push('decrypt'), envelopes).map((e) => ({
       id: e.id,

@@ -26,6 +26,14 @@ interface DecryptedDm {
   protocol: DmProtocol;
 }
 
+/** Load the caches `decryptDmEnvelopes` reads for a viewer: one protocol's, or both. */
+export async function hydrateDmDecryptCaches(viewerPubkey: string, only?: DmProtocol) {
+  await Promise.all([
+    only !== 'nip04' && giftWrapCache.cache.hydrate(viewerPubkey),
+    only !== 'nip17' && nip04Cache.hydrate(viewerPubkey),
+  ]);
+}
+
 function pTagValue(tags: string[][]): string | undefined {
   return tags.find((t) => t[0] === 'p')?.[1];
 }
