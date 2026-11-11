@@ -135,6 +135,12 @@ function relaysHold(...events: RelayEvent[]) {
   for (const relay of mockRelays) mockStored.set(relay.url, events);
 }
 
+/** The publish seam's default: every answering write relay stores the list. */
+async function acceptOnRelays({ event }: { event: RelayEvent }) {
+  for (const [url, stored] of mockStored) mockStored.set(url, [...stored, { ...event }]);
+  return ok({});
+}
+
 function setup() {
   const signer = {
     sign: jest.fn(async () => undefined),
@@ -198,7 +204,7 @@ beforeEach(async () => {
   mockReadGate = Promise.resolve();
   mockProfile.activeAccountIndex = 0;
   mockPublish.mockReset();
-  mockPublish.mockResolvedValue(ok({}));
+  mockPublish.mockImplementation(acceptOnRelays);
   mockPopup.mockReset();
   mockLayer = null;
   mockDisk.clear();
@@ -394,8 +400,11 @@ describe('following someone', () => {
 
   it('never has two lists in flight; a tap during a publish follows it, built on it', async () => {
     relaysHold(contacts(T, [['p', X]]));
-    const publish = deferred<unknown>();
-    mockPublish.mockReturnValueOnce(publish.promise);
+    const publish = deferred();
+    mockPublish.mockImplementationOnce(async (args: { event: RelayEvent }) => {
+      await publish.promise;
+      return acceptOnRelays(args);
+    });
     const { ndk } = setup();
 
     tap(Y);
@@ -406,7 +415,7 @@ describe('following someone', () => {
     void requestFollowSync(ndk, OWN);
     await Promise.resolve();
     expect(mockPublish).toHaveBeenCalledTimes(1);
-    publish.resolve(ok({}));
+    publish.resolve();
     await run;
 
     expect(mockPublish).toHaveBeenCalledTimes(2);
@@ -469,7 +478,7 @@ describe('following someone', () => {
     expect(social().optimisticFollowsByPubkey[Z]?.pending).toBe(true);
   });
 
-  it('builds on the saved list when a write relay does not answer', async () => {
+  it('waits rather than build on the saved list when a write relay does not answer', async () => {
     jest.useFakeTimers();
     social().setContactsFromRelay({ tags: [['p', X]], content: '', createdAtSec: T });
     mockStored.set(mockRelays[0].url, [contacts(T - 5, [])]);
@@ -480,10 +489,75 @@ describe('following someone', () => {
     await jest.advanceTimersByTimeAsync(12_001);
     await run;
 
-    expect(publishedTags()).toEqual([
-      ['p', X],
-      ['p', Z],
+    expect(mockPublish).not.toHaveBeenCalled();
+    expect(social().optimisticFollowsByPubkey[Z]?.pending).toBe(true);
+  });
+
+  it('waits when an older list answers and the relay holding the newer one times out', async () => {
+    jest.useFakeTimers();
+    // Relay two holds [X, Y] and never answers; relay one has only the older [X].
+    mockStored.set(mockRelays[0].url, [contacts(T, [['p', X]])]);
+    const { ndk } = setup();
+
+    tap(Z);
+    const run = requestFollowSync(ndk, OWN);
+    await jest.advanceTimersByTimeAsync(12_001);
+    await run;
+
+    expect(mockPublish).not.toHaveBeenCalled();
+    expect(social().optimisticFollowsByPubkey[Z]?.pending).toBe(true);
+    // The partial answer is not kept as the list a later follow builds on.
+    expect(social().contactsUpdatedAt).toBe(0);
+    expect(social().contactsTags).toEqual([]);
+  });
+
+  it('does not settle a tap against a read that did not finish', async () => {
+    jest.useFakeTimers();
+    mockStored.set(mockRelays[0].url, [
+      contacts(T, [
+        ['p', X],
+        ['p', Z],
+      ]),
     ]);
+    const { ndk } = setup();
+
+    social().setFollowIntent(Z, true);
+    const run = requestFollowSync(ndk, OWN);
+    await jest.advanceTimersByTimeAsync(12_001);
+    await run;
+
+    expect(social().optimisticFollowsByPubkey[Z]?.pending).toBe(true);
+  });
+
+  it('waits when the relays hold no list though one was saved before', async () => {
+    social().setContactsFromRelay({ tags: [['p', X]], content: '', createdAtSec: T });
+    relaysHold();
+    const { ndk } = setup();
+
+    tap(Z);
+    await requestFollowSync(ndk, OWN);
+
+    expect(mockPublish).not.toHaveBeenCalled();
+    expect(social().optimisticFollowsByPubkey[Z]?.pending).toBe(true);
+  });
+
+  it('waits rather than build on old raw tags a newer seed with the same follows vouched for', async () => {
+    // The saved raw list is older; a seed with the same people is newer, so the
+    // saved fields decode as one list at the seed's time.
+    social().setContactsFromRelay({
+      tags: [['p', X, 'wss://old.example']],
+      content: 'old',
+      createdAtSec: T,
+    });
+    social().seedFollowsFromFacade({ follows: [X], createdAtSec: T + 10 });
+    relaysHold(contacts(T, [['p', X, 'wss://old.example']], 'old'));
+    const { ndk } = setup();
+
+    tap(Z);
+    await requestFollowSync(ndk, OWN);
+
+    expect(mockPublish).not.toHaveBeenCalled();
+    expect(social().optimisticFollowsByPubkey[Z]?.pending).toBe(true);
   });
 
   it('drops the follow and shows the error when the signer refuses', async () => {
@@ -691,15 +765,36 @@ describe('the plan', () => {
 
   it('never treats a read that found nothing as an empty list without the indexers', () => {
     const intents = { [Z]: { value: true, pending: true, updatedAt: 1 } };
-    const unknown = { status: 'unknown' } as const;
-    expect(
-      planFollowPublish({ intents, list: unknown, read: 'complete', readFoundList: false })
-    ).toEqual({ step: 'ask-indexers' });
-    expect(
-      planFollowPublish({ intents, list: unknown, read: 'timed-out', readFoundList: false })
-    ).toEqual({ step: 'wait', reason: 'read-incomplete' });
-    expect(
-      planFollowPublish({ intents, list: unknown, read: 'no-relays', readFoundList: false })
-    ).toEqual({ step: 'wait', reason: 'read-incomplete' });
+    const known = { status: 'unknown' } as const;
+    expect(planFollowPublish({ intents, known, read: { status: 'empty' } })).toEqual({
+      step: 'ask-indexers',
+    });
+    expect(planFollowPublish({ intents, known, read: { status: 'incomplete' } })).toEqual({
+      step: 'wait',
+      reason: 'read-incomplete',
+    });
+  });
+
+  it('builds only on the list a complete read returned', () => {
+    const intents = { [Z]: { value: true, pending: true, updatedAt: 1 } };
+    const list = { tags: [['p', X]], content: 'c', createdAt: T };
+    const saved = {
+      status: 'authoritative' as const,
+      tags: [['p', Y]],
+      content: 'saved',
+      updatedAt: T,
+    };
+    expect(planFollowPublish({ intents, known: saved, read: { status: 'incomplete' } })).toEqual({
+      step: 'wait',
+      reason: 'read-incomplete',
+    });
+    expect(planFollowPublish({ intents, known: saved, read: { status: 'found', list } })).toEqual({
+      step: 'publish',
+      base: list,
+      tags: [
+        ['p', X],
+        ['p', Z],
+      ],
+    });
   });
 });

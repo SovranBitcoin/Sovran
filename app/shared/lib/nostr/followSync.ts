@@ -4,12 +4,12 @@
  *
  * A tap only records the intent (`setFollowIntent`), so the button answers at
  * once. This worker turns every outstanding intent into one list: it reads the
- * newest signed list from the write relays, applies only the intents to that
+ * newest signed list from every write relay, applies only the intents to that
  * list's tags and content exactly as they are, publishes, and records the
- * result. A follow list replaces the whole previous one on relays, so it never
- * publishes from a list it cannot vouch for (`planFollowPublish`): without a
- * base the intents wait and are tried again after hydration, when a list
- * arrives, on returning to the foreground and on the next tap.
+ * result. A follow list replaces the whole previous one on relays, so it only
+ * ever builds on the list a complete read just returned (`planFollowPublish`):
+ * anything less and the intents wait, to be tried again after hydration, when
+ * a list arrives, on returning to the foreground and on the next tap.
  *
  * Two devices publishing at the same moment can still overwrite each other;
  * that is how the list works on Nostr.
@@ -41,16 +41,30 @@ type FollowIntents = ReturnType<typeof selectFollowIntents>;
 /** What the indexers (nagg, Primal, relay tier) say about the account's list. */
 type IndexedList = 'none' | 'exists' | 'unanswered';
 
-type Base = { tags: string[][]; content: string; updatedAt: number };
+/** A follow list as signed: the base a publish builds on. */
+type ReadList = { tags: string[][]; content: string; createdAt: number };
+
+/**
+ * How this run's read of the write relays ended. Only a complete read says
+ * what the relays hold; a partial one may have missed the newest list.
+ */
+type ListRead =
+  | { status: 'incomplete' }
+  | { status: 'unusable' }
+  | { status: 'empty' }
+  | { status: 'found'; list: ReadList };
 
 type FollowPlan =
   | { step: 'idle' }
-  | { step: 'wait'; reason: 'no-list' | 'read-incomplete' }
+  | {
+      step: 'wait';
+      reason: 'read-incomplete' | 'unusable-list' | 'newer-known' | 'list-elsewhere' | 'no-list';
+    }
   | { step: 'ask-indexers' }
   | { step: 'already-applied' }
-  | { step: 'publish'; base: Base; tags: string[][] };
+  | { step: 'publish'; base: ReadList; tags: string[][] };
 
-const EMPTY_LIST: Base = { tags: [], content: '', updatedAt: 0 };
+const EMPTY_LIST: ReadList = { tags: [], content: '', createdAt: 0 };
 
 /** The list's tags with only the intents applied; every other entry stays as read. */
 export function applyFollowIntents(tags: string[][], intents: FollowIntents): string[][] {
@@ -62,36 +76,42 @@ export function applyFollowIntents(tags: string[][], intents: FollowIntents): st
 }
 
 /**
- * Pure: what to do with the outstanding intents, given the list as the store
- * now holds it (after any read result was saved) and how the read ended.
- * Known-empty needs every write relay to have answered with no list, nothing
- * loaded from anywhere, and the indexers to agree.
+ * Pure: what to do with the outstanding intents, given this run's read and
+ * the list the store knows (after a complete read's list was saved). Both a
+ * publish and settling a tap the list already holds stand only on the list a
+ * complete read returned. Known-empty needs every write relay to have
+ * answered with no list, nothing loaded for the account from anywhere, and
+ * the indexers to agree.
  */
 export function planFollowPublish(input: {
   intents: FollowIntents;
-  list: ContactList;
-  read: OwnEventReadOutcome;
-  readFoundList: boolean;
+  read: ListRead;
+  known: ContactList;
   indexed?: IndexedList;
 }): FollowPlan {
-  const { intents, list } = input;
+  const { intents, read, known } = input;
   if (Object.keys(intents).length === 0) return { step: 'idle' };
-  let base: Base;
-  switch (list.status) {
-    case 'authoritative':
-      base = list;
+  let base: ReadList;
+  switch (read.status) {
+    case 'incomplete':
+      return { step: 'wait', reason: 'read-incomplete' };
+    case 'unusable':
+      return { step: 'wait', reason: 'unusable-list' };
+    case 'found':
+      // A seed or a list newer than any write relay holds: the read is stale.
+      if (known.status !== 'unknown' && known.updatedAt > read.list.createdAt)
+        return { step: 'wait', reason: 'newer-known' };
+      base = read.list;
       break;
-    case 'seeded':
-      return { step: 'wait', reason: 'no-list' };
-    case 'unknown':
-      if (input.read !== 'complete' || input.readFoundList)
-        return { step: 'wait', reason: 'read-incomplete' };
+    case 'empty':
+      // A list or seed was loaded for the account but no write relay has it.
+      if (known.status !== 'unknown') return { step: 'wait', reason: 'list-elsewhere' };
       if (input.indexed === undefined) return { step: 'ask-indexers' };
       if (input.indexed !== 'none') return { step: 'wait', reason: 'no-list' };
       base = EMPTY_LIST;
       break;
     default: {
-      const unreachable: never = list;
+      const unreachable: never = read;
       return unreachable;
     }
   }
@@ -106,6 +126,16 @@ const ContactEvent = z.object({
   content: z.string(),
   created_at: z.number().int().nonnegative(),
 });
+
+/** Decode the read: a list only from a complete read, and only one that parses. */
+function decodeRead(read: { outcome: OwnEventReadOutcome; newest: unknown }): ListRead {
+  if (read.outcome !== 'complete') return { status: 'incomplete' };
+  if (!read.newest) return { status: 'empty' };
+  const parsed = ContactEvent.safeParse(read.newest);
+  if (!parsed.success) return { status: 'unusable' };
+  const { tags, content, created_at } = parsed.data;
+  return { status: 'found', list: { tags, content, createdAt: created_at } };
+}
 
 /** Ask the tiered facade whether the account has a follow list somewhere. */
 async function askIndexers(pubkey: string): Promise<{ indexed: IndexedList; seed?: () => void }> {
@@ -141,14 +171,14 @@ async function syncOnce(ndk: NDK, ownPubkey: string): Promise<void> {
 
       const signer = await matchingSigner(ndk, ownPubkey);
       scope.check();
-      const read = await readNewestOwnEvent(ndk, ownPubkey, Contacts);
+      const read = decodeRead(await readNewestOwnEvent(ndk, ownPubkey, Contacts));
       scope.check();
-      const fetched = read.newest ? ContactEvent.safeParse(read.newest) : undefined;
-      if (fetched?.success)
+      // Only a complete read's list is kept; the store ignores it if it knows a newer one.
+      if (read.status === 'found')
         social().setContactsFromRelay({
-          tags: fetched.data.tags,
-          content: fetched.data.content,
-          createdAtSec: fetched.data.created_at,
+          tags: read.list.tags,
+          content: read.list.content,
+          createdAtSec: read.list.createdAt,
         });
 
       let intents = selectFollowIntents(social());
@@ -156,9 +186,8 @@ async function syncOnce(ndk: NDK, ownPubkey: string): Promise<void> {
         intents = selectFollowIntents(social());
         return planFollowPublish({
           intents,
-          list: selectContactList(social()),
-          read: read.outcome,
-          readFoundList: !!read.newest,
+          read,
+          known: selectContactList(social()),
           indexed,
         });
       };
@@ -177,7 +206,7 @@ async function syncOnce(ndk: NDK, ownPubkey: string): Promise<void> {
         case 'wait':
           nostrLog.info('nostr.follow.waiting', {
             reason: plan.step === 'wait' ? plan.reason : 'no-list',
-            read: read.outcome,
+            read: read.status,
             intents: Object.keys(intents).length,
           });
           return;
@@ -196,7 +225,7 @@ async function syncOnce(ndk: NDK, ownPubkey: string): Promise<void> {
       const event = new NDKEvent(ndk);
       event.kind = Contacts;
       event.pubkey = ownPubkey;
-      event.created_at = Math.max(Math.floor(Date.now() / 1000), plan.base.updatedAt + 1);
+      event.created_at = Math.max(Math.floor(Date.now() / 1000), plan.base.createdAt + 1);
       event.tags = plan.tags;
       event.content = plan.base.content;
       try {
