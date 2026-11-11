@@ -1495,6 +1495,12 @@ export async function sendMessage(
     temperature?: number;
     max_tokens?: number;
     signal?: AbortSignal;
+    /**
+     * Whether the caller still wants this request, asked at each point before
+     * it is paid for and dispatched (after the client is ready, before the
+     * token is minted, before it is handed over). False cancels it.
+     */
+    canDispatch?: () => boolean;
   }
 ): Promise<{ stream: AsyncIterable<ChatCompletionChunk>; cost: Promise<number> }> {
   // No default. A sampling temperature is a claim about what the model
@@ -1529,6 +1535,7 @@ export async function sendMessage(
   const origin = routstrOrigin();
   const deadline = createRequestDeadline(options.signal);
   const signal = deadline.signal;
+  const canDispatch = () => ownsScope() && !signal.aborted && (options.canDispatch?.() ?? true);
   let mintUrl: string | undefined;
   let response: RoutedResponse;
   let finishPayment = async () => {};
@@ -1551,12 +1558,10 @@ export async function sendMessage(
       walletMints: paying.walletMints,
       duration_ms: elapsed(),
     });
-    const client = await deadline.wait(
-      getRoutstrClient(origin, () => ownsScope() && !signal.aborted)
-    );
+    const client = await deadline.wait(getRoutstrClient(origin, canDispatch));
     bound = client;
     finishPayment = client.finish;
-    if (!ownsScope() || signal?.aborted) throw new Error('Request cancelled before payment');
+    if (!canDispatch()) throw new Error('Request cancelled before payment');
     const payingMint = mintUrl;
     phase = 'payment';
     // Everything local is done; from here the SDK prices the request, mints a

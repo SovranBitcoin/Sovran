@@ -54,7 +54,7 @@ export async function matchingSigner(ndk: NDK, pubkey: string) {
 }
 
 /**
- * How a read ended. Only `complete` means every write relay answered, so only
+ * How a read ended. Only `complete` means every asked relay answered, so only
  * then does a missing `newest` say the relays hold no such list.
  */
 export type OwnEventReadOutcome = 'complete' | 'timed-out' | 'failed' | 'no-relays';
@@ -67,13 +67,17 @@ type OwnEventRead = {
   relays: string[];
 };
 
-/** Newest valid own event of `kind` across the write relays, waiting for each relay's answer. */
+/**
+ * Newest valid own event of `kind` across `asked` (the write relays unless
+ * named), waiting for each relay's answer. The device cache is never read.
+ */
 export async function readNewestOwnEvent(
   ndk: NDK,
   pubkey: string,
-  kind: number
+  kind: number,
+  asked: readonly string[] = getOwnWriteRelays()
 ): Promise<OwnEventRead> {
-  const relayUrls = [...new Set(getOwnWriteRelays())];
+  const relayUrls = [...new Set(asked)];
   if (relayUrls.length === 0) return { outcome: 'no-relays', newest: undefined, relays: [] };
   return new Promise<OwnEventRead>((resolve) => {
     let newest: NDKEvent | undefined;

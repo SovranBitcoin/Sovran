@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type SetStateAction } from 'r
 import { bytesToHex } from '@noble/hashes/utils.js';
 import {
   deserializeApplicationRumor,
+  getGroupMembers,
   getNostrGroupIdHex,
   type MarmotGroup,
 } from '@internet-privacy/marmot-ts';
@@ -506,7 +507,42 @@ async function sendDmImpl(ctx: SendDmCtx, text: string): Promise<void> {
   }
 }
 
-/** Create the conversation's group, invite the peer and save the index; null when that failed. */
+/**
+ * Groups created this app session whose invitation did not go out, by client
+ * and then peer: the next send for that peer invites into the same group
+ * instead of making a second one. Kept in memory only, since the DM index must
+ * name only a group the peer was invited to (a later open sends into whatever
+ * it names, and would never invite); after a restart the group stays unused
+ * and the next send creates another.
+ */
+const uninvitedGroups = new WeakMap<NonNullable<WhitenoiseClient>, Map<string, WnGroup>>();
+
+/**
+ * The peer's uninvited group, unless the peer was already added to it: then
+ * the add went out and only the welcome did not, which Marmot cannot send
+ * again, so the group is let go.
+ */
+function takeUninvitedGroup(target: OpenedFor): WnGroup | null {
+  const kept = uninvitedGroups.get(target.client);
+  const group = kept?.get(target.counterpartyPubkey);
+  if (!group) return null;
+  if (!getGroupMembers(group.state).includes(target.counterpartyPubkey)) return group;
+  keepUninvitedGroup(target, null);
+  return null;
+}
+
+/** Remember `group` as the peer's uninvited group, or forget it once the invitation went out. */
+function keepUninvitedGroup(target: OpenedFor, group: WnGroup | null): void {
+  const kept = uninvitedGroups.get(target.client);
+  if (!group) kept?.delete(target.counterpartyPubkey);
+  else if (kept) kept.set(target.counterpartyPubkey, group);
+  else uninvitedGroups.set(target.client, new Map([[target.counterpartyPubkey, group]]));
+}
+
+/**
+ * Create the conversation's group (or take the one whose invitation failed
+ * earlier), invite the peer and save the index; null when that failed.
+ */
 async function createDmGroup(ctx: SendDmCtx, target: OpenedFor): Promise<WnGroup | null> {
   const { relays, dispatch } = ctx;
   const { client, counterpartyPubkey, accountIndex } = target;
@@ -526,17 +562,23 @@ async function createDmGroup(ctx: SendDmCtx, target: OpenedFor): Promise<WnGroup
     }
     const keyPackageEvent = events[0];
 
-    const created = (await client.createGroup(`dm:${counterpartyPubkey.slice(0, 16)}`, {
-      description: 'White Noise 1:1 DM',
-      relays: fallbackRelays,
-    })) as WnGroup;
+    const uninvited = takeUninvitedGroup(target);
+    const created =
+      uninvited ??
+      ((await client.createGroup(`dm:${counterpartyPubkey.slice(0, 16)}`, {
+        description: 'White Noise 1:1 DM',
+        relays: fallbackRelays,
+      })) as WnGroup);
+    keepUninvitedGroup(target, created);
     await created.inviteByKeyPackageEvent(keyPackageEvent);
+    keepUninvitedGroup(target, null);
 
     await new WhitenoiseDmIndex(accountIndex).set(counterpartyPubkey, bytesToHex(created.id));
     dispatch({ type: 'group-created', for: target, group: created });
     wnLog.info('whitenoise.dm.group_created', {
       groupId: bytesToHex(created.id),
       counterparty: counterpartyPubkey.slice(0, 16),
+      reinvited: uninvited !== null,
     });
     return created;
   } catch (err) {

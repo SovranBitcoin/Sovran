@@ -30,6 +30,7 @@ jest.mock('@internet-privacy/marmot-ts', () => ({
     return rumor;
   },
   getNostrGroupIdHex: (state: { nostrGroupIdHex: string }) => state.nostrGroupIdHex,
+  getGroupMembers: (state: { members?: string[] }) => state.members ?? [],
 }));
 let mockKeys: { pubkey: string } | null = null;
 jest.mock('@/shared/providers/NostrKeysProvider', () => ({
@@ -65,7 +66,7 @@ function makeGroup(idBytes: number[], opts: { relays?: string[]; stored?: Rumor[
   const group = {
     id: new Uint8Array(idBytes),
     relays: opts.relays ?? [],
-    state: { nostrGroupIdHex: `nostr-${idBytes.join('')}` },
+    state: { nostrGroupIdHex: `nostr-${idBytes.join('')}`, members: [] as string[] },
     history: { loadMessages: jest.fn(async () => (opts.stored ?? []).map((rumor) => ({ rumor }))) },
     on: jest.fn((name: string, fn: Listener) => {
       if (name === 'applicationMessage') listeners.add(fn);
@@ -394,9 +395,9 @@ describe('the first send creates the group', () => {
     });
   });
 
-  it('an invite failure after the group exists saves no index and sends nothing; the next send creates another group', async () => {
+  it('an invite failure after the group exists saves no index and sends nothing; the next send invites the peer into that same group', async () => {
     const orphan = makeGroup([0x0f, 0x0f]);
-    orphan.inviteByKeyPackageEvent.mockRejectedValue(new Error('publish welcome failed'));
+    orphan.inviteByKeyPackageEvent.mockRejectedValueOnce(new Error('publish commit failed'));
     fake.client.createGroup.mockResolvedValueOnce(orphan);
     const { result } = await mount();
 
@@ -407,17 +408,83 @@ describe('the first send creates the group', () => {
     expect(orphan.sendChatMessage).not.toHaveBeenCalled();
     expect(await AsyncStorage.getItem(INDEX_KEY)).toBeNull();
     expect(result.current).toMatchObject({
-      error: 'publish welcome failed',
+      error: 'publish commit failed',
       hasGroup: false,
       isCreatingGroup: false,
       messages: [],
     });
 
-    // QUIRK: the first group stays created in the Marmot client with nothing
-    // pointing at it, and the retry creates (and invites into) a second one.
     await act(async () => {
       await result.current.send('hello');
     });
+    expect(fake.client.createGroup).toHaveBeenCalledTimes(1);
+    // The peer's key package is looked up again for the second invitation.
+    expect(fake.client.network.request).toHaveBeenCalledTimes(2);
+    expect(orphan.inviteByKeyPackageEvent).toHaveBeenCalledTimes(2);
+    expect(orphan.sendChatMessage.mock.calls).toEqual([['hello']]);
+    expect(await AsyncStorage.getItem(INDEX_KEY)).toBe('{"v":1,"d":"0f0f"}');
+    expect(result.current).toMatchObject({ error: null, hasGroup: true });
+  });
+
+  it('keeps the uninvited group when the conversation is closed and opened again in the same session', async () => {
+    const orphan = makeGroup([0x0f, 0x0f]);
+    orphan.inviteByKeyPackageEvent.mockRejectedValueOnce(new Error('publish commit failed'));
+    fake.client.createGroup.mockResolvedValueOnce(orphan);
+    const first = await mount();
+    await act(async () => {
+      await first.result.current.send('hello');
+    });
+    first.unmount();
+
+    const { result } = await mount();
+    await act(async () => {
+      await result.current.send('hello');
+    });
+
+    expect(fake.client.createGroup).toHaveBeenCalledTimes(1);
+    expect(await AsyncStorage.getItem(INDEX_KEY)).toBe('{"v":1,"d":"0f0f"}');
+  });
+
+  it("does not use one peer's uninvited group for another peer", async () => {
+    const OTHER = 'c'.repeat(64);
+    const orphan = makeGroup([0x0f, 0x0f]);
+    orphan.inviteByKeyPackageEvent.mockRejectedValueOnce(new Error('publish commit failed'));
+    fake.client.createGroup.mockResolvedValueOnce(orphan);
+    const first = await mount();
+    await act(async () => {
+      await first.result.current.send('hello');
+    });
+    first.unmount();
+
+    const { result } = await mount(OTHER);
+    await act(async () => {
+      await result.current.send('hi');
+    });
+
+    expect(fake.client.createGroup).toHaveBeenCalledTimes(2);
+    expect(await AsyncStorage.getItem(`whitenoise:0:dm-index:${OTHER}`)).toBe('{"v":1,"d":"c0de"}');
+  });
+
+  it('a group the peer was added to but whose welcome did not go out is not invited into again: the next send creates another', async () => {
+    const orphan = makeGroup([0x0f, 0x0f]);
+    // The add went out, so the peer is in the group; the welcome did not.
+    orphan.inviteByKeyPackageEvent.mockImplementationOnce(async () => {
+      orphan.state.members = [SELF, PEER];
+      throw new Error('Failed to deliver 1/1 Welcome message(s)');
+    });
+    fake.client.createGroup.mockResolvedValueOnce(orphan);
+    const { result } = await mount();
+    await act(async () => {
+      await result.current.send('hello');
+    });
+
+    await act(async () => {
+      await result.current.send('hello');
+    });
+
+    // QUIRK: Marmot cannot send that welcome again, so the first group stays
+    // created with nothing pointing at it and a second one is made.
+    expect(orphan.inviteByKeyPackageEvent).toHaveBeenCalledTimes(1);
     expect(fake.client.createGroup).toHaveBeenCalledTimes(2);
     expect(await AsyncStorage.getItem(INDEX_KEY)).toBe('{"v":1,"d":"c0de"}');
     expect(result.current.error).toBeNull();

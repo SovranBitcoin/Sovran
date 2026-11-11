@@ -335,6 +335,20 @@ export function useAiSend() {
           imageCount = 0;
         }
       }
+      // Whether the answer still belongs to the account and conversation it
+      // was asked in, on a screen still open. Asked before each request is
+      // paid for, up to the moment its token is handed over, but not once it
+      // is: a switch then leaves the answer streaming into its own
+      // conversation. Losing it aborts the request, so the abort paths stop it.
+      const owner: Owner = {
+        account: profile,
+        anonymous: storeState.isAnonymousMode,
+        conversationId,
+      };
+      const stillOwned = () => {
+        if (ownerChange(owner) !== 'none') controller.abort();
+        return !controller.signal.aborted;
+      };
       const primaryModel = primaryEntry.modelId;
       // What the user approved, or — on a retry, which shows no sheet — what
       // the model they picked would have reserved. No candidate may reserve
@@ -442,7 +456,7 @@ export function useAiSend() {
         let declinedAttempts = 0;
         for (let i = 0; i < candidateChain.length; i++) {
           if (useProfileStore.getState().activeAccountIndex !== profile) return;
-          if (controller.signal.aborted) throw { status: 0, error: { type: 'aborted' } };
+          if (!stillOwned()) throw { status: 0, error: { type: 'aborted' } };
           const candidate = candidateChain[i];
           const candidateReserve = reservedSatsForSend({
             entry: candidateEntries[i] ?? null,
@@ -517,6 +531,7 @@ export function useAiSend() {
               // blanket 0.7 is a guess that can only lose.
               max_tokens: maxTokens,
               signal: controller.signal,
+              canDispatch: stillOwned,
             });
             stream = result.stream;
             costPromise = result.cost;
