@@ -51,7 +51,11 @@ const mockSeedPool = jest.fn();
 const mockConnectListeners = new Set<(relay: Relay) => void>();
 const mockAppStateListeners = new Set<(state: string) => void>();
 let mockOffline = false;
+/** The active account, whose key the signer holds. */
+let mockActive = 'a1'.repeat(32);
+const mockProfileListeners = new Set<() => void>();
 let mockNdk: {
+  signer: { user: () => Promise<{ pubkey: string }> };
   subscribe: (filter: never, options: never, relaySet: never) => unknown;
   pool: { on: (type: string, l: () => void) => void; off: (type: string, l: () => void) => void };
 } | null;
@@ -108,8 +112,15 @@ jest.mock('@nostr-dev-kit/ndk-mobile', () => ({
   ...jest.requireActual('@nostr-dev-kit/ndk-mobile'),
   NDKEvent: class NDKEvent {
     kind = 0;
+    pubkey = '';
     created_at = 0;
     tags: string[][] = [];
+    content = '';
+    id = '';
+    async sign(signer: { user: () => Promise<{ pubkey: string }> }) {
+      this.pubkey = (await signer.user()).pubkey;
+      this.id = 'e'.repeat(64);
+    }
   },
   NDKRelaySet: {
     fromRelayUrls: (urls: string[]) => ({ relays: new Set(urls.map((url) => ({ url }))) }),
@@ -134,6 +145,18 @@ jest.mock('react-native-web/dist/exports/AppState', () => ({
     },
   },
 }));
+jest.mock('@/shared/stores/global/profileStore', () =>
+  jest
+    .requireActual<typeof import('./helpers/profileStoreMock')>('./helpers/profileStoreMock')
+    .activeAccountReaders(
+      () => ({ getActiveProfile: () => ({ pubkey: mockActive }) }),
+      (listener) => {
+        const notify = () => listener({});
+        mockProfileListeners.add(notify);
+        return () => mockProfileListeners.delete(notify);
+      }
+    )
+);
 jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({
   createProfileScopedStorage: () => ({
     getItem: async () => null,
@@ -210,7 +233,9 @@ beforeEach(() => {
   mockCached = null;
   mockAsked.length = 0;
   mockGate = () => Promise.resolve();
+  mockActive = A;
   mockNdk = {
+    signer: { user: async () => ({ pubkey: mockActive }) },
     subscribe: mockSubscription as never,
     pool: {
       on: (type, listener) => {
@@ -408,21 +433,22 @@ describe('first-run publish of the default relays', () => {
     expect(mockPublishEvent).toHaveBeenCalledTimes(1);
     const { event, relays, resolveOn } = mockPublishEvent.mock.calls[0][0];
     expect(event.kind).toBe(10002);
-    // Stamped when the 1.5 s delay ends.
+    // Signed by the account, stamped when the 1.5 s delay ends.
+    expect(event.pubkey).toBe(A);
     expect(event.created_at).toBe(NOW_SEC + 1);
     expect(event.tags).toEqual(DEFAULT_RELAYS.map((url) => ['r', url]));
     expect(relays).toEqual([...DEFAULT_RELAYS]);
     expect(resolveOn).toBe('all-settled');
-    // QUIRK (F240 D2): the store records the publish but keeps its (empty) entries.
+    // The saved list is the list published.
     expect(store()).toMatchObject({
-      entries: [],
+      entries: DEFAULT_RELAYS.map((url) => ({ url, read: true, write: true })),
       updatedAt: NOW_SEC + 1,
       hasPublished: true,
       source: 'relay',
     });
   });
 
-  it('marks an edit made before the first-run publish as published, though only the defaults were sent', async () => {
+  it('leaves an edit made before the first-run answer to the person to publish', async () => {
     const read = deferred();
     mockGate = () => read.promise;
     renderHook(() => useOwnRelayListSync(A, true));
@@ -433,22 +459,19 @@ describe('first-run publish of the default relays', () => {
     store().addRelay('wss://mine.example', { read: true, write: true });
     await act(async () => read.resolve());
 
-    expect(mockPublishEvent.mock.calls[0][0].event.tags).toEqual(
-      DEFAULT_RELAYS.map((url) => ['r', url])
-    );
-    // QUIRK (F240 D1): the edit is recorded as published and never sent.
-    expect(store()).toMatchObject({
-      entries: [{ url: 'wss://mine.example', read: true, write: true }],
-      source: 'relay',
-    });
+    // Neither replaced by the defaults nor marked published: Network settings
+    // still shows it as unpublished, and its Publish sends it.
+    expect(mockPublishEvent).not.toHaveBeenCalled();
+    expect(store()).toMatchObject({ source: 'local', hasPublished: false });
+    expect(store().entries.map((e) => e.url)).toEqual([...DEFAULT_RELAYS, 'wss://mine.example']);
+    expect(getKnownOwnWriteRelays(A)).toEqual([...DEFAULT_RELAYS, 'wss://mine.example']);
   });
 
-  it('after the first-run publish, adding one relay makes it the whole list', async () => {
+  it('after the first-run publish, adding one relay keeps the defaults', async () => {
     await mountAndWait(A);
     store().addRelay('wss://mine.example', { read: true, write: true });
 
-    // QUIRK (F240 D2): publishing this would drop the defaults from the public list.
-    expect(store().entries).toEqual([{ url: 'wss://mine.example', read: true, write: true }]);
+    expect(store().entries.map((e) => e.url)).toEqual([...DEFAULT_RELAYS, 'wss://mine.example']);
   });
 
   it('does not publish again once a list was published', async () => {
@@ -486,13 +509,16 @@ describe('unmount and account change', () => {
     mockGate = ({ authors }) => (authors[0] === A ? forA.promise : Promise.resolve());
     mockRelays.set(DAMUS, { events: [REMOTE()] });
     const view = await mountAndWait(A);
+    mockActive = B;
+    for (const listener of mockProfileListeners) listener();
     view.rerender({ pubkey: B, enabled: true });
     await act(async () => {
       jest.advanceTimersByTime(1_500);
     });
     await act(async () => forA.resolve());
 
-    expect(store().entries).toEqual([]);
+    // A's list is not taken in: the store holds the defaults B published.
+    expect(store().entries.map((e) => e.url)).toEqual([...DEFAULT_RELAYS]);
     expect(mockSeedPool).not.toHaveBeenCalled();
     // B's read found nothing, so B published the defaults.
     expect(mockPublishEvent).toHaveBeenCalledTimes(1);

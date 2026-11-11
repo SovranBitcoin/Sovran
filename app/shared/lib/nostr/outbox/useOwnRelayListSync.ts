@@ -6,7 +6,8 @@
  * relay-list store, and seeds the pool with those relays. If every one of them
  * answers that no list exists yet, it first-run-publishes the default
  * bootstrap set as the user's `kind:10002` so followers/outbox-aware clients
- * can discover them.
+ * can discover them (`publishOwnRelayList`), unless the person has an edit of
+ * their own waiting to be published.
  *
  * Only an answer from every asked relay marks the account's list as discovered
  * for this session, which is what lets the follow worker read and publish
@@ -28,33 +29,22 @@
 import { useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
 
-import { NDKEvent, useNDK } from '@nostr-dev-kit/ndk-mobile';
+import { useNDK } from '@nostr-dev-kit/ndk-mobile';
 import type NDK from '@nostr-dev-kit/ndk-mobile';
 
 import { nostrLog } from '@/shared/lib/logger';
-import { publishEvent } from '@/shared/lib/nostr/publish';
 import { readNewestOwnEvent, worthReadingAgain } from '@/shared/lib/nostr/ownReplaceableEvent';
-import { DEFAULT_RELAYS, normalizeRelayList } from '@/shared/lib/nostr/outbox/defaults';
+import { RELAY_LIST_KIND, parseRelayList } from '@/shared/lib/nostr/outbox/nip65';
 import {
-  RELAY_LIST_KIND,
-  parseRelayList,
-  serializeRelayList,
-} from '@/shared/lib/nostr/outbox/nip65';
-import { getOwnWriteRelays, useRelayListStore } from '@/shared/lib/nostr/outbox/relayListStore';
+  publishOwnRelayList,
+  relayListRelays,
+  trackRelaysAsked,
+} from '@/shared/lib/nostr/outbox/publishOwnRelayList';
+import { defaultEntries, useRelayListStore } from '@/shared/lib/nostr/outbox/relayListStore';
 import { seedPool } from '@/shared/lib/nostr/outbox/seedPool';
 import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
 
 const SYNC_DEFER_MS = 1_500;
-
-/**
- * The relays asked for the list: the saved write relays (where another client
- * would have put it) and the defaults (where this app puts it). A store that
- * has not loaded has no saved relays to name, so it is not asked yet.
- */
-function discoveryRelays(): string[] | null {
-  if (!useRelayListStore.persist.hasHydrated()) return null;
-  return normalizeRelayList([...getOwnWriteRelays(), ...DEFAULT_RELAYS]);
-}
 
 /**
  * Whether this session's discovery for the account finished, or must be tried
@@ -70,7 +60,7 @@ async function syncOwnRelayList(
   try {
     let read: Awaited<ReturnType<typeof readNewestOwnEvent>>;
     do {
-      const current = discoveryRelays();
+      const current = relayListRelays(pubkey);
       if (!current) return 'unanswered';
       for (const url of current) asked.add(url);
       read = await readNewestOwnEvent(ndk, pubkey, RELAY_LIST_KIND, {
@@ -101,26 +91,16 @@ async function syncOwnRelayList(
     if (newest) return 'discovered';
 
     // The relays hold no list: the defaults are the account's list.
-    // First-run-publish them (never clobbers).
-    if (useRelayListStore.getState().hasPublished) return 'discovered';
-    // Never a relay left out of the read: it may hold a list this one would replace.
-    const targets = DEFAULT_RELAYS.filter((url) => read.relays.includes(url));
-    if (targets.length === 0) return 'discovered';
-    const created = Math.floor(Date.now() / 1000);
-    const list = new NDKEvent(ndk);
-    list.kind = RELAY_LIST_KIND;
-    list.created_at = created;
-    list.tags = serializeRelayList(DEFAULT_RELAYS.map((url) => ({ url, read: true, write: true })));
-    const result = await publishEvent({
-      ndk,
-      event: list,
-      relays: targets,
-      resolveOn: 'all-settled',
+    // First-run-publish them (never clobbers), to the relays just read. An
+    // edit the person made before this answer is theirs to publish: it is
+    // neither replaced by the defaults nor marked published unsent.
+    const { hasPublished, source } = useRelayListStore.getState();
+    if (hasPublished || source === 'local') return 'discovered';
+    const published = await publishOwnRelayList(ndk, pubkey, defaultEntries(), {
+      read: { status: 'read', newest: undefined, relays: read.relays, asked: read.asked },
+      stillWanted: () => !isCancelled(),
     });
-    if (!isCancelled() && result.isOk()) {
-      useRelayListStore.getState().markPublished(created);
-      nostrLog.info('nostr.relays.first_run_published');
-    }
+    if (published.isOk()) nostrLog.info('nostr.relays.first_run_published');
     return 'discovered';
   } catch (error) {
     nostrLog.warn('nostr.relays.sync_failed', {
@@ -145,6 +125,7 @@ export function useOwnRelayListSync(pubkey: string | undefined, enabled: boolean
     let cancelled = false;
     let phase: 'waiting' | 'reading' | 'unanswered' | 'discovered' = 'waiting';
     const asked = new Set<string>();
+    const untrack = trackRelaysAsked(pubkey, asked);
     const run = async () => {
       phase = 'reading';
       phase = await syncOwnRelayList(ndk, pubkey, asked, () => cancelled);
@@ -163,6 +144,7 @@ export function useOwnRelayListSync(pubkey: string | undefined, enabled: boolean
 
     return () => {
       cancelled = true;
+      untrack();
       clearTimeout(timer);
       subscription.remove();
       ndk.pool.off('relay:connect', onRelayConnect);

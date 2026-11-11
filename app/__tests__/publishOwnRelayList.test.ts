@@ -1,29 +1,76 @@
 /**
  * @jest-environment node
  *
- * Network settings' "Publish relay list" (`publishRelayList`) against the real
- * relay-list store: what it sends, to which relays, how it is dated, and what
- * it records. Replaced: the publish seam, storage and the logger.
+ * Network settings' "Publish relay list" (`publishRelayList` over
+ * `publishOwnRelayList`) against the real relay-list store: what it reads
+ * first, what it sends, to which relays, how it is dated, what it records and
+ * what the screen is told. Replaced: the relays (a fake subscription per
+ * relay), the publish seam, the signer, the active account, storage and the
+ * logger.
  */
 import type NDK from '@nostr-dev-kit/ndk-mobile';
 import { errAsync, okAsync } from 'neverthrow';
 
 import { DEFAULT_RELAYS } from '@/shared/lib/nostr/outbox/defaults';
-import { publishRelayList } from '@/shared/lib/nostr/outbox/publishOwnRelayList';
+import { publishRelayList, trackRelaysAsked } from '@/shared/lib/nostr/outbox/publishOwnRelayList';
 import { useRelayListStore } from '@/shared/lib/nostr/outbox/relayListStore';
+import { forgetSilentRelays } from '@/shared/lib/nostr/ownReplaceableEvent';
+
+const OWN = 'a0'.repeat(32);
+type Relay = { url: string };
+type RelayEvent = {
+  kind: number;
+  pubkey: string;
+  created_at: number;
+  id: string;
+  tags: string[][];
+};
 
 const mockPublish = jest.fn();
+/** Per relay, the kind 10002s it holds, or `fail` for one whose read throws. */
+const mockHeld = new Map<string, RelayEvent[] | 'fail'>();
+const mockAsked: string[] = [];
+const mockProfile = { activeAccountIndex: 0, profiles: [{ accountIndex: 0, pubkey: OWN }] };
+const mockRelayObjects = new Map<string, Relay>();
+const mockRelay = (url: string) => {
+  if (!mockRelayObjects.has(url)) mockRelayObjects.set(url, { url });
+  return mockRelayObjects.get(url)!;
+};
 
 jest.mock('@nostr-dev-kit/ndk-mobile', () => ({
   ...jest.requireActual('@nostr-dev-kit/ndk-mobile'),
+  NDKRelaySet: {
+    fromRelayUrls: (urls: string[]) => ({ relays: new Set(urls.map(mockRelay)) }),
+  },
   NDKEvent: class NDKEvent {
     kind = 0;
+    pubkey = '';
     created_at = 0;
     tags: string[][] = [];
+    content = '';
+    id = '';
+    getEventHash() {
+      return this.id;
+    }
+    verifySignature() {
+      return true;
+    }
+    async sign(signer: { user: () => Promise<{ pubkey: string }> }) {
+      this.pubkey = (await signer.user()).pubkey;
+      this.id = 'e'.repeat(64);
+    }
   },
 }));
 jest.mock('@/shared/lib/nostr/publish', () => ({
   publishEvent: (...args: unknown[]) => mockPublish(...args),
+}));
+jest.mock('@/shared/stores/global/profileStore', () => ({
+  ...jest
+    .requireActual<typeof import('./helpers/profileStoreMock')>('./helpers/profileStoreMock')
+    .activeAccountReaders(
+      () => mockProfile,
+      () => () => undefined
+    ),
 }));
 jest.mock('@/shared/lib/logger', () => {
   // Every export is a silent logger that is also callable (`redactError`, hooks).
@@ -40,16 +87,43 @@ jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({
 
 const NOW_SEC = 1_790_000_000;
 const MINE = 'wss://mine.example';
-const ndk = { pool: {} } as unknown as NDK;
+const OLD = 'wss://old.example';
 const store = () => useRelayListStore.getState();
 
-function publish() {
+function relayFake() {
+  return {
+    signer: { user: async () => ({ pubkey: OWN }) },
+    subscribe: (_filter: unknown, _options: unknown, relaySet: { relays: Set<Relay> }) => {
+      const [relay] = [...relaySet.relays];
+      mockAsked.push(relay.url);
+      const listeners: Record<string, (...args: unknown[]) => void> = {};
+      const subscription = {
+        eosesSeen: new Set<Relay>(),
+        stop: () => undefined,
+        on: (type: string, listener: (...args: unknown[]) => void) => {
+          listeners[type] = listener;
+        },
+        start: async () => {
+          const held = mockHeld.get(relay.url) ?? [];
+          if (held === 'fail') throw new Error('relay failed');
+          const { NDKEvent } = jest.requireMock('@nostr-dev-kit/ndk-mobile');
+          for (const event of held) listeners.event(Object.assign(new NDKEvent(), event));
+          subscription.eosesSeen.add(relay);
+          listeners.eose();
+        },
+      };
+      return subscription;
+    },
+  } as unknown as NDK;
+}
+
+function publish(entries = store().entries) {
   const messages: (string | null)[] = [];
   const publishing: boolean[] = [];
   return publishRelayList({
-    ndk,
-    entries: store().entries,
-    markPublished: store().markPublished,
+    ndk: relayFake(),
+    pubkey: OWN,
+    entries,
     setPublishing: (value) => publishing.push(value),
     setPublishMsg: (message) => messages.push(message),
   }).then(() => ({ messages, publishing }));
@@ -58,9 +132,14 @@ function publish() {
 const sent = () => mockPublish.mock.calls[0][0];
 
 beforeEach(() => {
-  jest.useFakeTimers({ now: NOW_SEC * 1000 });
+  jest.useFakeTimers({ now: NOW_SEC * 1000, doNotFake: ['nextTick', 'setImmediate'] });
+  forgetSilentRelays();
+  mockHeld.clear();
+  mockAsked.length = 0;
   mockPublish.mockReset();
-  mockPublish.mockReturnValue(okAsync({ accepted: [{ url: MINE }, { url: DEFAULT_RELAYS[0] }] }));
+  mockPublish.mockImplementation(({ relays }: { relays: string[] }) =>
+    okAsync({ accepted: relays.map((url) => ({ url, ok: true })) })
+  );
   useRelayListStore.setState({
     entries: [{ url: MINE, read: true, write: true }],
     updatedAt: 100,
@@ -75,15 +154,30 @@ afterEach(() => {
 });
 
 describe('publishing the relay list from Network settings', () => {
-  it('sends the edited list to its write relays and the defaults, and records it as published', async () => {
+  it('reads every relay first, sends the signed list to all of them, and records it as the saved list', async () => {
     const { messages, publishing } = await publish();
 
-    expect(sent().event).toMatchObject({ kind: 10002, tags: [['r', MINE]] });
+    expect(mockAsked).toEqual([MINE, ...DEFAULT_RELAYS]);
+    expect(sent().event).toMatchObject({ kind: 10002, pubkey: OWN, tags: [['r', MINE]] });
     expect(sent().relays).toEqual([MINE, ...DEFAULT_RELAYS]);
     expect(sent().resolveOn).toBe('all-settled');
-    expect(store()).toMatchObject({ source: 'relay', hasPublished: true, updatedAt: NOW_SEC });
-    expect(messages).toEqual([null, 'Published to 2 relays.']);
+    expect(store()).toMatchObject({
+      entries: [{ url: MINE, read: true, write: true }],
+      source: 'relay',
+      hasPublished: true,
+      updatedAt: sent().event.created_at,
+    });
+    expect(messages).toEqual([null, `Published to ${DEFAULT_RELAYS.length + 1} relays.`]);
     expect(publishing).toEqual([true, false]);
+  });
+
+  it('sends a changed list to the old write relays as well as the new ones', async () => {
+    // This session's discovery asked the old write relay; the person replaced it.
+    const untrack = trackRelaysAsked(OWN, new Set([OLD]));
+    await publish();
+    untrack();
+
+    expect(sent().relays).toEqual(expect.arrayContaining([OLD, MINE]));
   });
 
   it('keeps the edit unpublished and says so when no relay accepts it', async () => {
@@ -94,23 +188,63 @@ describe('publishing the relay list from Network settings', () => {
     expect(messages).toEqual([null, 'Could not publish. Check your connection and try again.']);
   });
 
-  it('dates the list now, even when the list it replaces is dated later', async () => {
-    useRelayListStore.setState({ updatedAt: NOW_SEC + 600 });
-    await publish();
+  it('sends nothing, and says so, when a relay could not be read', async () => {
+    mockHeld.set(DEFAULT_RELAYS[0], 'fail');
+    const { messages } = await publish();
 
-    // QUIRK (F240 D3): relays keep the later list, while this one is recorded
-    // as published and lowers the saved time.
-    expect(sent().event.created_at).toBe(NOW_SEC);
-    expect(store().updatedAt).toBe(NOW_SEC);
+    expect(mockPublish).not.toHaveBeenCalled();
+    expect(store().source).toBe('local');
+    expect(messages).toEqual([null, 'Could not publish. Check your connection and try again.']);
   });
 
-  it('publishes an empty list once every relay is removed', async () => {
+  it('dates the list after the one it replaces, saved here or held by the relays', async () => {
+    useRelayListStore.setState({ updatedAt: NOW_SEC + 600 });
+    await publish();
+    expect(sent().event.created_at).toBe(NOW_SEC + 601);
+
+    mockPublish.mockClear();
+    mockHeld.set(MINE, [
+      { kind: 10002, pubkey: OWN, created_at: NOW_SEC + 900, id: 'b'.repeat(64), tags: [] },
+    ]);
+    store().addRelay('wss://another.example', { read: true, write: true });
+    await publish();
+    expect(sent().event.created_at).toBe(NOW_SEC + 901);
+  });
+
+  it('refuses a list with no relay to write to, and sends nothing', async () => {
     store().removeRelay(MINE);
+    const empty = await publish();
+    store().addRelay(MINE, { read: true, write: false });
+    const readOnly = await publish();
+
+    expect(mockPublish).not.toHaveBeenCalled();
+    expect(store().source).toBe('local');
+    for (const { messages } of [empty, readOnly])
+      expect(messages).toEqual([null, 'Add a relay to write to, or restore defaults.']);
+  });
+
+  it('keeps an edit made while publishing unpublished', async () => {
+    mockPublish.mockImplementation(({ relays }: { relays: string[] }) => {
+      store().addRelay('wss://during.example', { read: true, write: true });
+      return okAsync({ accepted: relays.map((url) => ({ url, ok: true })) });
+    });
     await publish();
 
-    // QUIRK (F240 D4): others find no relay for the account, while this phone
-    // keeps writing to the defaults.
-    expect(sent().event.tags).toEqual([]);
-    expect(sent().relays).toEqual([...DEFAULT_RELAYS]);
+    expect(store().source).toBe('local');
+    expect(store().entries.map((entry) => entry.url)).toEqual([MINE, 'wss://during.example']);
+  });
+});
+
+describe('editing a list that is empty because nothing was ever chosen', () => {
+  it('adds a relay to the defaults, which are what this app writes to', () => {
+    useRelayListStore.setState({ entries: [], source: 'relay' });
+    store().addRelay(MINE, { read: true, write: true });
+    expect(store().entries.map((entry) => entry.url)).toEqual([...DEFAULT_RELAYS, MINE]);
+  });
+
+  it('keeps an empty list the person emptied themselves', () => {
+    useRelayListStore.setState({ entries: [], source: 'local' });
+    store().addRelay(MINE, { read: true, write: true });
+    expect(store().entries.map((entry) => entry.url)).toEqual([MINE]);
   });
 });

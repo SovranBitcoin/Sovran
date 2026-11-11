@@ -12,6 +12,7 @@ import { ScreenScrollView } from '@/shared/ui/composed/ScreenScrollView';
 import React, { useState } from 'react';
 import { RefreshControl, View } from 'react-native';
 import { useNDK } from '@nostr-dev-kit/ndk-mobile';
+import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import {
   Button,
   Card,
@@ -48,6 +49,7 @@ const VERTEX_CREDITS_DESCRIPTION =
 export function SettingsNetworkScreen() {
   useLifecycleLogger('SettingsNetworkScreen');
   const { ndk } = useNDK();
+  const ownPubkey = useNostrKeysContext().keys?.pubkey;
   const vertexCreditsEnabled = useSettingsStore((s) => s.vertexCreditsEnabled);
   const setVertexCreditsEnabled = useSettingsStore((s) => s.setVertexCreditsEnabled);
   const naggTierEnabled = useSettingsStore((s) => s.naggTierEnabled);
@@ -65,7 +67,6 @@ export function SettingsNetworkScreen() {
   const removeRelay = useRelayListStore((s) => s.removeRelay);
   const setMarker = useRelayListStore((s) => s.setMarker);
   const restoreDefaults = useRelayListStore((s) => s.restoreDefaults);
-  const markPublished = useRelayListStore((s) => s.markPublished);
   const health = useRelayHealth();
   const tierHealth = useNostrTierHealth(health);
 
@@ -149,8 +150,8 @@ export function SettingsNetworkScreen() {
   };
 
   const handlePublish = () => {
-    if (!ndk) return;
-    return publishRelayList({ ndk, entries, markPublished, setPublishing, setPublishMsg });
+    if (!ndk || !ownPubkey) return;
+    return publishRelayList({ ndk, pubkey: ownPubkey, entries, setPublishing, setPublishMsg });
   };
 
   const sortedEntries = [...entries].sort((a, b) => a.url.localeCompare(b.url));
