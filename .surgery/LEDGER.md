@@ -6,7 +6,7 @@ State, not history. Passes run in order; one call runs one pass.
 | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 0 Pin behaviour           | **Done** (2026-11-11). Every boundary the surveys listed has a pin; the gates are closed. Branch `surgery/pass-0-gates`.                                             |
 | 1 Persisted state         | **Done** (2026-11-11), proven on every release fixture; no real upgrade was run. Cuts on `surgery/pass-1-cuts` and `surgery/pass-1-queue`, not merged. See "Pass 1". |
-| 2 Implicit state machines | **Awaiting approval** (2026-11-11). Surveyed; 15 behaviours fixed in 20 commits on `surgery/pass-2`; 16 conversions proposed, none made. See "Pass 2".               |
+| 2 Implicit state machines | **Cutting** (approved 2026-11-11). Surveyed; 15 behaviours fixed in 20 commits on `surgery/pass-2`; 16 conversions approved, in progress. See "Pass 2".              |
 | 3 Deepen modules          | Not started.                                                                                                                                                         |
 
 Pass 0 is on branch `surgery/pass-0`; pass 1's evidence is on `surgery/pass-1` and its cuts on `surgery/pass-1-cuts`, each stacked on the one before (worktree `../sovran-surgery`,
@@ -282,7 +282,20 @@ The house pattern for an explicit machine is `wallet/src/machine`: named steps, 
 the repo. Conversions should match it: a discriminated union for a value, a transition table for synchronous moves,
 that hand-written shape for async work.
 
-### Proposed conversions (none made; each needs the owner's approval)
+### Decisions (owner, 2026-11-11)
+
+- All sixteen conversions below are approved. The brief each builder follows is `pass-2/CONVERSION-BRIEF.md`.
+- Follow (1 and 11): build the full repair, not only a refusal. A follow is accepted on the phone at once; one
+  worker per account reads the newest real contact list, applies the outstanding changes to it with its tags kept
+  exactly, and only then publishes; with no list it can stand on, the follow waits and is published later. Second
+  opinion (Codex GPT-6 Astra): no union with a seeded list (it would bring back people unfollowed elsewhere); a
+  source that returns no event is not proof of an empty list; guard the account and signer across every wait; give
+  kinds 0 and 3 their own unwindowed filters. Two devices publishing at the same moment can still overwrite each
+  other: that is how the list works on Nostr and cannot be closed here.
+- Bluetooth message (6): a delivery report that arrives after the 15 second mark wins.
+- Payment routing (16): delete the Routstr top-up branch of Send; top-up from the AI screen is untouched.
+
+### Conversions (approved; status per row is kept below as they land)
 
 Ranked by reachable illegal states times money or saved-data risk, over cost. "Saved" means the shape on disk stays
 as it is and the states are decoded where it is read. Sizes: S one file, M under ten, L more.
