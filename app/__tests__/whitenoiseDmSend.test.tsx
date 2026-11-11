@@ -359,6 +359,23 @@ describe('the first send creates the group', () => {
     expect(result.current.messages).toHaveLength(1);
   });
 
+  it('a send callback kept from before the group existed sends into the group the first send made', async () => {
+    const { result } = await mount();
+    const send = result.current.send;
+
+    await act(async () => {
+      await send('one');
+    });
+    await act(async () => {
+      await send('two');
+    });
+
+    expect(fake.client.createGroup).toHaveBeenCalledTimes(1);
+    const created = (await fake.client.createGroup.mock.results[0]!.value) as FakeGroup;
+    expect(created.sendChatMessage.mock.calls).toEqual([['one'], ['two']]);
+    expect(await AsyncStorage.getItem(INDEX_KEY)).toBe('{"v":1,"d":"c0de"}');
+  });
+
   it('stops before creating anything when the peer has no key package, and shows why', async () => {
     fake.client.network.request.mockResolvedValue([]);
     const { result } = await mount();

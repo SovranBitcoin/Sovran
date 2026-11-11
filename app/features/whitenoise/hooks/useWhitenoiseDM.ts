@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { bytesToHex } from '@noble/hashes/utils.js';
 import {
   deserializeApplicationRumor,
@@ -7,6 +7,7 @@ import {
 } from '@internet-privacy/marmot-ts';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
+import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import { useWhitenoise } from '../WhitenoiseContext';
 import { resolveInboxRelays } from '../client/network';
 import { WhitenoiseDmIndex } from '../storage/dmIndex';
@@ -212,7 +213,17 @@ export function useWhitenoiseDM(counterpartyPubkey: string): UseWhitenoiseDMStat
   const { keys } = useNostrKeysContext();
   const selfPubkey = keys?.pubkey ?? '';
 
-  const [conversation, dispatch] = useReducer(conversationStep, CLOSED);
+  // The conversation as of now, moved by every event at once, so a send reads
+  // it at call time (a group the previous send just created included); the
+  // state copy is what renders.
+  const machine = useRef<Conversation>(CLOSED);
+  const [conversation, setConversation] = useState<Conversation>(CLOSED);
+  const dispatch = useCallback((event: ConversationEvent) => {
+    const next = conversationStep(machine.current, event);
+    if (next === machine.current) return;
+    machine.current = next;
+    setConversation(next);
+  }, []);
   const [messages, setMessages] = useState<WhitenoiseDmMessage[]>([]);
   // The state only counts once it is for this client, account and peer: in the
   // commit that first carries a new client the read for it has not started.
@@ -241,7 +252,7 @@ export function useWhitenoiseDM(counterpartyPubkey: string): UseWhitenoiseDMStat
     return () => {
       cancelled = true;
     };
-  }, [client, counterpartyPubkey, selfPubkey, accountIndex]);
+  }, [client, counterpartyPubkey, selfPubkey, accountIndex, dispatch]);
 
   // Subscribe to kind-445 events for the group and feed them into ingest.
   // The h-tag uses the *Nostr* group id (from the MarmotGroupData extension),
@@ -294,10 +305,22 @@ export function useWhitenoiseDM(counterpartyPubkey: string): UseWhitenoiseDMStat
   // again, and burn a second key package while orphaning the first group.
   // The `creating-group` state commits one render too late to stop it, so
   // the guard lives on useSingleFlight's ref, which holds regardless of
-  // callback identity.
-  const send = useSingleFlight((text: string) =>
-    sendDmImpl({ client, relays, opened, dispatch, setMessages }, text)
-  );
+  // callback identity. A send decides from the client, peer and conversation
+  // as they are when it is called, never as a kept callback saw them.
+  const inputs = useLatestRef({ client, relays, counterpartyPubkey, selfPubkey, accountIndex });
+  const send = useSingleFlight((text: string) => {
+    const now = inputs.current;
+    return sendDmImpl(
+      {
+        client: now.client,
+        relays: now.relays,
+        opened: openedForNow(machine.current, now),
+        dispatch,
+        setMessages,
+      },
+      text
+    );
+  });
 
   return {
     isClientReady: !!client,
