@@ -60,22 +60,21 @@ export function decodePaymentRequestEntryPhase(
 ): PaymentRequestEntryPhase {
   const metadata = metadataOf(entry);
   const phase = metadata.phase;
-  const operationId =
+  const ran =
     realOperationId(entry.operationId) || realOperationId(metadata.operationId);
   switch (phase) {
     case "delivered":
       return { kind: "delivered" };
     case "undelivered":
-      return operationId ? { kind: "undelivered" } : { kind: "unrecognised" };
+      return ran ? { kind: "undelivered" } : { kind: "unrecognised" };
     case "rolledBack":
       return { kind: "rolledBack" };
     case "preview":
     case undefined:
-      // An entry that has an operation id has run, whatever its phase says:
-      // the entry merge keeps a stale "preview" when a real row arrives.
-      return operationId ? { kind: "delivered" } : { kind: "preview" };
+      // An entry with a real operation id has run, whatever its phase says.
+      return ran ? { kind: "delivered" } : { kind: "preview" };
     default:
-      return operationId ? { kind: "delivered" } : { kind: "unrecognised" };
+      return ran ? { kind: "delivered" } : { kind: "unrecognised" };
   }
 }
 
