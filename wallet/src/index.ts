@@ -522,7 +522,7 @@ export {
   createScreenActionSession,
   createScreenActionManager,
   getAvailableActions,
-  isPaymentRequestPreview,
+  decodePaymentRequestEntryPhase,
   shouldApplyEntryUpdate,
   mergeEntryUpdate,
   decorateEntry,

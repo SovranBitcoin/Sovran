@@ -20,10 +20,8 @@ import { afterEach, describe, it, expect, vi } from "vitest";
 // behaviour specified for the day it returns. `reclaim-gate.test.ts` covers
 // what ships.
 vi.mock("../../src/p2pk/reclaimGate", () => ({ P2PK_RECLAIM_ENABLED: true }));
-import {
-  getAvailableActions,
-  isPaymentRequestPreview,
-} from "../../src/screen-actions/availability";
+import { getAvailableActions } from "../../src/screen-actions/availability";
+import { decodePaymentRequestEntryPhase } from "../../src/screen-actions/paymentRequestPhase";
 import { deriveMintMethodCapabilityMapFromTrustedMints } from "../../src/mint-capabilities";
 import { setLogger } from "../../src/logger";
 import { INPUTS, MINT1, MINT2 } from "../_harness/fixtures";
@@ -318,10 +316,13 @@ describe("paymentRequestAvailability — each phase the entry can carry", () => 
 });
 
 // ---------------------------------------------------------------------------
-// isPaymentRequestPreview
+// decodePaymentRequestEntryPhase — is the entry still a preview?
 // ---------------------------------------------------------------------------
 
-describe("isPaymentRequestPreview", () => {
+describe("decodePaymentRequestEntryPhase — preview", () => {
+  const isPaymentRequestPreview = (entry: Record<string, unknown>) =>
+    decodePaymentRequestEntryPhase(entry).kind === "preview";
+
   it('returns true for preview entry (phase "preview", no operationId)', () => {
     const entry = {
       id: "pr-preview-123",

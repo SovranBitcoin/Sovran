@@ -27,6 +27,7 @@ import type {
 } from "../machine/types";
 import { parseHistoryEntryOnce } from "../operations/historyEntry";
 import { getAvailableActions } from "./availability";
+import { withPaymentRequestSendOutcome } from "./paymentRequestPhase";
 import type { ScreenActionContext, ScreenActionHandlerMap } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -561,8 +562,6 @@ export function createDefaultScreenActionHandlers(
 
         const outcome = await machine.confirmPaymentRequest();
 
-        const setEntry = ctx.setEntry as ((e: EntryLike) => void) | undefined;
-
         // Nothing was sent (it failed before any ecash existed, or this tap
         // did not run the send): the entry stays a preview so Pay can retry.
         if (outcome.kind === "failed" || outcome.kind === "ignored") {
@@ -572,84 +571,17 @@ export function createDefaultScreenActionHandlers(
           return;
         }
 
-        // The ecash exists but neither reached the recipient nor came back.
-        // Say so, and offer no retry: a second Pay could pay twice.
-        if (outcome.kind === "undelivered") {
-          logger.warn("screenAction.paymentRequest.confirm.undelivered", {
-            operationId: outcome.operationId,
-          });
-          if (setEntry) {
-            setEntry({
-              ...preEntry,
-              state: "pending",
-              operationId: outcome.operationId,
-              metadata: {
-                ...((preEntry?.metadata ?? {}) as Record<string, unknown>),
-                operationId: outcome.operationId,
-                phase: "undelivered",
-                tokenCreated: "true",
-              },
-            } as EntryLike);
-          }
-          return;
-        }
-
-        // If the delivery failed and ecash was rolled back, set the entry
-        // to rolledBack state instead of enriching with delivered metadata.
-        if (outcome.kind === "rolledBack") {
-          logger.info("screenAction.paymentRequest.confirm.rolledBack");
-          if (setEntry) {
-            const metadata = (preEntry?.metadata ?? {}) as Record<
-              string,
-              unknown
-            >;
-            const operationId =
-              getString(getMetadata(preEntry), "operationId") ??
-              getString(preEntry, "operationId") ??
-              getString(preEntry, "id");
-            setEntry({
-              ...preEntry,
-              state: "rolledBack",
-              operationId,
-              metadata: {
-                ...metadata,
-                operationId,
-                phase: "rolledBack",
-                tokenCreated: "true",
-              },
-            } as EntryLike);
-          }
-          return;
-        }
-
-        // Success path — enrich the screen entry with delivery metadata.
-        if (setEntry) {
-          const metadata = (preEntry?.metadata ?? {}) as Record<
-            string,
-            unknown
-          >;
-          const operationId =
-            getString(getMetadata(preEntry), "operationId") ??
-            getString(preEntry, "operationId") ??
-            getString(preEntry, "id");
-          const enriched = {
-            ...preEntry,
-            state: "pending",
-            operationId,
-            metadata: {
-              ...metadata,
-              operationId,
-              phase: "delivered",
-              tokenCreated: "true",
-              nostrSent: "true",
-            },
-          };
-          logger.info("screenAction.paymentRequest.confirm.enrich", {
-            id: (enriched as any).id,
-            operationId,
-          });
-          setEntry(enriched as EntryLike);
-        }
+        // Delivered, rolled back, or (ecash out, neither delivered nor taken
+        // back) undelivered, which offers no retry: a second Pay could pay
+        // twice.
+        logger.info("screenAction.paymentRequest.confirm.sent", {
+          kind: outcome.kind,
+          ...(outcome.kind === "undelivered"
+            ? { operationId: outcome.operationId }
+            : {}),
+        });
+        const setEntry = ctx.setEntry as ((e: EntryLike) => void) | undefined;
+        setEntry?.(withPaymentRequestSendOutcome(preEntry, outcome));
       },
 
       cancel: goBack,

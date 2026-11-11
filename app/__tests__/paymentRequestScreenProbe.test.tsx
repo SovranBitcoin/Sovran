@@ -12,8 +12,12 @@ import { PaymentRequestScreen } from '@/features/send/screens/PaymentRequestScre
 const mockUseScreenActions = jest.fn();
 
 jest.mock('wallet', () => ({
-  isPaymentRequestPreview: (entry: { metadata?: { phase?: string }; operationId?: string }) =>
-    entry.metadata?.phase === 'preview' && !entry.operationId,
+  decodePaymentRequestEntryPhase: (entry: {
+    metadata?: { phase?: string };
+    operationId?: string;
+  }) => ({
+    kind: entry.metadata?.phase === 'preview' && !entry.operationId ? 'preview' : 'delivered',
+  }),
 }));
 jest.mock('wallet/react', () => ({
   useScreenActions: (...args: unknown[]) => mockUseScreenActions(...args),

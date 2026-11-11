@@ -14,7 +14,8 @@ export {
   meltOperationToScreenActionEntry,
   type MeltOperationLike,
 } from './createManager';
-export { getAvailableActions, isPaymentRequestPreview } from './availability';
+export { getAvailableActions } from './availability';
+export { decodePaymentRequestEntryPhase } from './paymentRequestPhase';
 export {
   createDefaultScreenActionHandlers,
   type DefaultScreenActionHandlersConfig,
