@@ -58,6 +58,11 @@ describe('transaction screen source label', () => {
     expect(sourceLabel({ id: 'tx-1', type: 'receive' })).toBe('Clipboard');
   });
 
+  it('names a payment that arrived over Bluetooth', () => {
+    setTransactionAnnotation('id:tx-2', { scan: { method: 'ble' } });
+    expect(sourceLabel({ id: 'tx-2', type: 'receive' })).toBe('Bluetooth');
+  });
+
   it('reads a mint quote shared as the annotation records it', () => {
     setTransactionAnnotation('quote:q-1', { distribution: { source: 'share' } });
     expect(sourceLabel({ id: 'mint-row', type: 'mint', quoteId: 'q-1' })).toBe('Shared');

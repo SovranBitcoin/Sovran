@@ -53,6 +53,7 @@ const HISTORY_TYPE_BY_SCREEN: Partial<Record<ScreenType, string>> = {
 const SOURCE_LABELS: Record<string, string> = {
   qr: 'QR Code',
   nfc: 'NFC',
+  ble: 'Bluetooth',
   paste: 'Clipboard',
   deeplink: 'Deep Link',
   copy: 'Copied',
