@@ -303,7 +303,13 @@ the unit back unless the tap paid (its token is on the tag). The tap checks its
 turn after every await; a tap a reset overtook still releases the session and
 switches the unit back, and touches nothing else (`endNfcTap`). Each only while
 it is still the tap's own: an NFC read begun since took the session over
-(`nfcRead`), and a tap the machine ran since owns the unit (`latestNfcTap`). A `confirmPaymentRequest()` call's result is settled only by its own
+(`nfcRead`), and a tap the machine ran since owns the unit (`latestNfcTap`).
+Which read a tap is, and that it is an NFC read at all, is fixed when its scan
+begins and travels with the scanned input (`ScanOrigin`), so a read that
+finishes after a newer one began keeps its own identity, and a read the
+machine did not take never turns a later input into a tap. The host's adapter
+releases a session only for a read that failed; after a read, releasing is
+the tap's alone, a failed write included. A `confirmPaymentRequest()` call's result is settled only by its own
 turn, so a tap that sent nothing resolves `ignored`.
 
 Gather order is fixed: amount -> mint -> proofs -> terminal

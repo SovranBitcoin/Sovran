@@ -303,6 +303,17 @@ interface NfcTap {
 }
 
 /**
+ * Where an EXECUTE came from, fixed when its scan began: the scan source, and
+ * for an NFC read which read it was (see `nfcRead`). It travels with the
+ * scanned input, so a read that finishes after a newer one began, or that the
+ * machine did not take, is never stamped with another scan's identity.
+ */
+interface ScanOrigin {
+  source: string | undefined;
+  nfcRead: number | null;
+}
+
+/**
  * How a tap's loop left. A paid tap (its token is on the tag) keeps the
  * terminal's unit; a stopped one switches back, then shows `error` when it has
  * one; one that threw switches back, then throws on. An overtaken tap ends as
@@ -340,7 +351,6 @@ export function createPaymentMachine(
   let urDecoder: ReturnType<NonNullable<typeof createURDecoder>> | null =
     createURDecoder?.() ?? null;
   let processedScanInput: string | null = null;
-  let lastScanSource: string | undefined;
   // The tag session and the unit belong to one NFC tap at a time, and the
   // adapter cannot tell one session from the next. `nfcRead` counts the NFC
   // reads begun: each takes the session over from any before it, so only a
@@ -406,7 +416,6 @@ export function createPaymentMachine(
       setStep("idle", {});
     });
     processedScanInput = null;
-    lastScanSource = undefined;
     if (createURDecoder) {
       urDecoder = createURDecoder();
     }
@@ -1121,8 +1130,12 @@ export function createPaymentMachine(
   }
 
   // Every exit of a turn goes through `finishTurn`, except a stale
-  // continuation, which returns: it owns nothing.
-  const send = async (event: FlowEvent): Promise<void> => {
+  // continuation, which returns: it owns nothing. `origin` is set for the
+  // EXECUTE of a scan.
+  const runTurn = async (
+    event: FlowEvent,
+    origin: ScanOrigin | null,
+  ): Promise<void> => {
     const sendGeneration = beginTurn(event.type);
     if (sendGeneration === null) return;
     // This caller's result holder, taken before anything awaits: only this
@@ -1454,11 +1467,11 @@ export function createPaymentMachine(
       let unit = getUnit?.() ?? configUnit;
       let nfcError: StepDataMap["error"] | undefined;
       const nfcTap: NfcTap | null =
-        event.type === "EXECUTE" && lastScanSource === "nfc" && nfcAdapter
+        event.type === "EXECUTE" && origin?.nfcRead != null && nfcAdapter
           ? {
               input: event.input,
               adapter: nfcAdapter,
-              read: nfcRead,
+              read: origin.nfcRead,
               session: "held",
               unitSwitch: null,
             }
@@ -1651,8 +1664,7 @@ export function createPaymentMachine(
       }
 
       if (event.type === "EXECUTE") {
-        const scanSource = lastScanSource;
-        lastScanSource = undefined;
+        const scanSource = origin?.source;
         flowCtx.source = scanSource;
         if (notifications?.onScanResolved && flowCtx.parsed) {
           const optionKinds =
@@ -2351,6 +2363,8 @@ export function createPaymentMachine(
     }
   };
 
+  const send = (event: FlowEvent): Promise<void> => runTurn(event, null);
+
   const changeMint = (
     mintUrl: string,
     opts?: { persist?: boolean; scope?: MintSelectorScope },
@@ -2376,7 +2390,10 @@ export function createPaymentMachine(
     return send({ type: "EXECUTE", input });
   };
 
-  async function processScanData(data: string): Promise<ProcessResult> {
+  async function processScanData(
+    data: string,
+    origin: ScanOrigin,
+  ): Promise<ProcessResult> {
     const isUR = data.startsWith("ur:") || data.startsWith("UR:");
     if (isUR && createURDecoder && urDecoder) {
       urDecoder.receivePart(data);
@@ -2385,7 +2402,7 @@ export function createPaymentMachine(
       if (urDecoder.isComplete() && urDecoder.isSuccess()) {
         const decoded = urDecoder.resultUR().decodeCBOR();
         const decodedString = new TextDecoder().decode(decoded);
-        await execute(decodedString);
+        await runTurn({ type: "EXECUTE", input: decodedString }, origin);
         urDecoder = createURDecoder();
         return { urInProgress: false };
       }
@@ -2398,7 +2415,7 @@ export function createPaymentMachine(
     }
 
     processedScanInput = data;
-    await execute(data);
+    await runTurn({ type: "EXECUTE", input: data }, origin);
     const state = cachedSnapshot;
 
     if (
@@ -2425,12 +2442,16 @@ export function createPaymentMachine(
           if (options?.reset) resetInternal();
 
           const hasData = data != null && data.length > 0;
-          lastScanSource =
+          const scanSource =
             options?.source ?? (hasData ? undefined : "clipboard");
-          if (lastScanSource === "nfc") nfcRead += 1;
+          // An NFC read takes the tag session over from any read before it.
+          const origin: ScanOrigin = {
+            source: scanSource,
+            nfcRead: scanSource === "nfc" ? ++nfcRead : null,
+          };
 
           if (hasData) {
-            return processScanData(data);
+            return processScanData(data, origin);
           }
 
           const source = options?.source ?? "clipboard";
@@ -2470,7 +2491,7 @@ export function createPaymentMachine(
             return { urInProgress: false };
           }
           if ("data" in result && result.data) {
-            return processScanData(result.data);
+            return processScanData(result.data, origin);
           }
 
           return { urInProgress: false };

@@ -800,3 +800,62 @@ describe("an NFC tap whose token could not be taken back", () => {
     }
   });
 });
+
+// A read belongs to the moment it began: which NFC read it is decides whether
+// its tap may still let go of the tag, and only a read makes a tap at all.
+describe("an NFC read that finishes late", () => {
+  type Request = typeof INPUTS.paymentRequestBasic;
+  type Held = { promise: Promise<Request>; resolve: (data: Request) => void };
+  const held = (): Held => {
+    let resolve!: (data: Request) => void;
+    const promise = new Promise<Request>((r) => {
+      resolve = r;
+    });
+    return { promise, resolve };
+  };
+
+  it("leaves the tag to a read that began after it", async () => {
+    const { tm, adapter } = setup();
+    const readA = held();
+    adapter.readPaymentRequest
+      .mockImplementationOnce(() => readA.promise)
+      .mockImplementationOnce(() => new Promise<Request>(() => {}));
+    const tapA = tm.machine.scan!(undefined, { source: "nfc" });
+    await vi.waitFor(() => expect(adapter.readPaymentRequest).toHaveBeenCalledTimes(1));
+    void tm.machine.scan!(undefined, { source: "nfc" });
+    await vi.waitFor(() => expect(adapter.readPaymentRequest).toHaveBeenCalledTimes(2));
+
+    readA.resolve(INPUTS.paymentRequestBasic);
+    await tapA;
+
+    expect(adapter.releaseSession).not.toHaveBeenCalled();
+  });
+
+  it("does not turn a later input into a tap when the machine did not take the read", async () => {
+    let finishSend!: () => void;
+    const { tm } = setup({
+      operations: {
+        executeSend: vi.fn(async () => {
+          await new Promise<void>((resolve) => {
+            finishSend = resolve;
+          });
+          return { historyEntry: JSON.stringify({ id: "tx-send", type: "send" }) };
+        }),
+        executeOfflineSend: undefined,
+      },
+    });
+    await tm.machine.startSendEcash({ reset: true });
+    const sending = tm.machine.enterAmount({ value: 10, unit: "sat" }, accepted, {
+      destination: "sendEcash",
+    });
+    await vi.waitFor(() => expect(finishSend).toBeTypeOf("function"));
+    await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
+    finishSend();
+    await sending;
+
+    await tm.machine.execute(INPUTS.paymentRequestBasic);
+
+    expect(sentMint(tm)).toBeUndefined();
+    tm.assertStep("navigateToPaymentRequest");
+  });
+});

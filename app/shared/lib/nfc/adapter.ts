@@ -4,9 +4,10 @@
  * Wraps APDU/NDEF primitives into the adapter interface that the payment
  * machine consumes. Session lifetime is owned by `./session.ts`; this file
  * only orchestrates the read/write APDU sequence and delegates acquire and
- * release to the deep module so the multi-step "session lives across the
- * flow" contract honors the same stale-prelude and release-on-throw
- * invariants as the one-shot writer.
+ * release to the deep module. A read that fails releases the session it
+ * acquired. Once a read succeeds the session is the payment machine's: it
+ * releases it when the tap ends, and only while no newer read has taken the
+ * session over, so a failed write here leaves it alone.
  */
 
 import type { NfcIOAdapter } from 'wallet';
@@ -131,7 +132,6 @@ export function createNfcAdapter(): NfcIOAdapter {
           tokenLength: token.length,
           ...nfcErrorFields(e),
         });
-        await releaseSession();
         throw e;
       }
     },

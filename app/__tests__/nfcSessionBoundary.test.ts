@@ -13,6 +13,8 @@
 
 import NfcManager from 'react-native-nfc-manager';
 
+import { createPaymentMachine } from 'wallet';
+
 import { createNfcAdapter, writeTokenToNFC } from '@/shared/lib/nfc';
 import { holdNfcReader } from '@/shared/lib/nfc/reader';
 import { buildTextNdef, decodeNdefText } from '@/shared/lib/nfc/ndef';
@@ -233,16 +235,81 @@ describe('reading a payment request', () => {
     expect(native.cancelTechnologyRequest).toHaveBeenCalledTimes(2);
   });
 
-  it('releases the session when the payment write fails', async () => {
+  // The session is the payment machine's from the read on: it lets go of it
+  // with the tap, and only while no newer read has taken it over.
+  it('leaves the session to the payment machine when the payment write fails', async () => {
     mockTag.current = terminalWith(CREQ);
     const adapter = createNfcAdapter();
     await adapter.readPaymentRequest();
     mockTag.current.failUpdateAt = 1;
 
     await expect(adapter.writeToken(TOKEN)).rejects.toMatchObject({ code: 'TAG_LOST' });
-    expect(native.cancelTechnologyRequest).toHaveBeenCalledTimes(2);
+    expect(native.cancelTechnologyRequest).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('a payment machine tap over the adapter', () => {
+  /** A real NUT-18 request: 100 sat, paid to mint1.example.com. */
+  const REQUEST =
+    'creqApGF0gaNhdGRwb3N0YWF4GWh0dHBzOi8vbWludDEuZXhhbXBsZS5jb21hZ/dhYRhkYXVjc2F0YW2BeBlodHRwczovL21pbnQxLmV4YW1wbGUuY29t';
+  const MINT = 'https://mint1.example.com';
+
+  function tapMachine(executeNfcSend: () => Promise<{ token: string; historyEntry: string; operationId: string }>) {
+    const adapter = createNfcAdapter();
+    const machine = createPaymentMachine({
+      handlers: {},
+      getContext: () => ({
+        trustedMintUrls: [MINT],
+        mintBalances: { [MINT]: 1000 },
+        proofAmounts: {},
+      }),
+      getUnit: () => 'sat',
+      nfcAdapter: adapter,
+      operations: {
+        executeSend: jest.fn(),
+        executeMintQuote: jest.fn(),
+        buildMintListItems: jest.fn(async () => []),
+        executeNfcSend,
+        rollbackSend: jest.fn(async () => undefined),
+      },
+      scanSources: { nfc: async () => ({ data: await adapter.readPaymentRequest() }) },
+    });
+    return { machine };
+  }
+
+  it('does not cancel a newer read when an older tap fails to write', async () => {
+    mockTag.current = terminalWith(REQUEST);
+    let created!: () => void;
+    const { machine } = tapMachine(async () => {
+      await new Promise<void>((resolve) => {
+        created = resolve;
+      });
+      return { token: TOKEN, historyEntry: '{}', operationId: 'op-a' };
+    });
+    const tapA = machine.scan!(undefined, { source: 'nfc' });
+    await waitFor(() => created !== undefined);
+
+    // A second tap starts reading and holds its own session open.
+    mockNative.request = () => new Promise(() => {});
+    void machine.scan!(undefined, { source: 'nfc' });
+    await waitFor(() => native.requestTechnology.mock.calls.length === 2);
+    const cancelsBeforeWrite = native.cancelTechnologyRequest.mock.calls.length;
+
+    mockTag.current.failUpdateAt = 0;
+    created();
+    await tapA;
+
+    expect(mockTag.current.log.some((line) => line.startsWith('UPDATE'))).toBe(true);
+    expect(native.cancelTechnologyRequest.mock.calls.length).toBe(cancelsBeforeWrite);
+  });
+});
+
+async function waitFor(condition: () => boolean): Promise<void> {
+  for (let i = 0; i < 100 && !condition(); i += 1) {
+    await new Promise<void>((resolve) => setImmediate(resolve));
+  }
+  if (!condition()) throw new Error('condition never held');
+}
 
 describe('writing a token to a tag', () => {
   it('checks the tag, then zeroes NLEN, writes the body and sets NLEN last, and releases', async () => {
