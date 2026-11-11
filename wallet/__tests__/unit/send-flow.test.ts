@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { sendFlow, startSendFlow, startSendEcashFlow } from '../../src/machine/flows/send';
+import { startSendFlow, startSendEcashFlow } from '../../src/machine/flows/send';
 import { MINT1, WALLETS } from '../_harness/fixtures';
 import { assertStep } from '../_harness/assertStep';
 
@@ -58,12 +58,5 @@ describe('send flow', () => {
 
     expect(result.step).toBe('error');
     expect(result.data).toMatchObject({ code: 'NO_BALANCE' });
-  });
-
-  it('declares actions and copy keys for send states', () => {
-    expect(sendFlow.actions({ type: 'select-mint', unit: 'sat' })).toEqual(['selectMint']);
-    expect(sendFlow.copyKeys({ type: 'enter-amount', unit: 'sat', mintUrl: MINT1 })).toEqual([
-      'timeline.flow.send',
-    ]);
   });
 });

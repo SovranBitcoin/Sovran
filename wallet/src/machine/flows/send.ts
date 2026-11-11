@@ -1,7 +1,6 @@
 import { createAmountEntryMethodContext } from '../../mint-capabilities';
 import { selectMint } from '../../mint-selection';
 import type { WalletContext } from '../../types';
-import type { PaymentCopyKey } from '../../copy';
 import type {
   FlowContext,
   FlowStep,
@@ -11,24 +10,6 @@ import type {
 } from '../types';
 import { logger, mintUrlFields } from '../../logger';
 import { normalizeP2pkLock, type P2pkLockSpec } from '../../p2pk';
-
-type SendFlowState =
-  | {
-      type: 'enter-amount';
-      unit: string;
-      mintUrl: string;
-      recipientPubkey?: string;
-      recipientProfile?: RecipientProfile;
-    }
-  | {
-      type: 'select-mint';
-      unit: string;
-      recipientPubkey?: string;
-      recipientProfile?: RecipientProfile;
-    }
-  | { type: 'blocked'; unit: string; reason: string };
-
-type SendFlowAction = 'enterAmount' | 'selectMint' | 'showError';
 
 interface SendFlowTransitionResult<S extends FlowStep = FlowStep> {
   step: S;
@@ -53,17 +34,6 @@ interface StartSendEcashOptions {
    * recipient can actually redeem the token. Passed to `selectMint`.
    */
   allowedMints?: string[];
-}
-
-interface SendFlowDefinition {
-  initial: SendFlowState;
-  start: (
-    walletCtx: WalletContext,
-    unit: string,
-    opts?: StartSendEcashOptions,
-  ) => SendFlowTransitionResult;
-  actions: (state: SendFlowState) => readonly SendFlowAction[];
-  copyKeys: (state: SendFlowState) => readonly PaymentCopyKey[];
 }
 
 /**
@@ -228,27 +198,3 @@ export function startSendEcashFlow(
       };
   }
 }
-
-export const sendFlow: SendFlowDefinition = {
-  initial: { type: 'select-mint', unit: 'sat' },
-  start: startSendEcashFlow,
-  actions: (state) => {
-    switch (state.type) {
-      case 'enter-amount':
-        return ['enterAmount'];
-      case 'select-mint':
-        return ['selectMint'];
-      case 'blocked':
-        return ['showError'];
-    }
-  },
-  copyKeys: (state) => {
-    switch (state.type) {
-      case 'enter-amount':
-      case 'select-mint':
-        return ['timeline.flow.send'];
-      case 'blocked':
-        return ['timeline.status.failed'];
-    }
-  },
-};
