@@ -1825,25 +1825,8 @@ export function createPaymentMachine(
 
             if (effect.isOk()) {
               if (effect.value.kind === "stale") return;
-
-              for (const link of effect.value.links) {
-                if (link.type === "linkTransaction") {
-                  operations.linkTransaction?.({
-              scannedInput: link.input,
-              transactionId: link.transactionId,
-            });
-                }
-              }
-
-              for (const notification of effect.value.notifications) {
-                if (notification.type === "onPaymentConfirmed") {
-                  void notifications?.onPaymentConfirmed?.(notification.data);
-                } else if (notification.type === "onTransactionCreated") {
-                  void notifications?.onTransactionCreated?.(notification.data);
-                }
-              }
-
               setStep(effect.value.step, effect.value.data);
+              announcePayment(effect.value);
             } else {
               for (const notification of effect.error.notifications) {
                 if (notification.type === "onNfcWriteFailed") {

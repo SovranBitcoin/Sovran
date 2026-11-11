@@ -823,10 +823,9 @@ describe("the main path", () => {
     expect(await isFree(tm.machine)).toBe(true);
   });
 
-  // QUIRK: the safety net frees the machine, but a link that throws after an
-  // NFC tap paid leaves the step on the payment request preview, still
-  // awaiting Pay: a later Pay sends the request a second time.
-  it("swallows a throw before the handler runs and is free afterwards", async () => {
+  // An NFC tap that paid records it before linking: a link that throws is
+  // logged, the tap completes, and a later Pay sends nothing.
+  it("completes an NFC tap that paid when linking it throws", async () => {
     let links = 0;
     const tm = build({
       nfcAdapter: nfcAdapter(),
@@ -840,13 +839,13 @@ describe("the main path", () => {
       tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" }),
     ).resolves.toMatchObject({ urInProgress: false });
     expect(tm.calls("executeNfcSend")).toBe(1);
-    expect(tm.machine.getStep()).toBe("navigateToPaymentRequest");
-    expect(tm.handled("sendComplete")).toBe(0);
+    expect(tm.machine.getStep()).toBe("sendComplete");
+    expect(tm.handled("sendComplete")).toBe(1);
     expect(isExecuting(tm.machine)).toBe(false);
     expect(await isFree(tm.machine)).toBe(true);
 
-    expect((await tm.machine.confirmPaymentRequest()).kind).toBe("delivered");
-    expect(tm.calls("executePaymentRequest")).toBe(1);
+    expect(await tm.machine.confirmPaymentRequest()).toEqual({ kind: "ignored" });
+    expect(tm.calls("executePaymentRequest")).toBe(0);
   });
 
   it("swallows a throwing handler on an input step and is free afterwards", async () => {
