@@ -102,25 +102,47 @@ const accepted = {
   failed: [],
   relayResults: [],
 };
+/** One read of one relay (or, for the editor's pool read, of `RELAY`), as NDK hands it out. */
+type FakeSubscription = EventEmitter & {
+  url: string;
+  relayFilters: Map<string, unknown[]>;
+  eosesSeen: Set<{ url: string }>;
+  stop: jest.Mock;
+  start: jest.Mock;
+  /** The relay has sent everything it holds. */
+  eose: () => void;
+};
+/**
+ * An NDK whose every subscription is its own, so each relay answers, or stays
+ * silent, on its own. What a relay does when a read of it starts is
+ * `onStart`; by default it answers holding nothing.
+ */
 const makeNdk = () => {
-  const relay = mockRelay(RELAY);
-  const subscription = Object.assign(new EventEmitter(), {
-    relayFilters: new Map([[relay.url, []]]),
-    eosesSeen: new Set<{ url: string }>(),
-    stop: jest.fn(),
-    start: jest.fn(async () => {
-      eose();
-    }),
-  });
-  const eose = () => {
-    subscription.eosesSeen.add(relay);
-    subscription.emit('eose');
-  };
+  const subscriptions: FakeSubscription[] = [];
+  const onStart = jest.fn(async (subscription: FakeSubscription) => subscription.eose());
+  const subscribe = jest.fn(
+    (_filter: unknown, _options: unknown, relaySet?: { relays: Set<{ url: string }> }) => {
+      const relays = relaySet ? [...relaySet.relays] : [mockRelay(RELAY)];
+      const subscription: FakeSubscription = Object.assign(new EventEmitter(), {
+        url: relays[0].url,
+        relayFilters: new Map(relays.map((relay) => [relay.url, []])),
+        eosesSeen: new Set<{ url: string }>(),
+        stop: jest.fn(),
+        start: jest.fn(() => onStart(subscription)),
+        eose: () => {
+          for (const relay of relays) subscription.eosesSeen.add(relay);
+          subscription.emit('eose');
+        },
+      });
+      subscriptions.push(subscription);
+      return subscription;
+    }
+  );
   return Object.assign(new NDK(), {
     signer: { user: async () => ({ pubkey }) },
-    subscribe: jest.fn(() => subscription),
-    subscription,
-    eose,
+    subscribe,
+    subscriptions,
+    onStart,
   });
 };
 const publish = (ndk: NDK = makeNdk(), initialLoad: OwnProfileLoadResult = { status: 'absent' }) =>
@@ -216,11 +238,11 @@ it('a same-id relay echo is idempotent and an older echo cannot regress the prof
 it('a profile switch during the base lookup prevents publishing', async () => {
   let finish!: () => void;
   const ndk = makeNdk();
-  ndk.subscription.start.mockImplementation(
-    () =>
+  ndk.onStart.mockImplementation(
+    (subscription) =>
       new Promise((resolve) => {
         finish = () => {
-          ndk.eose();
+          subscription.eose();
           resolve();
         };
       })
@@ -240,13 +262,14 @@ it('a profile switch during the base lookup prevents publishing', async () => {
 it('a stalled base fetch settles at three seconds and retains the local snapshot', async () => {
   jest.useFakeTimers();
   const ndk = makeNdk();
-  ndk.subscription.start.mockImplementation(() => new Promise(() => {}));
+  ndk.onStart.mockImplementation(() => new Promise(() => {}));
   const latest = { content: { about: 'keep' }, createdAt: 20, eventId: 'b'.repeat(64) };
   useOwnProfileMetadataStore.getState().setLatest(latest);
   const loading = loadOwnProfileMetadata(ndk, pubkey);
   await jest.advanceTimersByTimeAsync(3000);
   expect(await loading).toEqual({ status: 'found', snapshot: latest });
-  expect(ndk.subscription.stop).toHaveBeenCalledTimes(1);
+  expect(ndk.subscriptions).toHaveLength(1);
+  expect(ndk.subscriptions[0].stop).toHaveBeenCalledTimes(1);
   jest.useRealTimers();
 });
 
@@ -255,8 +278,8 @@ it('preserves the freshest fetched base, including fields unseen by the editor',
     .getState()
     .setLatest({ content: { about: 'Old' }, createdAt: 10, eventId: 'b'.repeat(64) });
   const ndk = makeNdk();
-  ndk.subscription.start.mockImplementation(async () => {
-    ndk.subscription.emit(
+  ndk.onStart.mockImplementation(async (subscription) => {
+    subscription.emit(
       'event',
       kind0('c'.repeat(64), 20, {
         about: 'New',
@@ -265,7 +288,7 @@ it('preserves the freshest fetched base, including fields unseen by the editor',
         extension: { keep: true },
       })
     );
-    ndk.eose();
+    subscription.eose();
   });
   await publish(ndk);
   const event = jest.mocked(publishEvent).mock.calls[0][0].event;
@@ -327,7 +350,7 @@ it('refuses a timed-out base lookup when a cached name proves a profile exists',
     }),
   });
   const ndk = makeNdk();
-  ndk.subscription.start.mockImplementation(() => new Promise(() => {}));
+  ndk.onStart.mockImplementation(() => new Promise(() => {}));
   const pending = publish(ndk);
   // The only relay is read again until it counts as silent, and once more.
   await readsTimeOut(SILENT_READS_BEFORE_LEFT_OUT + 1);
@@ -389,20 +412,21 @@ it.each(['timeout', 'error', 'invalid', 'synthetic-eose'])(
   async (failure) => {
     jest.useFakeTimers();
     const ndk = makeNdk();
-    ndk.subscription.start.mockImplementation(async () => {
+    ndk.onStart.mockImplementation(async (subscription) => {
       if (failure === 'error') throw new Error('offline');
       if (failure === 'invalid') {
-        ndk.subscription.emit('event', kind0('c'.repeat(64), 20, 'not json'));
-        ndk.eose();
+        subscription.emit('event', kind0('c'.repeat(64), 20, 'not json'));
+        subscription.eose();
       }
-      if (failure === 'synthetic-eose') ndk.subscription.emit('eose');
+      if (failure === 'synthetic-eose') subscription.emit('eose');
     });
     const pending = publish(ndk);
     await readsTimeOut(SILENT_READS_BEFORE_LEFT_OUT + 1);
     const result = await pending;
     jest.useRealTimers();
     expect(result._unsafeUnwrapErr().type).toBe('base-unavailable');
-    expect(ndk.subscription.stop).toHaveBeenCalled();
+    expect(ndk.subscriptions.length).toBeGreaterThan(0);
+    for (const subscription of ndk.subscriptions) expect(subscription.stop).toHaveBeenCalled();
     expect(publishEvent).not.toHaveBeenCalled();
   }
 );
@@ -442,16 +466,16 @@ it('clamps a future base and logs only its delta once per publish', async () => 
 it('of two profiles from the same second, takes the one with the lower id, remote or saved', async () => {
   const emitting = (...events: { id: string; about: string }[]) => {
     const ndk = makeNdk();
-    ndk.subscription.start.mockImplementation(async () => {
+    ndk.onStart.mockImplementation(async (subscription) => {
       for (const { id, about } of events)
-        ndk.subscription.emit('event', {
+        subscription.emit('event', {
           pubkey,
           kind: 0,
           id,
           created_at: 20,
           content: JSON.stringify({ about }),
         });
-      ndk.eose();
+      subscription.eose();
     });
     return ndk;
   };
@@ -527,10 +551,11 @@ describe('the profile a save builds on, and where it is sent', () => {
     const TWO = 'wss://two.example/';
     mockKnown = [RELAY, TWO];
     const ndk = makeNdk();
-    ndk.subscription.start.mockImplementation(async () => {
+    ndk.onStart.mockImplementation(async (subscription) => {
       // Relay two holds the newer profile and never answers.
-      ndk.subscription.emit('event', kind0('c'.repeat(64), 20, { name: 'Old' }));
-      ndk.eose();
+      if (subscription.url !== RELAY) return;
+      subscription.emit('event', kind0('c'.repeat(64), 20, { name: 'Old' }));
+      subscription.eose();
     });
     const pending = publish(ndk);
     await readsTimeOut(SILENT_READS_BEFORE_LEFT_OUT - 1);
@@ -551,9 +576,9 @@ describe('the profile a save builds on, and where it is sent', () => {
   it('builds on the profile the editor opened on when it is newer than what the relays read hold', async () => {
     const opened = { content: { about: 'opened' }, createdAt: 30, eventId: 'd'.repeat(64) };
     const ndk = makeNdk();
-    ndk.subscription.start.mockImplementation(async () => {
-      ndk.subscription.emit('event', kind0('c'.repeat(64), 20, { about: 'older' }));
-      ndk.eose();
+    ndk.onStart.mockImplementation(async (subscription) => {
+      subscription.emit('event', kind0('c'.repeat(64), 20, { about: 'older' }));
+      subscription.eose();
     });
     await publish(ndk, { status: 'found', snapshot: opened });
     const { event } = jest.mocked(publishEvent).mock.calls[0][0];
