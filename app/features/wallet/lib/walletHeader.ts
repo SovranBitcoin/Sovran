@@ -18,7 +18,6 @@ export const HEADER_LAYOUT = {
   HORIZONTAL_PADDING: 16,
   BUTTON_SPACING: 12,
   BUTTON_HEIGHT: 54,
-  CONTENT_PADDING_HORIZONTAL: 16,
   CONTENT_PADDING_VERTICAL: 14,
   ANDROID_OVERLAY_OFFSET: 8,
   ANDROID_BUTTON_SIZE: headerButtonSize,
@@ -47,12 +46,4 @@ const SIDE =
 /** Use in components with useWindowDimensions().width for reactive layout. */
 export function getHeaderTitleWidthFromWidth(windowWidth: number): number {
   return windowWidth - SIDE * 2;
-}
-
-/** Content width derived from button width (e.g. for BalanceDisplay inside header). */
-export function getContentWidthFromButtonWidth(
-  buttonWidth: number | undefined
-): number | undefined {
-  if (buttonWidth === undefined) return undefined;
-  return Math.max(0, buttonWidth - HEADER_LAYOUT.CONTENT_PADDING_HORIZONTAL);
 }
