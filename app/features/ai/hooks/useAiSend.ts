@@ -113,6 +113,27 @@ function availableChain(
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
+/** The account and conversation a send or regenerate belongs to, taken before its first wait. */
+type Owner = { account: number; anonymous: boolean; conversationId: string | null };
+
+function currentOwner(): Owner {
+  const state = useRoutstrStore.getState();
+  return {
+    account: useProfileStore.getState().activeAccountIndex,
+    anonymous: state.isAnonymousMode,
+    conversationId: selectConversationId(state),
+  };
+}
+
+/** What moved since `owner` was taken: a request then would be sent for the wrong one. */
+function ownerChange(owner: Owner): 'none' | 'account' | 'conversation' {
+  const now = currentOwner();
+  if (now.account !== owner.account) return 'account';
+  if (now.anonymous !== owner.anonymous || now.conversationId !== owner.conversationId)
+    return 'conversation';
+  return 'none';
+}
+
 /**
  * Encapsulates the routstr send + stream + balance-refresh flow for the AI
  * tab. Two entry points share the same streaming core:
@@ -950,8 +971,8 @@ export function useAiSend() {
       // provider, a mint the provider refuses and a declined confirmation used
       // to be indistinguishable from outside.
       const trimmed = userMessage.trim();
+      const owner = currentOwner();
       const storeNow = useRoutstrStore.getState();
-      const owner = useProfileStore.getState().activeAccountIndex;
       const quotedFunds = latestFunds.current;
       const activeProvider = storeNow.userNodeBaseUrl;
       // Quoted from the same chain the send will walk, refused models last, so
@@ -994,6 +1015,25 @@ export function useAiSend() {
         timestamp,
         ...(attachments && attachments.length > 0 ? { attachments } : {}),
       };
+      const answerPlaceholder = {
+        id: assistantMessageId,
+        parentId: userMessageId,
+        role: 'assistant' as const,
+        content: '',
+        timestamp: timestamp + 1,
+      };
+      // Checked after every wait before the request: an account or
+      // conversation that moved meanwhile would get the answer, and the bill,
+      // for a question asked elsewhere. Nothing is sent; a question asked in a
+      // saved conversation is left there, unanswered, to be asked again.
+      const ownerMoved = () => {
+        const change = ownerChange(owner);
+        if (change === 'none') return false;
+        aiLog.info('ai.send.owner_changed', { flowId, change });
+        if (change === 'conversation' && owner.conversationId !== null)
+          addMessages(owner.conversationId, [pendingUserMessage, answerPlaceholder]);
+        return true;
+      };
       // Assembly (incl. the inline-image window and per-attachment encoding)
       // is shared with retry via `assembleApiMessages` so the two flows can't
       // diverge — and now also shared with the quote, so the priced request
@@ -1005,6 +1045,7 @@ export function useAiSend() {
       const { messages: apiMessages, imageCount } = trimmed
         ? await assembleApiMessages([...activePath, pendingUserMessage], encodeChatImage)
         : { messages: [], imageCount: 0 };
+      if (ownerMoved()) return;
 
       // The node's admission gate for this body, computed the way the node
       // computes it. `null` when the model carries no usable pricing, which
@@ -1070,10 +1111,14 @@ export function useAiSend() {
             reserveKnown: gate.reserveKnown,
           });
           if (!allowed) return;
+          if (ownerChange(owner) === 'conversation') {
+            ownerMoved();
+            return;
+          }
           const current = useRoutstrStore.getState();
           const currentFunds = latestFunds.current;
           if (
-            useProfileStore.getState().activeAccountIndex !== owner ||
+            useProfileStore.getState().activeAccountIndex !== owner.account ||
             current.userNodeBaseUrl !== activeProvider ||
             current.selectedProvider !== storeNow.selectedProvider ||
             current.selectedTier !== storeNow.selectedTier ||
@@ -1102,16 +1147,7 @@ export function useAiSend() {
 
       // One write: a question is never saved without its answer, so one left
       // by a kill reads as an answer to ask again.
-      addMessages([
-        { ...pendingUserMessage, pending: true },
-        {
-          id: assistantMessageId,
-          parentId: userMessageId,
-          role: 'assistant',
-          content: '',
-          timestamp: timestamp + 1,
-        },
-      ]);
+      addMessages(conversationId, [{ ...pendingUserMessage, pending: true }, answerPlaceholder]);
 
       try {
         await streamIntoPlaceholder({
@@ -1160,6 +1196,7 @@ export function useAiSend() {
    */
   const retryInner = useCallback(
     async (messageId: string) => {
+      const owner = currentOwner();
       const stateNow = useRoutstrStore.getState();
       const original = stateNow.conversationHistory.find((m) => m.id === messageId);
       if (!original || original.role !== 'assistant') {
@@ -1180,14 +1217,20 @@ export function useAiSend() {
         aiLog.warn('ai.retry.no_context', { messageId });
         return;
       }
+      // The answer stays in its own conversation, to be asked again from there.
+      const change = ownerChange(owner);
+      if (change !== 'none') {
+        aiLog.info('ai.retry.owner_changed', { messageId, change });
+        return;
+      }
 
-      const conversationId = selectConversationId(useRoutstrStore.getState());
+      const { conversationId } = owner;
       const timestamp = Date.now();
       const newAssistantId = `msg-${timestamp}-r`;
       const flowId = `ai-retry-${timestamp}`;
       const parentId = original.parentId ?? null;
 
-      addMessages([
+      addMessages(conversationId, [
         {
           id: newAssistantId,
           parentId,
