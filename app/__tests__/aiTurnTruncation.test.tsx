@@ -36,7 +36,7 @@ jest.mock('@/shared/hooks/useThemeColor', () => ({
     // eslint-disable-next-line no-restricted-syntax -- withAlpha requires a real hex in this theme mock.
     typeof token === 'string' ? '#101010' : token.map(() => '#101010'),
 }));
-jest.mock('@/shared/lib/popup', () => ({ popup: jest.fn() }));
+jest.mock('@/shared/lib/popup', () => ({ popup: jest.fn(), staticPopup: jest.fn() }));
 jest.mock('@/shared/ui/primitives/Pressable', () => ({ Pressable: stub('Pressable') }));
 jest.mock('@/shared/ui/primitives/Text', () => ({ Text: stub('Text') }));
 jest.mock('@/shared/ui/primitives/Spinner', () => ({ Spinner: stub('Spinner') }));
@@ -171,5 +171,31 @@ describe('the bubble for an answer that stopped partway', () => {
     });
     expect(onRetry).toHaveBeenCalledWith(MESSAGE_ID);
     act(() => r.unmount());
+  });
+});
+
+describe('copying an answer', () => {
+  it('says Copied once the clipboard has it, and Failed to copy when the write is refused', async () => {
+    const { setStringAsync } = jest.requireMock<{ setStringAsync: jest.Mock }>('expo-clipboard');
+    const { popup, staticPopup } = jest.requireMock<{ popup: jest.Mock; staticPopup: jest.Mock }>(
+      '@/shared/lib/popup'
+    );
+    popup.mockClear();
+    const r = render(<AiMessageBubble message={answer} />);
+    const copy = () =>
+      act(async () => {
+        await r.root.findAllByProps({ testID: `ai-message-copy-${MESSAGE_ID}` })[0].props.onPress();
+      });
+
+    setStringAsync.mockResolvedValueOnce(undefined);
+    await copy();
+    expect(setStringAsync).toHaveBeenLastCalledWith(answer.content);
+    expect(popup).toHaveBeenCalledWith(expect.objectContaining({ message: 'Copied' }));
+
+    popup.mockClear();
+    setStringAsync.mockRejectedValueOnce(new Error('clipboard unavailable'));
+    await copy();
+    expect(popup).not.toHaveBeenCalled();
+    expect(staticPopup).toHaveBeenCalledWith('copy-failed');
   });
 });

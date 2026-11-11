@@ -28,7 +28,7 @@ import type { UnsignedEvent } from '@/features/nostrSigner/lib/nip46Types';
 import { useNostrPersonDisplay } from '@/shared/hooks/useNostrPersonDisplay';
 import { useNostrProfileMetadataMany } from '@/shared/hooks/useNostrProfileMetadata';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { popup } from '@/shared/lib/popup';
+import { popup, staticPopup } from '@/shared/lib/popup';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Skeleton } from '@/shared/ui/primitives/Skeleton';
@@ -388,8 +388,10 @@ export function ExpandableEventJson({
 
   const toggle = () => setExpanded((value) => !value);
   const copyJson = () => {
-    void Clipboard.setStringAsync(fullJson);
-    popup({ message: 'Copied', type: 'success', variant: 'toast', durationMs: 1500 });
+    Clipboard.setStringAsync(fullJson).then(
+      () => popup({ message: 'Copied', type: 'success', variant: 'toast', durationMs: 1500 }),
+      () => staticPopup('copy-failed')
+    );
   };
 
   return (

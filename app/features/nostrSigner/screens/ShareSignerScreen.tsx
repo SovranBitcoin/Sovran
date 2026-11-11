@@ -34,7 +34,7 @@ import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { INVARIANT_BLACK, INVARIANT_WHITE } from '@/shared/lib/brandColors';
 import { nostrLog } from '@/shared/lib/logger';
-import { popup } from '@/shared/lib/popup';
+import { popup, staticPopup } from '@/shared/lib/popup';
 import { relays as defaultSignerRelays } from '@/shared/ndk';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { ListRow } from '@/shared/ui/composed/ListRow';
@@ -126,8 +126,10 @@ export function ShareSignerScreen(): React.ReactElement {
 
   const copyLink = useSingleFlight(async () => {
     if (state.status !== 'ready') return;
-    await Clipboard.setStringAsync(state.uri);
-    popup({ message: 'Copied', type: 'success', variant: 'toast', durationMs: 1500 });
+    await Clipboard.setStringAsync(state.uri).then(
+      () => popup({ message: 'Copied', type: 'success', variant: 'toast', durationMs: 1500 }),
+      () => staticPopup('copy-failed')
+    );
   });
 
   const confirmRotate = () => {
