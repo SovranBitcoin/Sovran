@@ -17,6 +17,7 @@ import { SettingsRecoveryScreen } from '@/features/settings/screens/SettingsReco
 import { discoverMints } from '@/shared/lib/apiClient';
 import { deleteMintOperation, probeMintForHistory } from '@/shared/lib/cashu/managerInternals';
 import { paramPopup, staticPopup } from '@/shared/lib/popup';
+import { cashuLog } from '@/shared/lib/logger';
 import { guardedRouter } from '@/shared/hooks/useGuardedRouter';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -698,6 +699,62 @@ describe('a mint that times out while still restoring', () => {
     expect(mockUntrustMint).not.toHaveBeenCalled();
     expect(texts(renderer)).toContain('Timed out');
   });
+
+  /** A discovered mint, `EMPTY`, whose restore times out; nothing is found there. */
+  async function discoveredMintTimesOut() {
+    mockMints = [];
+    const EMPTY = 'https://empty.example';
+    jest.mocked(discoverMints).mockResolvedValue(
+      ok({
+        mints: [
+          { mintUrl: EMPTY, hasAudit: true, state: 'OK', averageScore: null, reviewCount: 0 },
+        ],
+      }) as never
+    );
+    jest.mocked(probeMintForHistory).mockResolvedValue(true);
+    const run = await runPastTimeout({ mint: EMPTY, searchAll: true });
+    return { ...run, EMPTY };
+  }
+
+  it('untrusts a discovered mint it timed out once its late restore finds nothing there', async () => {
+    const { renderer, finishA, EMPTY } = await discoveredMintTimesOut();
+    // Left trusted while its restore may still find funds, and reported so.
+    expect(mockUntrustMint).not.toHaveBeenCalled();
+    expect(cashuLog.info).toHaveBeenCalledWith(
+      'recovery.cleanup.timed_out_mints_left_trusted',
+      expect.objectContaining({ count: 1 })
+    );
+
+    finishA();
+    await advance(0);
+
+    // What the tidy-up would have done had it known: the run that trusted it untrusts it.
+    expect(mockUntrustMint.mock.calls.map((call) => call[0])).toEqual([EMPTY]);
+    expect(texts(renderer)).toContain('Timed out');
+  });
+
+  it('keeps trusting a discovered mint it timed out when another run has started since', async () => {
+    const { finishA } = await discoveredMintTimesOut();
+    // The mint is trusted now, so the next run restores it as one of its own.
+    mockMints = [{ mintUrl: 'https://empty.example', mintInfo: { name: 'Empty' } }];
+    mockRestoreKeyset.mockImplementation(() => Promise.resolve());
+    const next = await mount();
+    await act(async () => {
+      void byTestId(next, 'recovery-swipe')[0]!.props.onConfirm();
+      await jest.advanceTimersByTimeAsync(0);
+    });
+
+    finishA();
+    await advance(0);
+
+    expect(mockUntrustMint).not.toHaveBeenCalled();
+  });
+
+  it('keeps trusting a discovered mint it timed out while its late result never comes', async () => {
+    await discoveredMintTimesOut();
+    await advance(600_000);
+    expect(mockUntrustMint).not.toHaveBeenCalled();
+  });
 });
 
 describe('forced recovery at startup', () => {
@@ -772,6 +829,8 @@ describe('forced recovery at startup', () => {
     // has ended (F178), but a mint's outcome is final: its row stays timed out.
     expect(texts(renderer)).toContain('Timed out');
     expect(texts(renderer)).toContain('Recovered from 1 mint, but 1 failed.');
+    // A known mint was trusted before the run: its late result, empty, untrusts nothing.
+    expect(mockUntrustMint).not.toHaveBeenCalled();
   });
 
   it('keeps the pending operations of a mint that timed out', async () => {
