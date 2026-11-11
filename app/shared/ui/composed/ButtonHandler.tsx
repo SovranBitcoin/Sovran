@@ -72,7 +72,7 @@ import { actionMenuSheet } from '@/shared/lib/popup/popups/actionMenuSheet';
  * Defines the properties for each button in the ButtonHandler component.
  * Supports conditional rendering, loading states, and async operations.
  */
-export interface ButtonHandlerButton {
+interface ButtonHandlerButton {
   /** Test identifier for automated testing */
   testID: string;
   /** Whether the button is disabled */
