@@ -598,3 +598,20 @@ None of these is built yet. Each names the follow-up it settles.
 
 Still without a ruling: the rest of F243 and F244, the saved-but-unread fields and the unmeasured speed-ups in F245,
 pass 3 C2 (two facade reads with no caller) and C4 (one writer for the saved profile list).
+
+## Device runs
+
+**2026-11-12, iOS simulator, by Claude Fable 5.2.** A rebuilt 0.1.3 holding two accounts, a test mint, three history
+rows and a pending send was upgraded in place to `surgery/sweep-1` at `8b9aadbd7`: nothing was lost and no store was
+reset (the full row is in `docs/architecture/persistence/evidence-ledger.md`, "Real upgrades"). On the upgraded
+install these opened without a visible fault: wallet home, the receive hub and all four receive tabs, ecash send up
+to the amount and a Lightning invoice up to the Pay preview, history and the filter sheet (the count matched the
+list), the mint list, add mint and a mint page, settings, contacts and a profile, the feed, the map, the AI chat
+(full edition) and an account switch both ways.
+
+Seen: the app said "You are offline" while online because the one server it probes was down (the decided item above);
+the wallet header avatar was blank with that server down (not traced); released 0.1.3 crashed once when creating the
+second account, the branch build did not.
+
+Not done: Android; a store-signed build on a phone; NFC and Bluetooth; paying or sending from the new build; Follow,
+posting, an AI question. By the persistence rule the verdict stays INCONCLUSIVE until Android is run.
