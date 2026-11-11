@@ -2,13 +2,14 @@ import { registerAccountScoped } from '@/shared/lib/account/accountRegistry';
 import { verifyNip05 } from 'wallet';
 import NDK, { NDKEvent, NDKSubscriptionCacheUsage } from '@nostr-dev-kit/ndk-mobile';
 import { Result, ResultAsync, err, ok, type Result as ResultType } from 'neverthrow';
-import { parseProfileMetadata } from 'nostr';
+import { parseProfileMetadata, supersedes } from 'nostr';
 import { withSkippedPersistWrites } from '@/shared/lib/cashu/profileScopedStorage';
 import { nostrLog } from '@/shared/lib/logger';
 import { buildNostrDataLayer } from '@/shared/lib/nostr/buildNostrDataLayer';
 import { publishEvent } from '@/shared/lib/nostr/publish/publishEvent';
 import type { PublishError, PublishResult } from '@/shared/lib/nostr/publish/types';
 import { getOwnWriteRelays } from '@/shared/lib/nostr/outbox/relayListStore';
+import { nextReplaceableCreatedAt } from '@/shared/lib/nostr/ownReplaceableEvent';
 import { resolveWriteRelays } from '@/shared/lib/nostr/outbox/resolveWriteRelays';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 import {
@@ -34,15 +35,16 @@ export function applyProfilePatch(
   }
   return content;
 }
+// A base beyond this skew window is logged (clock_skew) but still superseded
+// by +1; capping below it would make every later edit unpublishable.
 export const PROFILE_CREATED_AT_MAX_SKEW_SECONDS = 300;
-// Kind-0 is replaceable: a lower created_at than the current event is ignored
-// by every relay, so the new event must always be newer than its base. A base
-// beyond the skew window is logged (clock_skew) but still superseded by +1;
-// capping below it would make every later edit unpublishable.
-export const nextProfileCreatedAtSec = (
-  baseCreatedAtSec = 0,
-  nowSeconds = Math.floor(Date.now() / 1000)
-) => Math.max(nowSeconds, baseCreatedAtSec + 1);
+
+/** Which of two kind-0 snapshots stands, by the rule relays apply. */
+const standsOver = (a: OwnProfileSnapshot, b: OwnProfileSnapshot) =>
+  supersedes(
+    { created_at: a.createdAt, id: a.eventId },
+    { created_at: b.createdAt, id: b.eventId }
+  );
 
 export function parseOwnProfileSnapshot(event: {
   content: string;
@@ -129,13 +131,7 @@ export async function loadOwnProfileMetadata(
         sawEvent = true;
         const parsed =
           event.pubkey === pubkey && event.kind === 0 ? parseOwnProfileSnapshot(event) : null;
-        if (
-          parsed &&
-          (!snapshot ||
-            parsed.createdAt > snapshot.createdAt ||
-            (parsed.createdAt === snapshot.createdAt && parsed.eventId < snapshot.eventId))
-        )
-          snapshot = parsed;
+        if (parsed && (!snapshot || standsOver(parsed, snapshot))) snapshot = parsed;
       });
       subscription.on('eose', () => {
         if (complete()) finish();
@@ -151,12 +147,7 @@ export async function loadOwnProfileMetadata(
     useProfileStore.getState().getActiveProfile()?.pubkey === pubkey
       ? useOwnProfileMetadataStore.getState().latest
       : null;
-  if (
-    latest &&
-    (remote.status !== 'found' ||
-      latest.createdAt > remote.snapshot.createdAt ||
-      (latest.createdAt === remote.snapshot.createdAt && latest.eventId < remote.snapshot.eventId))
-  )
+  if (latest && (remote.status !== 'found' || standsOver(latest, remote.snapshot)))
     return { status: 'found', snapshot: latest };
   return remote;
 }
@@ -228,7 +219,7 @@ export function publishOwnProfileMetadata({
     event.kind = 0;
     event.pubkey = pubkey;
     const nowSeconds = Math.floor(Date.now() / 1000);
-    event.created_at = nextProfileCreatedAtSec(base?.createdAt, nowSeconds);
+    event.created_at = nextReplaceableCreatedAt(base?.createdAt, nowSeconds);
     if (base && base.createdAt > nowSeconds + PROFILE_CREATED_AT_MAX_SKEW_SECONDS)
       nostrLog.warn('nostr.profile.publish.clock_skew', {
         deltaSeconds: base.createdAt - nowSeconds,
