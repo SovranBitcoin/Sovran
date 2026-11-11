@@ -243,6 +243,8 @@ type NfcWriteBackEffectSuccess =
     }
   | {
       kind: 'stale';
+      /** Whether the token reached the tag before the turn went stale. */
+      delivered: boolean;
     };
 
 type NfcWriteBackEffectError = {
@@ -1733,6 +1735,21 @@ export function runNfcWriteBackEffect({
     context: summarizeContext(context),
   });
 
+  // The write-back holds the tag session from here and lets it go on every
+  // way out, a stale one included: no one else releases it. A release that
+  // fails is logged; the session is gone either way.
+  const releaseSession = async (failurePath: boolean): Promise<void> => {
+    try {
+      await nfcAdapter.releaseSession();
+      logger.info('effects.nfcWriteBack.release.completed', { failurePath });
+    } catch (releaseErr) {
+      logger.warn('effects.nfcWriteBack.release.failed', {
+        failurePath,
+        error: errField(releaseErr),
+      });
+    }
+  };
+
   return ResultAsync.fromPromise(
     (async () => {
       let nfcSendResult: NfcSendOperationResult | null = null;
@@ -1751,22 +1768,20 @@ export function runNfcWriteBackEffect({
         });
         if (isStale('executeNfcSend')) {
           logger.info('effects.nfcWriteBack.stale', { op: 'executeNfcSend' });
-          return { kind: 'stale' } as const;
+          await releaseSession(false);
+          return { kind: 'stale', delivered: false } as const;
         }
 
         logger.info('effects.nfcWriteBack.progress', { phase: 'writing' });
         onProgress?.({ phase: 'writing' });
         await nfcAdapter.writeToken(nfcSendResult.token);
-        if (isStale('nfc.writeToken')) {
-          logger.info('effects.nfcWriteBack.stale', { op: 'nfc.writeToken' });
-          return { kind: 'stale' } as const;
-        }
       } catch (cause) {
         if (isStale('executeNfcSend.catch')) {
           logger.info('effects.nfcWriteBack.stale', {
             op: 'executeNfcSend.catch',
           });
-          return { kind: 'stale' } as const;
+          await releaseSession(true);
+          return { kind: 'stale', delivered: false } as const;
         }
 
         logger.warn('effects.nfcWriteBack.failed', {
@@ -1792,17 +1807,7 @@ export function runNfcWriteBackEffect({
           }
         }
 
-        try {
-          await nfcAdapter.releaseSession();
-          logger.info('effects.nfcWriteBack.release.completed', {
-            failurePath: true,
-          });
-        } catch (releaseErr) {
-          logger.warn('effects.nfcWriteBack.release.failed', {
-            error: errField(releaseErr),
-          });
-          // Release is idempotent and best-effort on the failure path.
-        }
+        await releaseSession(true);
 
         throw buildNfcWriteBackError({
           cause,
@@ -1812,22 +1817,13 @@ export function runNfcWriteBackEffect({
       }
 
       // The tag holds the token and the receiver may already have redeemed
-      // it: the payment is delivered. A session that will not close is logged
-      // and undoes nothing; taking the ecash back now could fail and leave
-      // the payment unrecorded, for Pay to send again.
-      try {
-        await nfcAdapter.releaseSession();
-      } catch (releaseErr) {
-        logger.warn('effects.nfcWriteBack.release.failed', {
-          failurePath: false,
-          error: errField(releaseErr),
-        });
-      }
-      if (isStale('nfc.releaseSession')) {
-        logger.info('effects.nfcWriteBack.stale', {
-          op: 'nfc.releaseSession',
-        });
-        return { kind: 'stale' } as const;
+      // it: the payment is delivered, also when a reset overtook the write. A
+      // session that will not close undoes nothing; taking the ecash back now
+      // could fail and leave the payment unrecorded, for Pay to send again.
+      await releaseSession(false);
+      if (isStale('nfc.writeToken')) {
+        logger.info('effects.nfcWriteBack.stale', { op: 'nfc.writeToken' });
+        return { kind: 'stale', delivered: true } as const;
       }
 
       return buildNfcWriteBackResult(nfcSendResult, data, context);

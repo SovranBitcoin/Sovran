@@ -283,9 +283,9 @@ const LEAVES_SETTLED_PREVIEW: Record<FlowEvent["type"], boolean> = {
 /**
  * What an NFC tap holds from the read that started it until it ends: the tag
  * session the read left open, and the unit it switched the host to for the
- * terminal. One EXECUTE turn opens it and ends it in one place, which every
- * way out of its auto-resolve loop reaches. A tap a reset or a newer turn
- * overtook owns nothing and ends nowhere.
+ * terminal. One EXECUTE turn opens it and ends it in one place (`endNfcTap`),
+ * which every way out reaches. A tap a reset or a newer turn overtook ends
+ * there too: it lets go of the tag and the unit, and touches nothing else.
  */
 interface NfcTap {
   /** What the tag said. */
@@ -298,9 +298,10 @@ interface NfcTap {
 }
 
 /**
- * How a tap's loop left. A paid tap keeps the terminal's unit; a stopped one
- * switches back, then shows `error` when it has one; one that threw switches
- * back, then throws on.
+ * How a tap's loop left. A paid tap (its token is on the tag) keeps the
+ * terminal's unit; a stopped one switches back, then shows `error` when it has
+ * one; one that threw switches back, then throws on. An overtaken tap ends as
+ * paid or stopped and shows and throws nothing.
  */
 type NfcTapEnd =
   | { kind: "paid" }
@@ -1037,6 +1038,29 @@ export function createPaymentMachine(
     return task;
   }
 
+  /**
+   * Ends an NFC tap however it left: releases the tag session unless the
+   * write-back did, and switches the unit back unless the tap paid. It does
+   * both for a tap a reset or a newer turn overtook as well, then returns
+   * false, and that turn returns without touching the machine.
+   */
+  async function endNfcTap(
+    tap: NfcTap,
+    end: NfcTapEnd,
+    generation: number,
+  ): Promise<boolean> {
+    if (tap.session === "held") {
+      tap.session = "released";
+      await tap.adapter.releaseSession().catch((error: unknown) => {
+        logger.warn("machine.nfc.release.failed", { error: errField(error) });
+      });
+    }
+    if (end.kind !== "paid") {
+      await tap.unitSwitch?.restore().catch(() => undefined);
+    }
+    return !isStaleGeneration(generation, "nfc.tap.end");
+  }
+
   // Every exit of a turn goes through `finishTurn`, except a stale
   // continuation, which returns: it owns nothing.
   const send = async (event: FlowEvent): Promise<void> => {
@@ -1432,12 +1456,7 @@ export function createPaymentMachine(
                   message: t("NFC_UNIT_SWITCH_FAILED", getLocale?.() ?? "en"),
                 };
               }
-              if (isStaleGeneration(sendGeneration, "nfc.switchUnit")) return;
               unit = getUnit?.() ?? configUnit;
-              // A bound context catches up with the unit only when React next
-              // re-runs its binding, so its `mintBalances` may still be the old
-              // unit's here. `unitBalances` holds every unit and does not lag:
-              // it is what found this request funded above.
               if (switched.isOk()) {
                 nfcTap.unitSwitch = {
                   unit,
@@ -1446,6 +1465,14 @@ export function createPaymentMachine(
                   },
                 };
               }
+              if (isStaleGeneration(sendGeneration, "nfc.switchUnit")) {
+                await endNfcTap(nfcTap, { kind: "stopped" }, sendGeneration);
+                return;
+              }
+              // A bound context catches up with the unit only when React next
+              // re-runs its binding, so its `mintBalances` may still be the old
+              // unit's here. `unitBalances` holds every unit and does not lag:
+              // it is what found this request funded above.
               walletCtx = readContext();
               // A missing/unsupported host switch keeps the existing unit hard-stop.
             }
@@ -1727,7 +1754,11 @@ export function createPaymentMachine(
                       unit: flowCtx.unit,
                     })
                   : { payable: true as const };
-                if (isStaleGeneration(sendGeneration, "nfc.payability")) return;
+                // Overtaken: the tap's end lets go of the tag and the unit.
+                if (isStaleGeneration(sendGeneration, "nfc.payability")) {
+                  end = { kind: "stopped" };
+                  break;
+                }
                 if (payability.payable) {
                   nfcPayableMints.add(candidate.mintUrl);
                   best = candidate;
@@ -1740,6 +1771,7 @@ export function createPaymentMachine(
                   reason: payability.reason,
                 });
               }
+              if (end) continue;
               if (best) {
                 logger.info("machine.nfc.mintChosen", {
                   ...mintUrlFields(best.mintUrl),
@@ -1838,7 +1870,11 @@ export function createPaymentMachine(
                   mintUrl: data.mintUrl,
                   unit: data.unit,
                 });
-                if (isStaleGeneration(sendGeneration, "nfc.payability")) return;
+                // Overtaken: the tap's end lets go of the tag and the unit.
+                if (isStaleGeneration(sendGeneration, "nfc.payability")) {
+                  end = { kind: "stopped" };
+                  continue;
+                }
                 if (!payability.payable) {
                   nfcRefusedMints.set(data.mintUrl, payability.reason);
                   logger.info("machine.nfc.mintRefused", {
@@ -1890,7 +1926,11 @@ export function createPaymentMachine(
               nfcTap.session = "released";
 
               if (effect.isOk()) {
-                if (effect.value.kind === "stale") return;
+                if (effect.value.kind === "stale") {
+                  // Overtaken: a token on the tag is paid, and keeps the unit.
+                  end = effect.value.delivered ? { kind: "paid" } : { kind: "stopped" };
+                  continue;
+                }
                 setStep(effect.value.step, effect.value.data);
                 // The request is paid and its flow is over: the context keeps
                 // nothing (request, intent, amount, mint) that choosing a mint
@@ -1923,21 +1963,14 @@ export function createPaymentMachine(
           }
         } catch (error) {
           // A throw ends the tap too, before the safety net finishes the turn.
-          if (isStaleGeneration(sendGeneration, "nfc.tap.threw")) throw error;
           end = { kind: "threw", error };
         }
 
-        // The tap ends here, however the loop left it.
-        if (nfcTap.session === "held") {
-          await nfcTap.adapter.releaseSession();
-          if (isStaleGeneration(sendGeneration, "nfc.releaseSession")) return;
-        }
-        if (end?.kind !== "paid") {
-          await nfcTap.unitSwitch?.restore().catch(() => undefined);
-          if (isStaleGeneration(sendGeneration, "nfc.revertUnit")) return;
-        }
-        if (end?.kind === "threw") throw end.error;
-        if (end?.kind === "stopped" && end.error) setStep("error", end.error);
+        // The loop always leaves with an end; a missing one is a stop.
+        const tapEnd: NfcTapEnd = end ?? { kind: "stopped" };
+        if (!(await endNfcTap(nfcTap, tapEnd, sendGeneration))) return;
+        if (tapEnd.kind === "threw") throw tapEnd.error;
+        if (tapEnd.kind === "stopped" && tapEnd.error) setStep("error", tapEnd.error);
       }
 
       // Intercept action steps when operations are provided.

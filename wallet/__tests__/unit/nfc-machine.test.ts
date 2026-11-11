@@ -551,25 +551,95 @@ describe("what an NFC tap leaves behind when it ends", () => {
     expect(tm.machine.inspect().isExecuting).toBe(false);
   });
 
-  // A reset owns the machine now: the stranded tap releases nothing and
-  // restores nothing.
-  it("releases and restores nothing after a reset overtakes the switch", async () => {
-    const { tm, adapter, switchUnit } = setup({ unit: "usd" });
-    let finish!: () => void;
-    switchUnit.mockImplementationOnce(
-      () =>
-        new Promise<void>((resolve) => {
-          finish = resolve;
-        }),
-    );
-    const pending = tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
-    await vi.waitFor(() => expect(switchUnit).toHaveBeenCalledTimes(1));
-    tm.machine.reset();
-    finish();
-    await pending;
-    tm.assertStep("idle");
-    expect(adapter.releaseSession).not.toHaveBeenCalled();
-    expect(unitSwitches(switchUnit)).toEqual(["usd"]);
+  // A reset owns the machine now: the stranded tap changes no step, runs no
+  // handler and sends nothing, but still lets go of the tag and the unit.
+  describe("after a reset overtakes it", () => {
+    type Deferred = { promise: Promise<void>; resolve: () => void };
+    const deferred = (): Deferred => {
+      let resolve!: () => void;
+      const promise = new Promise<void>((r) => {
+        resolve = r;
+      });
+      return { promise, resolve };
+    };
+
+    async function overtake(
+      tap: ReturnType<typeof setup>,
+      waiting: Deferred,
+      reached: () => void,
+    ) {
+      const pending = tap.tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
+      await vi.waitFor(reached);
+      const handled = tap.tm.handlerCalls.length;
+      tap.tm.machine.reset();
+      waiting.resolve();
+      await pending;
+      tap.tm.assertStep("idle");
+      expect(tap.tm.handlerCalls).toHaveLength(handled);
+      expect(tap.tm.machine.inspect().isExecuting).toBe(false);
+    }
+
+    it("releases the tag and switches the unit back during the switch", async () => {
+      const tap = setup({ unit: "usd" });
+      const switched = deferred();
+      tap.switchUnit.mockImplementationOnce(() => switched.promise);
+      await overtake(tap, switched, () => expect(tap.switchUnit).toHaveBeenCalledTimes(1));
+      expect(sentMint(tap.tm)).toBeUndefined();
+      expect(tap.adapter.releaseSession).toHaveBeenCalledTimes(1);
+      expect(unitSwitches(tap.switchUnit)).toEqual(["usd", "sat"]);
+    });
+
+    it.each([
+      { picked: "the resolver", mints: [accepted] },
+      { picked: "the mint list", mints: [accepted, other] },
+    ])("releases the tag and switches the unit back during the payability check of a mint $picked chose", async ({ mints }) => {
+      const checked = deferred();
+      const payability = vi.fn(async () => {
+        await checked.promise;
+        return { payable: true as const };
+      });
+      const tap = setup({
+        unit: "usd",
+        mints,
+        balances: { [accepted]: 100, [other]: 100 },
+        operations: { paymentRequestPayabilityFrom: payability },
+      });
+      await overtake(tap, checked, () => expect(payability).toHaveBeenCalledTimes(1));
+      expect(sentMint(tap.tm)).toBeUndefined();
+      expect(tap.adapter.releaseSession).toHaveBeenCalledTimes(1);
+      expect(unitSwitches(tap.switchUnit)).toEqual(["usd", "sat"]);
+    });
+
+    it("switches the unit back during the release", async () => {
+      const tap = setup({ unit: "usd", operations: { paymentRequestPayabilityFrom: refuseFees("fees") } });
+      const released = deferred();
+      tap.adapter.releaseSession.mockImplementationOnce(() => released.promise);
+      await overtake(tap, released, () => expect(tap.adapter.releaseSession).toHaveBeenCalledTimes(1));
+      expect(tap.adapter.releaseSession).toHaveBeenCalledTimes(1);
+      expect(unitSwitches(tap.switchUnit)).toEqual(["usd", "sat"]);
+    });
+
+    it("releases the tag and switches the unit back while the token is created", async () => {
+      const created = deferred();
+      const executeNfcSend = vi.fn(async () => {
+        await created.promise;
+        return { token: "cashuB-token", operationId: "op-1", historyEntry: "{}" };
+      });
+      const tap = setup({ unit: "usd", operations: { executeNfcSend } });
+      await overtake(tap, created, () => expect(executeNfcSend).toHaveBeenCalledTimes(1));
+      expect(tap.adapter.writeToken).not.toHaveBeenCalled();
+      expect(tap.adapter.releaseSession).toHaveBeenCalledTimes(1);
+      expect(unitSwitches(tap.switchUnit)).toEqual(["usd", "sat"]);
+    });
+
+    it("releases the tag and keeps the terminal's unit once the token is on the tag", async () => {
+      const tap = setup({ unit: "usd" });
+      const written = deferred();
+      tap.adapter.writeToken.mockImplementationOnce(() => written.promise);
+      await overtake(tap, written, () => expect(tap.adapter.writeToken).toHaveBeenCalledTimes(1));
+      expect(tap.adapter.releaseSession).toHaveBeenCalledTimes(1);
+      expect(unitSwitches(tap.switchUnit)).toEqual(["usd"]);
+    });
   });
 });
 

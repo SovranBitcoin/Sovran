@@ -829,8 +829,9 @@ describe('runNfcWriteBackEffect', () => {
     expect(releaseSession).toHaveBeenCalledTimes(1);
   });
 
-  it('returns stale before writing when NFC send resolves after reset', async () => {
+  it('returns stale before writing when NFC send resolves after reset, and releases the session', async () => {
     const writeToken = vi.fn(async () => {});
+    const releaseSession = vi.fn(async () => {});
 
     const result = await runNfcWriteBackEffect({
       data: confirmPaymentRequestData,
@@ -839,18 +840,40 @@ describe('runNfcWriteBackEffect', () => {
         historyEntry: sendHistoryEntry('nfc-send-entry-1'),
         operationId: 'operation-1',
       }),
-      nfcAdapter: {
-        writeToken,
-        releaseSession: async () => {},
-      },
+      nfcAdapter: { writeToken, releaseSession },
       context: sendContext,
       isStale: (op) => op === 'executeNfcSend',
     });
 
     expect(result.isOk()).toBe(true);
     if (result.isErr()) return;
-    expect(result.value).toEqual({ kind: 'stale' });
+    expect(result.value).toEqual({ kind: 'stale', delivered: false });
     expect(writeToken).not.toHaveBeenCalled();
+    expect(releaseSession).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports a token written before the turn went stale as delivered, and releases the session', async () => {
+    const releaseSession = vi.fn(async () => {});
+    const rollbackSend = vi.fn(async () => {});
+
+    const result = await runNfcWriteBackEffect({
+      data: confirmPaymentRequestData,
+      executeNfcSend: async () => ({
+        token: 'cashuBnfc-token',
+        historyEntry: sendHistoryEntry('nfc-send-entry-1'),
+        operationId: 'operation-1',
+      }),
+      rollbackSend,
+      nfcAdapter: { writeToken: async () => {}, releaseSession },
+      context: sendContext,
+      isStale: (op) => op === 'nfc.writeToken',
+    });
+
+    expect(result.isOk()).toBe(true);
+    if (result.isErr()) return;
+    expect(result.value).toEqual({ kind: 'stale', delivered: true });
+    expect(rollbackSend).not.toHaveBeenCalled();
+    expect(releaseSession).toHaveBeenCalledTimes(1);
   });
 });
 
