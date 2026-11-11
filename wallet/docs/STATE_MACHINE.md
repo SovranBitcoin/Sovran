@@ -772,6 +772,10 @@ MUST:
 - NFC skips `enterSendMemo` entirely; it never prompts for a memo.
 - On a genuine `executeNfcSend` failure the effect rolls back the pending send
   via `operations.rollbackSend` before surfacing the error (`effects.ts:1085`).
+- When the write failed and that rollback failed or is missing
+  (`tokenOutstanding`), the token may have reached the terminal: the error
+  says so (`NFC_WRITE_OUTCOME_UNKNOWN`), and the flow context keeps nothing
+  that could rebuild the request, as after a paid tap (`forgetNfcPayment`).
 
 MUST NOT:
 

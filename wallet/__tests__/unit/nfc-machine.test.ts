@@ -739,3 +739,62 @@ describe("a paid NFC tap", () => {
     }
   });
 });
+
+// The write failed and taking the token back failed too: the token may have
+// reached the terminal, so the tap is treated as sent and nothing done on the
+// error screen rebuilds the request for Pay to send again.
+describe("an NFC tap whose token could not be taken back", () => {
+  const sent = (tm: ReturnType<typeof createTestMachine>) =>
+    tm.operationCalls.filter(
+      (call) => call.name === "executeNfcSend" || call.name === "executePaymentRequest",
+    ).length;
+
+  function failedTap() {
+    const tap = setup({
+      operations: {
+        rollbackSend: vi.fn(async () => {
+          throw new Error("mint unreachable");
+        }),
+      },
+    });
+    tap.adapter.writeToken.mockRejectedValueOnce(new Error("tag lost"));
+    return tap;
+  }
+
+  it("says the first token may have gone out", async () => {
+    const { tm } = failedTap();
+    await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
+    tm.assertStep("error");
+    expect(tm.machine.inspect()).toMatchObject({
+      code: "NFC_WRITE_FAILED",
+      message: expect.stringMatching(/may have reached the terminal/),
+    });
+    expect(tm.notificationCalls).toContainEqual({
+      key: "onNfcWriteFailed",
+      data: expect.objectContaining({
+        message: expect.stringMatching(/may have reached the terminal/),
+        authored: true,
+        rolledBack: false,
+        stage: "write",
+      }),
+    });
+  });
+
+  it("is not sent again after choosing a mint, an amount or the mint list", async () => {
+    for (const choose of [
+      (tm: ReturnType<typeof createTestMachine>) => tm.machine.changeMint(accepted),
+      (tm: ReturnType<typeof createTestMachine>) =>
+        tm.machine.enterAmount({ value: 50, unit: "sat" }, accepted),
+      (tm: ReturnType<typeof createTestMachine>) => tm.machine.requestMintSelector(),
+    ]) {
+      const { tm } = failedTap();
+      await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
+      tm.assertStep("error");
+
+      await choose(tm);
+      await tm.machine.confirmPaymentRequest();
+
+      expect(sent(tm)).toBe(1);
+    }
+  });
+});

@@ -27,6 +27,7 @@ export interface PaymentCopyResolver {
 export type PaymentCopyKey =
   | "nfc.unitNotFunded"
   | "nfc.unitSwitchFailed"
+  | "nfc.writeOutcomeUnknown"
   | "timeline.mint.unpaid.label"
   | "timeline.mint.unpaid.info"
   | "timeline.mint.unpaid.onchainInfo"

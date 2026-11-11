@@ -1072,6 +1072,20 @@ export function createPaymentMachine(
   }
 
   /**
+   * An NFC tap's payment went out, or may have: its flow is over, and the
+   * context keeps nothing (request, intent, amount, mint) that choosing a
+   * mint or an amount could rebuild a preview from for Pay to send again.
+   */
+  function forgetNfcPayment(): void {
+    flowCtx = {
+      unit: flowCtx.unit,
+      source: flowCtx.source,
+      rawInput: flowCtx.rawInput,
+      offline: flowCtx.offline,
+    };
+  }
+
+  /**
    * Lets go of a tap's tag session, once. A newer read took the session
    * over, so a tap whose read is no longer the latest leaves it alone.
    */
@@ -1980,6 +1994,7 @@ export function createPaymentMachine(
                     void notifications?.onNfcPaymentProgress?.(progress);
                   },
                   isStale: (op) => isStaleGeneration(sendGeneration, op),
+                  locale: getLocale?.() ?? "en",
                 });
               } finally {
                 endCommit(sendGeneration);
@@ -1994,15 +2009,7 @@ export function createPaymentMachine(
                   continue;
                 }
                 setStep(effect.value.step, effect.value.data);
-                // The request is paid and its flow is over: the context keeps
-                // nothing (request, intent, amount, mint) that choosing a mint
-                // or an amount could rebuild a preview from for Pay to send.
-                flowCtx = {
-                  unit: flowCtx.unit,
-                  source: flowCtx.source,
-                  rawInput: flowCtx.rawInput,
-                  offline: flowCtx.offline,
-                };
+                forgetNfcPayment();
                 announcePayment(effect.value);
                 end = { kind: "paid" };
               } else {
@@ -2013,6 +2020,9 @@ export function createPaymentMachine(
                 }
 
                 setStep("error", effect.error.data);
+                // Its token may have reached the terminal: like an
+                // undelivered send, it is not offered again.
+                if (effect.error.tokenOutstanding) forgetNfcPayment();
                 end = { kind: "stopped" };
               }
 

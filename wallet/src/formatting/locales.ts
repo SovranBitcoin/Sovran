@@ -29,6 +29,7 @@ type TranslationMap = Record<string, string>;
 const en: TranslationMap = {
   NFC_UNIT_SWITCH_FAILED: paymentCopyDefaults["nfc.unitSwitchFailed"],
   UNIT_NOT_FUNDED: paymentCopyDefaults["nfc.unitNotFunded"],
+  NFC_WRITE_OUTCOME_UNKNOWN: paymentCopyDefaults["nfc.writeOutcomeUnknown"],
   // Annotation reasons
   PAYABLE_ECASH: 'Payable with Cashu — no fees',
 
@@ -74,6 +75,7 @@ const en: TranslationMap = {
 const ar: TranslationMap = {
   NFC_UNIT_SWITCH_FAILED: 'تعذّر اختيار عملة المحطة. حاول مرة أخرى.',
   UNIT_NOT_FUNDED: 'تطلب هذه المحطة {unit}. ليس لديك نقد إلكتروني بعملة {unit} لدى جهة إصدار مقبولة.',
+  NFC_WRITE_OUTCOME_UNKNOWN: 'ربما وصلت الدفعة إلى المحطة. تحقّق من سجلّك قبل أن تدفع مرة أخرى.',
   PAYABLE_ECASH: 'يمكن الدفع بكاشو — بدون رسوم',
 
   INSUFFICIENT_BALANCE: 'رصيد غير كافٍ',
@@ -114,6 +116,7 @@ const ar: TranslationMap = {
 const de: TranslationMap = {
   NFC_UNIT_SWITCH_FAILED: 'Die Währung des Terminals konnte nicht ausgewählt werden. Versuche es erneut.',
   UNIT_NOT_FUNDED: 'Dieses Terminal verlangt {unit}. Du hast kein {unit}-Ecash bei einer akzeptierten Mint.',
+  NFC_WRITE_OUTCOME_UNKNOWN: 'Die Zahlung hat das Terminal vielleicht erreicht. Prüfe deinen Verlauf, bevor du erneut zahlst.',
   PAYABLE_ECASH: 'Zahlbar mit Cashu — keine Gebühren',
 
   INSUFFICIENT_BALANCE: 'Unzureichendes Guthaben',

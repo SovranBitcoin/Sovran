@@ -252,6 +252,11 @@ type NfcWriteBackEffectError = {
   cause: unknown;
   data: StepDataMap['error'];
   rolledBack: boolean;
+  /**
+   * A token was made and could not be taken back: it may have reached the
+   * terminal, so the payment must not be offered again.
+   */
+  tokenOutstanding: boolean;
   notifications: MachineEffectNotification[];
 };
 
@@ -371,6 +376,7 @@ interface RunNfcWriteBackEffectConfig {
   context: FlowContext;
   onProgress?: (data: NfcPaymentProgressNotificationData) => void;
   isStale: (op: string) => boolean;
+  locale?: string;
 }
 
 interface RunRecipientPubkeyEffectConfig {
@@ -804,12 +810,19 @@ function buildNfcWriteBackError(args: {
   cause: unknown;
   rolledBack: boolean;
   stage: 'prepare' | 'write';
+  locale: string;
 }): NfcWriteBackEffectError {
-  const { message, authored } = failureText(args.cause, 'NFC write failed');
+  const tokenOutstanding = args.stage === 'write' && !args.rolledBack;
+  // The cause is logged below; what the person needs is that the payment
+  // may have gone out.
+  const { message, authored } = tokenOutstanding
+    ? { message: t('NFC_WRITE_OUTCOME_UNKNOWN', args.locale), authored: true }
+    : failureText(args.cause, 'NFC write failed');
 
   logger.warn('effects.nfcWriteBack.error', {
     rolledBack: args.rolledBack,
     stage: args.stage,
+    tokenOutstanding,
     error: errField(args.cause),
   });
 
@@ -817,6 +830,7 @@ function buildNfcWriteBackError(args: {
     kind: 'failed',
     cause: args.cause,
     rolledBack: args.rolledBack,
+    tokenOutstanding,
     data: {
       code: 'NFC_WRITE_FAILED',
       message,
@@ -1722,6 +1736,7 @@ export function runNfcWriteBackEffect({
   context,
   onProgress,
   isStale,
+  locale = 'en',
 }: RunNfcWriteBackEffectConfig): ResultAsync<
   NfcWriteBackEffectSuccess,
   NfcWriteBackEffectError
@@ -1829,6 +1844,7 @@ export function runNfcWriteBackEffect({
           cause,
           rolledBack,
           stage: nfcSendResult ? 'write' : 'prepare',
+          locale,
         });
       }
 
