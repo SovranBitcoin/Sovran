@@ -25,7 +25,7 @@ import { aiLog } from '@/shared/lib/logger';
  * text view, and the elapsed-seconds tick (a setInterval inside the bubble)
  * doesn't even read this buffer.
  *
- * On stream completion, `useAiSend` calls `clearStreaming()` and the persisted
+ * On stream completion, `useAiSend` calls `clearStreaming(id)` and the persisted
  * `finalizeAssistantMessage` write captures the same content + reasoning +
  * thinking duration that was rendering live, so the bubble seamlessly swaps
  * from the live buffer to the persisted message.
@@ -72,7 +72,10 @@ export function setStreamingReasoning(id: string, reasoning: string): void {
   notify();
 }
 
-export function clearStreaming(): void {
+/** End `id`'s stream. No-op if a different id is active: a stream stopped by
+ *  a newer one must not clear the newer one's live text. */
+export function clearStreaming(id: string): void {
+  if (streamingId !== id) return;
   streamingId = null;
   streamingText = '';
   streamingReasoning = '';

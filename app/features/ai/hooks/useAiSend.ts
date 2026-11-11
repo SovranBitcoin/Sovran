@@ -936,8 +936,14 @@ export function useAiSend() {
           errorId: presentation.id,
         });
       } finally {
-        clearStreaming();
-        setStatus({ isSending: false, streamingMessageId: null });
+        // Only this stream's own state: a newer stream that stopped this one
+        // owns the live text and the sending state now.
+        clearStreaming(assistantMessageId);
+        setStatus((current) =>
+          current.streamingMessageId === assistantMessageId
+            ? { isSending: false, streamingMessageId: null }
+            : current
+        );
       }
     },
     [removeMessages, finalizeAssistantMessage, updateSessionTitle, walletSats]

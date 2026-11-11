@@ -504,6 +504,43 @@ describe('streaming an answer', () => {
     }
   );
 
+  it('a send that overlaps a regenerated answer keeps its own live text and sending state', async () => {
+    useRoutstrStore.setState({
+      conversationHistory: [
+        msg('u1', 'user', null, 1, 'first question'),
+        msg('a1', 'assistant', 'u1', 2, 'first answer'),
+      ],
+    });
+    arrangeStream();
+    const hook = renderHook(useAiSend);
+    act(() => {
+      void hook.result.current.retry('a1');
+    });
+    await tick();
+    const older = live;
+    await act(async () => older.push(content('regenerat')));
+
+    // The composer's send starts a second stream, which stops the first.
+    arrangeStream();
+    let sending!: Promise<unknown>;
+    act(() => {
+      sending = hook.result.current.send('second question');
+    });
+    await tick();
+    const newer = history().at(-1)!.id;
+    const bubble = renderHook(() => useStreamingContent(newer));
+    await act(async () => live.push(content('still here')));
+
+    expect(bubble.result.current).toBe('still here');
+    expect(hook.result.current).toMatchObject({ isSending: true, streamingMessageId: newer });
+
+    await act(async () => {
+      live.end();
+      await sending;
+    });
+    expect(history().at(-1)).toMatchObject({ id: newer, content: 'still here' });
+  });
+
   it('a second send while one streams is dropped', async () => {
     const { hook } = await startSend();
 
