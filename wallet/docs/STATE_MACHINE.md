@@ -286,9 +286,8 @@ send(event)
 
 Every exit of a turn goes through `finishTurn` (`createMachine.ts`, section
 "Turn"), which frees the lock only while the turn still owns it. The turn's
-state (generation, lock, `isExecuting`, the commit generation and the
-payment-request confirm holders) is written only by the functions in that
-section. `__tests__/flows/turn-exits.test.ts` pins every exit. Every host
+state (generation, lock, `isExecuting` and the commit generation) is written
+only by the functions in that section. `__tests__/flows/turn-exits.test.ts` pins every exit. Every host
 notification goes through one helper (`tell`): one that throws or rejects is
 logged, and the payment, the turn, the next step's handler and the caller's
 outcome carry on. Once a payment settles its step records it first, and its
@@ -311,8 +310,9 @@ releases a session only for a read that failed; after a read, releasing is
 the tap's alone, a failed write included. A read no tap took (its EXECUTE was
 dropped while money moved, or its input was not run) is let go by the scan
 that read it, under the same newer-read rule, and one dropped while money
-moved fires `onScanError('nfc')` (`endUntakenNfcRead`). A `confirmPaymentRequest()` call's result is settled only by its own
-turn, so a tap that sent nothing resolves `ignored`.
+moved fires `onScanError('nfc')` (`endUntakenNfcRead`). A `confirmPaymentRequest()` call hands its turn the holder its
+result goes in, so the result is settled only by its own turn's send, and a tap
+that sent nothing resolves `ignored`.
 
 Gather order is fixed: amount -> mint -> proofs -> terminal
 (`resolveNext.ts:256-264`).

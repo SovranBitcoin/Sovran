@@ -277,7 +277,7 @@ export function createPaymentMachine(
   // picker, and an earlier picker's list can finish loading under a later one.
   let mintListLoad = 0;
   // The turn: one `send()` call holds the machine from `beginTurn` to
-  // `finishTurn`. Only the functions under "Turn" below write these five.
+  // `finishTurn`. Only the functions under "Turn" below write these four.
   //
   // `flowGeneration` names the running turn and every async result of its
   // flow. A reset or a superseding event bumps it, so each continuation of
@@ -291,13 +291,6 @@ export function createPaymentMachine(
   // payment-request delivery, NFC write-back): every event is dropped, fresh
   // intent included, while it is the current generation.
   let commitGeneration: number | null = null;
-  // Result holders of `confirmPaymentRequest` calls no turn has taken yet.
-  // A call registers before `send`, and its turn takes it as it begins, so
-  // only that turn's own send settles it; a caller the lock drops keeps its
-  // `ignored`.
-  let pendingPaymentRequestConfirms: {
-    outcome: PaymentRequestConfirmOutcome;
-  }[] = [];
   const listeners = new Set<() => void>();
 
   function setStep<S extends FlowStep>(
@@ -399,7 +392,6 @@ export function createPaymentMachine(
     flowGeneration += 1;
     restartFlow();
     finishTurn(flowGeneration, "reset", { notify: false });
-    pendingPaymentRequestConfirms = [];
   }
 
   function setExecuting(value: boolean, announce = true): void {
@@ -427,28 +419,6 @@ export function createPaymentMachine(
   /** A reset may hand a newer turn the commit first; only its owner clears it. */
   function endCommit(generation: number): void {
     if (commitGeneration === generation) commitGeneration = null;
-  }
-
-  type ConfirmHolder = (typeof pendingPaymentRequestConfirms)[number];
-
-  function registerConfirm(): ConfirmHolder {
-    const holder: ConfirmHolder = { outcome: { kind: "ignored" } };
-    pendingPaymentRequestConfirms.push(holder);
-    return holder;
-  }
-
-  function unregisterConfirm(holder: ConfirmHolder): void {
-    const idx = pendingPaymentRequestConfirms.indexOf(holder);
-    if (idx >= 0) pendingPaymentRequestConfirms.splice(idx, 1);
-  }
-
-  /** Takes every registered confirm holder; returns how to settle them. */
-  function takeConfirms(): (outcome: PaymentRequestConfirmOutcome) => void {
-    const holders = pendingPaymentRequestConfirms;
-    pendingPaymentRequestConfirms = [];
-    return (outcome) => {
-      for (const h of holders) h.outcome = outcome;
-    };
   }
 
   /**
@@ -1057,10 +1027,14 @@ export function createPaymentMachine(
 
   // Every exit of a turn goes through `finishTurn`, except a stale
   // continuation, which returns: it owns nothing. `origin` is set for the
-  // EXECUTE of a scan.
+  // EXECUTE of a scan, `confirm` for a `confirmPaymentRequest` call: where
+  // its result goes. Only this turn's own send writes it, so a call the lock
+  // drops, or a tap that sends nothing, keeps its `ignored` whatever a later
+  // turn delivers.
   const runTurn = async (
     event: FlowEvent,
     origin: ScanOrigin | null,
+    confirm: { outcome: PaymentRequestConfirmOutcome } | null = null,
   ): Promise<void> => {
     const sendGeneration = beginTurn(event.type);
     if (sendGeneration === null) {
@@ -1068,11 +1042,9 @@ export function createPaymentMachine(
       return;
     }
     const stale = (op: string) => isStaleGeneration(sendGeneration, op);
-    // This caller's result holder, taken before anything awaits: only this
-    // turn's own send settles it, so a tap that sends nothing stays
-    // `ignored` whatever a later turn delivers.
-    const settleConfirm =
-      event.type === "CONFIRM_PAYMENT_REQUEST" ? takeConfirms() : () => {};
+    const settleConfirm = (outcome: PaymentRequestConfirmOutcome): void => {
+      if (confirm) confirm.outcome = outcome;
+    };
     logger.info("machine.event.received", {
       type: event.type,
       currentStep: step,
@@ -2482,13 +2454,11 @@ export function createPaymentMachine(
 
   const confirmMelt = () => send({ type: "CONFIRM_MELT" });
   const confirmPaymentRequest = async (): Promise<PaymentRequestConfirmOutcome> => {
-    const holder = registerConfirm();
-    try {
-      await send({ type: "CONFIRM_PAYMENT_REQUEST" });
-      return holder.outcome;
-    } finally {
-      unregisterConfirm(holder);
-    }
+    const holder: { outcome: PaymentRequestConfirmOutcome } = {
+      outcome: { kind: "ignored" },
+    };
+    await runTurn({ type: "CONFIRM_PAYMENT_REQUEST" }, null, holder);
+    return holder.outcome;
   };
 
   const reset = () => {
