@@ -829,9 +829,12 @@ describe('runNfcWriteBackEffect', () => {
     expect(releaseSession).toHaveBeenCalledTimes(1);
   });
 
-  it('returns stale before writing when NFC send resolves after reset, and releases the session', async () => {
+  // The token exists but never reached the tag: taking it back is the only
+  // way the ecash returns, as when the write fails.
+  it('returns stale before writing when NFC send resolves after reset, takes the token back and releases the session', async () => {
     const writeToken = vi.fn(async () => {});
     const releaseSession = vi.fn(async () => {});
+    const rollbackSend = vi.fn(async () => {});
 
     const result = await runNfcWriteBackEffect({
       data: confirmPaymentRequestData,
@@ -840,6 +843,7 @@ describe('runNfcWriteBackEffect', () => {
         historyEntry: sendHistoryEntry('nfc-send-entry-1'),
         operationId: 'operation-1',
       }),
+      rollbackSend,
       nfcAdapter: { writeToken, releaseSession },
       context: sendContext,
       isStale: (op) => op === 'executeNfcSend',
@@ -849,6 +853,62 @@ describe('runNfcWriteBackEffect', () => {
     if (result.isErr()) return;
     expect(result.value).toEqual({ kind: 'stale', delivered: false });
     expect(writeToken).not.toHaveBeenCalled();
+    expect(rollbackSend).toHaveBeenCalledExactlyOnceWith('operation-1');
+    expect(releaseSession).toHaveBeenCalledTimes(1);
+  });
+
+  it('stays stale when taking back a token created after reset fails', async () => {
+    const releaseSession = vi.fn(async () => {});
+    const rollbackSend = vi.fn(async () => {
+      throw new Error('mint unreachable');
+    });
+
+    const result = await runNfcWriteBackEffect({
+      data: confirmPaymentRequestData,
+      executeNfcSend: async () => ({
+        token: 'cashuBnfc-token',
+        historyEntry: sendHistoryEntry('nfc-send-entry-1'),
+        operationId: 'operation-1',
+      }),
+      rollbackSend,
+      nfcAdapter: { writeToken: async () => {}, releaseSession },
+      context: sendContext,
+      isStale: (op) => op === 'executeNfcSend',
+    });
+
+    expect(result.isOk()).toBe(true);
+    if (result.isErr()) return;
+    expect(result.value).toEqual({ kind: 'stale', delivered: false });
+    expect(rollbackSend).toHaveBeenCalledTimes(1);
+    expect(releaseSession).toHaveBeenCalledTimes(1);
+  });
+
+  it('takes back a token whose write failed after reset', async () => {
+    const releaseSession = vi.fn(async () => {});
+    const rollbackSend = vi.fn(async () => {});
+
+    const result = await runNfcWriteBackEffect({
+      data: confirmPaymentRequestData,
+      executeNfcSend: async () => ({
+        token: 'cashuBnfc-token',
+        historyEntry: sendHistoryEntry('nfc-send-entry-1'),
+        operationId: 'operation-1',
+      }),
+      rollbackSend,
+      nfcAdapter: {
+        writeToken: async () => {
+          throw new Error('Tag removed');
+        },
+        releaseSession,
+      },
+      context: sendContext,
+      isStale: (op) => op === 'executeNfcSend.catch',
+    });
+
+    expect(result.isOk()).toBe(true);
+    if (result.isErr()) return;
+    expect(result.value).toEqual({ kind: 'stale', delivered: false });
+    expect(rollbackSend).toHaveBeenCalledExactlyOnceWith('operation-1');
     expect(releaseSession).toHaveBeenCalledTimes(1);
   });
 

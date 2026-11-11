@@ -765,7 +765,7 @@ run for this change.
 | Effect / operation | When | Network |
 | --- | --- | --- |
 | `operations.executeNfcSend` | NFC write-back | always (mint) |
-| `operations.rollbackSend` | NFC failure (not stale) | conditional |
+| `operations.rollbackSend` | NFC failure, or a stale tap whose token is not on the tag | conditional |
 
 MUST:
 
@@ -780,10 +780,13 @@ MUST NOT:
 
 Known nuances:
 
-- A STALE interruption (a newer flow superseded the tap) returns `stale` WITHOUT
-  rolling back (`effects.ts:1081-1083`) and leaves the step unchanged
-  (`createMachine.ts:962`) -- no `sendComplete`, no `error`. This differs from the
-  failure path, which does roll back.
+- A STALE interruption (a newer flow superseded the tap) returns `stale` and
+  leaves the step unchanged -- no `sendComplete`, no `error`. A token it created
+  that is not on the tag (the reset came while it was created, or the write
+  then failed) is taken back with the same best-effort `rollbackSend` the
+  failure path uses, and the result is logged. A reset during the write itself
+  cannot stop the write: a token that reached the tag counts as delivered and
+  is never taken back.
 - An NFC failure goes straight to `error` (`createMachine.ts:979-986`); it does
   NOT enter `routeOperationFailure`, so there is no BIP321 fallback. Lightning
   fallback after an ecash NFC failure, and an auto offline-send range, are NOT
@@ -1108,8 +1111,8 @@ during verification and the invariant rests on source review.
       (`resolveNext.ts:489-513`).
 - [ ] NFC skips `enterSendMemo` and shows no mint / option / confirm prompt
       (`createMachine.ts:879-998`).
-- [ ] NFC rolls back on failure but NOT on stale interruption
-      (`effects.ts:1081-1083,1085`).
+- [ ] NFC rolls back on failure, and on a stale interruption whose token is
+      not on the tag; never once the token is on the tag (`runNfcWriteBackEffect`).
 - [ ] Onchain send/receive stay gated off while `isMethodImplemented('onchain')`
       is false (`availability.ts:318-323`, `resolveNext.ts:284-296`).
 

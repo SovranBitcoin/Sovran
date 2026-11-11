@@ -619,7 +619,7 @@ describe("what an NFC tap leaves behind when it ends", () => {
       expect(unitSwitches(tap.switchUnit)).toEqual(["usd", "sat"]);
     });
 
-    it("releases the tag and switches the unit back while the token is created", async () => {
+    it("takes the token back, releases the tag and switches the unit back while the token is created", async () => {
       const created = deferred();
       const executeNfcSend = vi.fn(async () => {
         await created.promise;
@@ -628,6 +628,9 @@ describe("what an NFC tap leaves behind when it ends", () => {
       const tap = setup({ unit: "usd", operations: { executeNfcSend } });
       await overtake(tap, created, () => expect(executeNfcSend).toHaveBeenCalledTimes(1));
       expect(tap.adapter.writeToken).not.toHaveBeenCalled();
+      expect(
+        tap.tm.operationCalls.filter((call) => call.name === "rollbackSend").map((call) => call.args),
+      ).toEqual([["op-1"]]);
       expect(tap.adapter.releaseSession).toHaveBeenCalledTimes(1);
       expect(unitSwitches(tap.switchUnit)).toEqual(["usd", "sat"]);
     });

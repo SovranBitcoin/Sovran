@@ -1750,6 +1750,30 @@ export function runNfcWriteBackEffect({
     }
   };
 
+  // Takes back a token that never reached the tag. Best-effort: a failure is
+  // logged, and whether it worked is what the caller can report.
+  const rollBack = async (
+    operationId: string,
+    stale: boolean,
+  ): Promise<boolean> => {
+    if (!rollbackSend) return false;
+    try {
+      await rollbackSend(operationId);
+      logger.info('effects.nfcWriteBack.rollback.completed', {
+        stale,
+        operationIdPresent: operationId.length > 0,
+      });
+      return true;
+    } catch (rollbackErr) {
+      logger.warn('effects.nfcWriteBack.rollback.failed', {
+        stale,
+        operationIdPresent: operationId.length > 0,
+        error: errField(rollbackErr),
+      });
+      return false;
+    }
+  };
+
   return ResultAsync.fromPromise(
     (async () => {
       let nfcSendResult: NfcSendOperationResult | null = null;
@@ -1766,8 +1790,11 @@ export function runNfcWriteBackEffect({
           operationIdPresent: nfcSendResult.operationId.length > 0,
           ...summarizeHistoryEntry(nfcSendResult.historyEntry),
         });
+        // Overtaken with a token that is not on the tag: take it back, as a
+        // failed write does, and leave the machine to whoever overtook it.
         if (isStale('executeNfcSend')) {
           logger.info('effects.nfcWriteBack.stale', { op: 'executeNfcSend' });
+          await rollBack(nfcSendResult.operationId, true);
           await releaseSession(false);
           return { kind: 'stale', delivered: false } as const;
         }
@@ -1780,6 +1807,7 @@ export function runNfcWriteBackEffect({
           logger.info('effects.nfcWriteBack.stale', {
             op: 'executeNfcSend.catch',
           });
+          if (nfcSendResult) await rollBack(nfcSendResult.operationId, true);
           await releaseSession(true);
           return { kind: 'stale', delivered: false } as const;
         }
@@ -1790,22 +1818,10 @@ export function runNfcWriteBackEffect({
           error: errField(cause),
         });
 
-        let rolledBack = false;
-        if (nfcSendResult && rollbackSend) {
-          try {
-            await rollbackSend(nfcSendResult.operationId);
-            rolledBack = true;
-            logger.info('effects.nfcWriteBack.rollback.completed', {
-              operationIdPresent: nfcSendResult.operationId.length > 0,
-            });
-          } catch (rollbackErr) {
-            logger.warn('effects.nfcWriteBack.rollback.failed', {
-              operationIdPresent: nfcSendResult.operationId.length > 0,
-              error: errField(rollbackErr),
-            });
-            // Rollback is best-effort; the caller still needs the write failure.
-          }
-        }
+        // Rollback is best-effort; the caller still needs the write failure.
+        const rolledBack = nfcSendResult
+          ? await rollBack(nfcSendResult.operationId, false)
+          : false;
 
         await releaseSession(true);
 
