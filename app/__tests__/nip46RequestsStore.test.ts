@@ -274,15 +274,29 @@ describe('session allows', () => {
     expect(useNip46RequestsStore.getState().sessionAllows).toHaveLength(1);
   });
 
-  it('scopes per app and revokes per app', () => {
+  it('scopes per app, and ending an app session drops its allows and grants only', () => {
     const store = useNip46RequestsStore.getState();
     store.grantSessionAllow(APP_A, 'sign_event:1');
     store.grantSessionAllow(APP_B, 'sign_event:1');
+    store.grantSession({
+      clientPubkey: APP_A,
+      grantKey: 'nip44_decrypt',
+      peerPubkey: PEER_X,
+      peerIsSelf: false,
+    });
+    store.grantSession({
+      clientPubkey: APP_B,
+      grantKey: 'nip44_decrypt',
+      peerPubkey: PEER_X,
+      peerIsSelf: false,
+    });
     expect(store.hasSessionAllow(APP_B, 'sign_event:1')).toBe(true);
 
-    store.revokeSessionAllows(APP_A);
+    store.endClientSession(APP_A);
     expect(store.hasSessionAllow(APP_A, 'sign_event:1')).toBe(false);
+    expect(store.hasSessionGrant(APP_A, 'nip44_decrypt', PEER_X)).toBe(false);
     expect(store.hasSessionAllow(APP_B, 'sign_event:1')).toBe(true);
+    expect(store.hasSessionGrant(APP_B, 'nip44_decrypt', PEER_X)).toBe(true);
   });
 
   it('clear() drops pending, throttle flags, AND all session state', () => {

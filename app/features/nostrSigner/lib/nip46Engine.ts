@@ -1002,10 +1002,10 @@ export function createNip46Engine(overrides: Partial<Nip46EngineDeps> = {}): Nip
         inheritGrants: match.kind === 'active',
       });
       if (adopted.isErr()) return errAsync({ type: 'adopt-failed', cause: adopted.error });
-      // The replaced client's runtime leftovers: its timed decrypt grants die
-      // with it; its pending requests resolve/expire silently (resolve-time
-      // connection snapshots already treat a vanished record as unpaired).
-      requests().revokeSessionGrant(previousKey);
+      // The replaced client's runtime leftovers: its session ends with it; its
+      // pending requests resolve/expire silently (resolve-time connection
+      // snapshots already treat a vanished record as unpaired).
+      requests().endClientSession(previousKey);
       requests().setAppThrottled(previousKey, null);
     } else {
       // The store drops critical-always entries (its ceiling), caps relays, etc.

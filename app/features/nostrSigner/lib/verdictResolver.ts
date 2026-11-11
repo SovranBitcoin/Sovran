@@ -149,8 +149,7 @@ export function resolveVerdict(
     case 'block': {
       connections().blockApp(clientPubkey);
       // Session state must not survive a later unblock.
-      requests().revokeSessionGrant(clientPubkey);
-      requests().revokeSessionAllows(clientPubkey);
+      requests().endClientSession(clientPubkey);
       // The prompted request gets a final answer; everything else the app
       // queued is flushed silently (blocked tier = activity rows only).
       for (const other of requests().pending.filter((p) => p.clientPubkey === clientPubkey)) {

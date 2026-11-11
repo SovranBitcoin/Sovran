@@ -841,6 +841,30 @@ describe('nostrconnect pairing', () => {
       expect(activityEntries()[0]).toMatchObject({ clientPubkey: APP_B, method: 'connect' });
     });
 
+    it('active match: the replaced client keeps no session allow, so its key must ask again', async () => {
+      seedPreviousPrimal();
+      // "Allow for this session" on a wallet sign kind, given to the old key.
+      expect(
+        useNip46RequestsStore.getState().grantSessionAllow(OLD_CLIENT, 'sign_event:17375').isOk()
+      ).toBe(true);
+      const { engine } = makeEngine();
+      const parsed = reconnectUri();
+      engine.startNostrconnectPairing(parsed);
+
+      const result = await engine.completeNostrconnectPairing({
+        parsed,
+        acceptedGrantKeys: [],
+        presentedGrantKeys: [],
+        replacesClientPubkey: OLD_CLIENT,
+      });
+
+      expect(result.isOk()).toBe(true);
+      expect(useNip46RequestsStore.getState().hasSessionAllow(OLD_CLIENT, 'sign_event:17375')).toBe(
+        false
+      );
+      expect(useNip46RequestsStore.getState().sessionAllows).toEqual([]);
+    });
+
     it('forged replacesClientPubkey (matcher disagrees) fails the pairing, nothing written', async () => {
       // The previous record claims a DIFFERENT hostname — the matcher would
       // never pick it, so inheritance must be refused outright.
