@@ -279,6 +279,56 @@ describe('before the wallet history has loaded', () => {
 
     expect(rows().map((r) => [r.testID, r.amount])).toEqual([['swap-leg-melt-op-1', 1000]]);
   });
+
+  it('with only the melt loaded, shows what was melted as sent, no fee, and the real melt row', async () => {
+    seedGroup({ legs: [leg('l1', { amount: 1000, meltQuoteId: 'melt1', mintQuoteId: 'mint1' })] });
+    mockHistory = [historyEntry('melt', 'melt1', -1010)];
+
+    await render();
+
+    expect(header()).toMatchObject({ amount: 1010 });
+    expect(details()).not.toHaveProperty('Total Fees');
+    await expand();
+    expect(rows().map((r) => [r.testID, r.amount])).toEqual([['swap-leg-melt-melt-melt1', -1010]]);
+  });
+
+  it('with only the mint loaded, counts the leg amount as spent and draws a stand-in melt above the mint', async () => {
+    seedGroup({
+      legs: [
+        leg('l1', {
+          amount: 1000,
+          meltQuoteId: 'melt1',
+          meltOperationId: 'op-1',
+          mintQuoteId: 'mint1',
+        }),
+      ],
+    });
+    mockHistory = [historyEntry('mint', 'mint1', 990)];
+
+    await render();
+
+    expect(header()).toMatchObject({ amount: 990 });
+    expect(details()).toMatchObject({ 'Total Fees': '10 sat' });
+    await expand();
+    expect(rows().map((r) => [r.testID, r.amount])).toEqual([
+      ['swap-leg-melt-op-1', 1000],
+      ['swap-leg-mint-mint-mint1', 990],
+    ]);
+  });
+
+  it('when two history entries share a quote id, the later one in history is used', async () => {
+    seedGroup({ legs: [leg('l1', { amount: 1000, mintQuoteId: 'mint1' })] });
+    mockHistory = [
+      historyEntry('mint', 'mint1', 700),
+      { ...historyEntry('mint', 'mint1', 990), id: 'mint-again' } as unknown as HistoryEntry,
+    ];
+
+    await render();
+
+    expect(header()).toMatchObject({ amount: 990 });
+    await expand();
+    expect(rows().map((r) => [r.testID, r.amount])).toEqual([['swap-leg-mint-mint-again', 990]]);
+  });
 });
 
 describe('a swap with a failed leg', () => {
