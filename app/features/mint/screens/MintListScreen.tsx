@@ -79,11 +79,9 @@ interface MintListScreenProps {
   loading?: boolean;
   /** When true, all rows show a global loading state (a handler is executing). */
   isExecuting?: boolean;
-  /** Whether to show the details/inspect button on each mint (default: true) */
-  showDetailsButton?: boolean;
   /** Called when a selectable mint is tapped */
   onMintSelect: (item: MintListItem) => void;
-  /** Called when inspect/details button is pressed on a mint */
+  /** Called when a mint's inspect button is pressed; omit it to show no inspect button */
   onInspectMint?: (mintUrl: string) => void;
 }
 
@@ -162,7 +160,6 @@ export function MintListScreen({
   items,
   loading = false,
   isExecuting = false,
-  showDetailsButton = true,
   onMintSelect,
   onInspectMint,
 }: MintListScreenProps) {
@@ -340,7 +337,7 @@ export function MintListScreen({
       mockMode={mockMode}
       presence={presence[normalizeMintUrlKey(item.mintUrl)]}
       isExecuting={extraData === true}
-      onInspectMint={showDetailsButton ? onInspectMint : undefined}
+      onInspectMint={onInspectMint}
       onPress={handleMintPress}
     />
   );

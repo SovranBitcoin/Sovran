@@ -201,7 +201,6 @@ export function MintSelectFlowScreen({ flow, mintSelectorEntry }: MintSelectFlow
       <MintListScreen
         items={rows}
         loading={allCold}
-        showDetailsButton={!isNpcScope && actions.getInfo.available}
         onMintSelect={(item) => actions.select.execute({ mintUrl: item.mintUrl })}
         onInspectMint={
           !isNpcScope && actions.getInfo.available

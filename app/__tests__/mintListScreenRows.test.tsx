@@ -208,15 +208,6 @@ describe('MintListScreen rows', () => {
     }
   });
 
-  it('shows no inspect button when details are off', () => {
-    const { rows } = mount({ showDetailsButton: false });
-    for (const row of rows()) {
-      expect(row.props.trailing).toBeNull();
-      expect(row.props.trailingInteractive).toBe(false);
-      expect(row.props.trailingVariant).toBe('none');
-    }
-  });
-
   it('renders a cold row as a skeleton beside live rows', () => {
     const { rows } = mount({ items: [mint('alpha'), mint('cold', { metaState: 'cold' })] });
     expect(rows().map((row) => row.props.testID)).toEqual([
