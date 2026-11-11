@@ -302,6 +302,10 @@ async function syncOnce(ndk: NDK, ownPubkey: string): Promise<void> {
         intents: Object.keys(intents).length,
         tags: plan.tags.length,
       });
+      // A list that arrived while publishing, also one from the same second
+      // that relays prefer, may now be the newest: the taps stay until a
+      // complete read returns a list that holds them.
+      if (!sameSavedList(atBase, savedList())) continue;
       social().setContactsFromRelay({
         tags: plan.tags,
         content: plan.base.content,

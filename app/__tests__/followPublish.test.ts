@@ -618,6 +618,73 @@ describe('following someone', () => {
     expect(social().optimisticFollowsByPubkey).toEqual({});
   });
 
+  it('keeps the follow and builds again when a newer list arrives during the publish', async () => {
+    const now = Math.floor(Date.now() / 1000);
+    relaysHold(contacts(now - 100, [['p', X]]));
+    const newer = contacts(now + 30, [
+      ['p', X],
+      ['p', W],
+    ]);
+    mockPublish.mockImplementationOnce(async (args: { event: RelayEvent }) => {
+      await acceptOnRelays(args);
+      // Another client's list, dated after ours, lands before ours is recorded.
+      for (const relay of mockRelays) mockStored.set(relay.url, [newer]);
+      social().setContactsFromRelay({
+        tags: newer.tags,
+        content: '',
+        createdAtSec: newer.created_at,
+      });
+      return ok({});
+    });
+    const { ndk } = setup();
+
+    tap(Z);
+    await requestFollowSync(ndk, OWN);
+
+    expect(mockPublish).toHaveBeenCalledTimes(2);
+    expect(publishedTags(1)).toEqual([
+      ['p', X],
+      ['p', W],
+      ['p', Z],
+    ]);
+    expect(social().followingPubkeys).toEqual({ [X]: true, [W]: true, [Z]: true });
+    expect(social().optimisticFollowsByPubkey).toEqual({});
+  });
+
+  it('keeps the follow when a list from the same second arrives during the publish', async () => {
+    relaysHold(contacts(T, [['p', X]]));
+    mockPublish.mockImplementationOnce(async (args: { event: RelayEvent }) => {
+      await acceptOnRelays(args);
+      // Same second as ours, lower id: relays keep it over ours.
+      const rival = {
+        ...contacts(args.event.created_at, [
+          ['p', X],
+          ['p', W],
+        ]),
+        id: '0'.repeat(64),
+      };
+      for (const relay of mockRelays) mockStored.get(relay.url)!.push(rival);
+      social().setContactsFromRelay({
+        tags: rival.tags,
+        content: '',
+        createdAtSec: rival.created_at,
+      });
+      return ok({});
+    });
+    const { ndk } = setup();
+
+    tap(Z);
+    await requestFollowSync(ndk, OWN);
+
+    expect(mockPublish).toHaveBeenCalledTimes(2);
+    expect(publishedTags(1)).toEqual([
+      ['p', X],
+      ['p', W],
+      ['p', Z],
+    ]);
+    expect(social().optimisticFollowsByPubkey).toEqual({});
+  });
+
   it('waits rather than build on a list dated in the future', async () => {
     const future = Math.floor(Date.now() / 1000) + 3600;
     relaysHold(contacts(future, [['p', X]]));
