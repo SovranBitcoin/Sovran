@@ -78,7 +78,12 @@ describe('mintNuts readers', () => {
           { method: 'onchain', unit: 'sat' },
         ],
       },
-      '5': { methods: [{ method: 5, unit: 'sat' }, { method: 'bolt11', unit: 'sat' }] },
+      '5': {
+        methods: [
+          { method: 5, unit: 'sat' },
+          { method: 'bolt11', unit: 'sat' },
+        ],
+      },
     };
     expect(mintMethodsFromNuts(malformedFields as never)).toEqual(['bolt11', 'bolt12', 'onchain']);
     expect(meltMethodsFromNuts(malformedFields as never)).toEqual(['bolt11']);
