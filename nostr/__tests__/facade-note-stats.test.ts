@@ -54,6 +54,18 @@ describe('mergeNoteStatsByRank', () => {
     expect(merged[N1]?.likes).toBe(3);
     expect(merged[N2]?.likes).toBe(0);
   });
+
+  test('each note is ranked by the tier that supplied it, not by the first tier to answer', () => {
+    const likes = (count: number) =>
+      noteStatsFromRelayEvents(
+        [N1],
+        Array.from({ length: count }, (_, i) => ({ id: `like${i}`, pubkey: A, kind: 7, content: '+', tags: [['e', N1]], created_at: 1 })),
+      );
+    const empty = mergeNoteStatsByRank(undefined, {}, 'nagg');
+    const fromRelay = mergeNoteStatsByRank(empty, likes(1), 'relay');
+    const merged = mergeNoteStatsByRank(fromRelay, likes(9), 'primal');
+    expect(merged[N1]?.likes).toBe(9);
+  });
 });
 
 describe('getNoteStats through the facade', () => {

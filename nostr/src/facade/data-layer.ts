@@ -702,21 +702,20 @@ function rankOwner(metadata: object): NostrTier {
   return rankOwners.get(metadata) ?? 'relay';
 }
 
-/** Union by note id; a better-ranked tier's counts replace a worse one's, a worse one only adds ids. */
+/** Union by note id; for each note a better-ranked tier's counts replace a worse one's, a worse one only adds ids. */
 export function mergeNoteStatsByRank(
   acc: NoteStatsMap | undefined,
   next: NoteStatsMap,
   tier: NostrTier,
 ): NoteStatsMap {
-  if (!acc) {
-    const first: NoteStatsMap = { ...next };
-    rankOwners.set(first, tier);
-    return first;
+  const merged: NoteStatsMap = { ...acc };
+  for (const [id, stats] of Object.entries(next)) {
+    const existing = merged[id];
+    if (!existing || tierRank(tier) <= tierRank(rankOwner(existing))) {
+      merged[id] = stats;
+      rankOwners.set(stats, tier);
+    }
   }
-  const accTier = rankOwner(acc);
-  const nextWins = tierRank(tier) <= tierRank(accTier);
-  const merged: NoteStatsMap = nextWins ? { ...acc, ...next } : { ...next, ...acc };
-  rankOwners.set(merged, nextWins ? tier : accTier);
   return merged;
 }
 
