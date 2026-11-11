@@ -104,11 +104,9 @@ describe('Vertex request', () => {
       .mockResolvedValueOnce(
         new Response(JSON.stringify({ vertexFresh: true, pubkeys: [] })),
       );
-    const onRequestStart = vi.fn();
     const client = createNaggClient({
       appView: { baseUrl: 'https://nagg.test' },
       fetchImpl: fetchImpl as unknown as typeof fetch,
-      logger: { onRequestStart },
     });
     const layer = createNostrDataLayer({ tiers: [createNaggTier({ client })] });
     const stale = (
@@ -123,7 +121,6 @@ describe('Vertex request', () => {
       })
     )._unsafeUnwrap();
     expect(fresh).toMatchObject({ hits: [], vertexFresh: true });
-    expect(onRequestStart.mock.calls[1]?.[0].endpoint).toBe('/nostr/search');
     expect(fetchImpl.mock.calls[1]?.[1]?.cache).toBe('no-store');
   });
 });

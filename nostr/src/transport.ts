@@ -11,25 +11,6 @@ import {
 import type { NaggError } from './errors';
 import { toNaggNetworkError } from './errors';
 
-export interface NaggTransportLogger {
-  onRequestStart?: (event: NaggRequestLogEvent) => void;
-  onRequestEnd?: (event: NaggResponseLogEvent) => void;
-}
-
-export interface NaggRequestLogEvent {
-  operationName: string;
-  endpoint: string;
-  variables: Record<string, unknown>;
-  refresh: boolean;
-}
-
-export interface NaggResponseLogEvent extends NaggRequestLogEvent {
-  durationMs: number;
-  ok: boolean;
-  status?: number;
-  errorType?: NaggError['type'];
-}
-
 export interface NaggAppViewConfig {
   /** Base URL of the REST app-view, e.g. `https://nagg.example`. */
   baseUrl: string;
@@ -47,7 +28,6 @@ export interface NaggClientConfig {
   appView: NaggAppViewConfig;
   defaultTimeoutMs?: number;
   fetchImpl?: typeof fetch;
-  logger?: NaggTransportLogger;
 }
 
 /**
@@ -151,7 +131,6 @@ interface AppViewFetchOptions extends RequestControls {
   searchParams?: NaggSearchParams;
   body?: unknown;
   refresh?: boolean;
-  operationName: string;
 }
 
 function fetchAppViewRaw(
@@ -161,18 +140,9 @@ function fetchAppViewRaw(
 ): ResultAsync<unknown, NaggError> {
   const fetchImpl = config.fetchImpl ?? fetch;
   const refresh = opts.refresh === true || !!opts.searchParams?.svr;
-  // Signed URLs contain public lookup activity: never pass them to loggers.
-  const logEndpoint = opts.searchParams?.svr ? opts.path : undefined;
   const url = appViewUrl(baseUrl, config.appView.version, opts.path, opts.searchParams, refresh);
   const timeoutMs = opts.timeoutMs ?? config.defaultTimeoutMs ?? DEFAULT_TIMEOUT_MS;
   const signal = combineSignals(opts.signal, timeoutSignal(timeoutMs));
-  const startedAt = Date.now();
-  config.logger?.onRequestStart?.({
-    operationName: opts.operationName,
-    endpoint: logEndpoint ?? url,
-    variables: {},
-    refresh,
-  });
 
   const init: RequestInit = {
     method: opts.method,
@@ -201,7 +171,6 @@ function fetchAppViewRaw(
         status: response.status,
         statusText: response.statusText,
       };
-      logAppViewEnd(config, logEndpoint ?? url, opts.operationName, refresh, startedAt, false, response.status, error.type);
       if (opts.path === '/nostr/vertex/relay' || opts.searchParams?.svr) {
         return ResultAsync.fromPromise(response.json() as Promise<unknown>, toNaggNetworkError)
           .andThen((raw) => {
@@ -211,15 +180,7 @@ function fetchAppViewRaw(
       }
       return errAsync(error);
     }
-    return ResultAsync.fromPromise(response.json() as Promise<unknown>, toNaggNetworkError)
-      .map((raw) => {
-        logAppViewEnd(config, logEndpoint ?? url, opts.operationName, refresh, startedAt, true, response.status);
-        return raw;
-      })
-      .mapErr((error) => {
-        logAppViewEnd(config, logEndpoint ?? url, opts.operationName, refresh, startedAt, false, response.status, error.type);
-        return error;
-      });
+    return ResultAsync.fromPromise(response.json() as Promise<unknown>, toNaggNetworkError);
   });
 }
 
@@ -228,7 +189,6 @@ function fetchAppViewRest<TSchema extends z.ZodType>(
   baseUrl: string,
   request: NaggRestRequest<TSchema>
 ): ResultAsync<z.infer<TSchema>, NaggError> {
-  const operationName = request.operationName ?? request.path;
   return fetchAppViewRaw(config, baseUrl, {
     method: request.method ?? 'GET',
     path: request.path,
@@ -237,7 +197,6 @@ function fetchAppViewRest<TSchema extends z.ZodType>(
     refresh: request.refresh,
     signal: request.signal,
     timeoutMs: request.timeoutMs,
-    operationName,
   }).andThen((raw) => parseRestData(raw, request.responseSchema));
 }
 
@@ -254,28 +213,6 @@ function parseRestData<TSchema extends z.ZodType>(
     });
   }
   return ok(data.data);
-}
-
-function logAppViewEnd(
-  config: NaggClientConfig,
-  endpoint: string,
-  operationName: string,
-  refresh: boolean,
-  startedAt: number,
-  okResponse: boolean,
-  status?: number,
-  errorType?: NaggError['type']
-): void {
-  config.logger?.onRequestEnd?.({
-    operationName,
-    endpoint,
-    variables: {},
-    refresh,
-    durationMs: Date.now() - startedAt,
-    ok: okResponse,
-    status,
-    errorType,
-  });
 }
 
 export type { NaggError, RequestControls };
