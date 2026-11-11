@@ -78,6 +78,25 @@ function toOwnSyncEvent(raw: {
   };
 }
 
+/**
+ * One account's sync: what it has dispatched and the newest profile it
+ * applied. Made when that account's keys appear and replaced when they change
+ * (`sessionFor`), so nothing one account saw carries over to the next.
+ */
+type OwnSyncSession = {
+  owner: string;
+  /** Event ids already dispatched for `owner`. */
+  seen: Set<string>;
+  /** `created_at` of the newest profile applied; an older one in a later batch is ignored. */
+  profileNewestAt: number;
+};
+
+function sessionFor(current: OwnSyncSession | null, owner: string | undefined) {
+  if (!owner) return null;
+  if (current?.owner === owner) return current;
+  return { owner, seen: new Set<string>(), profileNewestAt: 0 };
+}
+
 function applyProfile(event: OwnSyncEvent, accountIndex: number): void {
   const snapshot = parseOwnProfileSnapshot(event);
   if (snapshot && useProfileStore.getState().getActiveProfile()?.pubkey === event.pubkey) {
@@ -107,26 +126,20 @@ export function useOwnEventsSync(): void {
 
   const { events } = useSubscribe({ filters, opts: OWN_SUBSCRIBE_OPTS });
 
-  // Only dispatch events we haven't seen; reset when the active profile changes.
-  const processedRef = useRef<Set<string>>(new Set());
-  // Newest kind:0 created_at applied so far — guards against an older profile
-  // event (in a later/out-of-order batch) regressing the cached name/avatar.
-  const lastProfileCreatedAtSecRef = useRef(0);
-  useEffect(() => {
-    processedRef.current = new Set();
-    lastProfileCreatedAtSecRef.current = 0;
-  }, [pubkey]);
+  const sessionRef = useRef<OwnSyncSession | null>(null);
 
   useEffect(() => {
-    if (!pubkey || !events?.length) return;
+    const session = sessionFor(sessionRef.current, pubkey);
+    sessionRef.current = session;
+    if (!session || !events?.length) return;
     const fresh: OwnSyncEvent[] = [];
     for (const raw of events) {
       const id = (raw as { id?: string }).id;
-      if (!id || processedRef.current.has(id)) continue;
-      processedRef.current.add(id);
+      if (!id || session.seen.has(id)) continue;
+      session.seen.add(id);
       const event = toOwnSyncEvent(raw as Parameters<typeof toOwnSyncEvent>[0]);
       // A follow list replaces this account's saved one: only its own counts.
-      if (event.kind === Contacts && event.pubkey !== pubkey) continue;
+      if (event.kind === Contacts && event.pubkey !== session.owner) continue;
       fresh.push(event);
     }
     if (fresh.length === 0) return;
@@ -140,7 +153,7 @@ export function useOwnEventsSync(): void {
     if (part.ownNotes.length > 0) {
       const own = useOwnContentStore.getState();
       for (const note of part.ownNotes) own.ingestSeen(note);
-      ingestOwnMediaBlobs(part.ownNotes, pubkey);
+      ingestOwnMediaBlobs(part.ownNotes, session.owner);
     }
     if (
       part.latestContacts &&
@@ -153,9 +166,9 @@ export function useOwnEventsSync(): void {
       });
       social.clearSettledFollowOptimistic();
     }
-    if (part.latestProfile && part.latestProfile.created_at > lastProfileCreatedAtSecRef.current) {
+    if (part.latestProfile && part.latestProfile.created_at > session.profileNewestAt) {
       applyProfile(part.latestProfile, activeAccountIndex);
-      lastProfileCreatedAtSecRef.current = part.latestProfile.created_at;
+      session.profileNewestAt = part.latestProfile.created_at;
     }
 
     nostrLog.debug('nostr.ownsync.ingested', {
