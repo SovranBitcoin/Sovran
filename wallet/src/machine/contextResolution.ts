@@ -25,7 +25,11 @@ import {
   buildProofSuggestions,
   findFullAmountCandidates,
 } from "./amountFallback";
-import { methodRequirementForDestination, toMintError } from "./resolveNext";
+import {
+  methodRequirementForDestination,
+  previewStep,
+  toMintError,
+} from "./resolveNext";
 import type {
   Destination,
   FlowContext,
@@ -867,18 +871,10 @@ export function resolveFromContext(
         revalidated.result,
       );
     }
+    const at = { mintUrl: revalidated.mintUrl, amount, unit };
     return logContextResult("melt_quote_preview", {
-      step: "navigateToMeltPreview",
+      ...previewStep(destination, ctx, at),
       context: { ...ctx, mintUrl: revalidated.mintUrl, destination },
-      data: {
-        mintUrl: revalidated.mintUrl,
-        meltTarget: ctx.meltTarget,
-        unit,
-        amount,
-        recipientPubkey: ctx.recipientPubkey,
-        recipientProfile: ctx.recipientProfile,
-        phase: { kind: "preview" },
-      },
     });
   }
 
@@ -942,18 +938,10 @@ export function resolveFromContext(
   }
 
   if (destination === "paymentRequest" && ctx.paymentRequest) {
+    const at = { mintUrl: effectiveMintUrl, amount, unit };
     return logContextResult("payment_request_preview", {
-      step: "navigateToPaymentRequest",
+      ...previewStep(destination, ctx, at),
       context: { ...ctx, mintUrl: effectiveMintUrl, destination },
-      data: {
-        mintUrl: effectiveMintUrl,
-        paymentRequest: ctx.paymentRequest,
-        unit,
-        amount,
-        recipientPubkey: ctx.recipientPubkey,
-        recipientProfile: ctx.recipientProfile,
-        phase: { kind: "preview" },
-      },
     });
   }
   if (

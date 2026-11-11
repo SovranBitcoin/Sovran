@@ -382,6 +382,37 @@ function checkProofComposition(
 // Terminal step builders
 // ---------------------------------------------------------------------------
 
+/**
+ * The preview a melt or a payment request opens on, awaiting Pay. Its target
+ * comes from the context, which every caller has checked holds it.
+ */
+export function previewStep(
+  destination: "meltQuote" | "paymentRequest",
+  ctx: FlowContext,
+  at: { mintUrl: string; amount: number; unit: string },
+):
+  | StepResult<"navigateToMeltPreview">
+  | StepResult<"navigateToPaymentRequest"> {
+  const { mintUrl, amount, unit } = at;
+  const recipient = {
+    recipientPubkey: ctx.recipientPubkey,
+    recipientProfile: ctx.recipientProfile,
+  };
+  const phase = { kind: "preview" } as const;
+  if (destination === "meltQuote") {
+    const meltTarget = ctx.meltTarget!;
+    return {
+      step: "navigateToMeltPreview",
+      data: { mintUrl, meltTarget, unit, amount, ...recipient, phase },
+    };
+  }
+  const paymentRequest = ctx.paymentRequest!;
+  return {
+    step: "navigateToPaymentRequest",
+    data: { mintUrl, paymentRequest, amount, unit, ...recipient, phase },
+  };
+}
+
 function terminalStep(
   destination: Destination,
   ctx: FlowContext,
@@ -398,14 +429,7 @@ function terminalStep(
     hasMemo: !!ctx.memo,
     memoLength: ctx.memo?.length ?? 0,
   });
-  const {
-    mintUrl,
-    amount,
-    unit,
-    meltTarget,
-    recipientPubkey,
-    recipientProfile,
-  } = ctx;
+  const { mintUrl, amount, unit } = ctx;
 
   switch (destination) {
     case "mintQuote":
@@ -424,31 +448,12 @@ function terminalStep(
         data: { amount: amount!, unit },
       };
     case "meltQuote":
-      return {
-        step: "navigateToMeltPreview",
-        data: {
-          mintUrl: mintUrl!,
-          meltTarget: meltTarget!,
-          unit,
-          amount: amount!,
-          recipientPubkey,
-          recipientProfile,
-          phase: { kind: "preview" },
-        },
-      };
     case "paymentRequest":
-      return {
-        step: "navigateToPaymentRequest",
-        data: {
-          mintUrl: mintUrl!,
-          paymentRequest: ctx.paymentRequest!,
-          amount: amount!,
-          unit,
-          recipientPubkey,
-          recipientProfile,
-          phase: { kind: "preview" },
-        },
-      };
+      return previewStep(destination, ctx, {
+        mintUrl: mintUrl!,
+        amount: amount!,
+        unit,
+      });
     case "sendEcash":
       if (enableEcashSendMemo && !ctx.sendMemoHandled) {
         return {

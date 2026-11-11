@@ -6,7 +6,7 @@ import { isValidSatAmount } from "../guards";
 import { normalizeNostrPubkey } from "../recipient";
 import { normalizeP2pkLock, type P2pkLockSpec } from "../p2pk";
 import type { Detectors, WalletContext } from "../types";
-import { resolveNext, type StepResult } from "./resolveNext";
+import { previewStep, resolveNext, type StepResult } from "./resolveNext";
 import { buildProofSuggestions } from "./amountFallback";
 import type { FlowContext, FlowEvent, FlowStep } from "./types";
 import { startSendFlow, startSendEcashFlow } from "./flows/send";
@@ -619,36 +619,12 @@ function handleProofsChosen(
   // re-check proof composition and loop back to chooseProofs when offline).
   const mintUrl = ctx.mintUrl!;
 
-  if (destination === "paymentRequest" && ctx.paymentRequest) {
-    return {
-      step: "navigateToPaymentRequest",
-      context: ctx,
-      data: {
-        mintUrl,
-        paymentRequest: ctx.paymentRequest,
-        unit: ctx.unit,
-        amount: event.amount,
-        recipientPubkey: ctx.recipientPubkey,
-        recipientProfile: ctx.recipientProfile,
-        phase: { kind: "preview" },
-      },
-    };
-  }
-
-  if (destination === "meltQuote" && ctx.meltTarget) {
-    return {
-      step: "navigateToMeltPreview",
-      context: ctx,
-      data: {
-        mintUrl,
-        meltTarget: ctx.meltTarget,
-        unit: ctx.unit,
-        amount: event.amount,
-        recipientPubkey: ctx.recipientPubkey,
-        recipientProfile: ctx.recipientProfile,
-        phase: { kind: "preview" },
-      },
-    };
+  if (
+    (destination === "paymentRequest" && ctx.paymentRequest) ||
+    (destination === "meltQuote" && ctx.meltTarget)
+  ) {
+    const at = { mintUrl, amount: event.amount, unit: ctx.unit };
+    return { ...previewStep(destination, ctx, at), context: ctx };
   }
 
   if (

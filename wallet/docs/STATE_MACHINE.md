@@ -1145,7 +1145,7 @@ during verification and the invariant rests on source review.
 | --- | --- |
 | `src/machine/createMachine.ts` | `send()` dispatcher, `inspect()` projection, step interception (`confirmSend`/`createMintQuote`/`reviewMint`/`openMint`), NFC auto-execute, `routeOperationFailure`, generation guards, bound methods, notify bus |
 | `src/machine/transitions.ts` | `transition()`, handlers (`handleExecute`/`handleAmountEntered`/`handleMintSelected`/`handleProofsChosen`/`handleSendMemoSubmitted`/`handleOptionChosen`), offline stamping, context reset/merge |
-| `src/machine/resolveNext.ts` | intent-driven routing, `getDestination`, gather order, `checkProofComposition`, `terminalStep`, mint gather, method requirements |
+| `src/machine/resolveNext.ts` | intent-driven routing, `getDestination`, gather order, `checkProofComposition`, `terminalStep`, `previewStep` (the melt and payment-request preview data), mint gather, method requirements |
 | `src/machine/contextResolution.ts` | `resolveFromContext` (intent-less continuation), `revalidateMintForAmount`, `requestMintSelector` |
 | `src/machine/effects.ts` | `runConfirmSendEffect`, `runConfirmMeltEffect`, `runConfirmPaymentRequestEffect`, `runMintQuoteEffect`, `runNfcWriteBackEffect`, `runMintReviewInfoEffect`, `handleConfirmSendFailure`, offline error builders |
 | `src/machine/amountFallback.ts` | `buildProofSuggestions`, `buildChooseProofsData`, `buildChooseAmountFallback`, `buildBalanceSuggestions` |
