@@ -113,6 +113,27 @@ async function mount(...args: Parameters<typeof useBitChat>) {
   return view;
 }
 
+/**
+ * Open a Bluetooth chat whose BLE start is still pending, switch the hook away
+ * from it (to a public geohash chat with no geohash, which never connects),
+ * then let the old start resolve.
+ */
+async function leaveBeforeBLEStarts(...args: Parameters<typeof useBitChat>) {
+  const starting = deferred<undefined>();
+  mockNative.startBLE.mockReturnValueOnce(starting.promise);
+  const view = renderHook((props: Parameters<typeof useBitChat>) => useBitChat(...props), {
+    initialProps: args,
+  });
+  await act(async () => undefined);
+  expect(view.result.current.isConnected).toBe(false);
+  view.rerender([undefined, 'nostr']);
+  await act(async () => {
+    starting.resolve(undefined);
+    await starting.promise;
+  });
+  return view;
+}
+
 beforeEach(() => {
   jest.useFakeTimers({ now: NOW });
   jest.clearAllMocks();
@@ -253,6 +274,11 @@ describe('public Bluetooth chat (ble)', () => {
     expect(mockRelease).toHaveBeenCalledTimes(1);
   });
 
+  it('a BLE start that resolves after leaving the chat leaves it disconnected', async () => {
+    const { result } = await leaveBeforeBLEStarts(undefined, 'ble');
+    expect(result.current.isConnected).toBe(false);
+  });
+
   it('a send goes to sendBLEMessage and a mesh message arrives as a peer row', async () => {
     const { result } = await mount(undefined, 'ble');
 
@@ -352,6 +378,13 @@ describe('Bluetooth direct message (ble-dm)', () => {
 
     expect(mockNative.startBLE).toHaveBeenCalledTimes(1);
     expect(mockNative.startBLEPrivateChat).toHaveBeenCalledWith(BLE_PEER);
+  });
+
+  it('a BLE start that resolves after leaving the thread leaves it disconnected', async () => {
+    const { result } = await leaveBeforeBLEStarts(undefined, 'ble-dm', {
+      dm: { peerID: BLE_PEER },
+    });
+    expect(result.current.isConnected).toBe(false);
   });
 
   it('a send saves a sending row in the DM store, then hands native the same message id', async () => {
