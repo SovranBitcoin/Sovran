@@ -86,11 +86,12 @@ export function WalletScreen() {
   const walletContext = useWalletContext();
   const machine = usePaymentFlowMachine({ walletContext });
 
-  // While a multi-leg swap is running, every payment-initiating button on
-  // this screen is gated. Coco's mint/melt services serialize through a
-  // per-instance lock, and the user kicking off a Send/Receive/Swap/Split
-  // Bill in parallel can stall the swap or surface "operation already in
-  // progress" errors. Greying out is the cheapest user-visible indicator.
+  // While a multi-leg swap is running, Receive, Send, Scan and Split on this
+  // screen are gated (the ambient NFC listener is not). Coco's mint/melt
+  // services serialize through a per-instance lock, and the user kicking off a
+  // Send/Receive/Swap/Split Bill in parallel can stall the swap or surface
+  // "operation already in progress" errors. Greying out is the cheapest
+  // user-visible indicator.
   const isSwapping = useSwapStatusStore((s) => s.active?.state === 'running');
 
   const handleReceive = () => {
