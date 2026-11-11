@@ -1169,6 +1169,26 @@ describe("an NFC tap", () => {
     expect(await isFree(tm.machine)).toBe(true);
   });
 
+  // The token is on the tag: the request is paid even when the session then
+  // fails to close, and nothing takes the ecash back or sends it again.
+  it("records the payment when the session fails to close after the write", async () => {
+    const adapter = nfcAdapter({
+      releaseSession: vi.fn(async () => {
+        throw new Error("session already gone");
+      }),
+    });
+    const rollbackSend = vi.fn(async () => {});
+    const tm = build({ nfcAdapter: adapter, operations: { rollbackSend } });
+    await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
+
+    expect(tm.machine.getStep()).toBe("sendComplete");
+    expect(rollbackSend).not.toHaveBeenCalled();
+    await tm.machine.requestMintSelector();
+    await tm.machine.confirmPaymentRequest();
+    expect(tm.calls("executeNfcSend") + tm.calls("executePaymentRequest")).toBe(1);
+    expect(await isFree(tm.machine)).toBe(true);
+  });
+
   // A reset while the tag session is released strands the tap: it runs no
   // handler and leaves `inspect()` and the lock to the reset.
   it("does nothing more after a reset while it releases the session", async () => {

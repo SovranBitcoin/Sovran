@@ -724,6 +724,12 @@ source==='nfc':
        -> sendComplete
 ```
 
+Once `writeToken` succeeds the tag holds the token and the payment is
+delivered: the session is released afterwards, and a release that fails is
+logged without a rollback or an error (the receiver may already have redeemed
+it). A paid tap leaves the flow context with only its unit, source and scanned
+input, so nothing done on the screen that follows rebuilds the request.
+
 Before the first transition, NFC reads the request's single unit. When it differs
 from the active unit, a trusted mint accepted by `m` must already hold at least
 `a` in that unit. Otherwise it fails with `UNIT_NOT_FUNDED`; balances at other

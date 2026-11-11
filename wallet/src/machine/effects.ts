@@ -1761,16 +1761,6 @@ export function runNfcWriteBackEffect({
           logger.info('effects.nfcWriteBack.stale', { op: 'nfc.writeToken' });
           return { kind: 'stale' } as const;
         }
-
-        await nfcAdapter.releaseSession();
-        if (isStale('nfc.releaseSession')) {
-          logger.info('effects.nfcWriteBack.stale', {
-            op: 'nfc.releaseSession',
-          });
-          return { kind: 'stale' } as const;
-        }
-
-        return buildNfcWriteBackResult(nfcSendResult, data, context);
       } catch (cause) {
         if (isStale('executeNfcSend.catch')) {
           logger.info('effects.nfcWriteBack.stale', {
@@ -1820,6 +1810,27 @@ export function runNfcWriteBackEffect({
           stage: nfcSendResult ? 'write' : 'prepare',
         });
       }
+
+      // The tag holds the token and the receiver may already have redeemed
+      // it: the payment is delivered. A session that will not close is logged
+      // and undoes nothing; taking the ecash back now could fail and leave
+      // the payment unrecorded, for Pay to send again.
+      try {
+        await nfcAdapter.releaseSession();
+      } catch (releaseErr) {
+        logger.warn('effects.nfcWriteBack.release.failed', {
+          failurePath: false,
+          error: errField(releaseErr),
+        });
+      }
+      if (isStale('nfc.releaseSession')) {
+        logger.info('effects.nfcWriteBack.stale', {
+          op: 'nfc.releaseSession',
+        });
+        return { kind: 'stale' } as const;
+      }
+
+      return buildNfcWriteBackResult(nfcSendResult, data, context);
     })(),
     (cause) => cause as NfcWriteBackEffectError,
   );

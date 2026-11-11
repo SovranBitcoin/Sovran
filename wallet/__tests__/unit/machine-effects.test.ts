@@ -801,6 +801,34 @@ describe('runNfcWriteBackEffect', () => {
     });
   });
 
+  // The tag holds the token, and the receiver may already have redeemed it:
+  // the payment went out, and a session that will not close undoes nothing.
+  it('reports the payment delivered when the session will not close after the write', async () => {
+    const rollbackSend = vi.fn(async () => {});
+    const releaseSession = vi.fn(async () => {
+      throw new Error('session already gone');
+    });
+
+    const result = await runNfcWriteBackEffect({
+      data: confirmPaymentRequestData,
+      executeNfcSend: async () => ({
+        token: 'cashuBnfc-token',
+        historyEntry: sendHistoryEntry('nfc-send-entry-1'),
+        operationId: 'operation-1',
+      }),
+      rollbackSend,
+      nfcAdapter: { writeToken: async () => {}, releaseSession },
+      context: sendContext,
+      isStale: () => false,
+    });
+
+    expect(result.isOk()).toBe(true);
+    if (result.isErr()) return;
+    expect(result.value).toMatchObject({ kind: 'completed', step: 'sendComplete' });
+    expect(rollbackSend).not.toHaveBeenCalled();
+    expect(releaseSession).toHaveBeenCalledTimes(1);
+  });
+
   it('returns stale before writing when NFC send resolves after reset', async () => {
     const writeToken = vi.fn(async () => {});
 
