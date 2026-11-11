@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type SetStateAction } from 'react';
 import { bytesToHex } from '@noble/hashes/utils.js';
 import {
   deserializeApplicationRumor,
@@ -28,6 +28,9 @@ export type WhitenoiseDmMessage = {
   isSelf: boolean;
   isPending?: boolean;
 };
+
+/** A change to the messages of the conversation opened for `target`. */
+type UpdateMessages = (target: OpenedFor, update: SetStateAction<WhitenoiseDmMessage[]>) => void;
 
 type UseWhitenoiseDMState = {
   isClientReady: boolean;
@@ -229,6 +232,13 @@ export function useWhitenoiseDM(counterpartyPubkey: string): UseWhitenoiseDMStat
     setConversation(next);
   }, []);
   const [messages, setMessages] = useState<WhitenoiseDmMessage[]>([]);
+  // Like the state events, a change for a conversation that is no longer the
+  // open one (a group created for the previous peer) is dropped.
+  const updateMessages = useCallback<UpdateMessages>((target, update) => {
+    const now = machine.current;
+    if (now.phase === 'closed' || now.for !== target) return;
+    setMessages(update);
+  }, []);
   // The state only counts once it is for this client, account and peer: in the
   // commit that first carries a new client the read for it has not started.
   const opened = openedForNow(conversation, {
@@ -238,6 +248,7 @@ export function useWhitenoiseDM(counterpartyPubkey: string): UseWhitenoiseDMStat
     accountIndex,
   });
   const group = groupOf(opened);
+  const openedFor = opened?.for ?? null;
 
   // Resolve existing group by counterparty pubkey, hydrate persisted history.
   // The impls construct their own WhitenoiseDmIndex from accountIndex at call
@@ -252,18 +263,18 @@ export function useWhitenoiseDM(counterpartyPubkey: string): UseWhitenoiseDMStat
     const target: OpenedFor = { client, counterpartyPubkey, selfPubkey, accountIndex };
     dispatch({ type: 'load-started', for: target });
     let cancelled = false;
-    void loadDmGroupImpl(target, () => cancelled, { dispatch, setMessages });
+    void loadDmGroupImpl(target, () => cancelled, { dispatch, updateMessages });
     return () => {
       cancelled = true;
     };
-  }, [client, counterpartyPubkey, selfPubkey, accountIndex, dispatch]);
+  }, [client, counterpartyPubkey, selfPubkey, accountIndex, dispatch, updateMessages]);
 
   // Subscribe to kind-445 events for the group and feed them into ingest.
   // The h-tag uses the *Nostr* group id (from the MarmotGroupData extension),
   // NOT the MLS `group.id`. They differ — getNostrGroupIdHex returns the
   // Nostr-tag value marmot writes when publishing kind-445 group events.
   useEffect(() => {
-    if (!client || !group) return;
+    if (!client || !group || !openedFor) return;
     const groupRelays = group.relays && group.relays.length > 0 ? group.relays : [...relays];
     const nostrGroupIdHex = getNostrGroupIdHex(group.state);
 
@@ -271,7 +282,10 @@ export function useWhitenoiseDM(counterpartyPubkey: string): UseWhitenoiseDMStat
       try {
         const rumor = deserializeApplicationRumor(bytes);
         if (!selfPubkey) return;
-        upsertDmMessage(setMessages, rumorToMessage(rumor, selfPubkey));
+        upsertDmMessage(
+          (update) => updateMessages(openedFor, update),
+          rumorToMessage(rumor, selfPubkey)
+        );
       } catch (err) {
         wnLog.warn('whitenoise.dm.deserialize_failed', {
           error: err instanceof Error ? err.message : String(err),
@@ -302,7 +316,7 @@ export function useWhitenoiseDM(counterpartyPubkey: string): UseWhitenoiseDMStat
       group.off('applicationMessage', onAppMessage);
       handle.unsubscribe();
     };
-  }, [client, group, relays, selfPubkey]);
+  }, [client, group, openedFor, relays, selfPubkey, updateMessages]);
 
   // The lazy group-creation path is the high-cost double-tap target: a
   // second concurrent call would see no group yet, call `client.createGroup`
@@ -321,7 +335,7 @@ export function useWhitenoiseDM(counterpartyPubkey: string): UseWhitenoiseDMStat
         opened: openedForNow(machine.current, now),
         current: () => machine.current,
         dispatch,
-        setMessages,
+        updateMessages,
       },
       text
     );
@@ -358,7 +372,7 @@ type WhitenoiseAccountIndex = ReturnType<typeof useWhitenoise>['accountIndex'];
 // we still find the right slot. O(n) per upsert vs the previous full sort.
 // Audit 33.json F-012.
 function upsertDmMessage(
-  setMessages: React.Dispatch<React.SetStateAction<WhitenoiseDmMessage[]>>,
+  setMessages: (update: SetStateAction<WhitenoiseDmMessage[]>) => void,
   msg: WhitenoiseDmMessage
 ): void {
   setMessages((prev) => {
@@ -376,7 +390,7 @@ async function loadDmGroupImpl(
   isCancelled: () => boolean,
   io: {
     dispatch: (event: ConversationEvent) => void;
-    setMessages: React.Dispatch<React.SetStateAction<WhitenoiseDmMessage[]>>;
+    updateMessages: UpdateMessages;
   }
 ): Promise<void> {
   const { client, counterpartyPubkey, selfPubkey, accountIndex } = target;
@@ -385,7 +399,7 @@ async function loadDmGroupImpl(
     const groupIdHex = await new WhitenoiseDmIndex(accountIndex).get(counterpartyPubkey);
     if (!groupIdHex) {
       if (!isCancelled()) {
-        io.setMessages([]);
+        io.updateMessages(target, []);
         io.dispatch({ type: 'loaded', for: target, group: null });
       }
       return;
@@ -399,7 +413,10 @@ async function loadDmGroupImpl(
       if (isCancelled()) return;
       if (selfPubkey) {
         const hydrated = stored.map((s) => rumorToMessage(s.rumor, selfPubkey));
-        io.setMessages(hydrated.sort((a, b) => a.createdAtSec - b.createdAtSec));
+        io.updateMessages(
+          target,
+          hydrated.sort((a, b) => a.createdAtSec - b.createdAtSec)
+        );
       }
     } catch (err) {
       wnLog.warn('whitenoise.dm.history_load_failed', {
@@ -422,11 +439,11 @@ interface SendDmCtx {
   /** The conversation as it is now, after a wait. */
   current: () => Conversation;
   dispatch: (event: ConversationEvent) => void;
-  setMessages: React.Dispatch<React.SetStateAction<WhitenoiseDmMessage[]>>;
+  updateMessages: UpdateMessages;
 }
 
 async function sendDmImpl(ctx: SendDmCtx, text: string): Promise<void> {
-  const { client, opened, dispatch, setMessages } = ctx;
+  const { client, opened, dispatch, updateMessages } = ctx;
   if (!text.trim()) return;
   if (!client) {
     dispatch({ type: 'send-without-client' });
@@ -452,7 +469,7 @@ async function sendDmImpl(ctx: SendDmCtx, text: string): Promise<void> {
       const now = ctx.current();
       return now.phase !== 'closed' && now.for === target;
     };
-    await loadDmGroupImpl(target, () => !stillFor(), { dispatch, setMessages });
+    await loadDmGroupImpl(target, () => !stillFor(), { dispatch, updateMessages });
     const after = ctx.current();
     if (after.phase !== 'ready' || after.for !== target) return;
     read = after;
@@ -465,6 +482,8 @@ async function sendDmImpl(ctx: SendDmCtx, text: string): Promise<void> {
 
   const optimisticId = mintLocalId('pending');
   const nowSec = Math.floor(Date.now() / 1000);
+  const setMessages = (update: SetStateAction<WhitenoiseDmMessage[]>) =>
+    updateMessages(target, update);
   upsertDmMessage(setMessages, {
     id: optimisticId,
     authorPubkey: selfPubkey,

@@ -631,6 +631,39 @@ describe('a send in the moment the client arrives', () => {
   });
 });
 
+describe('a conversation switched to another peer', () => {
+  it("keeps a message whose group was still being created for the first peer out of the second peer's thread", async () => {
+    const OTHER = 'c'.repeat(64);
+    const creating = deferred<FakeGroup>();
+    fake.client.createGroup.mockReturnValueOnce(creating.promise);
+    const view = renderHook((props: { peer: string }) => useWhitenoiseDM(props.peer), {
+      wrapper,
+      initialProps: { peer: PEER },
+    });
+    await act(async () => undefined);
+
+    let sending!: Promise<unknown>;
+    act(() => {
+      sending = view.result.current.send('for the first peer');
+    });
+    await act(async () => undefined);
+    expect(view.result.current.isCreatingGroup).toBe(true);
+
+    await act(async () => {
+      view.rerender({ peer: OTHER });
+    });
+    expect(view.result.current).toMatchObject({ isLoading: false, hasGroup: false, messages: [] });
+
+    const group = makeGroup([0xc0, 0xde]);
+    await act(async () => {
+      creating.resolve(group);
+      await sending;
+    });
+
+    expect(view.result.current.messages).toEqual([]);
+  });
+});
+
 describe('a client replaced while the conversation is open', () => {
   it("stops listening to the old client's group, and a failed read for the new client shows no group", async () => {
     const old = makeGroup([0x01, 0x02]);
