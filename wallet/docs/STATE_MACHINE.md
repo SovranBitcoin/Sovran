@@ -605,6 +605,8 @@ EXECUTE(paymentRequest) / OPTION_CHOSEN(paymentRequest)
         completed  -> step STAYS navigateToPaymentRequest, +historyEntry; outcome delivered
         rolledBack -> outcome rolledBack; routeOperationFailure(..,{rolledBack:true})
         thrown     -> outcome undelivered (PaymentRequestUndeliveredError) or failed;
+                      undelivered also sets `undeliveredOperationId` on the step, and a
+                      further confirm or mint list request is ignored
                       routeOperationFailure(..)
         stale / locked out -> outcome ignored
    NFC: source==='nfc' on navigateToPaymentRequest -> runNfcWriteBackEffect -> sendComplete

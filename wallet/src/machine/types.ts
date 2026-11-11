@@ -288,6 +288,12 @@ export interface StepDataMap {
     recipientProfile?: RecipientProfile;
     /** Populated after a successful payment request send. */
     historyEntry?: string;
+    /**
+     * Set when ecash for this request left the wallet, was not confirmed
+     * delivered and could not be taken back. The recipient may hold it, so
+     * this preview must not send again.
+     */
+    undeliveredOperationId?: string;
   };
   createMintQuote: {
     mintUrl: string;

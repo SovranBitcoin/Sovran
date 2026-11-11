@@ -343,6 +343,27 @@ describe('payment request — confirm after delivery', () => {
     tm.assertStep('navigateToPaymentRequest');
   });
 
+  it('does not send again, from the same mint or another, once ecash left and could not be taken back', async () => {
+    let attempts = 0;
+    const tm = createTestMachine({
+      operations: {
+        executePaymentRequest: async () => {
+          attempts += 1;
+          throw new PaymentRequestUndeliveredError('op-9', new Error('relay down'));
+        },
+      },
+    });
+    await tm.machine.execute(INPUTS.paymentRequestBasic, { reset: true });
+    expect((await tm.machine.confirmPaymentRequest()).kind).toBe('undelivered');
+
+    expect((await tm.machine.confirmPaymentRequest()).kind).toBe('ignored');
+    await tm.machine.requestMintSelector();
+    expect((await tm.machine.confirmPaymentRequest()).kind).toBe('ignored');
+
+    expect(attempts).toBe(1);
+    tm.assertStep('navigateToPaymentRequest');
+  });
+
   it('sends again when confirm is tapped after a failed attempt', async () => {
     let attempts = 0;
     const tm = createTestMachine({

@@ -833,7 +833,9 @@ export function createPaymentMachine(
       event.type === "REQUEST_MINT_SELECTOR" &&
       (step === "navigateToMeltPreview" ||
         step === "navigateToPaymentRequest") &&
-      (stepData as StepDataMap["navigateToMeltPreview"]).historyEntry
+      ((stepData as StepDataMap["navigateToMeltPreview"]).historyEntry ||
+        (stepData as StepDataMap["navigateToPaymentRequest"])
+          .undeliveredOperationId)
     ) {
       logger.warn("machine.mintSelector.alreadySettled", { currentStep: step });
       sendLocked = false;
@@ -1054,9 +1056,9 @@ export function createPaymentMachine(
     ) {
       const originalStep = step;
       const data = stepData as StepDataMap["navigateToPaymentRequest"];
-      if (data.historyEntry) {
-        // Already delivered: sending again would pay twice. The caller's
-        // outcome stays `ignored`.
+      if (data.historyEntry || data.undeliveredOperationId) {
+        // Already delivered, or sent and not taken back: sending again would
+        // pay twice. The caller's outcome stays `ignored`.
         logger.warn("machine.confirm.alreadySettled", { type: event.type });
         sendLocked = false;
         return;
@@ -1154,6 +1156,12 @@ export function createPaymentMachine(
             ? { kind: "undelivered", operationId: cause.operationId }
             : { kind: "failed" },
         );
+        if (undelivered) {
+          setStep("navigateToPaymentRequest", {
+            ...data,
+            undeliveredOperationId: cause.operationId,
+          });
+        }
         routeOperationFailure(cause, "paymentRequest", data.paymentRequest, data, {
           undelivered,
         });
