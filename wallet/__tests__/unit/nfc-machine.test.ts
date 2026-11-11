@@ -402,3 +402,108 @@ describe("NFC mint choice honours the payment-request gate", () => {
     });
   });
 });
+
+// Each way out of a tap, for a request in a unit the host had to switch to:
+// how often the tag session was released, and the host's unit switches in
+// order. A paid tap keeps the terminal's unit; any other end restores it.
+describe("what an NFC tap leaves behind when it ends", () => {
+  const unitSwitches = (switchUnit: ReturnType<typeof setup>["switchUnit"]) =>
+    switchUnit.mock.calls.map(([unit]) => unit);
+
+  it("keeps the terminal's unit after it pays and writes back", async () => {
+    const { tm, adapter, switchUnit } = setup({ unit: "usd" });
+    await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
+    tm.assertStep("sendComplete");
+    expect(adapter.releaseSession).toHaveBeenCalledTimes(1);
+    expect(unitSwitches(switchUnit)).toEqual(["usd"]);
+  });
+
+  it("restores the unit after the write-back fails", async () => {
+    const { tm, adapter, switchUnit } = setup({ unit: "usd" });
+    adapter.writeToken.mockRejectedValueOnce(new Error("tag lost"));
+    await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
+    tm.assertExecution({ code: "NFC_WRITE_FAILED" });
+    expect(adapter.releaseSession).toHaveBeenCalledTimes(1);
+    expect(unitSwitches(switchUnit)).toEqual(["usd", "sat"]);
+  });
+
+  it("restores the unit after the token cannot be created", async () => {
+    const { tm, adapter, switchUnit } = setup({
+      unit: "usd",
+      operations: {
+        executeNfcSend: vi.fn(async () => {
+          throw new Error("mint offline");
+        }),
+      },
+    });
+    await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
+    tm.assertExecution({ code: "NFC_WRITE_FAILED" });
+    expect(adapter.releaseSession).toHaveBeenCalledTimes(1);
+    expect(unitSwitches(switchUnit)).toEqual(["usd", "sat"]);
+  });
+
+  it("restores the unit after every funded mint was refused", async () => {
+    const { tm, adapter, switchUnit } = setup({
+      unit: "usd",
+      operations: { paymentRequestPayabilityFrom: refuseFees("fees") },
+    });
+    await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
+    tm.assertExecution({ code: "PAYMENT_REQUEST_FAILED", message: "fees" });
+    expect(adapter.releaseSession).toHaveBeenCalledTimes(1);
+    expect(unitSwitches(switchUnit)).toEqual(["usd", "sat"]);
+  });
+
+  it("restores the unit when the request stops on an error after the switch", async () => {
+    const { tm, adapter, switchUnit } = setup({ unit: "usd", unitSwitchTakes: false });
+    await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
+    tm.assertStep("error");
+    expect(adapter.releaseSession).toHaveBeenCalledTimes(1);
+    expect(unitSwitches(switchUnit)).toEqual(["usd", "sat"]);
+  });
+
+  it("releases once and switches nothing when the unit is not funded", async () => {
+    const { tm, adapter, switchUnit } = setup({ unit: "usd", balances: {} });
+    await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
+    tm.assertExecution({ code: "UNIT_NOT_FUNDED" });
+    expect(adapter.releaseSession).toHaveBeenCalledTimes(1);
+    expect(unitSwitches(switchUnit)).toEqual([]);
+  });
+
+  it("releases once and restores nothing when the switch itself fails", async () => {
+    const { tm, adapter, switchUnit } = setup({ unit: "usd" });
+    switchUnit.mockRejectedValueOnce(new Error("host switch failed"));
+    await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
+    tm.assertExecution({ code: "NFC_READ_FAILED" });
+    expect(adapter.releaseSession).toHaveBeenCalledTimes(1);
+    expect(unitSwitches(switchUnit)).toEqual(["usd"]);
+  });
+
+  it("releases once when a tag without an amount asks for one", async () => {
+    const { tm, adapter, switchUnit } = setup();
+    await tm.machine.scan!(INPUTS.lightningAddress, { source: "nfc" });
+    tm.assertExecution({ code: "NFC_READ_FAILED" });
+    expect(adapter.releaseSession).toHaveBeenCalledTimes(1);
+    expect(unitSwitches(switchUnit)).toEqual([]);
+  });
+
+  // A reset owns the machine now: the stranded tap releases nothing and
+  // restores nothing.
+  it("releases and restores nothing after a reset overtakes the switch", async () => {
+    const { tm, adapter, switchUnit } = setup({ unit: "usd" });
+    let finish!: () => void;
+    switchUnit.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const pending = tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
+    await vi.waitFor(() => expect(switchUnit).toHaveBeenCalledTimes(1));
+    tm.machine.reset();
+    finish();
+    await pending;
+    tm.assertStep("idle");
+    expect(adapter.releaseSession).not.toHaveBeenCalled();
+    expect(unitSwitches(switchUnit)).toEqual(["usd"]);
+  });
+});
