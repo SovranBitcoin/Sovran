@@ -364,6 +364,63 @@ describe("a turn superseded by fresh intent", () => {
     expect(await isFree(tm.machine)).toBe(true);
   });
 
+  it("keeps the newer turn's lock when the older one's handler returns late", async () => {
+    const receiveScreen = deferred();
+    const amountScreen = deferred();
+    const tm = build({
+      handlers: {
+        receiveToken: () => receiveScreen.promise,
+        enterAmount: () => amountScreen.promise,
+      },
+    });
+    const older = tm.machine.execute(INPUTS.cashuTokenV3, { reset: true });
+    await settle();
+    expect(tm.handled("receiveToken")).toBe(1);
+    const newer = tm.machine.startSendEcash();
+    await settle();
+    expect(tm.handled("enterAmount")).toBe(1);
+
+    receiveScreen.resolve();
+    await older;
+    expect(tm.machine.getStep()).toBe("enterAmount");
+    expect(await isFree(tm.machine)).toBe(false);
+
+    amountScreen.resolve();
+    await newer;
+    expect(isExecuting(tm.machine)).toBe(false);
+    expect(await isFree(tm.machine)).toBe(true);
+  });
+
+  it("keeps the newer turn's lock when a superseded quote refresh lands", async () => {
+    const refresh = deferred<MeltQuotePreview>();
+    const requote = deferred<MeltQuotePreview>();
+    let quotes = 0;
+    const tm = build({
+      operations: {
+        quoteMelt: () => {
+          quotes += 1;
+          if (quotes === 1) return Promise.resolve(meltQuote({ expiresAt: 1 }));
+          return quotes === 2 ? refresh.promise : requote.promise;
+        },
+      },
+    });
+    await toMeltPreview(tm.machine);
+    const pay = tm.machine.confirmMelt();
+    const newer = tm.machine.enterAmount({ value: 300, unit: "sat" }, MINT1);
+    expect(quotes).toBe(3);
+
+    refresh.resolve(meltQuote({ quoteId: "quote-2" }));
+    await pay;
+    expect(isExecuting(tm.machine)).toBe(true);
+    expect(await isFree(tm.machine)).toBe(false);
+
+    requote.resolve(meltQuote({ quoteId: "quote-3", quoteAmount: 300, flowAmount: 300 }));
+    await newer;
+    expect(tm.calls("executeMelt")).toBe(0);
+    expect(isExecuting(tm.machine)).toBe(false);
+    expect(await isFree(tm.machine)).toBe(true);
+  });
+
   // QUIRK: Pay with no mint chosen re-runs the mint list handler and then
   // frees the machine without checking that its turn still holds it. When
   // fresh intent took over while that handler ran, the newer turn's lock is
@@ -736,6 +793,32 @@ describe("the main path", () => {
     expect(tm.machine.getStep()).toBe("receiveToken");
     expect(isExecuting(tm.machine)).toBe(false);
     expect(await isFree(tm.machine)).toBe(true);
+  });
+
+  // QUIRK: the safety net frees the machine, but a link that throws after an
+  // NFC tap paid leaves the step on the payment request preview, still
+  // awaiting Pay: a later Pay sends the request a second time.
+  it("swallows a throw before the handler runs and is free afterwards", async () => {
+    let links = 0;
+    const tm = build({
+      nfcAdapter: nfcAdapter(),
+      direct: {
+        linkTransaction: () => {
+          if (++links === 1) throw new Error("history store closed");
+        },
+      },
+    });
+    await expect(
+      tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" }),
+    ).resolves.toMatchObject({ urInProgress: false });
+    expect(tm.calls("executeNfcSend")).toBe(1);
+    expect(tm.machine.getStep()).toBe("navigateToPaymentRequest");
+    expect(tm.handled("sendComplete")).toBe(0);
+    expect(isExecuting(tm.machine)).toBe(false);
+    expect(await isFree(tm.machine)).toBe(true);
+
+    expect((await tm.machine.confirmPaymentRequest()).kind).toBe("delivered");
+    expect(tm.calls("executePaymentRequest")).toBe(1);
   });
 
   it("swallows a throwing handler on an input step and is free afterwards", async () => {
