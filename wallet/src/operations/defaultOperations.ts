@@ -2051,10 +2051,19 @@ export function createDefaultOperations(
         }
       }
 
+      // The payment is delivered by now. A history read that fails must not
+      // turn it into a failure the person can retry; the fallback entry below
+      // stands in for the row.
       const historyEntry = await findSendHistoryEntryByOperationId(
         mgr,
         operationId,
-      );
+      ).catch((err: unknown) => {
+        logger.warn("operations.executePaymentRequest.historyLookupFailed", {
+          operationId,
+          error: errField(err),
+        });
+        return null;
+      });
       logger.info("operations.executePaymentRequest.historyLookup", {
         operationId,
         found: !!historyEntry,

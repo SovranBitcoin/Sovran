@@ -415,6 +415,27 @@ describe("executePaymentRequest — Nostr transport", () => {
     expect(failure).toMatchObject({ operationId: "op-1", message: "relay down" });
   });
 
+  it("reports a delivered send as delivered when its history row cannot be read", async () => {
+    const mockManager = createMockManager();
+    mockManager.history.getHistoryEntryById = vi.fn().mockRejectedValue(new Error("database is locked"));
+    mockGetPRInfo.mockReturnValue({
+      mints: [MINT1],
+      amount: 100,
+      unit: "sat",
+      transports: [{ type: "nostr", target: "nprofile1abc" }],
+    });
+    const sendNostrDM = vi.fn().mockResolvedValue(undefined);
+    const ops = createDefaultOperations({
+      getManager: () => mockManager as unknown as Manager,
+      sendNostrDM,
+    });
+
+    const result = await ops.executePaymentRequest!({ mintUrl: MINT1, paymentRequest: "creqABC", amount: 100, unit: "sat" });
+
+    expect(sendNostrDM).toHaveBeenCalledOnce();
+    expect(JSON.parse(result.historyEntry)).toMatchObject({ type: "send", amount: 100, unit: "sat" });
+  });
+
   it("throws when sendNostrDM is not provided for Nostr transport", async () => {
     const mockManager = createMockManager();
 
