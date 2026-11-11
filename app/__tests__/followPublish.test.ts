@@ -590,6 +590,47 @@ describe('following someone', () => {
     expect(mockPopup).not.toHaveBeenCalled();
   });
 
+  it('builds again on a list with the same time that arrived while signing', async () => {
+    relaysHold(contacts(T, [['p', X]]));
+    // Another client's list with the same second and a lower id: relays keep it.
+    const rival = {
+      ...contacts(T, [
+        ['p', X],
+        ['p', W],
+      ]),
+      id: '1'.padStart(64, '0'),
+    };
+    const { ndk, signer } = setup();
+    signer.sign.mockImplementationOnce(async () => {
+      mockStored.set(mockRelays[1].url, [contacts(T, [['p', X]]), rival]);
+      social().setContactsFromRelay({ tags: rival.tags, content: '', createdAtSec: T });
+    });
+
+    tap(Z);
+    await requestFollowSync(ndk, OWN);
+
+    expect(mockPublish).toHaveBeenCalledTimes(1);
+    expect(publishedTags()).toEqual([
+      ['p', X],
+      ['p', W],
+      ['p', Z],
+    ]);
+    expect(social().optimisticFollowsByPubkey).toEqual({});
+  });
+
+  it('waits rather than build on a list dated in the future', async () => {
+    const future = Math.floor(Date.now() / 1000) + 3600;
+    relaysHold(contacts(future, [['p', X]]));
+    const { ndk } = setup();
+
+    tap(Z);
+    await requestFollowSync(ndk, OWN);
+
+    expect(mockPublish).not.toHaveBeenCalled();
+    expect(social().optimisticFollowsByPubkey[Z]?.pending).toBe(true);
+    expect(social().contactsUpdatedAt).toBe(0);
+  });
+
   it('settles a tap the list already agrees with, without publishing', async () => {
     relaysHold(
       contacts(T, [

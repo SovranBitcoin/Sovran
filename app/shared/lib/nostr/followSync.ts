@@ -129,14 +129,41 @@ const ContactEvent = z.object({
   created_at: z.number().int().nonnegative(),
 });
 
-/** Decode the read: a list only from a complete read, and only one that parses. */
+/** How far ahead of this device's clock a list may be dated, as for the mute list. */
+const MAX_FUTURE_SEC = 60;
+
+/**
+ * Decode the read: a list only from a complete read, and only one that
+ * parses and is not dated in the future (building on it would date ours there
+ * too, and relays would keep it over every later list).
+ */
 function decodeRead(read: { outcome: OwnEventReadOutcome; newest: unknown }): ListRead {
   if (read.outcome !== 'complete') return { status: 'incomplete' };
   if (!read.newest) return { status: 'empty' };
   const parsed = ContactEvent.safeParse(read.newest);
-  if (!parsed.success) return { status: 'unusable' };
+  if (!parsed.success || parsed.data.created_at > Math.floor(Date.now() / 1000) + MAX_FUTURE_SEC)
+    return { status: 'unusable' };
   const { tags, content, created_at } = parsed.data;
   return { status: 'found', list: { tags, content, createdAt: created_at } };
+}
+
+/**
+ * The saved list fields. The store replaces at least one of them for every
+ * list or seed it accepts, also one with the same `created_at`, so while they
+ * are unchanged the list a publish builds on is still the newest known.
+ */
+function savedList() {
+  const state = useNostrSocialStore.getState();
+  return [
+    state.contactsTags,
+    state.contactsContent,
+    state.contactsUpdatedAt,
+    state.followingPubkeys,
+  ] as const;
+}
+
+function sameSavedList(a: ReturnType<typeof savedList>, b: ReturnType<typeof savedList>) {
+  return a.every((field, index) => field === b[index]);
 }
 
 /**
@@ -202,6 +229,7 @@ async function syncOnce(ndk: NDK, ownPubkey: string): Promise<void> {
           content: read.list.content,
           createdAtSec: read.list.createdAt,
         });
+      const atBase = savedList();
 
       let intents = selectFollowIntents(social());
       const planOf = (indexed?: IndexedList) => {
@@ -243,7 +271,6 @@ async function syncOnce(ndk: NDK, ownPubkey: string): Promise<void> {
         }
       }
 
-      const stampAtBase = social().contactsUpdatedAt;
       const event = new NDKEvent(ndk);
       event.kind = Contacts;
       event.pubkey = ownPubkey;
@@ -265,8 +292,8 @@ async function syncOnce(ndk: NDK, ownPubkey: string): Promise<void> {
       scope.check();
       if (event.pubkey !== ownPubkey || ndk.signer !== signer)
         throw new Error('Account signer changed');
-      // A list arrived while signing: build again on it.
-      if (social().contactsUpdatedAt !== stampAtBase) continue;
+      // A list or seed arrived while signing, also one dated the same second: build again on it.
+      if (!sameSavedList(atBase, savedList())) continue;
 
       const published = await publishEvent({ ndk, event, resolveOn: 'all-settled' });
       scope.check();
