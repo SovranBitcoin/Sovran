@@ -36,7 +36,12 @@ export interface MeshRedeemQueuePort {
   /** Drop expired entries (the store owns its TTL policy). */
   prune(): void;
   entries(): Record<string, MeshRedeemEntry>;
-  markStatus(tokenHash: string, status: MeshRedeemStatus, error?: string): void;
+  /** Refused by the store when the entry's status is not one the move may start from. */
+  markStatus(
+    tokenHash: string,
+    status: Exclude<MeshRedeemStatus, "pending">,
+    error?: string,
+  ): void;
   /** Exponential backoff + terminal `failed` after max attempts (store-owned policy). */
   scheduleRetry(tokenHash: string, error: string): void;
 }

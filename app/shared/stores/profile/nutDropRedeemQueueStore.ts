@@ -1,11 +1,13 @@
 import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { persist } from 'zustand/middleware';
 import {
+  canMeshRedeemMove,
   isMeshRedeemSettled,
   MESH_REDEEM_MAX_ATTEMPTS,
   MESH_REDEEM_STATUSES,
   meshRedeemPhase,
   type MeshRedeemEntry,
+  type MeshRedeemMove,
   type MeshRedeemStatus,
 } from 'wallet/redeemEntry';
 import { z } from 'zod';
@@ -68,12 +70,17 @@ interface NutDropRedeemQueueActions {
       | 'senderPubkey'
     >
   ) => boolean;
-  markStatus: (tokenHash: string, status: MeshRedeemStatus, error?: string) => void;
+  /** Refused, and logged, when the entry's status is not one the move may start from. */
+  markStatus: (
+    tokenHash: string,
+    status: Exclude<MeshRedeemStatus, 'pending'>,
+    error?: string
+  ) => void;
   scheduleRetry: (tokenHash: string, error: string) => void;
   /**
    * Put a parked entry (`untrusted-mint`, `failed`) back in line with a clean
    * attempt count: its mint has since been trusted, or the person asked to try
-   * again. A terminal entry is never requeued.
+   * again. Any other entry is left as it is.
    */
   requeue: (tokenHash: string) => void;
   prune: () => void;
@@ -174,6 +181,17 @@ const PersistedNutDropRedeemQueueStore = z.object({
 
 const isSettled = (entry: NutDropRedeemEntry) => isMeshRedeemSettled(meshRedeemPhase(entry));
 
+/** Whether `move` may start from the entry's status; a refusal is logged. */
+function allowsMove(tokenHash: string, entry: NutDropRedeemEntry, move: MeshRedeemMove): boolean {
+  if (canMeshRedeemMove(entry.status, move)) return true;
+  storeLog.warn('store.nut_drop_queue.move_refused', {
+    tokenHash: tokenHash.slice(0, 12),
+    from: entry.status,
+    move,
+  });
+  return false;
+}
+
 export const useNutDropRedeemQueueStore = create<NutDropRedeemQueueStore>({
   name: 'nut-drop-redeem-queue',
   scope: 'profile',
@@ -214,7 +232,7 @@ export const useNutDropRedeemQueueStore = create<NutDropRedeemQueueStore>({
 
       markStatus: (tokenHash, status, error) => {
         const existing = get().byTokenHash[tokenHash];
-        if (!existing) return;
+        if (!existing || !allowsMove(tokenHash, existing, status)) return;
         storeLog.info('store.nut_drop_queue.status', {
           tokenHash: tokenHash.slice(0, 12),
           status,
@@ -230,7 +248,7 @@ export const useNutDropRedeemQueueStore = create<NutDropRedeemQueueStore>({
 
       requeue: (tokenHash) => {
         const existing = get().byTokenHash[tokenHash];
-        if (!existing || isSettled(existing)) return;
+        if (!existing || !allowsMove(tokenHash, existing, 'requeue')) return;
         storeLog.info('store.nut_drop_queue.requeue', {
           tokenHash: tokenHash.slice(0, 12),
           from: existing.status,
@@ -246,7 +264,7 @@ export const useNutDropRedeemQueueStore = create<NutDropRedeemQueueStore>({
 
       scheduleRetry: (tokenHash, error) => {
         const existing = get().byTokenHash[tokenHash];
-        if (!existing) return;
+        if (!existing || !allowsMove(tokenHash, existing, 'retry')) return;
         const attempts = existing.attempts + 1;
         if (attempts >= MESH_REDEEM_MAX_ATTEMPTS) {
           storeLog.warn('store.nut_drop_queue.exhausted', {

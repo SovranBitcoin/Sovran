@@ -104,6 +104,7 @@ describe('nutDropRedeemQueueStore', () => {
     useNutDropRedeemQueueStore.getState().enqueue(HASH, ENTRY);
     useNutDropRedeemQueueStore.getState().scheduleRetry(HASH, page);
     expect(useNutDropRedeemQueueStore.getState().byTokenHash[HASH]?.lastError).toHaveLength(500);
+    useNutDropRedeemQueueStore.getState().markStatus(HASH, 'redeeming');
     useNutDropRedeemQueueStore.getState().markStatus(HASH, 'failed', page);
     expect(useNutDropRedeemQueueStore.getState().byTokenHash[HASH]?.lastError).toHaveLength(500);
   });

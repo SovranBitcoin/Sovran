@@ -193,6 +193,62 @@ describe('moves the queue accepts', () => {
   });
 });
 
+describe('moves the queue refuses', () => {
+  const STATUSES = [
+    'pending',
+    'redeeming',
+    'redeemed',
+    'spent',
+    'untrusted-mint',
+    'failed',
+  ] as const;
+  const MOVES = {
+    redeeming: () => store().markStatus(HASH, 'redeeming'),
+    redeemed: () => store().markStatus(HASH, 'redeemed'),
+    spent: () => store().markStatus(HASH, 'spent', 'late'),
+    'untrusted-mint': () => store().markStatus(HASH, 'untrusted-mint'),
+    failed: () => store().markStatus(HASH, 'failed', 'late'),
+    retry: () => store().scheduleRetry(HASH, 'late'),
+    requeue: () => store().requeue(HASH),
+  } as const;
+  // From which statuses each move means something; every other start is refused.
+  const ALLOWED: Record<keyof typeof MOVES, readonly Entry['status'][]> = {
+    redeeming: ['pending', 'redeeming'],
+    redeemed: ['redeeming', 'spent'],
+    spent: ['pending', 'redeeming', 'untrusted-mint', 'failed'],
+    'untrusted-mint': ['pending', 'redeeming'],
+    failed: ['redeeming'],
+    retry: ['pending', 'redeeming'],
+    requeue: ['untrusted-mint', 'failed'],
+  };
+  const refused = STATUSES.flatMap((from) =>
+    (Object.keys(MOVES) as (keyof typeof MOVES)[])
+      .filter((move) => !ALLOWED[move].includes(from))
+      .map((move) => [from, move] as const)
+  );
+
+  it.each(refused)('leaves a %s entry as it is on %s', (from, move) => {
+    at(from, { attempts: 2, nextAttemptAt: NOW - 5, lastError: 'earlier' });
+    const before = current();
+    MOVES[move]();
+    expect(current()).toEqual(before);
+  });
+
+  it('never brings a received token back into line', () => {
+    at('redeemed');
+    store().requeue(HASH);
+    store().scheduleRetry(HASH, 'late network error');
+    store().markStatus(HASH, 'redeeming');
+    expect(current()?.status).toBe('redeemed');
+  });
+
+  it('does not reset a token that is being received when "try again" lands on it', () => {
+    at('redeeming', { attempts: 1 });
+    store().requeue(HASH);
+    expect(current()).toMatchObject({ status: 'redeeming', attempts: 1 });
+  });
+});
+
 describe('what each reader makes of an entry', () => {
   // [name, status, fields]
   const KINDS = [
