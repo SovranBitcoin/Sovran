@@ -1,7 +1,6 @@
 import {
   checkBalance,
   sendMessage,
-  topUpBalance,
   setRoutstrNodeBaseUrl,
 } from '@/shared/lib/routstr/api';
 import { settleRoutstrClient } from '@/shared/lib/routstr/sdk/client';
@@ -81,10 +80,9 @@ const completion = () =>
 // operations below still hold a node-issued key and still rotate it.
 const operations = [
   ['balance', (key: string) => checkBalance(key)],
-  ['topup', (key: string) => topUpBalance({ apiKey: key, cashuToken: 'cashuA-test-topup' })],
 ] as const;
 const response = (status = 200, message = 'upstream unavailable', change = 'cashuB-test-change') =>
-  new Response(JSON.stringify(status === 200 ? { balance: 10, msats: 10 } : { detail: message }), {
+  new Response(JSON.stringify(status === 200 ? { balance: 10 } : { detail: message }), {
     status,
     headers: { 'x-cashu': change, 'content-type': 'application/json' },
   });

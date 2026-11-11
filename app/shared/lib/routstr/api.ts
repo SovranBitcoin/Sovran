@@ -331,10 +331,6 @@ const BalanceSpine = z.looseObject({
   reserved: RoutstrMsats.optional(),
 });
 
-const TopUpSpine = z.looseObject({
-  msats: RoutstrMsats.optional(),
-});
-
 // ── Types ────────────────────────────────────────────────────────────────
 
 interface BalanceResponse {
@@ -342,10 +338,6 @@ interface BalanceResponse {
   total_spent?: number;
   api_key?: string;
   reserved?: number;
-}
-
-interface TopUpResponse {
-  added_amount: number;
 }
 
 interface RoutstrError {
@@ -1007,54 +999,6 @@ export async function checkBalance(
     return result;
   } catch (error) {
     apiLog.error('api.routstr.balance.failed', {
-      status: error && typeof error === 'object' && 'status' in error ? error.status : 0,
-      duration_ms: Math.round(performance.now() - start),
-    });
-    toRoutstrError(error);
-  }
-}
-
-export async function topUpBalance(
-  { apiKey, cashuToken }: { apiKey: string; cashuToken: string },
-  controls: RequestControls = {}
-): Promise<TopUpResponse> {
-  apiLog.info('api.routstr.wallet.topup.start', { tokenLength: cashuToken?.length });
-  const start = performance.now();
-  const ownsScope = captureRequestScope();
-  try {
-    const response = await fetch(`${routstrBaseUrl()}/wallet/topup`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ cashu_token: cashuToken }),
-      signal: buildAbortSignal({ timeoutMs: ROUTSTR_TIMEOUT_MS, ...controls }),
-    });
-    const balanceKey = applyResponseChange(response, apiKey, ownsScope);
-    apiLog.debug('api.routstr.wallet.topup.response', {
-      status: response.status,
-      duration_ms: Math.round(performance.now() - start),
-    });
-    const data = await readRoutstrEnvelope(
-      response,
-      TopUpSpine,
-      {
-        route: '/wallet/topup',
-        invalidShapeEvent: 'api.routstr.wallet.topup.invalid_shape',
-      },
-      apiKey,
-      balanceKey,
-      ownsScope
-    );
-    const result = { added_amount: data.msats ?? 0 };
-    apiLog.info('api.routstr.wallet.topup.success', {
-      addedAmount: result.added_amount,
-      duration_ms: Math.round(performance.now() - start),
-    });
-    return result;
-  } catch (error) {
-    apiLog.error('api.routstr.wallet.topup.failed', {
       status: error && typeof error === 'object' && 'status' in error ? error.status : 0,
       duration_ms: Math.round(performance.now() - start),
     });
