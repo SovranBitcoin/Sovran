@@ -25,6 +25,8 @@ let mockDm = {
 };
 type ChatProps = {
   composerDisabled?: boolean;
+  composerPlaceholder?: string;
+  emptyContent?: ReactNode;
   messages?: unknown[];
   banner?: ReactNode;
   onSend?: (text: string) => unknown;
@@ -111,4 +113,77 @@ it('a blocked person’s conversation shows nothing, says how to unblock and sen
     'This person is blocked. Open “Block or report” to unblock them.'
   );
   mockIgnored = [];
+});
+
+/** Every string in a React element tree, in order. */
+function textsOf(node: ReactNode): string[] {
+  if (typeof node === 'string') return [node];
+  if (Array.isArray(node)) return node.flatMap(textsOf);
+  if (node && typeof node === 'object' && 'props' in node) {
+    return textsOf((node as ReactElement<{ children?: ReactNode }>).props.children);
+  }
+  return [];
+}
+
+it.each([
+  [
+    'no client',
+    { isClientReady: false, isLoading: false, isCreatingGroup: false, hasGroup: false },
+    true,
+    'Write here',
+    'White Noise is not available yet.',
+  ],
+  [
+    'loading',
+    { isClientReady: true, isLoading: true, isCreatingGroup: false, hasGroup: false },
+    true,
+    'Write here',
+    'Loading…',
+  ],
+  [
+    'reading a saved group’s history',
+    { isClientReady: true, isLoading: true, isCreatingGroup: false, hasGroup: true },
+    true,
+    'Write here',
+    'Loading…',
+  ],
+  [
+    'creating the group',
+    { isClientReady: true, isLoading: false, isCreatingGroup: true, hasGroup: false },
+    true,
+    'Creating encrypted group…',
+    'Start an MLS-encrypted chat with ',
+  ],
+  [
+    'no group yet',
+    { isClientReady: true, isLoading: false, isCreatingGroup: false, hasGroup: false },
+    false,
+    'Write here',
+    'Start an MLS-encrypted chat with ',
+  ],
+  [
+    'a group',
+    { isClientReady: true, isLoading: false, isCreatingGroup: false, hasGroup: true },
+    false,
+    'Write here',
+    'No messages yet. Say hi to ',
+  ],
+])('%s: the send box and the empty thread say so', (_name, dm, disabled, placeholder, empty) => {
+  openWith({ ...dm, error: null, messages: [] });
+  expect(mockChatProps.composerDisabled).toBe(disabled);
+  expect(mockChatProps.composerPlaceholder).toBe(placeholder);
+  expect(textsOf(mockChatProps.emptyContent)[0]).toMatch(new RegExp(`^${empty}`));
+});
+
+it('shows a failed read or send as the banner, the send box staying open', () => {
+  openWith({
+    isClientReady: true,
+    isLoading: false,
+    isCreatingGroup: false,
+    hasGroup: true,
+    error: 'no relay accepted',
+    messages: [],
+  });
+  expect(mockChatProps.composerDisabled).toBe(false);
+  expect(textsOf(mockChatProps.banner)).toEqual(['no relay accepted']);
 });
