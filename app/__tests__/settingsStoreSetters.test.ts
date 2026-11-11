@@ -185,12 +185,12 @@ describe('setters', () => {
       privacyRevision: expect.any(String),
       acceptedAt: expect.any(String),
     });
-    expect(state.isTermsAccepted()).toBe(true);
+    expect(state.termsAccepted?.termsAccepted).toBe(true);
   });
 
   it('acceptLegalDocuments on a fresh install records the terms with today’s date', async () => {
     const store = await loadStore();
-    expect(store.getState().isTermsAccepted()).toBe(false);
+    expect(store.getState().termsAccepted).toBeNull();
 
     store.getState().acceptLegalDocuments();
     const { termsAccepted, legalAcceptance } = store.getState();
@@ -226,6 +226,5 @@ describe('setters', () => {
       hasSeenOnboarding: true,
     });
     expect(saved().state).not.toHaveProperty('setDisplayBtc');
-    expect(saved().state).not.toHaveProperty('isTermsAccepted');
   });
 });
