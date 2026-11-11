@@ -1,7 +1,7 @@
 import { describe, test, expect } from 'vitest';
 import { ok, type Result } from 'neverthrow';
 import { createNaggClient } from '../src/transport';
-import { createNaggTier, createNostrDataLayer, socialGraphFromEvents } from '../src/facade';
+import { createNaggTier, createNostrDataLayer, socialGraphFromEvents, type SocialGraph } from '../src/facade';
 import { createRelayTier, type RelayConnection, type RawRelayEvent } from '../src/facade/relay';
 import type { NaggError } from '../src/errors';
 
@@ -91,6 +91,43 @@ describe('getSocialGraph through the facade', () => {
     expect(graph.tier).toBe('relay');
     expect(graph.follows).toEqual([F1, F2]);
     expect(graph.profiles).toEqual({}); // floor fetches profiles separately
+  });
+
+  test('the first tier to answer keeps its rank when a worse tier holds a list of the same age', async () => {
+    const graph = (follows: string[]): SocialGraph => ({
+      pubkey: ME,
+      follows,
+      profiles: {},
+      relayList: [],
+      mutes: [],
+      contactsUpdatedAt: 200,
+    });
+    let answerPrimal!: () => void;
+    const primalAnswered = new Promise<void>((resolve) => {
+      answerPrimal = resolve;
+    });
+    const layer = createNostrDataLayer({
+      tiers: [
+        { tier: 'nagg', getSocialGraph: async () => ({ kind: 'answered', value: graph([F1]) }) },
+        {
+          tier: 'primal',
+          getSocialGraph: async () => {
+            await primalAnswered;
+            return { kind: 'answered', value: graph([F2]) };
+          },
+        },
+      ],
+    });
+    const updates: string[][] = [];
+    const first = (
+      await layer.getSocialGraph({ pubkey: ME, onUpdate: (g) => updates.push(g.follows) })
+    )._unsafeUnwrap();
+    expect(first.follows).toEqual([F1]);
+
+    answerPrimal();
+    await new Promise<void>((r) => setTimeout(r, 0));
+    expect(updates.length).toBeGreaterThan(0);
+    for (const follows of updates) expect(follows).toEqual([F1]);
   });
 
 test('a nagg without the nostr module (404) is unsupported, not a failure: the floor answers', async () => {

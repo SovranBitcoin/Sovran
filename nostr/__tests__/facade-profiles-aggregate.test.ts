@@ -89,6 +89,27 @@ describe('getProfiles fans out and gap-fills across tiers', () => {
     expect(layer.cache.getProfile(A)?.name).toBe('primal-alice');
   });
 
+  test('the first tier to answer keeps its rank: a worse-ranked later answer cannot replace what it returned', async () => {
+    const relayAnswer = deferred<Result<RawRelayEvent[], NaggError>>();
+    const primal: PrimalConnection = {
+      request: () => Promise.resolve(ok([kind0(A, 'primal-alice', '1')])),
+    };
+    const relay: RelayConnection = { request: () => relayAnswer.promise };
+    const layer = createNostrDataLayer({
+      tiers: [createPrimalTier({ connection: primal }), createRelayTier({ connection: relay })],
+    });
+
+    // Two keys asked, Primal knows one: the read waits for more before it paints.
+    const pending = layer.getProfiles({ pubkeys: [A, B] });
+    await flush();
+    relayAnswer.resolve(ok([kind0(A, 'relay-alice', '2'), kind0(B, 'bob', '3')]));
+    const result = (await pending)._unsafeUnwrap();
+
+    expect(result.profiles[B]?.name).toBe('bob');
+    expect(result.profiles[A]?.name).toBe('primal-alice');
+    expect(layer.cache.getProfile(A)?.name).toBe('primal-alice');
+  });
+
   test('all tiers failing still yields one all_tiers_exhausted error and clears pending', async () => {
     const boom = (): Promise<Result<never[], NaggError>> =>
       Promise.resolve({ isOk: () => false, isErr: () => true } as never);
