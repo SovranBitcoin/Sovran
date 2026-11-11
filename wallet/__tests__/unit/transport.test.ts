@@ -7,8 +7,8 @@ import {
 import {
   classifyMeshRedeemError,
   createMeshRedeemOrchestrator,
-  type MeshRedeemEntry,
 } from "../../src/transport/redeemOrchestrator";
+import type { MeshRedeemEntry } from "../../src/transport/redeemEntry";
 
 const MY_PUBKEY = `02${"ab".repeat(32)}`;
 const OTHER_PUBKEY = `02${"cd".repeat(32)}`;

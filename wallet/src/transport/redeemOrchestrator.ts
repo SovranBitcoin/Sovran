@@ -21,28 +21,12 @@
 import type { Manager } from "@cashu/coco-core";
 import { NetworkError, HttpResponseError } from "@cashu/coco-core";
 import { logger, mintUrlFields } from "../logger";
-
-export type MeshRedeemStatus =
-  "pending" | "redeeming" | "redeemed" | "spent" | "untrusted-mint" | "failed";
-
-export interface MeshRedeemEntry {
-  /** Full encoded cashu token. */
-  token: string;
-  mintUrl: string;
-  /** Sum of proof amounts (mint units). */
-  amount: number;
-  unit: string;
-  status: MeshRedeemStatus;
-  attempts: number;
-  /** UNIX ms; the drain skips entries whose window hasn't opened. */
-  nextAttemptAt: number;
-  receivedAt: number;
-  lastError?: string;
-  /** Mesh peer that sent the drop (drives UI + redeemed-status routing). */
-  senderPeerID?: string;
-  /** NUT-18 payment id when the token arrived via an issued request. */
-  paymentId?: string;
-}
+import {
+  isMeshRedeemDue,
+  meshRedeemPhase,
+  type MeshRedeemEntry,
+  type MeshRedeemStatus,
+} from "./redeemEntry";
 
 /**
  * Persistence port over the wallet's redeem-queue store. Keys are the
@@ -154,11 +138,10 @@ export function createMeshRedeemOrchestrator(
     // only exist from a drain interrupted by a crash or an expired
     // background budget. Retrying is safe — a receive that actually
     // completed re-classifies as `spent`.
-    const due = Object.entries(config.queue.entries()).filter(
-      ([, entry]) =>
-        (entry.status === "pending" || entry.status === "redeeming") &&
-        entry.nextAttemptAt <= cutoff,
-    );
+    const due = Object.entries(config.queue.entries()).filter(([, entry]) => {
+      const phase = meshRedeemPhase(entry);
+      return isMeshRedeemDue(phase, cutoff) || phase.kind === "redeeming";
+    });
     if (due.length === 0) return;
 
     logger.info("transport.redeem.drainStart", { dueCount: due.length });

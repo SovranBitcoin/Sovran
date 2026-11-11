@@ -1,5 +1,13 @@
 import { defineStore as create } from '@/shared/lib/persist/defineStore';
 import { persist } from 'zustand/middleware';
+import {
+  isMeshRedeemSettled,
+  MESH_REDEEM_MAX_ATTEMPTS,
+  MESH_REDEEM_STATUSES,
+  meshRedeemPhase,
+  type MeshRedeemEntry,
+  type MeshRedeemStatus,
+} from 'wallet/redeemEntry';
 import { z } from 'zod';
 
 import {
@@ -22,32 +30,7 @@ import { persistConfig } from '@/shared/lib/persist/persistConfig';
  * Tokens here are P2PK-locked, so a leaked store file is not spendable by
  * anyone but this profile's key — still treated as wallet-adjacent data.
  */
-type NutDropRedeemStatus =
-  'pending' | 'redeeming' | 'redeemed' | 'spent' | 'untrusted-mint' | 'failed';
-
-interface NutDropRedeemEntry {
-  token: string;
-  mintUrl: string;
-  amount: number;
-  unit: string;
-  status: NutDropRedeemStatus;
-  attempts: number;
-  /** UNIX ms — drainer skips entries whose backoff window hasn't elapsed. */
-  nextAttemptAt: number;
-  receivedAt: number;
-  lastError?: string;
-  /**
-   * 16-hex BLE peer ID of the mesh sender — drives the NearPay lightning
-   * effect on that peer's avatar while the entry redeems. Optional:
-   * additive field, entries persisted by older builds lack it.
-   */
-  senderPeerID?: string;
-  /**
-   * NUT-18 payment id when the token arrived as an in-band mesh payment —
-   * lets the drain push the `redeemed` status back to the sender. Absent
-   * for public-broadcast drops.
-   */
-  paymentId?: string;
+interface NutDropRedeemEntry extends MeshRedeemEntry {
   /**
    * How the token reached us. Absent means `ble` (every entry written before
    * this field existed came over the mesh). A `nostr` entry arrived as a
@@ -85,7 +68,7 @@ interface NutDropRedeemQueueActions {
       | 'senderPubkey'
     >
   ) => boolean;
-  markStatus: (tokenHash: string, status: NutDropRedeemStatus, error?: string) => void;
+  markStatus: (tokenHash: string, status: MeshRedeemStatus, error?: string) => void;
   scheduleRetry: (tokenHash: string, error: string) => void;
   /**
    * Put a parked entry (`untrusted-mint`, `failed`) back in line with a clean
@@ -100,18 +83,8 @@ type NutDropRedeemQueueStore = NutDropRedeemQueueState & NutDropRedeemQueueActio
 
 /** Terminal entries only need to survive long enough to dedupe re-delivery. */
 const TERMINAL_TTL_MS = 24 * 60 * 60 * 1000;
-const MAX_ATTEMPTS = 5;
 const BASE_BACKOFF_MS = 30 * 1000;
 const MAX_BACKOFF_MS = 30 * 60 * 1000;
-
-const STATUS_VALUES = [
-  'pending',
-  'redeeming',
-  'redeemed',
-  'spent',
-  'untrusted-mint',
-  'failed',
-] as const;
 
 /**
  * The limits a new entry must fit before it is queued. They hold for writes
@@ -176,7 +149,7 @@ const PersistedNutDropRedeemQueueStore = z.object({
         // queue written by a newer build must keep the locked ecash and retry
         // it, not reject the whole profile-scoped blob. Mint redemption is
         // idempotent, so `pending` is the funds-safe fallback.
-        status: z.enum(STATUS_VALUES).default('pending').catch('pending'),
+        status: z.enum(MESH_REDEEM_STATUSES).default('pending').catch('pending'),
         attempts: z.number().int().nonnegative(),
         nextAttemptAt: z.number().int().nonnegative(),
         receivedAt: z.number().int().nonnegative(),
@@ -199,9 +172,7 @@ const PersistedNutDropRedeemQueueStore = z.object({
   recoveredCopy: z.string().max(128).nullable().default(null).catch(null),
 });
 
-function isTerminal(status: NutDropRedeemStatus): boolean {
-  return status === 'redeemed' || status === 'spent';
-}
+const isSettled = (entry: NutDropRedeemEntry) => isMeshRedeemSettled(meshRedeemPhase(entry));
 
 export const useNutDropRedeemQueueStore = create<NutDropRedeemQueueStore>({
   name: 'nut-drop-redeem-queue',
@@ -259,7 +230,7 @@ export const useNutDropRedeemQueueStore = create<NutDropRedeemQueueStore>({
 
       requeue: (tokenHash) => {
         const existing = get().byTokenHash[tokenHash];
-        if (!existing || isTerminal(existing.status)) return;
+        if (!existing || isSettled(existing)) return;
         storeLog.info('store.nut_drop_queue.requeue', {
           tokenHash: tokenHash.slice(0, 12),
           from: existing.status,
@@ -277,7 +248,7 @@ export const useNutDropRedeemQueueStore = create<NutDropRedeemQueueStore>({
         const existing = get().byTokenHash[tokenHash];
         if (!existing) return;
         const attempts = existing.attempts + 1;
-        if (attempts >= MAX_ATTEMPTS) {
+        if (attempts >= MESH_REDEEM_MAX_ATTEMPTS) {
           storeLog.warn('store.nut_drop_queue.exhausted', {
             tokenHash: tokenHash.slice(0, 12),
             attempts,
@@ -320,7 +291,7 @@ export const useNutDropRedeemQueueStore = create<NutDropRedeemQueueStore>({
           byTokenHash: Object.fromEntries(
             Object.entries(state.byTokenHash).filter(([, entry]) => {
               // Retry exhaustion and age do not prove that ecash was spent.
-              return !isTerminal(entry.status) || entry.receivedAt >= now - TERMINAL_TTL_MS;
+              return !isSettled(entry) || entry.receivedAt >= now - TERMINAL_TTL_MS;
             })
           ),
         }));
@@ -360,8 +331,7 @@ export const useNutDropRedeemQueueStore = create<NutDropRedeemQueueStore>({
         holds: (saved, recovered, copyId) =>
           saved.recoveredCopy === copyId &&
           Object.entries(recovered.byTokenHash).every(
-            ([hash, entry]) =>
-              isTerminal(entry.status) || saved.byTokenHash[hash]?.token === entry.token
+            ([hash, entry]) => isSettled(entry) || saved.byTokenHash[hash]?.token === entry.token
           ),
       },
     })

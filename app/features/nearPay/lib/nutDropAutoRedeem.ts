@@ -7,6 +7,7 @@ import {
   meshTokenDedupeKey,
 } from 'wallet';
 import { createDefaultOperations } from 'wallet/operations';
+import { meshRedeemPhase } from 'wallet/redeemEntry';
 import { useBLEPeerDirectory } from '@/features/bitchat/hooks/useBLEPeers';
 
 import { CocoManager } from '@/shared/lib/cashu/manager';
@@ -210,11 +211,13 @@ function getOrchestrator(): MeshRedeemOrchestrator {
 }
 
 export async function drainNutDropRedeemQueue(): Promise<void> {
-  const entries = Object.values(useNutDropRedeemQueueStore.getState().byTokenHash);
+  const phases = Object.values(useNutDropRedeemQueueStore.getState().byTokenHash).map((entry) =>
+    meshRedeemPhase(entry)
+  );
   paymentLog.info('near_pay.redeem.drain.start', {
-    entries: entries.length,
-    pending: entries.filter((entry) => entry.status === 'pending').length,
-    redeeming: entries.filter((entry) => entry.status === 'redeeming').length,
+    entries: phases.length,
+    pending: phases.filter((phase) => phase.kind === 'waiting').length,
+    redeeming: phases.filter((phase) => phase.kind === 'redeeming').length,
     restoreSettled: restoreSettled(),
     hasManager: !!getManager(),
     appState: AppState.currentState,
