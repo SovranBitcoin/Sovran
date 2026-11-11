@@ -74,7 +74,8 @@ export async function reconcileSwapLegs(
         const store = useSwapTransactionsStore.getState();
         const current = store.groups[groupId]?.legs.find((saved) => saved.id === leg.id);
         if (
-          current?.localStatus !== status ||
+          !current ||
+          current.localStatus !== status ||
           current.meltOperationId !== leg.meltOperationId ||
           current.mintOperationId !== leg.mintOperationId
         ) {
