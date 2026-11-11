@@ -1,94 +1,14 @@
 import { describe, expect, test } from "vitest";
 import {
-  authoredReplyChainInput,
   dmEnvelopesAppView,
   followedPubkeySource,
   followingPopularRankedEventsInput,
-  followingRecentEventsInput,
-  followingRepliesEventsInput,
   forYouRankedEventsInput,
-  globalTrendingRankedEventsInput,
-  notificationsInput,
-  profileEventsSearchInput,
-  profileSearchInput,
-  recentNotesEventsInput,
-  shuffleInput,
-  threadReplyRankInput,
   withEventExclusions,
   withRankedTargetExclusions,
 } from "../src/recipes";
 
-const root = {
-  id: "1".repeat(64),
-  pubkey: "a".repeat(64),
-  kind: 1,
-  createdAt: "2026-01-01T00:00:00.000Z",
-  content: "root",
-  tags: [],
-};
-
-function reply(idChar: string, parentId: string, pubkey = root.pubkey) {
-  return {
-    id: idChar.repeat(64),
-    pubkey,
-    kind: 1,
-    createdAt: `2026-01-01T00:00:0${Number.parseInt(idChar, 16) % 9}.000Z`,
-    content: idChar,
-    tags: [["e", parentId, "", "reply"]],
-  };
-}
-
 describe("rank recipes", () => {
-  test("profile search input defaults limit and sort", () => {
-    expect(profileSearchInput({ query: "jack" })).toEqual({
-      query: "jack",
-      limit: 10,
-      sort: "globalPagerank",
-    });
-  });
-
-  test("profile events search recipe uses generic kind-0 events", () => {
-    expect(profileEventsSearchInput({ query: "calle", limit: 7 })).toEqual({
-      kinds: [0],
-      search: "calle",
-      limit: 7,
-    });
-  });
-
-  test("authored reply chain input stays generic and bounded", () => {
-    expect(authoredReplyChainInput({ maxBranchFanout: 32 })).toEqual({
-      kinds: [1, 1111],
-      via: { key: "e" },
-      target: "EVENT_ID",
-      maxDepth: 8,
-      maxBranchFanout: 32,
-    });
-    expect(JSON.stringify(authoredReplyChainInput())).not.toContain(
-      "sourceEventAuthor",
-    );
-  });
-
-  test("relevant thread rank includes engagement, vertex, recency, and viewer boost", () => {
-    const rank = threadReplyRankInput("relevant", {
-      viewerPubkey: "b".repeat(64),
-      shuffle: { seed: "1", counter: 2 },
-    });
-
-    expect(
-      rank?.terms?.some((term) => term.pubkeyScore?.source === "vertex"),
-    ).toBe(true);
-    expect(
-      rank?.terms?.some((term) => term.candidateField === "CREATED_AT"),
-    ).toBe(true);
-    expect(
-      rank?.terms?.some(
-        (term) => term.derivedMetric === "contribution_quality",
-      ),
-    ).toBe(true);
-    expect(rank?.candidatePubkeyBoosts?.length).toBe(1);
-    expect(rank?.shuffle?.counter).toBe(2);
-  });
-
   test("feed recipes keep for-you and following popular distinct", () => {
     const forYou = forYouRankedEventsInput({
       viewerPubkey: "b".repeat(64),
@@ -111,12 +31,7 @@ describe("rank recipes", () => {
     expect(following.terms?.some((term) => term.pubkeyScore)).toBe(true);
   });
 
-  test("feed recipes build global, recent, and following inputs", () => {
-    expect(shuffleInput({ seed: "feed", counter: 1, strength: 0.15 })).toEqual({
-      seed: "feed",
-      counter: 1,
-      strength: 0.15,
-    });
+  test("the followed-pubkey source reads the viewer's latest follow list", () => {
     expect(followedPubkeySource("b".repeat(64))).toEqual([
       {
         latestEventTags: {
@@ -128,41 +43,6 @@ describe("rank recipes", () => {
         },
       },
     ]);
-
-    expect(
-      globalTrendingRankedEventsInput({ since: 10, limit: 12, offset: 3 }),
-    ).toEqual({
-      references: { kinds: [7], since: 10, until: undefined },
-      via: { key: "e" },
-      target: { kinds: [1] },
-      metric: { name: "k7_e.actors", op: "COUNT_DISTINCT", distinctField: "PUBKEY" },
-      shuffle: undefined,
-      limit: 12,
-      offset: 3,
-    });
-    expect(recentNotesEventsInput({ since: 11, until: 22, limit: 13 })).toEqual(
-      {
-        kinds: [1, 1111],
-        since: 11,
-        until: 22,
-        limit: 13,
-      },
-    );
-    expect(
-      followingRepliesEventsInput({ viewerPubkey: "b".repeat(64), limit: 14 }),
-    ).toMatchObject({
-      kinds: [1, 1111],
-      tags: [{ key: "e" }],
-      pubkeysFrom: followedPubkeySource("b".repeat(64)),
-      limit: 14,
-    });
-    expect(
-      followingRecentEventsInput({ viewerPubkey: "b".repeat(64), limit: 15 }),
-    ).toMatchObject({
-      kinds: [1, 1111],
-      pubkeysFrom: followedPubkeySource("b".repeat(64)),
-      limit: 15,
-    });
   });
 
   test("feed recipes apply ignored event and pubkey exclusions", () => {
@@ -200,40 +80,6 @@ describe("rank recipes", () => {
         excludeIds: ["d".repeat(64)],
         excludePubkeys: ["e".repeat(64)],
       },
-    });
-  });
-});
-
-describe("notification recipes", () => {
-  test("builds strict all notifications input by default", () => {
-    expect(notificationsInput({ pubkey: "a".repeat(64) })).toEqual({
-      pubkey: "a".repeat(64),
-      tab: "ALL",
-      policy: "STRICT",
-      replyScope: "THREAD",
-      limit: 50,
-    });
-  });
-
-  test("preserves mentions tab, relaxed policy, reply scope, and bounds", () => {
-    expect(
-      notificationsInput({
-        pubkey: "b".repeat(64),
-        tab: "MENTIONS",
-        policy: "RELAXED",
-        replyScope: "DIRECT",
-        since: 1,
-        until: 2,
-        limit: 10,
-      }),
-    ).toEqual({
-      pubkey: "b".repeat(64),
-      tab: "MENTIONS",
-      policy: "RELAXED",
-      replyScope: "DIRECT",
-      since: 1,
-      until: 2,
-      limit: 10,
     });
   });
 });

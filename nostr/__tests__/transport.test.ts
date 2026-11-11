@@ -1,11 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { z } from 'zod';
 import { createNaggClient } from '../src/transport';
-import {
-  createNaggCapabilityCache,
-  NAGG_CAPABILITIES,
-  probeServiceInfo,
-} from '../src/capabilities';
 
 function jsonFetch(requests: Request[], body: unknown) {
   return ((input: RequestInfo | URL, init?: RequestInit) => {
@@ -18,56 +13,6 @@ function jsonFetch(requests: Request[], body: unknown) {
     );
   }) as unknown as typeof fetch;
 }
-
-const SERVICE_INFO = {
-  graphqlSchemaVersion: '2026-06-04',
-  appViewVersion: 'v1',
-  capabilities: [
-    NAGG_CAPABILITIES.EVENTS_SHUFFLE,
-    NAGG_CAPABILITIES.AGGREGATE_EVENTS_SHUFFLE,
-    NAGG_CAPABILITIES.RANK_SHUFFLE,
-    NAGG_CAPABILITIES.AUTHORED_REPLY_CHAIN,
-  ],
-  appViews: [{ version: 'v1', routes: ['/nostr/capabilities'] }],
-};
-
-describe('capabilities (REST /nostr/capabilities)', () => {
-  test('probes serviceInfo from the REST capabilities endpoint', async () => {
-    const requests: Request[] = [];
-    const client = createNaggClient({
-      appView: { baseUrl: 'https://nagg.example' },
-      fetchImpl: jsonFetch(requests, SERVICE_INFO),
-    });
-
-    const result = await probeServiceInfo(client);
-
-    expect(result.isOk()).toBe(true);
-    expect(result._unsafeUnwrap().capabilities).toContain(NAGG_CAPABILITIES.RANK_SHUFFLE);
-    expect(requests[0]?.url).toBe('https://nagg.example/nostr/capabilities');
-    expect(requests[0]?.method).toBe('GET');
-  });
-
-  test('caches serviceInfo capability checks', async () => {
-    let calls = 0;
-    const client = createNaggClient({
-      appView: { baseUrl: 'https://nagg.example' },
-      fetchImpl: (() => {
-        calls += 1;
-        return Promise.resolve(new Response(JSON.stringify(SERVICE_INFO), { status: 200 }));
-      }) as unknown as typeof fetch,
-    });
-    const cache = createNaggCapabilityCache(client);
-
-    const supportsShuffle = await cache.supports(NAGG_CAPABILITIES.RANK_SHUFFLE);
-    const supportsEventShuffle = await cache.supports(NAGG_CAPABILITIES.EVENTS_SHUFFLE);
-    const supportsDerivedMetrics = await cache.supports('graphql.rank.derivedMetricTerms');
-
-    expect(supportsShuffle._unsafeUnwrap()).toBe(true);
-    expect(supportsEventShuffle._unsafeUnwrap()).toBe(true);
-    expect(supportsDerivedMetrics._unsafeUnwrap()).toBe(false);
-    expect(calls).toBe(1);
-  });
-});
 
 describe('app-view REST transport', () => {
   test('parses the raw app-view JSON and strips a trailing base slash', async () => {

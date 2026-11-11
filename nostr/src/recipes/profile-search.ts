@@ -1,5 +1,4 @@
 import { encodeSignedVertexRequest, type SignedVertexRequest } from '../facade/vertex-request';
-import type { EventQueryInput } from './rank';
 import type { NaggAppViewBinding } from '../transport';
 
 export type ProfileSearchInput = {
@@ -23,22 +22,5 @@ export function profileSearchAppView(input: ProfileSearchInput): NaggAppViewBind
       sort: input.sort ?? 'globalPagerank',
       ...(input.source ? { source: input.source } : {}),
     },
-  };
-}
-
-export function profileSearchInput(input: ProfileSearchInput): ProfileSearchInput {
-  return {
-    query: input.query,
-    limit: input.limit ?? 10,
-    sort: input.sort ?? 'globalPagerank',
-    ...(input.source ? { source: input.source } : {}),
-  };
-}
-
-export function profileEventsSearchInput(input: { query: string; limit?: number }): EventQueryInput {
-  return {
-    kinds: [0],
-    search: input.query,
-    limit: input.limit ?? 10,
   };
 }

@@ -70,18 +70,6 @@ export function withRankedTargetExclusions<T extends RankedEventsInput>(
   } as T;
 }
 
-export function shuffleInput(options: {
-  seed: string;
-  counter?: number;
-  strength?: number;
-}): ShuffleInput {
-  return {
-    seed: options.seed,
-    ...(options.counter != null ? { counter: options.counter } : {}),
-    ...(options.strength != null ? { strength: options.strength } : {}),
-  };
-}
-
 export function followedPubkeySource(viewerPubkey: string): FollowedPubkeySource {
   return [
     {
@@ -94,28 +82,6 @@ export function followedPubkeySource(viewerPubkey: string): FollowedPubkeySource
       },
     },
   ];
-}
-
-export function globalTrendingRankedEventsInput(options: {
-  since?: number;
-  until?: number;
-  limit?: number;
-  offset?: number;
-  shuffle?: ShuffleInput;
-}): RankedEventsInput {
-  return {
-    references: {
-      kinds: [7],
-      since: options.since,
-      until: options.until,
-    },
-    via: { key: 'e' },
-    target: { kinds: [1] },
-    metric: { name: 'k7_e.actors', op: 'COUNT_DISTINCT', distinctField: 'PUBKEY' },
-    shuffle: options.shuffle,
-    limit: options.limit ?? 30,
-    ...(options.offset ? { offset: options.offset } : {}),
-  };
 }
 
 export function forYouRankedEventsInput(options: {
@@ -155,58 +121,6 @@ export function forYouRankedEventsInput(options: {
     shuffle: options.shuffle,
     limit: options.limit ?? 30,
     offset: options.offset ?? 0,
-  };
-}
-
-export function recentNotesEventsInput(options: {
-  since?: number;
-  until?: number;
-  limit?: number;
-  offset?: number;
-  shuffle?: ShuffleInput;
-}): EventQueryInput {
-  return {
-    kinds: [1, 1111],
-    since: options.since,
-    until: options.until,
-    limit: options.limit ?? 30,
-    ...(options.offset ? { offset: options.offset } : {}),
-    ...(options.shuffle ? { shuffle: options.shuffle } : {}),
-  };
-}
-
-export function followingRepliesEventsInput(options: {
-  viewerPubkey: string;
-  limit?: number;
-  until?: number;
-  offset?: number;
-  shuffle?: ShuffleInput;
-}): EventQueryInput {
-  return {
-    kinds: [1, 1111],
-    tags: [{ key: 'e' }],
-    pubkeysFrom: followedPubkeySource(options.viewerPubkey),
-    limit: options.limit ?? 30,
-    ...(options.until ? { until: options.until } : {}),
-    ...(options.offset ? { offset: options.offset } : {}),
-    ...(options.shuffle ? { shuffle: options.shuffle } : {}),
-  };
-}
-
-export function followingRecentEventsInput(options: {
-  viewerPubkey: string;
-  limit?: number;
-  until?: number;
-  offset?: number;
-  shuffle?: ShuffleInput;
-}): EventQueryInput {
-  return {
-    kinds: [1, 1111],
-    pubkeysFrom: followedPubkeySource(options.viewerPubkey),
-    limit: options.limit ?? 30,
-    ...(options.until ? { until: options.until } : {}),
-    ...(options.offset ? { offset: options.offset } : {}),
-    ...(options.shuffle ? { shuffle: options.shuffle } : {}),
   };
 }
 
