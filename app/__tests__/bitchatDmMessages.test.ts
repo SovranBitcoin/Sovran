@@ -196,15 +196,19 @@ describe('delivery status', () => {
     });
   });
 
-  it('a late failure overrides a message already delivered', () => {
+  it('a late failure leaves a message the peer acknowledged delivered or read', () => {
     store().appendOutgoing(outgoing('o1', 1), PEER_A);
+    store().appendOutgoing(outgoing('o2', 2), PEER_A);
     status('o1', 'delivered');
-    status('o1', 'failed', 'timeout');
+    status('o2', 'read');
+    status('o1', 'failed', 'peer_unreachable');
+    status('o2', 'failed', 'peer_unreachable');
 
-    // QUIRK: 'failed' is always accepted, even after the peer acknowledged
-    // delivery, so a delivered message can be shown as failed. A later fix
-    // should change this assertion on purpose.
-    expect(thread()[0]).toMatchObject({ deliveryStatus: 'failed', failureReason: 'timeout' });
+    // Delivered is final: the peer's acknowledgement outranks any later failure.
+    expect(thread().map((m) => [m.deliveryStatus, m.failureReason])).toEqual([
+      ['delivered', undefined],
+      ['read', undefined],
+    ]);
   });
 
   it('a partial delivery counts as sent', () => {
