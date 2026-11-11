@@ -653,6 +653,10 @@ export function selectConversationId(
   return state.isAnonymousMode ? null : state.currentSessionId;
 }
 
+/** The lineup a model is chosen from: this session's, else the saved one (an empty one stands). */
+export const selectLineup = (state: Pick<RoutstrState, 'lineup' | 'lastKnownLineup'>) =>
+  state.lineup ?? state.lastKnownLineup?.lineup ?? null;
+
 /**
  * Apply a per-message transform in one conversation (`selectConversationId`
  * when its messages were written): its saved session's message list, and the
@@ -1268,7 +1272,7 @@ export const useRoutstrStore = create<RoutstrStore>({ name: 'routstr-store', sco
         // of four names compiled into the app: the menu now comes from the
         // catalog, so its ids do too. The known-four remain acceptable so a
         // selection survives a lineup that has not landed yet.
-        const lineup = get().lineup ?? get().lastKnownLineup?.lineup ?? null;
+        const lineup = selectLineup(get());
         const offered = new Set<string>([...PROVIDER_IDS, ...lineupProviderIds(lineup)]);
         const safeProvider = offered.has(slot.provider) ? slot.provider : DEFAULT_PROVIDER;
         // `TIER_IDS` is the global list of tier NAMES, so it can only say that

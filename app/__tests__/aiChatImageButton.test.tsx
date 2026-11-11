@@ -52,6 +52,8 @@ const mockRoutstr = {
 let mockFunds: { balanceSats: number } | null = { balanceSats: 1_000 };
 
 jest.mock('@/shared/stores/profile/routstrStore', () => ({
+  // The real lineup rule, over this file's stand-in state.
+  selectLineup: jest.requireActual('@/shared/stores/profile/routstrStore').selectLineup,
   useRoutstrStore: Object.assign(
     (select: (state: typeof mockRoutstr) => unknown) => select(mockRoutstr),
     { getState: () => mockRoutstr }

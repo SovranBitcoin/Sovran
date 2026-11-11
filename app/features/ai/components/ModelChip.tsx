@@ -1,5 +1,5 @@
 import { useCallback, useEffect } from 'react';
-import { useRoutstrFunds } from '../hooks/useRoutstrFunds';
+import { useSelectedModel } from '../hooks/useSelectedModel';
 import { useModelCatalog } from '../hooks/useModelCatalog';
 import { useModelPicker } from '../hooks/useModelPicker';
 import { Keyboard } from 'react-native';
@@ -23,10 +23,7 @@ import {
   entryForSlot,
   providersForLineup,
   estimateTurnCostSatsFromPricing,
-  getProviderById,
-  getTierById,
   isSelectionServed,
-  resolveSelectedEntry,
   UNSERVED_SELECTION_LABEL,
 } from '../lib/format';
 import { aiLog } from '@/shared/lib/logger';
@@ -62,13 +59,10 @@ export function ModelChip() {
   const background = useThemeColor('background');
   const openModelPicker = useModelPicker();
 
-  const selectedTier = useRoutstrStore((s) => s.selectedTier);
-  const selectedProvider = useRoutstrStore((s) => s.selectedProvider);
-  const funds = useRoutstrFunds();
-  const sessionLineup = useRoutstrStore((s) => s.lineup);
-  const lastKnownLineup = useRoutstrStore((s) => s.lastKnownLineup);
-  const lineup = sessionLineup ?? lastKnownLineup?.lineup ?? null;
-  const lineupSource = sessionLineup ? 'live' : lastKnownLineup ? 'persisted' : 'empty';
+  const { currentProvider, currentTier, lineup, balanceSats, resolvedEntry } = useSelectedModel();
+  const lineupSource = useRoutstrStore((s) =>
+    s.lineup ? 'live' : s.lastKnownLineup ? 'persisted' : 'empty'
+  );
 
   const models = useModelCatalog();
 
@@ -82,15 +76,6 @@ export function ModelChip() {
     void sweepUnsettledPayments('launch');
   });
 
-  const balanceSats = funds?.balanceSats ?? 0;
-  const currentTier = getTierById(selectedTier);
-  const currentProvider = getProviderById(selectedProvider);
-  const resolvedEntry = resolveSelectedEntry(
-    currentProvider.id,
-    currentTier.id,
-    balanceSats,
-    lineup
-  );
   // Nothing resolved, and the node HAS answered: this selection names a vendor
   // or a rung the node in front of us does not serve. The sealed selection is
   // the case that reaches a user — `routstrStore` deliberately refuses to move
@@ -134,8 +119,8 @@ export function ModelChip() {
     }
     aiLog.info('ai.tier.affordability_snapshot', {
       balanceSats,
-      selectedTier,
-      selectedProvider,
+      selectedTier: currentTier.id,
+      selectedProvider: currentProvider.id,
       buffer: AFFORD_BUFFER,
       // The mismatch this event was already carrying, stated rather than
       // inferred. `selectedProvider: "tinfoil"` over cells whose every
@@ -146,7 +131,15 @@ export function ModelChip() {
       catalogSize: models.length,
       cells: cellSnapshots,
     });
-  }, [balanceSats, models.length, lineup, lineupSource, selectedTier, selectedProvider, served]);
+  }, [
+    balanceSats,
+    models.length,
+    lineup,
+    lineupSource,
+    currentTier.id,
+    currentProvider.id,
+    served,
+  ]);
 
   // No lineup yet (first run, fetch pending) → show the tier label so the
   // chip never reads like a dev string.
@@ -186,8 +179,8 @@ export function ModelChip() {
     aiLog.info('ai.selection.state', {
       nodeBaseUrl,
       pinned: userNodeBaseUrl != null,
-      selectedProvider,
-      selectedTier,
+      selectedProvider: currentProvider.id,
+      selectedTier: currentTier.id,
       resolvedModelId,
       sealed,
       served,
@@ -198,8 +191,8 @@ export function ModelChip() {
   }, [
     nodeBaseUrl,
     userNodeBaseUrl,
-    selectedProvider,
-    selectedTier,
+    currentProvider.id,
+    currentTier.id,
     resolvedModelId,
     sealed,
     served,

@@ -32,8 +32,7 @@ import { ModelChip } from '../components/ModelChip';
 import { AiEmptyState } from '../components/AiEmptyState';
 import { AiMessageBubble, type BranchNav } from '../components/AiMessageBubble';
 import { useAiSend } from '../hooks/useAiSend';
-import { useRoutstrFunds } from '../hooks/useRoutstrFunds';
-import { resolveSelectedEntry } from '../lib/format';
+import { useSelectedModel } from '../hooks/useSelectedModel';
 import { pickChatImage } from '../lib/attachments';
 import { MAX_INLINE_IMAGES } from '../lib/assembleApiMessages';
 import { deriveActivePath, getSiblingInfo, withSynthesisedParents } from '../lib/branching';
@@ -161,21 +160,9 @@ export function AiChatScreen() {
   const previousScrollState = useRef<ChatScrollState | null>(null);
 
   // Vision gate for the composer's [+]: image attach is only offered when
-  // the model the current (provider, tier) slot resolves to accepts image
-  // input. Falls to disabled while no lineup exists yet (first run before
-  // the catalog fetch lands). Resolved against the wallet's spendable sats,
-  // the balance the model chip and the send resolve against.
-  const selectedTier = useRoutstrStore((s) => s.selectedTier);
-  const selectedProvider = useRoutstrStore((s) => s.selectedProvider);
-  const funds = useRoutstrFunds();
-  const sessionLineup = useRoutstrStore((s) => s.lineup);
-  const lastKnownLineup = useRoutstrStore((s) => s.lastKnownLineup);
-  const resolvedEntry = resolveSelectedEntry(
-    selectedProvider,
-    selectedTier,
-    funds?.balanceSats ?? 0,
-    sessionLineup ?? lastKnownLineup?.lineup ?? null
-  );
+  // the model the chip names accepts image input. Falls to disabled while no
+  // lineup exists yet (first run before the catalog fetch lands).
+  const { resolvedEntry } = useSelectedModel();
   const canAttachImages = !mockMode && resolvedEntry?.visionInput === true;
 
   const { send, retry, isSending } = useAiSend();
