@@ -1093,13 +1093,20 @@ describe("executeMelt — onchain (coco v2)", () => {
     expect(prepare).toHaveBeenCalledWith({ quote, feeIndex: 1 });
   });
 
-  it("cancels the operation when execute throws (reservation rescue)", async () => {
+  it("cancels a reservation only when execute left the operation prepared", async () => {
     const { create, prepare } = onchainMocks();
     const execute = vi.fn().mockRejectedValue(new Error("mint 500"));
     const cancel = vi.fn().mockResolvedValue(undefined);
     const mockManager = createMockManager({
       quotes: { melt: { create } },
-      ops: { melt: { prepare, execute, cancel } },
+      ops: {
+        melt: {
+          prepare,
+          execute,
+          cancel,
+          get: vi.fn().mockResolvedValue({ state: "prepared" }),
+        },
+      },
     });
 
     const ops = createDefaultOperations({

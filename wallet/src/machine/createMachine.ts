@@ -10,6 +10,7 @@ import {
   isMeltUserCancelledError,
   isMintOfflineError,
   PaymentRequestUndeliveredError,
+  MeltOutcomeUnknownError,
 } from "../errors";
 import { isLockedSend } from "../p2pk";
 import { t } from "../formatting/locales";
@@ -52,6 +53,7 @@ import type {
   PaymentMachine,
   PaymentRequestConfirmOutcome,
   PaymentRequestPreviewPhase,
+  MeltPreviewPhase,
   ProcessResult,
   RecipientProfile,
   ScanOptions,
@@ -65,12 +67,13 @@ import type {
  * ecash left without being taken back, paying again (or choosing another
  * mint to pay from) could pay twice.
  */
-function awaitsPay(phase: PaymentRequestPreviewPhase): boolean {
+function awaitsPay(phase: PaymentRequestPreviewPhase | MeltPreviewPhase): boolean {
   switch (phase.kind) {
     case "preview":
       return true;
     case "settled":
     case "undelivered":
+    case "unconfirmed":
       return false;
     default: {
       const unreachable: never = phase;
@@ -1147,9 +1150,9 @@ export function createPaymentMachine(
       operations?.executeMelt
     ) {
       const originalStep = step;
-      // A paid preview never reaches here (see the settled guard above): a
-      // second executeMelt would pay twice. A failed attempt leaves the
-      // phase `preview`, so Pay after a failure still retries: at once when
+      // Paid and unconfirmed previews never reach here: a second executeMelt
+      // could pay twice. A definitely unpaid attempt leaves phase `preview`,
+      // so Pay after a failure still retries: at once when
       // the preview showed no quote, after showing a new one when it did.
       const data = stepData as StepDataMap["navigateToMeltPreview"];
       const quoteExpired =
@@ -1240,15 +1243,29 @@ export function createPaymentMachine(
         logger.warn("machine.melt.failed", {
           error: errField(effect.error.cause),
         });
-        if (data.meltQuote) {
-          flowCtx = { ...flowCtx, spentMeltQuoteId: data.meltQuote.quoteId };
+        const cause = effect.error.cause;
+        if (cause instanceof MeltOutcomeUnknownError) {
+          setStep("navigateToMeltPreview", {
+            ...data,
+            phase: { kind: "unconfirmed", operationId: cause.operationId },
+          });
+          // Do not offer another rail or refresh the invoice: this one may pay.
+          tell("onPaymentFailed", () =>
+            notifications?.onPaymentFailed?.({
+              variant: "melt",
+              mintUrl: data.mintUrl,
+              amount: data.amount,
+              unit: data.unit,
+              message: cause.message,
+              authored: cause.authored,
+            }),
+          );
+        } else {
+          if (data.meltQuote) {
+            flowCtx = { ...flowCtx, spentMeltQuoteId: data.meltQuote.quoteId };
+          }
+          routeOperationFailure(cause, "melt", data.meltTarget, data);
         }
-        routeOperationFailure(
-          effect.error.cause,
-          "melt",
-          data.meltTarget,
-          data,
-        );
       }
 
       settledPayment = {

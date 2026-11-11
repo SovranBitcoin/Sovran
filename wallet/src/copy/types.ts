@@ -25,6 +25,7 @@ export interface PaymentCopyResolver {
 }
 
 export type PaymentCopyKey =
+  | "melt.outcomeUnknown"
   | "nfc.unitNotFunded"
   | "nfc.unitSwitchFailed"
   | "nfc.writeOutcomeUnknown"

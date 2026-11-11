@@ -33,7 +33,7 @@ export function meltDidNotPay(state: string): boolean {
 }
 
 /** What is known about a melt once the one `execute` that could send it has thrown. */
-export type FailedMeltExecuteOutcome =
+type FailedMeltExecuteOutcome =
   /** Coco finalized it: the payment went through although `execute` threw. */
   | 'paid'
   /** It did not pay and cannot any more: paying again is safe. */

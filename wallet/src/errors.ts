@@ -1,6 +1,7 @@
 import { NetworkError, HttpResponseError } from "@cashu/coco-core";
 
 import { logger } from "./logger";
+import { getPaymentCopy } from "./copy";
 
 function summarizeError(err: unknown): Record<string, unknown> {
   if (err instanceof HttpResponseError) {
@@ -141,5 +142,15 @@ export class UnitRateUnavailableError extends Error {
     super(`No exchange rate available to convert ${unit} to sats`);
     this.name = "UnitRateUnavailableError";
     this.unit = unit;
+  }
+}
+
+/** A melt may still pay; Coco recovery owns it until its outcome is known. */
+export class MeltOutcomeUnknownError extends AuthoredError {
+  readonly operationId: string;
+  constructor(operationId: string, cause: unknown) {
+    super(getPaymentCopy("melt.outcomeUnknown"), { cause });
+    this.name = "MeltOutcomeUnknownError";
+    this.operationId = operationId;
   }
 }

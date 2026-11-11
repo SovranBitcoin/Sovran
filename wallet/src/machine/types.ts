@@ -156,11 +156,13 @@ export interface AmountEntryDisplayMetadata {
 /**
  * Where a melt preview is. A successful melt keeps the step (the person is
  * already on the screen) and moves it to `settled`, which no Pay or mint
- * change can leave: paying again would pay twice.
+ * change can leave: paying again would pay twice. An `unconfirmed` melt
+ * may still pay, so the same guard holds it until a new intent starts.
  */
 export type MeltPreviewPhase =
   | { kind: "preview" }
-  | { kind: "settled"; historyEntry: string };
+  | { kind: "settled"; historyEntry: string }
+  | { kind: "unconfirmed"; operationId: string };
 
 /**
  * Where a payment request preview is. Besides `preview` and `settled`
@@ -169,7 +171,7 @@ export type MeltPreviewPhase =
  * it, so this preview must not send again.
  */
 export type PaymentRequestPreviewPhase =
-  | MeltPreviewPhase
+  | Exclude<MeltPreviewPhase, { kind: "unconfirmed" }>
   | { kind: "undelivered"; operationId: string };
 
 export interface StepDataMap {
@@ -1052,7 +1054,8 @@ export interface MachineOperations {
   /**
    * Execute a lightning melt. Called when the user confirms a melt from the
    * preview screen via `confirmMelt()`. The machine routes to the result
-   * handler on success or BIP321 fallback / error on failure.
+   * handler on success or BIP321 fallback / error on failure. An unresolved
+   * execution throws MeltOutcomeUnknownError so the machine blocks another pay.
    *
    * When `quoteId` references a quote previously created via
    * `quoteMelt` (BTC-05 quote-first), the implementation MUST execute

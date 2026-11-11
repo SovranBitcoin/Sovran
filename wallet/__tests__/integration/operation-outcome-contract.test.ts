@@ -692,7 +692,11 @@ describe("melt: quoteMelt then executeMelt against a real Coco Manager", () => {
 
     await expect(
       ops.executeMelt!({ ...MELT_INPUT, quoteId: quote.quoteId } as never),
-    ).rejects.toMatchObject({ name: "NetworkError" });
+    ).rejects.toMatchObject({
+      name: "MeltOutcomeUnknownError",
+      operationId: expect.any(String),
+      cause: { name: "NetworkError" },
+    });
 
     expect(await historyRows(manager)).toEqual([["melt", "executing"]]);
     expect(await balance(manager)).toEqual({ spendable: 88, reserved: 0 });
@@ -700,18 +704,19 @@ describe("melt: quoteMelt then executeMelt against a real Coco Manager", () => {
     expect(mint.calls.filter((call) => call === "melt")).toHaveLength(1);
   });
 
-  it("rejects when the paid melt's reply is lost, although Coco records it as paid", async () => {
+  it("returns paid evidence when Coco recovered the paid melt after a lost reply", async () => {
     const { manager, mint, ops } = await harness();
     const quote = await ops.quoteMelt!(MELT_INPUT as never);
     mint.faults.melt = "lost";
 
-    // QUIRK: the invoice was paid (Coco asks the mint about the quote after
-    // the lost reply, sees it PAID and finalizes the operation), yet
-    // executeMelt still rejects, so the caller reports a failed payment for
-    // one that went through.
-    await expect(
-      ops.executeMelt!({ ...MELT_INPUT, quoteId: quote.quoteId } as never),
-    ).rejects.toMatchObject({ name: "NetworkError" });
+    // Coco rethrows the transport error even after recovering to finalized.
+    // The default operation returns that finalized record as paid evidence.
+    const result = await ops.executeMelt!({ ...MELT_INPUT, quoteId: quote.quoteId });
+    expect(JSON.parse(result.historyEntry)).toMatchObject({
+      id: await onlyOperationId(manager),
+      state: "PAID",
+      quoteId: quote.quoteId,
+    });
 
     expect(await historyRows(manager)).toEqual([["melt", "finalized"]]);
     expect(await balance(manager)).toEqual({ spendable: 88, reserved: 0 });

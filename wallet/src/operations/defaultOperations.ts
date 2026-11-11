@@ -56,6 +56,7 @@ import { parsePaymentInput } from "../parse";
 import {
   AuthoredError,
   MeltUserCancelledError,
+  MeltOutcomeUnknownError,
   PaymentRequestUndeliveredError,
   UnitRateUnavailableError,
 } from "../errors";
@@ -71,6 +72,7 @@ import { getKeysetUnits } from "../core/keysetUnits";
 import { normalizeMintUrl } from "../transport/plan";
 import { assertPaymentRequestFeesSupported } from "../core/paymentRequestFees";
 import { parseHistoryEntryOnce } from "./historyEntry";
+import { outcomeOfFailedMeltExecute } from "../melt-outcome";
 
 // MintInfo is the cashu-ts GetInfoResponse — coco-core re-derives but does
 // not export it as a named type, so we infer it from the manager API to
@@ -136,11 +138,9 @@ function mapMeltOperationState(state: string): string {
 }
 
 /**
- * Execute a prepared melt with the reservation rescue shared by every melt
- * rail: prepare() reserved proofs at the mint, so if execute() throws — mint
- * unreachable mid-flight, network drop, mint 5xx, or the QA mock-fail gate —
- * the operation is cancelled so the proofs don't stay locked until the next
- * manager restart. Safety-critical: keep ONE copy.
+ * After execute returns or throws, only Coco's finalized state proves payment.
+ * On failure, release a reservation only when this call left it unsent;
+ * unresolved operations stay with Coco's recovery and must not be paid again.
  */
 async function executeMeltWithRescue(
   mgr: Manager,
@@ -164,14 +164,26 @@ async function executeMeltWithRescue(
       operationId: operation.id,
       error: errField(e),
     });
-    await mgr.ops.melt
-      .cancel(operation.id, "Execute failed")
-      .catch((cancelErr) => {
+    const saved = await mgr.ops.melt.get(operation.id).catch((lookupError) => {
+      logger.warn(`operations.${logPrefix}.lookupAfterFailureFailed`, {
+        operationId: operation.id,
+        error: errField(lookupError),
+      });
+      return null;
+    });
+    const outcome = outcomeOfFailedMeltExecute(e, saved?.state ?? null);
+    if (outcome === "paid" && saved?.state === "finalized") return saved;
+    if (outcome === "unknown") {
+      throw new MeltOutcomeUnknownError(operation.id, e);
+    }
+    if (saved?.state === "prepared") {
+      await mgr.ops.melt.cancel(operation.id, "Execute failed").catch((cancelErr) => {
         logger.warn(`operations.${logPrefix}.cancelAfterFailureFailed`, {
           operationId: operation.id,
           error: errField(cancelErr),
         });
       });
+    }
     throw e;
   }
   logger.info(`operations.${logPrefix}.complete`, {
@@ -202,9 +214,8 @@ function buildMeltEntry(
 }
 
 /**
- * Execute a prepared send with the same reservation rescue melts get
- * (executeMeltWithRescue): prepare() reserved proofs at the mint, so if
- * execute() throws — network drop mid-flight, app backgrounded, mint 5xx —
+ * Execute a prepared send with reservation rescue: prepare() reserved proofs,
+ * so if execute() throws — network drop mid-flight, app backgrounded, mint 5xx —
  * the operation is cancelled instead of abandoning the reservation (locked
  * proofs + a phantom pending history row until the next recovery run).
  * Safety-critical: keep ONE copy (BTC-07).

@@ -1,6 +1,8 @@
 import type { PaymentCopyCatalog } from "./types";
 
 export const paymentCopyDefaults = {
+  "melt.outcomeUnknown":
+    "The payment may still complete. Check your history before you pay again.",
   "nfc.unitSwitchFailed": "Could not select the terminal’s currency. Try again.",
   "nfc.unitNotFunded": "This terminal wants {unit}. You have no {unit} ecash at an accepted mint.",
   "nfc.writeOutcomeUnknown":
