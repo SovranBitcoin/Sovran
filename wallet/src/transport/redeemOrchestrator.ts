@@ -61,7 +61,7 @@ export type MeshRedeemErrorKind = "spent" | "network" | "retryable" | "fatal";
  * What the queue recorded for a failed attempt: back in line for another try,
  * spent, or held (refused by the mint, or out of attempts).
  */
-export type MeshRedeemFailure = "retrying" | "spent" | "failed";
+type MeshRedeemFailure = "retrying" | "spent" | "failed";
 
 export function classifyMeshRedeemError(err: unknown): MeshRedeemErrorKind {
   const message = err instanceof Error ? err.message : String(err);
