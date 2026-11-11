@@ -62,7 +62,6 @@ export function useContactSearch(searchQuery: string) {
     surface: 'searchProfiles',
     key: active ? profileSearchKey(active) : null,
     viewerKey: '',
-    strategy: 'aggregate',
     focusRevalidate: false,
     // A refinement is the same surface: keep the previous rows while it loads.
     // An unrelated query is not — it starts from the loading state.
