@@ -1001,6 +1001,30 @@ async function startSendMoneyToProfile(ctx: {
   }
 }
 
+/**
+ * The Follow button's tap. It only records what the person wants;
+ * `followSync` publishes it, so the button answers at once and every tap
+ * counts, also while one publishes. Each tap toggles what the store holds at
+ * that moment, so two taps before the screen redraws follow and unfollow.
+ */
+export function useFollowToggle(pubkey: string | undefined, ownPubkey: string | undefined) {
+  const setFollowIntent = useNostrSocialStore((state) => state.setFollowIntent);
+  return () => {
+    if (!pubkey || !ownPubkey) {
+      nostrLog.warn('user.profile.follow.precondition_failed', {
+        hasPubkey: !!pubkey,
+        hasNostrKeys: !!ownPubkey,
+      });
+      paramPopup('engagement-update-failed', 'follow');
+      return;
+    }
+    if (ownPubkey === pubkey) return;
+    const shouldFollow = !selectIsFollowingPubkey(pubkey)(useNostrSocialStore.getState());
+    nostrLog.info('user.profile.follow.toggle', { pubkey, shouldFollow });
+    setFollowIntent(pubkey, shouldFollow);
+  };
+}
+
 export function UserProfileScreen() {
   const { personMenu } = useModerationActions();
   useLifecycleLogger('UserProfileScreen', nostrLog);
@@ -1044,7 +1068,6 @@ export function UserProfileScreen() {
     isResolving: isMetadataResolving,
   } = useNostrProfileMetadata(pubkey);
 
-  const setFollowIntent = useNostrSocialStore((state) => state.setFollowIntent);
   // A tap not yet in a published follow list (for the logs; the button shows it as done).
   const followPending = useNostrSocialStore(
     (state) => !!(pubkey && state.optimisticFollowsByPubkey[pubkey]?.pending)
@@ -1233,22 +1256,7 @@ export function UserProfileScreen() {
     }
   };
 
-  // A tap only records what the person wants; `followSync` publishes it, so
-  // the button answers at once and every tap counts, also while one publishes.
-  const handleToggleFollow = () => {
-    const ownPubkey = nostrKeys?.pubkey;
-    if (!pubkey || !ownPubkey) {
-      nostrLog.warn('user.profile.follow.precondition_failed', {
-        hasPubkey: !!pubkey,
-        hasNostrKeys: !!ownPubkey,
-      });
-      paramPopup('engagement-update-failed', 'follow');
-      return;
-    }
-    if (ownPubkey === pubkey) return;
-    nostrLog.info('user.profile.follow.toggle', { pubkey, shouldFollow: !isFollowingProfile });
-    setFollowIntent(pubkey, !isFollowingProfile);
-  };
+  const handleToggleFollow = useFollowToggle(pubkey, nostrKeys?.pubkey);
 
   const handleMintInfoPress = () => {
     if (!profileMintUrl) return;
