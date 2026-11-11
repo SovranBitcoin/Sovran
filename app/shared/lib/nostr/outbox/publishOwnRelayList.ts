@@ -32,11 +32,22 @@ import {
 import { captureActiveProfile } from '@/shared/stores/global/profileStore';
 
 /** The relays this session's discovery for the account has asked, while it runs. */
-let discovery: { pubkey: string; asked: ReadonlySet<string> } | null = null;
+let discovery: {
+  pubkey: string;
+  asked: ReadonlySet<string>;
+  learned: ReadonlySet<string>;
+} | null = null;
 
-/** Discovery for `pubkey` has asked `asked` (it only grows). Returns the undo. */
-export function trackRelaysAsked(pubkey: string, asked: ReadonlySet<string>): () => void {
-  discovery = { pubkey, asked };
+/**
+ * Track discovery's queried relays and separately its learned write relays.
+ * Learned means eligible for the next edit's read, never already queried.
+ */
+export function trackRelaysAsked(
+  pubkey: string,
+  asked: ReadonlySet<string>,
+  learned: ReadonlySet<string> = new Set()
+): () => void {
+  discovery = { pubkey, asked, learned };
   return () => {
     if (discovery?.asked === asked) discovery = null;
   };
@@ -44,13 +55,18 @@ export function trackRelaysAsked(pubkey: string, asked: ReadonlySet<string>): ()
 
 /**
  * Where the account's relay list is read: its saved write relays, the
- * defaults and every relay this session's discovery asked. A store that has
+ * defaults and every relay this session's discovery asked or learned. A store that has
  * not loaded has no saved relays to name, so nothing is read yet.
  */
 export function relayListRelays(pubkey: string): string[] | null {
   if (!useRelayListStore.persist.hasHydrated()) return null;
-  const asked = discovery?.pubkey === pubkey ? discovery.asked : [];
-  return normalizeRelayList([...getOwnWriteRelays(), ...DEFAULT_RELAYS, ...asked]);
+  const tracked = discovery?.pubkey === pubkey ? discovery : null;
+  return normalizeRelayList([
+    ...getOwnWriteRelays(),
+    ...DEFAULT_RELAYS,
+    ...(tracked?.asked ?? []),
+    ...(tracked?.learned ?? []),
+  ]);
 }
 
 type RelayListPublishError =

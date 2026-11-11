@@ -55,6 +55,7 @@ async function syncOwnRelayList(
   ndk: NDK,
   pubkey: string,
   asked: Set<string>,
+  learned: Set<string>,
   isCancelled: () => boolean
 ): Promise<'discovered' | 'unanswered'> {
   try {
@@ -74,6 +75,7 @@ async function syncOwnRelayList(
       if (read.newest) {
         // A list any relay returned is taken in, even before the others answered.
         const entries = parseRelayList({ tags: read.newest.tags });
+        for (const entry of entries) if (entry.write) learned.add(entry.url);
         useRelayListStore.getState().setFromRelay(entries, read.newest.created_at ?? 0);
         seedPool(
           ndk,
@@ -127,10 +129,11 @@ export function useOwnRelayListSync(pubkey: string | undefined, enabled: boolean
     let cancelled = false;
     let phase: 'waiting' | 'reading' | 'unanswered' | 'discovered' = 'waiting';
     const asked = new Set<string>();
-    const untrack = trackRelaysAsked(pubkey, asked);
+    const learned = new Set<string>();
+    const untrack = trackRelaysAsked(pubkey, asked, learned);
     const run = async () => {
       phase = 'reading';
-      phase = await syncOwnRelayList(ndk, pubkey, asked, () => cancelled);
+      phase = await syncOwnRelayList(ndk, pubkey, asked, learned, () => cancelled);
     };
     const again = () => {
       if (!cancelled && phase === 'unanswered') void run();
