@@ -228,7 +228,9 @@ async function within<V>(promise: Promise<V>, ms: number): Promise<V | undefined
   try {
     return await Promise.race([
       promise,
-      new Promise<undefined>((resolve) => (timer = setTimeout(resolve, ms))),
+      new Promise<undefined>((resolve) => {
+        timer = setTimeout(() => resolve(undefined), ms);
+      }),
     ]);
   } finally {
     clearTimeout(timer);
