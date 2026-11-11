@@ -4,6 +4,7 @@ import * as Network from 'expo-network';
 
 import { OfflineStatusProvider, useOfflineStatus } from '@/shared/providers/OfflineProvider';
 import { resolveOfflineReachability } from '@/shared/lib/offlineReachability';
+import { log } from '@/shared/lib/logger';
 
 jest.mock('expo-network', () => ({
   getNetworkStateAsync: jest.fn().mockResolvedValue({ isConnected: true }),
@@ -138,4 +139,56 @@ it('still requires consecutive foreground failures before reporting offline', as
     await jest.advanceTimersByTimeAsync(3000);
   });
   expect(result.current.isOffline).toBe(false);
+});
+
+it('logs each change with the reason and the target that decided it', async () => {
+  jest.mocked(resolveOfflineReachability).mockResolvedValue({
+    isOffline: true,
+    reason: 'probe-unreachable',
+    probes: [
+      { name: 'nagg', host: 'nagg.example', ok: false, status: 404, durationMs: 40 },
+      { name: 'second', host: 'second.example', ok: false, durationMs: 1500, error: 'timeout' },
+    ],
+  });
+  renderHook(useOfflineStatus, { wrapper: OfflineStatusProvider });
+  await flush();
+  await act(async () => {
+    await jest.advanceTimersByTimeAsync(6000);
+  });
+  expect(log.info).toHaveBeenCalledWith('provider.offline.transition', {
+    from: 'online',
+    to: 'offline',
+    reachabilityReason: 'probe-unreachable',
+    probeStatus: 'failed',
+    probeHost: 'second.example',
+    probeName: 'second',
+    probeStatusCode: undefined,
+    probeError: 'timeout',
+    probeCount: 2,
+    probeDurationMs: 1540,
+  });
+
+  jest.mocked(resolveOfflineReachability).mockResolvedValue({
+    isOffline: false,
+    reason: 'probe-reachable',
+    probes: [
+      { name: 'nagg', host: 'nagg.example', ok: false, status: 404, durationMs: 40 },
+      { name: 'second', host: 'second.example', ok: true, status: 200, durationMs: 120 },
+    ],
+  });
+  await act(async () => {
+    await jest.advanceTimersByTimeAsync(3000);
+  });
+  expect(log.info).toHaveBeenLastCalledWith('provider.offline.transition', {
+    from: 'offline',
+    to: 'online',
+    reachabilityReason: 'probe-reachable',
+    probeStatus: 'success',
+    probeHost: 'second.example',
+    probeName: 'second',
+    probeStatusCode: 200,
+    probeError: undefined,
+    probeCount: 2,
+    probeDurationMs: 160,
+  });
 });

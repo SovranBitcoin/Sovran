@@ -133,4 +133,82 @@ describe('offline reachability', () => {
     expect(result).toMatchObject({ isOffline: true, reason: 'probe-unreachable' });
     expect(result.probes[0]).toMatchObject({ ok: false, error: 'timeout' });
   });
+  it('with the default list, the Sovran server answering 404 means offline', async () => {
+    const fetcher = jest.fn(async (url: RequestInfo | URL) =>
+      response(String(url).startsWith('https://configured-nagg.example') ? 404 : 200)
+    );
+
+    const result = await resolveOfflineReachability(connectedWifi, { fetcher });
+
+    expect(result).toMatchObject({ isOffline: true, reason: 'probe-unreachable' });
+    expect(result.probes).toEqual([
+      expect.objectContaining({ name: 'nagg', host: 'configured-nagg.example', status: 404 }),
+    ]);
+  });
+
+  it('is online when any probe of several answers, and names the one that did', async () => {
+    const fetcher = jest.fn(async (url: RequestInfo | URL) => {
+      if (String(url) === primaryProbe.url) throw new Error('Network request failed');
+      return response(200);
+    });
+
+    const result = await resolveOfflineReachability(connectedWifi, {
+      fetcher,
+      probes: [primaryProbe, { name: 'second', url: 'https://second.example/health' }],
+    });
+
+    expect(result).toMatchObject({ isOffline: false, reason: 'probe-reachable' });
+    expect(result.probes.filter((probe) => probe.ok)).toEqual([
+      expect.objectContaining({ name: 'second', host: 'second.example', status: 200 }),
+    ]);
+  });
+
+  it('is offline only when every probe of several fails, and reports each attempt', async () => {
+    const fetcher = jest.fn().mockRejectedValue(new Error('Network request failed'));
+
+    const result = await resolveOfflineReachability(connectedWifi, {
+      fetcher,
+      probes: [primaryProbe, { name: 'second', url: 'https://second.example/health' }],
+    });
+
+    expect(result).toMatchObject({ isOffline: true, reason: 'probe-unreachable' });
+    expect(result.probes.map((probe) => probe.name).sort()).toEqual(['primary', 'second']);
+    expect(result.probes.every((probe) => !probe.ok)).toBe(true);
+  });
+
+  it('does not let an answer that arrives after the time limit change an offline verdict', async () => {
+    jest.useFakeTimers();
+    try {
+      const timeoutError = Object.assign(new Error('Aborted'), { name: 'AbortError' });
+      const aborted: string[] = [];
+      // Each target would answer after two seconds; the limit is 1.5 seconds.
+      const fetcher = jest.fn(
+        (url: RequestInfo | URL, init?: RequestInit) =>
+          new Promise<Response>((resolve, reject) => {
+            const late = setTimeout(() => resolve(response(200)), 2000);
+            init?.signal?.addEventListener('abort', () => {
+              clearTimeout(late);
+              aborted.push(String(url));
+              reject(timeoutError);
+            });
+          })
+      );
+
+      const pending = resolveOfflineReachability(connectedWifi, {
+        fetcher,
+        probes: [primaryProbe, { name: 'second', url: 'https://second.example/health' }],
+      });
+      await jest.advanceTimersByTimeAsync(5000);
+      const result = await pending;
+      const snapshot = JSON.stringify(result);
+      await jest.advanceTimersByTimeAsync(5000);
+
+      expect(result).toMatchObject({ isOffline: true, reason: 'probe-unreachable' });
+      expect(result.probes.every((probe) => probe.error === 'timeout')).toBe(true);
+      expect(aborted.sort()).toEqual([primaryProbe.url, 'https://second.example/health'].sort());
+      expect(JSON.stringify(result)).toBe(snapshot);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
 });
