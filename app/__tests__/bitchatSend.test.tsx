@@ -440,7 +440,7 @@ describe('Bluetooth direct message (ble-dm)', () => {
     expect(thread()[0]).toMatchObject({ deliveryStatus: 'sent', isPending: false });
   });
 
-  it('a late sent or delivered after the 15 s watchdog leaves the row failed', async () => {
+  it('a late sent, then delivered, after the 15 s watchdog wins: the row shows delivered', async () => {
     const { result } = await mount(undefined, 'ble-dm', { dm: { peerID: BLE_PEER } });
     await act(async () => {
       await result.current.sendMessage('hello peer');
@@ -450,14 +450,18 @@ describe('Bluetooth direct message (ble-dm)', () => {
     });
     const messageID = thread()[0]!.id;
 
+    expect(thread()[0]).toMatchObject({ deliveryStatus: 'failed', failureReason: 'timeout' });
+
+    // The 15 s mark means "not confirmed yet": a later report wins (F212).
     act(() => {
       useBitchatDmMessagesStore.getState().applyDeliveryStatus({ messageID, status: 'sent' });
+    });
+    expect(thread()[0]).toMatchObject({ deliveryStatus: 'sent', isPending: false });
+    expect(thread()[0]).not.toHaveProperty('failureReason', 'timeout');
+    act(() => {
       useBitchatDmMessagesStore.getState().applyDeliveryStatus({ messageID, status: 'delivered' });
     });
-
-    // QUIRK (F212, D1): the watchdog's guess is final, so a message the peer
-    // received still offers a retry.
-    expect(thread()[0]).toMatchObject({ deliveryStatus: 'failed', failureReason: 'timeout' });
+    expect(thread()[0]).toMatchObject({ deliveryStatus: 'delivered', isPending: false });
   });
 
   it('the watchdog fires after the chat is closed', async () => {

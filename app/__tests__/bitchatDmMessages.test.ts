@@ -166,6 +166,20 @@ describe('delivery status', () => {
     expect(thread()[0].deliveryStatus).toBe('read');
   });
 
+  it('an unconfirmed message refuses a late sending and takes a native failure as final', () => {
+    store().appendOutgoing(outgoing('o1', 1), PEER_A);
+    expect(store().markTimedOut('o1')).toBe(true);
+    status('o1', 'sending');
+    expect(thread()[0]).toMatchObject({ deliveryStatus: 'failed', failureReason: 'timeout' });
+
+    status('o1', 'failed', 'peer_unreachable');
+    status('o1', 'delivered');
+    expect(thread()[0]).toMatchObject({
+      deliveryStatus: 'failed',
+      failureReason: 'peer_unreachable',
+    });
+  });
+
   it('a failure keeps its reason and a later delivery does not move it', () => {
     store().appendOutgoing(outgoing('o1', 1), PEER_A);
     status('o1', 'failed', 'peer_unreachable');
@@ -237,8 +251,8 @@ describe('after a restart', () => {
 
     await relaunch();
 
-    // QUIRK: a 'sent' message the native side already handed off is treated
-    // the same as one that never left. A later fix should change this on purpose.
+    // Both are saved as failed with reason app_restart, as every release has
+    // written them; that reads back as unconfirmed, not as a final failure.
     expect(thread().map((m) => [m.id, m.deliveryStatus, m.failureReason, m.isPending])).toEqual([
       ['in', undefined, undefined, undefined],
       ['sending', 'failed', 'app_restart', false],
@@ -246,6 +260,10 @@ describe('after a restart', () => {
       ['delivered', 'delivered', undefined, false],
     ]);
     expect(thread(PEER_B)[0].deliveryStatus).toBe('read');
+
+    status('sent', 'delivered');
+    expect(thread()[2]).toMatchObject({ deliveryStatus: 'delivered', isPending: false });
+    expect(thread()[2]).not.toHaveProperty('failureReason', 'app_restart');
   });
 
   it('reads back every saved status and reason, and writes back only the restart demotion', async () => {
@@ -292,15 +310,16 @@ describe('after a restart', () => {
     expect(rows(thread())).toEqual(expected);
     expect(rows(JSON.parse(mockAsync.get(key)!).state.byPeer[PEER_A])).toEqual(expected);
 
+    // A saved timeout or restart reads as unconfirmed, so a late delivery
+    // wins; any other saved failure is final (F212).
     for (const m of thread()) status(m.id, 'delivered');
-    // QUIRK (F212, D1): a saved failure is final whatever its reason.
     expect(thread().map((m) => m.deliveryStatus)).toEqual([
-      'failed',
-      'failed',
+      'delivered',
+      'delivered',
       'delivered',
       'read',
-      'failed',
-      'failed',
+      'delivered',
+      'delivered',
       'failed',
       'failed',
     ]);

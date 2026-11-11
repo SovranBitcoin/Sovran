@@ -53,8 +53,9 @@ const MOVES: Record<BleDmDelivery['state'], readonly DeliveryEvent['type'][]> = 
   // QUIRK: a late failure still overrides a message the peer acknowledged.
   delivered: ['read', 'failed'],
   read: ['failed'],
-  // QUIRK (F212): the watchdog's or a restart's guess is final.
-  unconfirmed: ['failed'],
+  // The 15 s mark and a restart mean "not confirmed yet": a later report
+  // wins (owner's ruling, F212). Until one comes it offers a retry.
+  unconfirmed: ['sent', 'delivered', 'read', 'failed'],
   // A new reason replaces the old one.
   failed: ['failed'],
 };
@@ -285,11 +286,12 @@ type PersistedSlice = Pick<BitchatDmMessagesStore, 'byPeer'>;
  *
  * Persisted to AsyncStorage so chat history survives app kill. On rehydrate,
  * any outbound message still in `sending` / `sent` (without a `delivered`
- * ack) is downgraded to `failed` with reason `'app_restart'` — we can't
- * know whether it actually reached the peer between the last write and the
- * relaunch, so we surface the ambiguity rather than show a misleading
- * "in flight" forever. The user can tap the failed bubble to retry, which
- * starts a fresh handshake and sends with a new messageID.
+ * ack) becomes unconfirmed, saved as `failed` with reason `'app_restart'` —
+ * we can't know whether it actually reached the peer between the last write
+ * and the relaunch, so we surface the ambiguity rather than show a misleading
+ * "in flight" forever. A delivery report that still arrives wins. The user can
+ * tap the failed bubble to retry, which starts a fresh handshake and sends
+ * with a new messageID.
  *
  * Native-side `DmPeerSummary` (UserDefaults-backed in `BitChatBLEBridge.swift`)
  * remains the source of truth for the Contacts-tab Recent/All entries — this
@@ -377,7 +379,7 @@ export const useBitchatDmMessagesStore = create<BitchatDmMessagesStore>({
       schema: PersistedBitchatDmStore,
       partialize: (state) => ({ byPeer: state.byPeer }),
       afterHydrate: (state) => {
-        // Demote any in-flight outbound messages to `failed`. We don't know
+        // Mark any in-flight outbound messages unconfirmed. We don't know
         // whether they actually made it to the peer between the last write
         // and the relaunch — better to flag the ambiguity than show a
         // permanent spinner. Inbound messages and already-delivered/read
