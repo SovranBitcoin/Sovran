@@ -11,6 +11,7 @@
 // ---------------------------------------------------------------------------
 
 import { getTokenMetadata } from '@cashu/cashu-ts';
+import { operationHistoryId } from '@cashu/coco-core';
 import type {
   HistoryEntry,
   LegacyMintHistoryEntry,
@@ -23,6 +24,7 @@ import { amountToNumber, type AmountValue } from '../amount';
 import { serializeHistoryEntry } from '../history/normalize';
 import { logger, mintUrlFields } from '../logger';
 import type { MachineOperations } from '../machine/types';
+import { proofsHaveP2PK } from '../p2pk';
 import { withTimeout } from '../safeFetch';
 import { classifyMeshRedeemError } from '../transport/redeemOrchestrator';
 
@@ -83,17 +85,15 @@ function isRecoverableReceiveError(err: unknown): boolean {
   return kind === 'network' || kind === 'retryable';
 }
 
-function receiveHistoryId(operationId: string): string {
-  return `receive:${operationId}`;
-}
-
 async function findReceiveHistoryEntryForOperation(
   manager: Manager,
   operationId: string,
   mintUrl: string,
   beforeIds: Set<string>
 ): Promise<ReceiveHistoryEntry | null> {
-  const direct = await manager.history.getHistoryEntryById(receiveHistoryId(operationId));
+  const direct = await manager.history.getHistoryEntryById(
+    operationHistoryId('receive', operationId)
+  );
   if (direct?.type === 'receive') return direct as ReceiveHistoryEntry;
 
   // This operation's own row wins wherever it sits in the page; a row that is
@@ -267,14 +267,7 @@ export function createExecuteReceive(
     let hadP2PKProofs = false;
     try {
       const metadata = getTokenMetadata(tokenString);
-      hadP2PKProofs = metadata.incompleteProofs.some((p) => {
-        try {
-          const parsed = JSON.parse(p.secret);
-          return Array.isArray(parsed) && parsed[0] === 'P2PK';
-        } catch {
-          return false;
-        }
-      });
+      hadP2PKProofs = proofsHaveP2PK(metadata.incompleteProofs);
     } catch (error) {
       logger.warn('payment.execute_receive.p2pk_detection_decode_failed', {
         ...mintUrlFields(mintUrl),
