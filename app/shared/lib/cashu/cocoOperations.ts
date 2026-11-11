@@ -7,11 +7,15 @@ type PreparedBolt11MintOperation = Awaited<ReturnType<Manager['ops']['mint']['pr
 type PreparedBolt11MeltOperation = Awaited<ReturnType<Manager['ops']['melt']['prepare']>>;
 
 /**
- * v2 quote-first bolt11 mint: create the canonical quote row (remote quote
- * happens here), then prepare the durable operation against it.
+ * v2 quote-first mint: create the canonical quote row (the remote quote
+ * happens here), then prepare the durable operation against it with the
+ * amount. A bolt11 quote carries the amount; an onchain quote is a reusable
+ * one with a FRESH deposit address per call (payment attribution for
+ * fixed-amount receives), so v2 takes the amount only at prepare.
  */
-export async function prepareBolt11MintQuote(
+export async function prepareMintQuote(
   manager: Manager,
+  method: 'bolt11' | 'onchain',
   mintUrl: string,
   amount: number,
   unit = 'sat'
@@ -20,85 +24,35 @@ export async function prepareBolt11MintQuote(
     ...mintUrlLogFields(mintUrl),
     amount,
     unit,
-    method: 'bolt11',
+    method,
   });
   try {
-    const quote = await manager.quotes.mint.create({
-      mintUrl,
-      method: 'bolt11',
-      amount: { amount, unit },
-    });
+    const quote = await manager.quotes.mint.create(
+      method === 'bolt11'
+        ? { mintUrl, method, amount: { amount, unit } }
+        : { mintUrl, method, unit }
+    );
     cashuLog.info('coco.operations.mint.quote_created', {
       ...mintUrlLogFields(mintUrl),
       quoteId: quote.quoteId,
       unit: quote.unit,
-      method: 'bolt11',
+      method,
     });
     const operation = await manager.ops.mint.prepare({ quote, amount });
     cashuLog.info('coco.operations.mint.prepare.done', {
       ...mintUrlLogFields(mintUrl),
       amount,
-      method: 'bolt11',
+      method,
     });
     return operation;
   } catch (error) {
     cashuLog.warn('coco.operations.mint.prepare.failed', {
       ...mintUrlLogFields(mintUrl),
       amount,
-      method: 'bolt11',
+      method,
       errorName: error instanceof Error ? error.name : typeof error,
     });
-    reportCocoApiFailure('quotes.mint.create/ops.mint.prepare', error, {
-      method: 'bolt11',
-      unit,
-    });
-    throw error;
-  }
-}
-
-/**
- * v2 quote-first onchain mint: reusable quote with a FRESH deposit address
- * per call (payment attribution for fixed-amount receives), then the durable
- * operation with an explicit amount, as v2 requires for reusable quotes.
- */
-export async function prepareOnchainMintQuote(
-  manager: Manager,
-  mintUrl: string,
-  amount: number,
-  unit = 'sat'
-): Promise<PreparedBolt11MintOperation> {
-  cashuLog.info('coco.operations.mint.prepare.start', {
-    ...mintUrlLogFields(mintUrl),
-    amount,
-    unit,
-    method: 'onchain',
-  });
-  try {
-    const quote = await manager.quotes.mint.create({ mintUrl, method: 'onchain', unit });
-    cashuLog.info('coco.operations.mint.quote_created', {
-      ...mintUrlLogFields(mintUrl),
-      quoteId: quote.quoteId,
-      unit: quote.unit,
-      method: 'onchain',
-    });
-    const operation = await manager.ops.mint.prepare({ quote, amount });
-    cashuLog.info('coco.operations.mint.prepare.done', {
-      ...mintUrlLogFields(mintUrl),
-      amount,
-      method: 'onchain',
-    });
-    return operation;
-  } catch (error) {
-    cashuLog.warn('coco.operations.mint.prepare.failed', {
-      ...mintUrlLogFields(mintUrl),
-      amount,
-      method: 'onchain',
-      errorName: error instanceof Error ? error.name : typeof error,
-    });
-    reportCocoApiFailure('quotes.mint.create/ops.mint.prepare', error, {
-      method: 'onchain',
-      unit,
-    });
+    reportCocoApiFailure('quotes.mint.create/ops.mint.prepare', error, { method, unit });
     throw error;
   }
 }

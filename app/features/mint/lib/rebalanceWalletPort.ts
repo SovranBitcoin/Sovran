@@ -4,7 +4,7 @@ import type { RebalanceWalletPort } from 'wallet';
 import { amountToNumber, requireAmount } from 'wallet/amount';
 
 import { releaseTrustWindow } from '@/features/mint/components/rebalance';
-import { prepareBolt11MeltQuote, prepareBolt11MintQuote } from '@/shared/lib/cashu/cocoOperations';
+import { prepareBolt11MeltQuote, prepareMintQuote } from '@/shared/lib/cashu/cocoOperations';
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { getReadyProofs, getWallet } from '@/shared/lib/cashu/managerInternals';
 
@@ -35,7 +35,8 @@ export function createRebalanceWalletPort(manager: Manager, unit: string): Rebal
       const quote = await wallet.createMeltQuoteBolt11(invoice);
       return requireAmount(quote.fee_reserve);
     },
-    createMintReceipt: (mintUrl, amount) => prepareBolt11MintQuote(manager, mintUrl, amount, unit),
+    createMintReceipt: (mintUrl, amount) =>
+      prepareMintQuote(manager, 'bolt11', mintUrl, amount, unit),
     getMintOperation: (operationId) => manager.ops.mint.get(operationId),
     prepareMelt: (mintUrl, invoice) => prepareBolt11MeltQuote(manager, mintUrl, invoice),
     executeMelt: (operationId) => manager.ops.melt.execute(operationId),

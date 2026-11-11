@@ -92,11 +92,8 @@ jest.mock('@/features/send/lib/createSovranScreenActionsBridge', () => ({
   getSovranMintEnrichment: jest.fn(),
 }));
 jest.mock('@/shared/lib/cashu/cocoOperations', () => ({
-  prepareBolt11MintQuote: jest.fn(async () => {
-    throw new Error('stop after choosing bolt11');
-  }),
-  prepareOnchainMintQuote: jest.fn(async () => {
-    throw new Error('stop after choosing onchain');
+  prepareMintQuote: jest.fn(async (_manager: unknown, method: string) => {
+    throw new Error(`stop after choosing ${method}`);
   }),
 }));
 
@@ -117,7 +114,7 @@ import {
   createSovranScanSources,
 } from '@/features/send/lib/sovranPaymentConfig';
 import { createSovranScreenActionsBridge } from '@/features/send/lib/createSovranScreenActionsBridge';
-import { prepareBolt11MintQuote, prepareOnchainMintQuote } from '@/shared/lib/cashu/cocoOperations';
+import { prepareMintQuote } from '@/shared/lib/cashu/cocoOperations';
 import { runDataMigrations } from '@/shared/lib/migrations/dataMigrations';
 import { clearPaymentContext } from '@/shared/stores/runtime/clearPaymentContext';
 import { staticPopup } from '@/shared/lib/popup';
@@ -311,20 +308,18 @@ describe('unit and operations', () => {
     expect(useMintStore.getState().activeUnit).toBe('sat');
   });
 
-  it.each([
-    ['onchain', prepareOnchainMintQuote, prepareBolt11MintQuote],
-    ['bolt11', prepareBolt11MintQuote, prepareOnchainMintQuote],
-  ] as const)(
-    'routes a %s mint quote to its quote-first wrapper with the live manager',
-    async (method, chosen, other) => {
+  it.each(['onchain', 'bolt11'] as const)(
+    'routes a %s mint quote to the quote-first wrapper with the live manager',
+    async (method) => {
       await mount();
 
       await expect(
         props().operations.executeMintQuote!({ mintUrl: MINT, amount: 21, unit: 'sat', method })
       ).rejects.toThrow(`stop after choosing ${method}`);
 
-      expect(chosen).toHaveBeenCalledWith(mockManagerHolder.current, MINT, 21, 'sat');
-      expect(other).not.toHaveBeenCalled();
+      expect(jest.mocked(prepareMintQuote).mock.calls).toEqual([
+        [mockManagerHolder.current, method, MINT, 21, 'sat'],
+      ]);
     }
   );
 

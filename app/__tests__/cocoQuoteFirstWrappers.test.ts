@@ -9,11 +9,7 @@
 
 import type { Manager } from '@cashu/coco-core';
 
-import {
-  prepareBolt11MeltQuote,
-  prepareBolt11MintQuote,
-  prepareOnchainMintQuote,
-} from '@/shared/lib/cashu/cocoOperations';
+import { prepareBolt11MeltQuote, prepareMintQuote } from '@/shared/lib/cashu/cocoOperations';
 import { reportCocoApiFailure } from '@/shared/lib/cashu/cocoFeedback';
 
 jest.mock('@/shared/lib/cashu/cocoFeedback', () => ({ reportCocoApiFailure: jest.fn() }));
@@ -83,11 +79,11 @@ afterEach(() => {
   jest.restoreAllMocks();
 });
 
-describe('prepareBolt11MintQuote', () => {
+describe('prepareMintQuote for bolt11', () => {
   it('creates a bolt11 quote for the amount and unit, then prepares the operation against it', async () => {
     const coco = fakeManager();
 
-    const result = await prepareBolt11MintQuote(coco.asManager, MINT, 210, 'usd');
+    const result = await prepareMintQuote(coco.asManager, 'bolt11', MINT, 210, 'usd');
 
     expect(coco.calls).toEqual(['quotes.mint.create', 'ops.mint.prepare']);
     expect(coco.manager.quotes.mint.create).toHaveBeenCalledWith({
@@ -106,7 +102,7 @@ describe('prepareBolt11MintQuote', () => {
   it('defaults the unit to sat', async () => {
     const coco = fakeManager();
 
-    await prepareBolt11MintQuote(coco.asManager, MINT, 5);
+    await prepareMintQuote(coco.asManager, 'bolt11', MINT, 5);
 
     expect(coco.manager.quotes.mint.create).toHaveBeenCalledWith(
       expect.objectContaining({ amount: { amount: 5, unit: 'sat' } })
@@ -118,7 +114,7 @@ describe('prepareBolt11MintQuote', () => {
     const refused = new Error('mint refused quote');
     coco.manager.quotes.mint.create.mockRejectedValueOnce(refused);
 
-    await expect(prepareBolt11MintQuote(coco.asManager, MINT, 21)).rejects.toBe(refused);
+    await expect(prepareMintQuote(coco.asManager, 'bolt11', MINT, 21)).rejects.toBe(refused);
 
     expect(coco.manager.ops.mint.prepare).not.toHaveBeenCalled();
     expect(reportCocoApiFailure).toHaveBeenCalledWith(
@@ -133,7 +129,7 @@ describe('prepareBolt11MintQuote', () => {
     const refused = new Error('prepare failed');
     coco.manager.ops.mint.prepare.mockRejectedValueOnce(refused);
 
-    await expect(prepareBolt11MintQuote(coco.asManager, MINT, 21)).rejects.toBe(refused);
+    await expect(prepareMintQuote(coco.asManager, 'bolt11', MINT, 21)).rejects.toBe(refused);
 
     expect(coco.manager.ops.mint.prepare).toHaveBeenCalledWith({
       quote: coco.mintQuote,
@@ -147,11 +143,11 @@ describe('prepareBolt11MintQuote', () => {
   });
 });
 
-describe('prepareOnchainMintQuote', () => {
+describe('prepareMintQuote for onchain', () => {
   it('creates an onchain quote with no amount, then prepares the operation with the amount', async () => {
     const coco = fakeManager();
 
-    const result = await prepareOnchainMintQuote(coco.asManager, MINT, 50_000);
+    const result = await prepareMintQuote(coco.asManager, 'onchain', MINT, 50_000);
 
     expect(coco.calls).toEqual(['quotes.mint.create', 'ops.mint.prepare']);
     expect(coco.manager.quotes.mint.create).toHaveBeenCalledWith({
@@ -171,7 +167,7 @@ describe('prepareOnchainMintQuote', () => {
     const refused = new Error('no onchain');
     coco.manager.quotes.mint.create.mockRejectedValueOnce(refused);
 
-    await expect(prepareOnchainMintQuote(coco.asManager, MINT, 1, 'sat')).rejects.toBe(refused);
+    await expect(prepareMintQuote(coco.asManager, 'onchain', MINT, 1, 'sat')).rejects.toBe(refused);
 
     expect(coco.manager.ops.mint.prepare).not.toHaveBeenCalled();
     expect(reportCocoApiFailure).toHaveBeenCalledWith(
