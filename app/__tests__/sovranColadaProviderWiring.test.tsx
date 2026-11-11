@@ -222,7 +222,8 @@ describe('ports handed to the wallet provider', () => {
     expect(p.chainAdapter).toEqual(
       expect.objectContaining({ getAddressTransactions: expect.any(Function) })
     );
-    const notificationsConfig = jest.mocked(createSovranNotifications).mock.calls[0]![0] as unknown as {
+    const notificationsConfig = jest.mocked(createSovranNotifications).mock
+      .calls[0]![0] as unknown as {
       getManager: () => unknown;
     };
     expect(notificationsConfig.getManager()).toBe(mockManagerHolder.current);
