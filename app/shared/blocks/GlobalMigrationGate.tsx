@@ -1,12 +1,50 @@
-import { ReactNode } from 'react';
+import { ReactNode, useEffect, useRef, useState } from 'react';
 
 import { signalMigrationsComplete } from '@/shared/lib/cashu/profileScopedStorage';
 import { migrateThenLoad } from '@/shared/lib/migrations/migrateThenLoad';
-import { initLog } from '@/shared/lib/logger';
-import { InitializationGate } from '@/shared/blocks/InitializationGate';
+import { initLog, log, Log, useInitMount, useLifecycleLogger } from '@/shared/lib/logger';
+import { useInitializationStage } from '@/shared/providers/InitializationProvider';
 import { StartupFailedScreen } from '@/shared/blocks/StartupFailedScreen';
 
 initLog('Module', 'GlobalMigrationGate loaded');
+
+const TAG = 'GlobalMigrationGate';
+const MESSAGE = 'Running global migrations...';
+
+type Status = 'pending' | 'complete' | 'failed';
+type Stage = ReturnType<typeof useInitializationStage>;
+
+/**
+ * Runs one attempt and reports the outcome to the stage.
+ *
+ * At module scope rather than inline in the effect: React Compiler cannot lower
+ * a try/catch containing ternaries, and an inline body would cost the gate — and
+ * therefore everything it wraps — its auto-memoization.
+ */
+async function runGlobalMigrations(
+  stage: Stage,
+  setStatus: (status: Status) => void
+): Promise<void> {
+  try {
+    stage.log(MESSAGE);
+    initLog(TAG, 'starting');
+    log.info('gate.global_migration.start');
+    await migrateThenLoad();
+    signalMigrationsComplete();
+    stage.complete();
+    setStatus('complete');
+    log.info('gate.global_migration.complete');
+    initLog(TAG, 'complete');
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : `${TAG} failed`;
+    log.error('gate.global_migration.failed', {
+      error: error instanceof Error ? error : new Error(String(error)),
+    });
+    stage.error(msg);
+    setStatus('failed');
+    initLog(TAG, `ERROR: ${error}`);
+  }
+}
 
 interface GlobalMigrationGateProps {
   children: ReactNode;
@@ -31,17 +69,37 @@ interface GlobalMigrationGateProps {
  * accounts or ask a long-standing user to restore.
  */
 export default function GlobalMigrationGate({ children }: GlobalMigrationGateProps) {
-  return (
-    <InitializationGate
-      tag="GlobalMigrationGate"
-      stageId="global-migrations"
-      outlivesAccount
-      message="Running global migrations..."
-      logEvent="gate.global_migration"
-      run={migrateThenLoad}
-      onSuccess={signalMigrationsComplete}
-      renderFailure={(retry) => <StartupFailedScreen step="storage" onRetry={retry} />}>
-      {children}
-    </InitializationGate>
-  );
+  useInitMount(TAG);
+  useLifecycleLogger(TAG);
+  // Mounted above the account providers, so its stage outlives an account switch.
+  const stage = useInitializationStage('global-migrations', {
+    message: MESSAGE,
+    blocking: true,
+    outlivesAccount: true,
+  });
+  const [status, setStatus] = useState<Status>('pending');
+  // Bumped by a retry; the effect runs once per attempt.
+  const [attempt, setAttempt] = useState(0);
+  const startedAttempt = useRef(-1);
+
+  useEffect(() => {
+    if (startedAttempt.current === attempt) return;
+    startedAttempt.current = attempt;
+    void runGlobalMigrations(stage, setStatus);
+  }, [stage, attempt]);
+
+  if (status === 'failed') {
+    return (
+      <StartupFailedScreen
+        step="storage"
+        onRetry={() => {
+          setStatus('pending');
+          setAttempt((current) => current + 1);
+        }}
+      />
+    );
+  }
+  if (status !== 'complete') return null;
+
+  return <Log name={TAG}>{children}</Log>;
 }
