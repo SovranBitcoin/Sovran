@@ -13,7 +13,7 @@
  */
 import { AppState } from 'react-native';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
-import type { ReactNode } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 
 import { GeohashChatScreen } from '@/features/bitchat/screens/GeohashChatScreen';
 import {
@@ -29,6 +29,8 @@ const RETRY = 'Retry sending message';
 const mockColor = '#222222';
 let mockRows: { id: string; isOwn: boolean; deliveryStatus?: string }[] = [];
 let mockOnSend: ((text: string) => unknown) | undefined;
+let mockChat: { composerDisabled?: boolean; banner?: unknown } = {};
+let mockIgnored: string[] = [];
 
 type Listener = (event: Record<string, unknown>) => void;
 const mockListeners: Record<string, Set<Listener>> = {};
@@ -128,13 +130,18 @@ jest.mock('@/shared/ui/composed/chat', () => {
       messages,
       renderBubble,
       onSend,
+      composerDisabled,
+      banner,
     }: {
+      composerDisabled?: boolean;
+      banner?: unknown;
       messages: { id: string; isOwn: boolean; deliveryStatus?: string }[];
       renderBubble?: (args: Record<string, unknown>) => ReactNode;
       onSend: (text: string) => unknown;
     }) => {
       mockRows = messages;
       mockOnSend = onSend;
+      mockChat = { composerDisabled, banner };
       return React.createElement(
         React.Fragment,
         null,
@@ -170,9 +177,10 @@ jest.mock('@/shared/providers/NostrKeysProvider', () => ({
   useNostrKeysContext: () => ({ keys: null }),
 }));
 jest.mock('@/features/feed/stores/ignoreStore', () => {
-  const state = { ignoredPubkeys: [], dmFilterEnabled: false, dmFilterWords: [] };
-  const useFeedIgnoreStore = (selector: (s: typeof state) => unknown) => selector(state);
-  useFeedIgnoreStore.getState = () => state;
+  const state = () => ({ ignoredPubkeys: mockIgnored, dmFilterEnabled: false, dmFilterWords: [] });
+  const useFeedIgnoreStore = (selector: (s: ReturnType<typeof state>) => unknown) =>
+    selector(state());
+  useFeedIgnoreStore.getState = state;
   return { useFeedIgnoreStore };
 });
 jest.mock('@/shared/hooks/useThemeColor', () => ({
@@ -238,11 +246,18 @@ async function openChat() {
 const statuses = () => mockRows.map((m) => [m.id, m.isOwn, m.deliveryStatus]);
 
 beforeEach(() => {
+  // The Bluetooth DM watchdog runs on these; none of the tests reach 15 s.
+  jest.useFakeTimers();
   jest.clearAllMocks();
   for (const key of Object.keys(mockListeners)) delete mockListeners[key];
   jest.spyOn(AppState, 'addEventListener').mockReturnValue({ remove: jest.fn() });
   useBitchatDmMessagesStore.setState({ byPeer: {} });
   mockRows = [];
+  mockIgnored = [];
+});
+
+afterEach(() => {
+  jest.useRealTimers();
 });
 
 describe('delivery shown for each row', () => {
@@ -361,4 +376,34 @@ it('reopening the chat does not offer a retry for a message already retried', as
 
   expect(screen.queryByLabelText(RETRY)).toBeNull();
   expect(mockSendPrivate).toHaveBeenCalledTimes(1);
+});
+
+it('a blocked person’s geohash DM shows nothing, says how to unblock and sends nothing', async () => {
+  const NOSTR_PEER = 'e'.repeat(64);
+  mockIgnored = [NOSTR_PEER];
+  render(<GeohashChatScreen geohash={GEOHASH} transport="nostr-dm" dmPeerID={NOSTR_PEER} />);
+  await act(async () => undefined);
+  act(() => {
+    mockListeners.nostrPrivate?.forEach((fn) =>
+      fn({
+        id: 'p1',
+        content: 'hi',
+        sender: 'anon',
+        senderPubkey: NOSTR_PEER,
+        timestamp: 1,
+        isOwn: false,
+        geohash: GEOHASH,
+      })
+    );
+  });
+
+  expect(mockRows).toEqual([]);
+  expect(mockChat.composerDisabled).toBe(true);
+  expect((mockChat.banner as ReactElement<{ children: string }>).props.children).toBe(
+    'This person is blocked. Open “Block or report” to unblock them.'
+  );
+  await act(async () => {
+    await mockOnSend?.('hi');
+  });
+  expect(mockNative.sendGeohashPrivateMessage).not.toHaveBeenCalled();
 });
