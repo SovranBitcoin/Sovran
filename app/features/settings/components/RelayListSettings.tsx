@@ -232,13 +232,11 @@ export function RelayListSettings({
             {state.editor.savedProposal ? (
               <>
                 <Text>{copy.pending}</Text>
-                {
-                  <RelayButton
-                    id={'relay-use-saved'}
-                    label={copy.applySaved}
-                    onPress={() => change(state.editor.savedProposal ?? [])}
-                  />
-                }
+                <RelayButton
+                  id="relay-use-saved"
+                  label={copy.applySaved}
+                  onPress={() => change(state.editor.savedProposal ?? [])}
+                />
               </>
             ) : null}
             <TextField>
@@ -254,76 +252,65 @@ export function RelayListSettings({
                 onSubmitEditing={add}
               />
             </TextField>
-            {<RelayButton id={'relay-add'} label={copy.add} onPress={add} />}
-            {
-              <RelayButton
-                id={'restore-defaults'}
-                label={copy.defaults}
-                onPress={() => change(defaultEntries())}
-              />
-            }
-            {
-              <RelayButton
-                id={'relay-review'}
-                label={copy.review}
-                onPress={() => {
-                  if (!state.entries.some((entry) => entry.write)) {
-                    setError(copy.noWrite);
-                    return;
-                  }
-                  setState({
-                    kind: 'reviewing',
-                    editor: state.editor,
-                    review: state.editor.review(state.entries),
-                  });
-                }}
-              />
-            }
+            <RelayButton id="relay-add" label={copy.add} onPress={add} />
+            <RelayButton
+              id="restore-defaults"
+              label={copy.defaults}
+              onPress={() => change(defaultEntries())}
+            />
+            <RelayButton
+              id="relay-review"
+              label={copy.review}
+              onPress={() => {
+                if (!state.entries.some((entry) => entry.write)) {
+                  setError(copy.noWrite);
+                  return;
+                }
+                setState({
+                  kind: 'reviewing',
+                  editor: state.editor,
+                  review: state.editor.review(state.entries),
+                });
+              }}
+            />
           </>
         ) : null}
         {reviewing ? (
           <>
-            {
-              <RelayButton
-                id={'publish'}
-                label={state.kind === 'publishing' ? copy.publishing : copy.publish}
-                onPress={publish}
-                disabled={state.kind === 'publishing'}
-              />
-            }
-            {
-              <RelayButton
-                id={'relay-back'}
-                label={copy.back}
-                onPress={() =>
-                  setState({ kind: 'editing', editor: state.editor, entries: state.review.entries })
-                }
-                disabled={state.kind === 'publishing'}
-              />
-            }
+            <RelayButton
+              id="publish"
+              busy={state.kind === 'publishing'}
+              label={state.kind === 'publishing' ? copy.publishing : copy.publish}
+              onPress={publish}
+              disabled={state.kind === 'publishing'}
+            />
+            <RelayButton
+              id="relay-back"
+              label={copy.back}
+              onPress={() =>
+                setState({ kind: 'editing', editor: state.editor, entries: state.review.entries })
+              }
+              disabled={state.kind === 'publishing'}
+            />
           </>
         ) : null}
         {state.kind === 'idle' ? (
           <RelayButton
-            id={'relay-edit'}
+            id="relay-edit"
             label={copy.edit}
             onPress={() => start()}
             disabled={!ndk || !pubkey}
           />
         ) : (
           <RelayButton
-            id={'relay-cancel'}
+            id="relay-cancel"
             label={copy.cancel}
             onPress={reset}
             disabled={state.kind === 'publishing'}
           />
         )}
         {state.kind === 'waiting' ? (
-          <RelayButton
-            id={'relay-reload'}
-            label={copy.reload}
-            onPress={() => start(state.entries)}
-          />
+          <RelayButton id="relay-reload" label={copy.reload} onPress={() => start(state.entries)} />
         ) : null}
         {error ? <Text testID="settings-network-relay-error">{error}</Text> : null}
       </View>
@@ -376,11 +363,13 @@ function RelayButton({
   label,
   onPress,
   disabled = false,
+  busy = false,
 }: {
   id: string;
   label: string;
   onPress: () => void;
   disabled?: boolean;
+  busy?: boolean;
 }) {
   return (
     <Button
@@ -389,6 +378,7 @@ function RelayButton({
       text={label}
       variant="secondary"
       disabled={disabled}
+      loading={busy}
       onPress={onPress}
     />
   );

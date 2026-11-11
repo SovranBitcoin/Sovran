@@ -199,10 +199,22 @@ jest.mock('@/shared/ui/composed/Section', () => {
 });
 jest.mock('@/shared/ui/primitives/Text', () => ({ Text: jest.requireMock('react-native').Text }));
 jest.mock('@/shared/ui/primitives/Button', () => ({
-  Button: ({ text, ...props }: { text: string }) => {
+  Button: ({
+    text,
+    loading = false,
+    ...props
+  }: {
+    text: string;
+    loading?: boolean;
+    disabled?: boolean;
+  }) => {
     const { Pressable, Text } = jest.requireMock('react-native');
     return (
-      <Pressable accessible accessibilityRole="button" {...props}>
+      <Pressable
+        accessible
+        accessibilityRole="button"
+        {...props}
+        accessibilityState={{ disabled: props.disabled || loading, busy: loading }}>
         <Text>{text}</Text>
       </Pressable>
     );
@@ -410,6 +422,7 @@ it('drops repeated publish taps while one publication is in progress', async () 
   fireEvent.press(screen.getByRole('button', { name: 'Review changes' }));
   const button = screen.getByRole('button', { name: 'Publish relay list' });
   fireEvent.press(button);
+  expect(screen.getByRole('button', { name: 'Publishing…', busy: true })).toBeOnTheScreen();
   fireEvent.press(button);
   expect(await screen.findByText(/^Published to /)).toBeOnTheScreen();
   expect(mockPublish).toHaveBeenCalledTimes(1);

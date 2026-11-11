@@ -556,3 +556,15 @@ it('does not mark discovery for an account switched by a saved-list subscriber',
     unsubscribe();
   }
 });
+
+it('dates replacements after both the saved timestamp and the newest remote event', async () => {
+  useRelayListStore.setState({ updatedAt: NOW_SEC + 600 });
+  const first = await edit();
+  await first.review([mine]).publish();
+  expect(sent().event.created_at).toBe(NOW_SEC + 601);
+  mockPublish.mockClear();
+  mockHeld.set(MINE, [remote([['r', MINE]], 'c', NOW_SEC + 900)]);
+  const next = await edit();
+  await next.review([mine]).publish();
+  expect(sent().event.created_at).toBe(NOW_SEC + 901);
+});
