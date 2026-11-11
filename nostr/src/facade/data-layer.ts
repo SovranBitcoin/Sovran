@@ -7,6 +7,7 @@ import {
   resolveAllTiers,
   auditAcrossTiers,
   applyOrderingManifest,
+  tierRank,
   type ReadProvenance,
   type TierAggregate,
   type TierCandidate,
@@ -654,12 +655,6 @@ const AGGREGATE_CAP_MS = {
   socialGraph: 800,
   noteStats: 800,
 } as const;
-
-const TIER_RANK_ORDER: readonly NostrTier[] = ['nagg', 'primal', 'relay', 'cache'];
-function tierRank(tier: NostrTier): number {
-  const index = TIER_RANK_ORDER.indexOf(tier);
-  return index < 0 ? TIER_RANK_ORDER.length : index;
-}
 
 function provenanceOf<T>(readId: string, agg: TierAggregate<T>): ReadProvenance {
   return {
