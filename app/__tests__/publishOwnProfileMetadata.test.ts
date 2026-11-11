@@ -645,9 +645,9 @@ it('returns waiting after bounded alternating relay timeouts without publishing 
     else subscription.emit('event', kind0('c'.repeat(64), 20, { about: 'partial' }));
   });
   let settled = false;
-  const pending = publish(ndk).then((result) => {
+  const pending = publish(ndk);
+  void pending.then(() => {
     settled = true;
-    return result;
   });
   await jest.advanceTimersByTimeAsync(48_001);
   const bounded = settled;
