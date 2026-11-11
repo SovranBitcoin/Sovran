@@ -8,18 +8,9 @@ import { z } from 'zod';
 // envelope module (`src/envelope.ts`). The v1 per-route response schemas
 // (feed page / thread / notifications page / note stats / enrichment / DM
 // connections / follow-status / own-profiles / posts / wallpapers) are GONE:
-// what remains here are the primitives shared across modules (the raw event,
-// the friendly metrics/profile shapes and the ordering manifest mirror).
+// what remains here are the primitives shared across modules (the raw event
+// and the friendly metrics/profile shapes).
 // ---------------------------------------------------------------------------
-
-// Local mirror of the shared @sovranbitcoin/schemas OrderingManifest. Defined in
-// nagg-ts's own zod (not imported as a value) so composing it into local schemas
-// keeps the inferred types portable — the symlinked shared package carries its
-// own zod copy, and mixing the two breaks type emission.
-export const NaggOrderingSchema = z.object({
-  orderBy: z.enum(['rank', 'created_at', 'arrival']),
-  elements: z.array(z.string().max(512)).max(5000),
-});
 
 /**
  * An event id or a public key on the wire: 32 bytes as lowercase hex (NIP-01).
@@ -87,11 +78,3 @@ export const NaggProfileInfoSchema = z
     picture: z.string().max(2048).optional().catch(undefined),
   })
   .passthrough();
-
-export type NaggFeedEventShape = z.infer<typeof NaggFeedEventSchema>;
-export type NaggNoteMetricsShape = z.infer<typeof NaggNoteMetricsSchema>;
-export type NaggProfileInfoShape = z.infer<typeof NaggProfileInfoSchema>;
-
-/** Per-id friendly metrics map (v1's note-stats shape, now derived from
- *  `POST /nostr/events/aggregates` via `noteStatsFromEnvelope`). */
-export type NaggNoteStats = Record<string, NaggNoteMetricsShape>;
