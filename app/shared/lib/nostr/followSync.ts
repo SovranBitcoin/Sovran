@@ -17,6 +17,7 @@
 import type NDK from '@nostr-dev-kit/ndk-mobile';
 import { NDKEvent } from '@nostr-dev-kit/ndk-mobile';
 import { Contacts } from 'nostr-tools/kinds';
+import type { facade } from 'nostr';
 import { z } from 'zod';
 
 import { nostrLog } from '@/shared/lib/logger';
@@ -80,8 +81,9 @@ export function applyFollowIntents(tags: string[][], intents: FollowIntents): st
  * the list the store knows (after a complete read's list was saved). Both a
  * publish and settling a tap the list already holds stand only on the list a
  * complete read returned. Known-empty needs every write relay to have
- * answered with no list, nothing loaded for the account from anywhere, and
- * the indexers to agree.
+ * answered with no list, no list or seed ever loaded for the account, and
+ * every enabled indexer settled without a list and without failing
+ * (`askIndexers`).
  */
 export function planFollowPublish(input: {
   intents: FollowIntents;
@@ -137,26 +139,46 @@ function decodeRead(read: { outcome: OwnEventReadOutcome; newest: unknown }): Li
   return { status: 'found', list: { tags, content, createdAt: created_at } };
 }
 
-/** Ask the tiered facade whether the account has a follow list somewhere. */
+/**
+ * Ask the tiered facade whether the account has a follow list somewhere, once
+ * every enabled source has settled. No source can prove there is none (nagg
+ * answers "not served" for a list it lacks, the relay tier settles on a
+ * majority of its relays), so this only holds a first follow back: `exists`
+ * when any source returned a list, `unanswered` when one failed or the
+ * answer says nothing about which sources settled, otherwise `none`.
+ */
 async function askIndexers(pubkey: string): Promise<{ indexed: IndexedList; seed?: () => void }> {
   const layer = buildNostrDataLayer();
   // No indexer is enabled: the write relays were every source there is.
   if (!layer) return { indexed: 'none' };
-  const result = await layer.getSocialGraph({ pubkey, refresh: true });
-  return result.match(
-    (graph) =>
-      graph.contactsUpdatedAt > 0
-        ? {
-            indexed: 'exists' as const,
-            seed: () =>
-              useNostrSocialStore.getState().seedFollowsFromFacade({
-                follows: graph.follows,
-                createdAtSec: graph.contactsUpdatedAt,
-              }),
-          }
-        : { indexed: 'none' as const },
-    () => ({ indexed: 'unanswered' as const })
-  );
+  // The aggregate resolves at its first paint; the last update says every source settled.
+  let settle: (graph: facade.ResolvedSocialGraph) => void = () => undefined;
+  const settled = new Promise<facade.ResolvedSocialGraph>((resolve) => (settle = resolve));
+  const result = await layer.getSocialGraph({
+    pubkey,
+    refresh: true,
+    onUpdate: (update) => {
+      if (update.provenance?.complete) settle(update);
+    },
+  });
+  if (result.isErr()) {
+    const { attempts } = result.error;
+    const noneServed =
+      attempts.length > 0 && attempts.every((attempt) => attempt.outcome === 'unsupported');
+    return { indexed: noneServed ? 'none' : 'unanswered' };
+  }
+  if (!result.value.provenance) return { indexed: 'unanswered' };
+  const graph = result.value.provenance.complete ? result.value : await settled;
+  if (graph.contactsUpdatedAt > 0)
+    return {
+      indexed: 'exists',
+      seed: () =>
+        useNostrSocialStore.getState().seedFollowsFromFacade({
+          follows: graph.follows,
+          createdAtSec: graph.contactsUpdatedAt,
+        }),
+    };
+  return { indexed: graph.provenance?.degraded === false ? 'none' : 'unanswered' };
 }
 
 /** One pass for one account, with the account and its signer pinned across every wait. */

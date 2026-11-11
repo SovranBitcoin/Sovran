@@ -608,22 +608,91 @@ describe('following someone', () => {
 });
 
 describe('an account with no follow list yet', () => {
+  /** How the facade's aggregate read reports which sources have answered. */
+  const provenance = (overrides: object = {}) => ({
+    readId: 'r',
+    sources: ['relay'],
+    attempts: [],
+    degraded: false,
+    complete: true,
+    ...overrides,
+  });
+  const graph = (follows: string[], contactsUpdatedAt: number, overrides: object = {}) => ({
+    tier: 'relay',
+    follows,
+    contactsUpdatedAt,
+    provenance: provenance(overrides),
+  });
+
   it('publishes the first follow once every write relay and the indexers say there is none', async () => {
     relaysHold();
-    mockLayer = { getSocialGraph: jest.fn(async () => ok({ follows: [], contactsUpdatedAt: 0 })) };
+    mockLayer = { getSocialGraph: jest.fn(async () => ok(graph([], 0))) };
     const { ndk } = setup();
 
     tap(Z);
     await requestFollowSync(ndk, OWN);
 
     expect(publishedTags()).toEqual([['p', Z]]);
-    expect(mockLayer.getSocialGraph).toHaveBeenCalledWith({ pubkey: OWN, refresh: true });
+    expect(mockLayer.getSocialGraph).toHaveBeenCalledWith(
+      expect.objectContaining({ pubkey: OWN, refresh: true })
+    );
+  });
+
+  it('publishes the first follow when no indexer is enabled and every write relay has none', async () => {
+    relaysHold();
+    mockLayer = null;
+    const { ndk } = setup();
+
+    tap(Z);
+    await requestFollowSync(ndk, OWN);
+
+    expect(publishedTags()).toEqual([['p', Z]]);
+  });
+
+  it('publishes the first follow when every indexer says it has no list to serve', async () => {
+    relaysHold();
+    mockLayer = {
+      getSocialGraph: jest.fn(async () =>
+        err({
+          type: 'all_tiers_exhausted',
+          attempts: [
+            { tier: 'nagg', outcome: 'unsupported' },
+            { tier: 'primal', outcome: 'unsupported' },
+          ],
+        })
+      ),
+    };
+    const { ndk } = setup();
+
+    tap(Z);
+    await requestFollowSync(ndk, OWN);
+
+    expect(publishedTags()).toEqual([['p', Z]]);
   });
 
   it('waits when an indexer knows a list the relays did not return', async () => {
     relaysHold();
+    mockLayer = { getSocialGraph: jest.fn(async () => ok(graph([X, Y], T))) };
+    const { ndk } = setup();
+
+    tap(Z);
+    await requestFollowSync(ndk, OWN);
+
+    expect(mockPublish).not.toHaveBeenCalled();
+    expect(social().optimisticFollowsByPubkey[Z]?.pending).toBe(true);
+    expect(social().followingPubkeys).toEqual({ [X]: true, [Y]: true });
+  });
+
+  it('waits for an indexer still answering, and for the list it then returns', async () => {
+    relaysHold();
     mockLayer = {
-      getSocialGraph: jest.fn(async () => ok({ follows: [X, Y], contactsUpdatedAt: T })),
+      getSocialGraph: jest.fn(async ({ onUpdate }: { onUpdate?: (graph: object) => void }) => {
+        // The first paint: the relay floor answered empty, Primal is pending.
+        setTimeout(() =>
+          onUpdate?.(graph([X, Y], T, { sources: ['relay', 'primal'], complete: true }))
+        );
+        return ok(graph([], 0, { complete: false, pending: ['primal'] }));
+      }),
     };
     const { ndk } = setup();
 
@@ -635,9 +704,40 @@ describe('an account with no follow list yet', () => {
     expect(social().followingPubkeys).toEqual({ [X]: true, [Y]: true });
   });
 
+  it('waits when an indexer failed to answer', async () => {
+    relaysHold();
+    mockLayer = {
+      getSocialGraph: jest.fn(async () =>
+        ok(
+          graph([], 0, {
+            degraded: true,
+            attempts: [{ tier: 'primal', outcome: 'failed' }],
+          })
+        )
+      ),
+    };
+    const { ndk } = setup();
+
+    tap(Z);
+    await requestFollowSync(ndk, OWN);
+
+    expect(mockPublish).not.toHaveBeenCalled();
+    expect(social().optimisticFollowsByPubkey[Z]?.pending).toBe(true);
+  });
+
   it('waits when the indexers do not answer', async () => {
     relaysHold();
-    mockLayer = { getSocialGraph: jest.fn(async () => err({ attempts: [] })) };
+    mockLayer = {
+      getSocialGraph: jest.fn(async () =>
+        err({
+          type: 'all_tiers_exhausted',
+          attempts: [
+            { tier: 'nagg', outcome: 'unsupported' },
+            { tier: 'primal', outcome: 'failed' },
+          ],
+        })
+      ),
+    };
     const { ndk } = setup();
 
     tap(Z);
