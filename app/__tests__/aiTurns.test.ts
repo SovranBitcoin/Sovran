@@ -4,7 +4,7 @@
  */
 import { nextTurn, readAnswer, type Turn } from '@/features/ai/lib/turns';
 
-const error = { id: 'unknown' as const, text: 'x' };
+const error = { id: 'routstr.interrupted' as const, text: 'x' };
 const asking: Turn = { phase: 'asking', startedAtMs: 5 };
 const streaming: Turn = { phase: 'streaming', startedAtMs: 5, text: 'hi', reasoning: '' };
 
