@@ -63,7 +63,8 @@ function statusOf(state: SwapGroup['state'], legs: SwapLeg[]) {
 
 it.each([
   ['a running group', 'running', [leg('done')], ['Pending', 'foreground']],
-  ['a failed leg in a running group', 'running', [leg('failed')], ['Failed', 'danger']],
+  // A running group may still start or settle a leg: it is not over, so not failed.
+  ['a failed leg in a running group', 'running', [leg('failed')], ['Pending', 'foreground']],
   ['a finished group', 'finished', [leg('done')], ['Completed', 'success']],
   [
     'a finished group with a failed leg',
@@ -85,6 +86,12 @@ it.each([
   ],
   ['a cancelled group', 'cancelled', [leg('done')], ['Completed', 'success']],
   [
+    'a cancelled group with a failed leg',
+    'cancelled',
+    [leg('done'), leg('failed')],
+    ['Failed', 'danger'],
+  ],
+  [
     'a cancelled group with a leg that never ran',
     'cancelled',
     [leg('pending')],
@@ -101,6 +108,20 @@ it.each([
 });
 
 describe('a leg whose melt or mint can still complete keeps the swap pending, however the group was saved', () => {
+  it.each([
+    ['settling', leg('settling')],
+    ['paymentPending', leg('paymentPending')],
+    ['melting', leg('melting', { meltOperationId: 'melt-op' })],
+  ])('beside a failed leg: %s', (_name, moving) => {
+    for (const state of ['running', 'finished', 'cancelled'] as const) {
+      expect([state, statusOf(state, [leg('failed', { id: 'leg-f' }), moving])]).toEqual([
+        state,
+        ['Pending', 'foreground'],
+      ]);
+    }
+  });
+
+
   it.each([
     ['melting', leg('melting', { meltOperationId: 'melt-op' })],
     ['verifying', leg('verifying', { meltOperationId: 'melt-op' })],

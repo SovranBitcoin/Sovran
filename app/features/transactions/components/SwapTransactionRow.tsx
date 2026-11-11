@@ -22,12 +22,12 @@ export const SwapTransactionRow = React.memo(({ group }: Props) => {
   const [foreground, danger, success] = useThemeColor(['foreground', 'danger', 'success'] as const);
 
   const aggregate = useMemo(() => {
-    const anyFailed = group.legs.some((l) => l.localStatus === 'failed');
-    if (anyFailed) return { text: 'Failed', color: danger };
     const outcome = swapGroupOutcome(group);
     switch (outcome) {
       case 'inProgress':
         return { text: 'Pending', color: withAlpha(foreground, 0.5) };
+      case 'failed':
+        return { text: 'Failed', color: danger };
       case 'finished':
       case 'cancelled':
         return { text: 'Completed', color: success };

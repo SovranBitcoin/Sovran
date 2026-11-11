@@ -80,11 +80,18 @@ export function legMoneyMayMove(leg: Pick<SwapLeg, 'localStatus' | 'meltOperatio
 }
 
 /**
- * What a saved group shows the person: `inProgress` while a run owns it, it
- * was interrupted, or any leg's money may still move, whatever the group was
- * saved as. A run that ended (an abort, Cancel) can leave a leg mid-payment.
+ * What a saved group shows the person, in this order:
+ *
+ * - `inProgress` while a run owns it, it was interrupted, or any leg's money
+ *   may still move, whatever the group was saved as. A run that ended (an
+ *   abort, Cancel) can leave a leg mid-payment, and one failed leg says nothing
+ *   about another that is still moving.
+ * - `failed` once nothing can still move and a leg failed.
+ * - Otherwise how the run ended: `finished` or `cancelled`.
+ *
+ * The history row and the detail screen both read this, so they agree.
  */
-export type SwapGroupOutcome = 'inProgress' | 'finished' | 'cancelled';
+export type SwapGroupOutcome = 'inProgress' | 'failed' | 'finished' | 'cancelled';
 
 export function swapGroupOutcome(
   group: Pick<SwapGroup, 'id' | 'state' | 'legs'>
@@ -97,7 +104,7 @@ export function swapGroupOutcome(
       return 'inProgress';
     case 'finished':
     case 'cancelled':
-      return phase;
+      return group.legs.some((leg) => leg.localStatus === 'failed') ? 'failed' : phase;
     default: {
       const exhaustive: never = phase;
       return exhaustive;

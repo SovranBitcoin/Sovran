@@ -207,6 +207,8 @@ function statusLabel(outcome: SwapGroupOutcome): string {
   switch (outcome) {
     case 'inProgress':
       return 'Running';
+    case 'failed':
+      return 'Failed';
     case 'finished':
       return 'Complete';
     case 'cancelled':
@@ -348,8 +350,10 @@ export function SwapTransactionScreen({ groupId }: Props) {
     }
 
     // Don't compute fees until mint history is loaded — otherwise received=0
-    // makes it look like everything was lost to fees.
-    const ready = hasMintHistory || swapGroupOutcome(group) === 'cancelled';
+    // makes it look like everything was lost to fees. A run that was stopped
+    // with nothing still moving may never load any.
+    const ready =
+      hasMintHistory || (group.state === 'cancelled' && swapGroupOutcome(group) !== 'inProgress');
 
     return {
       totalReceived: received,
@@ -381,8 +385,7 @@ export function SwapTransactionScreen({ groupId }: Props) {
   });
 
   const unit = group.unit || 'sat';
-  const isFailed = outcome === 'cancelled';
-  const headerColor = isFailed ? danger : success;
+  const headerColor = outcome === 'cancelled' || outcome === 'failed' ? danger : success;
   const fiatAmount = formatAmount(
     { amount: totalReceived || totalSent, unit },
     {

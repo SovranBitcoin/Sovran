@@ -86,7 +86,7 @@ jest.mock('expo-haptics', () => ({
 }));
 jest.mock('@/shared/hooks/useThemeColor', () => ({
   useThemeColor: (token: string | readonly string[]) =>
-    typeof token === 'string' ? 'c' : token.map(() => 'c'),
+    typeof token === 'string' ? token : [...token],
 }));
 jest.mock('@/shared/lib/color', () => ({
   ...jest.requireActual('@/shared/lib/color'),
@@ -299,7 +299,8 @@ describe('a swap with a failed leg', () => {
     await render();
 
     // The failed leg never melted: only the 10 the first leg cost is a fee.
-    expect(details()).toMatchObject({ Status: 'Cancelled', Steps: '2', 'Total Fees': '10 sat' });
+    expect(details()).toMatchObject({ Status: 'Failed', Steps: '2', 'Total Fees': '10 sat' });
+    expect(header()).toMatchObject({ color: 'danger' });
     expect(header()).toMatchObject({ amount: 990 });
 
     await expand();
@@ -325,6 +326,36 @@ describe('a swap with a failed leg', () => {
 
     // Money arrived for the failed leg, so it was sent: 1500 out, 1480 in.
     expect(details()).toMatchObject({ 'Total Fees': '20 sat' });
+  });
+
+  it('a finished group with a failed leg reads Failed, as its history row does', async () => {
+    seedGroup({
+      legs: [
+        leg('l1', { amount: 1000, meltQuoteId: 'melt1', mintQuoteId: 'mint1' }),
+        leg('l2', { amount: 500, localStatus: 'failed' }),
+      ],
+    });
+    mockHistory = [historyEntry('melt', 'melt1', -1000), historyEntry('mint', 'mint1', 990)];
+
+    await render();
+
+    expect(details()).toMatchObject({ Status: 'Failed', 'Total Fees': '10 sat' });
+    expect(header()).toMatchObject({ color: 'danger' });
+  });
+
+  it('a failed leg beside one still settling reads Running, as its history row does', async () => {
+    seedGroup({
+      legs: [
+        leg('l1', { amount: 500, localStatus: 'failed' }),
+        leg('l2', { amount: 700, localStatus: 'settling', meltQuoteId: 'melt2' }),
+      ],
+    });
+    mockHistory = [historyEntry('melt', 'melt2', -710)];
+
+    await render();
+
+    expect(details()).toMatchObject({ Status: 'Running' });
+    expect(details()).not.toHaveProperty('Total Fees');
   });
 
   it('a group still saved as running reads Running', async () => {
@@ -368,7 +399,7 @@ describe('a swap with a failed leg', () => {
     await render();
 
     // Nothing was sent, so nothing was lost to fees; the header keeps the amount asked for.
-    expect(details()).toMatchObject({ Status: 'Cancelled' });
+    expect(details()).toMatchObject({ Status: 'Failed' });
     expect(details()).not.toHaveProperty('Total Fees');
     expect(header()).toMatchObject({ amount: 700 });
   });
