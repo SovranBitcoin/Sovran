@@ -31,7 +31,7 @@
  */
 
 import type { RoutstrModel } from '@/shared/lib/routstr/api';
-import { E2EE_PROVIDER_ID } from '@/shared/lib/routstr/lineup';
+import { E2EE_PROVIDER_ID, emptyLineup, type LineupEntry } from '@/shared/lib/routstr/lineup';
 
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
 
@@ -227,5 +227,33 @@ describe('the tier a user picks is validated against the vendor, not the names',
       .getState()
       .setSelectedSlot({ provider: 'openai', tier: 'turbo' as unknown as 'auto' });
     expect(useRoutstrStore.getState().selectedTier).toBe('auto');
+  });
+});
+
+describe('a picked vendor is checked against the lineup a send reads', () => {
+  const qwenOnly = () => {
+    const lineup = emptyLineup();
+    const model: LineupEntry = {
+      modelId: 'qwen3',
+      displayName: 'Qwen 3',
+      contextLength: 128_000,
+      created: 1,
+      visionInput: false,
+      satsPricing: { prompt: null, completion: null, request: null, image: null, max_cost: 10 },
+    };
+    lineup.qwen = { auto: model, pro: null, max: null };
+    return { derivedAt: 1, nodeBaseUrl: null, lineup };
+  };
+
+  it('takes a vendor only the saved lineup offers while this session has none', () => {
+    useRoutstrStore.setState({ lineup: null, lastKnownLineup: qwenOnly() });
+    useRoutstrStore.getState().setSelectedSlot({ provider: 'qwen', tier: 'auto' });
+    expect(useRoutstrStore.getState().selectedProvider).toBe('qwen');
+  });
+
+  it('refuses it when this session derived an empty lineup', () => {
+    useRoutstrStore.setState({ lineup: emptyLineup(), lastKnownLineup: qwenOnly() });
+    useRoutstrStore.getState().setSelectedSlot({ provider: 'qwen', tier: 'auto' });
+    expect(useRoutstrStore.getState().selectedProvider).toBe('openai');
   });
 });
