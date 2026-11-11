@@ -53,7 +53,7 @@ export function relayListRelays(pubkey: string): string[] | null {
   return normalizeRelayList([...getOwnWriteRelays(), ...DEFAULT_RELAYS, ...asked]);
 }
 
-export type RelayListPublishError =
+type RelayListPublishError =
   /** Not a list to publish: it has no relay to write to. */
   | { type: 'no-write-relay' }
   /** The relays could not all be read; nothing was sent. */
