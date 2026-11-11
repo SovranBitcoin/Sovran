@@ -822,6 +822,20 @@ export function createPaymentMachine(
       unit: flowCtx.unit,
     });
 
+    // A settled preview has no mint left to choose. Opening the selector from
+    // it would replace the step data that says it settled, and the restore
+    // below would then rebuild an unpaid preview that Pay runs a second time.
+    if (
+      event.type === "REQUEST_MINT_SELECTOR" &&
+      (step === "navigateToMeltPreview" ||
+        step === "navigateToPaymentRequest") &&
+      (stepData as StepDataMap["navigateToMeltPreview"]).historyEntry
+    ) {
+      logger.warn("machine.mintSelector.alreadySettled", { currentStep: step });
+      sendLocked = false;
+      return;
+    }
+
     // Handle CONFIRM_MELT/CONFIRM_PAYMENT_REQUEST directly — these bypass transition().
     // On success: stepData is updated with historyEntry but step stays unchanged
     //   (the user is already on the screen — no re-navigation needed).
@@ -1130,17 +1144,13 @@ export function createPaymentMachine(
           error: errField(effect.error.cause),
         });
         const cause = effect.error.cause;
+        const undelivered = cause instanceof PaymentRequestUndeliveredError;
         settle(
-          cause instanceof PaymentRequestUndeliveredError
+          undelivered
             ? { kind: "undelivered", operationId: cause.operationId }
             : { kind: "failed" },
         );
-        routeOperationFailure(
-          effect.error.cause,
-          "paymentRequest",
-          data.paymentRequest,
-          data,
-        );
+        routeOperationFailure(cause, "paymentRequest", data.paymentRequest, data);
       }
 
       if (isStaleGeneration(sendGeneration, "executePaymentRequest.finalize"))

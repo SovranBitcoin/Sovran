@@ -581,6 +581,19 @@ describe('lightning melt — Pay after the melt settled', () => {
     tm.assertStep('navigateToMeltPreview');
   });
 
+  it('does not pay again when the mint list is opened and closed after a successful melt', async () => {
+    const tm = createTestMachine();
+    await tm.machine.execute(INPUTS.lightningAddress, { reset: true });
+    await tm.machine.enterAmount({ value: 200, unit: 'sat' }, MINT1);
+    await tm.machine.confirmMelt();
+
+    await tm.machine.requestMintSelector();
+    await tm.machine.confirmMelt();
+
+    expect(tm.operationCalls.filter((c) => c.name === 'executeMelt')).toHaveLength(1);
+    tm.assertStep('navigateToMeltPreview');
+  });
+
   it('pays again when Pay is tapped after a failed attempt', async () => {
     let attempts = 0;
     const tm = createTestMachine({

@@ -311,6 +311,18 @@ describe('payment request — confirm after delivery', () => {
     tm.assertStep('navigateToPaymentRequest');
   });
 
+  it('does not send again when the mint list is opened and closed after a delivered send', async () => {
+    const tm = createTestMachine();
+    await tm.machine.execute(INPUTS.paymentRequestBasic, { reset: true });
+    expect((await tm.machine.confirmPaymentRequest()).kind).toBe('delivered');
+
+    await tm.machine.requestMintSelector();
+    expect((await tm.machine.confirmPaymentRequest()).kind).toBe('ignored');
+
+    expect(tm.operationCalls.filter((c) => c.name === 'executePaymentRequest')).toHaveLength(1);
+    tm.assertStep('navigateToPaymentRequest');
+  });
+
   it('sends again when confirm is tapped after a failed attempt', async () => {
     let attempts = 0;
     const tm = createTestMachine({
