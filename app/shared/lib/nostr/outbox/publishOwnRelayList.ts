@@ -32,11 +32,22 @@ import {
 import { captureActiveProfile } from '@/shared/stores/global/profileStore';
 
 /** The relays this session's discovery for the account has asked, while it runs. */
-let discovery: { pubkey: string; asked: ReadonlySet<string> } | null = null;
+let discovery: {
+  pubkey: string;
+  asked: ReadonlySet<string>;
+  learned: ReadonlySet<string>;
+} | null = null;
 
-/** Discovery for `pubkey` has asked `asked` (it only grows). Returns the undo. */
-export function trackRelaysAsked(pubkey: string, asked: ReadonlySet<string>): () => void {
-  discovery = { pubkey, asked };
+/**
+ * Track discovery's queried relays and separately its learned write relays.
+ * Learned means eligible for the next edit's read, never already queried.
+ */
+export function trackRelaysAsked(
+  pubkey: string,
+  asked: ReadonlySet<string>,
+  learned: ReadonlySet<string> = new Set()
+): () => void {
+  discovery = { pubkey, asked, learned };
   return () => {
     if (discovery?.asked === asked) discovery = null;
   };
@@ -44,13 +55,18 @@ export function trackRelaysAsked(pubkey: string, asked: ReadonlySet<string>): ()
 
 /**
  * Where the account's relay list is read: its saved write relays, the
- * defaults and every relay this session's discovery asked. A store that has
+ * defaults and every relay this session's discovery asked or learned. A store that has
  * not loaded has no saved relays to name, so nothing is read yet.
  */
 export function relayListRelays(pubkey: string): string[] | null {
   if (!useRelayListStore.persist.hasHydrated()) return null;
-  const asked = discovery?.pubkey === pubkey ? discovery.asked : [];
-  return normalizeRelayList([...getOwnWriteRelays(), ...DEFAULT_RELAYS, ...asked]);
+  const tracked = discovery?.pubkey === pubkey ? discovery : null;
+  return normalizeRelayList([
+    ...getOwnWriteRelays(),
+    ...DEFAULT_RELAYS,
+    ...(tracked?.asked ?? []),
+    ...(tracked?.learned ?? []),
+  ]);
 }
 
 type RelayListPublishError =
@@ -78,13 +94,22 @@ export async function publishOwnRelayList(
 ): Promise<Result<{ accepted: number }, RelayListPublishError>> {
   if (!entries.some((entry) => entry.write)) return err({ type: 'no-write-relay' });
   const scope = captureActiveProfile(pubkey);
+  const held = useRelayListStore.getState().entries;
+  const updatedAt = useRelayListStore.getState().updatedAt;
+  // Capture old and proposed destinations before signer lookup can yield to an edit.
+  const destinations = relayListRelays(pubkey);
+  const wanted = () =>
+    (options.read !== undefined || entries === held) &&
+    useRelayListStore.getState().entries === held &&
+    useRelayListStore.getState().updatedAt === updatedAt &&
+    (options.stillWanted?.() ?? true);
   try {
     const signer = await matchingSigner(ndk, pubkey);
     scope.check();
-    const held = useRelayListStore.getState().entries;
-    const read =
-      options.read ?? (await readForEdit(ndk, pubkey, RELAY_LIST_KIND, relayListRelays(pubkey)));
+    if (!wanted()) return err({ type: 'waiting' });
+    const read = options.read ?? (await readForEdit(ndk, pubkey, RELAY_LIST_KIND, destinations));
     scope.check();
+    if (!wanted() || ndk.signer !== signer) return err({ type: 'waiting' });
     if (read.status === 'waiting') {
       nostrLog.info('nostr.relays.publish_waiting', { reason: read.reason });
       return err({ type: 'waiting' });
@@ -93,17 +118,19 @@ export async function publishOwnRelayList(
       kind: RELAY_LIST_KIND,
       pubkey,
       // After the newest list the relays hold and the one saved here.
-      replaces: Math.max(useRelayListStore.getState().updatedAt, read.newest?.created_at ?? 0),
+      replaces: Math.max(updatedAt, read.newest?.created_at ?? 0),
       tags: serializeRelayList(entries),
       content: '',
     });
+    scope.check();
+    if (!wanted() || ndk.signer !== signer) return err({ type: 'waiting' });
     const published = await publishToRelaysRead(ndk, event, read.relays);
     scope.check();
+    if (ndk.signer !== signer) return err({ type: 'failed' });
     if (published.isErr()) return err({ type: 'failed', cause: published.error });
     const accepted = published.value.accepted.length;
     nostrLog.info('nostr.relays.published', { accepted, relays: read.relays.length });
-    if (useRelayListStore.getState().entries === held && (options.stillWanted?.() ?? true))
-      useRelayListStore.getState().markPublished(event.created_at, [...entries]);
+    if (wanted()) useRelayListStore.getState().markPublished(event.created_at, [...entries]);
     return ok({ accepted });
   } catch (cause) {
     nostrLog.warn('nostr.relays.publish_failed', {

@@ -55,10 +55,12 @@ async function syncOwnRelayList(
   ndk: NDK,
   pubkey: string,
   asked: Set<string>,
+  learned: Set<string>,
   isCancelled: () => boolean
 ): Promise<'discovered' | 'unanswered'> {
   try {
     let read: Awaited<ReturnType<typeof readNewestOwnEvent>>;
+    let attempts = 0;
     do {
       const current = relayListRelays(pubkey);
       if (!current) return 'unanswered';
@@ -67,11 +69,13 @@ async function syncOwnRelayList(
         relays: [...asked],
         leaveOutSilent: true,
       });
+      attempts++;
       if (isCancelled()) return 'unanswered';
 
       if (read.newest) {
         // A list any relay returned is taken in, even before the others answered.
         const entries = parseRelayList({ tags: read.newest.tags });
+        for (const entry of entries) if (entry.write) learned.add(entry.url);
         useRelayListStore.getState().setFromRelay(entries, read.newest.created_at ?? 0);
         seedPool(
           ndk,
@@ -79,7 +83,7 @@ async function syncOwnRelayList(
         );
       }
       // A relay that stays silent is read without after a few reads in a row.
-    } while (worthReadingAgain(read));
+    } while (worthReadingAgain(read, attempts));
     const { newest } = read;
     // Only every relay's answer, but those left out as silent, makes the list
     // known, or says there is none.
@@ -125,10 +129,11 @@ export function useOwnRelayListSync(pubkey: string | undefined, enabled: boolean
     let cancelled = false;
     let phase: 'waiting' | 'reading' | 'unanswered' | 'discovered' = 'waiting';
     const asked = new Set<string>();
-    const untrack = trackRelaysAsked(pubkey, asked);
+    const learned = new Set<string>();
+    const untrack = trackRelaysAsked(pubkey, asked, learned);
     const run = async () => {
       phase = 'reading';
-      phase = await syncOwnRelayList(ndk, pubkey, asked, () => cancelled);
+      phase = await syncOwnRelayList(ndk, pubkey, asked, learned, () => cancelled);
     };
     const again = () => {
       if (!cancelled && phase === 'unanswered') void run();

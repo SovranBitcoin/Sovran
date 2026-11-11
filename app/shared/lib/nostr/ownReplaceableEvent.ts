@@ -101,8 +101,9 @@ type OwnEventRead = {
  */
 export const SILENT_READS_BEFORE_LEFT_OUT = 3;
 
-/** Per relay, this session: reads in a row it did not answer, and when the last one was counted. */
-const silence = new Map<string, { reads: number; countedAt: number }>();
+/** Logical ordering includes starts and answers, independent of clock precision. */
+let readOrder = 0;
+const silence = new Map<string, { reads: number; settledOrder: number }>();
 
 const silentReads = (url: string) => silence.get(url)?.reads ?? 0;
 const isLeftOut = (url: string) => silentReads(url) >= SILENT_READS_BEFORE_LEFT_OUT;
@@ -110,19 +111,19 @@ const isLeftOut = (url: string) => silentReads(url) >= SILENT_READS_BEFORE_LEFT_
 /** The relay answered (also "I hold nothing"): it is read and written again. */
 function heardFrom(url: string) {
   if (isLeftOut(url)) nostrLog.info('nostr.relays.answering_again', { relay: url });
-  silence.delete(url);
+  silence.set(url, { reads: 0, settledOrder: ++readOrder });
 }
 
 /**
- * A read that began at `startedAt` ended without the relay's answer. One that
+ * A read that began at `startedOrder` ended without the relay's answer. One that
  * overlapped a read already counted adds nothing: reads at the same moment
  * are one outage, not several reads in a row.
  */
-function notHeardFrom(url: string, startedAt: number) {
+function notHeardFrom(url: string, startedOrder: number) {
   const last = silence.get(url);
-  if (last && last.countedAt > startedAt) return;
+  if (last && last.settledOrder > startedOrder) return;
   const reads = (last?.reads ?? 0) + 1;
-  silence.set(url, { reads, countedAt: Date.now() });
+  silence.set(url, { reads, settledOrder: ++readOrder });
   if (reads === SILENT_READS_BEFORE_LEFT_OUT)
     nostrLog.warn('nostr.relays.left_out', { relay: url, silentReads: reads });
 }
@@ -135,9 +136,12 @@ export function forgetSilentRelays() {
 /**
  * Whether reading again can complete where `read` did not: a relay it waited
  * for did not answer and has not yet been silent long enough to be left out.
+ * Stop after the exclusion threshold plus one attempt even when alternating
+ * answers keep resetting each relay: an edit must eventually return waiting.
  */
-export function worthReadingAgain(read: OwnEventRead): boolean {
+export function worthReadingAgain(read: OwnEventRead, attempts = 1): boolean {
   return (
+    attempts < SILENT_READS_BEFORE_LEFT_OUT + 1 &&
     read.outcome === 'timed-out' &&
     read.silent.some((url) => silentReads(url) <= SILENT_READS_BEFORE_LEFT_OUT)
   );
@@ -164,7 +168,7 @@ export async function readNewestOwnEvent(
   const leftOut = options.leaveOutSilent ? relayUrls.filter(isLeftOut) : [];
   const probes = new Set(leftOut.length < relayUrls.length ? leftOut : []);
   if (probes.size > 0) nostrLog.info('nostr.own_event.read_without', { kind, relays: [...probes] });
-  const startedAt = Date.now();
+  const startedOrder = ++readOrder;
   return new Promise<OwnEventRead>((resolve) => {
     let newest: NDKEvent | undefined;
     let settled = false;
@@ -186,7 +190,7 @@ export async function readNewestOwnEvent(
       settled = true;
       clearTimeout(timer);
       for (const subscription of waitedFor) subscription.stop();
-      if (outcome === 'timed-out') for (const url of pending) notHeardFrom(url, startedAt);
+      if (outcome === 'timed-out') for (const url of pending) notHeardFrom(url, startedOrder);
       resolve({
         outcome,
         newest,
@@ -235,7 +239,7 @@ export async function readNewestOwnEvent(
         });
         void subscription.start().catch(() => {
           if (probe) return stopProbe(url);
-          if (!settled) notHeardFrom(url, startedAt);
+          if (!settled) notHeardFrom(url, startedOrder);
           finish('failed');
         });
       }
@@ -265,8 +269,11 @@ export async function readForEdit(
 ): Promise<ReadForEdit> {
   if (!relays) return { status: 'waiting', reason: 'relay-list-unknown' };
   let read: OwnEventRead;
-  do read = await readNewestOwnEvent(ndk, pubkey, kind, { relays, leaveOutSilent: true });
-  while (worthReadingAgain(read));
+  let attempts = 0;
+  do {
+    read = await readNewestOwnEvent(ndk, pubkey, kind, { relays, leaveOutSilent: true });
+    attempts++;
+  } while (worthReadingAgain(read, attempts));
   if (read.outcome !== 'complete') return { status: 'waiting', reason: read.outcome };
   return { status: 'read', newest: read.newest, relays: read.relays, asked: read.asked };
 }

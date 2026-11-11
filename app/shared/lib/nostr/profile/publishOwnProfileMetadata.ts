@@ -176,7 +176,10 @@ export function publishOwnProfileMetadata({
   if (existing) return existing;
   let eventId: string | undefined;
   let changed = false;
-  const isOwner = () => !changed && activePubkey() === pubkey;
+  const isOwner = () =>
+    !changed &&
+    activePubkey() === pubkey &&
+    useProfileStore.getState().getActiveProfile()?.accountIndex === accountIndex;
   const unsubscribe = useProfileStore.subscribe(() => {
     if (!isOwner()) {
       changed = true;
@@ -199,7 +202,7 @@ export function publishOwnProfileMetadata({
     // Build only on a complete read of the account's relays (a relay silent
     // read after read left out), as for every own list; anything less waits.
     const read = await readForEdit(ndk, pubkey, 0);
-    if (!isOwner()) return err({ type: 'profile-changed' });
+    if (!isOwner() || ndk.signer !== signer) return err({ type: 'profile-changed' });
     if (read.status === 'waiting') return err({ type: 'base-unavailable' });
     const remote = read.newest ? parseOwnProfileSnapshot(read.newest) : null;
     if (read.newest && !remote) return err({ type: 'base-unavailable' });
@@ -212,6 +215,12 @@ export function publishOwnProfileMetadata({
         (newest, snapshot) => (!newest || standsOver(snapshot, newest) ? snapshot : newest),
         null
       );
+    // Relay sync can learn a newer base while identity verification or signing
+    // awaits. Stop this save and let a retry read and patch that base afresh.
+    const baseIsCurrent = () => {
+      const known = useOwnProfileMetadataStore.getState().latest;
+      return !known || (base !== null && !standsOver(known, base));
+    };
     const profile = useProfileStore.getState().getActiveProfile();
     if (
       !base &&
@@ -240,6 +249,7 @@ export function publishOwnProfileMetadata({
       if (verification.status !== 'verified') return err({ type: 'nip05-unverified' });
       content.nip05 = verification.identifier;
     }
+    if (!baseIsCurrent()) return err({ type: 'base-unavailable' });
     event.content = JSON.stringify(content);
     event.tags = [];
     const signed = await ResultAsync.fromPromise(
@@ -249,6 +259,7 @@ export function publishOwnProfileMetadata({
     if (signed.isErr()) return err(signed.error);
     if (!isOwner() || event.pubkey !== pubkey || ndk.signer !== signer)
       return err({ type: 'profile-changed' });
+    if (!baseIsCurrent()) return err({ type: 'base-unavailable' });
     eventId = event.id;
     useOwnProfileMetadataStore
       .getState()
@@ -261,6 +272,7 @@ export function publishOwnProfileMetadata({
     });
     // Exactly the relays read: one that was not read may hold a newer profile.
     const result = await publishToRelaysRead(ndk, event, read.relays, 'optimistic');
+    if (!isOwner() || ndk.signer !== signer) return err({ type: 'profile-changed' });
     if (result.isErr()) return err(result.error);
     if (isOwner())
       ingestOwnProfileMetadata(

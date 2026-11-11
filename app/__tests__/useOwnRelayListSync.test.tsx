@@ -18,6 +18,8 @@
 import { act, renderHook } from '@testing-library/react-native';
 import { ResultAsync, errAsync, okAsync } from 'neverthrow';
 
+import { publishOwnRelayList } from '@/shared/lib/nostr/outbox/publishOwnRelayList';
+import type NDK from '@nostr-dev-kit/ndk-mobile';
 import { useOwnRelayListSync } from '@/shared/lib/nostr/outbox/useOwnRelayListSync';
 import {
   getKnownOwnWriteRelays,
@@ -668,4 +670,40 @@ describe('a discovery that did not finish', () => {
     expect(mockAsked).toHaveLength(asked);
     view.unmount();
   });
+});
+
+it('stops discovery after alternating relay timeouts and waits for a wakeup', async () => {
+  let calls = 0;
+  mockGate = async () => {
+    const attempt = Math.floor(calls++ / DEFAULT_RELAYS.length);
+    mockRelays.set(DAMUS, attempt % 2 === 0 ? 'silent' : { events: [] });
+    mockRelays.set(NOS, attempt % 2 === 1 ? 'silent' : { events: [] });
+  };
+  const view = await mountAndWait(A);
+  for (let i = 0; i < 4; i++) await waitOutRead();
+  const reads = mockAsked.length;
+  await waitOutRead();
+  expect(mockAsked.length).toBe(reads);
+  expect(getKnownOwnWriteRelays(A)).toBeNull();
+  expect(mockPublishEvent).not.toHaveBeenCalled();
+  view.unmount();
+});
+
+it('reads and publishes to a learned old write relay removed before its first query', async () => {
+  const old = 'wss://learned-old.example';
+  const next = 'wss://new.example';
+  mockRelays.set(DAMUS, { events: [relayList(A, 500, [old])] });
+  const view = await mountAndWait(A);
+  expect(mockAsked.flatMap((read) => read.relays ?? [])).not.toContain(old);
+  expect(store().entries.map((entry) => entry.url)).toEqual([old]);
+  store().removeRelay(old);
+  store().addRelay(next, { read: true, write: true });
+  await act(async () => {
+    await publishOwnRelayList(mockNdk as unknown as NDK, A, store().entries);
+  });
+  expect(mockAsked.flatMap((read) => read.relays ?? [])).toContain(old);
+  expect(mockPublishEvent.mock.calls.at(-1)![0].relays).toEqual(
+    expect.arrayContaining([old, next])
+  );
+  view.unmount();
 });
