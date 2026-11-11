@@ -515,6 +515,43 @@ describe('waits made while the lock is held are bounded', () => {
   });
 });
 
+describe('a recent transition from another runtime', () => {
+  it.each(['switch', 'create', 'delete'] as const)(
+    'refuses %s, leaves that guard and the splash alone, and frees the lock',
+    async (flow) => {
+      const {
+        switchToExistingProfile,
+        createAndSwitchProfile,
+        deleteAllProfiles,
+        mockRestart,
+        AsyncStorage,
+        registerTransitionControls,
+      } = setup();
+      mockRestart.mockReturnValue(true);
+      const resetStages = jest.fn();
+      registerTransitionControls({ resetStages, cancelResetStages: jest.fn() });
+      const guard = JSON.stringify({ startedAt: Date.now() });
+      await AsyncStorage.setItem('profile-transition-in-progress', guard);
+
+      const run = {
+        switch: () => switchToExistingProfile({ accountIndex: 1 }),
+        create: () =>
+          createAndSwitchProfile({
+            getKeysForAccount: async () => ({ pubkey: 'c'.repeat(64) }),
+          }),
+        delete: () => deleteAllProfiles(),
+      }[flow];
+      expect(await run()).toBe(false);
+
+      expect(resetStages).not.toHaveBeenCalled();
+      expect(mockRestart).not.toHaveBeenCalled();
+      expect(await AsyncStorage.getItem('profile-transition-in-progress')).toBe(guard);
+      await AsyncStorage.removeItem('profile-transition-in-progress');
+      expect(await switchToExistingProfile({ accountIndex: 1 })).toBe(true);
+    }
+  );
+});
+
 describe('importAndSwitchProfile', () => {
   // A real key: an import is refused unless its key, public key and account
   // number describe one identity.
@@ -572,6 +609,22 @@ describe('importAndSwitchProfile', () => {
     expect(await importAndSwitchProfile({ ...imported, pubkeyHex: 'b'.repeat(64) })).toBe('exists');
 
     expect(storeImportedNsec).not.toHaveBeenCalled();
+    expect(await switchToExistingProfile({ accountIndex: 1 })).toBe(true);
+  });
+
+  it('is busy while another runtime’s transition is recent, storing nothing and freeing the lock', async () => {
+    const { importAndSwitchProfile, switchToExistingProfile, mockRestart, AsyncStorage } = setup();
+    mockRestart.mockReturnValue(true);
+    await AsyncStorage.setItem(
+      'profile-transition-in-progress',
+      JSON.stringify({ startedAt: Date.now() })
+    );
+
+    expect(await importAndSwitchProfile(imported)).toBe('busy');
+
+    expect(storeImportedNsec).not.toHaveBeenCalled();
+    expect(await AsyncStorage.getItem('profile-transition-in-progress')).not.toBeNull();
+    await AsyncStorage.removeItem('profile-transition-in-progress');
     expect(await switchToExistingProfile({ accountIndex: 1 })).toBe(true);
   });
 
