@@ -1,3 +1,9 @@
+/** The failure recorded on an answer's turn, if it failed. */
+function getTurnError(messageId: string) {
+  const turn = getTurn(messageId);
+  return turn?.phase === 'failed' ? turn.error : null;
+}
+
 jest.mock('@/features/ai/lib/navigateToAddFunds', () => ({
   useNavigateToAddFunds: () => jest.fn(),
 }));
@@ -9,7 +15,7 @@ import { sendMessage, checkBalance, ROUTSTR_MAX_COMPLETION_TOKENS } from '@/shar
 import { refreshRoutstrLineup } from '@/shared/lib/routstr/refreshLineup';
 import { staticPopup } from '@/shared/lib/popup';
 import { confirmSpend } from '@/features/ai/lib/spendConfirm';
-import { getTurnError, resetTurnErrors } from '@/features/ai/lib/turnErrors';
+import { getTurn, resetTurns } from '@/features/ai/lib/turns';
 import { chatErrorActions } from '@/features/ai/lib/chatErrorActions';
 import { resetModelAvailability } from '@/features/ai/lib/modelAvailability';
 import { ERROR_COPY } from '@/shared/lib/errors/catalog';
@@ -142,7 +148,7 @@ describe('AI send lineup recovery', () => {
   });
   beforeEach(async () => {
     jest.clearAllMocks();
-    resetTurnErrors();
+    resetTurns();
     resetModelAvailability();
     await useRoutstrStore.persist.rehydrate();
     const lineup = emptyLineup();

@@ -26,8 +26,7 @@ import {
   getSiblingInfo,
   withSynthesisedParents,
 } from '@/features/ai/lib/branching';
-import { useStreamingContent, useStreamingReasoning } from '@/features/ai/lib/streamingBuffer';
-import { getTurnError, resetTurnErrors } from '@/features/ai/lib/turnErrors';
+import { getTurn, resetTurns, useTurn, type Turn } from '@/features/ai/lib/turns';
 import { resetModelAvailability } from '@/features/ai/lib/modelAvailability';
 import { sendMessage, checkBalance } from '@/shared/lib/routstr/api';
 import { refreshRoutstrLineup } from '@/shared/lib/routstr/refreshLineup';
@@ -169,6 +168,19 @@ function arrangeStream(cost = 4) {
   });
 }
 const tick = () => act(async () => undefined);
+
+/** What the bubble shows live for a turn: its text and reasoning while asked or streamed. */
+function liveOf(turn: Turn | undefined) {
+  if (turn?.phase === 'streaming') return { text: turn.text, thinking: turn.reasoning };
+  if (turn?.phase === 'asking') return { text: '', thinking: '' };
+  return { text: null, thinking: null };
+}
+
+/** The failure recorded on an answer's turn, if it failed. */
+function getTurnError(messageId: string) {
+  const turn = getTurn(messageId);
+  return turn?.phase === 'failed' ? turn.error : null;
+}
 const history = () => useRoutstrStore.getState().conversationHistory;
 
 function msg(
@@ -183,7 +195,7 @@ function msg(
 
 beforeEach(async () => {
   jest.clearAllMocks();
-  resetTurnErrors();
+  resetTurns();
   resetModelAvailability();
   await useRoutstrStore.persist.rehydrate();
   const lineup = emptyLineup();
@@ -356,16 +368,14 @@ describe('streaming an answer', () => {
     });
     await tick();
     const assistantId = history()[1]!.id;
-    const bubble = renderHook(() => ({
-      text: useStreamingContent(assistantId),
-      thinking: useStreamingReasoning(assistantId),
-    }));
+    const bubble = renderHook(() => liveOf(useTurn(assistantId)));
     return { hook, bubble, assistantId, sending: () => sending };
   }
 
-  it('the bubble reads each chunk from the live buffer while the store keeps an empty placeholder', async () => {
+  it('the bubble reads each chunk from the turn while the store keeps an empty placeholder', async () => {
     const { bubble, assistantId, hook } = await startSend();
-    expect(hook.result.current).toMatchObject({ isSending: true, streamingMessageId: assistantId });
+    expect(hook.result.current.isSending).toBe(true);
+    expect(getTurn(assistantId)?.phase).toBe('asking');
     expect(bubble.result.current).toEqual({ text: '', thinking: '' });
 
     await act(async () => live.push(reasoning('let me think')));
@@ -377,7 +387,7 @@ describe('streaming an answer', () => {
     expect(history()[0]).toMatchObject({ role: 'user', content: 'hello', pending: true });
   });
 
-  it('on completion writes content, reasoning and cost to the store once and clears the live buffer', async () => {
+  it('on completion writes content, reasoning and cost to the store once and settles the turn', async () => {
     const { bubble, assistantId, hook, sending } = await startSend();
 
     await act(async () => {
@@ -395,7 +405,8 @@ describe('streaming an answer', () => {
     });
     expect(history()[0]!.pending).toBe(false);
     expect(bubble.result.current).toEqual({ text: null, thinking: null });
-    expect(hook.result.current).toMatchObject({ isSending: false, streamingMessageId: null });
+    expect(hook.result.current.isSending).toBe(false);
+    expect(getTurn(assistantId)).toEqual({ phase: 'done', truncation: null });
   });
 
   it('what is saved mid-stream: the session holds the pending question and an empty answer', async () => {
@@ -528,11 +539,11 @@ describe('streaming an answer', () => {
     });
     await tick();
     const newer = history().at(-1)!.id;
-    const bubble = renderHook(() => useStreamingContent(newer));
+    const bubble = renderHook(() => liveOf(useTurn(newer)).text);
     await act(async () => live.push(content('still here')));
 
     expect(bubble.result.current).toBe('still here');
-    expect(hook.result.current).toMatchObject({ isSending: true, streamingMessageId: newer });
+    expect(hook.result.current.isSending).toBe(true);
 
     await act(async () => {
       live.end();

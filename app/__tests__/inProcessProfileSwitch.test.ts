@@ -227,10 +227,8 @@ it('canary resets every registered profile/session store and invokes every reach
   const attachments = require('@/features/ai/lib/attachments');
   const image = { localUri: sentinel, mimeType: 'image/jpeg', width: 1, height: 1 };
   expect(await attachments.encodeChatImage(image)).toContain(sentinel);
-  const errors = require('@/features/ai/lib/turnErrors');
-  const truncations = require('@/features/ai/lib/turnTruncation');
-  errors.recordTurnError(sentinel, { id: 'unknown', text: sentinel });
-  truncations.recordTurnTruncation(sentinel, { budgetTokens: 42 });
+  const turns = require('@/features/ai/lib/turns');
+  turns.dispatchTurn(sentinel, { type: 'failed', error: { id: 'unknown', text: sentinel } });
   const availability = require('@/features/ai/lib/modelAvailability');
   availability.markModelUnavailable('https://example.invalid', sentinel, { status: 404 });
   const zaps = require('@/shared/stores/runtime/pendingZapStore');
@@ -325,8 +323,7 @@ it('canary resets every registered profile/session store and invokes every reach
   expect(availability.isModelUnavailable('https://example.invalid', sentinel)).toBe(false);
   expect(zaps.peekPendingZap(sentinel)).toBeUndefined();
   expect(nip04Cache.get('a'.repeat(64), sentinel)).toBeUndefined();
-  expect(errors.getTurnError(sentinel)).toBeNull();
-  expect(truncations.getTurnTruncation(sentinel)).toBeNull();
+  expect(turns.getTurn(sentinel)).toBeUndefined();
   expect(giftWrapCache.cache.get('a'.repeat(64), sentinel)).toBeUndefined();
   expect(theme.getState().mode).toBe('light');
   process.stdout.write(

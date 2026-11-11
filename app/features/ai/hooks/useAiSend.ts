@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import {
   selectConversationId,
   useRoutstrStore,
@@ -45,24 +45,12 @@ import {
 import { confirmSpend } from '../lib/spendConfirm';
 import { evaluateSendGate } from '../lib/sendGate';
 import { reservedSatsForSend } from '../lib/reserve';
-import { clearTurnTruncation, recordTurnTruncation } from '../lib/turnTruncation';
 import { useHeldMints } from './useHeldMints';
 import { assembleApiMessages, stripImageParts } from '../lib/assembleApiMessages';
 import { encodeChatImage } from '../lib/attachments';
 import { deriveActivePath, getAncestorsExclusive } from '../lib/branching';
 import { useNavigateToAddFunds } from '../lib/navigateToAddFunds';
-import { clearTurnError, recordTurnError } from '../lib/turnErrors';
-import {
-  clearStreaming,
-  setStreamingReasoning,
-  setStreamingText,
-  startStreaming,
-} from '../lib/streamingBuffer';
-
-interface SendStatus {
-  isSending: boolean;
-  streamingMessageId: string | null;
-}
+import { dispatchTurn, useAnyTurnLive } from '../lib/turns';
 
 /** Minimum interval between streaming-token haptics. Streamers can fire >50
  * tokens/sec; without throttling the device feels like a buzzing wall. 80ms
@@ -138,9 +126,11 @@ const r2 = (n: number) => Math.round(n * 100) / 100;
  *     new branch immediately.
  *
  * Both flows:
- *   - Stream tokens through the module-level `streamingBuffer` instead of
- *     `routstrStore.updateMessage`, so per-token AsyncStorage writes are
- *     avoided (those caused the "sudden reveal" lag).
+ *   - Move the answer's turn (`turns`) through asking, streaming and how it
+ *     settled, by its message id, so a stream only ever touches its own
+ *     answer. Tokens stream there instead of into `routstrStore`, so
+ *     per-token AsyncStorage writes are avoided (those caused the "sudden
+ *     reveal" lag).
  *   - Persist the final assistant payload (content + reasoning + thinking
  *     duration + cost) in ONE atomic write via `finalizeAssistantMessage`,
  *     preserving the placeholder's id / parentId / role / timestamp.
@@ -153,10 +143,7 @@ const r2 = (n: number) => Math.round(n * 100) / 100;
  *     `UserMessagesScreen`).
  */
 export function useAiSend() {
-  const [status, setStatus] = useState<SendStatus>({
-    isSending: false,
-    streamingMessageId: null,
-  });
+  const isSending = useAnyTurnLive();
 
   const isAnonymous = useRoutstrStore((s) => s.isAnonymousMode);
   const currentSessionId = useRoutstrStore((s) => s.currentSessionId);
@@ -188,7 +175,7 @@ export function useAiSend() {
 
   /**
    * Drives a single placeholder assistant message to completion: walks the
-   * candidate chain, streams tokens into `streamingBuffer`, finalises the
+   * candidate chain, streams tokens into its turn, finalises the
    * persisted message, and stamps cost asynchronously off the post-stream
    * balance diff. Both `send` and `retry` funnel through here.
    */
@@ -272,7 +259,7 @@ export function useAiSend() {
         });
         // Same contract as a failed request: the turn stays in the
         // conversation and says, in place, why it could not run.
-        recordTurnError(assistantMessageId, { id, text: ERROR_COPY[id] });
+        dispatchTurn(assistantMessageId, { type: 'failed', error: { id, text: ERROR_COPY[id] } });
         return;
       }
 
@@ -322,15 +309,9 @@ export function useAiSend() {
         });
       let candidateChain = candidateEntries.map((e) => e.modelId);
 
-      setStatus({ isSending: true, streamingMessageId: assistantMessageId });
-      // Captures `Date.now()` for the live "Thinking for X seconds"
-      // counter rendered by the bubble. Resets text + reasoning channels
-      // so a previous stream's tail can't leak into this one.
-      startStreaming(assistantMessageId);
-      // A placeholder that is streaming is not a failed one. Ids are fresh per
-      // send and per retry, so this only ever matters if one is re-driven.
-      clearTurnError(assistantMessageId);
-      clearTurnTruncation(assistantMessageId);
+      // Captures `Date.now()` for the live "Thinking for X seconds" counter
+      // rendered by the bubble.
+      dispatchTurn(assistantMessageId, { type: 'asked', startedAtMs: Date.now() });
 
       // Hoisted so the catch block (402 popup) can reference whichever
       // candidate we were last attempting when the request failed.
@@ -717,10 +698,6 @@ export function useAiSend() {
             }
             chunksWithReasoning++;
             fullReasoning += reasoning;
-            // Push the live reasoning to the streaming buffer so the bubble
-            // can render the model's thought process as it arrives, instead
-            // of waiting for stream completion to surface it.
-            setStreamingReasoning(assistantMessageId, fullReasoning);
           }
 
           if (content) {
@@ -735,13 +712,21 @@ export function useAiSend() {
             }
             chunksWithContent++;
             fullContent += content;
-            setStreamingText(assistantMessageId, fullContent);
 
             if (now - lastHapticAt >= HAPTIC_THROTTLE_MS) {
               lastHapticAt = now;
               void EnhancedHaptics.navigateHaptic();
             }
           }
+
+          // The bubble renders the reasoning and the text as they arrive,
+          // instead of waiting for the stream to end.
+          if (reasoning || content)
+            dispatchTurn(assistantMessageId, {
+              type: 'streamed',
+              text: fullContent,
+              reasoning: fullReasoning,
+            });
 
           if (now - lastProgressAt >= STREAM_PROGRESS_INTERVAL_MS) {
             const windowMs = now - lastProgressAt;
@@ -768,7 +753,6 @@ export function useAiSend() {
         // content rather than as a failure — the content is real — and the
         // bubble offers to carry on from there.
         const truncated = isBudgetTruncation(finishReason);
-        if (truncated) recordTurnTruncation(assistantMessageId, { budgetTokens: sentMaxTokens });
         const totalMs = streamEnd - sendStart;
         const streamMs = firstChunkAt > 0 ? streamEnd - firstChunkAt : 0;
         aiLog.info('ai.stream.complete', {
@@ -835,6 +819,15 @@ export function useAiSend() {
             ...(costSats != null && costSats > 0 ? { costSats } : {}),
           });
         }
+        dispatchTurn(
+          assistantMessageId,
+          finalizePayload
+            ? {
+                type: 'answered',
+                truncation: truncated ? { budgetTokens: sentMaxTokens } : null,
+              }
+            : { type: 'interrupted' }
+        );
         aiLog.info('ai.send.assistant_finalized', {
           flowId,
           messageId: assistantMessageId,
@@ -879,6 +872,7 @@ export function useAiSend() {
         if (isAbortError(err) || controller.signal.aborted) {
           aiLog.info('ai.send.aborted', { flowId });
           removeMessages(conversationId, new Set([assistantMessageId]));
+          dispatchTurn(assistantMessageId, { type: 'stopped' });
           span.end({ outcome: 'aborted' });
           return;
         }
@@ -925,10 +919,13 @@ export function useAiSend() {
               ? `${friendlyName} reserves ${requiredSats} sats per request; ${availableSats} available. Add at least ${shortfallSats} sats.`
               : `${friendlyName} reserves more per request than your wallet holds.`;
         }
-        recordTurnError(assistantMessageId, {
-          id: presentation.id,
-          text: presentation.text,
-          ...(detail != null ? { detail } : {}),
+        dispatchTurn(assistantMessageId, {
+          type: 'failed',
+          error: {
+            id: presentation.id,
+            text: presentation.text,
+            ...(detail != null ? { detail } : {}),
+          },
         });
         aiLog.info('ai.turn_error.shown', {
           flowId,
@@ -936,14 +933,9 @@ export function useAiSend() {
           errorId: presentation.id,
         });
       } finally {
-        // Only this stream's own state: a newer stream that stopped this one
-        // owns the live text and the sending state now.
-        clearStreaming(assistantMessageId);
-        setStatus((current) =>
-          current.streamingMessageId === assistantMessageId
-            ? { isSending: false, streamingMessageId: null }
-            : current
-        );
+        // Left without settling (the account changed under it): it ended
+        // without an answer. Only this turn: a newer stream owns its own.
+        dispatchTurn(assistantMessageId, { type: 'interrupted' });
       }
     },
     [removeMessages, finalizeAssistantMessage, updateSessionTitle, walletSats]
@@ -1222,5 +1214,5 @@ export function useAiSend() {
   const retry = useSingleFlight(retryInner);
 
   const balance = useRoutstrStore((s) => s.balance);
-  return { send, retry, ...status, balance };
+  return { send, retry, isSending, balance };
 }

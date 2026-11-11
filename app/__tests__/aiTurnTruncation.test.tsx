@@ -17,12 +17,7 @@ import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 
 import { isBudgetTruncation } from '@/features/ai/lib/finalize';
-import {
-  clearTurnTruncation,
-  getTurnTruncation,
-  recordTurnTruncation,
-  resetTurnTruncations,
-} from '@/features/ai/lib/turnTruncation';
+import { dispatchTurn, getTurn, resetTurns } from '@/features/ai/lib/turns';
 import { AiMessageBubble } from '@/features/ai/components/AiMessageBubble';
 import type { RoutstrMessage } from '@/shared/stores/profile/routstrStore';
 
@@ -84,12 +79,18 @@ function render(node: React.ReactElement) {
   return renderer;
 }
 
+/** An answer that streamed and ran out of completion budget. */
+function recordTurnTruncation(messageId: string, truncation: { budgetTokens: number }) {
+  dispatchTurn(messageId, { type: 'asked', startedAtMs: 1 });
+  dispatchTurn(messageId, { type: 'answered', truncation });
+}
+
 const texts = (r: TestRenderer.ReactTestRenderer) =>
   r.root.findAllByType('Text' as never).map((n) => String(n.props.children));
 
 afterEach(() => {
   act(() => {
-    resetTurnTruncations();
+    resetTurns();
   });
 });
 
@@ -111,10 +112,10 @@ describe('isBudgetTruncation', () => {
 describe('the truncation record', () => {
   it('remembers the budget that ran out, and forgets on a fresh attempt', () => {
     recordTurnTruncation(MESSAGE_ID, { budgetTokens: 2000 });
-    expect(getTurnTruncation(MESSAGE_ID)).toEqual({ budgetTokens: 2000 });
+    expect(getTurn(MESSAGE_ID)).toEqual({ phase: 'done', truncation: { budgetTokens: 2000 } });
     // A re-driven placeholder must not carry the previous attempt's note.
-    clearTurnTruncation(MESSAGE_ID);
-    expect(getTurnTruncation(MESSAGE_ID)).toBeNull();
+    dispatchTurn(MESSAGE_ID, { type: 'asked', startedAtMs: 1 });
+    expect(getTurn(MESSAGE_ID)).toEqual({ phase: 'asking', startedAtMs: 1 });
   });
 });
 

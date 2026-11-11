@@ -219,7 +219,7 @@ function upstreamIdForModel(model: string): string | undefined {
  * reserve for it.
  *
  * Being wrong low is now recoverable and visible: a stream that ends on
- * `finish_reason: 'length'` is recorded (`features/ai/lib/turnTruncation.ts`)
+ * `finish_reason: 'length'` is recorded on its turn (`features/ai/lib/turns.ts`)
  * and the bubble says so and offers to continue. Being wrong high is not — it
  * is the user's money locked for the duration, and every refund race and stuck
  * token scales with it. Retune it against `ai.stream.complete`, which records

@@ -13,19 +13,34 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { popup } from '@/shared/lib/popup';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
 import { formatRelative } from '@/shared/lib/date';
-import {
-  useStreamingContent,
-  useStreamingReasoning,
-  useStreamingStartedAt,
-} from '../lib/streamingBuffer';
-import { useTurnError } from '../lib/turnErrors';
-import { useTurnTruncation } from '../lib/turnTruncation';
+import { readAnswer, useTurn, type Turn, type TurnError } from '../lib/turns';
 import { AiTurnErrorPill } from './AiTurnErrorPill';
 import { withAlpha } from '@/shared/lib/color';
 import { ERROR_COPY } from '@/shared/lib/errors/catalog';
 
-/** What a failed turn says when nothing remembers which failure it was. */
-const INTERRUPTED_TURN_COPY = ERROR_COPY['routstr.interrupted'];
+/** What an answer that ended without one says. */
+const INTERRUPTED: TurnError = {
+  id: 'routstr.interrupted',
+  text: ERROR_COPY['routstr.interrupted'],
+};
+
+/** What stands in place of an answer that settled with nothing in it. */
+function emptyAnswerError(answer: Turn): TurnError | null {
+  switch (answer.phase) {
+    case 'asking':
+    case 'streaming':
+      return null;
+    case 'failed':
+      return answer.error;
+    case 'done':
+    case 'interrupted':
+      return INTERRUPTED;
+    default: {
+      const unreachable: never = answer;
+      return unreachable;
+    }
+  }
+}
 
 /** Active-branch widget data for one assistant message. Provided by the
  *  screen, which owns the conversation tree and the `setActiveBranch`
@@ -43,7 +58,6 @@ export interface BranchNav {
 
 interface AiMessageBubbleProps {
   message: RoutstrMessage;
-  isStreaming?: boolean;
   /** Invoked with the message id when the user taps Retry. Omit to hide the
    *  Retry action (e.g. while another message is mid-stream). */
   onRetry?: (messageId: string) => void;
@@ -317,45 +331,44 @@ function BranchNavView({ index, total, onPrev, onNext, color, testIdPrefix }: Br
   );
 }
 
-function AssistantBubble({
-  message,
-  isStreaming,
-  onRetry,
-  onContinue,
-  branchNav,
-}: AiMessageBubbleProps) {
+function AssistantBubble({ message, onRetry, onContinue, branchNav }: AiMessageBubbleProps) {
   const [foreground, shade400] = useThemeColor(['foreground', 'shade-400'] as const);
 
-  // While streaming, the bubble for the in-flight assistant message reads
-  // its live text + reasoning + start-time from the module-level buffer
-  // instead of the persisted store. Other bubbles' streaming-buffer
-  // hooks return null and they don't re-render.
-  const liveContent = useStreamingContent(message.id);
-  const liveReasoning = useStreamingReasoning(message.id);
-  const liveStartedAt = useStreamingStartedAt(message.id);
+  // While it is asked and streamed, the answer's text, reasoning and start
+  // time come from its turn rather than the saved message. Other bubbles'
+  // turns do not change, so they don't re-render.
+  const answer = readAnswer(message, useTurn(message.id));
+  const isLive = answer.phase === 'asking' || answer.phase === 'streaming';
+  const elapsedSeconds = useElapsedSeconds(isLive ? answer.startedAtMs : null);
 
-  // `isLive` is gated on the prop coming from the chat screen (canonical
-  // truth: "is this id the screen's `streamingMessageId`?") AND on the
-  // buffer having a start timestamp. Either flipping false drops us out
-  // of live mode, which prevents a stale buffer entry from showing a
-  // running timer on an already-finalised bubble.
-  const isLive = isStreaming === true && liveStartedAt != null;
-  const elapsedSeconds = useElapsedSeconds(isLive ? liveStartedAt : null);
-
-  const turnError = useTurnError(message.id);
   // An answer that stopped because its completion budget ran out. Not an
   // error — there is real content above it that the user paid for — but not
   // a finished answer either, and the difference is invisible without this.
-  const truncation = useTurnTruncation(message.id);
+  const truncation = answer.phase === 'done' ? answer.truncation : null;
 
-  const displayedContent = liveContent ?? message.content;
-  // Persisted reasoning is the source of truth once the stream ends. Mid-
-  // stream we prefer the live channel so reasoning tokens render as they
-  // arrive instead of appearing all at once on completion.
-  const displayedReasoning = isLive ? (liveReasoning ?? '') : (message.reasoningContent ?? '');
+  // The saved message is the source of truth once the stream ends. Mid-
+  // stream the turn's text and reasoning render as they arrive instead of
+  // appearing all at once on completion.
+  const displayedContent =
+    answer.phase === 'streaming' ? answer.text : isLive ? '' : message.content;
+  const displayedReasoning =
+    answer.phase === 'streaming'
+      ? answer.reasoning
+      : isLive
+        ? ''
+        : (message.reasoningContent ?? '');
 
   const hasContent = displayedContent.length > 0;
   const hasReasoning = displayedReasoning.length > 0;
+
+  // A settled assistant turn with nothing in it is a failed or interrupted
+  // one: the send flow leaves the placeholder standing and records why, and
+  // an empty bubble is the one thing this surface must never render. One
+  // saved before this run is a request the app was closed on, or whose
+  // connection dropped, before the node finished: the answer is gone, and the
+  // sats the node did not spend are being recovered. Said as that, rather
+  // than as an unexplained failure over a balance that visibly dropped.
+  const error = !hasContent && !hasReasoning ? emptyAnswerError(answer) : null;
 
   // Header shows whenever:
   //   • we're actively streaming this bubble (live counter + spinner),
@@ -407,23 +420,9 @@ function AssistantBubble({
     onContinue(message.id);
   }, [onContinue, message.id]);
 
-  const showActions = hasContent && !isStreaming;
+  const showActions = hasContent && !isLive;
 
-  // A settled assistant turn with nothing in it is a failed one: the send flow
-  // leaves the placeholder standing and records why, and an empty bubble is
-  // the one thing this surface must never render. The fallback covers a
-  // placeholder that outlived its record — persisted across a relaunch, or
-  // aged out of the bounded buffer. In practice that is a request the app was
-  // closed on, or whose connection dropped, before the node finished: the
-  // answer is gone, and the sats the node did not spend are being recovered.
-  // Said as that, rather than as an unexplained failure over a balance that
-  // visibly dropped.
-  const failed = !isStreaming && !hasContent && !hasReasoning;
-  const error =
-    turnError ??
-    (failed ? { id: 'routstr.interrupted' as const, text: INTERRUPTED_TURN_COPY } : null);
-
-  if (failed && error) {
+  if (error) {
     return (
       <View className="my-2 self-stretch px-1">
         <AiTurnErrorPill messageId={message.id} error={error} onRetry={onRetry} />
@@ -458,7 +457,7 @@ function AssistantBubble({
         {hasContent ? (
           <Text size={16} style={{ color: foreground, lineHeight: 24 }}>
             {displayedContent}
-            {isStreaming ? (
+            {isLive ? (
               <Text size={16} style={{ color: withAlpha(foreground, 0.5) }}>
                 {' ▍'}
               </Text>
@@ -473,7 +472,7 @@ function AssistantBubble({
             trade for holding less of their money if the case where it bites
             is visible; silently truncating a paid answer would be worse than
             over-reserving. */}
-        {truncation && !isStreaming ? (
+        {truncation ? (
           <HStack className="mt-0.5 shrink items-center gap-1.5">
             <Icon name="mdi:alert-circle-outline" size={14} color={shade400} />
             <Text size={12} className="text-foreground/60 shrink">
@@ -500,9 +499,7 @@ function AssistantBubble({
             it's easier to land a finger on the small chevron targets. The
             row is hidden while the bubble is mid-stream so the user can't
             kick off a sibling that races with the in-flight write. Copy
-            alone stays visible so partial output can be copied — see the
-            previous rev's comment about why we no longer gate Copy on
-            `!isStreaming`. */}
+            alone stays visible so partial output can be copied. */}
         {hasContent ? (
           <HStack
             align="center"
