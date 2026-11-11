@@ -301,3 +301,56 @@ describe('conversation list seeding', () => {
     expect(unsubscribe).toHaveBeenCalledTimes(1);
   });
 });
+
+describe.each([
+  { source: 'conversations', limit: 100 },
+  { source: 'thread', limit: 50 },
+] as const)('$source inbox requests', ({ source, limit }) => {
+  function useFeed() {
+    const thread = useDmThread({
+      counterparty: source === 'thread' ? 'peer' : '',
+      viewerPubkey: source === 'thread' ? 'viewer' : undefined,
+      viewerPrivateKey: key,
+    });
+    const conversations = useDmConversations(
+      source === 'conversations' ? 'viewer' : undefined,
+      key
+    );
+    return source === 'thread' ? thread : conversations;
+  }
+
+  it(`asks the inbox for ${limit} envelopes for the viewer, then pages behind them`, async () => {
+    mockInbox
+      .mockResolvedValueOnce(page('peer', limit, 1000))
+      .mockResolvedValueOnce(page('peer', 1, 500));
+    const { result } = renderHook(() => useFeed());
+    await waitFor(() => expect(result.current.hasMore).toBe(true));
+    expect(mockInbox).toHaveBeenCalledTimes(1);
+    expect(mockInbox.mock.calls[0]).toEqual([
+      { viewer: 'viewer', limit, until: undefined, refresh: false, signal: expect.any(Object) },
+    ]);
+    expect(mockInbox.mock.calls[0][0].signal.aborted).toBe(false);
+    await act(async () => {
+      await result.current.loadMore();
+    });
+    expect(mockInbox.mock.calls[1]).toEqual([
+      {
+        viewer: 'viewer',
+        limit,
+        until: expect.any(Number),
+        refresh: false,
+        signal: expect.any(Object),
+      },
+    ]);
+    expect(result.current.hasMore).toBe(false);
+  });
+
+  it(`stops after a first page shorter than ${limit}`, async () => {
+    mockInbox.mockResolvedValueOnce(page('peer', limit - 1, 1000));
+    const { result } = renderHook(() => useFeed());
+    await waitFor(() => expect(result.current.hasLoadedOnce).toBe(true));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.hasMore).toBe(false);
+    expect(mockInbox).toHaveBeenCalledTimes(1);
+  });
+});
