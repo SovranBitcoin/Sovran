@@ -362,6 +362,12 @@ Messages, follows, feed, AI:
 - Own events are no longer written into another account's stores after an in-process switch; the own-profile
   tie-break is the same however events arrive in batches.
 - One failed load-more no longer ends notification paging.
+- After the last review's repairs: sending again from the amount screen after an ecash send starts a new send; a
+  tap's token is not rolled back once its write has started; "rolled back" is reported only when it is known; only
+  mint error codes that prove a melt was refused free its ecash; a swap leg given up before its melt was sent is
+  cancelled in Coco before it is called failed; a failed swap transfer is replaced only by a route that carried its
+  amount; relay-list discovery needs every asked relay to answer and never reads the cache; an AI send stops for good
+  once its conversation or account changed; a White Noise group whose invitation failed is reused.
 - Bluetooth: one retry per failed message for the session; a delivered or read report wins over a timeout, a restart
   or a failure; a Nut Drop arriving during a redeem run gets one more run; a duplicate intake can no longer park a
   token that is being redeemed; a queue move with no meaning is refused.
@@ -377,9 +383,10 @@ Messages, follows, feed, AI:
 Surveys: Claude Opus 5.5 (four areas), Codex GPT-6.1 Sol and GPT-6 Astra (two each). Builds: Claude Opus 5.5; small
 review fixes and the merge: Claude Fable 5.2. Every build was reviewed commit by commit by Codex GPT-6.1 Sol or GPT-6
 Astra from the diff and the tests; each review found defects, most of them older bugs the named states exposed, and
-each was followed by a fix run. The last fix round was reviewed too; what that review found was NOT repaired and
-is filed as F235 (payments and NFC, including one regression: sending again from the amount screen after a send does
-nothing), F236 (follow, AI, White Noise) and F237 (swaps, recovery, toast). Repair those before this branch merges.
+each was followed by a fix run. The owner then asked for what the last review left to be repaired (2026-11-11): it
+was, in two more rounds, each reviewed by Codex. What those reviews still found is filed as F238 (payments, NFC,
+swaps: money first) and F239 (follow, AI, recovery, toast). The reviews did not converge to nothing: each round found
+fewer and narrower gaps, most of them older than this pass.
 
 `persistence-release-safety` for the store-touching conversions (1, 3, 5, 6, 7, 9, 11): every upgrade test passes,
 the schema drift snapshots are unchanged and every release fixture loads; **no real upgrade was run**, so the verdict
@@ -387,7 +394,7 @@ is INCONCLUSIVE, not PASS.
 
 ### Open findings from pass 2
 
-In `docs/follow-ups/`: F213, F216, F218, F220 to F237. Highest: F235 to F237 (above), F227 (a follow can wait for ever with nothing on
+In `docs/follow-ups/`: F213, F216, F218, F220 to F234, F238, F239. Highest: F238 (above), F227 (a follow can wait for ever with nothing on
 screen saying so), F228 (the NFC and Tap to pay changes have not been run on a phone), F230 (swap leftovers, among
 them upgraded legs that cannot reach done and proofs that can stay reserved), F232 (AI answer text not saved across
 a kill).
