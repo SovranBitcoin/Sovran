@@ -197,8 +197,22 @@ function setup() {
     sign: jest.fn(async () => undefined),
     user: jest.fn(async () => ({ pubkey: OWN })),
   };
+  const connectListeners = new Set<(relay: Relay) => void>();
+  const pool = {
+    on: (type: string, listener: (relay: Relay) => void) => {
+      if (type === 'relay:connect') connectListeners.add(listener);
+    },
+    off: (type: string, listener: (relay: Relay) => void) => {
+      if (type === 'relay:connect') connectListeners.delete(listener);
+    },
+    /** A relay in the pool (re)connects. */
+    connect: (relay: Relay) => {
+      for (const listener of connectListeners) listener(relay);
+    },
+  };
   const ndk = {
     signer,
+    pool,
     subscribe: (filter: unknown, _options: unknown, relaySet: { relays: Set<Relay> }) => {
       mockFilters.push(filter);
       const [relay] = [...relaySet.relays];
@@ -221,7 +235,7 @@ function setup() {
       return subscription;
     },
   } as unknown as NDK;
-  return { ndk, signer };
+  return { ndk, signer, pool };
 }
 
 function deferred<V = void>() {
@@ -1169,6 +1183,69 @@ describe('the follow sync hook with the real worker', () => {
     await waitFor(() => expect(mockPublish).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(social().optimisticFollowsByPubkey).toEqual({}));
     expect(publishedTags(1)).toEqual([['p', Z]]);
+    view.unmount();
+  });
+});
+
+describe('what wakes a waiting follow', () => {
+  it('a list from the same second the own-events sync takes in', async () => {
+    // Saved by an earlier session, with no id; the relays hold a different list from that second.
+    mockDisk.set(
+      'nostr-social-store',
+      JSON.stringify({
+        version: 2,
+        state: {
+          contactsTags: [['p', W]],
+          contactsUpdatedAt: T,
+          followingPubkeys: { [W]: true },
+        },
+      })
+    );
+    await useNostrSocialStore.persist.rehydrate();
+    const held = contacts(T, [['p', X]]);
+    relaysHold(held);
+    const { ndk } = setup();
+    mockHookNdk = ndk;
+    const view = renderHook(() => useFollowSync());
+
+    act(() => tap(Z));
+    await act(async () => undefined);
+    expect(mockPublish).not.toHaveBeenCalled();
+
+    act(() => saveList(held));
+    await waitFor(() => expect(mockPublish).toHaveBeenCalledTimes(1));
+    expect(publishedTags()).toEqual([
+      ['p', X],
+      ['p', Z],
+    ]);
+    view.unmount();
+  });
+
+  it('a write relay connecting after it did not answer', async () => {
+    jest.useFakeTimers();
+    mockStored.set(mockRelays[0].url, [contacts(T, [['p', X]])]);
+    const { ndk, pool } = setup();
+    mockHookNdk = ndk;
+    const view = renderHook(() => useFollowSync());
+
+    act(() => tap(Z));
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(12_001);
+    });
+    expect(mockPublish).not.toHaveBeenCalled();
+
+    // Relay two is back and answers now.
+    mockStored.set(mockRelays[1].url, [contacts(T, [['p', X]])]);
+    await act(async () => pool.connect({ url: 'wss://elsewhere.example' }));
+    expect(mockPublish).not.toHaveBeenCalled();
+    await act(async () => pool.connect(mockRelays[1]));
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(0);
+    });
+    expect(publishedTags()).toEqual([
+      ['p', X],
+      ['p', Z],
+    ]);
     view.unmount();
   });
 });

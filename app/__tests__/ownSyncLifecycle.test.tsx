@@ -117,7 +117,7 @@ beforeEach(() => {
   }
   mockPubkey = A;
   mockLayer = { getSocialGraph: jest.fn(async () => graph([F1], 100)) };
-  mockNdk = { id: 'ndk' };
+  mockNdk = { id: 'ndk', pool: { on: () => undefined, off: () => undefined } };
   mockInitialized = true;
   mockOffline = false;
   mockHydrated = true;

@@ -1,9 +1,9 @@
 import { useEffect } from 'react';
 import { AppState } from 'react-native';
-import { useNDK } from '@nostr-dev-kit/ndk-mobile';
+import { useNDK, type NDKRelay } from '@nostr-dev-kit/ndk-mobile';
 
 import { requestFollowSync } from '@/shared/lib/nostr/followSync';
-import { useRelayListStore } from '@/shared/lib/nostr/outbox/relayListStore';
+import { getOwnWriteRelays, useRelayListStore } from '@/shared/lib/nostr/outbox/relayListStore';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useNostrNDKContext } from '@/shared/providers/NostrNDKProvider';
 import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
@@ -13,8 +13,9 @@ import { useNostrSocialStore } from '@/shared/stores/profile/nostrSocialStore';
  * Starts the follow worker whenever outstanding follow taps could be
  * published: once the NDK and its signer are ready and the account's saved
  * state has loaded (which resumes a tap saved before the app closed), when the
- * network comes back, on each new tap, when a follow list arrives, when the
- * account's relay list loads or changes, and on returning to the foreground.
+ * network comes back, on each new tap, when a follow list or seed is taken in
+ * (also one from the same second), when the account's relay list loads or
+ * changes, when a write relay connects, and on returning to the foreground.
  */
 export function useFollowSync() {
   const { ndk } = useNDK();
@@ -40,15 +41,22 @@ export function useFollowSync() {
     const stopStore = useNostrSocialStore.subscribe((state, previous) => {
       if (
         state.optimisticFollowsByPubkey !== previous.optimisticFollowsByPubkey ||
-        state.contactsUpdatedAt !== previous.contactsUpdatedAt
+        state.contactsUpdatedAt !== previous.contactsUpdatedAt ||
+        state.contactsEvent !== previous.contactsEvent
       )
         request();
     });
+    // A write relay that did not answer a read may answer now.
+    const onRelayConnect = (relay: NDKRelay) => {
+      if (getOwnWriteRelays().includes(relay.url)) request();
+    };
+    ndk.pool.on('relay:connect', onRelayConnect);
     const subscription = AppState.addEventListener('change', (state) => {
       if (state === 'active') request();
     });
     return () => {
       subscription.remove();
+      ndk.pool.off('relay:connect', onRelayConnect);
       stopStore();
       stopRelays();
       stopRelayHydration();
