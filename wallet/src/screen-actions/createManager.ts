@@ -21,7 +21,10 @@ import type {
 import { buildBip321OnchainUri } from "../bip321";
 import { looksLikeBitcoinAddress } from "../parse";
 import { extractP2PKPubkey } from "../p2pk";
-import { isPaymentRequestPreviewId } from "./paymentRequestPhase";
+import {
+  decodePaymentRequestEntryPhase,
+  isPaymentRequestPreviewId,
+} from "./paymentRequestPhase";
 import {
   entryStateRank,
   isTerminalFailureState,
@@ -809,12 +812,13 @@ export function mergeEntryUpdate(
   // When a real operationId arrives, stale phase:'preview' must be upgraded.
   // The real entry from the DB carries operationId but no metadata, so the
   // merge preserves the preview entry's phase. Fix it here to keep the
-  // merged entry self-consistent.
+  // merged entry self-consistent. The decoder says whether the id names an
+  // operation: a payment request preview's own id does not, and Pay must
+  // stay offered on a request that never sent.
   const mergedMeta = getMetadata(merged);
   if (
     mergedMeta?.phase === "preview" &&
-    (typeof (merged as Record<string, unknown>).operationId === "string" ||
-      typeof mergedMeta?.operationId === "string")
+    decodePaymentRequestEntryPhase(merged).kind === "delivered"
   ) {
     (mergedMeta as Record<string, unknown>).phase = "delivered";
   }
