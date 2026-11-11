@@ -303,6 +303,26 @@ describe('useOwnEventsSync', () => {
     unmount();
   });
 
+  it('writes the keys account events while another account is active', () => {
+    const { rerender, unmount } = mount();
+    // The active account has moved to B; the keys provider still holds A's keys.
+    useProfileStore.setState({ activeAccountIndex: 1 });
+
+    deliver(rerender, [
+      likeEvent(id(60), 'target-4'),
+      profileEvent(id(61), T, 'Alice'),
+      { id: id(62), kind: 3, pubkey: A, content: '', tags: [['p', B]], created_at: T },
+    ]);
+
+    // QUIRK: likes, notes and deletions go into whichever account's stores are loaded, here
+    // B's (D7). Only the profile and the follow list check the active account. A fix that
+    // waits for the keys and the active account to agree should change this on purpose.
+    expect(liked('target-4')).toBe(id(60));
+    expect(latestProfileId()).toBeUndefined();
+    expect(useNostrSocialStore.getState().contactsTags).toEqual([]);
+    unmount();
+  });
+
   it('starts over for a new account, and dispatches its events afresh', () => {
     const { rerender, unmount } = mount();
     const like = likeEvent(id(40), 'target-3');
