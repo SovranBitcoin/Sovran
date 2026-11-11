@@ -1115,6 +1115,29 @@ describe('an account with no follow list yet', () => {
     expect(social().followingPubkeys).toEqual({ [X]: true, [Y]: true });
   });
 
+  it('gives up on an indexer whose last update never comes, and keeps the follow', async () => {
+    jest.useFakeTimers();
+    relaysHold();
+    mockLayer = {
+      // The first paint says a source is still pending; no later update arrives.
+      getSocialGraph: jest.fn(async () =>
+        ok(graph([], 0, { complete: false, pending: ['primal'] }))
+      ),
+    };
+    const { ndk } = setup();
+
+    tap(Z);
+    let stopped = false;
+    void requestFollowSync(ndk, OWN).then(() => (stopped = true));
+    await jest.advanceTimersByTimeAsync(10_000);
+    expect(stopped).toBe(false);
+    await jest.advanceTimersByTimeAsync(5_001);
+
+    expect(stopped).toBe(true);
+    expect(mockPublish).not.toHaveBeenCalled();
+    expect(social().optimisticFollowsByPubkey[Z]?.pending).toBe(true);
+  });
+
   it('waits when an indexer failed to answer', async () => {
     relaysHold();
     mockLayer = {

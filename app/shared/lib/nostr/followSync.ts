@@ -17,7 +17,7 @@
 import type NDK from '@nostr-dev-kit/ndk-mobile';
 import { NDKEvent } from '@nostr-dev-kit/ndk-mobile';
 import { Contacts } from 'nostr-tools/kinds';
-import { supersedes, type facade } from 'nostr';
+import { supersedes, tiers, type facade } from 'nostr';
 import { z } from 'zod';
 
 import { nostrLog } from '@/shared/lib/logger';
@@ -216,12 +216,33 @@ function sameRelays(read: readonly string[], ownPubkey: string) {
 }
 
 /**
+ * How long to wait for the aggregate's last update. Each source still pending
+ * at the data layer's bookkeeping ceiling is recorded as failed, so that
+ * update comes by then; past it, and a margin, it is not coming.
+ */
+const INDEXERS_SETTLE_MS = tiers.DEFAULT_SOURCE_TIMEOUT_MS + 5_000;
+
+/** `promise`'s value, or `undefined` once `ms` have passed without one. */
+async function within<V>(promise: Promise<V>, ms: number): Promise<V | undefined> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<undefined>((resolve) => (timer = setTimeout(resolve, ms))),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
  * Ask the tiered facade whether the account has a follow list somewhere, once
  * every enabled source has settled. No source can prove there is none (nagg
  * answers "not served" for a list it lacks, the relay tier settles on a
  * majority of its relays), so this only holds a first follow back: `exists`
- * when any source returned a list, `unanswered` when one failed or the
- * answer says nothing about which sources settled, otherwise `none`.
+ * when any source returned a list, `unanswered` when one failed, the answer
+ * says nothing about which sources settled or they did not all settle in
+ * time, otherwise `none`.
  */
 async function askIndexers(pubkey: string): Promise<{ indexed: IndexedList; seed?: () => void }> {
   const layer = buildNostrDataLayer();
@@ -244,7 +265,10 @@ async function askIndexers(pubkey: string): Promise<{ indexed: IndexedList; seed
     return { indexed: noneServed ? 'none' : 'unanswered' };
   }
   if (!result.value.provenance) return { indexed: 'unanswered' };
-  const graph = result.value.provenance.complete ? result.value : await settled;
+  const graph = result.value.provenance.complete
+    ? result.value
+    : await within(settled, INDEXERS_SETTLE_MS);
+  if (!graph) return { indexed: 'unanswered' };
   if (graph.contactsUpdatedAt > 0)
     return {
       indexed: 'exists',
