@@ -177,6 +177,9 @@ async function buildRoutstrClient(baseUrl: string, canDispatch: () => boolean = 
       async sendToken(mintUrl, amount) {
         assertDispatch();
         await built.driver.flush();
+        // Asked again after the flush: a switch while it ran would otherwise
+        // mint a token only to abandon it to recovery.
+        assertDispatch();
         mintedFromHost = hostOf(mintUrl);
         const token = await wallet.sendToken(mintUrl, amount);
         originalToken = token;

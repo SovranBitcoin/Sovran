@@ -133,6 +133,25 @@ describe('Routstr payment ownership boundary', () => {
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
+  it('mints no token when the request stops being owned while the journal flushes before minting', async () => {
+    // Owned at the first check before minting; lost while the journal flushes.
+    const canDispatch = jest.fn().mockReturnValueOnce(true).mockReturnValue(false);
+    const bound = await getRoutstrClient('https://node.example', canDispatch);
+    await expect(
+      bound.client.routeRequest({
+        path: '/v1/chat/completions',
+        method: 'POST',
+        baseUrl: bound.baseUrl,
+        mintUrl: 'https://mint.example',
+        body: { model: 'm' },
+        modelId: 'm',
+      })
+    ).rejects.toThrow();
+    expect(canDispatch).toHaveBeenCalled();
+    expect(mockSend).not.toHaveBeenCalled();
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
   it('does not report a settled payment when the SDK swallows a failed change receive', async () => {
     mockReceive.mockResolvedValueOnce({ success: false, amount: 0, unit: 'sat' });
     const { bound } = await request();
