@@ -180,3 +180,19 @@ it('does not call an empty unfinished GitHub upload a published Android APK', ()
     ]).map((record) => record.evidence)
   ).toEqual(['release-only', 'published']);
 });
+
+it('can enrich an observation with an actual resolved tag commit without inventing a source from a branch name', () => {
+  const entry = {
+    tag_name: 'v0.1.3',
+    target_commitish: 'main',
+    draft: false,
+    prerelease: false,
+    published_at: '2026-09-12T18:44:28Z',
+    html_url: 'https://github.com/SovranBitcoin/Sovran/releases/tag/v0.1.3',
+    assets: [],
+  };
+  const previous = githubReleases([entry]);
+  expect(previous[0].sourceSha).toBeUndefined();
+  const enriched = githubReleases([entry], new Map([['v0.1.3', 'a'.repeat(40)]]));
+  expect(retainHistory(previous, enriched)[0].sourceSha).toBe('a'.repeat(40));
+});

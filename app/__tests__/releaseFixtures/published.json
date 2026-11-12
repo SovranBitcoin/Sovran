@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "observedAt": "2026-11-12T00:21:31.271Z",
+  "observedAt": "2026-11-12T00:49:19.596Z",
   "sources": [
     {
       "source": "https://apps.apple.com/gb/app/sovran/id6499554529",
@@ -5294,6 +5294,7 @@
       "platform": "github",
       "channel": "github-release",
       "version": "0.1.0",
+      "sourceSha": "d23d07230bad0d5db2172c863ac0deb21a1d4cff",
       "evidence": "release-only",
       "releasedAt": "2026-06-18T17:09:30Z",
       "source": "https://github.com/SovranBitcoin/Sovran/releases/tag/v0.1.0"
@@ -5303,6 +5304,7 @@
       "platform": "github",
       "channel": "github-release",
       "version": "0.1.3",
+      "sourceSha": "d9ad12c4bde03b609cd90a4487c466b88007a4cb",
       "evidence": "release-only",
       "releasedAt": "2026-09-12T18:44:28Z",
       "source": "https://github.com/SovranBitcoin/Sovran/releases/tag/v0.1.3"
@@ -5312,6 +5314,7 @@
       "platform": "android",
       "channel": "github-apk",
       "version": "0.1.3",
+      "sourceSha": "d9ad12c4bde03b609cd90a4487c466b88007a4cb",
       "evidence": "published",
       "releasedAt": "2026-09-12T18:44:28Z",
       "source": "https://github.com/SovranBitcoin/Sovran/releases/download/v0.1.3/sovran-0.1.3.apk"

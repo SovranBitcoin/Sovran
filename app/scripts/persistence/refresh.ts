@@ -50,7 +50,16 @@ export async function refreshCatalog(
   const pages = z
     .array(z.array(z.unknown()))
     .parse(gh('--paginate', '--slurp', `repos/${repo}/releases?per_page=100`));
-  const github = githubReleases(pages.flat());
+  const preliminary = githubReleases(pages.flat());
+  const tagCommits = new Map<string, string>();
+  for (const release of preliminary.filter((entry) => entry.channel === 'github-release')) {
+    const tag = release.id.slice('github:'.length);
+    const commit = z
+      .object({ sha: z.string().regex(/^[a-f0-9]{40}$/) })
+      .parse(gh(`repos/${repo}/commits/${encodeURIComponent(tag)}`));
+    tagCommits.set(tag, commit.sha);
+  }
+  const github = githubReleases(pages.flat(), tagCommits);
   const eas = easBuilds(
     readFileSync(join(root, 'docs/architecture/persistence/store-builds.tsv'), 'utf8')
   );

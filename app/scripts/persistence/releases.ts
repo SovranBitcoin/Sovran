@@ -136,7 +136,10 @@ const githubSchema = z.array(
     ),
   })
 );
-export function githubReleases(input: unknown): ReleaseObservation[] {
+export function githubReleases(
+  input: unknown,
+  tagCommits: ReadonlyMap<string, string> = new Map()
+): ReleaseObservation[] {
   return githubSchema
     .parse(input)
     .filter((entry) => !entry.draft && !entry.prerelease && entry.published_at)
@@ -148,6 +151,7 @@ export function githubReleases(input: unknown): ReleaseObservation[] {
       return [
         observationSchema.parse({
           id: `github:${entry.tag_name}`,
+          sourceSha: tagCommits.get(entry.tag_name),
           platform: 'github',
           channel: 'github-release',
           version: releaseVersion,
@@ -158,6 +162,7 @@ export function githubReleases(input: unknown): ReleaseObservation[] {
         ...apks.map((asset) =>
           observationSchema.parse({
             id: `github:${entry.tag_name}:${asset.name}`,
+            sourceSha: tagCommits.get(entry.tag_name),
             platform: 'android',
             channel: 'github-apk',
             version: releaseVersion,
@@ -231,9 +236,21 @@ export function retainHistory(
   const records = new Map(previous.map((record) => [record.id, record]));
   for (const record of observed) {
     const before = records.get(record.id);
-    if (before && JSON.stringify(before) !== JSON.stringify(record))
-      throw new Error(`Contradictory release evidence: ${record.id}`);
-    records.set(record.id, record);
+    if (before)
+      for (const key of Object.keys(before)) {
+        if (key === 'sourceKnown') continue;
+        const was: unknown = Reflect.get(before, key);
+        const now: unknown = Reflect.get(record, key);
+        if (was !== undefined && now !== undefined && was !== now)
+          throw new Error(`Contradictory release evidence: ${record.id}`);
+      }
+    records.set(
+      record.id,
+      observationSchema.parse({
+        ...before,
+        ...Object.fromEntries(Object.entries(record).filter(([, value]) => value !== undefined)),
+      })
+    );
   }
   const confirmations = new Map<string, string>();
   for (const record of records.values()) {
