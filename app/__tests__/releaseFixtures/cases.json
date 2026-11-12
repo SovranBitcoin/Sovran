@@ -1,0 +1,275 @@
+[
+  {
+    "id": "restore-pending",
+    "epoch": "E19",
+    "store": "wallet-lifecycle",
+    "source": {
+      "commit": "d9ad12c4b",
+      "path": "shared/stores/global/walletLifecycleStore.ts:36-41",
+      "reason": "Historical restore enum and companion fields; pending was written by AppGate, other states retain compatibility with earlier builds."
+    },
+    "rows": [
+      {
+        "storage": "asyncStorage",
+        "key": "wallet-lifecycle",
+        "edits": [
+          {
+            "kind": "set",
+            "path": ["state", "restoreStatus"],
+            "value": "pending"
+          },
+          {
+            "kind": "set",
+            "path": ["state", "seedCreatedAt"],
+            "value": null
+          },
+          {
+            "kind": "set",
+            "path": ["state", "lastRestoreAt"],
+            "value": null
+          },
+          {
+            "kind": "set",
+            "path": ["state", "lastRestoreError"],
+            "value": null
+          }
+        ]
+      }
+    ],
+    "replaces": ["that no restore is needed", "when the phrase was made"],
+    "facts": [
+      {
+        "what": "the restore record's restoreStatus",
+        "store": "wallet-lifecycle",
+        "path": ["restoreStatus"],
+        "equals": "pending"
+      },
+      {
+        "what": "the restore record's seedCreatedAt",
+        "store": "wallet-lifecycle",
+        "path": ["seedCreatedAt"],
+        "equals": null
+      },
+      {
+        "what": "the restore record's lastRestoreAt",
+        "store": "wallet-lifecycle",
+        "path": ["lastRestoreAt"],
+        "equals": null
+      },
+      {
+        "what": "the restore record's lastRestoreError",
+        "store": "wallet-lifecycle",
+        "path": ["lastRestoreError"],
+        "equals": null
+      }
+    ],
+    "diskFacts": [
+      {
+        "storage": "asyncStorage",
+        "key": "wallet-lifecycle",
+        "path": ["state", "restoreStatus"],
+        "equals": "pending"
+      },
+      {
+        "storage": "asyncStorage",
+        "key": "wallet-lifecycle",
+        "path": ["state", "seedCreatedAt"],
+        "equals": null
+      },
+      {
+        "storage": "asyncStorage",
+        "key": "wallet-lifecycle",
+        "path": ["state", "lastRestoreAt"],
+        "equals": null
+      },
+      {
+        "storage": "asyncStorage",
+        "key": "wallet-lifecycle",
+        "path": ["state", "lastRestoreError"],
+        "equals": null
+      }
+    ]
+  },
+  {
+    "id": "restore-in-progress",
+    "epoch": "E19",
+    "store": "wallet-lifecycle",
+    "source": {
+      "commit": "d9ad12c4b",
+      "path": "shared/stores/global/walletLifecycleStore.ts:36-41",
+      "reason": "Historical restore enum and companion fields; pending was written by AppGate, other states retain compatibility with earlier builds."
+    },
+    "rows": [
+      {
+        "storage": "asyncStorage",
+        "key": "wallet-lifecycle",
+        "edits": [
+          {
+            "kind": "set",
+            "path": ["state", "restoreStatus"],
+            "value": "in-progress"
+          },
+          {
+            "kind": "set",
+            "path": ["state", "seedCreatedAt"],
+            "value": null
+          },
+          {
+            "kind": "set",
+            "path": ["state", "lastRestoreAt"],
+            "value": 1788000000000
+          },
+          {
+            "kind": "set",
+            "path": ["state", "lastRestoreError"],
+            "value": null
+          }
+        ]
+      }
+    ],
+    "replaces": ["that no restore is needed", "when the phrase was made"],
+    "facts": [
+      {
+        "what": "the restore record's restoreStatus",
+        "store": "wallet-lifecycle",
+        "path": ["restoreStatus"],
+        "equals": "in-progress"
+      },
+      {
+        "what": "the restore record's seedCreatedAt",
+        "store": "wallet-lifecycle",
+        "path": ["seedCreatedAt"],
+        "equals": null
+      },
+      {
+        "what": "the restore record's lastRestoreAt",
+        "store": "wallet-lifecycle",
+        "path": ["lastRestoreAt"],
+        "equals": 1788000000000
+      },
+      {
+        "what": "the restore record's lastRestoreError",
+        "store": "wallet-lifecycle",
+        "path": ["lastRestoreError"],
+        "equals": null
+      }
+    ],
+    "diskFacts": [
+      {
+        "storage": "asyncStorage",
+        "key": "wallet-lifecycle",
+        "path": ["state", "restoreStatus"],
+        "equals": "in-progress"
+      },
+      {
+        "storage": "asyncStorage",
+        "key": "wallet-lifecycle",
+        "path": ["state", "seedCreatedAt"],
+        "equals": null
+      },
+      {
+        "storage": "asyncStorage",
+        "key": "wallet-lifecycle",
+        "path": ["state", "lastRestoreAt"],
+        "equals": 1788000000000
+      },
+      {
+        "storage": "asyncStorage",
+        "key": "wallet-lifecycle",
+        "path": ["state", "lastRestoreError"],
+        "equals": null
+      }
+    ]
+  },
+  {
+    "id": "restore-failed",
+    "epoch": "E19",
+    "store": "wallet-lifecycle",
+    "source": {
+      "commit": "d9ad12c4b",
+      "path": "shared/stores/global/walletLifecycleStore.ts:36-41",
+      "reason": "Historical restore enum and companion fields; pending was written by AppGate, other states retain compatibility with earlier builds."
+    },
+    "rows": [
+      {
+        "storage": "asyncStorage",
+        "key": "wallet-lifecycle",
+        "edits": [
+          {
+            "kind": "set",
+            "path": ["state", "restoreStatus"],
+            "value": "failed"
+          },
+          {
+            "kind": "set",
+            "path": ["state", "seedCreatedAt"],
+            "value": null
+          },
+          {
+            "kind": "set",
+            "path": ["state", "lastRestoreAt"],
+            "value": null
+          },
+          {
+            "kind": "set",
+            "path": ["state", "lastRestoreError"],
+            "value": "Could not reach https://mint.example/Bitcoin"
+          }
+        ]
+      }
+    ],
+    "replaces": ["that no restore is needed", "when the phrase was made"],
+    "facts": [
+      {
+        "what": "the restore record's restoreStatus",
+        "store": "wallet-lifecycle",
+        "path": ["restoreStatus"],
+        "equals": "failed"
+      },
+      {
+        "what": "the restore record's seedCreatedAt",
+        "store": "wallet-lifecycle",
+        "path": ["seedCreatedAt"],
+        "equals": null
+      },
+      {
+        "what": "the restore record's lastRestoreAt",
+        "store": "wallet-lifecycle",
+        "path": ["lastRestoreAt"],
+        "equals": null
+      },
+      {
+        "what": "the restore record's lastRestoreError",
+        "store": "wallet-lifecycle",
+        "path": ["lastRestoreError"],
+        "equals": "Could not reach https://mint.example/Bitcoin"
+      }
+    ],
+    "diskFacts": [
+      {
+        "storage": "asyncStorage",
+        "key": "wallet-lifecycle",
+        "path": ["state", "restoreStatus"],
+        "equals": "failed"
+      },
+      {
+        "storage": "asyncStorage",
+        "key": "wallet-lifecycle",
+        "path": ["state", "seedCreatedAt"],
+        "equals": null
+      },
+      {
+        "storage": "asyncStorage",
+        "key": "wallet-lifecycle",
+        "path": ["state", "lastRestoreAt"],
+        "equals": null
+      },
+      {
+        "storage": "asyncStorage",
+        "key": "wallet-lifecycle",
+        "path": ["state", "lastRestoreError"],
+        "equals": "Could not reach https://mint.example/Bitcoin"
+      }
+    ]
+  }
+]
