@@ -6,7 +6,7 @@ import { createRequire } from "node:module";
 import { siteBrandFiles, generateSiteBrand } from "./site-brand.mjs";
 
 const root = new URL("../", import.meta.url);
-const require = createRequire(new URL("app/package.json", root));
+const require = createRequire(new URL("site/package.json", root));
 const sharp = require("sharp");
 const hash = (bytes) => createHash("sha256").update(bytes).digest("hex");
 const files = await siteBrandFiles();
