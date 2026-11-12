@@ -63,7 +63,7 @@ const rules: Rule[] = [];
 // reviewed scenario must not silently inherit permission to publish or spend.
 const REVIEWED_STEPS: Record<string, string> = {
   'store.screenshots': 'a52bc34fb965b292b3cd6a120fcfd6e562f29d09993f54abddb8d45ca6ce5880',
-  'marketing.screenshots': '450416c9fad96340bffb49213debaa305d255dd733499078dc191c71a84772b3',
+  'marketing.screenshots': '56d44d0eadaa6543d2e523b16adbb1a9b666a02495f5af4bfd3a2cda760d26e6',
   'marketing.screenshots.wallpapers':
     '0975631fb929f95d12fa4b28ca3e64acea5e0baeaa7d0d9e193834ba40a51897',
   'marketing.screenshots.media': '03f950e886a9f3666c8c9eb1c9929961e15d9c62bd1abe2d1349b2619dc814df',
@@ -146,7 +146,7 @@ recipe('marketing.screenshots', 'native-fixture', [
   ['feed', 'demo-feed-ready'],
   ['notifications', 'screen-notifications'],
   ['settings', 'ACCOUNT'],
-  ['ai', 'e2e-action-menu-open:model-picker', 2, 'model-picker'],
+  ['ai', 'Model', 2, 'model-picker'],
   ['receive-qr', 'payment-info-bip321-data'],
 ]);
 recipe('marketing.screenshots.media', 'native-fixture', [

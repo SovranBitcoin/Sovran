@@ -70,7 +70,7 @@
     {"action":"tapUntil","sequence":[{"tap":{"id":"header-profile-avatar"}}],"until":{"id":"drawer-menu-ai"},"attempts":4,"settleMs":6000},
     {"action":"tapUntil","sequence":[{"tap":{"id":"drawer-menu-ai"}}],"until":{"id":"screen-ai"},"attempts":4,"settleMs":6000},
     {"action":"screenshot","name":"ai","delayMs":1200},
-    {"action":"tapUntil","sequence":[{"tap":{"id":"ai-model-chip"}}],"until":{"id":"e2e-action-menu-open:model-picker"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"ai-model-chip"}}],"until":{"label":"Model"},"attempts":4,"settleMs":6000},
     {"action":"screenshot","name":"ai","delayMs":1200},
     {"action":"goHome"},
     {"action":"goHome"},
