@@ -204,12 +204,16 @@ it('exposes profile switching as a checked switch and toggles in both directions
   expect(toggle().props.accessibilityRole).toBe('switch');
   expect(toggle().props.accessibilityLabel).toBe('Switch profiles without restart');
   expect(toggle().props.accessibilityState).toEqual({ checked: false });
-  act(() => toggle().props.onPress());
+  act(() => {
+    toggle().props.onPress();
+  });
   expect(mockSetInProcessProfileSwitch).toHaveBeenLastCalledWith(true);
 
   mockInProcessProfileSwitch = true;
   act(() => tree.update(<SettingsScreen />));
   expect(toggle().props.accessibilityState).toEqual({ checked: true });
-  act(() => toggle().props.onPress());
+  act(() => {
+    toggle().props.onPress();
+  });
   expect(mockSetInProcessProfileSwitch).toHaveBeenLastCalledWith(false);
 });

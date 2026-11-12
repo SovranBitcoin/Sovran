@@ -878,3 +878,7 @@ and evidence documentation; no phone store, key, database, migration or wire for
 - No additional native capture, funded operation, live publication, Android UI or persistence
   certification was run for these tooling changes. Saved checks remain unavailable (jevlint
   absent). The release-safety verdict remains INCONCLUSIVE. Existing follow-ups retain limits.
+
+The full lint rerun found two floating-promise errors in the newly added component-test
+callbacks (241 pre-existing warnings elsewhere). Explicit void-returning act callbacks repair
+both; focused ESLint and all five settings tests then passed. No production code changed.
