@@ -882,3 +882,16 @@ and evidence documentation; no phone store, key, database, migration or wire for
 The full lint rerun found two floating-promise errors in the newly added component-test
 callbacks (241 pre-existing warnings elsewhere). Explicit void-returning act callbacks repair
 both; focused ESLint and all five settings tests then passed. No production code changed.
+
+## PR 305 Linux nginx smoke launcher — 2026-11-12
+
+- Current CI progressed beyond capture freshness and branding, then nginx failed opening
+  `/dev/stderr` (ENXIO). Reproduced the unchanged smoke test in an isolated Linux/Bun 1.4.2
+  container: two tests passed, real nginx startup failed with the same error.
+- The test now supplies a private 0600 regular file as the child's stderr, closes the parent's
+  descriptor even if spawn throws, and reads that file for startup diagnostics. The production
+  nginx template, real routing/security assertions and owned-child cleanup are unchanged.
+- Linux rerun: all three tests and 228 assertions passed. Full website command: 150 Bun tests
+  and 20 Node tests passed. Two independent Sol reviewers audited the pinned diff and each
+  reran the three nginx tests on macOS; no new defect verified. They did not independently
+  rerun Linux. Claude/Fable remain unavailable. No product behavior or saved state changed.
