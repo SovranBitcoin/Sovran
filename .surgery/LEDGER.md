@@ -772,3 +772,70 @@ fixtures and release sources and independently audited the diffs/tests. Final in
 audits covered each of `0cf94477b`, `812d6745c` and `1e4728ad5` against its parent; they
 found no additional verified defect and ran focused tooling tests (15 and 24 passing tests). Claude Fable 5.2 was
 unavailable due the API rate limit; no cross-provider review is claimed. No push or PR.
+
+## Consolidated merge: CI repairs (2026-11-12)
+
+The owner approved publishing and merging the consolidated Sovran work through PR #305,
+excluding the separate Wallet Sync/Marmot branch. Every local surgery branch is contained;
+the ten separate lab commits remain outside the candidate. Existing White Noise maintenance
+belongs to the surgery stack and remains included. The main checkout's older untracked notes
+were preserved outside the repository before its initial local fast-forward.
+
+### What changed and why
+
+- Reproduced the docs build's 22 dead links. Repository-only targets now use GitHub source
+  links, and the historical persistence audit folder has an index. The dead-link gate remains on.
+- Reproduced stale website assertions: a now-valid Android capture was expected to be withheld,
+  mint/melt audit wording was still called swap success, and a fixture hard-coded an old page
+  count. Explicit off-profile PNG inputs retain device rejection coverage; a separate test checks
+  every real canonical page on both platforms.
+- Reproduced the native CLI dropping its first flag when no edition was named. Nine new cases
+  failed before repair. Parsing now preserves status/force ordering and rejects malformed,
+  duplicate, incompatible and path-bearing arguments before effects. The parsed result is typed
+  explicitly. Router characterization uses real routes so generated Expo route types accept it.
+- A native screenshot run reached the model picker but waited for its retired action-menu probe.
+  The recipe now waits for the exact visible Model title present in native accessibility evidence;
+  its expanded effects/privacy pin was re-reviewed for that selector-only change. The repaired
+  step passed in the successful run. No send or publish control was added to either recipe.
+- A complete native run could not import because historical welcome-page records predate the
+  current page registry. The historical reader now retains safe page names while preserving
+  all other record/path/hash/privacy checks. New records still require current canonical pages.
+  A regression reproduced the failure, then proved record/byte retention and tamper rejection.
+- Refreshed the existing public iOS fixture captures and derived social artwork through the normal
+  pipeline. Both complete scenarios, their verification and cleanup passed. Six website-selected
+  images were visually inspected and report current source fingerprints. Sixteen library records
+  were refreshed; no record was removed, no unrefreshed record changed, and both retired welcome
+  records were preserved exactly. No old persistence-fixture disk or release hash was rewritten.
+
+### Behaviour changed
+
+Product behaviour: none in these CI repairs. Tooling now treats native flags correctly and
+preserves screenshot evidence for retired pages. No phone store, key, database, migration,
+wire format, dependency declaration, lockfile, app version or release workflow was changed.
+
+### Verification and evidence limits
+
+- Docs and public website builds pass without disabling any source, freshness, privacy, profile,
+  artifact-integrity or dead-link gate. Derived artwork check and canonical legal-byte checks pass.
+- Full website command: 150 Bun tests and 20 Node tests passed. Capture/import and native-tooling
+  tests pass, including the new red/green regressions. Router cooldown: twelve tests passed.
+- Root type-check passes every workspace and both app platforms. Lint reports zero errors and
+  241 baseline warnings; knip, copy, follow-up and whitespace checks pass.
+- Native presentation evidence: iPhone 17 Pro Max, iOS 26.2, disposable simulators, approved mock
+  fixtures, funds n/a. Marketing and store scenarios completed 104 and 107 expanded steps,
+  respectively, with complete cleanup. These captures do not establish funded payment, live AI
+  response, relay-publication, device storage or upgrade safety. Android native UI was not run.
+- The first native attempts exposed local setup gaps: uninitialized pinned submodules, the existing
+  vendor postinstall patch, and dependency-directory symlinks into another checkout. A normal
+  frozen-lock install fixed the Uniwind NativeModules startup recursion; onboarding then passed.
+  The builder rejected a setup-time fingerprint drift; the successful build retained the guard.
+- GPT-6.1 Sol implemented the repairs. Separate Sol agents independently audited the link,
+  assertion, CLI, selector/effect-pin and historical-reader diffs and ran focused tests. Claude
+  remained unavailable, so no final cross-provider review is claimed. Saved-check automation
+  remains unavailable. The release-safety verdict remains INCONCLUSIVE, not inferred from CI.
+
+Independent artifact audit of `efa9598d0` verified all six selected sources and OG provenance
+are current, both native receipts match the completed runs, and all 216 library records remain.
+Sixteen were refreshed; no unrefreshed record changed. Only public PNGs and whitelisted JSON
+were committed. No absolute local artifact paths or private-key encodings were found. Final
+GitHub checks remain the merge gate; no release-safety certification is inferred from them.
