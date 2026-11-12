@@ -73,7 +73,8 @@
     "screenshots:status": "bun app/e2e/capture/status.ts",
     "screenshots:test": "bun test app/e2e/capture && node --test scripts/capture-cli.test.mjs",
     "screenshots:native-build": "bun app/e2e/press/native-build.ts",
-    "assets:wallpapers": "node scripts/fetch-wallpapers.mjs"
+    "assets:wallpapers": "node scripts/fetch-wallpapers.mjs",
+    "persistence": "bun app/scripts/persistence.ts"
   },
   "devDependencies": {
     "opentype.js": "2.0.0",
