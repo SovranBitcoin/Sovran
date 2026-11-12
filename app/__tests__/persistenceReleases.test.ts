@@ -1,6 +1,7 @@
 /** @jest-environment node */
 import {
   appleHistory,
+  githubReleases,
   pipelineReleases,
   mapRelease,
   retainHistory,
@@ -153,4 +154,29 @@ it('maps every retained observation and every current build inventory entry to a
         `${record.platform} ${record.version} build ${record.build ?? 'unknown'}: ${record.id}`
     )
   ).toEqual([]);
+});
+
+it('does not call an empty unfinished GitHub upload a published Android APK', () => {
+  const entry = {
+    tag_name: 'v0.1.3',
+    draft: false,
+    prerelease: false,
+    published_at: '2026-09-12T18:44:28Z',
+    html_url: 'https://github.com/SovranBitcoin/Sovran/releases/tag/v0.1.3',
+    assets: [
+      {
+        name: 'wallet.apk',
+        state: 'starter',
+        size: 0,
+        browser_download_url:
+          'https://github.com/SovranBitcoin/Sovran/releases/download/v0.1.3/wallet.apk',
+      },
+    ],
+  };
+  expect(githubReleases([entry]).map((record) => record.evidence)).toEqual(['release-only']);
+  expect(
+    githubReleases([
+      { ...entry, assets: [{ ...entry.assets[0], state: 'uploaded', size: 123 }] },
+    ]).map((record) => record.evidence)
+  ).toEqual(['release-only', 'published']);
 });

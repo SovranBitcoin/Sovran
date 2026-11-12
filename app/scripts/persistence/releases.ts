@@ -126,7 +126,14 @@ const githubSchema = z.array(
     prerelease: z.boolean(),
     published_at: z.string().nullable(),
     html_url: z.string().url(),
-    assets: z.array(z.object({ name: z.string(), browser_download_url: z.string().url() })),
+    assets: z.array(
+      z.object({
+        name: z.string(),
+        browser_download_url: z.string().url(),
+        state: z.string(),
+        size: z.number().int().nonnegative(),
+      })
+    ),
   })
 );
 export function githubReleases(input: unknown): ReleaseObservation[] {
@@ -135,7 +142,9 @@ export function githubReleases(input: unknown): ReleaseObservation[] {
     .filter((entry) => !entry.draft && !entry.prerelease && entry.published_at)
     .flatMap((entry) => {
       const releaseVersion = version.parse(entry.tag_name.replace(/^v/, ''));
-      const apks = entry.assets.filter((asset) => asset.name.endsWith('.apk'));
+      const apks = entry.assets.filter(
+        (asset) => asset.name.endsWith('.apk') && asset.state === 'uploaded' && asset.size > 0
+      );
       return [
         observationSchema.parse({
           id: `github:${entry.tag_name}`,
