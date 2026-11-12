@@ -729,22 +729,35 @@ export async function ensureNativeBuild(
   return built;
 }
 
+export function parseNativeBuildArgs(args: readonly string[]) {
+  const [platform, ...flags] = args;
+  if (platform !== 'ios' && platform !== 'android') throw new Error('Choose ios or android');
+  const kind: BuildKind = flags.includes('--bundled') ? 'bundled' : 'dev';
+  const editionAt = flags.indexOf('--edition');
+  const edition = editionAt === -1 ? undefined : flags[editionAt + 1];
+  for (const option of ['--bundled', '--edition'])
+    if (flags.filter((flag) => flag === option).length > 1) throw new Error(`Duplicate ${option}`);
+  if (editionAt !== -1 && (!edition || !/^[a-z][a-z0-9-]*$/.test(edition)))
+    throw new Error('--edition needs a named edition');
+  const remaining = flags.filter(
+    (value, index) =>
+      value !== '--bundled' &&
+      (editionAt === -1 || (index !== editionAt && index !== editionAt + 1))
+  );
+  if (remaining.length > 1) throw new Error('Choose one of --force or --status');
+  const [flag] = remaining;
+  if (edition !== undefined) {
+    if (platform !== 'ios' || kind !== 'bundled' || flag !== undefined)
+      throw new Error('--edition goes with `ios --bundled` and nothing else');
+  } else if (flag !== undefined && flag !== '--force' && flag !== '--status')
+    throw new Error('Choose --force or --status');
+  return { platform, kind, edition, flag };
+}
+
 if (import.meta.main) {
   try {
-    const [platform, ...flags] = process.argv.slice(2);
-    const kind: BuildKind = flags.includes('--bundled') ? 'bundled' : 'dev';
-    const editionAt = flags.indexOf('--edition');
-    const edition = editionAt === -1 ? undefined : flags[editionAt + 1];
-    const [flag] = flags.filter(
-      (value, index) => value !== '--bundled' && index !== editionAt && index !== editionAt + 1
-    );
-    if (platform !== 'ios' && platform !== 'android')
-      throw new Error(
-        'Usage: bun app/e2e/press/native-build.ts ios|android [--bundled [--edition full]] [--force|--status]'
-      );
+    const { platform, kind, edition, flag } = parseNativeBuildArgs(process.argv.slice(2));
     if (edition !== undefined) {
-      if (platform !== 'ios' || kind !== 'bundled' || flag !== undefined)
-        throw new Error('--edition goes with `ios --bundled` and nothing else');
       await ensureNativeBuild('ios', 'auto', 'bundled');
       console.log(JSON.stringify(await bundledEdition(edition), null, 2));
     } else if (flag === '--status') {
@@ -766,7 +779,6 @@ if (import.meta.main) {
         )
       );
     } else {
-      if (flag !== undefined && flag !== '--force') throw new Error('Choose --force or --status');
       const stamp = await ensureNativeBuild(platform, flag === '--force' ? 'force' : 'auto', kind);
       console.log(JSON.stringify(stamp, null, 2));
     }
