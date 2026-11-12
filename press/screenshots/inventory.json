@@ -212,76 +212,6 @@
       "privacy": "disposable-profile",
       "platform": "android",
       "baseline": false,
-      "stepId": "T17",
-      "status": "captured",
-      "blocker": null,
-      "publicationEligibility": "eligible-after-verification",
-      "platformProfile": {
-        "driver": "android",
-        "orientation": "portrait",
-        "identity": "disposable",
-        "effects": "navigation-only"
-      },
-      "readinessStepIds": [
-        "T16"
-      ],
-      "routes": [],
-      "latestAttempt": {
-        "at": "2026-09-25T20:03:15.175Z",
-        "status": "captured",
-        "attempts": 1,
-        "runs": [
-          "run-2026-09-25T20-03-19-999Z-f4dc6f19"
-        ]
-      }
-    },
-    {
-      "scenario": "capture.onboarding",
-      "page": "onboarding-carousel",
-      "occurrence": 2,
-      "state": "profile",
-      "evidenceClass": "native-navigation",
-      "readiness": [
-        "Carry your profile with you"
-      ],
-      "privacy": "disposable-profile",
-      "platform": "android",
-      "baseline": false,
-      "stepId": "T15",
-      "status": "captured",
-      "blocker": null,
-      "publicationEligibility": "eligible-after-verification",
-      "platformProfile": {
-        "driver": "android",
-        "orientation": "portrait",
-        "identity": "disposable",
-        "effects": "navigation-only"
-      },
-      "readinessStepIds": [
-        "T14"
-      ],
-      "routes": [],
-      "latestAttempt": {
-        "at": "2026-09-25T20:03:15.175Z",
-        "status": "captured",
-        "attempts": 1,
-        "runs": [
-          "run-2026-09-25T20-03-19-999Z-f4dc6f19"
-        ]
-      }
-    },
-    {
-      "scenario": "capture.onboarding",
-      "page": "onboarding-carousel",
-      "occurrence": 4,
-      "state": "start-small",
-      "evidenceClass": "native-navigation",
-      "readiness": [
-        "Start small"
-      ],
-      "privacy": "disposable-profile",
-      "platform": "android",
-      "baseline": false,
       "stepId": "T19",
       "status": "captured",
       "blocker": null,
@@ -307,17 +237,17 @@
     },
     {
       "scenario": "capture.onboarding",
-      "page": "welcome",
-      "occurrence": 1,
-      "state": "default",
+      "page": "onboarding-carousel",
+      "occurrence": 2,
+      "state": "profile",
       "evidenceClass": "native-navigation",
       "readiness": [
-        "Welcome to Sovran"
+        "Carry your profile with you"
       ],
       "privacy": "disposable-profile",
       "platform": "android",
-      "baseline": true,
-      "stepId": "T21",
+      "baseline": false,
+      "stepId": "T16",
       "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
@@ -328,7 +258,42 @@
         "effects": "navigation-only"
       },
       "readinessStepIds": [
-        "T20"
+        "T15"
+      ],
+      "routes": [],
+      "latestAttempt": {
+        "at": "2026-09-25T20:03:15.175Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T20-03-19-999Z-f4dc6f19"
+        ]
+      }
+    },
+    {
+      "scenario": "capture.onboarding",
+      "page": "onboarding-carousel",
+      "occurrence": 4,
+      "state": "start-small",
+      "evidenceClass": "native-navigation",
+      "readiness": [
+        "Start small"
+      ],
+      "privacy": "disposable-profile",
+      "platform": "android",
+      "baseline": false,
+      "stepId": "T22",
+      "status": "captured",
+      "blocker": null,
+      "publicationEligibility": "eligible-after-verification",
+      "platformProfile": {
+        "driver": "android",
+        "orientation": "portrait",
+        "identity": "disposable",
+        "effects": "navigation-only"
+      },
+      "readinessStepIds": [
+        "T21"
       ],
       "routes": [],
       "latestAttempt": {
@@ -402,7 +367,7 @@
         "effects": "navigation-only"
       },
       "readinessStepIds": [
-        "P32"
+        "P34"
       ],
       "routes": [
         "(drawer)/(tabs)/index/index.tsx"
@@ -1069,7 +1034,7 @@
       "privacy": "public-fixture",
       "platform": "android",
       "baseline": true,
-      "stepId": "T46",
+      "stepId": "T47",
       "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
@@ -1080,7 +1045,7 @@
         "effects": "navigation-only"
       },
       "readinessStepIds": [
-        "T45"
+        "T46"
       ],
       "routes": [
         "(receive-flow)/receive.tsx"
@@ -1365,7 +1330,7 @@
       "privacy": "public-fixture",
       "platform": "android",
       "baseline": true,
-      "stepId": "T13",
+      "stepId": "T14",
       "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
@@ -1376,7 +1341,7 @@
         "effects": "navigation-only"
       },
       "readinessStepIds": [
-        "T12"
+        "T13"
       ],
       "routes": [
         "(receive-flow)/lightningReceive.tsx",
@@ -1406,8 +1371,8 @@
       "baseline": true,
       "stepId": "T22",
       "status": "blocked",
-      "blocker": "Re-review effects/privacy for changed recipe capture.history, including expanded fixtures, then update REVIEWED_STEPS.",
-      "publicationEligibility": "blocked",
+      "blocker": null,
+      "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
         "driver": "android",
         "orientation": "portrait",
@@ -1505,8 +1470,8 @@
       "baseline": true,
       "stepId": "T15",
       "status": "blocked",
-      "blocker": "Re-review effects/privacy for changed recipe capture.history, including expanded fixtures, then update REVIEWED_STEPS.",
-      "publicationEligibility": "blocked",
+      "blocker": null,
+      "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
         "driver": "android",
         "orientation": "portrait",
@@ -1542,8 +1507,8 @@
       "baseline": true,
       "stepId": "T10",
       "status": "blocked",
-      "blocker": "Re-review effects/privacy for changed recipe capture.history, including expanded fixtures, then update REVIEWED_STEPS.",
-      "publicationEligibility": "blocked",
+      "blocker": null,
+      "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
         "driver": "android",
         "orientation": "portrait",
@@ -2353,6 +2318,106 @@
       }
     },
     {
+      "platform": "android",
+      "page": "details",
+      "state": "default",
+      "baseline": true,
+      "scenario": null,
+      "occurrence": null,
+      "stepId": null,
+      "evidenceClass": "unavailable",
+      "privacy": "blocked",
+      "publicationEligibility": "blocked",
+      "status": "blocked",
+      "blocker": "Review details.tsx and add an effect-reviewed recipe with page-specific readiness; no recipe is approved for this canonical page.",
+      "platformProfile": {
+        "driver": "android",
+        "orientation": "portrait",
+        "identity": "disposable",
+        "effects": "navigation-only"
+      },
+      "readiness": [],
+      "readinessStepIds": [],
+      "routes": [
+        "details.tsx"
+      ]
+    },
+    {
+      "platform": "android",
+      "page": "picker",
+      "state": "default",
+      "baseline": true,
+      "scenario": null,
+      "occurrence": null,
+      "stepId": null,
+      "evidenceClass": "unavailable",
+      "privacy": "blocked",
+      "publicationEligibility": "blocked",
+      "status": "blocked",
+      "blocker": "Review picker.tsx and add an effect-reviewed recipe with page-specific readiness; no recipe is approved for this canonical page.",
+      "platformProfile": {
+        "driver": "android",
+        "orientation": "portrait",
+        "identity": "disposable",
+        "effects": "navigation-only"
+      },
+      "readiness": [],
+      "readinessStepIds": [],
+      "routes": [
+        "picker.tsx"
+      ]
+    },
+    {
+      "platform": "android",
+      "page": "emoji-picker",
+      "state": "default",
+      "baseline": true,
+      "scenario": null,
+      "occurrence": null,
+      "stepId": null,
+      "evidenceClass": "unavailable",
+      "privacy": "blocked",
+      "publicationEligibility": "blocked",
+      "status": "blocked",
+      "blocker": "Review emojiPicker.tsx and add an effect-reviewed recipe with page-specific readiness; no recipe is approved for this canonical page.",
+      "platformProfile": {
+        "driver": "android",
+        "orientation": "portrait",
+        "identity": "disposable",
+        "effects": "navigation-only"
+      },
+      "readiness": [],
+      "readinessStepIds": [],
+      "routes": [
+        "emojiPicker.tsx"
+      ]
+    },
+    {
+      "platform": "android",
+      "page": "note-picker",
+      "state": "default",
+      "baseline": true,
+      "scenario": null,
+      "occurrence": null,
+      "stepId": null,
+      "evidenceClass": "unavailable",
+      "privacy": "blocked",
+      "publicationEligibility": "blocked",
+      "status": "blocked",
+      "blocker": "Review notes.tsx and add an effect-reviewed recipe with page-specific readiness; no recipe is approved for this canonical page.",
+      "platformProfile": {
+        "driver": "android",
+        "orientation": "portrait",
+        "identity": "disposable",
+        "effects": "navigation-only"
+      },
+      "readiness": [],
+      "readinessStepIds": [],
+      "routes": [
+        "notes.tsx"
+      ]
+    },
+    {
       "scenario": "capture.local-navigation",
       "page": "camera",
       "occurrence": 1,
@@ -2586,7 +2651,7 @@
       "privacy": "public-fixture",
       "platform": "android",
       "baseline": true,
-      "stepId": "T35",
+      "stepId": "T36",
       "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
@@ -2597,7 +2662,7 @@
         "effects": "navigation-only"
       },
       "readinessStepIds": [
-        "T34"
+        "T35"
       ],
       "routes": [
         "(drawer)/(tabs)/contacts/index.tsx"
@@ -2698,7 +2763,7 @@
       "privacy": "public-fixture",
       "platform": "android",
       "baseline": true,
-      "stepId": "T29",
+      "stepId": "T30",
       "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
@@ -2709,7 +2774,7 @@
         "effects": "navigation-only"
       },
       "readinessStepIds": [
-        "T28"
+        "T29"
       ],
       "routes": [
         "(drawer)/(tabs)/ai/index.tsx"
@@ -2730,7 +2795,7 @@
       "state": "model-picker",
       "evidenceClass": "native-fixture",
       "readiness": [
-        "e2e-action-menu-open:model-picker"
+        "Model"
       ],
       "privacy": "public-fixture",
       "platform": "android",
@@ -2887,7 +2952,7 @@
       "privacy": "public-fixture",
       "platform": "android",
       "baseline": true,
-      "stepId": "T11",
+      "stepId": "T12",
       "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
@@ -2898,7 +2963,7 @@
         "effects": "navigation-only"
       },
       "readinessStepIds": [
-        "T10"
+        "T11"
       ],
       "routes": [
         "(transactions-flow)/transactions.tsx"
@@ -2924,7 +2989,7 @@
       "privacy": "public-fixture",
       "platform": "android",
       "baseline": true,
-      "stepId": "T42",
+      "stepId": "T43",
       "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
@@ -2935,7 +3000,7 @@
         "effects": "navigation-only"
       },
       "readinessStepIds": [
-        "T41"
+        "T42"
       ],
       "routes": [
         "(mint-flow)/distribution.tsx"
@@ -2988,8 +3053,8 @@
       "baseline": true,
       "stepId": "T29",
       "status": "blocked",
-      "blocker": "Re-review effects/privacy for changed recipe capture.history, including expanded fixtures, then update REVIEWED_STEPS.",
-      "publicationEligibility": "blocked",
+      "blocker": null,
+      "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
         "driver": "android",
         "orientation": "portrait",
@@ -3717,6 +3782,31 @@
       }
     },
     {
+      "platform": "android",
+      "page": "receive-message-ecash",
+      "state": "default",
+      "baseline": true,
+      "scenario": null,
+      "occurrence": null,
+      "stepId": null,
+      "evidenceClass": "unavailable",
+      "privacy": "blocked",
+      "publicationEligibility": "blocked",
+      "status": "blocked",
+      "blocker": "Review (receive-flow)/messageEcash.tsx and add an effect-reviewed recipe with page-specific readiness; no recipe is approved for this canonical page.",
+      "platformProfile": {
+        "driver": "android",
+        "orientation": "portrait",
+        "identity": "disposable",
+        "effects": "navigation-only"
+      },
+      "readiness": [],
+      "readinessStepIds": [],
+      "routes": [
+        "(receive-flow)/messageEcash.tsx"
+      ]
+    },
+    {
       "scenario": "capture.receive-rails",
       "page": "receive-rails",
       "occurrence": 3,
@@ -3913,7 +4003,7 @@
       "privacy": "public-fixture",
       "platform": "android",
       "baseline": true,
-      "stepId": "T17",
+      "stepId": "T25",
       "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
@@ -3924,7 +4014,7 @@
         "effects": "navigation-only"
       },
       "readinessStepIds": [
-        "T16"
+        "T24"
       ],
       "routes": [
         "(settings-flow)/design-system-empty-states.tsx"
@@ -3950,7 +4040,7 @@
       "privacy": "public-fixture",
       "platform": "android",
       "baseline": true,
-      "stepId": "T29",
+      "stepId": "T37",
       "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
@@ -3961,7 +4051,7 @@
         "effects": "navigation-only"
       },
       "readinessStepIds": [
-        "T28"
+        "T36"
       ],
       "routes": [
         "(settings-flow)/design-system-fade-stress.tsx"
@@ -3987,7 +4077,7 @@
       "privacy": "public-fixture",
       "platform": "android",
       "baseline": true,
-      "stepId": "T05",
+      "stepId": "T13",
       "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
@@ -3998,7 +4088,7 @@
         "effects": "navigation-only"
       },
       "readinessStepIds": [
-        "T04"
+        "T12"
       ],
       "routes": [
         "(settings-flow)/design-system-foundations.tsx"
@@ -4024,7 +4114,7 @@
       "privacy": "public-fixture",
       "platform": "android",
       "baseline": true,
-      "stepId": "T09",
+      "stepId": "T17",
       "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
@@ -4035,7 +4125,7 @@
         "effects": "navigation-only"
       },
       "readinessStepIds": [
-        "T08"
+        "T16"
       ],
       "routes": [
         "(settings-flow)/design-system-loading.tsx"
@@ -4061,7 +4151,7 @@
       "privacy": "public-fixture",
       "platform": "android",
       "baseline": true,
-      "stepId": "T34",
+      "stepId": "T42",
       "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
@@ -4072,7 +4162,7 @@
         "effects": "navigation-only"
       },
       "readinessStepIds": [
-        "T33"
+        "T41"
       ],
       "routes": [
         "(settings-flow)/design-system-posts.tsx"
@@ -4088,6 +4178,115 @@
     },
     {
       "scenario": "capture.design-system",
+      "page": "settings-design-system-screens",
+      "occurrence": 1,
+      "state": "default",
+      "evidenceClass": "native-fixture",
+      "readiness": [
+        "ds-screens-unit-sat"
+      ],
+      "privacy": "public-fixture",
+      "platform": "android",
+      "baseline": true,
+      "stepId": "T05",
+      "status": "notattempted",
+      "blocker": null,
+      "publicationEligibility": "eligible-after-verification",
+      "platformProfile": {
+        "driver": "android",
+        "orientation": "portrait",
+        "identity": "disposable",
+        "effects": "navigation-only"
+      },
+      "readinessStepIds": [
+        "T04"
+      ],
+      "routes": [
+        "(settings-flow)/design-system-screens.tsx"
+      ]
+    },
+    {
+      "platform": "android",
+      "page": "settings-design-system-prompts",
+      "state": "default",
+      "baseline": true,
+      "scenario": null,
+      "occurrence": null,
+      "stepId": null,
+      "evidenceClass": "unavailable",
+      "privacy": "blocked",
+      "publicationEligibility": "blocked",
+      "status": "blocked",
+      "blocker": "Review (settings-flow)/design-system-prompts.tsx and add an effect-reviewed recipe with page-specific readiness; no recipe is approved for this canonical page.",
+      "platformProfile": {
+        "driver": "android",
+        "orientation": "portrait",
+        "identity": "disposable",
+        "effects": "navigation-only"
+      },
+      "readiness": [],
+      "readinessStepIds": [],
+      "routes": [
+        "(settings-flow)/design-system-prompts.tsx"
+      ]
+    },
+    {
+      "platform": "android",
+      "page": "settings-design-system-prompt",
+      "state": "default",
+      "baseline": true,
+      "scenario": null,
+      "occurrence": null,
+      "stepId": null,
+      "evidenceClass": "unavailable",
+      "privacy": "blocked",
+      "publicationEligibility": "blocked",
+      "status": "blocked",
+      "blocker": "Review (settings-flow)/design-system-prompt.tsx, (prompt-flow)/cta-sample.tsx and add an effect-reviewed recipe with page-specific readiness; no recipe is approved for this canonical page.",
+      "platformProfile": {
+        "driver": "android",
+        "orientation": "portrait",
+        "identity": "disposable",
+        "effects": "navigation-only"
+      },
+      "readiness": [],
+      "readinessStepIds": [],
+      "routes": [
+        "(settings-flow)/design-system-prompt.tsx",
+        "(prompt-flow)/cta-sample.tsx"
+      ]
+    },
+    {
+      "scenario": "capture.design-system",
+      "page": "settings-design-system-variations",
+      "occurrence": 1,
+      "state": "default",
+      "evidenceClass": "native-fixture",
+      "readiness": [
+        "ds-subject-transaction-row"
+      ],
+      "privacy": "public-fixture",
+      "platform": "android",
+      "baseline": true,
+      "stepId": "T09",
+      "status": "notattempted",
+      "blocker": null,
+      "publicationEligibility": "eligible-after-verification",
+      "platformProfile": {
+        "driver": "android",
+        "orientation": "portrait",
+        "identity": "disposable",
+        "effects": "navigation-only"
+      },
+      "readinessStepIds": [
+        "T08"
+      ],
+      "routes": [
+        "(settings-flow)/design-system-variations.tsx"
+      ]
+    },
+    {
+      "scenario": "capture.design-system",
       "page": "settings-design-system-segmented",
       "occurrence": 1,
       "state": "default",
@@ -4098,9 +4297,9 @@
       "privacy": "public-fixture",
       "platform": "android",
       "baseline": true,
-      "stepId": "T13",
+      "stepId": "T21",
       "status": "blocked",
-      "blocker": "Add mandatory readiness wait for Pause immediately before T13",
+      "blocker": "Add mandatory readiness wait for Pause immediately before T21",
       "publicationEligibility": "blocked",
       "platformProfile": {
         "driver": "android",
@@ -4133,7 +4332,7 @@
       "privacy": "public-fixture",
       "platform": "android",
       "baseline": true,
-      "stepId": "T22",
+      "stepId": "T30",
       "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
@@ -4144,7 +4343,7 @@
         "effects": "navigation-only"
       },
       "readinessStepIds": [
-        "T21"
+        "T29"
       ],
       "routes": [
         "(settings-flow)/design-system-skeleton-crossfade.tsx"
@@ -5052,8 +5251,8 @@
       "baseline": true,
       "stepId": "T06",
       "status": "blocked",
-      "blocker": "Re-review effects/privacy for changed recipe capture.history, including expanded fixtures, then update REVIEWED_STEPS.",
-      "publicationEligibility": "blocked",
+      "blocker": null,
+      "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
         "driver": "android",
         "orientation": "portrait",
@@ -5348,76 +5547,6 @@
       "privacy": "disposable-profile",
       "platform": "ios",
       "baseline": false,
-      "stepId": "T17",
-      "status": "captured",
-      "blocker": null,
-      "publicationEligibility": "eligible-after-verification",
-      "platformProfile": {
-        "driver": "sim",
-        "orientation": "portrait",
-        "identity": "disposable",
-        "effects": "navigation-only"
-      },
-      "readinessStepIds": [
-        "T16"
-      ],
-      "routes": [],
-      "latestAttempt": {
-        "at": "2026-09-25T20:00:56.294Z",
-        "status": "captured",
-        "attempts": 1,
-        "runs": [
-          "run-2026-09-25T20-01-01-836Z-649d9764"
-        ]
-      }
-    },
-    {
-      "scenario": "capture.onboarding",
-      "page": "onboarding-carousel",
-      "occurrence": 2,
-      "state": "profile",
-      "evidenceClass": "native-navigation",
-      "readiness": [
-        "Carry your profile with you"
-      ],
-      "privacy": "disposable-profile",
-      "platform": "ios",
-      "baseline": false,
-      "stepId": "T15",
-      "status": "captured",
-      "blocker": null,
-      "publicationEligibility": "eligible-after-verification",
-      "platformProfile": {
-        "driver": "sim",
-        "orientation": "portrait",
-        "identity": "disposable",
-        "effects": "navigation-only"
-      },
-      "readinessStepIds": [
-        "T14"
-      ],
-      "routes": [],
-      "latestAttempt": {
-        "at": "2026-09-25T20:00:56.294Z",
-        "status": "captured",
-        "attempts": 1,
-        "runs": [
-          "run-2026-09-25T20-01-01-836Z-649d9764"
-        ]
-      }
-    },
-    {
-      "scenario": "capture.onboarding",
-      "page": "onboarding-carousel",
-      "occurrence": 4,
-      "state": "start-small",
-      "evidenceClass": "native-navigation",
-      "readiness": [
-        "Start small"
-      ],
-      "privacy": "disposable-profile",
-      "platform": "ios",
-      "baseline": false,
       "stepId": "T19",
       "status": "captured",
       "blocker": null,
@@ -5443,17 +5572,17 @@
     },
     {
       "scenario": "capture.onboarding",
-      "page": "welcome",
-      "occurrence": 1,
-      "state": "default",
+      "page": "onboarding-carousel",
+      "occurrence": 2,
+      "state": "profile",
       "evidenceClass": "native-navigation",
       "readiness": [
-        "Welcome to Sovran"
+        "Carry your profile with you"
       ],
       "privacy": "disposable-profile",
       "platform": "ios",
-      "baseline": true,
-      "stepId": "T21",
+      "baseline": false,
+      "stepId": "T16",
       "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
@@ -5464,7 +5593,42 @@
         "effects": "navigation-only"
       },
       "readinessStepIds": [
-        "T20"
+        "T15"
+      ],
+      "routes": [],
+      "latestAttempt": {
+        "at": "2026-09-25T20:00:56.294Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T20-01-01-836Z-649d9764"
+        ]
+      }
+    },
+    {
+      "scenario": "capture.onboarding",
+      "page": "onboarding-carousel",
+      "occurrence": 4,
+      "state": "start-small",
+      "evidenceClass": "native-navigation",
+      "readiness": [
+        "Start small"
+      ],
+      "privacy": "disposable-profile",
+      "platform": "ios",
+      "baseline": false,
+      "stepId": "T22",
+      "status": "captured",
+      "blocker": null,
+      "publicationEligibility": "eligible-after-verification",
+      "platformProfile": {
+        "driver": "sim",
+        "orientation": "portrait",
+        "identity": "disposable",
+        "effects": "navigation-only"
+      },
+      "readinessStepIds": [
+        "T21"
       ],
       "routes": [],
       "latestAttempt": {
@@ -5536,17 +5700,17 @@
         "effects": "navigation-only"
       },
       "readinessStepIds": [
-        "P32"
+        "P34"
       ],
       "routes": [
         "(drawer)/(tabs)/index/index.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-28T04:40:47.643Z",
+        "at": "2026-11-12T02:26:35.559Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-28T04-40-54-232Z-d1e4941a"
+          "run-2026-11-12T02-26-40-784Z-41a69cc9"
         ]
       }
     },
@@ -6187,7 +6351,7 @@
       "privacy": "public-fixture",
       "platform": "ios",
       "baseline": true,
-      "stepId": "T46",
+      "stepId": "T47",
       "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
@@ -6198,17 +6362,17 @@
         "effects": "navigation-only"
       },
       "readinessStepIds": [
-        "T45"
+        "T46"
       ],
       "routes": [
         "(receive-flow)/receive.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-28T04:40:47.643Z",
+        "at": "2026-11-12T02:26:35.559Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-28T04-40-54-232Z-d1e4941a"
+          "run-2026-11-12T02-26-40-784Z-41a69cc9"
         ]
       }
     },
@@ -6299,7 +6463,7 @@
       "platform": "ios",
       "baseline": true,
       "stepId": "T15",
-      "status": "running",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -6315,10 +6479,12 @@
         "(receive-flow)/qrDisplay.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-28T04:49:58.762Z",
-        "status": "running",
+        "at": "2026-11-12T02:11:35.937Z",
+        "status": "captured",
         "attempts": 1,
-        "runs": []
+        "runs": [
+          "run-2026-11-12T02-11-40-025Z-902ef0bc"
+        ]
       }
     },
     {
@@ -6481,7 +6647,7 @@
       "privacy": "public-fixture",
       "platform": "ios",
       "baseline": true,
-      "stepId": "T13",
+      "stepId": "T14",
       "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
@@ -6492,7 +6658,7 @@
         "effects": "navigation-only"
       },
       "readinessStepIds": [
-        "T12"
+        "T13"
       ],
       "routes": [
         "(receive-flow)/lightningReceive.tsx",
@@ -6500,11 +6666,11 @@
         "lightningReceive.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-28T04:40:47.643Z",
+        "at": "2026-11-12T02:26:35.559Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-28T04-40-54-232Z-d1e4941a"
+          "run-2026-11-12T02-26-40-784Z-41a69cc9"
         ]
       }
     },
@@ -6522,8 +6688,8 @@
       "baseline": true,
       "stepId": "T22",
       "status": "blocked",
-      "blocker": "Re-review effects/privacy for changed recipe capture.history, including expanded fixtures, then update REVIEWED_STEPS.",
-      "publicationEligibility": "blocked",
+      "blocker": null,
+      "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
         "driver": "sim",
         "orientation": "portrait",
@@ -6560,7 +6726,7 @@
       "platform": "ios",
       "baseline": true,
       "stepId": "T19",
-      "status": "running",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -6576,10 +6742,12 @@
         "(send-flow)/send.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-28T04:49:58.762Z",
-        "status": "running",
+        "at": "2026-11-12T02:11:35.937Z",
+        "status": "captured",
         "attempts": 1,
-        "runs": []
+        "runs": [
+          "run-2026-11-12T02-11-40-025Z-902ef0bc"
+        ]
       }
     },
     {
@@ -6621,8 +6789,8 @@
       "baseline": true,
       "stepId": "T15",
       "status": "blocked",
-      "blocker": "Re-review effects/privacy for changed recipe capture.history, including expanded fixtures, then update REVIEWED_STEPS.",
-      "publicationEligibility": "blocked",
+      "blocker": null,
+      "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
         "driver": "sim",
         "orientation": "portrait",
@@ -6660,8 +6828,8 @@
       "baseline": true,
       "stepId": "T10",
       "status": "blocked",
-      "blocker": "Re-review effects/privacy for changed recipe capture.history, including expanded fixtures, then update REVIEWED_STEPS.",
-      "publicationEligibility": "blocked",
+      "blocker": null,
+      "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
         "driver": "sim",
         "orientation": "portrait",
@@ -6883,7 +7051,7 @@
       "platform": "ios",
       "baseline": true,
       "stepId": "T03",
-      "status": "running",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -6900,10 +7068,12 @@
         "(send-flow)/mintSelect.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-28T04:49:58.762Z",
-        "status": "running",
+        "at": "2026-11-12T02:11:35.937Z",
+        "status": "captured",
         "attempts": 1,
-        "runs": []
+        "runs": [
+          "run-2026-11-12T02-11-40-025Z-902ef0bc"
+        ]
       }
     },
     {
@@ -7030,7 +7200,7 @@
       "platform": "ios",
       "baseline": true,
       "stepId": "T06",
-      "status": "running",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -7046,10 +7216,12 @@
         "(mint-flow)/info.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-28T04:49:58.762Z",
-        "status": "running",
+        "at": "2026-11-12T02:11:35.937Z",
+        "status": "captured",
         "attempts": 1,
-        "runs": []
+        "runs": [
+          "run-2026-11-12T02-11-40-025Z-902ef0bc"
+        ]
       }
     },
     {
@@ -7437,7 +7609,7 @@
       "platform": "ios",
       "baseline": true,
       "stepId": "T27",
-      "status": "running",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -7456,11 +7628,113 @@
         "userMessages.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-28T04:49:58.762Z",
-        "status": "running",
+        "at": "2026-11-12T02:11:35.937Z",
+        "status": "captured",
         "attempts": 1,
-        "runs": []
+        "runs": [
+          "run-2026-11-12T02-11-40-025Z-902ef0bc"
+        ]
       }
+    },
+    {
+      "platform": "ios",
+      "page": "details",
+      "state": "default",
+      "baseline": true,
+      "scenario": null,
+      "occurrence": null,
+      "stepId": null,
+      "evidenceClass": "unavailable",
+      "privacy": "blocked",
+      "publicationEligibility": "blocked",
+      "status": "blocked",
+      "blocker": "Review details.tsx and add an effect-reviewed recipe with page-specific readiness; no recipe is approved for this canonical page.",
+      "platformProfile": {
+        "driver": "sim",
+        "orientation": "portrait",
+        "identity": "disposable",
+        "effects": "navigation-only"
+      },
+      "readiness": [],
+      "readinessStepIds": [],
+      "routes": [
+        "details.tsx"
+      ]
+    },
+    {
+      "platform": "ios",
+      "page": "picker",
+      "state": "default",
+      "baseline": true,
+      "scenario": null,
+      "occurrence": null,
+      "stepId": null,
+      "evidenceClass": "unavailable",
+      "privacy": "blocked",
+      "publicationEligibility": "blocked",
+      "status": "blocked",
+      "blocker": "Review picker.tsx and add an effect-reviewed recipe with page-specific readiness; no recipe is approved for this canonical page.",
+      "platformProfile": {
+        "driver": "sim",
+        "orientation": "portrait",
+        "identity": "disposable",
+        "effects": "navigation-only"
+      },
+      "readiness": [],
+      "readinessStepIds": [],
+      "routes": [
+        "picker.tsx"
+      ]
+    },
+    {
+      "platform": "ios",
+      "page": "emoji-picker",
+      "state": "default",
+      "baseline": true,
+      "scenario": null,
+      "occurrence": null,
+      "stepId": null,
+      "evidenceClass": "unavailable",
+      "privacy": "blocked",
+      "publicationEligibility": "blocked",
+      "status": "blocked",
+      "blocker": "Review emojiPicker.tsx and add an effect-reviewed recipe with page-specific readiness; no recipe is approved for this canonical page.",
+      "platformProfile": {
+        "driver": "sim",
+        "orientation": "portrait",
+        "identity": "disposable",
+        "effects": "navigation-only"
+      },
+      "readiness": [],
+      "readinessStepIds": [],
+      "routes": [
+        "emojiPicker.tsx"
+      ]
+    },
+    {
+      "platform": "ios",
+      "page": "note-picker",
+      "state": "default",
+      "baseline": true,
+      "scenario": null,
+      "occurrence": null,
+      "stepId": null,
+      "evidenceClass": "unavailable",
+      "privacy": "blocked",
+      "publicationEligibility": "blocked",
+      "status": "blocked",
+      "blocker": "Review notes.tsx and add an effect-reviewed recipe with page-specific readiness; no recipe is approved for this canonical page.",
+      "platformProfile": {
+        "driver": "sim",
+        "orientation": "portrait",
+        "identity": "disposable",
+        "effects": "navigation-only"
+      },
+      "readiness": [],
+      "readinessStepIds": [],
+      "routes": [
+        "notes.tsx"
+      ]
     },
     {
       "scenario": "capture.local-navigation",
@@ -7549,7 +7823,7 @@
       "platform": "ios",
       "baseline": true,
       "stepId": "T50",
-      "status": "running",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -7565,10 +7839,12 @@
         "(settings-flow)/index.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-28T04:49:58.762Z",
-        "status": "running",
+        "at": "2026-11-12T02:11:35.937Z",
+        "status": "captured",
         "attempts": 1,
-        "runs": []
+        "runs": [
+          "run-2026-11-12T02-11-40-025Z-902ef0bc"
+        ]
       }
     },
     {
@@ -7584,7 +7860,7 @@
       "platform": "ios",
       "baseline": true,
       "stepId": "T32",
-      "status": "running",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -7600,10 +7876,12 @@
         "(drawer)/(tabs)/feed/index.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-28T04:49:58.762Z",
-        "status": "running",
+        "at": "2026-11-12T02:11:35.937Z",
+        "status": "captured",
         "attempts": 1,
-        "runs": []
+        "runs": [
+          "run-2026-11-12T02-11-40-025Z-902ef0bc"
+        ]
       }
     },
     {
@@ -7692,7 +7970,7 @@
       "privacy": "public-fixture",
       "platform": "ios",
       "baseline": true,
-      "stepId": "T35",
+      "stepId": "T36",
       "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
@@ -7703,17 +7981,17 @@
         "effects": "navigation-only"
       },
       "readinessStepIds": [
-        "T34"
+        "T35"
       ],
       "routes": [
         "(drawer)/(tabs)/contacts/index.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-28T04:40:47.643Z",
+        "at": "2026-11-12T02:26:35.559Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-28T04-40-54-232Z-d1e4941a"
+          "run-2026-11-12T02-26-40-784Z-41a69cc9"
         ]
       }
     },
@@ -7730,7 +8008,7 @@
       "platform": "ios",
       "baseline": true,
       "stepId": "T37",
-      "status": "running",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -7746,10 +8024,12 @@
         "(drawer)/(tabs)/notifications/index.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-28T04:49:58.762Z",
-        "status": "running",
+        "at": "2026-11-12T02:11:35.937Z",
+        "status": "captured",
         "attempts": 1,
-        "runs": []
+        "runs": [
+          "run-2026-11-12T02-11-40-025Z-902ef0bc"
+        ]
       }
     },
     {
@@ -7801,7 +8081,7 @@
       "privacy": "public-fixture",
       "platform": "ios",
       "baseline": true,
-      "stepId": "T29",
+      "stepId": "T30",
       "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
@@ -7812,17 +8092,17 @@
         "effects": "navigation-only"
       },
       "readinessStepIds": [
-        "T28"
+        "T29"
       ],
       "routes": [
         "(drawer)/(tabs)/ai/index.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-28T04:40:47.643Z",
+        "at": "2026-11-12T02:26:35.559Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-28T04-40-54-232Z-d1e4941a"
+          "run-2026-11-12T02-26-40-784Z-41a69cc9"
         ]
       }
     },
@@ -7833,13 +8113,13 @@
       "state": "model-picker",
       "evidenceClass": "native-fixture",
       "readiness": [
-        "e2e-action-menu-open:model-picker"
+        "Model"
       ],
       "privacy": "public-fixture",
       "platform": "ios",
       "baseline": false,
       "stepId": "T44",
-      "status": "running",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -7855,10 +8135,12 @@
         "(drawer)/(tabs)/ai/index.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-28T04:49:58.762Z",
-        "status": "running",
+        "at": "2026-11-12T02:11:35.937Z",
+        "status": "captured",
         "attempts": 1,
-        "runs": []
+        "runs": [
+          "run-2026-11-12T02-11-40-025Z-902ef0bc"
+        ]
       }
     },
     {
@@ -7984,7 +8266,7 @@
       "privacy": "public-fixture",
       "platform": "ios",
       "baseline": true,
-      "stepId": "T11",
+      "stepId": "T12",
       "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
@@ -7995,17 +8277,17 @@
         "effects": "navigation-only"
       },
       "readinessStepIds": [
-        "T10"
+        "T11"
       ],
       "routes": [
         "(transactions-flow)/transactions.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-28T04:40:47.643Z",
+        "at": "2026-11-12T02:26:35.559Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-28T04-40-54-232Z-d1e4941a"
+          "run-2026-11-12T02-26-40-784Z-41a69cc9"
         ]
       }
     },
@@ -8021,7 +8303,7 @@
       "privacy": "public-fixture",
       "platform": "ios",
       "baseline": true,
-      "stepId": "T42",
+      "stepId": "T43",
       "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
@@ -8032,17 +8314,17 @@
         "effects": "navigation-only"
       },
       "readinessStepIds": [
-        "T41"
+        "T42"
       ],
       "routes": [
         "(mint-flow)/distribution.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-28T04:40:47.643Z",
+        "at": "2026-11-12T02:26:35.559Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-28T04-40-54-232Z-d1e4941a"
+          "run-2026-11-12T02-26-40-784Z-41a69cc9"
         ]
       }
     },
@@ -8085,8 +8367,8 @@
       "baseline": true,
       "stepId": "T29",
       "status": "blocked",
-      "blocker": "Re-review effects/privacy for changed recipe capture.history, including expanded fixtures, then update REVIEWED_STEPS.",
-      "publicationEligibility": "blocked",
+      "blocker": null,
+      "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
         "driver": "sim",
         "orientation": "portrait",
@@ -8810,6 +9092,31 @@
       }
     },
     {
+      "platform": "ios",
+      "page": "receive-message-ecash",
+      "state": "default",
+      "baseline": true,
+      "scenario": null,
+      "occurrence": null,
+      "stepId": null,
+      "evidenceClass": "unavailable",
+      "privacy": "blocked",
+      "publicationEligibility": "blocked",
+      "status": "blocked",
+      "blocker": "Review (receive-flow)/messageEcash.tsx and add an effect-reviewed recipe with page-specific readiness; no recipe is approved for this canonical page.",
+      "platformProfile": {
+        "driver": "sim",
+        "orientation": "portrait",
+        "identity": "disposable",
+        "effects": "navigation-only"
+      },
+      "readiness": [],
+      "readinessStepIds": [],
+      "routes": [
+        "(receive-flow)/messageEcash.tsx"
+      ]
+    },
+    {
       "scenario": "capture.receive-rails",
       "page": "receive-rails",
       "occurrence": 3,
@@ -9006,7 +9313,7 @@
       "privacy": "public-fixture",
       "platform": "ios",
       "baseline": true,
-      "stepId": "T17",
+      "stepId": "T25",
       "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
@@ -9017,7 +9324,7 @@
         "effects": "navigation-only"
       },
       "readinessStepIds": [
-        "T16"
+        "T24"
       ],
       "routes": [
         "(settings-flow)/design-system-empty-states.tsx"
@@ -9043,7 +9350,7 @@
       "privacy": "public-fixture",
       "platform": "ios",
       "baseline": true,
-      "stepId": "T29",
+      "stepId": "T37",
       "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
@@ -9054,7 +9361,7 @@
         "effects": "navigation-only"
       },
       "readinessStepIds": [
-        "T28"
+        "T36"
       ],
       "routes": [
         "(settings-flow)/design-system-fade-stress.tsx"
@@ -9080,7 +9387,7 @@
       "privacy": "public-fixture",
       "platform": "ios",
       "baseline": true,
-      "stepId": "T05",
+      "stepId": "T13",
       "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
@@ -9091,7 +9398,7 @@
         "effects": "navigation-only"
       },
       "readinessStepIds": [
-        "T04"
+        "T12"
       ],
       "routes": [
         "(settings-flow)/design-system-foundations.tsx"
@@ -9117,7 +9424,7 @@
       "privacy": "public-fixture",
       "platform": "ios",
       "baseline": true,
-      "stepId": "T09",
+      "stepId": "T17",
       "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
@@ -9128,7 +9435,7 @@
         "effects": "navigation-only"
       },
       "readinessStepIds": [
-        "T08"
+        "T16"
       ],
       "routes": [
         "(settings-flow)/design-system-loading.tsx"
@@ -9154,7 +9461,7 @@
       "privacy": "public-fixture",
       "platform": "ios",
       "baseline": true,
-      "stepId": "T34",
+      "stepId": "T42",
       "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
@@ -9165,7 +9472,7 @@
         "effects": "navigation-only"
       },
       "readinessStepIds": [
-        "T33"
+        "T41"
       ],
       "routes": [
         "(settings-flow)/design-system-posts.tsx"
@@ -9181,6 +9488,115 @@
     },
     {
       "scenario": "capture.design-system",
+      "page": "settings-design-system-screens",
+      "occurrence": 1,
+      "state": "default",
+      "evidenceClass": "native-fixture",
+      "readiness": [
+        "ds-screens-unit-sat"
+      ],
+      "privacy": "public-fixture",
+      "platform": "ios",
+      "baseline": true,
+      "stepId": "T05",
+      "status": "notattempted",
+      "blocker": null,
+      "publicationEligibility": "eligible-after-verification",
+      "platformProfile": {
+        "driver": "sim",
+        "orientation": "portrait",
+        "identity": "disposable",
+        "effects": "navigation-only"
+      },
+      "readinessStepIds": [
+        "T04"
+      ],
+      "routes": [
+        "(settings-flow)/design-system-screens.tsx"
+      ]
+    },
+    {
+      "platform": "ios",
+      "page": "settings-design-system-prompts",
+      "state": "default",
+      "baseline": true,
+      "scenario": null,
+      "occurrence": null,
+      "stepId": null,
+      "evidenceClass": "unavailable",
+      "privacy": "blocked",
+      "publicationEligibility": "blocked",
+      "status": "blocked",
+      "blocker": "Review (settings-flow)/design-system-prompts.tsx and add an effect-reviewed recipe with page-specific readiness; no recipe is approved for this canonical page.",
+      "platformProfile": {
+        "driver": "sim",
+        "orientation": "portrait",
+        "identity": "disposable",
+        "effects": "navigation-only"
+      },
+      "readiness": [],
+      "readinessStepIds": [],
+      "routes": [
+        "(settings-flow)/design-system-prompts.tsx"
+      ]
+    },
+    {
+      "platform": "ios",
+      "page": "settings-design-system-prompt",
+      "state": "default",
+      "baseline": true,
+      "scenario": null,
+      "occurrence": null,
+      "stepId": null,
+      "evidenceClass": "unavailable",
+      "privacy": "blocked",
+      "publicationEligibility": "blocked",
+      "status": "blocked",
+      "blocker": "Review (settings-flow)/design-system-prompt.tsx, (prompt-flow)/cta-sample.tsx and add an effect-reviewed recipe with page-specific readiness; no recipe is approved for this canonical page.",
+      "platformProfile": {
+        "driver": "sim",
+        "orientation": "portrait",
+        "identity": "disposable",
+        "effects": "navigation-only"
+      },
+      "readiness": [],
+      "readinessStepIds": [],
+      "routes": [
+        "(settings-flow)/design-system-prompt.tsx",
+        "(prompt-flow)/cta-sample.tsx"
+      ]
+    },
+    {
+      "scenario": "capture.design-system",
+      "page": "settings-design-system-variations",
+      "occurrence": 1,
+      "state": "default",
+      "evidenceClass": "native-fixture",
+      "readiness": [
+        "ds-subject-transaction-row"
+      ],
+      "privacy": "public-fixture",
+      "platform": "ios",
+      "baseline": true,
+      "stepId": "T09",
+      "status": "notattempted",
+      "blocker": null,
+      "publicationEligibility": "eligible-after-verification",
+      "platformProfile": {
+        "driver": "sim",
+        "orientation": "portrait",
+        "identity": "disposable",
+        "effects": "navigation-only"
+      },
+      "readinessStepIds": [
+        "T08"
+      ],
+      "routes": [
+        "(settings-flow)/design-system-variations.tsx"
+      ]
+    },
+    {
+      "scenario": "capture.design-system",
       "page": "settings-design-system-segmented",
       "occurrence": 1,
       "state": "default",
@@ -9191,9 +9607,9 @@
       "privacy": "public-fixture",
       "platform": "ios",
       "baseline": true,
-      "stepId": "T13",
+      "stepId": "T21",
       "status": "blocked",
-      "blocker": "Add mandatory readiness wait for Pause immediately before T13",
+      "blocker": "Add mandatory readiness wait for Pause immediately before T21",
       "publicationEligibility": "blocked",
       "platformProfile": {
         "driver": "sim",
@@ -9226,7 +9642,7 @@
       "privacy": "public-fixture",
       "platform": "ios",
       "baseline": true,
-      "stepId": "T22",
+      "stepId": "T30",
       "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
@@ -9237,7 +9653,7 @@
         "effects": "navigation-only"
       },
       "readinessStepIds": [
-        "T21"
+        "T29"
       ],
       "routes": [
         "(settings-flow)/design-system-skeleton-crossfade.tsx"
@@ -10145,8 +10561,8 @@
       "baseline": true,
       "stepId": "T06",
       "status": "blocked",
-      "blocker": "Re-review effects/privacy for changed recipe capture.history, including expanded fixtures, then update REVIEWED_STEPS.",
-      "publicationEligibility": "blocked",
+      "blocker": null,
+      "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
         "driver": "sim",
         "orientation": "portrait",
@@ -10284,7 +10700,7 @@
     }
   ],
   "campaign": {
-    "startedAt": "2026-09-28T04:49:53.996Z",
+    "startedAt": "2026-11-12T02:26:31.109Z",
     "interrupted": false
   }
 }
