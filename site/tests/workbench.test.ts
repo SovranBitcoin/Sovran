@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { createServer } from 'vite';
 import { transform } from '@astrojs/compiler';
 import { dev } from 'astro';
+import { CANONICAL_PAGES } from '../../app/e2e/schema/pages';
 import { SCENE_PRESETS } from '../../scripts/lib/phone-frame.mjs';
 import { websiteCaptures } from '../scripts/website-captures.mjs';
 import { buildSourceCatalog } from '../scripts/source-catalog.mjs';
@@ -75,7 +76,15 @@ test('the public scene catalog admits only selected, hash-matching captures with
   expect(() => resolveScene({ screenshots: ['android/wallet'] })).toThrow();
 });
 
-test('retained captures declare one reviewed device, and off-profile ones are withheld', async () => {
+test('the catalog retains every canonical baseline slot on both platforms', async () => {
+  const catalog = await buildSourceCatalog(fileURLToPath(new URL('../../', import.meta.url)));
+  const baseline = catalog.captures.filter((capture: any) => capture.baseline);
+  expect(baseline.length).toBe(CANONICAL_PAGES.length * 2);
+  for (const platform of ['ios', 'android']) for (const page of CANONICAL_PAGES)
+    expect(baseline.some((capture: any) => capture.id === `${platform}/${page}`)).toBe(true);
+});
+
+test('retained captures declare reviewed devices and show profile information', async () => {
   const catalog = await buildSourceCatalog(fileURLToPath(new URL('../../', import.meta.url)));
   const frames = new Map<string, Set<string>>();
   for (const capture of catalog.captures.filter((item: any) => item.available))
@@ -83,14 +92,11 @@ test('retained captures declare one reviewed device, and off-profile ones are wi
       capture.platform,
       (frames.get(capture.platform) ?? new Set()).add(capture.frameId)
     );
-  // Android has exactly one body. A store-delivery capture is a different
-  // device, so it is withheld with its reason instead of being reframed.
+  // Every available capture uses a reviewed body. Rejection of off-profile
+  // images is exercised with explicit inputs in composition.test.mjs.
   expect([...(frames.get('android') ?? [])]).toEqual(['android-emulator']);
   for (const frameId of frames.get('ios') ?? [])
     expect(['iphone-17-pro', 'iphone-17-pro-max']).toContain(frameId);
-  const wallet = catalog.captures.find((item: any) => item.id === 'android/wallet');
-  expect(wallet.available).toBeFalsy();
-  expect(wallet.reason).toContain('1080x1920');
   // The workbench says the device beside each image, not only inside evidence.
   expect(read('../site/scripts/catalog-browser.mjs')).toContain('off library-v1');
 });

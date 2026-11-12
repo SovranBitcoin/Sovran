@@ -33,7 +33,7 @@ async function fixture(t) {
     await put(`press/artwork/${registry[id].file}`, bytes);
   }
   await put('press/artwork/source/screenshots.json', registry);
-  await put('app/e2e/schema/pages.ts', await readFile(join(repoRoot, 'app/e2e/schema/pages.ts')));
+  await put('app/e2e/schema/pages.ts', "export const CANONICAL_PAGES = [\n  'wallet',\n  'feed',\n  'send',\n  'camera',\n  'ai',\n  'settings',\n] as const;\n");
   await put('press/artwork/source/screenshot-context.json', { contexts: { wallet: { page: 'wallet', caption: 'Wallet', relatedPages: ['feed', 'send'] } }, collections: [] });
   for (const weight of ['ExtraBold', 'Medium']) { const file = `app/assets/fonts/MonaSans/MonaSans-${weight}.ttf`; await put(file, await readFile(join(repoRoot, file))); }
   // The published watermark is a real brand output, so renders need the real
@@ -43,6 +43,18 @@ async function fixture(t) {
   for (const variant of brand.variants) if (variant.svg) await put(`app/assets/brand/${variant.svg}`, await readFile(join(repoRoot, `app/assets/brand/${variant.svg}`)));
   return { root, put, registry };
 }
+
+test('off-profile Android pixels are withheld instead of being reframed', async t => {
+  const { root, put, registry } = await fixture(t);
+  const bytes = await sharp({ create: { width: 1080, height: 1920, channels: 4, background: '#54885b' } }).png().toBuffer();
+  await put(`press/artwork/${registry['android/wallet'].file}`, bytes);
+  registry['android/wallet'].sha256 = sha256(bytes);
+  await put('press/artwork/source/screenshots.json', registry);
+  const wallet = resolveCapture(await buildSourceCatalog(root), 'android/wallet');
+  assert.equal(wallet.available, false);
+  assert.match(wallet.reason, /1080x1920/);
+  await assert.rejects(renderComposition({ ...base, phones: [{ captureId: 'android/wallet' }] }, { repoRoot: root }), /unavailable/);
+});
 
 test('catalog never substitutes missing, mismatched, withdrawn or symlinked pixels; inventory alone is not image authority', async t => {
   const { root, put, registry } = await fixture(t);
@@ -99,11 +111,11 @@ async function libraryFixture(t) {
   return { ...setup, records, manifest, inventory };
 }
 
-test('all 202 canonical baseline slots exist before captures and inventory preserves blocked/planned/failed statuses', async t => {
+test('all canonical baseline slots exist before captures and inventory preserves blocked/planned/failed statuses', async t => {
   const { root, put } = await fixture(t);
   let catalog = await buildSourceCatalog(root);
-  assert.equal(catalog.coverage.baselineDenominator, 202);
-  assert.equal(catalog.coverage.baselineSlots, 202);
+  assert.equal(catalog.coverage.baselineDenominator, 12);
+  assert.equal(catalog.coverage.baselineSlots, 12);
   const camera = resolveCapture(catalog, 'ios/camera');
   assert.equal(camera.attemptStatus, 'blocked'); assert.match(camera.blocker, /plan unavailable/);
   await put('press/screenshots/inventory.json', { version: 1, targets: [
@@ -112,7 +124,7 @@ test('all 202 canonical baseline slots exist before captures and inventory prese
     { platform: 'ios', page: 'wallet', state: 'default', baseline: true, status: 'failed', lastAttempt: { reason: 'Timeout' } },
   ] });
   catalog = await buildSourceCatalog(root);
-  assert.equal(catalog.coverage.baselineSlots, 202);
+  assert.equal(catalog.coverage.baselineSlots, 12);
   assert.equal(resolveCapture(catalog, 'ios/camera').attemptStatus, 'blocked');
   assert.equal(resolveCapture(catalog, 'ios/camera').blocker, 'Permission fixture required');
   assert.equal(resolveCapture(catalog, 'android/camera').attemptStatus, 'planned');
