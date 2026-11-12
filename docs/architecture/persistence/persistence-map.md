@@ -2,7 +2,7 @@
 
 Every durable thing a Sovran build has written, by epoch, and what the 0.1.4 candidate
 (`5651d4720`) does with it on the first launch after an upgrade. Second artifact of the
-[persistence release safety](../../../.agents/skills/persistence-release-safety/SKILL.md)
+[persistence release safety](https://github.com/SovranBitcoin/Sovran/blob/main/.agents/skills/persistence-release-safety/SKILL.md)
 procedure.
 
 Built 2026-10-10 from `surface.sh` run on every store build's commit

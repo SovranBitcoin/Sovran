@@ -1,7 +1,7 @@
 # Sovran entropy audit
 
 > Historical assessment of the September 12 snapshot. The current Cashu implementation
-> follows [ADR 22](../../app/docs/adr/0022-cashu-uses-javascript-cryptography.md).
+> follows [ADR 22](https://github.com/SovranBitcoin/Sovran/blob/main/app/docs/adr/0022-cashu-uses-javascript-cryptography.md).
 
 **The primary wallet mnemonic and mnemonic-derived Nostr keys use a sound cryptographic entropy path. The broader claim that every entropy path in Sovran fails closed is false.** A reproducible storage-error sequence can replace an existing master mnemonic, and reachable iOS BitChat code ignores random-generator failures when creating a device seed and encryption nonces. Those findings warrant changes before treating the application as having completed its entropy and seed-lifecycle hardening.
 

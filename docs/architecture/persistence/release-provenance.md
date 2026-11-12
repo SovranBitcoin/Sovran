@@ -1,7 +1,7 @@
 # Release provenance
 
 Which builds of Sovran could be on a phone, and which commit each was built from. This is the
-first artifact of the [persistence release safety](../../../.agents/skills/persistence-release-safety/SKILL.md)
+first artifact of the [persistence release safety](https://github.com/SovranBitcoin/Sovran/blob/main/.agents/skills/persistence-release-safety/SKILL.md)
 procedure. Rebuild it with:
 
 ```sh
