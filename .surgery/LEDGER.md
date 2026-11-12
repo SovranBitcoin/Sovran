@@ -699,7 +699,7 @@ self-audited against their parents; another independent review was not repeated.
 
 ## Persistence coverage research (2026-11-12)
 
-**Proposal only, awaiting approval for implementation.** The owner asked whether every released Zustand format
+**Research completed; the approved initial implementation is recorded below.** The owner asked whether every released Zustand format
 could be exercised over broad values and forward upgrades without routine simulator runs. Research and the
 independent repository audit are in [persistence-fixture-patterns](research/persistence-fixture-patterns.md).
 
@@ -711,3 +711,64 @@ verification layer. No persisted data, product code or migration was changed and
 is claimed. EAS refresh succeeded (456 store builds; tracked TSV unchanged). Three existing focused gates passed:
 116 tests, one skipped. Research: GPT-6.1 Sol; independent repo audit: a separate GPT-6.1 Sol agent. Fable 5.2
 medium was attempted and failed due Claude's API rate limit. Behavior changed: none.
+
+
+## Declarative persistence fixture harness (2026-11-12)
+
+Implemented on `test/persistence-contracts` in the separate `sovran-persistence-contracts`
+worktree, based on the local `surgery/decisions-1` work. The default branch is `main`; the
+runner tests the checked-out candidate rather than switching branches.
+
+### What changed
+
+- Reused all twenty frozen historical disks and the actual three-launch startup runner.
+  Declarative JSON supplies additional preservation or explicit transformation cases; the
+  restore cases retain all original baseline account, identity, bytes and defaulting assertions.
+- Added explicit online release collection from Apple's structured history, confirmed pipeline
+  channels, GitHub releases/uploaded APKs and the existing EAS inventory. Public publication,
+  release-only and installable-build evidence remain distinct. Ambiguous epoch mappings are
+  retained; unmapped versions fail. GitHub tag commits are resolved, not inferred from a branch.
+- Added status, scaffold, filtered check and explicit refresh commands. Reports verify actual
+  executed case selection, carry candidate/source evidence and refuse hidden legacy selection
+  or fixture-writing environment settings. Reports are written fresh before promotion.
+- Bound compact declarations and field-evidence credit to the correct account. Published or
+  installable newest fixtures must be frozen too. No old fixture data or hashes were rewritten.
+- Added the workflow to the existing fixture/release guides. Broader field/variant obligations,
+  generated campaigns and interruption schedules remain [F247](../docs/follow-ups/F247.md).
+
+### Behaviour changed
+
+Product behaviour: none. Test/tooling behaviour now rejects misleading selection/report evidence,
+invalid account bindings, unfinished APK uploads and editable installable newest fixtures. Each
+verified defect was reproduced before repair. No stores, keys, databases, migrations, wire formats,
+dependencies or native controls changed.
+
+### Verification
+
+- The new complete check passed 1,146 tests across ten suites (two existing skips), with all
+  twenty-three selected epoch/case pairs confirmed in the actual Jest report.
+- `cd app && bun run test:upgrade` passed 1,325 tests across thirteen suites (two existing skips),
+  including the existing real Coco SQLite upgrade tests.
+- A disposable copy with a deliberately broken restore-status write failed three real startup/
+  saved-data checks (103 other checks passed). The working checkout's product code was untouched.
+- Root type-check passed every workspace and both app platforms; knip, formatting, copy lint,
+  follow-up validation and whitespace checks passed. Full app lint reported zero errors and
+  the existing 241 warnings. The full app suite passed all 808 suites: 9,809 tests and
+  271 snapshots (six existing skips). Wallet/Nostr and task-harness suites were not rerun
+  for these test/tooling-only changes.
+- Live release refresh completed. The EAS refresh retained the existing 456-row inventory;
+  deduplicated catalog observations distinguish 431 installable builds from public evidence.
+
+### Limits and models
+
+This is test infrastructure, not a release certification: the persistence verdict remains
+INCONCLUSIVE. Native backend/keychain/backup behavior, exhaustive field/value combinations,
+all intermediate upgrade paths and full Android public history are unproven. Unknown historical
+writer commits and ambiguous versions remain visible. Saved checks could not run because
+`jevlint` is unavailable. No funded/live scenarios or native simulator/device runs occurred.
+
+GPT-6.1 Sol implemented and verified this work. Separate Sol agents surveyed the existing
+fixtures and release sources and independently audited the diffs/tests. Final independent
+audits covered each of `0cf94477b`, `812d6745c` and `1e4728ad5` against its parent; they
+found no additional verified defect and ran focused tooling tests (15 and 24 passing tests). Claude Fable 5.2 was
+unavailable due the API rate limit; no cross-provider review is claimed. No push or PR.

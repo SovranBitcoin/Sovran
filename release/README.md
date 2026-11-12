@@ -18,6 +18,9 @@ run of releases that wrote the same things to disk. If this release changes noth
 add its version to the newest fixture's `versions`. If it adds, removes, renames or
 re-versions a store, a SecureStore key or a database, write a new fixture; the
 [fixtures guide](../app/__tests__/releaseFixtures/README.md) has the four steps.
+Use its declarative cases for meaningful saved values and `bun run persistence check` for
+case-level upgrade failures. Refresh the published-release evidence before preparing a release;
+review the catalog diff separately from the frozen historical disks.
 `releaseFixturesCompleteness.test.ts` fails, naming what is missing, until one of the two is
 done, and again when a store changes after the fixture was written. After the release is
 published, run `python3 .agents/skills/persistence-release-safety/epochs.py builds` and commit
