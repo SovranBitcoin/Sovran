@@ -839,3 +839,42 @@ are current, both native receipts match the completed runs, and all 216 library 
 Sixteen were refreshed; no unrefreshed record changed. Only public PNGs and whitelisted JSON
 were committed. No absolute local artifact paths or private-key encodings were found. Final
 GitHub checks remain the merge gate; no release-safety certification is inferred from them.
+
+## PR 305 follow-up CI contracts — 2026-11-12
+
+### What changed / Behaviour changed
+
+Product behavior: none. These repairs change test isolation, harness catalog validation
+and evidence documentation; no phone store, key, database, migration or wire format changed.
+
+- Replaced a deleted DLEQ boundary-test citation with the actual wallet callback and app
+  proof/Nut Drop seams. Indexed the three missing authored settings journeys and recorded
+  the completed iOS presentation runs without claiming Android, funded or relay proof.
+- Branding tests resolve the already-declared sharp dependency from the site workspace,
+  so isolated site CI and root-only installations both work without dependency changes.
+- Reconciled exact matrix pins with five authored additions: 167 scenarios, 290 pairs.
+  Four navigation journeys add eight supported pairs; physical BLE adds no simulator pair.
+  Runner/viewer equality, duplicates, fingerprints and supported-platform guards remain.
+- Updated the DM authoring assertion for its lock-choice sheet, preserving the 130-second
+  thread-decay hold and prohibiting retries of the send choice. Audited the profile-switch
+  checked-control contract with a component regression before allowing its Android 0/1 waits.
+- Lease tests now configure private subprocesses before importing the lease module, avoiding
+  cached environment configuration and shared machine lock interference. Production wait,
+  resource and disk safeguards are unchanged; owned subprocesses and directories are bounded.
+
+### Verified and not verified
+
+- Full offline native-harness suite: 901 tests across 72 files passed. This validates harness
+  contracts, not execution of all 167 scenarios on devices. JSON scenario validation passed.
+- Settings component suite: five tests passed, including switch role/label/checked state and
+  both toggle directions. Coverage ledger: five tests passed. Focused matrix/loader: 81 passed.
+- Branding tests: five passed independently in site-only and root-only dependency layouts.
+  The old app-anchored lookup failed in the isolated site layout before repair.
+- Cached-import-order refresh/lease suite: eight passed. Root type-check passed all workspaces
+  and both app platforms. Knip, copy, follow-up, changed-source formatting and whitespace passed.
+- GPT-6.1 Sol made the changes. Separate Sol reviewers inspected every pinned commit against
+  its parent through the audit-commit procedure and reran focused checks; no defect verified.
+  Claude/Fable remain unavailable from rate limiting, so cross-provider review is not claimed.
+- No additional native capture, funded operation, live publication, Android UI or persistence
+  certification was run for these tooling changes. Saved checks remain unavailable (jevlint
+  absent). The release-safety verdict remains INCONCLUSIVE. Existing follow-ups retain limits.
