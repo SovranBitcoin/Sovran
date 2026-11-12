@@ -15,7 +15,7 @@ const edit = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('set'), path, value: z.json() }),
   z.object({ kind: z.literal('remove'), path }),
 ]);
-export const caseSchema = z.object({
+const expandedCaseSchema = z.object({
   id: z
     .string()
     .regex(/^[a-z0-9][a-z0-9-]*$/)
@@ -55,12 +55,86 @@ export const caseSchema = z.object({
     )
     .default([]),
 });
+const preserveCaseSchema = expandedCaseSchema
+  .pick({ id: true, epoch: true, store: true, source: true })
+  .extend({
+    storageKey: z.string().min(1),
+    currentKey: z.string().min(1).optional(),
+    accountIndex: z.number().int().optional(),
+    preserve: z
+      .record(z.string().min(1), z.json())
+      .refine((values) => Object.keys(values).length > 0, 'Declare at least one field to preserve'),
+  })
+  .strict();
+export const caseSchema = z.union([expandedCaseSchema.strict(), preserveCaseSchema]);
 export type CaseDefinition = z.input<typeof caseSchema>;
+function expandDefinition(input: z.output<typeof caseSchema>, fixtures: readonly ReleaseFixture[]) {
+  if (!('preserve' in input)) return input;
+  const original = fixtures.find((fixture) => fixture.epoch === input.epoch);
+  if (!original) throw new Error(`Unknown epoch ${input.epoch}`);
+  if (input.storageKey.includes(':profile:') && input.accountIndex === undefined)
+    throw new Error('Profile cases require accountIndex');
+  const account =
+    input.accountIndex === undefined
+      ? undefined
+      : original.survives.accounts.find((item) => item.accountIndex === input.accountIndex);
+  if (input.accountIndex !== undefined && !account) throw new Error('Unknown fixture account');
+  const validKeys = account
+    ? [
+        `${input.store}:profile:${account.pubkey}`,
+        `${input.store}:profile:${account.accountIndex}`,
+        ...(account.accountIndex === 0 ? [input.store] : []),
+      ]
+    : [input.store];
+  for (const key of [input.storageKey, input.currentKey ?? input.storageKey]) {
+    if (!validKeys.includes(key))
+      throw new Error(`Storage key ${key} does not belong to the declared store/account`);
+  }
+  const held = original.survives.facts.filter(
+    (item) =>
+      item.store === input.store &&
+      item.accountIndex === input.accountIndex &&
+      item.path.length === 1 &&
+      Object.hasOwn(input.preserve, item.path[0])
+  );
+  return expandedCaseSchema.parse({
+    id: input.id,
+    epoch: input.epoch,
+    store: input.store,
+    source: input.source,
+    rows: [
+      {
+        storage: 'asyncStorage',
+        key: input.storageKey,
+        edits: Object.entries(input.preserve).map(([field, value]) => ({
+          kind: 'set',
+          path: ['state', field],
+          value,
+        })),
+      },
+    ],
+    replaces: held.map((item) => item.what),
+    facts: Object.entries(input.preserve).map(([field, value]) => ({
+      what:
+        held.find((item) => item.path[0] === field)?.what ?? `${input.store}.${field} is preserved`,
+      store: input.store,
+      accountIndex: input.accountIndex,
+      path: [field],
+      equals: value,
+    })),
+    diskFacts: Object.entries(input.preserve).map(([field, value]) => ({
+      storage: 'asyncStorage',
+      key: input.currentKey ?? input.storageKey,
+      path: ['state', field],
+      equals: value,
+    })),
+  });
+}
 export type UpgradeCase = {
   id: string;
   store: string;
   fixture: ReleaseFixture;
-  diskFacts: z.output<typeof caseSchema>['diskFacts'];
+  diskFacts: z.output<typeof expandedCaseSchema>['diskFacts'];
 };
 export function readPath(value: unknown, keys: readonly (string | number)[]): unknown {
   return keys.reduce<unknown>(
@@ -68,7 +142,10 @@ export function readPath(value: unknown, keys: readonly (string | number)[]): un
     value
   );
 }
-function patch(value: unknown, changes: z.output<typeof caseSchema>['rows'][number]['edits']) {
+function patch(
+  value: unknown,
+  changes: z.output<typeof expandedCaseSchema>['rows'][number]['edits']
+) {
   const cloned: unknown = structuredClone(value);
   for (const change of changes) {
     if (
@@ -91,7 +168,7 @@ export function compileCase(
   input: CaseDefinition,
   fixtures: readonly ReleaseFixture[] = RELEASE_FIXTURES
 ): UpgradeCase {
-  const definition = caseSchema.parse(input);
+  const definition = expandDefinition(caseSchema.parse(input), fixtures);
   const original = fixtures.find((fixture) => fixture.epoch === definition.epoch);
   if (!original) throw new Error(`Unknown epoch ${definition.epoch}`);
   const replaced = new Set(definition.replaces);
@@ -141,7 +218,10 @@ export function compileCase(
 }
 
 /** Declarations are data; parsing fails before any upgrade if an input is incomplete. */
-export const CASE_DEFINITIONS = z.array(caseSchema).parse(declarations);
+export const CASE_DEFINITIONS = z
+  .array(caseSchema)
+  .parse(declarations)
+  .map((declaration) => expandDefinition(declaration, RELEASE_FIXTURES));
 export function baselineCases(
   fixtures: readonly ReleaseFixture[] = RELEASE_FIXTURES
 ): UpgradeCase[] {
@@ -170,8 +250,14 @@ export function selectCases(
       (!filter.store ||
         item.store === filter.store ||
         (item.id === 'baseline' &&
-          item.fixture.survives.facts.some((f) => f.store === filter.store)))
+          (item.fixture.survives.facts.some((f) => f.store === filter.store) ||
+            Object.keys(item.fixture.asyncStorage).some(
+              (key) => key === filter.store || key.startsWith(`${filter.store}:profile:`)
+            ))))
   );
   if (!selected.length) throw new Error(`No persistence cases match ${JSON.stringify(filter)}`);
   return selected;
 }
+
+export const caseTitle = (item: UpgradeCase) =>
+  `${item.fixture.epoch}/${item.id} [${item.store}] (${item.fixture.versions.join(', ')}) → candidate`;

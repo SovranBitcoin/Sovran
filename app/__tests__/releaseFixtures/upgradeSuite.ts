@@ -4,12 +4,12 @@ import { join } from 'node:path';
 import { contents, install, launch, rejectionsOfLastLaunchSoFar } from './launch';
 import type { Launch } from './launch';
 import { NAMED_CHECKS, PHRASE } from './format';
-import { readPath, type UpgradeCase } from './cases';
+import { caseTitle, readPath, type UpgradeCase } from './cases';
 
 /** The same full-startup checks serve frozen baselines and declared variants. Cases run serially. */
 export function registerUpgradeCases(cases: readonly UpgradeCase[]) {
   for (const item of cases)
-    describe(`${item.fixture.epoch}/${item.id} [${item.store}] (${item.fixture.versions.join(', ')}) → candidate`, () => {
+    describe(caseTitle(item), () => {
       const { fixture } = item;
       const { survives } = fixture;
       const gap = (what: string) => fixture.knownGaps.find((known) => known.what === what);
