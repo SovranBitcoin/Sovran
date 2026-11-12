@@ -64,6 +64,9 @@ export const captureRecord = z.object({
   sessionSha256: digest,
   captureProfile: captureMetadata,
 });
+// Historical pages can leave the registry; their validated bytes remain archival evidence.
+const archivedCaptureRecord = captureRecord.extend({ page: z.string().regex(/^[a-z][a-z0-9-]*$/) });
+
 const attestation = z.object({
   sourceFingerprint: digest,
   appSourceBefore: stamp,
@@ -376,9 +379,9 @@ export async function importCaptureRun(runDir: string, options: CaptureImportOpt
       : { version: 1, captures: [] };
     if (previous.version !== 1 || !Array.isArray(previous.captures))
       throw new Error('Invalid library manifest');
-    const records = new Map<string, (typeof images)[number]['record']>();
+    const records = new Map<string, z.output<typeof archivedCaptureRecord>>();
     for (const raw of previous.captures) {
-      const record = captureRecord.parse(raw);
+      const record = archivedCaptureRecord.parse(raw);
       const expected = `${record.platform}/${record.page}${record.state === 'default' ? '' : `--${record.state}`}.png`;
       if (
         record.file !== expected ||
