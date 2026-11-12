@@ -356,7 +356,7 @@ contracts only. The full matrix now includes 153 scenarios and 264 platform pair
 | Contract                                                        | WV evidence                                                                                        | AJ evidence                                                                                                                                | JSON/native decision                                                                                                                                                                                                                   |
 | --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Decode, trust review, redeem, invalid/spent failure             | `wallet/__tests__/flows/receive-token.test.ts`; `wallet/__tests__/unit/default-operations.test.ts` | Receive screen/component tests                                                                                                             | `receive.cashu.paste` product-run proves the controlled trusted-mint Paste/redeem happy path, finalized transaction truth, balance conservation, and cleanup; trust-review plus invalid/spent rendered cases remain unproved on device |
-| Offline DLEQ all-proof verification                             | Wallet offline/token unit and integration tests                                                    | `app/__tests__/offlineReceiveDleq.test.ts`; `app/__tests__/sovranReceiveDleqBoundary.test.ts`; `app/__tests__/nutDropDleqBoundary.test.ts` | WV/AJ own the proof matrix; device owns one valid and one rejected rendered case later                                                                                                                                                 |
+| Offline DLEQ all-proof verification                             | `wallet/__tests__/unit/receive-operations.test.ts` (verifier callback ordering and refusal)        | `app/__tests__/offlineReceiveDleq.test.ts`; `app/__tests__/nutDropDleqBoundary.test.ts` | WV pins the injected verifier callback; AJ owns the DLEQ proof matrix and Nut Drop boundary. These are separate seams; device owns one valid and one rejected rendered case later                                                      |
 | Preview dismissal without redeeming                             | Parser/flow state remains WV-owned                                                                 | UI dismissal/history behavior                                                                                                              | `receive.cashu.dismiss` product-run proves a prepared controlled preview, explicit Cancel, zero balance/history mutation, recoverable unspent custody, exact cleanup, and final wallet zero                                            |
 | Source propagation for Paste/QR/gallery/deep-link/NFC/BLE/Nostr | `wallet/__tests__/unit/annotations.test.ts`; screen-action entry matching                          | App scan/deep-link/NFC adapters                                                                                                            | `tx.source.cashu-paste` product-run proves the first canonical source case from entry through immediate and reopened transaction detail; others remain explicit backlog rows                                                           |
 
@@ -496,16 +496,20 @@ are decoupled.
    and offline harness checks separately; it must not imply that one runner
    covered another layer or that fake execution proves product behavior.
 
-
 ## Store presentation capture
 
-`store.screenshots` owns the eight-screen store capture journey on iPhone and
-Android. It uses the existing demo wallet/contact/message data on an owned fresh
-device, with no counterparty effects or message sends. This is presentation
-coverage, not settlement proof. Fake-driver execution is orchestration evidence
-only. Native capture is currently unverified: the 2026-09-11 attempt found an
-outdated iOS binary, and rebuilding both platforms failed when the host ran out
-of disk space. See [the capture workflow and audit](testing-store-screenshots.md).
+`store.screenshots` owns the store presentation journey on iPhone and Android. It
+uses the existing demo wallet/contact/message data on an owned fresh device, with
+no counterparty effects or message sends. This is presentation coverage, not
+settlement proof. Fake-driver execution is orchestration evidence only.
+
+On 2026-11-12, the iOS store and marketing recipes completed native verification
+and cleanup on disposable iPhone 17 Pro Max/iOS 26.2 simulators. Their imported
+source/build attestations and image hashes are recorded in
+[the capture manifest](../../press/screenshots/manifest.json). Six website-selected
+images were visually inspected. Android native refresh, funded behavior and
+physical-device behavior were not verified by this run. The earlier blocked
+attempt remains documented in [the capture workflow and audit](testing-store-screenshots.md).
 
 ## New settings journeys (2026-09-11)
 
@@ -531,3 +535,23 @@ platforms; these results are not product proof.
 Both scenarios target iOS and Android. Their authoring and fake-driver checks
 cover harness orchestration only; native execution remains unverified on both
 platforms and is required to establish product behavior.
+
+## Relay-list review and cancellation
+
+`settings.relay-review-cancel` reads the latest list, edits a local draft, opens
+the comparison, cancels and leaves without tapping Publish. Both platform plans
+require a fresh disposable identity and the isolated `relay.controlled` fixture;
+that fixture remains unavailable, so this journey is authored and validated but
+not native-verified. Deterministic component tests separately cover publication
+races and saved proposals; they do not establish native reachability.
+
+## Developer-switch and identity-verification journeys
+
+- `settings.in-process-switch-toggle` checks that the developer-only switch starts
+  off, can be enabled and disabled, and leaves without performing a wallet operation.
+- `settings.nip05.verification` edits a draft with a reserved `.invalid` identity,
+  checks failed verification and disabled saving, retries, removes the identity and
+  leaves without publishing.
+
+Both require a fresh disposable profile and target iOS and Android. They are
+source-authored journeys; this entry does not claim native execution or product proof.
