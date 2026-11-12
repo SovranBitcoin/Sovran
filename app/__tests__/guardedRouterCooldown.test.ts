@@ -83,13 +83,13 @@ describe('guardedRouter cooldown', () => {
   });
 
   it('remembers only the last destination, so A, B, A inside the cooldown all go through', () => {
-    guardedRouter.push('/a');
+    guardedRouter.push('/camera');
     now += 10;
-    guardedRouter.push('/b');
+    guardedRouter.push('/composer');
     now += 10;
-    guardedRouter.push('/a');
+    guardedRouter.push('/camera');
 
-    expect(mockRouter.push.mock.calls).toEqual([['/a'], ['/b'], ['/a']]);
+    expect(mockRouter.push.mock.calls).toEqual([['/camera'], ['/composer'], ['/camera']]);
   });
 
   it('drops a second back inside the cooldown', () => {
@@ -127,8 +127,8 @@ describe('guardedRouter cooldown', () => {
 
   it('returns nothing for a dropped call and the router result for one that goes through', () => {
     mockRouter.push.mockReturnValueOnce('pushed');
-    expect(guardedRouter.push('/r')).toBe('pushed');
+    expect(guardedRouter.push('/camera')).toBe('pushed');
     now += 1;
-    expect(guardedRouter.push('/r')).toBeUndefined();
+    expect(guardedRouter.push('/camera')).toBeUndefined();
   });
 });
