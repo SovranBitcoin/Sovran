@@ -729,7 +729,12 @@ export async function ensureNativeBuild(
   return built;
 }
 
-export function parseNativeBuildArgs(args: readonly string[]) {
+export function parseNativeBuildArgs(args: readonly string[]): {
+  platform: Platform;
+  kind: BuildKind;
+  edition: string | undefined;
+  flag: '--force' | '--status' | undefined;
+} {
   const [platform, ...flags] = args;
   if (platform !== 'ios' && platform !== 'android') throw new Error('Choose ios or android');
   const kind: BuildKind = flags.includes('--bundled') ? 'bundled' : 'dev';
@@ -745,12 +750,11 @@ export function parseNativeBuildArgs(args: readonly string[]) {
       (editionAt === -1 || (index !== editionAt && index !== editionAt + 1))
   );
   if (remaining.length > 1) throw new Error('Choose one of --force or --status');
-  const [flag] = remaining;
-  if (edition !== undefined) {
-    if (platform !== 'ios' || kind !== 'bundled' || flag !== undefined)
-      throw new Error('--edition goes with `ios --bundled` and nothing else');
-  } else if (flag !== undefined && flag !== '--force' && flag !== '--status')
+  const flag = remaining.length ? remaining[0] : undefined;
+  if (flag !== undefined && flag !== '--force' && flag !== '--status')
     throw new Error('Choose --force or --status');
+  if (edition !== undefined && (platform !== 'ios' || kind !== 'bundled' || flag !== undefined))
+    throw new Error('--edition goes with `ios --bundled` and nothing else');
   return { platform, kind, edition, flag };
 }
 
