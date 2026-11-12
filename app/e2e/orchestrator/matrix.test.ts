@@ -5,12 +5,26 @@ import { buildChunkPlan, chunkArgv, pairKey } from './matrix';
 describe('buildChunkPlan (real authoring tree)', () => {
   const plan = buildChunkPlan({ platforms: ['ios', 'android'] });
 
-  test('matches the fresh-matrix invariant: 162 scenarios, 282 pairs', () => {
+  test('matches the fresh-matrix invariant: 167 scenarios, 290 pairs', () => {
     expect(plan.isOk()).toBe(true);
     const value = plan._unsafeUnwrap();
-    expect(value.scenarioCount).toBe(162);
-    expect(value.expectedPairKeys.length).toBe(282);
-    expect(new Set(value.expectedPairKeys).size).toBe(282);
+    expect(value.scenarioCount).toBe(167);
+    expect(value.expectedPairKeys.length).toBe(290);
+    expect(new Set(value.expectedPairKeys).size).toBe(290);
+  });
+
+  test('includes reviewed navigation additions without inventing physical BLE support', () => {
+    const value = plan._unsafeUnwrap();
+    for (const id of [
+      'settings.design-system.prompts',
+      'settings.relay-review-cancel',
+      'settings.in-process-switch-toggle',
+      'settings.nip05.verification',
+    ])
+      for (const platform of ['ios', 'android'] as const)
+        expect(value.expectedPairKeys).toContain(pairKey(id, platform));
+    for (const platform of ['ios', 'android'] as const)
+      expect(value.expectedPairKeys).not.toContain(pairKey('send.nearby.select', platform));
   });
 
   test('one chunk per session group per supported platform, iOS first', () => {
@@ -25,7 +39,7 @@ describe('buildChunkPlan (real authoring tree)', () => {
     );
     // Chunks jointly prove exactly the full matrix.
     const proved = new Set(value.chunks.flatMap((chunk) => chunk.expectedPairKeys));
-    expect(proved.size).toBe(282);
+    expect(proved.size).toBe(290);
   });
 
   test('multi-member groups keep the last member as --scenario target', () => {

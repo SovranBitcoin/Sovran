@@ -29,7 +29,7 @@ describe('loadE2E over the real tree', () => {
   });
 
   it('requires every canonical scenario to author a non-empty verify section', () => {
-    expect(loaded.scenarios.size).toBe(162);
+    expect(loaded.scenarios.size).toBe(167);
     for (const scenario of loaded.scenarios.values()) {
       expect(scenario.verify.length).toBeGreaterThan(0);
     }
@@ -1061,10 +1061,36 @@ describe('loadE2E over the real tree', () => {
   it('promotes contact Cashu DM only with the two-minute thread-decay regression hold', () => {
     const scenario = loaded.scenarios.get('send.cashu.dm-contact')!;
     expect(scenario.deferredReason).toBeUndefined();
-    expect(scenario.steps).toContainEqual({
+    const openLockChoice = {
+      action: 'tapUntil',
+      sequence: [{ tap: { id: 'amount-next-menu-ecash' } }],
+      until: { id: 'send-lock-off' },
+      attempts: 4,
+      settleMs: 6000,
+    } satisfies (typeof scenario.steps)[number];
+    expect(scenario.steps).toContainEqual(openLockChoice);
+    const opening = scenario.steps.findIndex(
+      (step) => JSON.stringify(step) === JSON.stringify(openLockChoice)
+    );
+    expect(scenario.steps[opening + 1]).toEqual({
       action: 'tap',
-      selector: { id: 'amount-next-menu-ecash' },
+      selector: { id: 'send-lock-off' },
     });
+    expect(
+      scenario.steps.filter(
+        (step) =>
+          step.action === 'tap' && 'id' in step.selector && step.selector.id === 'send-lock-off'
+      )
+    ).toHaveLength(1);
+    expect(
+      scenario.steps.some(
+        (step) =>
+          step.action === 'tapUntil' &&
+          step.sequence.some(
+            (part) => 'tap' in part && 'id' in part.tap && part.tap.id === 'send-lock-off'
+          )
+      )
+    ).toBe(false);
     expect(scenario.steps).not.toContainEqual({ action: 'tapAt', x: 0.5, y: 0.845 });
     expect(scenario.steps).not.toContainEqual({
       action: 'tapUntil',
@@ -1385,6 +1411,7 @@ describe('loadE2E over the real tree', () => {
       'notification-policy-relaxed',
       'notification-policy-strict',
       'profile-reveal-mnemonic',
+      'settings-in-process-profile-switch-toggle',
       'settings-mock-fail-melt-toggle',
       'settings-mock-fail-send-toggle',
       'settings-mock-offline-toggle',
